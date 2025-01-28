@@ -48,3 +48,8 @@ Thumbs.db
 *.mov
 *.wmv
 
+
+# tests
+coverage.xml
+junit_result.xml
+.coverage

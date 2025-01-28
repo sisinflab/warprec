@@ -1,0 +1,52 @@
+image: python:3.11
+
+definitions:
+  caches:
+    # Define the cache for the Poetry CLI. Poetry defaults to be installed at /opt/poetry so we
+    # cache that directory.
+    poetry-cli-cache:
+      key:
+        files:
+          - bitbucket-pipelines.yml
+      path: /opt/poetry
+    # Define the cache for the virtual environment.
+    poetry-venv-cache:
+      key:
+        files:
+          - poetry.lock
+      path: .venv
+
+pipelines:
+  pull-requests:
+    "**":
+      - step:
+          name: Setup poetry
+          caches:
+            - poetry-cli-cache
+            - poetry-venv-cache
+          script:
+            - pipe: atlassian/poetry-cli-setup:0.2.4
+            - POETRY_VERSION=1.8.4 ./setup-poetry.sh
+            - make install
+      - parallel:
+        - step:
+            name: Lint
+            caches:
+              - poetry-cli-cache
+              - poetry-venv-cache
+            script:
+              - pipe: atlassian/poetry-cli-setup:0.2.4
+              - POETRY_VERSION=1.8.4 ./setup-poetry.sh
+              - make install
+              - make lint
+
+        # - step:
+        #     name: Tests
+        #     caches:
+        #       - poetry-cli-cache
+        #       - poetry-venv-cache
+        #     script:
+        #       - pipe: atlassian/poetry-cli-setup:0.2.4
+        #       - POETRY_VERSION=1.8.4 ./setup-poetry.sh
+        #       - make install
+        #       - make test
