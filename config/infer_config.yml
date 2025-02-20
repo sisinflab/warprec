@@ -1,0 +1,38 @@
+data:
+  dataset_name: MovieLens
+  loading_strategy: dataset
+  data_type: transaction
+  local_path: tests/test_dataset/movielens.csv
+  experiment_path: experiment/test/
+  sep: ','
+  rating_type: explicit
+  batch_size: 1024
+  labels:
+    user_id_lable: user_id
+    item_id_label: item_id
+    rating_label: rating
+    timestamp_label: timestamp
+  dtypes:
+    user_id_type: int64
+splitter:
+  strategy: temporal
+  validation: True
+  ratio: [0.8, 0.1, 0.1]
+models:
+  EASE:
+    meta:
+      load_from: experiment/test/MovieLens/1740059565301/
+evaluation:
+  top_k: [10, 20, 50]
+  metrics: [NDCG, Precision, Recall, HitRate]
+general:
+  seed: 42
+  float_digits: 8
+  device: cpu
+  validation_metric: NDCG@10
+  precision: float64
+  max_evals: 10
+  recommendation:
+    save_recs: True
+    sep: \t
+    ext: .tsv

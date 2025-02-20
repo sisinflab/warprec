@@ -1,0 +1,26 @@
+data:
+  dataset_name: MovieLens
+  loading_strategy: split
+  data_type: transaction
+  split_dir: experiment/test/MovieLens/1739898518265/
+  sep: '\t'
+  experiment_path: experiment/test/
+  rating_type: explicit
+models:
+  EASE:
+    l2: [0.0, 200.0]
+    implementation: ['elliot']
+splitter:
+  strategy: temporal
+  validation: True
+  ratio: [0.8, 0.1, 0.1]
+evaluation:
+  top_k: [10, 20, 50]
+  metrics: [NDCG, Precision, Recall, HitRate]
+general:
+  seed: 42
+  float_digits: 8
+  device: cpu
+  validation_metric: NDCG@10
+  precision: float32
+  max_evals: 10

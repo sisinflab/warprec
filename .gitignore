@@ -53,3 +53,5 @@ Thumbs.db
 coverage.xml
 junit_result.xml
 .coverage
+experiment/
+tests/
