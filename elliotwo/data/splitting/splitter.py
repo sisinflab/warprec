@@ -203,6 +203,8 @@ class Splitter:
             Tuple[List[int], List[int]]:
                 List[int]: List of indexes of the first partition.
                 List[int]: List of indexes of the second partition.
+
+        TODO: This method does not ensures that every user is in the training set.
         """
         np.random.seed(self._random_seed)
 
