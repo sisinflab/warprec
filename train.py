@@ -1,4 +1,6 @@
 import importlib
+import argparse
+from argparse import Namespace
 
 import elliotwo
 from elliotwo.utils.config import load_yaml
@@ -7,7 +9,7 @@ from elliotwo.recommenders.trainer import Trainer
 from elliotwo.evaluation.evaluator import Evaluator
 
 
-def main():
+def main(args: Namespace):
     """Main function to start the experiment.
 
     This method will start the train pipeline.
@@ -15,8 +17,7 @@ def main():
     logger.msg("Starting experiment.")
 
     # Config parser testing
-    config_path = "config/train_config.yml"
-    config = load_yaml(config_path)
+    config = load_yaml(args.config)
 
     # Writer module testing
     writer = elliotwo.data.LocalWriter(config)
@@ -86,4 +87,14 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "-c",
+        "--config",
+        type=str,
+        action="store",
+        required=True,
+        help="Config file local path",
+    )
+    args = parser.parse_args()
+    main(args)

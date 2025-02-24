@@ -83,7 +83,7 @@ class Interactions:
         """This method will return the transaction information in dict format.
 
         Returns:
-            dict: The transaction information in the current \
+            dict: The transaction information in the current
                 representation {user ID: {item ID: rating}}.
         """
         return self._inter_dict

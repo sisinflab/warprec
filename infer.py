@@ -1,4 +1,6 @@
 import importlib
+import argparse
+from argparse import Namespace
 from os.path import join
 
 import elliotwo
@@ -7,7 +9,7 @@ from elliotwo.utils.logger import logger
 from elliotwo.evaluation.evaluator import Evaluator
 
 
-def main():
+def main(args: Namespace):
     """Main function to start the experiment.
 
     This method will start the inference pipeline.
@@ -15,8 +17,7 @@ def main():
     logger.msg("Starting inference.")
 
     # Config parser testing
-    config_path = "config/infer_config.yml"
-    config = load_yaml(config_path)
+    config = load_yaml(args.config)
 
     # Reader module testing
     reader = elliotwo.data.LocalReader(config)
@@ -64,4 +65,14 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "-c",
+        "--config",
+        type=str,
+        action="store",
+        required=True,
+        help="Config file local path",
+    )
+    args = parser.parse_args()
+    main(args)

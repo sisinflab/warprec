@@ -30,6 +30,7 @@ pydoclint = "^0.6.0"
 mypy = "^1.14.1"
 pylint = "^3.3.3"
 bandit = "^1.8.2"
+nvitop = "^1.4.2"
 
 
 [build-system]

@@ -1673,6 +1673,18 @@ files = [
 ]
 
 [[package]]
+name = "nvidia-ml-py"
+version = "12.570.86"
+description = "Python Bindings for the NVIDIA Management Library"
+optional = false
+python-versions = "*"
+groups = ["dev"]
+files = [
+    {file = "nvidia_ml_py-12.570.86-py3-none-any.whl", hash = "sha256:58907de35a845abd13dcb227f18298f3b5dd94a72d04c9e594e77711e95c0b51"},
+    {file = "nvidia_ml_py-12.570.86.tar.gz", hash = "sha256:0508d4a0c7b6d015cf574530b95a62ed4fc89da3b8b47e1aefe6777db170ec8b"},
+]
+
+[[package]]
 name = "nvidia-nccl-cu12"
 version = "2.21.5"
 description = "NVIDIA Collective Communication Library (NCCL) Runtime"
@@ -1711,6 +1723,49 @@ files = [
     {file = "nvidia_nvtx_cu12-12.4.127-py3-none-manylinux2014_x86_64.whl", hash = "sha256:781e950d9b9f60d8241ccea575b32f5105a5baf4c2351cab5256a24869f12a1a"},
     {file = "nvidia_nvtx_cu12-12.4.127-py3-none-win_amd64.whl", hash = "sha256:641dccaaa1139f3ffb0d3164b4b84f9d253397e38246a4f2f36728b48566d485"},
 ]
+
+[[package]]
+name = "nvitop"
+version = "1.4.2"
+description = "An interactive NVIDIA-GPU process viewer and beyond, the one-stop solution for GPU process management."
+optional = false
+python-versions = ">=3.7"
+groups = ["dev"]
+files = [
+    {file = "nvitop-1.4.2-py3-none-any.whl", hash = "sha256:cbb78b935dd843ce18eca6fb9d3d0199da168a15a0019a8f2308afcd3dff1af4"},
+    {file = "nvitop-1.4.2.tar.gz", hash = "sha256:13c039aa099374fb1a29eb9412849a9d984a162e2ad7d3a1ed2a7f5723914d71"},
+]
+
+[package.dependencies]
+colorama = {version = ">=0.4.0", markers = "platform_system == \"Windows\""}
+nvidia-ml-py = ">=11.450.51,<12.571.0a0"
+psutil = ">=5.6.6"
+windows-curses = {version = ">=2.2.0", markers = "platform_system == \"Windows\""}
+
+[package.extras]
+cuda10 = ["nvidia-ml-py (==11.450.51)"]
+lint = ["black (>=24.0.0,<25.0.0a0)", "mypy", "pre-commit", "pylint[spelling]", "typing-extensions"]
+pynvml-11-450-129 = ["nvidia-ml-py (==11.450.129)"]
+pynvml-11-450-51 = ["nvidia-ml-py (==11.450.51)"]
+pynvml-11-460-79 = ["nvidia-ml-py (==11.460.79)"]
+pynvml-11-470-66 = ["nvidia-ml-py (==11.470.66)"]
+pynvml-11-495-46 = ["nvidia-ml-py (==11.495.46)"]
+pynvml-11-510-69 = ["nvidia-ml-py (==11.510.69)"]
+pynvml-11-515-48 = ["nvidia-ml-py (==11.515.48)"]
+pynvml-11-515-75 = ["nvidia-ml-py (==11.515.75)"]
+pynvml-11-525-112 = ["nvidia-ml-py (==11.525.112)"]
+pynvml-11-525-131 = ["nvidia-ml-py (==11.525.131)"]
+pynvml-11-525-150 = ["nvidia-ml-py (==11.525.150)"]
+pynvml-11-525-84 = ["nvidia-ml-py (==11.525.84)"]
+pynvml-12-535-108 = ["nvidia-ml-py (==12.535.108)"]
+pynvml-12-535-133 = ["nvidia-ml-py (==12.535.133)"]
+pynvml-12-535-161 = ["nvidia-ml-py (==12.535.161)"]
+pynvml-12-535-77 = ["nvidia-ml-py (==12.535.77)"]
+pynvml-12-550-52 = ["nvidia-ml-py (==12.550.52)"]
+pynvml-12-550-89 = ["nvidia-ml-py (==12.550.89)"]
+pynvml-12-555-43 = ["nvidia-ml-py (==12.555.43)"]
+pynvml-12-560-30 = ["nvidia-ml-py (==12.560.30)"]
+pynvml-12-570-86 = ["nvidia-ml-py (==12.570.86)"]
 
 [[package]]
 name = "opencensus"
@@ -2045,6 +2100,30 @@ files = [
     {file = "protobuf-5.29.3-py3-none-any.whl", hash = "sha256:0a18ed4a24198528f2333802eb075e59dea9d679ab7a6c5efb017a59004d849f"},
     {file = "protobuf-5.29.3.tar.gz", hash = "sha256:5da0f41edaf117bde316404bad1a486cb4ededf8e4a54891296f648e8e076620"},
 ]
+
+[[package]]
+name = "psutil"
+version = "7.0.0"
+description = "Cross-platform lib for process and system monitoring in Python.  NOTE: the syntax of this script MUST be kept compatible with Python 2.7."
+optional = false
+python-versions = ">=3.6"
+groups = ["dev"]
+files = [
+    {file = "psutil-7.0.0-cp36-abi3-macosx_10_9_x86_64.whl", hash = "sha256:101d71dc322e3cffd7cea0650b09b3d08b8e7c4109dd6809fe452dfd00e58b25"},
+    {file = "psutil-7.0.0-cp36-abi3-macosx_11_0_arm64.whl", hash = "sha256:39db632f6bb862eeccf56660871433e111b6ea58f2caea825571951d4b6aa3da"},
+    {file = "psutil-7.0.0-cp36-abi3-manylinux_2_12_i686.manylinux2010_i686.manylinux_2_17_i686.manylinux2014_i686.whl", hash = "sha256:1fcee592b4c6f146991ca55919ea3d1f8926497a713ed7faaf8225e174581e91"},
+    {file = "psutil-7.0.0-cp36-abi3-manylinux_2_12_x86_64.manylinux2010_x86_64.manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:4b1388a4f6875d7e2aff5c4ca1cc16c545ed41dd8bb596cefea80111db353a34"},
+    {file = "psutil-7.0.0-cp36-abi3-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:a5f098451abc2828f7dc6b58d44b532b22f2088f4999a937557b603ce72b1993"},
+    {file = "psutil-7.0.0-cp36-cp36m-win32.whl", hash = "sha256:84df4eb63e16849689f76b1ffcb36db7b8de703d1bc1fe41773db487621b6c17"},
+    {file = "psutil-7.0.0-cp36-cp36m-win_amd64.whl", hash = "sha256:1e744154a6580bc968a0195fd25e80432d3afec619daf145b9e5ba16cc1d688e"},
+    {file = "psutil-7.0.0-cp37-abi3-win32.whl", hash = "sha256:ba3fcef7523064a6c9da440fc4d6bd07da93ac726b5733c29027d7dc95b39d99"},
+    {file = "psutil-7.0.0-cp37-abi3-win_amd64.whl", hash = "sha256:4cf3d4eb1aa9b348dec30105c55cd9b7d4629285735a102beb4441e38db90553"},
+    {file = "psutil-7.0.0.tar.gz", hash = "sha256:7be9c3eba38beccb6495ea33afd982a44074b78f28c434a1f51cc07fd315c456"},
+]
+
+[package.extras]
+dev = ["abi3audit", "black (==24.10.0)", "check-manifest", "coverage", "packaging", "pylint", "pyperf", "pypinfo", "pytest", "pytest-cov", "pytest-xdist", "requests", "rstcheck", "ruff", "setuptools", "sphinx", "sphinx_rtd_theme", "toml-sort", "twine", "virtualenv", "vulture", "wheel"]
+test = ["pytest", "pytest-xdist", "setuptools"]
 
 [[package]]
 name = "py-spy"
@@ -3563,6 +3642,33 @@ files = [
 dev = ["black (>=19.3b0) ; python_version >= \"3.6\"", "pytest (>=4.6.2)"]
 
 [[package]]
+name = "windows-curses"
+version = "2.4.1"
+description = "Support for the standard curses module on Windows"
+optional = false
+python-versions = "*"
+groups = ["dev"]
+markers = "platform_system == \"Windows\""
+files = [
+    {file = "windows_curses-2.4.1-cp310-cp310-win32.whl", hash = "sha256:53d711e07194d0d3ff7ceff29e0955b35479bc01465d46c3041de67b8141db2f"},
+    {file = "windows_curses-2.4.1-cp310-cp310-win_amd64.whl", hash = "sha256:325439cd4f37897a1de8a9c068a5b4c432f9244bf9c855ee2fbeb3fa721a770c"},
+    {file = "windows_curses-2.4.1-cp311-cp311-win32.whl", hash = "sha256:4fa1a176bfcf098d0c9bb7bc03dce6e83a4257fc0c66ad721f5745ebf0c00746"},
+    {file = "windows_curses-2.4.1-cp311-cp311-win_amd64.whl", hash = "sha256:fd7d7a9cf6c1758f46ed76b8c67f608bc5fcd5f0ca91f1580fd2d84cf41c7f4f"},
+    {file = "windows_curses-2.4.1-cp312-cp312-win32.whl", hash = "sha256:bdbe7d58747408aef8a9128b2654acf6fbd11c821b91224b9a046faba8c6b6ca"},
+    {file = "windows_curses-2.4.1-cp312-cp312-win_amd64.whl", hash = "sha256:5c9c2635faf171a229caca80e1dd760ab00db078e2a285ba2f667bbfcc31777c"},
+    {file = "windows_curses-2.4.1-cp313-cp313-win32.whl", hash = "sha256:05d1ca01e5199a435ccb6c8c2978df4a169cdff1ec99ab15f11ded9de8e5be26"},
+    {file = "windows_curses-2.4.1-cp313-cp313-win_amd64.whl", hash = "sha256:8cf653f8928af19c103ae11cfed38124f418dcdd92643c4cd17239c0cec2f9da"},
+    {file = "windows_curses-2.4.1-cp36-cp36m-win32.whl", hash = "sha256:6a5a831cabaadde41a6856fea5a0c68c74b7d11d332a816e5a5e6c84577aef3a"},
+    {file = "windows_curses-2.4.1-cp36-cp36m-win_amd64.whl", hash = "sha256:e61be805edc390ccfdeaf0e0c39736d931d3c4a007d6bf0f98d1e792ce437796"},
+    {file = "windows_curses-2.4.1-cp37-cp37m-win32.whl", hash = "sha256:a36b8fd4e410ddfb1a8eb65af2116c588e9f99b2ff3404412317440106755485"},
+    {file = "windows_curses-2.4.1-cp37-cp37m-win_amd64.whl", hash = "sha256:db776df70c10bd523c4a1ab0a7624a1d58c7d47f83ec49c6988f05bc1189e7b8"},
+    {file = "windows_curses-2.4.1-cp38-cp38-win32.whl", hash = "sha256:e9ce84559f80de7ec770d28c3b2991e0da51748def04e25a3c08ada727cfac2d"},
+    {file = "windows_curses-2.4.1-cp38-cp38-win_amd64.whl", hash = "sha256:618e31458fedba2cf8105485ff00533ece780026c544142fc1647a20dc6c7641"},
+    {file = "windows_curses-2.4.1-cp39-cp39-win32.whl", hash = "sha256:775a2e0fefeddfdb0e00b3fa6c4f21caf9982db34df30e4e62c49caaef7b5e56"},
+    {file = "windows_curses-2.4.1-cp39-cp39-win_amd64.whl", hash = "sha256:4588213f7ef3b0c24c5cb9e309653d7a84c1792c707561e8b471d466ca79f2b8"},
+]
+
+[[package]]
 name = "wrapt"
 version = "1.17.2"
 description = "Module for decorators, wrappers and monkey patching."
@@ -3751,4 +3857,4 @@ propcache = ">=0.2.0"
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.12 <3.13"
-content-hash = "692ea9a9c35ea3ff6cab0db9fff575b593c00a07121592f4640c739d08290191"
+content-hash = "b50967698ad20c7537c549c27be47ee3afed8532bb110da550c1356423b9a48e"
