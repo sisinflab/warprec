@@ -15,6 +15,8 @@ class Splitter:
 
     Args:
         config (Configuration): Configuration file.
+
+    TODO: Implement Strategy Pattern.
     """
 
     def __init__(self, config: Configuration):

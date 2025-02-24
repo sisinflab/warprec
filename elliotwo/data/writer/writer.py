@@ -19,6 +19,8 @@ class AbstractWriter(ABC):
 
     Args:
         config (Configuration): The configuration of the experiment.
+
+    TODO: Use Factory Pattern for different writer.
     """
 
     def __init__(self, config: Configuration):
@@ -60,6 +62,8 @@ class LocalWriter(AbstractWriter):
 
     Args:
         config (Configuration): The configuration of the experiment.
+
+    TODO: Using context manager
     """
 
     def __init__(self, config: Configuration):

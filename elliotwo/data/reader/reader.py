@@ -16,6 +16,8 @@ class AbstractReader(ABC):
 
     Args:
         config (Configuration): Configuration file.
+
+    TODO: Use Factory Pattern for different reader.
     """
 
     def __init__(self, config: Configuration) -> None:
