@@ -55,8 +55,8 @@ class AbstractWriter(ABC):
 
 
 class LocalWriter(AbstractWriter):
-    """LocalWriter is the class to be used when the results of \
-        the experiment want to be saved locally.
+    """LocalWriter is the class to be used when the results of
+    the experiment want to be saved locally.
 
     Args:
         config (Configuration): The configuration of the experiment.
@@ -80,6 +80,9 @@ class LocalWriter(AbstractWriter):
             join(self._experiment_path, "serialized")
         )
         self._experiment_split_dir = Path(join(self._experiment_path, "split"))
+
+        if self._config.general.setup_experiment:
+            self.setup_experiment()
 
     def setup_experiment(self):
         """This is the main function to be executed, it sets up all \

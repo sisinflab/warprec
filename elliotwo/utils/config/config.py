@@ -351,10 +351,12 @@ class EvaluationConfig(BaseModel):
     Attributes:
         top_k (List[int]): List of cutoffs to evaluate.
         metrics (List[str]): List of metrics to compute during evaluation.
+        save_evaluation (Optional[bool]): Wether or not to save the evaluation.
     """
 
     top_k: List[int]
     metrics: List[str]
+    save_evaluation: Optional[bool] = True
 
     @field_validator("metrics")
     @classmethod
@@ -413,12 +415,13 @@ class GeneralConfig(BaseModel):
         seed (Optional[int]): The seed that will be used during the experiment for reproducibility.
         float_digits (Optional[int]): The number of floating point digits to show on console.
         device (Optional[str]): The device that will be used for most operations.
-        validation_metric (Optional[str]): The validation metric to use, \
+        validation_metric (Optional[str]): The validation metric to use,
             in the format of metric_name@top_k.
         precision (Optional[str]): The precision to use during computation.
         max_evals (Optional[int]): The maximum number of evaluations to compute with hyperopt.
-        recommendation (Optional[GeneralRecommendation]): The general informations \
+        recommendation (Optional[GeneralRecommendation]): The general informations
             about the recommendation.
+        setup_experiment (Optional[bool]): Wether or not to setup the experiment ambient.
     """
 
     seed: Optional[int] = 42
@@ -430,6 +433,7 @@ class GeneralConfig(BaseModel):
     recommendation: Optional[GeneralRecommendation] = Field(
         default_factory=GeneralRecommendation
     )
+    setup_experiment: Optional[bool] = True
 
     @field_validator("device")
     @classmethod
@@ -472,6 +476,20 @@ class GeneralConfig(BaseModel):
                 "Validation metric should be provided with a top_k number."
             )
         return v
+
+    @model_validator(mode="after")
+    def model_validation(self):
+        """This method validates the General configuration.
+
+        Raise:
+            ValueError: If some values are inconsistent in the configuration file.
+        """
+        if self.recommendation.save_recs and not self.setup_experiment:  # pylint: disable=no-member
+            raise ValueError(
+                "You are trying to save the recommendations without "
+                "setting up the directoy. Set setup_experiment to True."
+            )
+        return self
 
 
 class Configuration(BaseModel):
@@ -560,6 +578,7 @@ class Configuration(BaseModel):
         When the configuration passes this check, everything should be good to go.
 
         Raise:
+            FileNotFoundError: If the local file has not been found.
             ValueError: If any information between parts of the configuration file is inconsistent.
         """
         _local_path = self.data.local_path
@@ -596,6 +615,25 @@ class Configuration(BaseModel):
                 raise ValueError(
                     "Column labels required do not match with the \
                         column names found in the local file."
+                )
+
+        # Check if experiment has been set up correctly
+        if not self.general.setup_experiment:
+            for model_name, model_data in self.models.items():
+                if model_data["meta"]["save_model"]:
+                    raise ValueError(
+                        f"You are trying to save the model state for {model_name} model but "
+                        "experiment must be setup first. Set setup_experiment to True."
+                    )
+            if self.splitter.save_split:
+                raise ValueError(
+                    "You are trying to save the splits but experiment must be "
+                    "setup first. Set setup_experiment to True."
+                )
+            if self.evaluation.save_valuation:
+                raise ValueError(
+                    "You are trying to save the evaluation but experiment must be "
+                    "setup first. Set setup_experiment to True."
                 )
 
         # Final checks and parsing

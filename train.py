@@ -21,7 +21,6 @@ def main(args: Namespace):
 
     # Writer module testing
     writer = elliotwo.data.LocalWriter(config)
-    writer.setup_experiment()
 
     # Reader module testing
     reader = elliotwo.data.LocalReader(config)
