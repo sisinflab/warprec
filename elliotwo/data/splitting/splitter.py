@@ -1,4 +1,3 @@
-import random
 from typing import Tuple, List
 
 import numpy as np
@@ -189,35 +188,41 @@ class Splitter:
     def _ratio_split(
         self, data: DataFrame, test_size: float = 0.2
     ) -> Tuple[List[int], List[int]]:
-        """Method used to split a set of data into two partition,\
-              respecting the rateo given as input.
+        """Method used to split a set of data into two partition,
+            respecting the rateo given as input.
 
-        The method used to split data is random. If a seed was set,\
-              then the split will be reproducible.
+        The method used to split data is random. If a seed was set,
+            then the split will be reproducible.
 
         Args:
             data (DataFrame): The original data in DataFrame format.
-            test_size (float): This value represent the percentage of\
-                  data that will be taken out.
+            test_size (float): This value represent the percentage of
+                data that will be taken out.
 
         Returns:
             Tuple[List[int], List[int]]:
                 List[int]: List of indexes of the first partition.
                 List[int]: List of indexes of the second partition.
         """
-        # Set random seed for reproducibility
-        random.seed(self._random_seed)
+        np.random.seed(self._random_seed)
 
-        # Compute number of test samples
-        n_test = int(len(data) * test_size)
+        user_groups = data.groupby(
+            "user_id"
+        ).indices  # Dictionary {user_id: np.array(indices)}
 
-        # Generate shuffled indices
-        indices = list(range(len(data)))
-        random.shuffle(indices)
+        train_indices = []
+        test_indices = []
 
-        # Split indices
-        test_indices = indices[:n_test]
-        train_indices = indices[n_test:]
+        for user, indices in user_groups.items():
+            if len(indices) == 1:
+                # If a user has only one interaction, force it into train
+                train_indices.append(indices[0])
+            else:
+                # Shuffle indices and split
+                np.random.shuffle(indices)
+                split_idx = int(len(indices) * (1 - test_size))
+                train_indices.extend(indices[:split_idx])
+                test_indices.extend(indices[split_idx:])
 
         return train_indices, test_indices
 
