@@ -6,6 +6,7 @@ from torch import Tensor
 from elliotwo.utils.config import Configuration
 from elliotwo.data.dataset import Interactions
 from elliotwo.recommenders.abstract_recommender import AbstractRecommender
+from elliotwo.utils.registry import metric_registry
 
 
 class AbstractMetric(ABC):
@@ -172,6 +173,7 @@ class DiscountedMetric(TopKMetric):
         )
 
 
+@metric_registry.register("nDCG")
 class NDCG(DiscountedMetric):
     """Implementation of nDCG@k metric.
 
@@ -227,6 +229,7 @@ class NDCG(DiscountedMetric):
         return ndcg.mean().item()
 
 
+@metric_registry.register("HitRate")
 class HitRate(BinaryMetric):
     """Implementation of the HitRate@k metric.
 
@@ -253,6 +256,7 @@ class HitRate(BinaryMetric):
         return (ranked_relevances.sum(dim=1) > 0).float().mean().item()
 
 
+@metric_registry.register("Precision")
 class Precision(BinaryMetric):
     """Implementation of the Precision metric. More information can \
         be found here: https://en.wikipedia.org/wiki/Precision_and_recall.
@@ -279,6 +283,7 @@ class Precision(BinaryMetric):
         return ranked_relevances.mean().item()
 
 
+@metric_registry.register("Recall")
 class Recall(BinaryMetric):
     """Implementation of the Recall metric. More information can \
         be found here: https://en.wikipedia.org/wiki/Precision_and_recall.

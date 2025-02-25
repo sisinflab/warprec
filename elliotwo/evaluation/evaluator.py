@@ -1,9 +1,10 @@
-import importlib
 from tabulate import tabulate
 from elliotwo.data.dataset import AbstractDataset
 from elliotwo.utils.config import Configuration
+from elliotwo.evaluation.metrics import AbstractMetric
 from elliotwo.recommenders.abstract_recommender import AbstractRecommender
 from elliotwo.utils.logger import logger
+from elliotwo.utils.registry import metric_registry
 
 
 class Evaluator:
@@ -36,11 +37,11 @@ class Evaluator:
             model (AbstractRecommender): The model already trained to be evaluated.
 
         Returns:
-            dict: The results in dict format using this \
+            dict: The results in dict format using this
                 criteria {'Test' or 'Validation': dict{metric_name@top_k: value}}
         """
         logger.separator()
-        logger.msg(f"Starting evaluation for model {model.__class__.__name__}")
+        logger.msg(f"Starting evaluation for model {model.name}")
 
         for metric_name in self._metrics:
             for k in self._top_k:
@@ -55,7 +56,7 @@ class Evaluator:
                 self._result_dict["Test"][f"{metric_name}@{k}"] = result["test"]
 
         self._print_console()
-        logger.positive(f"Evaluation completed for model {model.__class__.__name__}")
+        logger.positive(f"Evaluation completed for model {model.name}")
 
         return self._result_dict
 
@@ -77,14 +78,12 @@ class Evaluator:
             top_k (int): Cutoff to be used during evaluation.
 
         Returns:
-            dict: The results of the validation in dict \
+            dict: The results of the validation in dict
                 format using this criteria {'test' or 'val': value}
         """
-        evaluation_module = importlib.import_module("elliotwo.evaluation.metrics")
-        metric_class = getattr(evaluation_module, metric_name)
 
         results = {}
-        metric = metric_class(config)
+        metric: AbstractMetric = metric_registry.get(metric_name, config)
         if config.splitter.validation:
             results["val"] = metric.eval(model, dataset.val_set, top_k)
         results["test"] = metric.eval(model, dataset.test_set, top_k)

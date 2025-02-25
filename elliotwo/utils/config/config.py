@@ -1,6 +1,7 @@
+# pylint: disable=E1101
 import os
-from typing import Tuple, Type, List, Optional, ClassVar, Dict
-from abc import abstractmethod
+from typing import Tuple, List, Optional, ClassVar, Dict
+from abc import abstractmethod, ABC
 
 import yaml
 import numpy as np
@@ -8,6 +9,7 @@ import torch
 from ray import tune
 from pydantic import BaseModel, Field, field_validator, model_validator
 from elliotwo.utils.enums import RatingType, SplittingStrategies
+from elliotwo.utils.registry import metric_registry, params_registry, model_registry
 from elliotwo.utils.logger import logger
 
 
@@ -165,7 +167,7 @@ class SplittingConfig(BaseModel):
 
     Attributes:
         strategy (Optional[SplittingStrategies]): The splitting strategy to be used to split data.
-        validation (Optional[bool]): Whether or not to create a validation \
+        validation (Optional[bool]): Whether or not to create a validation
             split during the splitting process.
         ratio (Optional[List[float]]): The ratios of the splitting to be created.
         k (Optional[int]): The number of examples to remove during leave-k-out strategy.
@@ -209,15 +211,15 @@ class SplittingConfig(BaseModel):
         if self.strategy in [SplittingStrategies.RANDOM, SplittingStrategies.TEMPORAL]:
             if self.ratio is None:
                 raise ValueError(
-                    f"You have chosen {self.strategy.value} splitting but \
-                        the ratio field has not been filled."
+                    f"You have chosen {self.strategy.value} splitting but "
+                    "the ratio field has not been filled."
                 )
             _expected_ratio = 3 if self.validation else 2
             if len(self.ratio) != _expected_ratio:
                 raise ValueError(
-                    "The ratio and the number of split expectd \
-                        do not match. Check if validation set parameter \
-                            has been set or if ratio values are correct."
+                    "The ratio and the number of split expectd "
+                    "do not match. Check if validation set parameter "
+                    "has been set or if ratio values are correct."
                 )
 
         # Attention checks
@@ -226,15 +228,15 @@ class SplittingConfig(BaseModel):
             and self.k
         ):
             logger.attention(
-                f"You have filled the k field but the splitting strategy \
-                    has been set to {self.strategy.value}. Check your \
-                        configuration file for possible errors."
+                f"You have filled the k field but the splitting strategy "
+                f"has been set to {self.strategy.value}. Check your "
+                "configuration file for possible errors."
             )
         if self.strategy == SplittingStrategies.LEAVE_ONE_OUT and self.ratio:
             logger.attention(
-                "You have filled the ratio field but splitting strategy \
-                    has been set to leave-one-out. Check your \
-                        configuration file for possible errors."
+                "You have filled the ratio field but splitting strategy "
+                "has been set to leave-one-out. Check your "
+                "configuration file for possible errors."
             )
 
         return self
@@ -246,13 +248,15 @@ class Meta(BaseModel):
     Attributes:
         save_model (Optional[bool]): Whether save or not the model state after training.
         load_from (Optional[str]): The path where a previos model state has been saved.
+        implementation (Optional[str]): The implementation to be used.
     """
 
     save_model: Optional[bool] = False
     load_from: Optional[str] = None
+    implementation: Optional[str] = "latest"
 
 
-class RecomModel(BaseModel):
+class RecomModel(BaseModel, ABC):
     """Definition of a RecommendationModel configuration. All models must extend this class.
 
     Attributes:
@@ -260,6 +264,16 @@ class RecomModel(BaseModel):
     """
 
     meta: Meta = Field(default_factory=Meta)
+
+    @model_validator(mode="after")
+    def model_validation(self):
+        _name = self.__class__.__name__
+        _imp = self.meta.implementation
+        if _name not in model_registry.list_registered():
+            raise ValueError(f"Model {_name} not in model_registry.")
+        if _imp not in model_registry.list_implementations(_name):
+            raise ValueError(f"Model {_name} does not have {_imp} implementation.")
+        return self
 
     @abstractmethod
     def get_params(self, param_dict: dict) -> dict:
@@ -276,31 +290,15 @@ class RecomModel(BaseModel):
         """
 
 
+@params_registry.register("EASE")
 class EASE(RecomModel):
     """Definition of the model EASE.
 
     Attributes:
         l2 (Optional[List[float]]): List of values that l2 regularization can take.
-        implementation (Optional[List[str]]): List of different implementation to test out.
     """
 
     l2: Optional[List[float]] = [1.0, 2.0]
-    implementation: Optional[List[str]] = ["classic"]
-
-    @field_validator("implementation")
-    @classmethod
-    def check_implementation(cls, v):
-        """Validates implementation.
-
-        Raise:
-            ValueError: If the implementation is not supported.
-        """
-        if not isinstance(v, list):
-            v = [v]
-        for imp in v:
-            if imp not in ["classic", "elliot"]:
-                raise ValueError(f"Implementation {imp} not supported by model EASE.")
-        return v
 
     @field_validator("l2")
     @classmethod
@@ -321,12 +319,10 @@ class EASE(RecomModel):
         return v
 
     def get_params(self, param_dict: dict) -> dict:
-        return {
-            "l2": tune.uniform(param_dict["l2"][0], param_dict["l2"][1]),
-            "implementation": tune.choice(param_dict["implementation"]),
-        }
+        return {"l2": tune.uniform(param_dict["l2"][0], param_dict["l2"][1])}
 
 
+@params_registry.register("Slim")
 class Slim(RecomModel):
     """Definition of the model Slim.
 
@@ -339,10 +335,10 @@ class Slim(RecomModel):
     alpha: Optional[List[float]]
 
     def get_params(self, param_dict: dict) -> dict:
-        pass
-
-
-MODEL_REGISTRY: Dict[str, Type[RecomModel]] = {"EASE": EASE, "Slim": Slim}
+        return {
+            "l1": tune.uniform(param_dict["l1"][0], param_dict["l1"][1]),
+            "alpha": tune.uniform(param_dict["alpha"][0], param_dict["alpha"][1]),
+        }
 
 
 class EvaluationConfig(BaseModel):
@@ -360,19 +356,19 @@ class EvaluationConfig(BaseModel):
 
     @field_validator("metrics")
     @classmethod
-    def metrics_validator(cls, v):
+    def metrics_validator(cls, v: List[str]):
         """Validate metrics.
 
         Raise:
             ValueError: If the metric is not present in the METRICS_REGISTRY.
         """
         for metric in v:
-            if metric not in METRICS_REGISTRY:
-                raise ValueError(f"Metric {metric} not supported.")
+            if metric.upper() not in metric_registry.list_registered():
+                raise ValueError(
+                    f"Metric {metric} not in metric registry. This is the list"
+                    f"of supported metrics: {metric_registry.list_registered()}"
+                )
         return v
-
-
-METRICS_REGISTRY = ["NDCG", "Precision", "Recall", "HitRate"]
 
 
 class GeneralRecommendation(BaseModel):
@@ -469,8 +465,11 @@ class GeneralConfig(BaseModel):
                 "Validation metric contains more than one @, check your configuration file."
             )
         metric, top_k = v.split("@")
-        if metric not in METRICS_REGISTRY:
-            raise ValueError(f"The metric {metric} if not present in METRIC_REGISTRY.")
+        if metric not in metric_registry.list_registered():
+            raise ValueError(
+                f"Metric {metric} not in metric registry. This is the list"
+                f"of supported metrics: {metric_registry.list_registered()}"
+            )
         if not top_k.isnumeric():
             raise ValueError(
                 "Validation metric should be provided with a top_k number."
@@ -648,16 +647,11 @@ class Configuration(BaseModel):
 
         Returns:
             dict: The dictionary containig all the models and their parameters.
-
-        Raises:
-            ValueError: If the model is not present in the MODEL_REGISTRY.
         """
         parsed_models = {}
 
         for model_name, model_data in self.models.items():
-            model_class = MODEL_REGISTRY.get(model_name)
-            if not model_class:
-                raise ValueError(f"Model {model_name} not found in MODEL_REGISTRY.")
+            model_class: RecomModel = params_registry.get(model_name, **model_data)
 
             model_data = {
                 k: (
@@ -668,7 +662,7 @@ class Configuration(BaseModel):
                 for k, v in model_data.items()
             }
 
-            parsed_models[model_name] = model_class(**model_data).model_dump()
+            parsed_models[model_name] = model_class.model_dump()
         return parsed_models
 
     def check_column_dtype(self) -> None:
@@ -749,17 +743,11 @@ class Configuration(BaseModel):
             param_dict (dict): The dictionary containing the parameters to parse.
 
         Returns:
-            dict: The dictionary with the parsed parameters in \
+            dict: The dictionary with the parsed parameters in
                 the format {param_name: hyperopt_object, ...}
-
-        Raises:
-            ValueError: If the model name is not present in the MODEL_REGISTRY.
         """
-        model_class = MODEL_REGISTRY.get(model_name)
-        if not model_class:
-            raise ValueError(f"The model {model_name} not found in MODEL_REGISTRY.")
-        model_instance = model_class()
-        return model_instance.get_params(param_dict)
+        model_class: RecomModel = params_registry.get(model_name)
+        return model_class.get_params(param_dict)
 
 
 def load_yaml(path: str) -> Configuration:

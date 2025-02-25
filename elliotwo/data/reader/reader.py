@@ -1,9 +1,9 @@
-import joblib
 from typing import Any
 from os.path import join, isfile
 from abc import ABC, abstractmethod
 
 import pandas as pd
+import joblib
 from pathlib import Path
 from pandas import DataFrame
 from elliotwo.data.dataset import Interactions, TransactionDataset

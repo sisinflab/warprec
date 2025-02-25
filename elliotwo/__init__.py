@@ -1,15 +1,25 @@
 from .data import (
+    Interactions,
     AbstractDataset,
     TransactionDataset,
     ContextDataset,
-    Interactions,
     Splitter,
+    AbstractStrategy,
     LocalReader,
+    AbstractWriter,
     LocalWriter,
 )
-from .utils import logger
-from .recommenders import EASE, Slim, Trainer
-from .evaluation import NDCG, Precision, Recall, HitRate
+from .recommenders import EASE, Slim, Trainer, AbstractRecommender
+from .evaluation import Evaluator, NDCG, Precision, Recall, HitRate
+from .utils import (
+    Configuration,
+    load_yaml,
+    logger,
+    splitting_registry,
+    metric_registry,
+    params_registry,
+    model_registry,
+)
 
 __all__ = [
     "LocalReader",
@@ -18,14 +28,24 @@ __all__ = [
     "ContextDataset",
     "Interactions",
     "Splitter",
+    "AbstractStrategy",
+    "Configuration",
+    "load_yaml",
     "logger",
+    "splitting_registry",
+    "metric_registry",
+    "params_registry",
+    "model_registry",
+    "AbstractWriter",
     "LocalWriter",
     "LocalReader",
     "EASE",
     "Slim",
+    "Evaluator",
     "NDCG",
     "Precision",
     "Recall",
     "HitRate",
     "Trainer",
+    "AbstractRecommender",
 ]

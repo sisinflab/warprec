@@ -1,3 +1,3 @@
-from .config import Configuration, load_yaml
+from .config import Configuration, RecomModel, load_yaml
 
-__all__ = ["Configuration", "load_yaml"]
+__all__ = ["Configuration", "RecomModel", "load_yaml"]

@@ -130,9 +130,6 @@ class ContextDataset(AbstractDataset):
     TODO: Implement
     """
 
-    def __init__(self, config: Configuration):
-        super().__init__(config)
-
     @abstractmethod
     def get_dims(self) -> Tuple[int, int]:
         raise NotImplementedError

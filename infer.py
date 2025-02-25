@@ -1,4 +1,3 @@
-import importlib
 import argparse
 from argparse import Namespace
 from os.path import join
@@ -7,6 +6,7 @@ import elliotwo
 from elliotwo.utils.config import load_yaml
 from elliotwo.utils.logger import logger
 from elliotwo.evaluation.evaluator import Evaluator
+from elliotwo.utils.registry import model_registry
 
 
 def main(args: Namespace):
@@ -47,21 +47,31 @@ def main(args: Namespace):
 
     # Models to infer
     models = list(config.models.keys())
-    recommender_module = importlib.import_module("elliotwo.recommenders")
     coo = Evaluator(dataset, config)
 
-    for model in models:
+    for model_name in models:
         # Restoring model to previous state
-        params = config.models[model]
-        train_params = config.convert_params(model, params)
+        params = config.models[model_name]
+        train_params = config.convert_params(model_name, params)
         path = params["meta"]["load_from"]
-        path = join(path, "serialized", model + ".joblib")
+        path = join(path, "serialized", model_name + ".joblib")
         deserialized_data = reader.load_model_state(local_path=path)
 
-        model_class = getattr(recommender_module, model)
-        loaded_model = model_class(config, dataset, train_params)
-        loaded_model.load_model(deserialized_data)
-        _ = coo.run(loaded_model)
+        imp = params["meta"]["implementation"]
+        if imp == "latest":
+            model = model_registry.get_latest(
+                model_name, config=config, dataset=dataset, params=train_params
+            )
+        else:
+            model = model_registry.get(
+                model_name,
+                implementation=imp,
+                config=config,
+                dataset=dataset,
+                params=train_params,
+            )
+        model.load_model(deserialized_data)
+        _ = coo.run(model)
 
 
 if __name__ == "__main__":

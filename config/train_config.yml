@@ -24,8 +24,8 @@ models:
   EASE:
     meta:
       save_model: True
+      implementation: elliot
     l2: [0.0, 200.0]
-    implementation: ['elliot']
   #Slim:
   #  l1: [0.1, 0.2, 0.5]
   #  alpha: [0.1, 0.2, 0.5]

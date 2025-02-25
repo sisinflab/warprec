@@ -1,12 +1,13 @@
-import importlib
 import argparse
 from argparse import Namespace
 
-import elliotwo
+from elliotwo.data import LocalReader, LocalWriter, Splitter
 from elliotwo.utils.config import load_yaml
 from elliotwo.utils.logger import logger
 from elliotwo.recommenders.trainer import Trainer
 from elliotwo.evaluation.evaluator import Evaluator
+from elliotwo.evaluation.metrics import AbstractMetric
+from elliotwo.utils.registry import metric_registry
 
 
 def main(args: Namespace):
@@ -20,10 +21,10 @@ def main(args: Namespace):
     config = load_yaml(args.config)
 
     # Writer module testing
-    writer = elliotwo.data.LocalWriter(config)
+    writer = LocalWriter(config)
 
     # Reader module testing
-    reader = elliotwo.data.LocalReader(config)
+    reader = LocalReader(config)
 
     # Dataset loading
     dataset = None
@@ -32,7 +33,7 @@ def main(args: Namespace):
 
         # Splitter testing
         if config.splitter:
-            splitter = elliotwo.Splitter(config)
+            splitter = Splitter(config)
 
             if config.data.data_type == "transaction":
                 dataset = splitter.split_transaction(data)
@@ -54,31 +55,26 @@ def main(args: Namespace):
     # Trainer testing
     models = list(config.models.keys())
     val_metric, val_k = config.validation_metric()
-    recommender_module = importlib.import_module("elliotwo.recommenders")
-    evaluation_module = importlib.import_module("elliotwo.evaluation.metrics")
-    metric_class = getattr(evaluation_module, val_metric)
+    metric: AbstractMetric = metric_registry.get(val_metric, config=config)
     coo = Evaluator(dataset, config)
 
-    for model in models:
-        params = config.models[model]
-        train_params = config.convert_params(model, params)
-        model_class = getattr(recommender_module, model)
-        trainer = Trainer(
-            model_class, dataset, train_params, metric_class, val_k, config
-        )
+    for model_name in models:
+        params = config.models[model_name]
+        train_params = config.convert_params(model_name, params)
+        trainer = Trainer(model_name, dataset, train_params, metric, val_k, config)
         best_model, _ = trainer.train_and_evaluate()
 
         # Evaluation testing
         result_dict = coo.run(best_model)
         writer.write_results(
-            result_dict, model, config.evaluation.metrics, config.evaluation.top_k
+            result_dict, model_name, config.evaluation.metrics, config.evaluation.top_k
         )
 
         # Recommendation
         if config.general.recommendation.save_recs:
             umap_i, imap_i = dataset.get_inverse_mappings()
             recs = best_model.get_recs(umap_i, imap_i, k=50)
-            writer.write_recs(recs, model)
+            writer.write_recs(recs, model_name)
 
         # Model serialization
         if params["meta"]["save_model"]:

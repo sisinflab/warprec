@@ -1,3 +1,3 @@
-from .writer import LocalWriter, AbstractWriter
+from .writer import AbstractWriter, LocalWriter
 
 __all__ = ["AbstractWriter", "LocalWriter"]

@@ -1,15 +1,15 @@
+# pylint: disable=invalid-name
 import numpy as np
 from sklearn.linear_model import ElasticNet
 from elliotwo.data.dataset import AbstractDataset
 from elliotwo.utils.config import Configuration
 from elliotwo.recommenders.abstract_recommender import ItemSimilarityRecommender
+from elliotwo.utils.registry import model_registry
 
 
+@model_registry.register(name="Slim")
 class Slim(ItemSimilarityRecommender):
     """Implementation of Slim model from Sparse Linear Methods for Top-N Recommender Systems 2011.
-
-    Attributes:
-        VERSION (str): The version of the model.
 
     Args:
         config (Configuration): The configuration of the experiement.
@@ -23,8 +23,6 @@ class Slim(ItemSimilarityRecommender):
         alpha (float): Normalization parameter to use during train.
     """
 
-    VERSION: str = "0.1"
-
     def __init__(
         self,
         config: Configuration,
@@ -35,10 +33,10 @@ class Slim(ItemSimilarityRecommender):
     ):
         super().__init__(config, dataset, params, *args, **kwargs)
 
+        self._name = "Slim"
         self.X = self.interaction_matrix
         self.l1 = self._params["l1"]
         self.alpha = self._params["alpha"]
-        self._model_version = self.VERSION
 
     def fit(self):
         """During training we will compute the B similarity matrix {item x item}."""

@@ -5,13 +5,13 @@ from torch import nn, Tensor
 import pandas as pd
 import numpy as np
 from pandas import DataFrame
-from elliotwo.data.dataset import AbstractDataset
 from elliotwo.utils.config import Configuration
 from elliotwo.data.writer import AbstractWriter
+from elliotwo.data.dataset import AbstractDataset
 from elliotwo.utils.logger import logger
 
 
-class AbstractRecommender(nn.Module):
+class AbstractRecommender(nn.Module, ABC):
     """Abstract class that defines the basic functionalities of a recommendation model.
 
     Args:
@@ -34,7 +34,7 @@ class AbstractRecommender(nn.Module):
         self._config = config
         self._dataset = dataset
         self._params = params
-        self._model_version: str = ""
+        self._name: str = "Name not set"
         # The train set sparse matrix
         self.interaction_matrix = self._dataset.train_set.get_sparse()
 
@@ -68,11 +68,11 @@ class AbstractRecommender(nn.Module):
         Args:
             writer (AbstractWriter): The writer to use to write the model state.
         """
-        logger.msg(f"Starting serialization of the model {self.__class__.__name__}.")
+        logger.msg(f"Starting serialization of the model {self.name}.")
         data_to_serialize = self._serialize()
-        writer.write_model(data_to_serialize, self.__class__.__name__)
+        writer.write_model(data_to_serialize, self.name)
         logger.positive(
-            f"Serialization process of the model {self.__class__.__name__} completed succefully."
+            f"Serialization process of the model {self.name} completed succefully."
         )
 
     def load_model(self, deserialized_data: dict) -> None:
@@ -82,11 +82,9 @@ class AbstractRecommender(nn.Module):
             deserialized_data (dict): The deserialized information that \
                 will be used to restore the state of the model.
         """
-        logger.msg(f"Loading previous state of the model {self.__class__.__name__}.")
+        logger.msg(f"Loading previous state of the model {self.name}.")
         self._deserialize(deserialized_data)
-        logger.positive(
-            f"Loading of the model {self.__class__.__name__} completed succefully."
-        )
+        logger.positive(f"Loading of the model {self.name} completed succefully.")
 
     def get_recs(self, umap_i: dict, imap_i: dict, k: int) -> DataFrame:
         """This method turns the learned parameters into new \
@@ -120,8 +118,12 @@ class AbstractRecommender(nn.Module):
 
         return recommendations
 
+    @property
+    def name(self):
+        return self._name
 
-class ItemSimilarityRecommender(AbstractRecommender, ABC):
+
+class ItemSimilarityRecommender(AbstractRecommender):
     """ItemSimilarityRecommender implementation.
 
     A ItemSimilarityRecommender is a Collaborative Filtering recommendation model \
@@ -129,8 +131,8 @@ class ItemSimilarityRecommender(AbstractRecommender, ABC):
 
     Args:
         config (Configuration): The configuration file.
-        dataset (AbstractDataset): The dataset on wich the train will be executed.
-        params (dict): The parameters to set up the model.
+        dataset (AbstractDataset): The dataset to train the model on.
+        params (dict): The parameters of the model.
         *args: Argument for PyTorch nn.Module.
         **kwargs: Keyword argument for PyTorch nn.Module.
     """
@@ -156,7 +158,6 @@ class ItemSimilarityRecommender(AbstractRecommender, ABC):
         umap, imap = self._dataset.get_mappings()
         serialization_dict = {
             "model_name": self.__class__.__name__,
-            "version": self._model_version,
             "item_similarity": self.item_similarity,
             "user_mapping": umap,
             "item_mapping": imap,
@@ -174,10 +175,6 @@ class ItemSimilarityRecommender(AbstractRecommender, ABC):
         if self.__class__.__name__ != deserialized_data["model_name"]:
             logger.negative(
                 "You are trying to load a model informations from a different model."
-            )
-        if self._version != deserialized_data["version"]:
-            logger.attention(
-                "You are loading informations from a previous version of this model."
             )
         self.item_similarity = deserialized_data["item_similarity"]
         self._dataset.update_mappings(

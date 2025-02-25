@@ -1,5 +1,4 @@
 import time
-import joblib
 from os.path import join
 from pathlib import Path
 from typing import List
@@ -7,9 +6,10 @@ from abc import ABC, abstractmethod
 
 import pandas as pd
 import numpy as np
+import joblib
 from pandas import DataFrame
-from elliotwo.data.dataset import AbstractDataset
 from elliotwo.utils.config import Configuration
+from elliotwo.data.dataset import AbstractDataset
 from elliotwo.utils.logger import logger
 
 
