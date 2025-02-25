@@ -23,4 +23,4 @@ general:
   device: cpu
   validation_metric: NDCG@10
   precision: float32
-  max_evals: 10
+  max_eval: 10

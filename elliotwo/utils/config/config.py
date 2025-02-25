@@ -31,16 +31,16 @@ class Labels(BaseModel):
     timestamp_label: Optional[str] = "timestamp"
 
 
-class CustomDtypes(BaseModel):
-    """Definition of the custom dtypes sub-configuration.
+class CustomDtype(BaseModel):
+    """Definition of the custom dtype sub-configuration.
 
     This class reads and optionally overrides default labels of important data.
 
     Attributes:
-        user_id_type (Optional[str]): The dtypes to format the user_id column.
-        item_id_type (Optional[str]): The dtypes to format the item_id column.
-        rating_type (Optional[str]): The dtypes to format the rating column.
-        timestamp_type (Optional[str]): The dtypes to format the timestamp column.
+        user_id_type (Optional[str]): The dtype to format the user_id column.
+        item_id_type (Optional[str]): The dtype to format the item_id column.
+        rating_type (Optional[str]): The dtype to format the rating column.
+        timestamp_type (Optional[str]): The dtype to format the timestamp column.
     """
 
     user_id_type: Optional[str] = "int32"
@@ -65,7 +65,7 @@ class DataConfig(BaseModel):
         batch_size (Optional[int]): The batch size to be used during the reading process.
             If None is chosen, the data will be read in one pass.
         labels (Labels): The labels sub-configuration. Defaults to Labels default values.
-        dtypes (CustomDtypes): The list of column dtypes.
+        dtype (CustomDtype): The list of column dtype.
     """
 
     dataset_name: str
@@ -78,7 +78,7 @@ class DataConfig(BaseModel):
     rating_type: RatingType
     batch_size: Optional[int] = None
     labels: Labels = Field(default_factory=Labels)
-    dtypes: CustomDtypes = Field(default_factory=CustomDtypes)
+    dtype: CustomDtype = Field(default_factory=CustomDtype)
 
     @field_validator("loading_strategy")
     @classmethod
@@ -129,7 +129,7 @@ class DataConfig(BaseModel):
 
     @model_validator(mode="after")
     def check_data(self):
-        """This method checks if the required informations have been passed to the configuration.
+        """This method checks if the required information have been passed to the configuration.
 
         Raise:
             ValueError: If an important field has not been filled with the correct information.
@@ -201,7 +201,7 @@ class SplittingConfig(BaseModel):
 
     @model_validator(mode="after")
     def check_dependencies(self):
-        """This method checks if the required informations have been passed to the configuration.
+        """This method checks if the required information have been passed to the configuration.
 
         Raise:
             ValueError: If an important field has not been filled with the correct information.
@@ -217,7 +217,7 @@ class SplittingConfig(BaseModel):
             _expected_ratio = 3 if self.validation else 2
             if len(self.ratio) != _expected_ratio:
                 raise ValueError(
-                    "The ratio and the number of split expectd "
+                    "The ratio and the number of split expected "
                     "do not match. Check if validation set parameter "
                     "has been set or if ratio values are correct."
                 )
@@ -247,7 +247,7 @@ class Meta(BaseModel):
 
     Attributes:
         save_model (Optional[bool]): Whether save or not the model state after training.
-        load_from (Optional[str]): The path where a previos model state has been saved.
+        load_from (Optional[str]): The path where a previous model state has been saved.
         implementation (Optional[str]): The implementation to be used.
     """
 
@@ -372,11 +372,11 @@ class EvaluationConfig(BaseModel):
 
 
 class GeneralRecommendation(BaseModel):
-    """Definition of recommendation informations.
+    """Definition of recommendation information.
 
     Attributes:
         save_recs (Optional[bool]): Flag for recommendation saving. Defaults to False.
-        sep (Optional[str]): Custom separator to use during recomendation saving. Defaults to ','.
+        sep (Optional[str]): Custom separator to use during recommendation saving. Defaults to ','.
         ext (Optional[str]): Custom extension. Defaults to '.csv'.
     """
 
@@ -414,8 +414,8 @@ class GeneralConfig(BaseModel):
         validation_metric (Optional[str]): The validation metric to use,
             in the format of metric_name@top_k.
         precision (Optional[str]): The precision to use during computation.
-        max_evals (Optional[int]): The maximum number of evaluations to compute with hyperopt.
-        recommendation (Optional[GeneralRecommendation]): The general informations
+        max_eval (Optional[int]): The maximum number of evaluations to compute with hyperopt.
+        recommendation (Optional[GeneralRecommendation]): The general information
             about the recommendation.
         setup_experiment (Optional[bool]): Wether or not to setup the experiment ambient.
     """
@@ -425,7 +425,7 @@ class GeneralConfig(BaseModel):
     device: Optional[str] = "cpu"
     validation_metric: Optional[str] = "nDCG@5"
     precision: Optional[str] = "float32"
-    max_evals: Optional[int] = 10
+    max_eval: Optional[int] = 10
     recommendation: Optional[GeneralRecommendation] = Field(
         default_factory=GeneralRecommendation
     )
@@ -457,8 +457,8 @@ class GeneralConfig(BaseModel):
         """
         if "@" not in v:
             raise ValueError(
-                f"Validation metric {v} not valid. Validation metric \
-                    should be defined as: metric_name@top_k."
+                f"Validation metric {v} not valid. Validation metric "
+                f"should be defined as: metric_name@top_k."
             )
         if v.count("@") > 1:
             raise ValueError(
@@ -486,7 +486,7 @@ class GeneralConfig(BaseModel):
         if self.recommendation.save_recs and not self.setup_experiment:  # pylint: disable=no-member
             raise ValueError(
                 "You are trying to save the recommendations without "
-                "setting up the directoy. Set setup_experiment to True."
+                "setting up the directory. Set setup_experiment to True."
             )
         return self
 
@@ -497,17 +497,17 @@ class Configuration(BaseModel):
     This class defines the structure of the configuration file accepted by the framework.
 
     Attributes:
-        data (DataConfig): Configuration of the dataloading process.
+        data (DataConfig): Configuration of the data loading process.
         splitter (SplittingConfig): Configuration of the splitting process.
-        models (Dict[str, dict]): The dictionary containing model informations \
+        models (Dict[str, dict]): The dictionary containing model information
             in the format {model_name: dict{param_1: value, param_2: value, ...}, ...}
         evaluation (EvaluationConfig): Configuration of the evaluation process.
         general (GeneralConfig): General configuration of the experiment
-        column_map_dtype (ClassVar[dict]): The mapping between the string dtypes \
+        column_map_dtype (ClassVar[dict]): The mapping between the string dtype
             and their numpy counterpart.
-        sparse_np_dtype (ClassVar[dict]): The mapping between the string dtypes \
+        sparse_np_dtype (ClassVar[dict]): The mapping between the string dtype
             and their numpy sparse counterpart.
-        sparse_torch_dtype (ClassVar[dict]): The mapping between the string dtypes \
+        sparse_torch_dtype (ClassVar[dict]): The mapping between the string dtype
             and their torch sparse counterpart.
     """
 
@@ -517,7 +517,7 @@ class Configuration(BaseModel):
     evaluation: EvaluationConfig
     general: GeneralConfig = None
 
-    # Supported dtypes
+    # Supported dtype
     column_map_dtype: ClassVar[dict] = {
         "int8": np.int8,
         "int16": np.int16,
@@ -601,11 +601,11 @@ class Configuration(BaseModel):
                 self.data.labels.item_id_label,
             ]
             if self.data.rating_type == RatingType.EXPLICIT:
-                # In case the RatyingType is explicit, we add the
+                # In case the RatingType is explicit, we add the
                 # score label and read scores from the source.
                 _column_names.append(self.data.labels.rating_label)
             if self.splitter.strategy == SplittingStrategies.TEMPORAL:
-                # In case the SplittingStrategy is temporale, we add the
+                # In case the SplittingStrategy is temporal, we add the
                 # timestamp label and read timestamps from the source.
                 _column_names.append(self.data.labels.timestamp_label)
 
@@ -667,26 +667,26 @@ class Configuration(BaseModel):
         return parsed_models
 
     def check_column_dtype(self) -> None:
-        """This method validates the custom dtypes passed with the configuration file.
+        """This method validates the custom dtype passed with the configuration file.
 
         Raise:
-            ValueError: If the dtypes are not supported or incorrect.
+            ValueError: If the dtype are not supported or incorrect.
         """
-        for dtype_str in self.data.dtypes.model_dump().values():
+        for dtype_str in self.data.dtype.model_dump().values():
             if dtype_str not in self.column_map_dtype:
                 raise ValueError(
                     f"Custom dtype {dtype_str} not supported as a column data type."
                 )
 
     def column_dtype(self) -> List[np.dtype]:
-        """This method will parse the dtypes from the string forma to their numpy counterpart.
+        """This method will parse the dtype from the string forma to their numpy counterpart.
 
         Returns:
-            List[np.dtype]: A list containing the dtypes to use for dataloading.
+            List[np.dtype]: A list containing the dtype to use for data loading.
         """
         return [
             self.column_map_dtype[dtype_str]
-            for dtype_str in self.data.dtypes.model_dump().values()
+            for dtype_str in self.data.dtype.model_dump().values()
         ]
 
     def column_names(self) -> List[str]:
@@ -701,7 +701,7 @@ class Configuration(BaseModel):
         """This method checks the precision passed through configuration.
 
         Raises:
-            ValueError: If the precision is not suppoerted or incorrect.
+            ValueError: If the precision is not supported or incorrect.
         """
         if self.general.precision not in self.sparse_np_dtype:
             raise ValueError(

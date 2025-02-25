@@ -38,7 +38,7 @@ general:
   device: cpu
   validation_metric: NDCG@10
   precision: float64
-  max_evals: 10
+  max_eval: 10
   recommendation:
     save_recs: True
     sep: \t
