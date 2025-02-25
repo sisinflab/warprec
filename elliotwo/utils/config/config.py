@@ -34,7 +34,7 @@ class Labels(BaseModel):
 class CustomDtypes(BaseModel):
     """Definition of the custom dtypes sub-configuration.
 
-    This class reads and optionally ovverrides default labels of important data.
+    This class reads and optionally overrides default labels of important data.
 
     Attributes:
         user_id_type (Optional[str]): The dtypes to format the user_id column.
@@ -60,9 +60,9 @@ class DataConfig(BaseModel):
         split_dir (Optional[str]): The directory where the splits are saved.
         experiment_path (Optional[str]): The local experiment path.
         sep (Optional[str]): Custom separator for the file containing the transaction data.
-        rating_type (RatingType): The type of rating to be used. If 'implicit' is chosen, \
-            the the reader will not look for a score.
-        batch_size (Optional[int]): The batch size to be used during the reading process. \
+        rating_type (RatingType): The type of rating to be used. If 'implicit' is chosen,
+            the reader will not look for a score.
+        batch_size (Optional[int]): The batch size to be used during the reading process.
             If None is chosen, the data will be read in one pass.
         labels (Labels): The labels sub-configuration. Defaults to Labels default values.
         dtypes (CustomDtypes): The list of column dtypes.
@@ -200,7 +200,7 @@ class SplittingConfig(BaseModel):
         return v
 
     @model_validator(mode="after")
-    def check_dependecies(self):
+    def check_dependencies(self):
         """This method checks if the required informations have been passed to the configuration.
 
         Raise:
@@ -306,7 +306,7 @@ class EASE(RecomModel):
         """Validates the l2 regularization.
 
         Raise:
-            ValueErrro: If the l2 is not a range compatible with hyperopt formulation.
+            ValueError: If the l2 is not a range compatible with ray tune formulation.
         """
         if not isinstance(v, list):
             raise ValueError(
@@ -558,7 +558,7 @@ class Configuration(BaseModel):
     @field_validator("general", mode="before")
     @classmethod
     def check_general(cls, v: GeneralConfig) -> GeneralConfig:
-        """Validate splitter.
+        """Validate general configuration.
 
         Args:
             v (GeneralConfig): The GeneralConfig object to validate.
@@ -629,7 +629,7 @@ class Configuration(BaseModel):
                     "You are trying to save the splits but experiment must be "
                     "setup first. Set setup_experiment to True."
                 )
-            if self.evaluation.save_valuation:
+            if self.evaluation.save_evaluation:
                 raise ValueError(
                     "You are trying to save the evaluation but experiment must be "
                     "setup first. Set setup_experiment to True."
@@ -646,13 +646,14 @@ class Configuration(BaseModel):
         """This method parses the models and creates the correct data structures.
 
         Returns:
-            dict: The dictionary containig all the models and their parameters.
+            dict: The dictionary containing all the models and their parameters.
         """
         parsed_models = {}
 
         for model_name, model_data in self.models.items():
             model_class: RecomModel = params_registry.get(model_name, **model_data)
 
+            # Extract model train parameters, removing the meta infos
             model_data = {
                 k: (
                     [v]
@@ -744,7 +745,7 @@ class Configuration(BaseModel):
 
         Returns:
             dict: The dictionary with the parsed parameters in
-                the format {param_name: hyperopt_object, ...}
+                the format {param_name: ray tune object, ...}
         """
         model_class: RecomModel = params_registry.get(model_name)
         return model_class.get_params(param_dict)
