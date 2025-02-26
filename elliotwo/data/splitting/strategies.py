@@ -4,6 +4,7 @@ from abc import ABC, abstractmethod
 import numpy as np
 from pandas import DataFrame
 from elliotwo.utils.config import Configuration
+from elliotwo.utils.enums import SplittingStrategies
 from elliotwo.utils.registry import splitting_registry
 
 
@@ -35,7 +36,7 @@ class AbstractStrategy(ABC):
         """
 
 
-@splitting_registry.register("random")
+@splitting_registry.register(SplittingStrategies.RANDOM)
 class RandomSplit(AbstractStrategy):
     """The definition of the random split strategy.
 
@@ -122,7 +123,7 @@ class RandomSplit(AbstractStrategy):
         return train_indices, test_indices
 
 
-@splitting_registry.register("leave-one-out")
+@splitting_registry.register(SplittingStrategies.LEAVE_ONE_OUT)
 class LeaveOneOutSplit(AbstractStrategy):
     """The definition of a leave-one-out splitting strategy.
 
@@ -199,7 +200,7 @@ class LeaveOneOutSplit(AbstractStrategy):
         return train_idxs, test_idxs
 
 
-@splitting_registry.register("temporal")
+@splitting_registry.register(SplittingStrategies.TEMPORAL)
 class TemporalSplit(AbstractStrategy):
     """The definition of a temporal splitting strategy.
 
