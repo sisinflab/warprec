@@ -217,7 +217,7 @@ class TemporalSplit(AbstractStrategy):
             self._val_size = config.splitter.ratio[2]
 
     def split(self, data: DataFrame) -> Tuple[List[int], List[int], List[int]]:
-        """Implementation of the temporal splitting. Original data will be splitted \
+        """Implementation of the temporal splitting. Original data will be splitted
             according to timestamp. If a seed has been set, the split will be reproducible.
 
         Args:
@@ -247,7 +247,7 @@ class TemporalSplit(AbstractStrategy):
     ) -> Tuple[List[int], List[int]]:
         """Method to split data in two partitions, using a timestamp.
 
-        This method will split data based on time, using as test\
+        This method will split data based on time, using as test
             samples the more recent transactions.
 
         Args:
