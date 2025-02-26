@@ -54,7 +54,7 @@ class RandomSplit(AbstractStrategy):
 
     def split(self, data: DataFrame) -> Tuple[List[int], List[int], List[int]]:
         """Implementation of the random splitting. Original data will
-            be splitted randomly. If a seed has been set, the split wiil be reproducible.
+            be splitted randomly. If a seed has been set, the split will be reproducible.
 
         Args:
             data (DataFrame): The DataFrame to be splitted.
@@ -82,7 +82,7 @@ class RandomSplit(AbstractStrategy):
         self, data: DataFrame, test_size: float = 0.2
     ) -> Tuple[List[int], List[int]]:
         """Method used to split a set of data into two partition,
-            respecting the rateo given as input.
+            respecting the ratio given as input.
 
         The method used to split data is random. If a seed was set,
             then the split will be reproducible.
@@ -137,7 +137,7 @@ class LeaveOneOutSplit(AbstractStrategy):
 
     def split(self, data: DataFrame) -> Tuple[List[int], List[int], List[int]]:
         """Implementation of the leave-one-out splitting. If a seed has
-            been set, the split wiil be reproducible.
+            been set, the split will be reproducible.
 
         Args:
             data (DataFrame): The DataFrame to be splitted.
@@ -218,7 +218,7 @@ class TemporalSplit(AbstractStrategy):
 
     def split(self, data: DataFrame) -> Tuple[List[int], List[int], List[int]]:
         """Implementation of the temporal splitting. Original data will be splitted \
-            according to timestamp. If a seed has benn set, the split wiil be reproducible.
+            according to timestamp. If a seed has been set, the split will be reproducible.
 
         Args:
             data (DataFrame): The DataFrame to be splitted.
