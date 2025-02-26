@@ -37,7 +37,7 @@ class AbstractDataset(ABC):
 
     @abstractmethod
     def get_dims(self) -> Tuple[int, int]:
-        """Returns the the dimensions of the data.
+        """Returns the dimensions of the data.
 
         Returns:
             Tuple[int, int]:
