@@ -1,3 +1,4 @@
+from tqdm import tqdm
 from tabulate import tabulate
 from elliotwo.data.dataset import AbstractDataset
 from elliotwo.utils.config import Configuration
@@ -43,17 +44,20 @@ class Evaluator:
         logger.separator()
         logger.msg(f"Starting evaluation for model {model.name}")
 
-        for metric_name in self._metrics:
-            for k in self._top_k:
-                result = self.evaluate_metric(
-                    metric_name, model, self._dataset, self._config, k
-                )
+        total_evaluation = len(self._metrics) * len(self._top_k)
+        with tqdm(total=total_evaluation, desc="Evaluating metrics") as pbar:
+            for metric_name in self._metrics:
+                for k in self._top_k:
+                    result = self.evaluate_metric(
+                        metric_name, model, self._dataset, self._config, k
+                    )
 
-                if self._config.splitter.validation:
-                    self._result_dict["Validation"][f"{metric_name}@{k}"] = result[
-                        "val"
-                    ]
-                self._result_dict["Test"][f"{metric_name}@{k}"] = result["test"]
+                    if self._config.splitter.validation:
+                        self._result_dict["Validation"][f"{metric_name}@{k}"] = result[
+                            "val"
+                        ]
+                    self._result_dict["Test"][f"{metric_name}@{k}"] = result["test"]
+                    pbar.update()
 
         self._print_console()
         logger.positive(f"Evaluation completed for model {model.name}")
