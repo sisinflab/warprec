@@ -12,7 +12,7 @@ class Slim(ItemSimilarityRecommender):
     """Implementation of Slim model from Sparse Linear Methods for Top-N Recommender Systems 2011.
 
     Args:
-        config (Configuration): The configuration of the experiement.
+        config (Configuration): The configuration of the experiment.
         dataset (AbstractDataset): The dataset to train the model on.
         params (dict): The parameters of the model.
         *args: Variable length argument list.

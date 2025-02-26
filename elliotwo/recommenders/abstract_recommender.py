@@ -16,7 +16,7 @@ class AbstractRecommender(nn.Module, ABC):
 
     Args:
         config (Configuration): The configuration file.
-        dataset (AbstractDataset): The dataset on wich the train will be executed.
+        dataset (AbstractDataset): The dataset on which the train will be executed.
         params (dict): The parameters to set up the model.
         *args: Argument for PyTorch nn.Module.
         **kwargs: Keyword argument for PyTorch nn.Module.
@@ -47,7 +47,7 @@ class AbstractRecommender(nn.Module, ABC):
         """This method will return the part of the recommender that was learned.
 
         Returns:
-            dict: The dictionary containign all the important informations about the model.
+            dict: The dictionary containing all the important information about the model.
         """
 
     @abstractmethod
@@ -72,23 +72,23 @@ class AbstractRecommender(nn.Module, ABC):
         data_to_serialize = self._serialize()
         writer.write_model(data_to_serialize, self.name)
         logger.positive(
-            f"Serialization process of the model {self.name} completed succefully."
+            f"Serialization process of the model {self.name} completed successfully."
         )
 
     def load_model(self, deserialized_data: dict) -> None:
         """This method will load a model from a given checkpoint.
 
         Args:
-            deserialized_data (dict): The deserialized information that \
+            deserialized_data (dict): The deserialized information that
                 will be used to restore the state of the model.
         """
         logger.msg(f"Loading previous state of the model {self.name}.")
         self._deserialize(deserialized_data)
-        logger.positive(f"Loading of the model {self.name} completed succefully.")
+        logger.positive(f"Loading of the model {self.name} completed successfully.")
 
     def get_recs(self, umap_i: dict, imap_i: dict, k: int) -> DataFrame:
-        """This method turns the learned parameters into new \
-            recommendations in DataFrame format.
+        """This method turns the learned parameters into new
+        recommendations in DataFrame format.
 
         Args:
             umap_i (dict): The inverse mapping from index -> user_id.
@@ -98,7 +98,7 @@ class AbstractRecommender(nn.Module, ABC):
         Returns:
             DataFrame: A DataFrame containing the top k recommendations for each user.
         """
-        # Extract informations from model
+        # Extract information from model
         scores = self.forward()
         top_k_items = torch.topk(scores, k, dim=1).indices
         user_ids = torch.arange(scores.shape[0]).unsqueeze(1).expand(-1, k)
@@ -126,8 +126,8 @@ class AbstractRecommender(nn.Module, ABC):
 class ItemSimilarityRecommender(AbstractRecommender):
     """ItemSimilarityRecommender implementation.
 
-    A ItemSimilarityRecommender is a Collaborative Filtering recommendation model \
-        wich learns a similarity matrix B and produces recommendations using the computation: X@B.
+    A ItemSimilarityRecommender is a Collaborative Filtering recommendation model
+    which learns a similarity matrix B and produces recommendations using the computation: X@B.
 
     Args:
         config (Configuration): The configuration file.
@@ -149,11 +149,11 @@ class ItemSimilarityRecommender(AbstractRecommender):
         self.item_similarity = None
 
     def _serialize(self) -> dict:
-        """This method return the part of the recommender that was learned, \
-            in this case the similarity matrix {item x item}.
+        """This method return the part of the recommender that was learned,
+        in this case the similarity matrix {item x item}.
 
         Returns:
-            dict: The dictionary containign all the important informations about the model.
+            dict: The dictionary containing all the important information about the model.
         """
         umap, imap = self._dataset.get_mappings()
         serialization_dict = {
@@ -165,16 +165,16 @@ class ItemSimilarityRecommender(AbstractRecommender):
         return serialization_dict
 
     def _deserialize(self, deserialized_data: dict):
-        """This method load the part of the recommender from a checkpoint, \
-            in this case the similarity matrix {item x item}.
+        """This method load the part of the recommender from a checkpoint,
+        in this case the similarity matrix {item x item}.
 
         Args:
-            deserialized_data (dict): The data loaded with a reader, \
+            deserialized_data (dict): The data loaded with a reader,
                 must be compatible with the model itself.
         """
         if self.__class__.__name__ != deserialized_data["model_name"]:
             logger.negative(
-                "You are trying to load a model informations from a different model."
+                "You are trying to load a model information from a different model."
             )
         self.item_similarity = deserialized_data["item_similarity"]
         self._dataset.update_mappings(

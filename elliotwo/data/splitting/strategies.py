@@ -54,7 +54,7 @@ class RandomSplit(AbstractStrategy):
 
     def split(self, data: DataFrame) -> Tuple[List[int], List[int], List[int]]:
         """Implementation of the random splitting. Original data will
-            be splitted randomly. If a seed has been set, the split will be reproducible.
+        be splitted randomly. If a seed has been set, the split will be reproducible.
 
         Args:
             data (DataFrame): The DataFrame to be splitted.
@@ -82,10 +82,10 @@ class RandomSplit(AbstractStrategy):
         self, data: DataFrame, test_size: float = 0.2
     ) -> Tuple[List[int], List[int]]:
         """Method used to split a set of data into two partition,
-            respecting the ratio given as input.
+        respecting the ratio given as input.
 
         The method used to split data is random. If a seed was set,
-            then the split will be reproducible.
+        then the split will be reproducible.
 
         Args:
             data (DataFrame): The original data in DataFrame format.
@@ -137,7 +137,7 @@ class LeaveOneOutSplit(AbstractStrategy):
 
     def split(self, data: DataFrame) -> Tuple[List[int], List[int], List[int]]:
         """Implementation of the leave-one-out splitting. If a seed has
-            been set, the split will be reproducible.
+        been set, the split will be reproducible.
 
         Args:
             data (DataFrame): The DataFrame to be splitted.
@@ -163,7 +163,7 @@ class LeaveOneOutSplit(AbstractStrategy):
         """Method to split data in two partitions, using a fixed number.
 
         This method will take in account some limit examples like
-            users with less then k transactions.
+        users with less then k transactions.
 
         Args:
             data (DataFrame): The original data in DataFrame format.
@@ -218,7 +218,7 @@ class TemporalSplit(AbstractStrategy):
 
     def split(self, data: DataFrame) -> Tuple[List[int], List[int], List[int]]:
         """Implementation of the temporal splitting. Original data will be splitted
-            according to timestamp. If a seed has been set, the split will be reproducible.
+        according to timestamp. If a seed has been set, the split will be reproducible.
 
         Args:
             data (DataFrame): The DataFrame to be splitted.
@@ -248,7 +248,7 @@ class TemporalSplit(AbstractStrategy):
         """Method to split data in two partitions, using a timestamp.
 
         This method will split data based on time, using as test
-            samples the more recent transactions.
+        samples the more recent transactions.
 
         Args:
             data (DataFrame): The original data in DataFrame format.

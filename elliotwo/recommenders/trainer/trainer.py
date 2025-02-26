@@ -17,7 +17,7 @@ class Trainer:
 
     Args:
         model_name (str): The name of the model to optimize.
-        dataset (AbstractDataset): The dataset on wich optimize the model.
+        dataset (AbstractDataset): The dataset on which optimize the model.
         param_space (dict): The param space to optimize using Hyperopt.
         metric (AbstractMetric): The metric to use as validation.
         top_k (int): The cutoff tu use as validation.
@@ -51,8 +51,8 @@ class Trainer:
     def train_and_evaluate(self) -> Tuple[AbstractRecommender, dict]:
         """Main method of the Trainer class.
 
-        This method will execute the training of the model and evaluation, \
-            according to informations passed through configuration.
+        This method will execute the training of the model and evaluation,
+        according to information passed through configuration.
 
         Returns:
             Tuple[AbstractRecommender, dict]:
@@ -97,8 +97,8 @@ class Trainer:
         self.best_score = best_trial.last_result["score"]
 
         logger.msg(
-            f"Best params combination: {self.best_params} with a score of \
-                {self._metric.get_name()}@{self._top_k}: {self.best_score:.{self._dgts}f}"
+            f"Best params combination: {self.best_params} with a score of "
+            f"{self._metric.get_name()}@{self._top_k}: {self.best_score:.{self._dgts}f}"
         )
         logger.positive(
             f"Hyperparameter tuning for {self._model_name} ended successfully."
@@ -159,7 +159,7 @@ class Trainer:
 
         Args:
             model (AbstractRecommender): The trained model to evaluate.
-            dataset (AbstractDataset): The dataset on wich evaluation will be executed.
+            dataset (AbstractDataset): The dataset on which evaluation will be executed.
             metric (AbstractMetric): The metric to evaluate.
             top_k (int): The cutoff to calculate metric.
 

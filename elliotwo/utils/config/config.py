@@ -137,25 +137,25 @@ class DataConfig(BaseModel):
         # ValueError checks
         if self.loading_strategy == "split" and not self.split_dir:
             raise ValueError(
-                "You have chosen split loading strategy but the split_dir \
-                    field has not been filled."
+                "You have chosen split loading strategy but the split_dir "
+                "field has not been filled."
             )
         if self.loading_strategy == "dataset" and not self.local_path:
             raise ValueError(
-                "You have chosen dataset loading strategy but the local_path \
-                    field has not been filled."
+                "You have chosen dataset loading strategy but the local_path "
+                "field has not been filled."
             )
 
         # Attention checks
         if self.loading_strategy == "split" and self.local_path:
             logger.attention(
-                "You have chosen split loading strategy but the local_path field \
-                    has been filled. Check your configuration file for possible errors."
+                "You have chosen split loading strategy but the local_path field "
+                "has been filled. Check your configuration file for possible errors."
             )
         if self.loading_strategy == "dataset" and self.split_dir:
             logger.attention(
-                "You have chosen dataset loading strategy but the split_dir field \
-                    has been filled. Check your configuration file for possible errors."
+                "You have chosen dataset loading strategy but the split_dir field "
+                "has been filled. Check your configuration file for possible errors."
             )
         return self
 
@@ -193,12 +193,12 @@ class SplittingConfig(BaseModel):
         if v is not None:
             if len(v) not in [2, 3]:
                 raise ValueError(
-                    "List must be of length 2 in case of train/test split or 3 \
-                        in case of train/val/test split."
+                    "List must be of length 2 in case of train/test split or 3 "
+                    "in case of train/val/test split."
                 )
             if not abs(sum(v) - 1.0) < tol:  # Slight tolerance for the sum
                 raise ValueError(
-                    f"The sum of ratios must be 1. Received sum: {sum(v)}."
+                    f"The sum of ratios must be 1. Received sum: {sum(v)}. "
                     f"Accepted tolerance: {tol}"
                 )
         return v
@@ -575,12 +575,15 @@ class Configuration(BaseModel):
         return v
 
     @model_validator(mode="after")
-    def config_validation(self):
+    def config_validation(self) -> "Configuration":
         """This method checks if everything in the configuration file is missing or incorrect.
 
         When the configuration passes this check, everything should be good to go.
 
-        Raise:
+        Returns:
+            Configuration: The validated configuration.
+
+        Raises:
             FileNotFoundError: If the local file has not been found.
             ValueError: If any information between parts of the configuration file is inconsistent.
         """
@@ -616,8 +619,8 @@ class Configuration(BaseModel):
             # Check if column name defined in config are present in the header of the local file
             if not set(_column_names).issubset(set(_header)):
                 raise ValueError(
-                    "Column labels required do not match with the \
-                        column names found in the local file."
+                    "Column labels required do not match with the "
+                    "column names found in the local file."
                 )
 
         # Check if experiment has been set up correctly
@@ -673,7 +676,7 @@ class Configuration(BaseModel):
     def check_column_dtype(self) -> None:
         """This method validates the custom dtype passed with the configuration file.
 
-        Raise:
+        Raises:
             ValueError: If the dtype are not supported or incorrect.
         """
         for dtype_str in self.data.dtype.model_dump().values():

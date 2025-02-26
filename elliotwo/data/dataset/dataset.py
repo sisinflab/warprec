@@ -12,7 +12,7 @@ class AbstractDataset(ABC):
 
     Attributes:
         train_set (Interactions): Training set on that will be used with recommendation models.
-        val_set (Interactions): Validation set, not mandatory, \
+        val_set (Interactions): Validation set, not mandatory,
             used during training to validate the process.
         test_set (Interactions): Test set, not mandatory, used in evaluation to calculate metrics.
 

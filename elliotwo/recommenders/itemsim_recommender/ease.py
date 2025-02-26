@@ -14,7 +14,7 @@ class EASE(ItemSimilarityRecommender):
     preparation shared between all implementations.
 
     Args:
-        config (Configuration): The configuration of the experiement.
+        config (Configuration): The configuration of the experiment.
         dataset (AbstractDataset): The dataset to train the model on.
         params (dict): The parameters of the model.
         *args: Variable length argument list.
@@ -81,5 +81,5 @@ class EASE_Elliot(EASE):
         P = np.linalg.inv(self.item_similarity)
         self.item_similarity = P / (-np.diag(P))
 
-        # Remove diagonal items as in the calssic implementation
+        # Remove diagonal items as in the classic implementation
         self.item_similarity[diagonal_indices] = 0.0

@@ -28,7 +28,7 @@ class Splitter:
         """The main method of the class. This method must be called to split the data.
 
         When called, this method will return the splitting calculated by
-            the splitting method selected in the configuration file.
+        the splitting method selected in the configuration file.
 
         This method accepts transaction data, and will return a TransactionDataset object.
 

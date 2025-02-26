@@ -14,8 +14,8 @@ from elliotwo.utils.logger import logger
 
 
 class AbstractWriter(ABC):
-    """AbstractWriter is the abstract definition of a writer, \
-        during an experiment multiple writers can be defined.
+    """AbstractWriter is the abstract definition of a writer,
+    during an experiment multiple writers can be defined.
 
     Args:
         config (Configuration): The configuration of the experiment.
@@ -29,8 +29,8 @@ class AbstractWriter(ABC):
 
     @abstractmethod
     def setup_experiment(self):
-        """This is the main function to be executed, it sets up all \
-            the important directory to then later save results.
+        """This is the main function to be executed, it sets up all
+        the important directory to then later save results.
         """
 
     @abstractmethod
@@ -89,8 +89,8 @@ class LocalWriter(AbstractWriter):
             self.setup_experiment()
 
     def setup_experiment(self):
-        """This is the main function to be executed, it sets up all \
-            the important directory to then later save results."""
+        """This is the main function to be executed, it sets up all
+        the important directory to then later save results."""
         logger.msg("Setting up experiment local folder.")
 
         # Check if directory exists and create the non existing one
@@ -117,9 +117,9 @@ class LocalWriter(AbstractWriter):
         """This function writes locally all the results of the experiment.
 
         Args:
-            result_dict (dict): The dictionary containing the results, \
-                must be in the format index: value, where index is a \
-                    string formatted as: metric_name@top_k.
+            result_dict (dict): The dictionary containing the results,
+                must be in the format index: value, where index
+                is a string formatted as: metric_name@top_k.
             model_name (str): The name of the model which was evaluated.
             metric_names (List[str]): The names of the metrics to be retrieved from the dictionary.
             top_k (List[int]): The list of top_k, or cutoffs, to retrieve from dictionary.
@@ -138,13 +138,13 @@ class LocalWriter(AbstractWriter):
     def _result_to_dataframe(
         self, result_dict: dict, metric_names: List[str], top_k: List[int]
     ) -> DataFrame:
-        """This is a utility method to transform a dictionary of \
-            results in the corresponding DataFrame format.
+        """This is a utility method to transform a dictionary of
+        results in the corresponding DataFrame format.
 
         Args:
-            result_dict (dict): The dictionary containing the results, \
-                must be in the format index: value, where index is a \
-                    string formatted as: metric_name@top_k.
+            result_dict (dict): The dictionary containing the results,
+                must be in the format index: value, where index is a
+                string formatted as: metric_name@top_k.
             metric_names (List[str]): The names of the metrics to be retrieved from the dictionary.
             top_k (List[int]): The list of top_k, or cutoffs, to retrieve from dictionary.
 
@@ -166,7 +166,7 @@ class LocalWriter(AbstractWriter):
 
         Args:
             recs (DataFrame): The recommendations in DataFrame format.
-            model_name (str): The name of the model wich produced the recommendations.
+            model_name (str): The name of the model which produced the recommendations.
         """
         # experiment_path/recs/model_name.{custom_extension}
         _path = join(
@@ -187,7 +187,7 @@ class LocalWriter(AbstractWriter):
 
     def write_model(self, data_to_serialize: dict, model_name: str):
         """This method writes the model state into a local path,
-            using joblib for the serialization.
+        using joblib for the serialization.
 
         Args:
             data_to_serialize (dict): The original data to be serialized.

@@ -56,7 +56,7 @@ class BasicRegistry(Generic[T]):
             **kwargs: Keyword arguments to pass to the class constructor.
 
         Returns:
-            T: Any type of object stored previosuly.
+            T: Any type of object stored previously.
 
         Raises:
             ValueError: If name is not to be found in registry.
@@ -85,7 +85,7 @@ params_registry: BasicRegistry["RecomModel"] = BasicRegistry("Params")
 
 
 class ModelRegistry:
-    """The defintion of a registry for Recommendation Models.
+    """The definition of a registry for Recommendation Models.
 
     Args:
         registry_name (str): The name of the registry.
@@ -136,11 +136,12 @@ class ModelRegistry:
     ) -> "AbstractRecommender":
         """
         Get an instance from the registry by name.
+
         Args:
             name (str): Name of the registered recommender.
             implementation (str): The name of the implementation of the recommender.
             *args: Arguments to pass to the class constructor.
-            **kwargs: Kayword arguments to pass to the class constructor.
+            **kwargs: Keyword arguments to pass to the class constructor.
 
         Returns:
             AbstractRecommender: The recommender model.
@@ -165,10 +166,11 @@ class ModelRegistry:
     def get_latest(self, name: str, *args, **kwargs) -> "AbstractRecommender":
         """
         Get an instance from the registry by name.
+
         Args:
             name (str): Name of the registered class.
             *args: Arguments to pass to the class constructor.
-            **kwargs: Kayword arguments to pass to the class constructor.
+            **kwargs: Keyword arguments to pass to the class constructor.
 
         Returns:
             AbstractRecommender: The latest version of the recommender model.

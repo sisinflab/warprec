@@ -9,15 +9,15 @@ from elliotwo.utils.registry import metric_registry
 
 
 class Evaluator:
-    """Evaluator class will evaluate a trained model on a given \
-        set of metrics, taking into account the cutoff.
+    """Evaluator class will evaluate a trained model on a given
+    set of metrics, taking into account the cutoff.
 
-    If a validation set has been provided in the dataset, then this \
-        class will provide results on validation too.
+    If a validation set has been provided in the dataset, then this
+    class will provide results on validation too.
 
     Args:
         dataset (AbstractDataset): The dataset to be evaluate.
-        config (Configuration): The configuration where all \
+        config (Configuration): The configuration where all
             information about evaluation is stored.
     """
 
@@ -108,7 +108,7 @@ class Evaluator:
 
         Args:
             res_dict (dict): The dictionary containing all the results.
-            header (str): The header of the evaluation grid, \
+            header (str): The header of the evaluation grid,
                 usually set with the name of evaluation.
         """
         _tab = []

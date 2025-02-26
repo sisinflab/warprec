@@ -56,8 +56,8 @@ class TopKMetric(AbstractMetric):
     ) -> Tuple[Tensor, Tensor]:
         """The data preparation of a TopKMetric starts with the definition of the ranked relevance.
 
-        The different implementation of a TopKMetric should define their \
-            proper way of calculating ground truth.
+        The different implementation of a TopKMetric should define their
+        proper way of calculating ground truth.
 
         Args:
             model (AbstractRecommender): The trained model to evaluate.
@@ -104,10 +104,11 @@ class TopKMetric(AbstractMetric):
 
 
 class BinaryMetric(TopKMetric):
-    """A Binary TopKMetric defines a relevant item either as 1 or 0, \
-        so wether it was or not present in the user interaction list.
-    A metric that is defined as binary will not take into account how \
-        important was the item but rather focus on the quantity of
+    """A Binary TopKMetric defines a relevant item either as 1 or 0,
+    so wether it was or not present in the user interaction list.
+
+    A metric that is defined as binary will not take into account how
+    important was the item but rather focus on the quantity of
     retrieved items.
 
     Args:
@@ -149,7 +150,7 @@ class DiscountedMetric(TopKMetric):
     ) -> Tuple[Tensor, Tensor]:
         ranked_relevances, gt = super().data_preparation(model, dataset, top_k)
 
-        # We precompure the discounted relevance score
+        # We precompute the discounted relevance score
         ranked_relevances = torch.where(
             ranked_relevances != 0,
             2 ** (ranked_relevances + 1) - 1,
@@ -185,10 +186,12 @@ class NDCG(DiscountedMetric):
         self, model: AbstractRecommender, dataset: Interactions, top_k: int
     ) -> float:
         """The nDCG@k metric is defined as the rapport of the DCG@k and the IDCG@k.
-        The DCG@k represent the Discounted Cumulative Gain, \
-            wich measures the gain of the items retrieved.
-        The IDCG@k represent the Ideal Discounted Cumulative Gain, \
-            wich measures the maximum gain possible
+
+        The DCG@k represent the Discounted Cumulative Gain,
+        which measures the gain of the items retrieved.
+
+        The IDCG@k represent the Ideal Discounted Cumulative Gain,
+        which measures the maximum gain possible
         obtainable by a perfect model.
 
         Args:
@@ -240,8 +243,9 @@ class HitRate(BinaryMetric):
     def eval(
         self, model: AbstractRecommender, dataset: Interactions, top_k: int
     ) -> float:
-        """The HitRate@k metric counts the number of users for wich \
-            the model retrieved at least one item.
+        """The HitRate@k metric counts the number of users for which
+        the model retrieved at least one item.
+
         This is normalized by the total number of users.
 
         Args:
@@ -258,8 +262,8 @@ class HitRate(BinaryMetric):
 
 @metric_registry.register("Precision")
 class Precision(BinaryMetric):
-    """Implementation of the Precision metric. More information can \
-        be found here: https://en.wikipedia.org/wiki/Precision_and_recall.
+    """Implementation of the Precision metric. More information can
+    be found here: https://en.wikipedia.org/wiki/Precision_and_recall.
 
     Args:
         config (Configuration): The configuration of the experiment.
@@ -268,8 +272,8 @@ class Precision(BinaryMetric):
     def eval(
         self, model: AbstractRecommender, dataset: Interactions, top_k: int
     ) -> float:
-        """The Precision@k counts the number of item retrieved correctly, \
-            over the maximum number of possible retrieve items.
+        """The Precision@k counts the number of item retrieved correctly,
+        over the maximum number of possible retrieve items.
 
         Args:
             model (AbstractRecommender): The trained model to evaluate.
@@ -285,8 +289,8 @@ class Precision(BinaryMetric):
 
 @metric_registry.register("Recall")
 class Recall(BinaryMetric):
-    """Implementation of the Recall metric. More information can \
-        be found here: https://en.wikipedia.org/wiki/Precision_and_recall.
+    """Implementation of the Recall metric. More information can
+    be found here: https://en.wikipedia.org/wiki/Precision_and_recall.
 
     Args:
         config (Configuration): The configuration of the experiment.
@@ -295,8 +299,8 @@ class Recall(BinaryMetric):
     def eval(
         self, model: AbstractRecommender, dataset: Interactions, top_k: int
     ) -> float:
-        """The Recall@k counts the number of item retrieve correctly, \
-            over the total number of relevant item in the ground truth.
+        """The Recall@k counts the number of item retrieve correctly,
+        over the total number of relevant item in the ground truth.
 
         Args:
             model (AbstractRecommender): The trained model to evaluate.

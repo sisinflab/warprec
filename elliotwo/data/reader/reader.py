@@ -54,8 +54,8 @@ class AbstractReader(ABC):
 
 
 class LocalReader(AbstractReader):
-    """This class extends the AbstractReader, it handles \
-        all the data reading part from a local machine.
+    """This class extends the AbstractReader, it handles
+    all the data reading part from a local machine.
 
     Args:
         config (Configuration): Configuration file.
@@ -67,13 +67,13 @@ class LocalReader(AbstractReader):
         # Retrieve the path from the config. This isn't an optional value
         self._path = config.data.local_path
 
-        # Check if the otional reading parameters have been set
+        # Check if the optional reading parameters have been set
         self._sep = config.data.sep
         self._batch_size = config.data.batch_size
         self._column_names = config.column_names()
         self._dtypes = dict(zip(self._column_names, config.column_dtype()))
 
-        # Check if the optinal label parameters have been set
+        # Check if the optional label parameters have been set
         self._user_label = config.data.labels.user_id_label
         self._item_label = config.data.labels.item_id_label
         self._score_label = config.data.labels.rating_label
@@ -119,7 +119,7 @@ class LocalReader(AbstractReader):
             **kwargs (Any): The keyword arguments. For local reading 'local_path' must be provided.
 
         Returns:
-            dict: The deserialized informations of the model.
+            dict: The deserialized information of the model.
 
         Raises:
             ValueError: If the path was not provided.
@@ -133,8 +133,8 @@ class LocalReader(AbstractReader):
         raise FileNotFoundError(f"Model state not found in {path}")
 
     def read_transaction_split(self) -> TransactionDataset:
-        """This method will read the split data from the local source, \
-            using parameters from the config file.
+        """This method will read the split data from the local source,
+        using parameters from the config file.
 
         Returns:
             TransactionDataset: The dataset object containing the split transaction data.

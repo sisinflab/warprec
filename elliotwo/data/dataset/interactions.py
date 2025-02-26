@@ -37,7 +37,7 @@ class Interactions:
         self._inter_sparse = None
         self._config = config
 
-        # Retrieve informations from config
+        # Retrieve information from config
         self._rating_type = self._config.data.rating_type
         self._user_label = self._config.data.labels.user_id_label
         self._item_label = self._config.data.labels.item_id_label
@@ -99,8 +99,8 @@ class Interactions:
     def get_sparse(self) -> csr_matrix:
         """This method retrieves the sparse representation of data.
 
-        This method also checks if the sparse structure has \
-            already been created, if not then it also create it first.
+        This method also checks if the sparse structure has
+        already been created, if not then it also create it first.
 
         Returns:
             csr_matrix: Sparse representation of the transactions (CSR Format).
