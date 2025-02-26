@@ -189,14 +189,18 @@ class SplittingConfig(BaseModel):
             ValueError: If the list length is different from 2 or 3.
             ValueError: The sum of the values isn't 1.
         """
+        tol = 1e-6
         if v is not None:
             if len(v) not in [2, 3]:
                 raise ValueError(
                     "List must be of length 2 in case of train/test split or 3 \
                         in case of train/val/test split."
                 )
-            if not abs(sum(v) - 1.0) < 1e-6:  # Slight tolerance for the sum
-                raise ValueError(f"The sum of ratios must be 1. Received sum: {sum(v)}")
+            if not abs(sum(v) - 1.0) < tol:  # Slight tolerance for the sum
+                raise ValueError(
+                    f"The sum of ratios must be 1. Received sum: {sum(v)}."
+                    f"Accepted tolerance: {tol}"
+                )
         return v
 
     @model_validator(mode="after")
