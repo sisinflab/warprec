@@ -8,7 +8,7 @@ data:
   rating_type: explicit
   batch_size: 1024
   labels:
-    user_id_lable: user_id
+    user_id_label: user_id
     item_id_label: item_id
     rating_label: rating
     timestamp_label: timestamp

@@ -21,14 +21,30 @@ class Meta(BaseModel):
     implementation: Optional[str] = "latest"
 
 
+class Optimization(BaseModel):
+    """Definition of the Optimization sub-configuration of a RecommenderModel.
+
+    Attributes:
+        strategy (Optional[str]): The strategy to use in the optimization.
+        validation_metric (Optional[str]): The metric/loss that will validate each trial in Ray Tune.
+        mode (Optional[str]): Wether to maximize or minimize the metric/loss.
+    """
+
+    strategy: Optional[str] = "grid"
+    validation_metric: Optional[str] = "NDCG@10"
+    mode: Optional[str] = "max"
+
+
 class RecomModel(BaseModel, ABC):
     """Definition of a RecommendationModel configuration. All models must extend this class.
 
     Attributes:
         meta (Meta): The meta-information about the model. Defaults to Meta default values.
+        optimization (Optimization): The optimization information that will be used by Ray Tune.
     """
 
     meta: Meta = Field(default_factory=Meta)
+    optimization: Optimization = Field(default_factory=Optimization)
 
     @model_validator(mode="after")
     def model_validation(self):

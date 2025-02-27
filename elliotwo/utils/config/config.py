@@ -254,15 +254,18 @@ class Configuration(BaseModel):
         """
         return self.sparse_torch_dtype[self.general.precision]
 
-    def validation_metric(self) -> Tuple[str, int]:
+    def validation_metric(self, val_metric: str) -> Tuple[str, int]:
         """This method will parse the validation metric.
+
+        Args:
+            val_metric (str): The validation metric in string format.
 
         Returns:
             Tuple[str, int]:
                 str: The name of the metric to use for validation.
                 int: The cutoff to use for validation.
         """
-        metric_name, top_k = self.general.validation_metric.split("@")
+        metric_name, top_k = val_metric.split("@")
         return metric_name, int(top_k)
 
     def convert_params(self, model_name: str, param_dict: dict) -> dict:

@@ -8,7 +8,7 @@ data:
   rating_type: explicit
   batch_size: 1024
   labels:
-    user_id_lable: user_id
+    user_id_label: user_id
     item_id_label: item_id
     rating_label: rating
     timestamp_label: timestamp
@@ -25,6 +25,10 @@ models:
     meta:
       save_model: True
       implementation: elliot
+    optimization:
+      strategy: grid
+      validation_metric: NDCG@10
+      mode: max
     l2: [0.0, 200.0]
   #Slim:
   #  l1: [0.1, 0.2, 0.5]
@@ -36,7 +40,6 @@ general:
   seed: 42
   float_digits: 8
   device: cpu
-  validation_metric: NDCG@10
   precision: float64
   max_eval: 10
   recommendation:

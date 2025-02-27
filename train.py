@@ -54,13 +54,15 @@ def main(args: Namespace):
 
     # Trainer testing
     models = list(config.models.keys())
-    val_metric, val_k = config.validation_metric()
-    metric: AbstractMetric = metric_registry.get(val_metric, config=config)
     coo = Evaluator(dataset, config)
 
     for model_name in models:
         params = config.models[model_name]
         train_params = config.convert_params(model_name, params)
+        val_metric, val_k = config.validation_metric(
+            params["optimization"]["validation_metric"]
+        )
+        metric: AbstractMetric = metric_registry.get(val_metric, config=config)
         trainer = Trainer(model_name, dataset, train_params, metric, val_k, config)
         best_model, _ = trainer.train_and_evaluate()
 
