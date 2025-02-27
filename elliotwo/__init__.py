@@ -20,6 +20,7 @@ from .utils import (
     metric_registry,
     params_registry,
     model_registry,
+    parse_params,
 )
 
 __all__ = [
@@ -38,6 +39,7 @@ __all__ = [
     "metric_registry",
     "params_registry",
     "model_registry",
+    "parse_params",
     "AbstractWriter",
     "LocalWriter",
     "LocalReader",

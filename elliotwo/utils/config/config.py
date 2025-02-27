@@ -254,21 +254,6 @@ class Configuration(BaseModel):
         metric_name, top_k = val_metric.split("@")
         return metric_name, int(top_k)
 
-    def convert_params(self, model_name: str, param_dict: dict) -> dict:
-        """This method will parse the parameters of a given model
-        and return them in the correct format.
-
-        Args:
-            model_name (str): The name of the model to parse.
-            param_dict (dict): The dictionary containing the parameters to parse.
-
-        Returns:
-            dict: The dictionary with the parsed parameters in
-                the format {param_name: ray tune object, ...}
-        """
-        model_class: RecomModel = params_registry.get(model_name)
-        return model_class.get_params(param_dict)
-
 
 def load_yaml(path: str) -> Configuration:
     """This method reads the configuration file and returns a Configuration object.

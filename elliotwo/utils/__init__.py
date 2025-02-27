@@ -8,6 +8,7 @@ from .registry import (
 from .dataclasses import TrainerConfig
 from .config import Configuration, load_yaml
 from .logger import logger
+from .ray_utils import parse_params
 
 __all__ = [
     "RatingType",
@@ -20,4 +21,5 @@ __all__ = [
     "Configuration",
     "load_yaml",
     "logger",
+    "parse_params",
 ]

@@ -3,7 +3,6 @@ from dataclasses import dataclass
 
 if TYPE_CHECKING:
     from elliotwo.evaluation.metrics import AbstractMetric
-    from elliotwo.data.dataset import AbstractDataset
 
 
 @dataclass
@@ -13,14 +12,13 @@ class TrainerConfig:
 
     Attributes:
         model_name (str): The name of the model to optimize.
-        dataset (AbstractDataset): The dataset on which optimize the model.
-        param_space (dict): The param space to optimize using Ray Tune.
+        param (dict): The parameters of the model already in
+            Ray Tune format.
         metric (AbstractMetric): The metric to use as validation.
         top_k (int): The cutoff tu use as validation.
     """
 
     model_name: str
-    dataset: "AbstractDataset"
-    param_space: dict
+    param: dict
     metric: "AbstractMetric"
     top_k: int

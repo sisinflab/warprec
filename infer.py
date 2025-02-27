@@ -52,7 +52,6 @@ def main(args: Namespace):
     for model_name in models:
         # Restoring model to previous state
         params = config.models[model_name]
-        train_params = config.convert_params(model_name, params)
         path = params["meta"]["load_from"]
         path = join(path, "serialized", model_name + ".joblib")
         deserialized_data = reader.load_model_state(local_path=path)
@@ -60,7 +59,7 @@ def main(args: Namespace):
         imp = params["meta"]["implementation"]
         if imp == "latest":
             model = model_registry.get_latest(
-                model_name, config=config, dataset=dataset, params=train_params
+                model_name, config=config, dataset=dataset, params=None
             )
         else:
             model = model_registry.get(
@@ -68,7 +67,7 @@ def main(args: Namespace):
                 implementation=imp,
                 config=config,
                 dataset=dataset,
-                params=train_params,
+                params=None,
             )
         model.load_model(deserialized_data)
         _ = coo.run(model)

@@ -1,8 +1,7 @@
 # pylint: disable=E1101
 from typing import List, Optional, Union
-from abc import abstractmethod, ABC
+from abc import ABC
 
-from ray import tune
 from pydantic import BaseModel, Field, model_validator, field_validator
 from elliotwo.utils.registry import params_registry, model_registry, metric_registry
 
@@ -27,21 +26,31 @@ class Optimization(BaseModel):
     Attributes:
         strategy (Optional[str]): The strategy to use in the optimization.
             - grid: Performs grid search over all the parameters provided.
+            - hopt: Bayesian optimization using HyperOptOptimization.
         validation_metric (Optional[str]): The metric/loss that will validate each trial in Ray Tune.
         mode (Optional[str]): Wether to maximize or minimize the metric/loss.
             - min: Minimize the validation metric.
             - max: Maximize the validation metric.
+        num_samples (Optional[int]): The number of trials that Ray Tune will try.
+            In case of a grid search, this parameter should be set to 1.
+        cpu_per_trial (Optional[float]): The number of cpu cores dedicated to
+            each trial.
+        gpu_per_trial (Optional[float]): The number of gpu dedicated to
+            each trial.
     """
 
     strategy: Optional[str] = "grid"
     validation_metric: Optional[str] = "NDCG@10"
     mode: Optional[str] = "max"
+    num_samples: Optional[int] = 1
+    cpu_per_trial: Optional[float] = 1.0
+    gpu_per_trial: Optional[float] = 0.0
 
     @field_validator("strategy")
     @classmethod
     def check_strategy(cls, v):
         """Validate strategy."""
-        supported_strategies = ["grid"]
+        supported_strategies = ["grid", "hopt"]
         if v not in supported_strategies:
             raise ValueError(
                 "The strategy provided is not supported. These are the "
@@ -96,6 +105,9 @@ class RecomModel(BaseModel, ABC):
 
     @model_validator(mode="after")
     def model_validation(self):
+        # This is a list of all strategies that expect data to be
+        # a range format
+        _range_strat = ["hopt"]
         _name = self.__class__.__name__
         _imp = self.meta.implementation
 
@@ -110,23 +122,14 @@ class RecomModel(BaseModel, ABC):
         for field, value in updated_values.items():
             if not isinstance(value, list):
                 updated_values[field] = [value]
+            if self.optimization.strategy in _range_strat and len(value) > 2:
+                raise ValueError(
+                    f"For the strategy {self.optimization.strategy} values of {field} are "
+                    f"expected to range like [1.0, 5.0]. Value received {value}"
+                )
 
         self.__dict__.update(updated_values)
         return self
-
-    @abstractmethod
-    def get_params(self, param_dict: dict) -> dict:
-        """This method transforms the parameters passed to the model
-        in their correct format, to be ingested by Ray Tune.
-
-        Every model should implement their own way of parsing the parameters in the correct format.
-
-        Args:
-            param_dict (dict): The dictionary containing the parameters to parse.
-
-        Returns:
-            dict: The dictionary with parsed parameters for Ray Tune.
-        """
 
 
 @params_registry.register("EASE")
@@ -138,9 +141,6 @@ class EASE(RecomModel):
     """
 
     l2: Union[List[float], float]
-
-    def get_params(self, param_dict: dict) -> dict:
-        return {"l2": tune.uniform(param_dict["l2"][0], param_dict["l2"][1])}
 
 
 @params_registry.register("Slim")
@@ -154,9 +154,3 @@ class Slim(RecomModel):
 
     l1: Union[List[float], float]
     alpha: Union[List[float], float]
-
-    def get_params(self, param_dict: dict) -> dict:
-        return {
-            "l1": tune.uniform(param_dict["l1"][0], param_dict["l1"][1]),
-            "alpha": tune.uniform(param_dict["alpha"][0], param_dict["alpha"][1]),
-        }

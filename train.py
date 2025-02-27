@@ -3,6 +3,7 @@ from argparse import Namespace
 
 from elliotwo.data import LocalReader, LocalWriter, Splitter
 from elliotwo.utils.config import load_yaml
+from elliotwo.utils.ray_utils import parse_params
 from elliotwo.utils.logger import logger
 from elliotwo.recommenders.trainer import Trainer
 from elliotwo.evaluation.evaluator import Evaluator
@@ -59,13 +60,13 @@ def main(args: Namespace):
 
     for model_name in models:
         params = config.models[model_name]
-        train_params = config.convert_params(model_name, params)
         val_metric, val_k = config.validation_metric(
             params["optimization"]["validation_metric"]
         )
         metric: AbstractMetric = metric_registry.get(val_metric, config=config)
-        train_config = TrainerConfig(model_name, dataset, train_params, metric, val_k)
-        trainer = Trainer(train_config, config)
+        train_params = parse_params(params)
+        train_config = TrainerConfig(model_name, train_params, metric, val_k)
+        trainer = Trainer(dataset, train_config, config)
         best_model, _ = trainer.train_and_evaluate()
 
         # Evaluation testing

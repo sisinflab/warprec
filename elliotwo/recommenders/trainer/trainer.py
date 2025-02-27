@@ -16,20 +16,34 @@ class Trainer:
     """This class will be used to train a model and optimize the hyperparameters.
 
     Args:
+        dataset (AbstractDataset): The dataset to use during training.
         train_config (TrainerConfig): The training configuration.
         config (Configuration): The configuration of the experiment.
     """
 
     def __init__(
         self,
+        dataset: AbstractDataset,
         train_config: TrainerConfig,
         config: Configuration,
     ):
         self._train_config = train_config
-        self._dataset = ray.put(train_config.dataset)
+        self._dataset = ray.put(dataset)
         self._config = config
         self._imp = config.models[train_config.model_name]["meta"]["implementation"]
+        self._strategy = config.models[train_config.model_name]["optimization"][
+            "strategy"
+        ]
         self._mode = config.models[train_config.model_name]["optimization"]["mode"]
+        self._num_samples = config.models[train_config.model_name]["optimization"][
+            "num_samples"
+        ]
+        self._cpu = config.models[train_config.model_name]["optimization"][
+            "cpu_per_trial"
+        ]
+        self._gpu = config.models[train_config.model_name]["optimization"][
+            "gpu_per_trial"
+        ]
         self._dgts = self._config.general.float_digits
 
     def train_and_evaluate(self) -> Tuple[AbstractRecommender, dict]:
@@ -45,33 +59,41 @@ class Trainer:
         """
         logger.separator()
         logger.msg(
-            f"Starting hyperparameter tuning for {self._train_config.model_name}"
+            f"Starting hyperparameter tuning for {self._train_config.model_name} "
+            f"with {self._strategy} strategy."
         )
 
-        # Using HyperOpt for TPE search algo
-        search_alg = HyperOptSearch(
-            metric="score",
-            mode=self._mode,
-            random_state_seed=self._config.general.seed,
+        # Ray Tune parameters
+        obj_function = tune.with_parameters(
+            self._objective_function,
+            dataset=self._dataset,
+            model_name=self._train_config.model_name,
+            metric=self._train_config.metric,
+            top_k=self._train_config.top_k,
+            implementation=self._imp,
+            config=self._config,
         )
+
+        # Selecting the correct search algorithm.
+        # This might be done in a better way
+        search_alg = None  # Grid search
+
+        if self._strategy == "hopt":
+            search_alg = HyperOptSearch(
+                metric="score",
+                mode=self._mode,
+                random_state_seed=self._config.general.seed,
+            )
 
         # Run the hyperparameter tuning
         analysis = tune.run(
-            tune.with_parameters(
-                self._objective_function,
-                dataset=self._dataset,
-                model_name=self._train_config.model_name,
-                metric=self._train_config.metric,
-                top_k=self._train_config.top_k,
-                implementation=self._imp,
-                config=self._config,
-            ),
-            resources_per_trial={"cpu": 1},
-            config=self._train_config.param_space,
+            obj_function,
+            resources_per_trial={"cpu": self._cpu, "gpu": self._gpu},
+            config=self._train_config.param,
             metric="score",
             mode=self._mode,
             search_alg=search_alg,
-            num_samples=10,
+            num_samples=self._num_samples,
             verbose=0,
         )
 
@@ -84,7 +106,9 @@ class Trainer:
 
         logger.msg(
             f"Best params combination: {best_params} with a score of "
-            f"{self._train_config.metric.get_name()}@{self._train_config.top_k}: {best_score:.{self._dgts}f}"
+            f"{self._train_config.metric.get_name()}@"
+            f"{self._train_config.top_k}: "
+            f"{best_score:.{self._dgts}f}."
         )
         logger.positive(
             f"Hyperparameter tuning for {self._train_config.model_name} ended successfully."
@@ -117,7 +141,6 @@ class Trainer:
         Returns:
             dict: A dictionary containing the score and the model trained.
         """
-        logger.msg(f"Training with current parameters: {params}")
         if implementation == "latest":
             model = model_registry.get_latest(
                 name=model_name, config=config, dataset=dataset, params=params

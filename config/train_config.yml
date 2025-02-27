@@ -26,10 +26,11 @@ models:
       save_model: True
       implementation: elliot
     optimization:
-      strategy: grid
+      strategy: hopt
       validation_metric: NDCG@10
       mode: max
-    l2: 1.0
+      num_samples: 10
+    l2: [0.0, 200.0]
   #Slim:
   #  l1: [0.1, 0.2, 0.5]
   #  alpha: [0.1, 0.2, 0.5]
