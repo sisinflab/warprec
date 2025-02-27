@@ -1,6 +1,9 @@
+from typing import TYPE_CHECKING
 from dataclasses import dataclass
-from elliotwo.evaluation.metrics import AbstractMetric
-from elliotwo.data.dataset import AbstractDataset
+
+if TYPE_CHECKING:
+    from elliotwo.evaluation.metrics import AbstractMetric
+    from elliotwo.data.dataset import AbstractDataset
 
 
 @dataclass
@@ -17,7 +20,7 @@ class TrainerConfig:
     """
 
     model_name: str
-    dataset: AbstractDataset
+    dataset: "AbstractDataset"
     param_space: dict
-    metric: AbstractMetric
+    metric: "AbstractMetric"
     top_k: int

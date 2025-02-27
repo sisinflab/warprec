@@ -29,7 +29,7 @@ models:
       strategy: grid
       validation_metric: NDCG@10
       mode: max
-    l2: [0.0, 200.0]
+    l2: 1.0
   #Slim:
   #  l1: [0.1, 0.2, 0.5]
   #  alpha: [0.1, 0.2, 0.5]

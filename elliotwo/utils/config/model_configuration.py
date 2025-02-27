@@ -1,9 +1,9 @@
 # pylint: disable=E1101
-from typing import List, Optional
+from typing import List, Optional, Union
 from abc import abstractmethod, ABC
 
 from ray import tune
-from pydantic import BaseModel, Field, field_validator, model_validator
+from pydantic import BaseModel, Field, model_validator
 from elliotwo.utils.registry import params_registry, model_registry
 
 
@@ -50,10 +50,20 @@ class RecomModel(BaseModel, ABC):
     def model_validation(self):
         _name = self.__class__.__name__
         _imp = self.meta.implementation
+
+        # Basic controls
         if _name not in model_registry.list_registered():
             raise ValueError(f"Model {_name} not in model_registry.")
         if _imp not in model_registry.list_implementations(_name):
             raise ValueError(f"Model {_name} does not have {_imp} implementation.")
+
+        # General parameters control
+        updated_values = self.model_dump(exclude=["meta", "optimization"])
+        for field, value in updated_values.items():
+            if not isinstance(value, list):
+                updated_values[field] = [value]
+
+        self.__dict__.update(updated_values)
         return self
 
     @abstractmethod
@@ -76,28 +86,10 @@ class EASE(RecomModel):
     """Definition of the model EASE.
 
     Attributes:
-        l2 (Optional[List[float]]): List of values that l2 regularization can take.
+        l2 (Union[List[float], float]): List of values that l2 regularization can take.
     """
 
-    l2: Optional[List[float]] = [1.0, 2.0]
-
-    @field_validator("l2")
-    @classmethod
-    def check_l2(cls, v):
-        """Validates the l2 regularization.
-
-        Raise:
-            ValueError: If the l2 is not a range compatible with ray tune formulation.
-        """
-        if not isinstance(v, list):
-            raise ValueError(
-                "L2 value must be a list that represents the min and max value to explore."
-            )
-        if len(v) != 2:
-            raise ValueError(
-                "L2 value must be a list that represents the min and max value to explore."
-            )
-        return v
+    l2: Union[List[float], float]
 
     def get_params(self, param_dict: dict) -> dict:
         return {"l2": tune.uniform(param_dict["l2"][0], param_dict["l2"][1])}
@@ -108,12 +100,12 @@ class Slim(RecomModel):
     """Definition of the model Slim.
 
     Attributes:
-        l1 (Optional[List[float]]): List of values that l1 regularization can take.
-        alpha (Optional[List[float]]): List of values that alpha can take.
+        l1 (Union[List[float], float]): List of values that l1 regularization can take.
+        alpha (Union[List[float], float]): List of values that alpha can take.
     """
 
-    l1: Optional[List[float]]
-    alpha: Optional[List[float]]
+    l1: Union[List[float], float]
+    alpha: Union[List[float], float]
 
     def get_params(self, param_dict: dict) -> dict:
         return {
