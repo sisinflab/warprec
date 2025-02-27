@@ -1,6 +1,5 @@
-from typing import Tuple, Any
+from typing import Tuple
 
-import numpy as np
 import ray
 from ray import tune
 from ray.tune.search.hyperopt import HyperOptSearch
@@ -8,6 +7,7 @@ from elliotwo.recommenders.abstract_recommender import AbstractRecommender
 from elliotwo.data.dataset import AbstractDataset
 from elliotwo.evaluation.metrics import AbstractMetric
 from elliotwo.utils.config import Configuration
+from elliotwo.utils.dataclasses import TrainerConfig
 from elliotwo.utils.logger import logger
 from elliotwo.utils.registry import model_registry
 
@@ -16,37 +16,21 @@ class Trainer:
     """This class will be used to train a model and optimize the hyperparameters.
 
     Args:
-        model_name (str): The name of the model to optimize.
-        dataset (AbstractDataset): The dataset on which optimize the model.
-        param_space (dict): The param space to optimize using Hyperopt.
-        metric (AbstractMetric): The metric to use as validation.
-        top_k (int): The cutoff tu use as validation.
+        train_config (TrainerConfig): The training configuration.
         config (Configuration): The configuration of the experiment.
     """
 
     def __init__(
         self,
-        model_name: str,
-        dataset: AbstractDataset,
-        param_space: dict,
-        metric: AbstractMetric,
-        top_k: int,
+        train_config: TrainerConfig,
         config: Configuration,
     ):
-        self._model_name = model_name
-        self._dataset = ray.put(dataset)
-        self._param_space = param_space
-        self._metric = metric
-        self._top_k = top_k
+        self._train_config = train_config
+        self._dataset = ray.put(train_config.dataset)
         self._config = config
-        self._imp = config.models[model_name]["meta"]["implementation"]
+        self._imp = config.models[train_config.model_name]["meta"]["implementation"]
+        self._mode = config.models[train_config.model_name]["optimization"]["mode"]
         self._dgts = self._config.general.float_digits
-        self._rstate = np.random.default_rng(self._config.general.seed)
-
-        # Track best evaluation
-        self.best_params: dict[str, Any] = {}
-        self.best_model = None
-        self.best_score = -np.inf
 
     def train_and_evaluate(self) -> Tuple[AbstractRecommender, dict]:
         """Main method of the Trainer class.
@@ -60,12 +44,14 @@ class Trainer:
                 dict: A dictionary with the best params. The content depends on the model trained.
         """
         logger.separator()
-        logger.msg(f"Starting hyperparameter tuning for {self._model_name}")
+        logger.msg(
+            f"Starting hyperparameter tuning for {self._train_config.model_name}"
+        )
 
         # Using HyperOpt for TPE search algo
         search_alg = HyperOptSearch(
             metric="score",
-            mode="max",
+            mode=self._mode,
             random_state_seed=self._config.general.seed,
         )
 
@@ -74,16 +60,16 @@ class Trainer:
             tune.with_parameters(
                 self._objective_function,
                 dataset=self._dataset,
-                model_name=self._model_name,
-                metric=self._metric,
-                top_k=self._top_k,
+                model_name=self._train_config.model_name,
+                metric=self._train_config.metric,
+                top_k=self._train_config.top_k,
                 implementation=self._imp,
                 config=self._config,
             ),
             resources_per_trial={"cpu": 1},
-            config=self._param_space,
+            config=self._train_config.param_space,
             metric="score",
-            mode="max",
+            mode=self._mode,
             search_alg=search_alg,
             num_samples=10,
             verbose=0,
@@ -92,20 +78,20 @@ class Trainer:
         # Train and retrieve results
         best_trial = analysis.best_trial
 
-        self.best_params = analysis.best_config
-        self.best_model = best_trial.last_result["model"]
-        self.best_score = best_trial.last_result["score"]
+        best_params = analysis.best_config
+        best_model = best_trial.last_result["model"]
+        best_score = best_trial.last_result["score"]
 
         logger.msg(
-            f"Best params combination: {self.best_params} with a score of "
-            f"{self._metric.get_name()}@{self._top_k}: {self.best_score:.{self._dgts}f}"
+            f"Best params combination: {best_params} with a score of "
+            f"{self._train_config.metric.get_name()}@{self._train_config.top_k}: {best_score:.{self._dgts}f}"
         )
         logger.positive(
-            f"Hyperparameter tuning for {self._model_name} ended successfully."
+            f"Hyperparameter tuning for {self._train_config.model_name} ended successfully."
         )
         logger.separator()
 
-        return self.best_model, self.best_params
+        return best_model, best_params
 
     def _objective_function(
         self,
