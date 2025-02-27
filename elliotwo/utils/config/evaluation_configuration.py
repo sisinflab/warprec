@@ -1,0 +1,35 @@
+# pylint: disable=E1101
+from typing import List, Optional
+
+from pydantic import BaseModel, field_validator
+from elliotwo.utils.registry import metric_registry
+
+
+class EvaluationConfig(BaseModel):
+    """Definition of Evaluation configuration.
+
+    Attributes:
+        top_k (List[int]): List of cutoffs to evaluate.
+        metrics (List[str]): List of metrics to compute during evaluation.
+        save_evaluation (Optional[bool]): Wether or not to save the evaluation.
+    """
+
+    top_k: List[int]
+    metrics: List[str]
+    save_evaluation: Optional[bool] = True
+
+    @field_validator("metrics")
+    @classmethod
+    def metrics_validator(cls, v: List[str]):
+        """Validate metrics.
+
+        Raise:
+            ValueError: If the metric is not present in the METRICS_REGISTRY.
+        """
+        for metric in v:
+            if metric.upper() not in metric_registry.list_registered():
+                raise ValueError(
+                    f"Metric {metric} not in metric registry. This is the list"
+                    f"of supported metrics: {metric_registry.list_registered()}"
+                )
+        return v
