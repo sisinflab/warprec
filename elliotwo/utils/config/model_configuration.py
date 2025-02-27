@@ -3,8 +3,8 @@ from typing import List, Optional, Union
 from abc import abstractmethod, ABC
 
 from ray import tune
-from pydantic import BaseModel, Field, model_validator
-from elliotwo.utils.registry import params_registry, model_registry
+from pydantic import BaseModel, Field, model_validator, field_validator
+from elliotwo.utils.registry import params_registry, model_registry, metric_registry
 
 
 class Meta(BaseModel):
@@ -26,13 +26,61 @@ class Optimization(BaseModel):
 
     Attributes:
         strategy (Optional[str]): The strategy to use in the optimization.
+            - grid: Performs grid search over all the parameters provided.
         validation_metric (Optional[str]): The metric/loss that will validate each trial in Ray Tune.
         mode (Optional[str]): Wether to maximize or minimize the metric/loss.
+            - min: Minimize the validation metric.
+            - max: Maximize the validation metric.
     """
 
     strategy: Optional[str] = "grid"
     validation_metric: Optional[str] = "NDCG@10"
     mode: Optional[str] = "max"
+
+    @field_validator("strategy")
+    @classmethod
+    def check_strategy(cls, v):
+        """Validate strategy."""
+        supported_strategies = ["grid"]
+        if v not in supported_strategies:
+            raise ValueError(
+                "The strategy provided is not supported. These are the "
+                f"supported strategies: {supported_strategies}"
+            )
+        return v
+
+    @field_validator("validation_metric")
+    @classmethod
+    def check_validation_metric(cls, v: str):
+        """Validate validation metric."""
+        if "@" not in v:
+            raise ValueError(
+                f"Validation metric {v} not valid. Validation metric "
+                f"should be defined as: metric_name@top_k."
+            )
+        if v.count("@") > 1:
+            raise ValueError(
+                "Validation metric contains more than one @, check your configuration file."
+            )
+        metric, top_k = v.split("@")
+        if metric not in metric_registry.list_registered():
+            raise ValueError(
+                f"Metric {metric} not in metric registry. This is the list"
+                f"of supported metrics: {metric_registry.list_registered()}"
+            )
+        if not top_k.isnumeric():
+            raise ValueError(
+                "Validation metric should be provided with a top_k number."
+            )
+        return v
+
+    @field_validator("mode")
+    @classmethod
+    def check_mode(cls, v):
+        """Validate mode."""
+        if v not in ["min", "max"]:
+            raise ValueError("Mode should be either min or max.")
+        return v
 
 
 class RecomModel(BaseModel, ABC):

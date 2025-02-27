@@ -70,14 +70,7 @@ class Configuration(BaseModel):
     @field_validator("splitter", mode="before")
     @classmethod
     def check_splitter(cls, v: SplittingConfig) -> SplittingConfig:
-        """Validate splitter.
-
-        Args:
-            v (SplittingConfig): The SplittingConfig object to validate.
-
-        Returns:
-            SplittingConfig: The SplittingConfig object if the value is not None.
-        """
+        """Validate splitter."""
         if v is None:
             return SplittingConfig()
         return v
@@ -85,14 +78,7 @@ class Configuration(BaseModel):
     @field_validator("general", mode="before")
     @classmethod
     def check_general(cls, v: GeneralConfig) -> GeneralConfig:
-        """Validate general configuration.
-
-        Args:
-            v (GeneralConfig): The GeneralConfig object to validate.
-
-        Returns:
-            GeneralConfig: The GeneralConfig object if the value is not None.
-        """
+        """Validate general configuration."""
         if v is None:
             return GeneralConfig()
         return v

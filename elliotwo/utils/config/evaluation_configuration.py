@@ -21,11 +21,7 @@ class EvaluationConfig(BaseModel):
     @field_validator("metrics")
     @classmethod
     def metrics_validator(cls, v: List[str]):
-        """Validate metrics.
-
-        Raise:
-            ValueError: If the metric is not present in the METRICS_REGISTRY.
-        """
+        """Validate metrics."""
         for metric in v:
             if metric.upper() not in metric_registry.list_registered():
                 raise ValueError(

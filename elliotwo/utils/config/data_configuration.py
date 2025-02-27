@@ -76,11 +76,7 @@ class DataConfig(BaseModel):
     @field_validator("loading_strategy")
     @classmethod
     def check_loading_strategy(cls, v: str):
-        """Validates the loading strategy.
-
-        Raise:
-            ValueError: If the loading strategy is incorrect or not supported.
-        """
+        """Validates the loading strategy."""
         supported_strategies = ["dataset", "split"]
         if v not in supported_strategies:
             raise ValueError(
@@ -91,11 +87,7 @@ class DataConfig(BaseModel):
     @field_validator("data_type")
     @classmethod
     def check_data_type(cls, v: str):
-        """Validates the data type.
-
-        Raise:
-            ValueError: If the data type is incorrect or not supported.
-        """
+        """Validates the data type."""
         supported_data_types = ["transaction"]
         if v not in supported_data_types:
             raise ValueError(
@@ -106,11 +98,7 @@ class DataConfig(BaseModel):
     @field_validator("sep")
     @classmethod
     def check_sep(cls, v: str):
-        """Validates the separator.
-
-        Raise:
-            UnicodeDecodeError: If the separator is not correct.
-        """
+        """Validates the separator."""
         try:
             v = v.encode().decode("unicode_escape")
         except UnicodeDecodeError:
@@ -122,11 +110,7 @@ class DataConfig(BaseModel):
 
     @model_validator(mode="after")
     def check_data(self):
-        """This method checks if the required information have been passed to the configuration.
-
-        Raise:
-            ValueError: If an important field has not been filled with the correct information.
-        """
+        """This method checks if the required information have been passed to the configuration."""
         # ValueError checks
         if self.loading_strategy == "split" and not self.split_dir:
             raise ValueError(

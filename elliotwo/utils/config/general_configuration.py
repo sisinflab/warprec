@@ -2,7 +2,6 @@
 from typing import Optional
 
 from pydantic import BaseModel, Field, field_validator, model_validator
-from elliotwo.utils.registry import metric_registry
 from elliotwo.utils.logger import logger
 
 
@@ -22,11 +21,7 @@ class GeneralRecommendation(BaseModel):
     @field_validator("sep")
     @classmethod
     def check_sep(cls, v: str):
-        """Validates the separator.
-
-        Raise:
-            UnicodeDecodeError: If the separator is not correct.
-        """
+        """Validates the separator."""
         try:
             v = v.encode().decode("unicode_escape")
         except UnicodeDecodeError:
@@ -69,11 +64,7 @@ class GeneralConfig(BaseModel):
     @field_validator("device")
     @classmethod
     def check_device(cls, v: str):
-        """Validate device.
-
-        Raise:
-            ValueError: If the device is not in the correct format.
-        """
+        """Validate device."""
         if v in ("cuda", "cpu"):
             return v
         if v.startswith("cuda:"):
@@ -82,42 +73,9 @@ class GeneralConfig(BaseModel):
                 return v
         raise ValueError(f'Device {v} is not supported. Use "cpu" or "cuda[:index]".')
 
-    @field_validator("validation_metric")
-    @classmethod
-    def check_validation_metric(cls, v: str):
-        """Validate validation metric.
-
-        Raise:
-            ValueError: If the validation metric is not in the correct format.
-        """
-        if "@" not in v:
-            raise ValueError(
-                f"Validation metric {v} not valid. Validation metric "
-                f"should be defined as: metric_name@top_k."
-            )
-        if v.count("@") > 1:
-            raise ValueError(
-                "Validation metric contains more than one @, check your configuration file."
-            )
-        metric, top_k = v.split("@")
-        if metric not in metric_registry.list_registered():
-            raise ValueError(
-                f"Metric {metric} not in metric registry. This is the list"
-                f"of supported metrics: {metric_registry.list_registered()}"
-            )
-        if not top_k.isnumeric():
-            raise ValueError(
-                "Validation metric should be provided with a top_k number."
-            )
-        return v
-
     @model_validator(mode="after")
     def model_validation(self):
-        """This method validates the General configuration.
-
-        Raise:
-            ValueError: If some values are inconsistent in the configuration file.
-        """
+        """This method validates the General configuration."""
         if self.recommendation.save_recs and not self.setup_experiment:  # pylint: disable=no-member
             raise ValueError(
                 "You are trying to save the recommendations without "

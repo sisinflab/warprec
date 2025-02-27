@@ -29,12 +29,7 @@ class SplittingConfig(BaseModel):
     @field_validator("ratio")
     @classmethod
     def check_sum_to_one(cls, v):
-        """Validates the ratios.
-
-        Raise:
-            ValueError: If the list length is different from 2 or 3.
-            ValueError: The sum of the values isn't 1.
-        """
+        """Validates the ratios."""
         tol = 1e-6
         if v is not None:
             if len(v) not in [2, 3]:
