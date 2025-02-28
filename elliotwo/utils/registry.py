@@ -82,6 +82,8 @@ class BasicRegistry(Generic[T]):
 metric_registry: BasicRegistry["AbstractMetric"] = BasicRegistry("Metrics")
 splitting_registry: BasicRegistry["AbstractStrategy"] = BasicRegistry("Splitting")
 params_registry: BasicRegistry["RecomModel"] = BasicRegistry("Params")
+search_algorithm_registry: BasicRegistry[object] = BasicRegistry("SearchAlgorithms")
+scheduler_registry: BasicRegistry[object] = BasicRegistry("Schedulers")
 
 
 class ModelRegistry:

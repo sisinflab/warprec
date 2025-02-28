@@ -3,7 +3,12 @@ from typing import List, Optional, Union
 from abc import ABC
 
 from pydantic import BaseModel, Field, model_validator, field_validator
-from elliotwo.utils.registry import params_registry, model_registry, metric_registry
+from elliotwo.utils.registry import (
+    params_registry,
+    model_registry,
+    metric_registry,
+    search_algorithm_registry,
+)
 from elliotwo.utils.logger import logger
 
 
@@ -51,11 +56,10 @@ class Optimization(BaseModel):
     @classmethod
     def check_strategy(cls, v):
         """Validate strategy."""
-        supported_strategies = ["grid", "hopt"]
-        if v not in supported_strategies:
+        if v not in search_algorithm_registry.list_registered():
             raise ValueError(
                 "The strategy provided is not supported. These are the "
-                f"supported strategies: {supported_strategies}"
+                f"supported strategies: {search_algorithm_registry.list_registered()}"
             )
         return v
 
@@ -86,18 +90,18 @@ class Optimization(BaseModel):
 
     @field_validator("mode")
     @classmethod
-    def check_mode(cls, v):
+    def check_mode(cls, v: str):
         """Validate mode."""
-        if v not in ["min", "max"]:
+        if v.lower() not in ["min", "max"]:
             raise ValueError("Mode should be either min or max.")
-        return v
+        return v.lower()
 
     @model_validator(mode="after")
     def model_validation(self):
         if self.strategy == "grid" and self.num_samples > 1:
             logger.attention(
                 f"You are running a grid search with num_samples {self.num_samples}, "
-                f"this will execute the grid search more times than needed."
+                f"check your configuration for possible mistakes."
             )
         return self
 
