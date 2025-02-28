@@ -4,6 +4,7 @@ from abc import ABC
 
 from pydantic import BaseModel, Field, model_validator, field_validator
 from elliotwo.utils.registry import params_registry, model_registry, metric_registry
+from elliotwo.utils.logger import logger
 
 
 class Meta(BaseModel):
@@ -90,6 +91,15 @@ class Optimization(BaseModel):
         if v not in ["min", "max"]:
             raise ValueError("Mode should be either min or max.")
         return v
+
+    @model_validator(mode="after")
+    def model_validation(self):
+        if self.strategy == "grid" and self.num_samples > 1:
+            logger.attention(
+                f"You are running a grid search with num_samples {self.num_samples}, "
+                f"this will execute the grid search more times than needed."
+            )
+        return self
 
 
 class RecomModel(BaseModel, ABC):
