@@ -26,17 +26,59 @@ class Meta(BaseModel):
     implementation: Optional[str] = "latest"
 
 
+class Properties(BaseModel):
+    """Definition of the Properties of the search algorithm and
+    the scheduler.
+
+    Some of these attributes are required for Ray Tune to work properly.
+
+    Attributes:
+        mode (Optional[str]): Wether to maximize or minimize the metric/loss.
+            - min: Minimize the validation metric.
+            - max: Maximize the validation metric.
+        seed (Optional[int]): The seed to use during optimization.
+            This parameter will make the experiment reproducible.
+        time_attr (Optional[str]): The measure of time that will be used
+            by the scheduler.
+        max_t (Optional[int]): Max time unit given to each trial.
+        grace_period (Optional[int]): Min time unit given to each trial.
+        reduction_factor (Optional[float]): Halving rate of trials.
+    """
+
+    mode: Optional[str]
+    seed: Optional[int]
+    time_attr: Optional[str]
+    max_t: Optional[int]
+    grace_period: Optional[int]
+    reduction_factor: Optional[float]
+
+    @field_validator("mode")
+    @classmethod
+    def check_mode(cls, v: str):
+        """Validate mode."""
+        if v.lower() not in ["min", "max"]:
+            raise ValueError("Mode should be either min or max.")
+        return v.lower()
+
+
 class Optimization(BaseModel):
     """Definition of the Optimization sub-configuration of a RecommenderModel.
 
     Attributes:
         strategy (Optional[str]): The strategy to use in the optimization.
             - grid: Performs grid search over all the parameters provided.
+            - random: Random search over the param space.
             - hopt: Bayesian optimization using HyperOptOptimization.
+            - optuna: Optuna optimization, more information can
+                be found at https://docs.ray.io/en/latest/tune/api/doc/ray.tune.search.optuna.OptunaSearch.html
+            - bohb: BOHB optimization, more information can
+                be found at https://docs.ray.io/en/latest/tune/api/doc/ray.tune.search.bohb.TuneBOHB.html
+        scheduler (Optional[str]): The scheduler to use in optimization.
+            - fifo: Classic First In First Out trail optimization.
+            - asha: ASHA Scheduler, more information can be found
+                at https://docs.ray.io/en/latest/tune/api/doc/ray.tune.schedulers.ASHAScheduler.html.
+        properties (Optional[Properties]): The attributes required for Ray Tune to work.
         validation_metric (Optional[str]): The metric/loss that will validate each trial in Ray Tune.
-        mode (Optional[str]): Wether to maximize or minimize the metric/loss.
-            - min: Minimize the validation metric.
-            - max: Maximize the validation metric.
         num_samples (Optional[int]): The number of trials that Ray Tune will try.
             In case of a grid search, this parameter should be set to 1.
         cpu_per_trial (Optional[float]): The number of cpu cores dedicated to
@@ -46,8 +88,9 @@ class Optimization(BaseModel):
     """
 
     strategy: Optional[str] = "grid"
+    scheduler: Optional[str] = "fifo"
+    properties: Optional[Properties] = None
     validation_metric: Optional[str] = "NDCG@10"
-    mode: Optional[str] = "max"
     num_samples: Optional[int] = 1
     cpu_per_trial: Optional[float] = 1.0
     gpu_per_trial: Optional[float] = 0.0
@@ -87,14 +130,6 @@ class Optimization(BaseModel):
                 "Validation metric should be provided with a top_k number."
             )
         return v
-
-    @field_validator("mode")
-    @classmethod
-    def check_mode(cls, v: str):
-        """Validate mode."""
-        if v.lower() not in ["min", "max"]:
-            raise ValueError("Mode should be either min or max.")
-        return v.lower()
 
     @model_validator(mode="after")
     def model_validation(self):

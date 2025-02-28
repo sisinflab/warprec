@@ -27,8 +27,11 @@ models:
       implementation: elliot
     optimization:
       strategy: hopt
+      scheduler: fifo
+      properties:
+        mode: max
+        seed: 42
       validation_metric: NDCG@10
-      mode: max
       num_samples: 10
     l2: [0.0, 200.0]
   #Slim:
