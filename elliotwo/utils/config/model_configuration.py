@@ -133,7 +133,7 @@ class Optimization(BaseModel):
 
     @model_validator(mode="after")
     def model_validation(self):
-        if self.strategy == "grid" and self.num_samples > 1:
+        if self.strategy == SearchAlgorithms.GRID and self.num_samples > 1:
             logger.attention(
                 f"You are running a grid search with num_samples {self.num_samples}, "
                 f"check your configuration for possible mistakes."
@@ -156,7 +156,6 @@ class RecomModel(BaseModel, ABC):
     def model_validation(self):
         # This is a list of all strategies that expect data to be
         # a range format
-        _range_strat = ["hopt"]
         _name = self.__class__.__name__
         _imp = self.meta.implementation
 
@@ -171,10 +170,14 @@ class RecomModel(BaseModel, ABC):
         for field, value in updated_values.items():
             if not isinstance(value, list):
                 updated_values[field] = [value]
-            if self.optimization.strategy in _range_strat and len(value) > 2:
+            if (
+                not self.optimization.strategy == SearchAlgorithms.GRID
+                and not all(isinstance(item, str) for item in value)
+                and len(value) > 2
+            ):
                 raise ValueError(
-                    f"For the strategy {self.optimization.strategy} values of {field} are "
-                    f"expected to range like [1.0, 5.0]. Value received {value}"
+                    f"For the strategy {self.optimization.strategy.name} values of {field} are "
+                    f"expected in range form, like [1.0, 5.0]. Value received {value}"
                 )
 
         self.__dict__.update(updated_values)
