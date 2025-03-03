@@ -33,7 +33,7 @@ models:
         seed: 42
       validation_metric: NDCG@10
       num_samples: 10
-    l2: [0.0, 200.0]
+    l2: ['qloguniform', 5.0, 200.0, 5.0]
   #Slim:
   #  l1: [0.1, 0.2, 0.5]
   #  alpha: [0.1, 0.2, 0.5]

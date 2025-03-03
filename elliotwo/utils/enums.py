@@ -1,4 +1,5 @@
 from enum import Enum
+from typing import List
 
 
 class RatingType(str, Enum):
@@ -65,3 +66,45 @@ class Schedulers(str, Enum):
 
     FIFO = "fifo"
     ASHA = "asha"
+
+
+class SearchSpace(str, Enum):
+    """Represents the types of search spaces supported.
+
+    This enum is used to track the possible search spaces:
+        - UNIFORM: Uniform search space.
+        - QUNIFORM: Rounded Uniform search space.
+        - LOGUNIFORM: Logarithmic Uniform search space.
+        - QLOGUNIFORM: Rounded Logarithmic Uniform search space.
+        - RANDN: Random search space.
+        - QRANDN: Rounded Random search space.
+        - RANDINT: Random Integer search space.
+        - QRANDINT: Rounded Random Integer search space.
+        - LOGRANDINT: Logarithmic Random Integer search space.
+        - QLOGRANDINT: Rounded Logarithmic Random Integer search space.
+        - CHOICE: Discrete search space.
+        - GRID: Exhaustive discrete search space for grid search.
+    """
+
+    UNIFORM = "uniform"
+    QUNIFORM = "quniform"
+    LOGUNIFORM = "loguniform"
+    QLOGUNIFORM = "qloguniform"
+    RANDN = "randn"
+    QRANDN = "qrandn"
+    RANDINT = "randint"
+    QRANDINT = "qrandint"
+    LOGRANDINT = "lograndint"
+    QLOGRANDINT = "qlograndint"
+    CHOICE = "choice"
+    GRID = "grid"
+
+
+def rounded_search_spaces() -> List["SearchSpace"]:
+    return [
+        SearchSpace.QUNIFORM,
+        SearchSpace.QLOGUNIFORM,
+        SearchSpace.QRANDN,
+        SearchSpace.QRANDINT,
+        SearchSpace.QLOGRANDINT,
+    ]

@@ -1,4 +1,11 @@
-from .enums import RatingType, SplittingStrategies, SearchAlgorithms, Schedulers
+from .enums import (
+    RatingType,
+    SplittingStrategies,
+    SearchAlgorithms,
+    Schedulers,
+    SearchSpace,
+    rounded_search_spaces,
+)
 from .registry import (
     splitting_registry,
     metric_registry,
@@ -6,6 +13,7 @@ from .registry import (
     model_registry,
     search_algorithm_registry,
     scheduler_registry,
+    search_space_registry,
 )
 from .config import Configuration, load_yaml, parse_params
 from .logger import logger
@@ -15,12 +23,15 @@ __all__ = [
     "SplittingStrategies",
     "SearchAlgorithms",
     "Schedulers",
+    "SearchSpace",
+    "rounded_search_spaces",
     "splitting_registry",
     "metric_registry",
     "params_registry",
     "model_registry",
     "search_algorithm_registry",
     "scheduler_registry",
+    "search_space_registry",
     "Configuration",
     "load_yaml",
     "parse_params",

@@ -22,6 +22,7 @@ from .utils import (
     model_registry,
     search_algorithm_registry,
     scheduler_registry,
+    search_space_registry,
 )
 
 __all__ = [
@@ -42,6 +43,7 @@ __all__ = [
     "model_registry",
     "search_algorithm_registry",
     "scheduler_registry",
+    "search_space_registry",
     "AbstractWriter",
     "LocalWriter",
     "LocalReader",

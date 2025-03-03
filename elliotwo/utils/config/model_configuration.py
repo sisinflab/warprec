@@ -2,7 +2,12 @@ from typing import List, Optional, Union
 from abc import ABC
 
 from pydantic import BaseModel, Field, model_validator, field_validator
-from elliotwo.utils.enums import SearchAlgorithms, Schedulers
+from elliotwo.utils.enums import (
+    SearchAlgorithms,
+    Schedulers,
+    SearchSpace,
+    rounded_search_spaces,
+)
 from elliotwo.utils.registry import (
     params_registry,
     model_registry,
@@ -169,17 +174,61 @@ class RecomModel(BaseModel, ABC):
         updated_values = self.model_dump(exclude=["meta", "optimization"])
         for field, value in updated_values.items():
             if not isinstance(value, list):
-                updated_values[field] = [value]
-            if (
-                not self.optimization.strategy == SearchAlgorithms.GRID
-                and not all(isinstance(item, str) for item in value)
-                and len(value) > 2
-            ):
-                raise ValueError(
-                    f"For the strategy {self.optimization.strategy.name} values of {field} are "
-                    f"expected in range form, like [1.0, 5.0]. Value received {value}"
-                )
+                value = [value]
+                updated_values[field] = value
 
+            if self.optimization.strategy == SearchAlgorithms.GRID:
+                if all(isinstance(item, value[0]) for item in value):
+                    updated_values[field] = [SearchSpace.GRID] + value
+                else:
+                    raise ValueError(
+                        f"For the Grid Search optimization the field {field} "
+                        f"must be all of the same type. Values received {value}."
+                    )
+            else:
+                if all(isinstance(item, str) for item in value):
+                    updated_values[field] = [SearchSpace.CHOICE] + value
+                else:
+                    if len(value) < 2 or len(value) > 4:
+                        raise ValueError(
+                            f"The value list is expected to be either: a range list, like "
+                            f"[1.0, 5.0] or a range list with the first element as the "
+                            f"distribution to use for the sampling process, like ['uniform', 1.0, 5.0]. "
+                            f"In case of rounded distribution a fourth value is required. "
+                            f"For the field {field} the value received was {value}."
+                        )
+                    elif len(value) == 2:
+                        if all(isinstance(item, (float, int)) for item in value):
+                            updated_values[field] = [SearchSpace.UNIFORM] + value
+                        else:
+                            raise ValueError(
+                                f"The range must be in float format. For the field {field} "
+                                f"the value received was {value}"
+                            )
+                    else:
+                        if isinstance(value[0], str) and all(
+                            isinstance(item, (float, int)) for item in value[1:]
+                        ):
+                            if (
+                                value[0] in rounded_search_spaces()
+                                and len(value) == 4
+                                or value[0] not in rounded_search_spaces()
+                                and len(value) == 3
+                            ):
+                                updated_values[field] = value
+                            else:
+                                raise ValueError(
+                                    f"Rounded distribution expect three values, with the third one being "
+                                    f"the approximation. Not rounded distribution expect two values. "
+                                    f"You passed {value} for the field {field}."
+                                )
+                        else:
+                            raise ValueError(
+                                f"Values are expected to be all float numbers, like [1.0, 5.0] or "
+                                f"they you can pass the format of the parameter space in form of a "
+                                f"string as the first element in the list, like ['uniform', 1.0, 5.0]. "
+                                f"You passed {value} for the field {field}."
+                            )
         self.__dict__.update(updated_values)
         return self
 
@@ -189,10 +238,10 @@ class EASE(RecomModel):
     """Definition of the model EASE.
 
     Attributes:
-        l2 (Union[List[float], float]): List of values that l2 regularization can take.
+        l2 (Union[List[Union[str, float, int]], float, int]): List of values that l2 regularization can take.
     """
 
-    l2: Union[List[float], float]
+    l2: Union[List[Union[str, float, int]], float, int]
 
 
 @params_registry.register("Slim")
@@ -200,9 +249,9 @@ class Slim(RecomModel):
     """Definition of the model Slim.
 
     Attributes:
-        l1 (Union[List[float], float]): List of values that l1 regularization can take.
-        alpha (Union[List[float], float]): List of values that alpha can take.
+        l1 (Union[List[Union[str, float, int]], float, int]): List of values that l1 regularization can take.
+        alpha (Union[List[Union[str, float, int]], float, int]): List of values that alpha can take.
     """
 
-    l1: Union[List[float], float]
-    alpha: Union[List[float], float]
+    l1: Union[List[Union[str, float, int]], float, int]
+    alpha: Union[List[Union[str, float, int]], float, int]

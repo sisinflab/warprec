@@ -2,7 +2,7 @@ from typing import TypeVar, Dict, Type, Optional, Callable, List, Generic, TYPE_
 
 if TYPE_CHECKING:
     from elliotwo.recommenders.abstract_recommender import AbstractRecommender
-    from elliotwo.utils.config import RecomModel
+    from elliotwo.utils.config import RecomModel, SearchSpaceWrapper
     from elliotwo.evaluation.metrics import AbstractMetric
     from elliotwo.data.splitting.strategies import AbstractStrategy
     from elliotwo.recommenders.trainer.strategies import (
@@ -90,6 +90,9 @@ search_algorithm_registry: BasicRegistry["BaseSearchWrapper"] = BasicRegistry(
     "SearchAlgorithms"
 )
 scheduler_registry: BasicRegistry["BaseSchedulerWrapper"] = BasicRegistry("Schedulers")
+search_space_registry: BasicRegistry["SearchSpaceWrapper"] = BasicRegistry(
+    "SearchSpace"
+)
 
 
 class ModelRegistry:
