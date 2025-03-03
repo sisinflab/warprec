@@ -23,7 +23,7 @@ splitter:
 models:
   EASE:
     meta:
-      save_model: True
+      save_model: False
       implementation: elliot
     optimization:
       strategy: hopt

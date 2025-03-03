@@ -2,13 +2,21 @@ from typing import Tuple
 
 import ray
 from ray import tune
-from ray.tune.search.hyperopt import HyperOptSearch
 from elliotwo.recommenders.abstract_recommender import AbstractRecommender
 from elliotwo.data.dataset import AbstractDataset
 from elliotwo.evaluation.metrics import AbstractMetric
-from elliotwo.utils.config import Configuration
+from elliotwo.recommenders.trainer.strategies import (
+    BaseSearchWrapper,
+    BaseSchedulerWrapper,
+)
+from elliotwo.utils.config import Configuration, RecomModel
 from elliotwo.utils.logger import logger
-from elliotwo.utils.registry import model_registry
+from elliotwo.utils.registry import (
+    model_registry,
+    params_registry,
+    search_algorithm_registry,
+    scheduler_registry,
+)
 
 
 class Trainer:
@@ -40,12 +48,17 @@ class Trainer:
         self._top_k = top_k
         self._dataset = ray.put(dataset)
         self._config = config
-        self._imp = config.models[model_name]["meta"]["implementation"]
-        self._strategy = config.models[model_name]["optimization"]["strategy"]
-        self._mode = config.models[model_name]["optimization"]["mode"]
-        self._num_samples = config.models[model_name]["optimization"]["num_samples"]
-        self._cpu = config.models[model_name]["optimization"]["cpu_per_trial"]
-        self._gpu = config.models[model_name]["optimization"]["gpu_per_trial"]
+        self._model_params: RecomModel = params_registry.get(
+            model_name, **config.models[model_name]
+        )
+        self._imp = self._model_params.meta.implementation
+        self._strategy = self._model_params.optimization.strategy
+        self._scheduler = self._model_params.optimization.scheduler
+        self._mode = self._model_params.optimization.properties.mode
+        self._properties = self._model_params.optimization.properties
+        self._num_samples = self._model_params.optimization.num_samples
+        self._cpu = self._model_params.optimization.cpu_per_trial
+        self._gpu = self._model_params.optimization.gpu_per_trial
         self._dgts = self._config.general.float_digits
 
     def train_and_evaluate(self) -> Tuple[AbstractRecommender, dict]:
@@ -62,7 +75,7 @@ class Trainer:
         logger.separator()
         logger.msg(
             f"Starting hyperparameter tuning for {self._model_name} "
-            f"with {self._strategy} strategy."
+            f"with {self._strategy.name} strategy and with {self._scheduler.name} scheduler."
         )
 
         # Ray Tune parameters
@@ -78,31 +91,28 @@ class Trainer:
 
         # Selecting the correct search algorithm.
         # This might be done in a better way
-        search_alg = None  # Grid search
-
-        if self._strategy == "hopt":
-            search_alg = HyperOptSearch(
-                metric="score",
-                mode=self._mode,
-                random_state_seed=self._config.general.seed,
-            )
+        search_alg: BaseSearchWrapper = search_algorithm_registry.get(
+            self._strategy, **self._properties.model_dump()
+        )
+        scheduler: BaseSchedulerWrapper = scheduler_registry.get(
+            self._scheduler, **self._properties.model_dump()
+        )
 
         # Run the hyperparameter tuning
         analysis = tune.run(
             obj_function,
             resources_per_trial={"cpu": self._cpu, "gpu": self._gpu},
             config=self._train_param,
-            metric="score",
-            mode=self._mode,
             search_alg=search_alg,
+            scheduler=scheduler,
             num_samples=self._num_samples,
             verbose=0,
         )
 
         # Train and retrieve results
-        best_trial = analysis.best_trial
+        best_trial = analysis.get_best_trial("score", self._mode)
+        best_params = analysis.get_best_config("score", self._mode)
 
-        best_params = analysis.best_config
         best_model = best_trial.last_result["model"]
         best_score = best_trial.last_result["score"]
 

@@ -4,6 +4,8 @@ from .registry import (
     metric_registry,
     params_registry,
     model_registry,
+    search_algorithm_registry,
+    scheduler_registry,
 )
 from .config import Configuration, load_yaml
 from .logger import logger
@@ -18,6 +20,8 @@ __all__ = [
     "metric_registry",
     "params_registry",
     "model_registry",
+    "search_algorithm_registry",
+    "scheduler_registry",
     "Configuration",
     "load_yaml",
     "logger",

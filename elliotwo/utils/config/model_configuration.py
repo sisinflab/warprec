@@ -2,6 +2,7 @@ from typing import List, Optional, Union
 from abc import ABC
 
 from pydantic import BaseModel, Field, model_validator, field_validator
+from elliotwo.utils.enums import SearchAlgorithms, Schedulers
 from elliotwo.utils.registry import (
     params_registry,
     model_registry,
@@ -44,12 +45,12 @@ class Properties(BaseModel):
         reduction_factor (Optional[float]): Halving rate of trials.
     """
 
-    mode: Optional[str]
-    seed: Optional[int]
-    time_attr: Optional[str]
-    max_t: Optional[int]
-    grace_period: Optional[int]
-    reduction_factor: Optional[float]
+    mode: Optional[str] = None
+    seed: Optional[int] = None
+    time_attr: Optional[str] = None
+    max_t: Optional[int] = None
+    grace_period: Optional[int] = None
+    reduction_factor: Optional[float] = None
 
     @field_validator("mode")
     @classmethod
@@ -64,7 +65,7 @@ class Optimization(BaseModel):
     """Definition of the Optimization sub-configuration of a RecommenderModel.
 
     Attributes:
-        strategy (Optional[str]): The strategy to use in the optimization.
+        strategy (Optional[SearchAlgorithms]): The strategy to use in the optimization.
             - grid: Performs grid search over all the parameters provided.
             - random: Random search over the param space.
             - hopt: Bayesian optimization using HyperOptOptimization.
@@ -72,7 +73,7 @@ class Optimization(BaseModel):
                 be found at https://docs.ray.io/en/latest/tune/api/doc/ray.tune.search.optuna.OptunaSearch.html.
             - bohb: BOHB optimization, more information can
                 be found at https://docs.ray.io/en/latest/tune/api/doc/ray.tune.search.bohb.TuneBOHB.html.
-        scheduler (Optional[str]): The scheduler to use in optimization.
+        scheduler (Optional[Schedulers]): The scheduler to use in optimization.
             - fifo: Classic First In First Out trial optimization.
             - asha: ASHA Scheduler, more information can be found
                 at https://docs.ray.io/en/latest/tune/api/doc/ray.tune.schedulers.ASHAScheduler.html.
@@ -86,8 +87,8 @@ class Optimization(BaseModel):
             each trial.
     """
 
-    strategy: Optional[str] = "grid"
-    scheduler: Optional[str] = "fifo"
+    strategy: Optional[SearchAlgorithms] = SearchAlgorithms.GRID
+    scheduler: Optional[Schedulers] = Schedulers.FIFO
     properties: Optional[Properties] = None
     validation_metric: Optional[str] = "NDCG@10"
     num_samples: Optional[int] = 1
@@ -96,9 +97,9 @@ class Optimization(BaseModel):
 
     @field_validator("strategy")
     @classmethod
-    def check_strategy(cls, v):
+    def check_strategy(cls, v: str):
         """Validate strategy."""
-        if v not in search_algorithm_registry.list_registered():
+        if v.upper() not in search_algorithm_registry.list_registered():
             raise ValueError(
                 "The strategy provided is not supported. These are the "
                 f"supported strategies: {search_algorithm_registry.list_registered()}"

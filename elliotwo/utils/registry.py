@@ -5,6 +5,10 @@ if TYPE_CHECKING:
     from elliotwo.utils.config import RecomModel
     from elliotwo.evaluation.metrics import AbstractMetric
     from elliotwo.data.splitting.strategies import AbstractStrategy
+    from elliotwo.recommenders.trainer.strategies import (
+        BaseSearchWrapper,
+        BaseSchedulerWrapper,
+    )
 
 T = TypeVar("T")
 
@@ -82,8 +86,10 @@ class BasicRegistry(Generic[T]):
 metric_registry: BasicRegistry["AbstractMetric"] = BasicRegistry("Metrics")
 splitting_registry: BasicRegistry["AbstractStrategy"] = BasicRegistry("Splitting")
 params_registry: BasicRegistry["RecomModel"] = BasicRegistry("Params")
-search_algorithm_registry: BasicRegistry[object] = BasicRegistry("SearchAlgorithms")
-scheduler_registry: BasicRegistry[object] = BasicRegistry("Schedulers")
+search_algorithm_registry: BasicRegistry["BaseSearchWrapper"] = BasicRegistry(
+    "SearchAlgorithms"
+)
+scheduler_registry: BasicRegistry["BaseSchedulerWrapper"] = BasicRegistry("Schedulers")
 
 
 class ModelRegistry:

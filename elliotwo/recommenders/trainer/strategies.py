@@ -12,7 +12,7 @@ Author: Avolio Marco
 Date: 03/03/2025
 """
 
-from abc import ABC
+from abc import ABC, abstractmethod
 
 from ray.tune.search.hyperopt import HyperOptSearch
 from ray.tune.search.optuna import OptunaSearch
@@ -25,8 +25,16 @@ from elliotwo.utils.enums import SearchAlgorithms, Schedulers
 from elliotwo.utils.registry import search_algorithm_registry, scheduler_registry
 
 
+class BaseSearchWrapper(ABC):
+    """Common interface for all search algorithm wrappers."""
+
+    @abstractmethod
+    def __init__(self, **kwargs):
+        pass
+
+
 @search_algorithm_registry.register(SearchAlgorithms.GRID)
-class GridSearchWrapper(ABC):
+class GridSearchWrapper(BaseSearchWrapper):
     """Wrapper for the GridSearch algorithm in Ray Tune.
 
     This wrapper is empty in order to be registered inside
@@ -36,12 +44,12 @@ class GridSearchWrapper(ABC):
     def __init__(self, **kwargs):
         pass
 
-    def __new__(cls):
+    def __new__(cls, **kwargs):
         return None
 
 
 @search_algorithm_registry.register(SearchAlgorithms.RANDOM)
-class RandomSearchWrapper(ABC):
+class RandomSearchWrapper(BaseSearchWrapper):
     """Wrapper for the RandomSearch algorithm in Ray Tune.
 
     This wrapper is empty in order to be registered inside
@@ -51,12 +59,12 @@ class RandomSearchWrapper(ABC):
     def __init__(self, **kwargs):
         pass
 
-    def __new__(cls):
+    def __new__(cls, **kwargs):
         return None
 
 
 @search_algorithm_registry.register(SearchAlgorithms.HYPEROPT)
-class HyperOptWrapper(HyperOptSearch, ABC):
+class HyperOptWrapper(HyperOptSearch, BaseSearchWrapper):
     """Wrapper for the HyperOpt algorithm in Ray Tune.
 
     Args:
@@ -71,7 +79,7 @@ class HyperOptWrapper(HyperOptSearch, ABC):
 
 
 @search_algorithm_registry.register(SearchAlgorithms.OPTUNA)
-class OptunaWrapper(OptunaSearch, ABC):
+class OptunaWrapper(OptunaSearch, BaseSearchWrapper):
     """Wrapper for the HyperOpt algorithm in Ray Tune.
 
     Args:
@@ -86,7 +94,7 @@ class OptunaWrapper(OptunaSearch, ABC):
 
 
 @search_algorithm_registry.register(SearchAlgorithms.BOHB)
-class BOHBWrapper(TuneBOHB, ABC):
+class BOHBWrapper(TuneBOHB, BaseSearchWrapper):
     """Wrapper for the HyperOpt algorithm in Ray Tune.
 
     Args:
@@ -100,8 +108,16 @@ class BOHBWrapper(TuneBOHB, ABC):
         super().__init__(mode=mode, seed=seed, metric="score")
 
 
+class BaseSchedulerWrapper(ABC):
+    """Common interface for all scheduler wrappers."""
+
+    @abstractmethod
+    def __init__(self, **kwargs):
+        pass
+
+
 @scheduler_registry.register(Schedulers.FIFO)
-class FIFOSchedulerWrapper(FIFOScheduler, ABC):
+class FIFOSchedulerWrapper(FIFOScheduler, BaseSchedulerWrapper):
     """Wrapper for the FIFO scheduler."""
 
     def __init__(self, **kwargs):
@@ -109,7 +125,7 @@ class FIFOSchedulerWrapper(FIFOScheduler, ABC):
 
 
 @scheduler_registry.register(Schedulers.ASHA)
-class ASHASchedulerWrapper(ASHAScheduler, ABC):
+class ASHASchedulerWrapper(ASHAScheduler, BaseSchedulerWrapper):
     """Wrapper for the ASHA scheduler.
 
     Args:
@@ -117,7 +133,7 @@ class ASHASchedulerWrapper(ASHAScheduler, ABC):
             either 'min' or 'max'.
         time_attr (str): The measure of time that will be used
             by the scheduler.
-        max_t (int): Max time unit given to each trial.
+        max_t (int): Maximum number of iterations.
         grace_period (int): Min time unit given to each trial.
         reduction_factor (float): Halving rate of trials.
         **kwargs: Keyword arguments.
