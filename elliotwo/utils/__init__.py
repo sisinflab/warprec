@@ -7,9 +7,8 @@ from .registry import (
     search_algorithm_registry,
     scheduler_registry,
 )
-from .config import Configuration, load_yaml
+from .config import Configuration, load_yaml, parse_params
 from .logger import logger
-from .ray_utils import parse_params
 
 __all__ = [
     "RatingType",
@@ -24,6 +23,7 @@ __all__ = [
     "scheduler_registry",
     "Configuration",
     "load_yaml",
+    "parse_params",
     "logger",
     "parse_params",
 ]

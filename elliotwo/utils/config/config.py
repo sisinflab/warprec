@@ -1,9 +1,11 @@
 import os
 from typing import Tuple, List, ClassVar, Dict
+from copy import deepcopy
 
 import yaml
 import numpy as np
 import torch
+from ray import tune
 from pydantic import BaseModel, field_validator, model_validator
 from elliotwo.utils.config import (
     GeneralConfig,
@@ -12,7 +14,7 @@ from elliotwo.utils.config import (
     RecomModel,
     EvaluationConfig,
 )
-from elliotwo.utils.enums import RatingType, SplittingStrategies
+from elliotwo.utils.enums import RatingType, SplittingStrategies, SearchAlgorithms
 from elliotwo.utils.registry import params_registry
 from elliotwo.utils.logger import logger
 
@@ -252,6 +254,25 @@ class Configuration(BaseModel):
         """
         metric_name, top_k = val_metric.split("@")
         return metric_name, int(top_k)
+
+
+def parse_params(params: dict):
+    tune_params = {}
+    strategy = params["optimization"]["strategy"]
+    params_copy = deepcopy(params)
+    params_copy.pop("meta")
+    params_copy.pop("optimization")
+    if strategy == SearchAlgorithms.GRID:
+        for k, v in params_copy.items():
+            tune_params[k] = tune.grid_search(v)
+    else:
+        for k, v in params_copy.items():
+            if all(isinstance(item, str) for item in v):
+                tune_params[k] = tune.choice(v)
+            else:
+                tune_params[k] = tune.uniform(v[0], v[1])
+
+    return tune_params
 
 
 def load_yaml(path: str) -> Configuration:

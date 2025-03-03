@@ -2,8 +2,7 @@ import argparse
 from argparse import Namespace
 
 from elliotwo.data import LocalReader, LocalWriter, Splitter
-from elliotwo.utils.config import load_yaml
-from elliotwo.utils.ray_utils import parse_params
+from elliotwo.utils.config import load_yaml, parse_params
 from elliotwo.utils.logger import logger
 from elliotwo.recommenders.trainer import Trainer
 from elliotwo.evaluation.evaluator import Evaluator

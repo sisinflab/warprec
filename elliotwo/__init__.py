@@ -14,6 +14,7 @@ from .evaluation import Evaluator, NDCG, Precision, Recall, HitRate
 from .utils import (
     Configuration,
     load_yaml,
+    parse_params,
     logger,
     splitting_registry,
     metric_registry,
@@ -21,7 +22,6 @@ from .utils import (
     model_registry,
     search_algorithm_registry,
     scheduler_registry,
-    parse_params,
 )
 
 __all__ = [
@@ -34,6 +34,7 @@ __all__ = [
     "AbstractStrategy",
     "Configuration",
     "load_yaml",
+    "parse_params",
     "logger",
     "splitting_registry",
     "metric_registry",
@@ -41,7 +42,6 @@ __all__ = [
     "model_registry",
     "search_algorithm_registry",
     "scheduler_registry",
-    "parse_params",
     "AbstractWriter",
     "LocalWriter",
     "LocalReader",
