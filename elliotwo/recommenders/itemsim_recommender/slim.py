@@ -1,4 +1,3 @@
-# pylint: disable=invalid-name
 import numpy as np
 from sklearn.linear_model import ElasticNet
 from elliotwo.data.dataset import AbstractDataset

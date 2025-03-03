@@ -75,7 +75,7 @@ class GeneralConfig(BaseModel):
     @model_validator(mode="after")
     def model_validation(self):
         """This method validates the General configuration."""
-        if self.recommendation.save_recs and not self.setup_experiment:  # pylint: disable=no-member
+        if self.recommendation.save_recs and not self.setup_experiment:
             raise ValueError(
                 "You are trying to save the recommendations without "
                 "setting up the directory. Set setup_experiment to True."

@@ -1,4 +1,3 @@
-# pylint: disable=invalid-name
 import numpy as np
 from sklearn.utils.extmath import safe_sparse_dot
 from elliotwo.data.dataset import AbstractDataset
