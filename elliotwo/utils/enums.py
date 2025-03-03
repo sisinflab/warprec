@@ -32,3 +32,33 @@ class SplittingStrategies(str, Enum):
     RANDOM = "random"
     LEAVE_ONE_OUT = "leave-one-out"
     TEMPORAL = "temporal"
+
+
+class SearchAlgorithms(str, Enum):
+    """Represents the types of search algorithms supported.
+
+    This enum is used to track the possible search algorithms:
+        - GRID: The exhaustive search of all possible combinations hyperparameters.
+        - RANDOM: The random search over all the search space.
+        - HYPEROPT: The TPE algorithm implemented inside HyperOpt.
+        - OPTUNA: The Optuna optimization algorithm.
+        - BOHB: The Bandit-Wise and Bayesian optimization algorithm.
+    """
+
+    GRID = "grid"
+    RANDOM = "random"
+    HYPEROPT = "hopt"
+    OPTUNA = "optuna"
+    BOHB = "bohb"
+
+
+class Schedulers(str, Enum):
+    """Represents the types of schedulers supported.
+
+    This enum is used to track the possible schedulers:
+        - FIFO: Classic First-In First-Out implementation.
+        - ASHA: Scheduler that supports parallelism and early stopping.
+    """
+
+    FIFO = "fifo"
+    ASHA = "asha"

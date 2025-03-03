@@ -1,4 +1,4 @@
-from .enums import RatingType, SplittingStrategies
+from .enums import RatingType, SplittingStrategies, SearchAlgorithms, Schedulers
 from .registry import (
     splitting_registry,
     metric_registry,
@@ -13,6 +13,8 @@ from .ray_utils import parse_params
 __all__ = [
     "RatingType",
     "SplittingStrategies",
+    "SearchAlgorithms",
+    "Schedulers",
     "splitting_registry",
     "metric_registry",
     "params_registry",

@@ -8,10 +8,11 @@ from ray.tune.schedulers import (
     FIFOScheduler,
     ASHAScheduler,
 )
+from elliotwo.utils.enums import SearchAlgorithms, Schedulers
 from elliotwo.utils.registry import search_algorithm_registry, scheduler_registry
 
 
-@search_algorithm_registry.register("grid")
+@search_algorithm_registry.register(SearchAlgorithms.GRID)
 class GridSearchWrapper(ABC):
     """Wrapper for the GridSearch algorithm in Ray Tune.
 
@@ -26,7 +27,7 @@ class GridSearchWrapper(ABC):
         return None
 
 
-@search_algorithm_registry.register("random")
+@search_algorithm_registry.register(SearchAlgorithms.RANDOM)
 class RandomSearchWrapper(ABC):
     """Wrapper for the RandomSearch algorithm in Ray Tune.
 
@@ -41,7 +42,7 @@ class RandomSearchWrapper(ABC):
         return None
 
 
-@search_algorithm_registry.register("hopt")
+@search_algorithm_registry.register(SearchAlgorithms.HYPEROPT)
 class HyperOptWrapper(HyperOptSearch, ABC):
     """Wrapper for the HyperOpt algorithm in Ray Tune.
 
@@ -56,7 +57,7 @@ class HyperOptWrapper(HyperOptSearch, ABC):
         super().__init__(mode=mode, random_state_seed=seed, metric="score")
 
 
-@search_algorithm_registry.register("optuna")
+@search_algorithm_registry.register(SearchAlgorithms.OPTUNA)
 class OptunaWrapper(OptunaSearch, ABC):
     """Wrapper for the HyperOpt algorithm in Ray Tune.
 
@@ -71,7 +72,7 @@ class OptunaWrapper(OptunaSearch, ABC):
         super().__init__(mode=mode, seed=seed, metric="score")
 
 
-@search_algorithm_registry.register("bohb")
+@search_algorithm_registry.register(SearchAlgorithms.BOHB)
 class BOHBWrapper(TuneBOHB, ABC):
     """Wrapper for the HyperOpt algorithm in Ray Tune.
 
@@ -86,7 +87,7 @@ class BOHBWrapper(TuneBOHB, ABC):
         super().__init__(mode=mode, seed=seed, metric="score")
 
 
-@scheduler_registry.register("fifo")
+@scheduler_registry.register(Schedulers.FIFO)
 class FIFOSchedulerWrapper(FIFOScheduler, ABC):
     """Wrapper for the FIFO scheduler."""
 
@@ -94,7 +95,7 @@ class FIFOSchedulerWrapper(FIFOScheduler, ABC):
         pass
 
 
-@scheduler_registry.register("asha")
+@scheduler_registry.register(Schedulers.ASHA)
 class ASHASchedulerWrapper(ASHAScheduler, ABC):
     """Wrapper for the ASHA scheduler.
 
