@@ -5,8 +5,10 @@ from ray import tune
 from elliotwo.recommenders.abstract_recommender import AbstractRecommender
 from elliotwo.data.dataset import AbstractDataset
 from elliotwo.evaluation.metrics import AbstractMetric
-from elliotwo.recommenders.trainer.strategies import (
+from elliotwo.recommenders.trainer.search_algorithm_wrapper import (
     BaseSearchWrapper,
+)
+from elliotwo.recommenders.trainer.scheduler_wrapper import (
     BaseSchedulerWrapper,
 )
 from elliotwo.utils.config import Configuration, RecomModel

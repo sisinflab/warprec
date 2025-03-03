@@ -1,10 +1,13 @@
 from .trainer import Trainer
-from .strategies import (
+from .search_algorithm_wrapper import (
     GridSearchWrapper,
     RandomSearchWrapper,
     HyperOptWrapper,
     OptunaWrapper,
     BOHBWrapper,
+)
+
+from .scheduler_wrapper import (
     FIFOSchedulerWrapper,
     ASHASchedulerWrapper,
 )

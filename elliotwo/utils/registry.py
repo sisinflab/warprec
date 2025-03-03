@@ -5,8 +5,10 @@ if TYPE_CHECKING:
     from elliotwo.utils.config import RecomModel, SearchSpaceWrapper
     from elliotwo.evaluation.metrics import AbstractMetric
     from elliotwo.data.splitting.strategies import AbstractStrategy
-    from elliotwo.recommenders.trainer.strategies import (
+    from elliotwo.recommenders.trainer.search_algorithm_wrapper import (
         BaseSearchWrapper,
+    )
+    from elliotwo.recommenders.trainer.scheduler_wrapper import (
         BaseSchedulerWrapper,
     )
 
