@@ -7,7 +7,6 @@ from elliotwo.recommenders.abstract_recommender import AbstractRecommender
 from elliotwo.data.dataset import AbstractDataset
 from elliotwo.evaluation.metrics import AbstractMetric
 from elliotwo.utils.config import Configuration
-from elliotwo.utils.dataclasses import TrainerConfig
 from elliotwo.utils.logger import logger
 from elliotwo.utils.registry import model_registry
 
@@ -16,34 +15,37 @@ class Trainer:
     """This class will be used to train a model and optimize the hyperparameters.
 
     Args:
+
+        model_name (str): The name of the model to optimize.
+        param (dict): The parameters of the model already in
+            Ray Tune format.
         dataset (AbstractDataset): The dataset to use during training.
-        train_config (TrainerConfig): The training configuration.
+        metric (AbstractMetric): The metric to use as validation.
+        top_k (int): The cutoff tu use as validation.
         config (Configuration): The configuration of the experiment.
     """
 
     def __init__(
         self,
+        model_name: str,
+        param: dict,
         dataset: AbstractDataset,
-        train_config: TrainerConfig,
+        metric: AbstractMetric,
+        top_k: int,
         config: Configuration,
     ):
-        self._train_config = train_config
+        self._model_name = model_name
+        self._train_param = param
+        self._metric = metric
+        self._top_k = top_k
         self._dataset = ray.put(dataset)
         self._config = config
-        self._imp = config.models[train_config.model_name]["meta"]["implementation"]
-        self._strategy = config.models[train_config.model_name]["optimization"][
-            "strategy"
-        ]
-        self._mode = config.models[train_config.model_name]["optimization"]["mode"]
-        self._num_samples = config.models[train_config.model_name]["optimization"][
-            "num_samples"
-        ]
-        self._cpu = config.models[train_config.model_name]["optimization"][
-            "cpu_per_trial"
-        ]
-        self._gpu = config.models[train_config.model_name]["optimization"][
-            "gpu_per_trial"
-        ]
+        self._imp = config.models[model_name]["meta"]["implementation"]
+        self._strategy = config.models[model_name]["optimization"]["strategy"]
+        self._mode = config.models[model_name]["optimization"]["mode"]
+        self._num_samples = config.models[model_name]["optimization"]["num_samples"]
+        self._cpu = config.models[model_name]["optimization"]["cpu_per_trial"]
+        self._gpu = config.models[model_name]["optimization"]["gpu_per_trial"]
         self._dgts = self._config.general.float_digits
 
     def train_and_evaluate(self) -> Tuple[AbstractRecommender, dict]:
@@ -59,7 +61,7 @@ class Trainer:
         """
         logger.separator()
         logger.msg(
-            f"Starting hyperparameter tuning for {self._train_config.model_name} "
+            f"Starting hyperparameter tuning for {self._model_name} "
             f"with {self._strategy} strategy."
         )
 
@@ -67,9 +69,9 @@ class Trainer:
         obj_function = tune.with_parameters(
             self._objective_function,
             dataset=self._dataset,
-            model_name=self._train_config.model_name,
-            metric=self._train_config.metric,
-            top_k=self._train_config.top_k,
+            model_name=self._model_name,
+            metric=self._metric,
+            top_k=self._top_k,
             implementation=self._imp,
             config=self._config,
         )
@@ -89,7 +91,7 @@ class Trainer:
         analysis = tune.run(
             obj_function,
             resources_per_trial={"cpu": self._cpu, "gpu": self._gpu},
-            config=self._train_config.param,
+            config=self._train_param,
             metric="score",
             mode=self._mode,
             search_alg=search_alg,
@@ -106,12 +108,12 @@ class Trainer:
 
         logger.msg(
             f"Best params combination: {best_params} with a score of "
-            f"{self._train_config.metric.get_name()}@"
-            f"{self._train_config.top_k}: "
+            f"{self._metric.get_name()}@"
+            f"{self._top_k}: "
             f"{best_score:.{self._dgts}f}."
         )
         logger.positive(
-            f"Hyperparameter tuning for {self._train_config.model_name} ended successfully."
+            f"Hyperparameter tuning for {self._model_name} ended successfully."
         )
         logger.separator()
 

@@ -8,7 +8,6 @@ from elliotwo.utils.logger import logger
 from elliotwo.recommenders.trainer import Trainer
 from elliotwo.evaluation.evaluator import Evaluator
 from elliotwo.evaluation.metrics import AbstractMetric
-from elliotwo.utils.dataclasses import TrainerConfig
 from elliotwo.utils.registry import metric_registry
 
 
@@ -65,8 +64,7 @@ def main(args: Namespace):
         )
         metric: AbstractMetric = metric_registry.get(val_metric, config=config)
         train_params = parse_params(params)
-        train_config = TrainerConfig(model_name, train_params, metric, val_k)
-        trainer = Trainer(dataset, train_config, config)
+        trainer = Trainer(model_name, train_params, dataset, metric, val_k, config)
         best_model, _ = trainer.train_and_evaluate()
 
         # Evaluation testing

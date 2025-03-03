@@ -14,7 +14,6 @@ from .evaluation import Evaluator, NDCG, Precision, Recall, HitRate
 from .utils import (
     Configuration,
     load_yaml,
-    TrainerConfig,
     logger,
     splitting_registry,
     metric_registry,
@@ -33,7 +32,6 @@ __all__ = [
     "AbstractStrategy",
     "Configuration",
     "load_yaml",
-    "TrainerConfig",
     "logger",
     "splitting_registry",
     "metric_registry",

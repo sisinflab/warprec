@@ -5,7 +5,6 @@ from .registry import (
     params_registry,
     model_registry,
 )
-from .dataclasses import TrainerConfig
 from .config import Configuration, load_yaml
 from .logger import logger
 from .ray_utils import parse_params
@@ -19,7 +18,6 @@ __all__ = [
     "metric_registry",
     "params_registry",
     "model_registry",
-    "TrainerConfig",
     "Configuration",
     "load_yaml",
     "logger",
