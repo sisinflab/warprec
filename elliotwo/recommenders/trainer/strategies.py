@@ -1,4 +1,4 @@
-# pylint: disable=unused-argument, too-few-public-methods, too-many-arguments, too-many-positional-arguments
+# pylint: disable=unused-argument, too-few-public-methods
 from abc import ABC
 
 from ray.tune.search.hyperopt import HyperOptSearch

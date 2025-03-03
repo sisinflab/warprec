@@ -44,7 +44,7 @@ repos:
             "--reports=no",
             # "--good-names=e,f,i,j,k,p,v,x,y,z,x0,x1,z0,z1,tn,fn,tp,fp,auc,fc,bn",
             # "--disable=C0301, C0114, C0115, C0116, E1101, E1121, R0903, R0913, W0511",
-            "--disable=C0114,W0511",
+            "--disable=C0114,W0511,R0913,R0914,E1101",
             "--extension-pkg-whitelist=pydantic",
           ]
         exclude: ^tests/

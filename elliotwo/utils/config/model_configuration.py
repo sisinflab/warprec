@@ -1,4 +1,3 @@
-# pylint: disable=E1101
 from typing import List, Optional, Union
 from abc import ABC
 

@@ -1,4 +1,3 @@
-# pylint: disable=E1101
 from typing import List, Optional
 
 from pydantic import BaseModel, field_validator, model_validator
