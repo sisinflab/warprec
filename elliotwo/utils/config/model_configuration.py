@@ -69,11 +69,11 @@ class Optimization(BaseModel):
             - random: Random search over the param space.
             - hopt: Bayesian optimization using HyperOptOptimization.
             - optuna: Optuna optimization, more information can
-                be found at https://docs.ray.io/en/latest/tune/api/doc/ray.tune.search.optuna.OptunaSearch.html
+                be found at https://docs.ray.io/en/latest/tune/api/doc/ray.tune.search.optuna.OptunaSearch.html.
             - bohb: BOHB optimization, more information can
-                be found at https://docs.ray.io/en/latest/tune/api/doc/ray.tune.search.bohb.TuneBOHB.html
+                be found at https://docs.ray.io/en/latest/tune/api/doc/ray.tune.search.bohb.TuneBOHB.html.
         scheduler (Optional[str]): The scheduler to use in optimization.
-            - fifo: Classic First In First Out trail optimization.
+            - fifo: Classic First In First Out trial optimization.
             - asha: ASHA Scheduler, more information can be found
                 at https://docs.ray.io/en/latest/tune/api/doc/ray.tune.schedulers.ASHAScheduler.html.
         properties (Optional[Properties]): The attributes required for Ray Tune to work.

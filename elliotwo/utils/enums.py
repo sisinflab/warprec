@@ -38,11 +38,13 @@ class SearchAlgorithms(str, Enum):
     """Represents the types of search algorithms supported.
 
     This enum is used to track the possible search algorithms:
-        - GRID: The exhaustive search of all possible combinations hyperparameters.
-        - RANDOM: The random search over all the search space.
-        - HYPEROPT: The TPE algorithm implemented inside HyperOpt.
-        - OPTUNA: The Optuna optimization algorithm.
-        - BOHB: The Bandit-Wise and Bayesian optimization algorithm.
+        - GRID: Performs grid search over all the parameters provided.
+        - RANDOM: Random search over the param space.
+        - HYPEROPT: Bayesian optimization using HyperOptOptimization.
+        - OPTUNA: Optuna optimization, more information can
+            be found at https://docs.ray.io/en/latest/tune/api/doc/ray.tune.search.optuna.OptunaSearch.html
+        - BOHB: BOHB optimization, more information can
+            be found at https://docs.ray.io/en/latest/tune/api/doc/ray.tune.search.bohb.TuneBOHB.html
     """
 
     GRID = "grid"
@@ -56,8 +58,9 @@ class Schedulers(str, Enum):
     """Represents the types of schedulers supported.
 
     This enum is used to track the possible schedulers:
-        - FIFO: Classic First-In First-Out implementation.
-        - ASHA: Scheduler that supports parallelism and early stopping.
+        - FIFO: Classic First In First Out trial optimization.
+        - ASHA: ASHA Scheduler, more information can be found
+            at https://docs.ray.io/en/latest/tune/api/doc/ray.tune.schedulers.ASHAScheduler.html.
     """
 
     FIFO = "fifo"
