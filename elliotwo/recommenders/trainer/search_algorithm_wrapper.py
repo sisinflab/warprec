@@ -11,6 +11,7 @@ Author: Avolio Marco
 Date: 03/03/2025
 """
 
+from typing import Any
 from abc import ABC, abstractmethod
 
 from ray.tune.search.hyperopt import HyperOptSearch
@@ -24,7 +25,7 @@ class BaseSearchWrapper(ABC):
     """Common interface for all search algorithm wrappers."""
 
     @abstractmethod
-    def __init__(self, **kwargs):
+    def __init__(self, **kwargs: Any):
         pass
 
 
@@ -34,12 +35,15 @@ class GridSearchWrapper(BaseSearchWrapper):
 
     This wrapper is empty in order to be registered inside
     the search_algorithm_registry but return None to Ray Tune.
+
+    Args:
+        **kwargs (Any): Keyword arguments.
     """
 
-    def __init__(self, **kwargs):
+    def __init__(self, **kwargs: Any):
         pass
 
-    def __new__(cls, **kwargs):
+    def __new__(cls, **kwargs: Any):
         return None
 
 
@@ -49,12 +53,15 @@ class RandomSearchWrapper(BaseSearchWrapper):
 
     This wrapper is empty in order to be registered inside
     the search_algorithm_registry but return None to Ray Tune.
+
+    Args:
+        **kwargs (Any): Keyword arguments.
     """
 
-    def __init__(self, **kwargs):
+    def __init__(self, **kwargs: Any):
         pass
 
-    def __new__(cls, **kwargs):
+    def __new__(cls, **kwargs: Any):
         return None
 
 
@@ -66,10 +73,10 @@ class HyperOptWrapper(HyperOptSearch, BaseSearchWrapper):
         mode (str): The mode to run the optimization. Must be
             either 'min' or 'max'.
         seed (int): The seed to make the experiment reproducible.
-        **kwargs: Keyword arguments.
+        **kwargs (Any): Keyword arguments.
     """
 
-    def __init__(self, mode: str, seed: int, **kwargs):
+    def __init__(self, mode: str, seed: int, **kwargs: Any):
         super().__init__(mode=mode, random_state_seed=seed, metric="score")
 
 
@@ -81,10 +88,10 @@ class OptunaWrapper(OptunaSearch, BaseSearchWrapper):
         mode (str): The mode to run the optimization. Must be
             either 'min' or 'max'.
         seed (int): The seed to make the experiment reproducible.
-        **kwargs: Keyword arguments.
+        **kwargs (Any): Keyword arguments.
     """
 
-    def __init__(self, mode: str, seed: int, **kwargs):
+    def __init__(self, mode: str, seed: int, **kwargs: Any):
         super().__init__(mode=mode, seed=seed, metric="score")
 
 
@@ -96,8 +103,8 @@ class BOHBWrapper(TuneBOHB, BaseSearchWrapper):
         mode (str): The mode to run the optimization. Must be
             either 'min' or 'max'.
         seed (int): The seed to make the experiment reproducible.
-        **kwargs: Keyword arguments.
+        **kwargs (Any): Keyword arguments.
     """
 
-    def __init__(self, mode: str, seed: int, **kwargs):
+    def __init__(self, mode: str, seed: int, **kwargs: Any):
         super().__init__(mode=mode, seed=seed, metric="score")

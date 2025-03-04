@@ -18,7 +18,7 @@ class GridSpaceWrapper(SearchSpaceWrapper):
     """The Grid Search Space Wrapper."""
 
     def __call__(self, *args) -> Callable:
-        return tune.choice(*args)
+        return tune.grid_search([args])
 
 
 @search_space_registry.register(SearchSpace.CHOICE)

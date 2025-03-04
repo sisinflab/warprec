@@ -11,6 +11,7 @@ Author: Avolio Marco
 Date: 03/03/2025
 """
 
+from typing import Any
 from abc import ABC, abstractmethod
 
 from ray.tune.schedulers import (
@@ -25,16 +26,20 @@ class BaseSchedulerWrapper(ABC):
     """Common interface for all scheduler wrappers."""
 
     @abstractmethod
-    def __init__(self, **kwargs):
+    def __init__(self, **kwargs: Any):
         pass
 
 
 @scheduler_registry.register(Schedulers.FIFO)
 class FIFOSchedulerWrapper(FIFOScheduler, BaseSchedulerWrapper):
-    """Wrapper for the FIFO scheduler."""
+    """Wrapper for the FIFO scheduler.
 
-    def __init__(self, **kwargs):
-        pass
+    Args:
+        **kwargs (Any): Keyword arguments.
+    """
+
+    def __init__(self, **kwargs: Any):
+        return None
 
 
 @scheduler_registry.register(Schedulers.ASHA)
@@ -49,7 +54,7 @@ class ASHASchedulerWrapper(ASHAScheduler, BaseSchedulerWrapper):
         max_t (int): Maximum number of iterations.
         grace_period (int): Min time unit given to each trial.
         reduction_factor (float): Halving rate of trials.
-        **kwargs: Keyword arguments.
+        **kwargs (Any): Keyword arguments.
     """
 
     def __init__(
@@ -59,7 +64,7 @@ class ASHASchedulerWrapper(ASHAScheduler, BaseSchedulerWrapper):
         max_t: int,
         grace_period: int,
         reduction_factor: float,
-        **kwargs,
+        **kwargs: Any,
     ):
         super().__init__(
             mode=mode,
