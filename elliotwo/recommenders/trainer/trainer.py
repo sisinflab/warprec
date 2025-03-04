@@ -53,15 +53,6 @@ class Trainer:
         self._model_params: RecomModel = params_registry.get(
             model_name, **config.models[model_name]
         )
-        self._imp = self._model_params.meta.implementation
-        self._strategy = self._model_params.optimization.strategy
-        self._scheduler = self._model_params.optimization.scheduler
-        self._mode = self._model_params.optimization.properties.mode
-        self._properties = self._model_params.optimization.properties
-        self._num_samples = self._model_params.optimization.num_samples
-        self._cpu = self._model_params.optimization.cpu_per_trial
-        self._gpu = self._model_params.optimization.gpu_per_trial
-        self._dgts = self._config.general.float_digits
 
     def train_and_evaluate(self) -> Tuple[AbstractRecommender, dict]:
         """Main method of the Trainer class.
@@ -77,7 +68,8 @@ class Trainer:
         logger.separator()
         logger.msg(
             f"Starting hyperparameter tuning for {self._model_name} "
-            f"with {self._strategy.name} strategy and with {self._scheduler.name} scheduler."
+            f"with {self._model_params.optimization.strategy.name} strategy "
+            f"and with {self._model_params.optimization.scheduler.name} scheduler."
         )
 
         # Ray Tune parameters
@@ -87,33 +79,39 @@ class Trainer:
             model_name=self._model_name,
             metric=self._metric,
             top_k=self._top_k,
-            implementation=self._imp,
+            implementation=self._model_params.meta.implementation,
             config=self._config,
         )
 
-        # Selecting the correct search algorithm.
-        # This might be done in a better way
+        properties = self._model_params.optimization.properties.model_dump()
         search_alg: BaseSearchWrapper = search_algorithm_registry.get(
-            self._strategy, **self._properties.model_dump()
+            self._model_params.optimization.strategy, **properties
         )
         scheduler: BaseSchedulerWrapper = scheduler_registry.get(
-            self._scheduler, **self._properties.model_dump()
+            self._model_params.optimization.scheduler, **properties
         )
 
         # Run the hyperparameter tuning
         analysis = tune.run(
             obj_function,
-            resources_per_trial={"cpu": self._cpu, "gpu": self._gpu},
+            resources_per_trial={
+                "cpu": self._model_params.optimization.cpu_per_trial,
+                "gpu": self._model_params.optimization.gpu_per_trial,
+            },
             config=self._train_param,
             search_alg=search_alg,
             scheduler=scheduler,
-            num_samples=self._num_samples,
+            num_samples=self._model_params.optimization.num_samples,
             verbose=0,
         )
 
         # Train and retrieve results
-        best_trial = analysis.get_best_trial("score", self._mode)
-        best_params = analysis.get_best_config("score", self._mode)
+        best_trial = analysis.get_best_trial(
+            "score", self._model_params.optimization.properties.mode
+        )
+        best_params = analysis.get_best_config(
+            "score", self._model_params.optimization.properties.mode
+        )
 
         best_model = best_trial.last_result["model"]
         best_score = best_trial.last_result["score"]
@@ -122,7 +120,7 @@ class Trainer:
             f"Best params combination: {best_params} with a score of "
             f"{self._metric.get_name()}@"
             f"{self._top_k}: "
-            f"{best_score:.{self._dgts}f}."
+            f"{best_score:.{self._config.general.float_digits}f}."
         )
         logger.positive(
             f"Hyperparameter tuning for {self._model_name} ended successfully."
