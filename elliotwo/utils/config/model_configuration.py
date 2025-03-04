@@ -146,7 +146,8 @@ class Optimization(BaseModel):
         if self.strategy == SearchAlgorithms.GRID and self.num_samples > 1:
             logger.attention(
                 f"You are running a grid search with num_samples {self.num_samples}, "
-                f"check your configuration for possible mistakes."
+                f"this will run extra samples. Check your configuration "
+                f"for possible mistakes."
             )
         if self.scheduler == Schedulers.FIFO:
             if self.properties.time_attr is not None:
@@ -266,6 +267,10 @@ class RecomModel(BaseModel, ABC):
         Raises:
             ValueError: If the values are not of the same type.
         """
+        if isinstance(value[0], str):
+            _strat: str = value[0]
+            if _strat.lower() == SearchSpace.GRID.value:
+                value.pop(0)
         if all(isinstance(item, type(value[0])) for item in value):
             return [SearchSpace.GRID] + value
         raise ValueError(
