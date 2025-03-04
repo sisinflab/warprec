@@ -6,13 +6,13 @@ from elliotwo.utils.enums import (
     SearchAlgorithms,
     Schedulers,
     SearchSpace,
-    rounded_search_spaces,
 )
 from elliotwo.utils.registry import (
     params_registry,
     model_registry,
     metric_registry,
     search_algorithm_registry,
+    search_space_registry,
 )
 from elliotwo.utils.logger import logger
 
@@ -138,6 +138,7 @@ class Optimization(BaseModel):
 
     @model_validator(mode="after")
     def model_validation(self):
+        """Optimization model validation."""
         if self.strategy == SearchAlgorithms.GRID and self.num_samples > 1:
             logger.attention(
                 f"You are running a grid search with num_samples {self.num_samples}, "
@@ -159,78 +160,223 @@ class RecomModel(BaseModel, ABC):
 
     @model_validator(mode="after")
     def model_validation(self):
-        # This is a list of all strategies that expect data to be
-        # a range format
+        """RecomModel model validation."""
         _name = self.__class__.__name__
         _imp = self.meta.implementation
 
         # Basic controls
-        if _name not in model_registry.list_registered():
-            raise ValueError(f"Model {_name} not in model_registry.")
-        if _imp not in model_registry.list_implementations(_name):
-            raise ValueError(f"Model {_name} does not have {_imp} implementation.")
+        self.validate_model_and_implementation(_name, _imp)
 
         # General parameters control
         updated_values = self.model_dump(exclude=["meta", "optimization"])
-        for field, value in updated_values.items():
-            if not isinstance(value, list):
-                value = [value]
-                updated_values[field] = value
+        updated_values = self.normalize_values(updated_values)
 
+        for field, value in updated_values.items():
             if self.optimization.strategy == SearchAlgorithms.GRID:
-                if all(isinstance(item, value[0]) for item in value):
-                    updated_values[field] = [SearchSpace.GRID] + value
-                else:
-                    raise ValueError(
-                        f"For the Grid Search optimization the field {field} "
-                        f"must be all of the same type. Values received {value}."
-                    )
+                updated_values[field] = self.validate_grid_search(field, value)
             else:
-                if all(isinstance(item, str) for item in value):
-                    updated_values[field] = [SearchSpace.CHOICE] + value
-                else:
-                    if len(value) < 2 or len(value) > 4:
-                        raise ValueError(
-                            f"The value list is expected to be either: a range list, like "
-                            f"[1.0, 5.0] or a range list with the first element as the "
-                            f"distribution to use for the sampling process, like ['uniform', 1.0, 5.0]. "
-                            f"In case of rounded distribution a fourth value is required. "
-                            f"For the field {field} the value received was {value}."
-                        )
-                    elif len(value) == 2:
-                        if all(isinstance(item, (float, int)) for item in value):
-                            updated_values[field] = [SearchSpace.UNIFORM] + value
-                        else:
-                            raise ValueError(
-                                f"The range must be in float format. For the field {field} "
-                                f"the value received was {value}"
-                            )
-                    else:
-                        if isinstance(value[0], str) and all(
-                            isinstance(item, (float, int)) for item in value[1:]
-                        ):
-                            if (
-                                value[0] in rounded_search_spaces()
-                                and len(value) == 4
-                                or value[0] not in rounded_search_spaces()
-                                and len(value) == 3
-                            ):
-                                updated_values[field] = value
-                            else:
-                                raise ValueError(
-                                    f"Rounded distribution expect three values, with the third one being "
-                                    f"the approximation. Not rounded distribution expect two values. "
-                                    f"You passed {value} for the field {field}."
-                                )
-                        else:
-                            raise ValueError(
-                                f"Values are expected to be all float numbers, like [1.0, 5.0] or "
-                                f"they you can pass the format of the parameter space in form of a "
-                                f"string as the first element in the list, like ['uniform', 1.0, 5.0]. "
-                                f"You passed {value} for the field {field}."
-                            )
+                updated_values[field] = self.validate_other_search(field, value)
+
         self.__dict__.update(updated_values)
         return self
+
+    def validate_model_and_implementation(self, name: str, imp: str):
+        """Checks if the model and its implementation exist in the registry.
+
+        Args:
+            name (str): The name of the model.
+            imp (str): The name of the implementation.
+
+        Raises:
+            ValueError: If model or implementation is not registered.
+        """
+        if name not in model_registry.list_registered():
+            raise ValueError(f"Model {name} not in model_registry.")
+        if imp not in model_registry.list_implementations(name):
+            raise ValueError(f"Model {name} does not have {imp} implementation.")
+
+    def normalize_values(self, values: dict) -> dict:
+        """Ensures all values are lists.
+
+        Args:
+            values (dict): The dictionary with all the parameters
+                of the model.
+
+        Returns:
+            dict: The dictionary of all normalized parameters.
+        """
+        for field, value in values.items():
+            if not isinstance(value, list):
+                values[field] = [value]
+        return values
+
+    def validate_grid_search(
+        self, field: str, value: List[Union[str, float, int]]
+    ) -> List[Union[str, float, int]]:
+        """Validates Grid Search specific constraints.
+
+        Args:
+            field (str): The name of the field.
+            value (List[Union[str, float, int]]): The parameter list.
+
+        Returns:
+            List[Union[str, float, int]]: The grid search validated parameter list.
+
+        Raises:
+            ValueError: If the values are not of the same type.
+        """
+        if all(isinstance(item, type(value[0])) for item in value):
+            return [SearchSpace.GRID] + value
+        raise ValueError(
+            f"For the Grid Search optimization, the field {field} must have values of the same type. "
+            f"Values received: {value}."
+        )
+
+    def validate_other_search(
+        self, field: str, value: List[Union[str, float, int]]
+    ) -> List[Union[str, float, int]]:
+        """Validates search strategies other than Grid Search.
+
+        Args:
+            field (str): The name of the field.
+            value (List[Union[str, float, int]]): The parameter list.
+
+        Returns:
+            List[Union[str, float, int]]: The validated parameter list.
+
+        Raises:
+            ValueError: If the range is not in a correct format.
+        """
+        if all(isinstance(item, str) for item in value):
+            return [SearchSpace.CHOICE] + value
+
+        if len(value) < 2 or len(value) > 4:
+            raise ValueError(
+                f"Invalid range format for field {field}. Expected [1.0, 5.0] or ['uniform', 1.0, 5.0]. "
+                f"Received: {value}."
+            )
+
+        if len(value) == 2:
+            return self.validate_basic_range(field, value)
+
+        return self.validate_advanced_distribution(field, value)
+
+    def validate_basic_range(
+        self, field: str, value: List[Union[str, float, int]]
+    ) -> List[Union[str, float, int]]:
+        """Validates simple numerical ranges.
+
+        Args:
+            field (str): The name of the field.
+            value (List[Union[str, float, int]]): The parameter list.
+
+        Returns:
+            List[Union[str, float, int]]: The parameter in the uniform format.
+
+        Raises:
+            ValueError: If values are not numbers.
+        """
+        if all(isinstance(item, (float, int)) for item in value):
+            return [str(SearchSpace.UNIFORM)] + [float(item) for item in value]
+        raise ValueError(
+            f"The range for field {field} must contain numbers. Received: {value}."
+        )
+
+    def validate_advanced_distribution(
+        self, field: str, value: List[Union[str, float, int]]
+    ) -> List[Union[str, float, int]]:
+        """Validates complex search space distributions.
+
+        Args:
+            field (str): The name of the field.
+            value (List[Union[str, float, int]]): The parameter list.
+
+        Returns:
+            List[Union[str, float, int]]: The values in uniformed format.
+
+        Raises:
+            ValueError: If the SearchSpace is not in the registry.
+        """
+        if not isinstance(value[0], str):
+            raise ValueError(
+                f"Expected the first element of the parameter list to be "
+                f"a valid SearchSpace. Value received {value[0]}, "
+                f"SearchSpace supported {search_space_registry.list_registered()} "
+            )
+        _selected_search_space: str = value[0]
+        _int_search_spaces = [
+            SearchSpace.RANDINT,
+            SearchSpace.QRANDINT,
+            SearchSpace.LOGRANDINT,
+            SearchSpace.QLOGRANDINT,
+        ]
+
+        if (
+            _selected_search_space.upper()
+            not in search_space_registry.list_registered()
+        ):
+            raise ValueError(
+                f"{_selected_search_space} not found in SearchSpace registry. "
+                f"Available options: {search_space_registry.list_registered()}."
+            )
+
+        self.check_distribution_constraints(field, value, _selected_search_space)
+
+        if _selected_search_space not in _int_search_spaces:
+            return [_selected_search_space] + [float(item) for item in value[1:]]
+
+        return [_selected_search_space] + [int(item) for item in value[1:]]
+
+    def check_distribution_constraints(
+        self, field: str, value: List[Union[str, float, int]], search_space: str
+    ):
+        """Ensures that specific distributions meet their constraints.
+
+        Args:
+            field (str): The name of the field.
+            value (List[Union[str, float, int]]): The parameter list.
+            search_space (str): The search space selected for the field.
+
+        Raises:
+            ValueError: If the values provided do not respect the SearchSpace format.
+        """
+        _rounded_search_spaces = [
+            SearchSpace.QUNIFORM,
+            SearchSpace.QLOGUNIFORM,
+            SearchSpace.QRANDN,
+            SearchSpace.QRANDINT,
+            SearchSpace.QLOGRANDINT,
+        ]
+        _log_search_spaces = [
+            SearchSpace.LOGUNIFORM,
+            SearchSpace.QLOGUNIFORM,
+            SearchSpace.LOGRANDINT,
+            SearchSpace.QLOGRANDINT,
+        ]
+        if search_space in _rounded_search_spaces and len(value) != 4:
+            raise ValueError(
+                f"{search_space} requires a rounding factor, but none was provided. "
+                f"Received: {value} for field {field}."
+            )
+        if search_space not in _rounded_search_spaces and len(value) == 4:
+            raise ValueError(
+                f"{search_space} does not require a rounding factor, but extra values were provided. "
+                f"Received: {value} for field {field}."
+            )
+        if search_space in _rounded_search_spaces:
+            i1, i2, i3 = int(value[1]), int(value[2]), int(value[3])
+            if i1 % i3 != 0 or i2 % i3 != 0:
+                raise ValueError(
+                    f"Rounded distributions require values divisible by the round term. "
+                    f"Received: {value} for field {field}."
+                )
+        if search_space in _log_search_spaces:
+            f1, f2 = float(value[1]), float(value[2])
+            if f1 <= 0 or f2 <= 0:
+                raise ValueError(
+                    f"Logarithmic distributions require positive values. "
+                    f"Received: {value} for field {field}."
+                )
 
 
 @params_registry.register("EASE")

@@ -1,5 +1,4 @@
 from enum import Enum
-from typing import List
 
 
 class RatingType(str, Enum):
@@ -98,13 +97,3 @@ class SearchSpace(str, Enum):
     QLOGRANDINT = "qlograndint"
     CHOICE = "choice"
     GRID = "grid"
-
-
-def rounded_search_spaces() -> List["SearchSpace"]:
-    return [
-        SearchSpace.QUNIFORM,
-        SearchSpace.QLOGUNIFORM,
-        SearchSpace.QRANDN,
-        SearchSpace.QRANDINT,
-        SearchSpace.QLOGRANDINT,
-    ]
