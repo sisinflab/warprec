@@ -255,7 +255,18 @@ class Configuration(BaseModel):
         return metric_name, int(top_k)
 
 
-def parse_params(params: dict):
+def parse_params(params: dict) -> dict:
+    """This method parses the parameters of a model.
+
+    From simple lists it creates the correct data format for
+    Ray Tune hyperparameter optimization.
+
+    Args:
+        params (dict): The parameters of the model.
+
+    Returns:
+        dict: The parameters in the Ray Tune format.
+    """
     tune_params = {}
     params_copy = deepcopy(params)
     params_copy.pop("meta")
