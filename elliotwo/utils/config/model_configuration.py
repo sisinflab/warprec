@@ -51,7 +51,7 @@ class Properties(BaseModel):
     """
 
     mode: Optional[str] = None
-    seed: Optional[int] = None
+    seed: Optional[int] = 42
     time_attr: Optional[str] = None
     max_t: Optional[int] = None
     grace_period: Optional[int] = None
@@ -61,6 +61,8 @@ class Properties(BaseModel):
     @classmethod
     def check_mode(cls, v: str):
         """Validate mode."""
+        if v is None:
+            raise ValueError("Mode must be provided.")
         if v.lower() not in ["min", "max"]:
             raise ValueError("Mode should be either min or max.")
         return v.lower()
@@ -95,7 +97,7 @@ class Optimization(BaseModel):
     strategy: Optional[SearchAlgorithms] = SearchAlgorithms.GRID
     scheduler: Optional[Schedulers] = Schedulers.FIFO
     properties: Optional[Properties] = None
-    validation_metric: Optional[str] = "NDCG@10"
+    validation_metric: Optional[str] = None
     num_samples: Optional[int] = 1
     cpu_per_trial: Optional[float] = 1.0
     gpu_per_trial: Optional[float] = 0.0
@@ -115,6 +117,8 @@ class Optimization(BaseModel):
     @classmethod
     def check_validation_metric(cls, v: str):
         """Validate validation metric."""
+        if v is None:
+            raise ValueError("Validation metric must be provided.")
         if "@" not in v:
             raise ValueError(
                 f"Validation metric {v} not valid. Validation metric "
@@ -144,6 +148,43 @@ class Optimization(BaseModel):
                 f"You are running a grid search with num_samples {self.num_samples}, "
                 f"check your configuration for possible mistakes."
             )
+        if self.scheduler == Schedulers.FIFO:
+            if self.properties.time_attr is not None:
+                logger.attention(
+                    "You have passe the field time_attribute but FIFO "
+                    "scheduling does not require it."
+                )
+            if self.properties.max_t is not None:
+                logger.attention(
+                    "You have passe the field max_t but FIFO "
+                    "scheduling does not require it."
+                )
+            if self.properties.grace_period is not None:
+                logger.attention(
+                    "You have passe the field grace_period but FIFO "
+                    "scheduling does not require it."
+                )
+            if self.properties.reduction_factor is not None:
+                logger.attention(
+                    "You have passe the field reduction_factor but FIFO "
+                    "scheduling does not require it."
+                )
+        if self.scheduler == Schedulers.ASHA:
+            if self.properties.max_t is None:
+                raise ValueError(
+                    "Max_t property is required for ASHA scheduling. "
+                    "Change type of scheduling or provide the max_t attribute."
+                )
+            if self.properties.grace_period is None:
+                raise ValueError(
+                    "Grace_period property is required for ASHA scheduling. "
+                    "Change type of scheduling or provide the grace_period attribute."
+                )
+            if self.properties.reduction_factor is None:
+                raise ValueError(
+                    "Reduction_factor property is required for ASHA scheduling. "
+                    "Change type of scheduling or provide the reduction_factor attribute."
+                )
         return self
 
 
