@@ -259,7 +259,9 @@ def parse_params(params: dict) -> dict:
     """This method parses the parameters of a model.
 
     From simple lists it creates the correct data format for
-    Ray Tune hyperparameter optimization.
+    Ray Tune hyperparameter optimization. The correct format depends
+    on the search space desired. An example could be:
+    ['uniform', 5.0, 100.0] -> tune.uniform(5.0, 100.0)
 
     Args:
         params (dict): The parameters of the model.
