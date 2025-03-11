@@ -23,7 +23,7 @@ splitter:
 models:
   EASE:
     meta:
-      save_model: False
+      save_model: True
       implementation: elliot
     optimization:
       strategy: hopt
@@ -31,15 +31,16 @@ models:
       properties:
         mode: max
         seed: 42
-      validation_metric: NDCG@10
-      num_samples: 10
-    l2: ['qrandn', 5, 200, 5]
+      validation_metric: nDCG@10
+      num_samples: 5
+      cpu_per_trial: 6
+    l2: ['uniform', 5, 100]
   #Slim:
   #  l1: [0.1, 0.2, 0.5]
   #  alpha: [0.1, 0.2, 0.5]
 evaluation:
   top_k: [10, 20, 50]
-  metrics: [NDCG, Precision, Recall, HitRate]
+  metrics: [nDCG, Precision, Recall, HitRate]
 general:
   seed: 42
   float_digits: 8

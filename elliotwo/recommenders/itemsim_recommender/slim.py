@@ -1,8 +1,11 @@
+from typing import Any
+
 import numpy as np
+import torch
+from torch import nn
 from sklearn.linear_model import ElasticNet
-from elliotwo.data.dataset import AbstractDataset
-from elliotwo.utils.config import Configuration
 from elliotwo.recommenders.abstract_recommender import ItemSimilarityRecommender
+from elliotwo.data.dataset import Interactions
 from elliotwo.utils.registry import model_registry
 
 
@@ -11,52 +14,44 @@ class Slim(ItemSimilarityRecommender):
     """Implementation of Slim model from Sparse Linear Methods for Top-N Recommender Systems 2011.
 
     Args:
-        config (Configuration): The configuration of the experiment.
-        dataset (AbstractDataset): The dataset to train the model on.
-        params (dict): The parameters of the model.
-        *args: Variable length argument list.
-        **kwargs: Arbitrary keyword arguments
+        items (int): The number of items that will be learned.
+        *args (Any): Variable length argument list.
+        **kwargs (Any): Arbitrary keyword arguments
 
     The params allowed by this model are as follows:
         l1 (float): Normalization parameter to use during train.
         alpha (float): Normalization parameter to use during train.
     """
 
-    def __init__(
-        self,
-        config: Configuration,
-        dataset: AbstractDataset,
-        params: dict,
-        *args,
-        **kwargs,
-    ):
-        super().__init__(config, dataset, params, *args, **kwargs)
-
+    def __init__(self, items: int, *args: Any, **kwargs: Any):
+        super().__init__(items, *args, **kwargs)
         self._name = "Slim"
-        self.X = self.interaction_matrix
-        self.l1 = self._params["l1"]
-        self.alpha = self._params["alpha"]
 
-    def fit(self):
+    def fit(self, interactions: Interactions, params: dict, *args: Any, **kwargs: Any):
         """During training we will compute the B similarity matrix {item x item}."""
         # Predefine the number of items, similarity matrix and ElasticNet
-        num_items = self.X.shape[1]
-        self.item_similarity = np.zeros((num_items, num_items))
+        X = interactions.get_sparse()
+        l1 = params["l1"]
+        alpha = params["alpha"]
+
+        num_items = X.shape[1]
+        item_sim = np.zeros((num_items, num_items))
 
         for i in range(num_items):
             # x_i represent the item column from training set
-            x_i = self.X[:, i].toarray().ravel()
+            x_i = X[:, i].toarray().ravel()
 
             # X_j will contain all the other columns
             mask = np.arange(num_items) != i
-            X_j = self.X[:, mask]
+            X_j = X[:, mask]
 
             # Use ElasticNet as in the paper
             model = ElasticNet(
-                alpha=self.alpha, l1_ratio=self.l1, fit_intercept=False, positive=True
+                alpha=alpha, l1_ratio=l1, fit_intercept=False, positive=True
             )
             model.fit(X_j, x_i)
 
             # Get coefficients and use them in the similarity matrix
             coef = model.coef_
-            self.item_similarity[i, mask] = coef
+            item_sim[i, mask] = coef
+        self.item_similarity = nn.Parameter(torch.from_numpy(item_sim))

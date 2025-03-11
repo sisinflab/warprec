@@ -1,10 +1,14 @@
+import os
+import tempfile
 from typing import Tuple
 
 import ray
+import torch
 from ray import tune
+from ray.tune import Checkpoint
 from elliotwo.recommenders.abstract_recommender import AbstractRecommender
 from elliotwo.data.dataset import AbstractDataset
-from elliotwo.evaluation.metrics import AbstractMetric
+from elliotwo.evaluation.evaluator import Evaluator
 from elliotwo.recommenders.trainer.search_algorithm_wrapper import (
     BaseSearchWrapper,
 )
@@ -30,7 +34,8 @@ class Trainer:
         param (dict): The parameters of the model already in
             Ray Tune format.
         dataset (AbstractDataset): The dataset to use during training.
-        metric (AbstractMetric): The metric to use as validation.
+        metric_name (str): The name of the metric that will be used
+            as validation.
         top_k (int): The cutoff tu use as validation.
         config (Configuration): The configuration of the experiment.
     """
@@ -40,19 +45,26 @@ class Trainer:
         model_name: str,
         param: dict,
         dataset: AbstractDataset,
-        metric: AbstractMetric,
+        metric_name: str,
         top_k: int,
         config: Configuration,
     ):
-        self._model_name = model_name
-        self._train_param = param
-        self._metric = metric
-        self._top_k = top_k
-        self._dataset = ray.put(dataset)
-        self._config = config
+        self.infos = dataset.info()
         self._model_params: RecomModel = params_registry.get(
             model_name, **config.models[model_name]
         )
+        self._model = ray.put(
+            model_registry.get(
+                model_name, self._model_params.meta.implementation, **self.infos
+            )
+        )
+        self.model_name = model_name
+        self._evaluator = Evaluator([metric_name], [top_k])
+        self._train_param = param
+        self._metric_name = metric_name
+        self._top_k = top_k
+        self._dataset = ray.put(dataset)
+        self._config = config
 
     def train_and_evaluate(self) -> Tuple[AbstractRecommender, dict]:
         """Main method of the Trainer class.
@@ -67,23 +79,22 @@ class Trainer:
         """
         logger.separator()
         logger.msg(
-            f"Starting hyperparameter tuning for {self._model_name} "
+            f"Starting hyperparameter tuning for {self.model_name} "
             f"with {self._model_params.optimization.strategy.name} strategy "
             f"and with {self._model_params.optimization.scheduler.name} scheduler."
         )
 
+        properties = self._model_params.optimization.properties.model_dump()
+
         # Ray Tune parameters
         obj_function = tune.with_parameters(
             self._objective_function,
+            model=self._model,
             dataset=self._dataset,
-            model_name=self._model_name,
-            metric=self._metric,
-            top_k=self._top_k,
-            implementation=self._model_params.meta.implementation,
-            config=self._config,
+            mode=properties["mode"],
+            evaluator=self._evaluator,
         )
 
-        properties = self._model_params.optimization.properties.model_dump()
         search_alg: BaseSearchWrapper = search_algorithm_registry.get(
             self._model_params.optimization.strategy, **properties
         )
@@ -102,7 +113,7 @@ class Trainer:
             search_alg=search_alg,
             scheduler=scheduler,
             num_samples=self._model_params.optimization.num_samples,
-            verbose=0,
+            verbose=1,
         )
 
         # Train and retrieve results
@@ -113,80 +124,82 @@ class Trainer:
             "score", self._model_params.optimization.properties.mode
         )
 
-        best_model = best_trial.last_result["model"]
+        # Retrieve best model from checkpoint
+        checkpoint = torch.load(
+            os.path.join(best_trial.checkpoint.path, "checkpoint.pt")
+        )
+        model_state = checkpoint["model_state"]
+        best_model = model_registry.get(
+            self.model_name, self._model_params.meta.implementation, **self.infos
+        )
+        best_model.load_state_dict(model_state)
+
+        # Best score obtained during hyperparameter optimization
         best_score = best_trial.last_result["score"]
 
         logger.msg(
             f"Best params combination: {best_params} with a score of "
-            f"{self._metric.get_name()}@"
+            f"{self._metric_name}@"
             f"{self._top_k}: "
             f"{best_score:.{self._config.general.float_digits}f}."
         )
         logger.positive(
-            f"Hyperparameter tuning for {self._model_name} ended successfully."
+            f"Hyperparameter tuning for {self.model_name} ended successfully."
         )
-        logger.separator()
 
-        return best_model, best_params
+        # Clear checkpoint directory manually
+        # for trial in analysis.trials:
+        #    shutil.rmtree(trial.checkpoint.path)
+
+        ray.shutdown()
+
+        return (
+            best_model,
+            best_params,
+        )
 
     def _objective_function(
         self,
         params: dict,
+        model: AbstractRecommender,
         dataset: AbstractDataset,
-        model_name: str,
-        metric: AbstractMetric,
-        top_k: int,
-        implementation: str,
-        config: Configuration,
+        mode: str,
+        evaluator: Evaluator,
     ) -> dict:
         """Objective function to optimize the hyperparameters.
 
         Args:
-            params (dict): The dictionary with the parameters for the model.
-            dataset (AbstractDataset): The dataset to use for training.
-            model_name (str): The name of the model to optimize.
-            metric (AbstractMetric): The metric to use for evaluation.
-            top_k (int): The cutoff to use for evaluation.
-            implementation (str): The implementation to use.
-            config (Configuration): The configuration of the experiment.
+            params (dict): The parameter to train the model.
+            model (AbstractRecommender): The model to train.
+            dataset (AbstractDataset): The dataset to train the model on.
+            mode (str): Wether or not to maximize or minimize the metric.
+            evaluator (Evaluator): The evaluator that will calculate the
+                validation metric.
 
         Returns:
             dict: A dictionary containing the score and the model trained.
         """
-        if implementation == "latest":
-            model = model_registry.get_latest(
-                name=model_name, config=config, dataset=dataset, params=params
+        try:
+            model.fit(dataset.train_set, params)
+        except Exception as e:
+            logger.negative(
+                f"The fitting of the model {model.name}, failed with parameters: {params}. Error: {e}"
             )
-        else:
-            model = model_registry.get(
-                name=model_name,
-                implementation=implementation,
-                config=config,
-                dataset=dataset,
-                params=params,
+            if mode == "max":
+                return {"score": -torch.inf}
+            return {"score": torch.inf}
+
+        evaluator.evaluate(model, dataset, test_set=False)
+        results = evaluator.compute_results()
+        score = results[self._top_k][self._metric_name]
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            torch.save(
+                {"model_state": model.state_dict()},
+                os.path.join(tmpdir, "checkpoint.pt"),
             )
-        model.fit()
-        score = self._evaluate(model, dataset, metric, top_k)
-        return {"score": score, "model": model}
+            tune.report(
+                metrics={"score": score}, checkpoint=Checkpoint.from_directory(tmpdir)
+            )
 
-    def _evaluate(
-        self,
-        model: AbstractRecommender,
-        dataset: AbstractDataset,
-        metric: AbstractMetric,
-        top_k: int,
-    ) -> float:
-        """This function will evaluate a metric on a trained model.
-
-        Args:
-            model (AbstractRecommender): The trained model to evaluate.
-            dataset (AbstractDataset): The dataset on which evaluation will be executed.
-            metric (AbstractMetric): The metric to evaluate.
-            top_k (int): The cutoff to calculate metric.
-
-        Returns:
-            float: The value of the metric.
-        """
-        if self._config.splitter.validation:
-            return metric.eval(model, dataset.val_set, top_k)
-        return metric.eval(model, dataset.test_set, top_k)
+        return {"score": score}

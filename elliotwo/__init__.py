@@ -10,7 +10,7 @@ from .data import (
     LocalWriter,
 )
 from .recommenders import EASE, Slim, Trainer, AbstractRecommender
-from .evaluation import Evaluator, NDCG, Precision, Recall, HitRate
+from .evaluation import Evaluator, nDCG, Precision, Recall, HitRate
 from .utils import (
     Configuration,
     load_yaml,
@@ -50,7 +50,7 @@ __all__ = [
     "EASE",
     "Slim",
     "Evaluator",
-    "NDCG",
+    "nDCG",
     "Precision",
     "Recall",
     "HitRate",

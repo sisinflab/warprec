@@ -2,6 +2,7 @@ import argparse
 from argparse import Namespace
 from os.path import join
 
+import torch
 import elliotwo
 from elliotwo.utils.config import load_yaml
 from elliotwo.utils.logger import logger
@@ -47,30 +48,32 @@ def main(args: Namespace):
 
     # Models to infer
     models = list(config.models.keys())
-    coo = Evaluator(dataset, config)
+
+    evaluator = Evaluator(
+        list(config.evaluation.metrics),
+        list(config.evaluation.top_k),
+    )
 
     for model_name in models:
         # Restoring model to previous state
         params = config.models[model_name]
         path = params["meta"]["load_from"]
-        path = join(path, "serialized", model_name + ".joblib")
-        deserialized_data = reader.load_model_state(local_path=path)
+        path = join(path, "serialized", model_name + ".pt")
+        checkpoint = torch.load(path)
 
-        imp = params["meta"]["implementation"]
-        if imp == "latest":
-            model = model_registry.get_latest(
-                model_name, config=config, dataset=dataset, params=None
-            )
-        else:
-            model = model_registry.get(
-                model_name,
-                implementation=imp,
-                config=config,
-                dataset=dataset,
-                params=None,
-            )
-        model.load_model(deserialized_data)
-        _ = coo.run(model)
+        model = model_registry.get(
+            model_name,
+            implementation=params["meta"]["implementation"],
+        )
+        model.load_state_dict(checkpoint)
+
+        evaluator.evaluate(model, dataset, test_set=False, verbose=True)
+        results = evaluator.compute_results()
+        evaluator.print_console(results, config.evaluation.metrics, "Validation")
+
+        evaluator.evaluate(model, dataset, test_set=True, verbose=True)
+        results = evaluator.compute_results()
+        evaluator.print_console(results, config.evaluation.metrics, "Test")
 
 
 if __name__ == "__main__":

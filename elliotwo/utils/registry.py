@@ -3,7 +3,7 @@ from typing import TypeVar, Dict, Type, Optional, Callable, List, Generic, TYPE_
 if TYPE_CHECKING:
     from elliotwo.recommenders.abstract_recommender import AbstractRecommender
     from elliotwo.utils.config import RecomModel, SearchSpaceWrapper
-    from elliotwo.evaluation.metrics import AbstractMetric
+    from elliotwo.evaluation.metrics import BaseMetric
     from elliotwo.data.splitting.strategies import AbstractStrategy
     from elliotwo.recommenders.trainer.search_algorithm_wrapper import (
         BaseSearchWrapper,
@@ -85,7 +85,7 @@ class BasicRegistry(Generic[T]):
 
 
 # Singleton basic registries
-metric_registry: BasicRegistry["AbstractMetric"] = BasicRegistry("Metrics")
+metric_registry: BasicRegistry["BaseMetric"] = BasicRegistry("Metrics")
 splitting_registry: BasicRegistry["AbstractStrategy"] = BasicRegistry("Splitting")
 params_registry: BasicRegistry["RecomModel"] = BasicRegistry("Params")
 search_algorithm_registry: BasicRegistry["BaseSearchWrapper"] = BasicRegistry(
@@ -145,7 +145,7 @@ class ModelRegistry:
         return decorator
 
     def get(
-        self, name: str, implementation: str, *args, **kwargs
+        self, name: str, implementation: str = None, *args, **kwargs
     ) -> "AbstractRecommender":
         """
         Get an instance from the registry by name.
@@ -162,6 +162,8 @@ class ModelRegistry:
         Raises:
             ValueError: If name is not to be found in registry.
         """
+        if implementation is None:
+            implementation = "latest"
         versions = self._registry.get(name.upper())
         if versions is None:
             raise ValueError(
@@ -174,34 +176,6 @@ class ModelRegistry:
                 f"'{implementation}' not found in {name} registered implementations. "
                 f"Available options: {list(versions.keys())}"
             )
-        return cls(*args, **kwargs)
-
-    def get_latest(self, name: str, *args, **kwargs) -> "AbstractRecommender":
-        """
-        Get an instance from the registry by name.
-
-        Args:
-            name (str): Name of the registered class.
-            *args: Arguments to pass to the class constructor.
-            **kwargs: Keyword arguments to pass to the class constructor.
-
-        Returns:
-            AbstractRecommender: The latest version of the recommender model.
-
-        Raises:
-            ValueError: If name is not to be found in registry.
-        """
-        versions = self._registry.get(name.upper())
-        if versions is None:
-            raise ValueError(
-                f"'{name}' not found in {self.registry_name} registry. "
-                f"Available options: {list(self._registry.keys())}"
-            )
-        cls = versions.get("latest")
-        if cls is None:
-            # If there is no literal 'latest' version, we assume the last
-            # added key is the latest
-            cls = versions[next(reversed(versions))]
         return cls(*args, **kwargs)
 
     def list_registered(self) -> List[str]:

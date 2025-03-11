@@ -1,8 +1,9 @@
-from tqdm import tqdm
+from typing import List, Dict, Union
+
+import torch
 from tabulate import tabulate
 from elliotwo.data.dataset import AbstractDataset
-from elliotwo.utils.config import Configuration
-from elliotwo.evaluation.metrics import AbstractMetric
+from elliotwo.evaluation.metrics import BaseMetric
 from elliotwo.recommenders.abstract_recommender import AbstractRecommender
 from elliotwo.utils.logger import logger
 from elliotwo.utils.registry import metric_registry
@@ -16,110 +17,93 @@ class Evaluator:
     class will provide results on validation too.
 
     Args:
-        dataset (AbstractDataset): The dataset to be evaluate.
-        config (Configuration): The configuration where all
-            information about evaluation is stored.
+        metric_list (List[str]): The list of metric names that will
+            be evaluated.
+        k_values (List[int]): The cutoffs.
     """
 
-    def __init__(self, dataset: AbstractDataset, config: Configuration):
-        self._dataset = dataset
-        self._config = config
-        self._metrics = self._config.evaluation.metrics
-        self._top_k = self._config.evaluation.top_k
-        self._result_dict: dict[str, dict] = {}
-        if self._config.splitter.validation:
-            self._result_dict["Validation"] = {}
-        self._result_dict["Test"] = {}
+    def __init__(self, metric_list: List[str], k_values: List[int]):
+        self.k_values = k_values
+        self.metrics: Dict[int, List[BaseMetric]] = {
+            k: [metric_registry.get(metric_name, k) for metric_name in metric_list]
+            for k in k_values
+        }
 
-    def run(self, model: AbstractRecommender) -> dict:
-        """Use this method to start the evaluation.
-
-        Args:
-            model (AbstractRecommender): The model already trained to be evaluated.
-
-        Returns:
-            dict: The results in dict format using this
-                criteria {'Test' or 'Validation': dict{metric_name@top_k: value}}
-        """
-        logger.separator()
-        logger.msg(f"Starting evaluation for model {model.name}")
-
-        total_evaluation = len(self._metrics) * len(self._top_k)
-        with tqdm(total=total_evaluation, desc="Evaluating metrics") as pbar:
-            for metric_name in self._metrics:
-                for k in self._top_k:
-                    result = self.evaluate_metric(
-                        metric_name, model, self._dataset, self._config, k
-                    )
-
-                    if self._config.splitter.validation:
-                        self._result_dict["Validation"][f"{metric_name}@{k}"] = result[
-                            "val"
-                        ]
-                    self._result_dict["Test"][f"{metric_name}@{k}"] = result["test"]
-                    pbar.update()
-
-        self._print_console()
-        logger.positive(f"Evaluation completed for model {model.name}")
-
-        return self._result_dict
-
-    def evaluate_metric(
+    def evaluate(
         self,
-        metric_name: str,
         model: AbstractRecommender,
         dataset: AbstractDataset,
-        config: Configuration,
-        top_k: int,
-    ) -> dict:
-        """This function will calculate a given metric on data provided.
+        device: str = "cpu",
+        test_set: bool = True,
+        verbose: bool = False,
+    ):
+        """The main method to evaluate a list of metrics on the prediction of a model.
 
         Args:
-            metric_name (str): The string name of the metric that will be calculated.
             model (AbstractRecommender): The trained model.
-            dataset (AbstractDataset): The dataset to evaluate.
-            config (Configuration): Configuration file.
-            top_k (int): Cutoff to be used during evaluation.
+            dataset (AbstractDataset): The dataset from which retrieve train/val/test data.
+            device (str): The device on which the metrics will be calculated.
+            test_set (bool): Wether or not to compute metrics on test set.
+            verbose (bool): Wether of not the method should write with logger.
+        """
+        if verbose:
+            partition = "test set" if test_set else "validation set"
+            logger.separator()
+            logger.msg(f"Starting evaluation for model {model.name} on {partition}.")
+
+        # Reset all metrics in evaluator
+        for _, metric_list in self.metrics.items():
+            for metric in metric_list:
+                metric.reset()
+
+        for train_batch, val_batch, test_batch in dataset:
+            if test_set:
+                target = torch.tensor(test_batch.toarray(), device=device)
+            else:
+                target = torch.tensor(val_batch.toarray(), device=device)
+            predictions = model.forward(train_batch).to(device)
+
+            for _, metric_instances in self.metrics.items():
+                for metric in metric_instances:
+                    metric.update(predictions, target)
+
+        if verbose:
+            logger.positive(f"Evaluation completed for model {model.name}.")
+
+    def compute_results(self) -> Dict[int, Dict[str, float]]:
+        """The method to retrieve computed results in dictionary format.
 
         Returns:
-            dict: The results of the validation in dict
-                format using this criteria {'test' or 'val': value}
+            Dict[int, Dict[str, float]]: The dictionary containing the results.
         """
-
         results = {}
-        metric: AbstractMetric = metric_registry.get(metric_name, config)
-        if config.splitter.validation:
-            results["val"] = metric.eval(model, dataset.val_set, top_k)
-        results["test"] = metric.eval(model, dataset.test_set, top_k)
+        for k, metric_instances in self.metrics.items():
+            results[k] = {
+                metric.name: metric.compute().item() for metric in metric_instances
+            }
         return results
 
-    def _print_console(self):
-        """Utility function to print results using tabulate."""
-        logger.msg("")
-        if self._config.splitter.validation:
-            self.__pprint_result_set(
-                self._result_dict["Validation"], "Validation Set Evaluation"
-            )
-            logger.msg("")
-        self.__pprint_result_set(self._result_dict["Test"], "Test Set Evaluation")
-
-    def __pprint_result_set(self, res_dict: dict, header: str):
+    def print_console(
+        self,
+        res_dict: Dict[int, Dict[str, float]],
+        metrics_list: List[str],
+        header: str,
+    ):
         """Utility function to print results using tabulate.
 
         Args:
-            res_dict (dict): The dictionary containing all the results.
+            res_dict (Dict[int, Dict[str, float]]): The dictionary containing all the results.
+            metrics_list (List[str]): The names of the metrics.
             header (str): The header of the evaluation grid,
                 usually set with the name of evaluation.
         """
         _tab = []
-        for k in self._top_k:
-            _metric_tab = ["Top@" + str(k)]
-            for metric_name in self._metrics:
-                key = metric_name + "@" + str(k)
-                score = res_dict[key]
+        for k, metrics in res_dict.items():
+            _metric_tab: List[Union[str, float]] = ["Top@" + str(k)]
+            for _, score in metrics.items():
                 _metric_tab.append(score)
             _tab.append(_metric_tab)
-        table = tabulate(_tab, headers=self._metrics, tablefmt="grid")
+        table = tabulate(_tab, headers=metrics_list, tablefmt="grid")
         _rlen = len(table.split("\n", maxsplit=1)[0])
         logger.msg(header.center(_rlen, "-"))
         for row in table.split("\n"):

@@ -6,10 +6,11 @@ from abc import ABC, abstractmethod
 
 import pandas as pd
 import numpy as np
-import joblib
+import torch
 from pandas import DataFrame
 from elliotwo.utils.config import Configuration
 from elliotwo.data.dataset import AbstractDataset
+from elliotwo.recommenders.abstract_recommender import AbstractRecommender
 from elliotwo.utils.logger import logger
 
 
@@ -48,7 +49,7 @@ class AbstractWriter(ABC):
         """This method writes recommendations in the destination."""
 
     @abstractmethod
-    def write_model(self, data_to_serialize: dict, model_name: str):
+    def write_model(self, model: AbstractRecommender):
         """This method writes the model state into a destination."""
 
     @abstractmethod
@@ -142,9 +143,9 @@ class LocalWriter(AbstractWriter):
         results in the corresponding DataFrame format.
 
         Args:
-            result_dict (dict): The dictionary containing the results,
-                must be in the format index: value, where index is a
-                string formatted as: metric_name@top_k.
+            result_dict (dict): The dictionary containing the results.
+                The first index is the top_k integer, the second
+                the name of the metric.
             metric_names (List[str]): The names of the metrics to be retrieved from the dictionary.
             top_k (List[int]): The list of top_k, or cutoffs, to retrieve from dictionary.
 
@@ -156,7 +157,7 @@ class LocalWriter(AbstractWriter):
         for k in top_k:
             row = []
             for metric in metric_names:
-                row.append(result_dict[metric + "@" + str(k)])
+                row.append(result_dict[k][metric])
             result_list.append(row)
         result_array = np.array(result_list)
         return pd.DataFrame(result_array, columns=metric_names, index=indexes)
@@ -185,17 +186,16 @@ class LocalWriter(AbstractWriter):
             index=None,
         )
 
-    def write_model(self, data_to_serialize: dict, model_name: str):
+    def write_model(self, model: AbstractRecommender):
         """This method writes the model state into a local path,
         using joblib for the serialization.
 
         Args:
-            data_to_serialize (dict): The original data to be serialized.
-            model_name (str): The name of the model that was serialized.
+            model (AbstractRecommender): The model to write locally.
         """
         # experiment_path/serialized/model_name.joblib
-        _path = join(self._experiment_serialized_models_dir, model_name + ".joblib")
-        joblib.dump(data_to_serialize, _path, compress=3)
+        _path = join(self._experiment_serialized_models_dir, model.name + ".pth")
+        torch.save(model.state_dict(), _path)
 
     def write_split(self, dataset: AbstractDataset) -> None:
         _path_train = join(self._experiment_split_dir, "train.tsv")

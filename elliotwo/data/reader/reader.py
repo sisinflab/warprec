@@ -85,7 +85,7 @@ class LocalReader(AbstractReader):
         Returns:
             DataFrame: The data read from the local source.
         """
-        logger.msg(f"Starting reading process from local source in: {self._path}.")
+        logger.msg(f"Starting reading process from local source in: {self._path}")
         data = None
 
         if self._batch_size is not None:

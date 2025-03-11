@@ -76,14 +76,14 @@ class Optimization(BaseModel):
             - grid: Performs grid search over all the parameters provided.
             - random: Random search over the param space.
             - hopt: Bayesian optimization using HyperOptOptimization.
-            - optuna: Optuna optimization, more information can
-                be found at https://docs.ray.io/en/latest/tune/api/doc/ray.tune.search.optuna.OptunaSearch.html.
-            - bohb: BOHB optimization, more information can
-                be found at https://docs.ray.io/en/latest/tune/api/doc/ray.tune.search.bohb.TuneBOHB.html.
+            - optuna: Optuna optimization, more information can be found at:
+                https://docs.ray.io/en/latest/tune/api/doc/ray.tune.search.optuna.OptunaSearch.html.
+            - bohb: BOHB optimization, more information can be found at:
+                https://docs.ray.io/en/latest/tune/api/doc/ray.tune.search.bohb.TuneBOHB.html.
         scheduler (Optional[Schedulers]): The scheduler to use in optimization.
             - fifo: Classic First In First Out trial optimization.
-            - asha: ASHA Scheduler, more information can be found
-                at https://docs.ray.io/en/latest/tune/api/doc/ray.tune.schedulers.ASHAScheduler.html.
+            - asha: ASHA Scheduler, more information can be found at:
+                https://docs.ray.io/en/latest/tune/api/doc/ray.tune.schedulers.ASHAScheduler.html.
         properties (Optional[Properties]): The attributes required for Ray Tune to work.
         validation_metric (Optional[str]): The metric/loss that will validate each trial in Ray Tune.
         num_samples (Optional[int]): The number of trials that Ray Tune will try.
@@ -129,7 +129,7 @@ class Optimization(BaseModel):
                 "Validation metric contains more than one @, check your configuration file."
             )
         metric, top_k = v.split("@")
-        if metric not in metric_registry.list_registered():
+        if metric.upper() not in metric_registry.list_registered():
             raise ValueError(
                 f"Metric {metric} not in metric registry. This is the list"
                 f"of supported metrics: {metric_registry.list_registered()}"

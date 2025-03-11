@@ -15,6 +15,8 @@ class AbstractDataset(ABC):
         val_set (Interactions): Validation set, not mandatory,
             used during training to validate the process.
         test_set (Interactions): Test set, not mandatory, used in evaluation to calculate metrics.
+        nuid (int): Number of user IDs.
+        niid (int): Number of item IDs.
 
     Args:
         config (Configuration): The configuration file.
@@ -23,6 +25,8 @@ class AbstractDataset(ABC):
     train_set: Interactions
     val_set: Interactions
     test_set: Interactions
+    nuid: int
+    niid: int
 
     def __init__(self, config: Configuration):
         self._config = config
@@ -65,6 +69,18 @@ class AbstractDataset(ABC):
                 dict: Mapping of item_idxs -> item_id.
         """
 
+    def info(self) -> dict:
+        """This method returns the main information of the
+        dataset in dict format.
+
+        Returns:
+            dict: The dictionary with the main information of
+                the dataset.
+        """
+        return {
+            "items": self.niid,
+        }
+
     def update_mappings(self, user_mapping: dict, item_mapping: dict):
         """Update the mappings of the dataset.
 
@@ -74,6 +90,23 @@ class AbstractDataset(ABC):
         """
         self._umap = user_mapping
         self._imap = item_mapping
+
+    def __iter__(self):
+        self.train_iter = iter(self.train_set)
+        self.val_iter = iter(self.val_set) if self.val_set else None
+        self.test_iter = iter(self.test_set) if self.test_set else None
+
+        return self
+
+    def __next__(self):
+        try:
+            train_batch = next(self.train_iter)
+            val_batch = next(self.val_iter) if self.val_iter else None
+            test_batch = next(self.test_iter) if self.test_iter else None
+
+            return train_batch, val_batch, test_batch
+        except StopIteration as exc:
+            raise exc
 
 
 class TransactionDataset(AbstractDataset):
@@ -107,13 +140,13 @@ class TransactionDataset(AbstractDataset):
         self.train_set = train_set
         self.val_set = val_set
         self.test_set = test_set
-        self._nuid = nuid
-        self._niid = niid
+        self.nuid = nuid
+        self.niid = niid
         self._umap = user_mapping
         self._imap = item_mapping
 
     def get_dims(self) -> Tuple[int, int]:
-        return (self._nuid, self._niid)
+        return (self.nuid, self.niid)
 
     def get_mappings(self) -> Tuple[dict, dict]:
         return (self._umap, self._imap)

@@ -6,8 +6,6 @@ from elliotwo.utils.config import load_yaml, parse_params
 from elliotwo.utils.logger import logger
 from elliotwo.recommenders.trainer import Trainer
 from elliotwo.evaluation.evaluator import Evaluator
-from elliotwo.evaluation.metrics import AbstractMetric
-from elliotwo.utils.registry import metric_registry
 
 
 def main(args: Namespace):
@@ -54,20 +52,33 @@ def main(args: Namespace):
 
     # Trainer testing
     models = list(config.models.keys())
-    coo = Evaluator(dataset, config)
+
+    evaluator = Evaluator(
+        [metric for metric in config.evaluation.metrics],
+        [k for k in config.evaluation.top_k],
+    )
 
     for model_name in models:
         params = config.models[model_name]
         val_metric, val_k = config.validation_metric(
             params["optimization"]["validation_metric"]
         )
-        metric: AbstractMetric = metric_registry.get(val_metric, config=config)
         train_params = parse_params(params)
-        trainer = Trainer(model_name, train_params, dataset, metric, val_k, config)
+        trainer = Trainer(model_name, train_params, dataset, val_metric, val_k, config)
         best_model, _ = trainer.train_and_evaluate()
 
         # Evaluation testing
-        result_dict = coo.run(best_model)
+        result_dict = {}
+        evaluator.evaluate(best_model, dataset, test_set=False, verbose=True)
+        results = evaluator.compute_results()
+        evaluator.print_console(results, config.evaluation.metrics, "Validation")
+        result_dict["Validation"] = results
+
+        evaluator.evaluate(best_model, dataset, test_set=True, verbose=True)
+        results = evaluator.compute_results()
+        evaluator.print_console(results, config.evaluation.metrics, "Test")
+        result_dict["Test"] = results
+
         writer.write_results(
             result_dict, model_name, config.evaluation.metrics, config.evaluation.top_k
         )
@@ -75,12 +86,12 @@ def main(args: Namespace):
         # Recommendation
         if config.general.recommendation.save_recs:
             umap_i, imap_i = dataset.get_inverse_mappings()
-            recs = best_model.get_recs(umap_i, imap_i, k=50)
+            recs = best_model.get_recs(dataset.train_set, umap_i, imap_i, k=50)
             writer.write_recs(recs, model_name)
 
         # Model serialization
         if params["meta"]["save_model"]:
-            best_model.save_model(writer)
+            writer.write_model(best_model)
 
 
 if __name__ == "__main__":

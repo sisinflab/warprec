@@ -18,6 +18,8 @@ class Interactions:
             int: Number of items.
         user_mapping (dict): Mapping of user ID -> user idx.
         item_mapping (dict): Mapping of item ID -> item idx.
+        batch_size (int): The batch size that will be used to
+            iterate over the interactions.
 
     Raises:
         ValueError: If the rating type is not supported.
@@ -30,12 +32,14 @@ class Interactions:
         original_dims: Tuple[int, int],
         user_mapping: dict,
         item_mapping: dict,
+        batch_size: int = 1024,
     ) -> None:
         self._inter_dict = {}
         self._inter_df = data
         self._index = 0
         self._inter_sparse = None
         self._config = config
+        self._batch_size = batch_size
 
         # Retrieve information from config
         self._rating_type = self._config.data.rating_type
@@ -140,10 +144,11 @@ class Interactions:
         ratings = []
 
         # Iter self and get all tuple of interactions
-        for u, i, r in self:
-            users.append(self._umap[u])
-            items.append(self._imap[i])
-            ratings.append(r)
+        for u, i_r in self._inter_dict.items():
+            for i, r in i_r.items():
+                users.append(self._umap[u])
+                items.append(self._imap[i])
+                ratings.append(r)
 
         # Create sparse structure
         self._inter_sparse = coo_matrix(
@@ -160,28 +165,28 @@ class Interactions:
             Interactions: The iterator of the interactions.
         """
         self._index = 0
+        if not isinstance(self._inter_sparse, csr_matrix):
+            self._to_sparse()
         return self
 
-    def __next__(self) -> Tuple[int, int, float]:
-        """This method will return the next interaction in the data.
+    def __next__(self) -> csr_matrix:
+        """This method will iterate over the sparse data.
 
         Returns:
-            Tuple[int, int, float]:
-                int: User ID.
-                int: Item ID.
-                float: Rating.
+            csr_matrix: The csr representation of data.
         Raises:
             StopIteration: If the end of the data is reached.
+            ValueError: If the sparse matrix is None.
         """
-        if self._index < len(self._inter_df):
-            result = self._inter_df.iloc[self._index]
-            self._index += 1
-            return (
-                result[self._user_label],
-                result[self._item_label],
-                result[self._score_label],
-            )
-        raise StopIteration
+        if self._index >= self._og_nuid:
+            raise StopIteration
+        if self._inter_sparse is None:
+            raise ValueError("The sparse matrix is None.")
+
+        start = self._index
+        end = min(start + self._batch_size, self._og_nuid)
+        self._index = end
+        return self._inter_sparse[start:end]
 
     def __len__(self) -> int:
         """This method calculates the length of the interactions.

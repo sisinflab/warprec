@@ -1,3 +1,4 @@
+# pylint: disable=too-few-public-methods
 from typing import Tuple, List
 from abc import ABC, abstractmethod
 

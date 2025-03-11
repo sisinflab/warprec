@@ -1,4 +1,4 @@
 from .evaluator import Evaluator
-from .metrics import NDCG, Precision, Recall, HitRate
+from .metrics import BaseMetric, nDCG, Precision, Recall, HitRate
 
-__all__ = ["Evaluator", "NDCG", "Precision", "Recall", "HitRate"]
+__all__ = ["Evaluator", "BaseMetric", "nDCG", "Precision", "Recall", "HitRate"]

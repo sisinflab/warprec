@@ -1,96 +1,56 @@
+from typing import Any
 from abc import ABC, abstractmethod
 
 import torch
-from torch import nn, Tensor
 import pandas as pd
 import numpy as np
+from torch import nn, Tensor
+from scipy.sparse import csr_matrix
 from pandas import DataFrame
-from elliotwo.utils.config import Configuration
-from elliotwo.data.writer import AbstractWriter
-from elliotwo.data.dataset import AbstractDataset
-from elliotwo.utils.logger import logger
+from elliotwo.data.dataset import Interactions
 
 
 class AbstractRecommender(nn.Module, ABC):
     """Abstract class that defines the basic functionalities of a recommendation model.
 
     Args:
-        config (Configuration): The configuration file.
-        dataset (AbstractDataset): The dataset on which the train will be executed.
-        params (dict): The parameters to set up the model.
-        *args: Argument for PyTorch nn.Module.
-        **kwargs: Keyword argument for PyTorch nn.Module.
+        *args (Any): Argument for PyTorch nn.Module.
+        **kwargs (Any): Keyword argument for PyTorch nn.Module.
     """
 
     def __init__(
         self,
-        config: Configuration,
-        dataset: AbstractDataset,
-        params: dict,
-        *args,
-        **kwargs,
+        *args: Any,
+        **kwargs: Any,
     ):
         super().__init__(*args, **kwargs)
-        self._config = config
-        self._dataset = dataset
-        self._params = params
-        self._name: str = "Name not set"
-        # The train set sparse matrix
-        self.interaction_matrix = self._dataset.train_set.get_sparse()
+        self._name = ""
 
     @abstractmethod
-    def fit(self):
+    def fit(self, *args, **kwargs):
         """This method will train the model on the dataset."""
 
     @abstractmethod
-    def _serialize(self) -> dict:
-        """This method will return the part of the recommender that was learned.
-
-        Returns:
-            dict: The dictionary containing all the important information about the model.
-        """
-
-    @abstractmethod
-    def _deserialize(self, deserialized_data: dict):
-        """This method load the part of the recommender from a checkpoint."""
-
-    @abstractmethod
-    def forward(self) -> Tensor:
+    def forward(self, *args: Any, **kwargs: Any) -> Tensor:
         """This method will return the prediction of the model.
+
+        Args:
+            *args (Any): List of arguments.
+            **kwargs (Any): The dictionary of keyword arguments.
 
         Returns:
             Tensor: The score matrix {user x item}.
         """
 
-    def save_model(self, writer: AbstractWriter) -> None:
-        """This method will save the model state using a writer.
-
-        Args:
-            writer (AbstractWriter): The writer to use to write the model state.
-        """
-        logger.msg(f"Starting serialization of the model {self.name}.")
-        data_to_serialize = self._serialize()
-        writer.write_model(data_to_serialize, self.name)
-        logger.positive(
-            f"Serialization process of the model {self.name} completed successfully."
-        )
-
-    def load_model(self, deserialized_data: dict) -> None:
-        """This method will load a model from a given checkpoint.
-
-        Args:
-            deserialized_data (dict): The deserialized information that
-                will be used to restore the state of the model.
-        """
-        logger.msg(f"Loading previous state of the model {self.name}.")
-        self._deserialize(deserialized_data)
-        logger.positive(f"Loading of the model {self.name} completed successfully.")
-
-    def get_recs(self, umap_i: dict, imap_i: dict, k: int) -> DataFrame:
+    def get_recs(
+        self, X: Interactions, umap_i: dict, imap_i: dict, k: int
+    ) -> DataFrame:
         """This method turns the learned parameters into new
         recommendations in DataFrame format.
 
         Args:
+            X (Interactions): The set that will be used to
+                produce recommendations.
             umap_i (dict): The inverse mapping from index -> user_id.
             imap_i (dict): The inverse mapping from index -> item_id.
             k (int): The top k recommendation to be produced.
@@ -99,7 +59,7 @@ class AbstractRecommender(nn.Module, ABC):
             DataFrame: A DataFrame containing the top k recommendations for each user.
         """
         # Extract information from model
-        scores = self.forward()
+        scores = self.forward(X.get_sparse())
         top_k_items = torch.topk(scores, k, dim=1).indices
         user_ids = torch.arange(scores.shape[0]).unsqueeze(1).expand(-1, k)
         recommendations = torch.stack((user_ids, top_k_items), dim=2).reshape(-1, 2)
@@ -120,6 +80,7 @@ class AbstractRecommender(nn.Module, ABC):
 
     @property
     def name(self):
+        """The name of the model."""
         return self._name
 
 
@@ -130,65 +91,36 @@ class ItemSimilarityRecommender(AbstractRecommender):
     which learns a similarity matrix B and produces recommendations using the computation: X@B.
 
     Args:
-        config (Configuration): The configuration file.
-        dataset (AbstractDataset): The dataset to train the model on.
-        params (dict): The parameters of the model.
-        *args: Argument for PyTorch nn.Module.
-        **kwargs: Keyword argument for PyTorch nn.Module.
+        items (int): The number of items that will be learned.
+        *args (Any): Argument for PyTorch nn.Module.
+        **kwargs (Any): Keyword argument for PyTorch nn.Module.
     """
 
     def __init__(
         self,
-        config: Configuration,
-        dataset: AbstractDataset,
-        params: dict,
-        *args,
-        **kwargs,
+        items: int,
+        *args: Any,
+        **kwargs: Any,
     ):
-        super().__init__(config, dataset, params, *args, **kwargs)
-        self.item_similarity = None
+        super().__init__(*args, **kwargs)
+        self.item_similarity = nn.Parameter(torch.rand(items, items))
 
-    def _serialize(self) -> dict:
-        """This method return the part of the recommender that was learned,
-        in this case the similarity matrix {item x item}.
-
-        Returns:
-            dict: The dictionary containing all the important information about the model.
-        """
-        umap, imap = self._dataset.get_mappings()
-        serialization_dict = {
-            "model_name": self.__class__.__name__,
-            "item_similarity": self.item_similarity,
-            "user_mapping": umap,
-            "item_mapping": imap,
-        }
-        return serialization_dict
-
-    def _deserialize(self, deserialized_data: dict):
-        """This method load the part of the recommender from a checkpoint,
-        in this case the similarity matrix {item x item}.
+    def forward(
+        self, interaction_matrix: csr_matrix, *args: Any, **kwargs: Any
+    ) -> Tensor:
+        """Prediction in the form of X@B where B is a {item x item} similarity matrix.
 
         Args:
-            deserialized_data (dict): The data loaded with a reader,
-                must be compatible with the model itself.
-        """
-        if self.__class__.__name__ != deserialized_data["model_name"]:
-            logger.negative(
-                "You are trying to load a model information from a different model."
-            )
-        self.item_similarity = deserialized_data["item_similarity"]
-        self._dataset.update_mappings(
-            deserialized_data["user_mapping"], deserialized_data["item_mapping"]
-        )
-
-    def forward(self) -> Tensor:
-        """Prediction in the form of X@B where B is a {item x item} similarity matrix.
+            interaction_matrix (csr_matrix): The interactions matrix
+                that will be used to predict.
+            *args (Any): List of arguments.
+            **kwargs (Any): The dictionary of keyword arguments.
 
         Returns:
             Tensor: The score matrix {user x item}.
         """
-        r = self.interaction_matrix @ self.item_similarity
+        r = interaction_matrix @ self.item_similarity.detach().numpy()  # pylint: disable=not-callable
 
         # Masking interaction already seen in train
-        r[self.interaction_matrix.nonzero()] = -torch.inf
+        r[interaction_matrix.nonzero()] = -torch.inf
         return torch.from_numpy(r)
