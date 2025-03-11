@@ -194,7 +194,7 @@ class LocalWriter(AbstractWriter):
             model (AbstractRecommender): The model to write locally.
         """
         # experiment_path/serialized/model_name.joblib
-        _path = join(self._experiment_serialized_models_dir, model.name + ".pth")
+        _path = join(self._experiment_serialized_models_dir, model.name_param + ".pth")
         torch.save(model.state_dict(), _path)
 
     def write_split(self, dataset: AbstractDataset) -> None:
