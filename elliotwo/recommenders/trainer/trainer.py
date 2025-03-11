@@ -81,7 +81,7 @@ class Trainer:
 
         properties = self._model_params.optimization.properties.model_dump()
         mode = self._model_params.optimization.properties.mode
-        save_all_checkpoints = self._model_params.meta.save_all_checkpoints
+        keep_all_ray_checkpoints = self._model_params.meta.keep_all_ray_checkpoints
 
         # Ray Tune parameters
         obj_function = tune.with_parameters(
@@ -100,7 +100,7 @@ class Trainer:
         )
 
         best_checkpoint_callback = BestCheckpointCallback(
-            "score", mode, save_all_checkpoints
+            "score", mode, keep_all_ray_checkpoints
         )
 
         # Run the hyperparameter tuning
@@ -164,7 +164,7 @@ class Trainer:
         dataset: AbstractDataset,
         mode: str,
         evaluator: Evaluator,
-    ) -> dict:
+    ):
         """Objective function to optimize the hyperparameters.
 
         Args:
@@ -174,9 +174,6 @@ class Trainer:
             mode (str): Wether or not to maximize or minimize the metric.
             evaluator (Evaluator): The evaluator that will calculate the
                 validation metric.
-
-        Returns:
-            dict: A dictionary containing the score and the model trained.
         """
         model = model_registry.get(
             model_name,
@@ -191,8 +188,12 @@ class Trainer:
                 f"The fitting of the model {model.name}, failed with parameters: {params}. Error: {e}"
             )
             if mode == "max":
-                return {"score": -torch.inf}
-            return {"score": torch.inf}
+                tune.report(
+                    metrics={"score": -torch.inf},
+                )
+            tune.report(
+                metrics={"score": torch.inf},
+            )
 
         evaluator.evaluate(model, dataset, test_set=False)
         results = evaluator.compute_results()
@@ -207,14 +208,12 @@ class Trainer:
                 metrics={"score": score}, checkpoint=Checkpoint.from_directory(tmpdir)
             )
 
-        return {"score": score}
-
 
 class BestCheckpointCallback(tune.Callback):
-    def __init__(self, metric: str, mode: str, save_all_checkpoints: bool):
+    def __init__(self, metric: str, mode: str, keep_all_ray_checkpoints: bool):
         self.metric = metric
         self.mode = mode
-        self.save_all_checkpoints = save_all_checkpoints
+        self.keep_all_ray_checkpoints = keep_all_ray_checkpoints
         self.best_score = -float("inf") if mode == "max" else float("inf")
         self.best_checkpoint = None
 
@@ -230,7 +229,7 @@ class BestCheckpointCallback(tune.Callback):
         if is_better:
             # Delete previous best checkpoint
             if (
-                not self.save_all_checkpoints
+                not self.keep_all_ray_checkpoints
                 and self.best_checkpoint
                 and os.path.exists(self.best_checkpoint)
             ):
@@ -240,7 +239,9 @@ class BestCheckpointCallback(tune.Callback):
             self.best_score = score
             self.best_checkpoint = trial.checkpoint.path
 
-        elif not self.save_all_checkpoints and os.path.exists(trial.checkpoint.path):
+        elif not self.keep_all_ray_checkpoints and os.path.exists(
+            trial.checkpoint.path
+        ):
             shutil.rmtree(trial.checkpoint.path)
 
     def get_best_checkpoint(self):
