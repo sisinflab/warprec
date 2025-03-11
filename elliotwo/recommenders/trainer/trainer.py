@@ -53,11 +53,6 @@ class Trainer:
         self._model_params: RecomModel = params_registry.get(
             model_name, **config.models[model_name]
         )
-        self._model = ray.put(
-            model_registry.get(
-                model_name, self._model_params.meta.implementation, **self.infos
-            )
-        )
         self.model_name = model_name
         self._evaluator = Evaluator([metric_name], [top_k])
         self._train_param = param
@@ -85,13 +80,15 @@ class Trainer:
         )
 
         properties = self._model_params.optimization.properties.model_dump()
+        mode = self._model_params.optimization.properties.mode
+        save_all_checkpoints = self._model_params.optimization.save_all_checkpoints
 
         # Ray Tune parameters
         obj_function = tune.with_parameters(
             self._objective_function,
-            model=self._model,
+            model_name=self.model_name,
             dataset=self._dataset,
-            mode=properties["mode"],
+            mode=mode,
             evaluator=self._evaluator,
         )
 
@@ -103,7 +100,7 @@ class Trainer:
         )
 
         best_checkpoint_callback = BestCheckpointCallback(
-            "score", self._model_params.optimization.properties.mode
+            "score", mode, save_all_checkpoints
         )
 
         # Run the hyperparameter tuning
@@ -122,12 +119,8 @@ class Trainer:
         )
 
         # Train and retrieve results
-        best_trial = analysis.get_best_trial(
-            "score", self._model_params.optimization.properties.mode
-        )
-        best_params = analysis.get_best_config(
-            "score", self._model_params.optimization.properties.mode
-        )
+        best_trial = analysis.get_best_trial("score", mode)
+        best_params = analysis.get_best_config("score", mode)
 
         # Retrieve best model from checkpoint
         checkpoint = torch.load(
@@ -137,7 +130,10 @@ class Trainer:
         )
         model_state = checkpoint["model_state"]
         best_model = model_registry.get(
-            self.model_name, self._model_params.meta.implementation, **self.infos
+            self.model_name,
+            self._model_params.meta.implementation,
+            params=best_params,
+            **self.infos,
         )
         best_model.load_state_dict(model_state)
 
@@ -164,7 +160,7 @@ class Trainer:
     def _objective_function(
         self,
         params: dict,
-        model: AbstractRecommender,
+        model_name: str,
         dataset: AbstractDataset,
         mode: str,
         evaluator: Evaluator,
@@ -173,7 +169,7 @@ class Trainer:
 
         Args:
             params (dict): The parameter to train the model.
-            model (AbstractRecommender): The model to train.
+            model_name (str): The name of the model to train.
             dataset (AbstractDataset): The dataset to train the model on.
             mode (str): Wether or not to maximize or minimize the metric.
             evaluator (Evaluator): The evaluator that will calculate the
@@ -182,8 +178,14 @@ class Trainer:
         Returns:
             dict: A dictionary containing the score and the model trained.
         """
+        model = model_registry.get(
+            model_name,
+            self._model_params.meta.implementation,
+            params=params,
+            **self.infos,
+        )
         try:
-            model.fit(dataset.train_set, params)
+            model.fit(dataset.train_set)
         except Exception as e:
             logger.negative(
                 f"The fitting of the model {model.name}, failed with parameters: {params}. Error: {e}"
@@ -209,9 +211,10 @@ class Trainer:
 
 
 class BestCheckpointCallback(tune.Callback):
-    def __init__(self, metric: str, mode: str):
+    def __init__(self, metric: str, mode: str, save_all_checkpoints: bool):
         self.metric = metric
         self.mode = mode
+        self.save_all_checkpoints = save_all_checkpoints
         self.best_score = -float("inf") if mode == "max" else float("inf")
         self.best_checkpoint = None
 
@@ -226,14 +229,18 @@ class BestCheckpointCallback(tune.Callback):
 
         if is_better:
             # Delete previous best checkpoint
-            if self.best_checkpoint and os.path.exists(self.best_checkpoint):
+            if (
+                not self.save_all_checkpoints
+                and self.best_checkpoint
+                and os.path.exists(self.best_checkpoint)
+            ):
                 shutil.rmtree(self.best_checkpoint)
 
             # Update best score and checkpoint
             self.best_score = score
             self.best_checkpoint = trial.checkpoint.path
 
-        elif os.path.exists(trial.checkpoint.path):
+        elif not self.save_all_checkpoints and os.path.exists(trial.checkpoint.path):
             shutil.rmtree(trial.checkpoint.path)
 
     def get_best_checkpoint(self):

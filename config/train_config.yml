@@ -33,6 +33,7 @@ models:
         seed: 42
       validation_metric: nDCG@10
       num_samples: 5
+      save_all_checkpoints: True
       cpu_per_trial: 6
     l2: ['uniform', 5, 100]
   #Slim:

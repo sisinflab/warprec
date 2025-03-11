@@ -14,16 +14,19 @@ class AbstractRecommender(nn.Module, ABC):
     """Abstract class that defines the basic functionalities of a recommendation model.
 
     Args:
+        params (dict): The dictionary with the model params.
         *args (Any): Argument for PyTorch nn.Module.
         **kwargs (Any): Keyword argument for PyTorch nn.Module.
     """
 
     def __init__(
         self,
+        params: dict,
         *args: Any,
         **kwargs: Any,
     ):
         super().__init__(*args, **kwargs)
+        self.init_params(params)
         self._name = ""
 
     @abstractmethod
@@ -78,10 +81,28 @@ class AbstractRecommender(nn.Module, ABC):
 
         return recommendations
 
+    def init_params(self, params: dict):
+        """This method sets up the model with the correct parameters.
+
+        Args:
+            params (dict): The dictionary with the model params.
+        """
+        for ann, _ in self.__class__.__annotations__.items():
+            setattr(self, ann, params[ann])
+
     @property
     def name(self):
         """The name of the model."""
         return self._name
+
+    @property
+    def name_param(self):
+        """The name of the model with all it's parameters."""
+        name = self._name
+        for ann, _ in self.__class__.__annotations__.items():
+            value = getattr(self, ann, None)
+            name += f"_{ann}={value:.4f}"
+        return name
 
 
 class ItemSimilarityRecommender(AbstractRecommender):
@@ -91,6 +112,7 @@ class ItemSimilarityRecommender(AbstractRecommender):
     which learns a similarity matrix B and produces recommendations using the computation: X@B.
 
     Args:
+        params (dict): The dictionary with the model params.
         items (int): The number of items that will be learned.
         *args (Any): Argument for PyTorch nn.Module.
         **kwargs (Any): Keyword argument for PyTorch nn.Module.
@@ -98,11 +120,12 @@ class ItemSimilarityRecommender(AbstractRecommender):
 
     def __init__(
         self,
+        params: dict,
         items: int,
         *args: Any,
         **kwargs: Any,
     ):
-        super().__init__(*args, **kwargs)
+        super().__init__(params, *args, **kwargs)
         self.item_similarity = nn.Parameter(torch.rand(items, items))
 
     def forward(

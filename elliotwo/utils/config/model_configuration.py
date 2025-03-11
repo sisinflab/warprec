@@ -88,6 +88,8 @@ class Optimization(BaseModel):
         validation_metric (Optional[str]): The metric/loss that will validate each trial in Ray Tune.
         num_samples (Optional[int]): The number of trials that Ray Tune will try.
             In case of a grid search, this parameter should be set to 1.
+        save_all_checkpoints (Optional[bool]): Wether or not to save all the
+            checkpoints for the model optimization.
         cpu_per_trial (Optional[float]): The number of cpu cores dedicated to
             each trial.
         gpu_per_trial (Optional[float]): The number of gpu dedicated to
@@ -99,6 +101,7 @@ class Optimization(BaseModel):
     properties: Optional[Properties] = None
     validation_metric: Optional[str] = None
     num_samples: Optional[int] = 1
+    save_all_checkpoints: Optional[bool] = False
     cpu_per_trial: Optional[float] = 1.0
     gpu_per_trial: Optional[float] = 0.0
 

@@ -13,7 +13,12 @@ from elliotwo.utils.registry import model_registry
 class Slim(ItemSimilarityRecommender):
     """Implementation of Slim model from Sparse Linear Methods for Top-N Recommender Systems 2011.
 
+    Attributes:
+        l1 (float): The normalization value.
+        alpha (float): The alpha multiplication constant value.
+
     Args:
+        params (dict): The dictionary with the model params.
         items (int): The number of items that will be learned.
         *args (Any): Variable length argument list.
         **kwargs (Any): Arbitrary keyword arguments
@@ -23,16 +28,17 @@ class Slim(ItemSimilarityRecommender):
         alpha (float): Normalization parameter to use during train.
     """
 
-    def __init__(self, items: int, *args: Any, **kwargs: Any):
-        super().__init__(items, *args, **kwargs)
+    l1: float
+    alpha: float
+
+    def __init__(self, params: dict, items: int, *args: Any, **kwargs: Any):
+        super().__init__(params, items, *args, **kwargs)
         self._name = "Slim"
 
-    def fit(self, interactions: Interactions, params: dict, *args: Any, **kwargs: Any):
+    def fit(self, interactions: Interactions, *args: Any, **kwargs: Any):
         """During training we will compute the B similarity matrix {item x item}."""
         # Predefine the number of items, similarity matrix and ElasticNet
         X = interactions.get_sparse()
-        l1 = params["l1"]
-        alpha = params["alpha"]
 
         num_items = X.shape[1]
         item_sim = np.zeros((num_items, num_items))
@@ -47,7 +53,7 @@ class Slim(ItemSimilarityRecommender):
 
             # Use ElasticNet as in the paper
             model = ElasticNet(
-                alpha=alpha, l1_ratio=l1, fit_intercept=False, positive=True
+                alpha=self.alpha, l1_ratio=self.l1, fit_intercept=False, positive=True
             )
             model.fit(X_j, x_i)
 

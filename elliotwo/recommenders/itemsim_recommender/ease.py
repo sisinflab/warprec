@@ -16,6 +16,7 @@ class EASE(ItemSimilarityRecommender):
     preparation shared between all implementations.
 
     Args:
+        params (dict): The dictionary with the model params.
         items (int): The number of items that will be learned.
         *args (Any): Argument for PyTorch nn.Module.
         **kwargs (Any): Keyword argument for PyTorch nn.Module.
@@ -23,11 +24,12 @@ class EASE(ItemSimilarityRecommender):
 
     def __init__(
         self,
+        params: dict,
         items: int,
         *args: Any,
         **kwargs: Any,
     ):
-        super().__init__(items, *args, **kwargs)
+        super().__init__(params, items, *args, **kwargs)
         self._name = "EASE"
 
 
@@ -36,25 +38,25 @@ class EASE_Classic(EASE):
     """Implementation of EASE algorithm from
         Embarrassingly Shallow Autoencoders for Sparse Data 2019.
 
-    The params allowed by this model are as follows:
-        l2 (float): Normalization parameter to use during train.
+    Attributes:
+        l2 (float): The normalization value.
     """
 
-    def fit(self, interactions: Interactions, params: dict, *args: Any, **kwargs: Any):
+    l2: float
+
+    def fit(self, interactions: Interactions, *args: Any, **kwargs: Any):
         """During training we will compute the B similarity matrix {item x item}.
 
         Args:
             interactions (Interactions): The interactions that will be
                 learned by the model.
-            params (dict): The dictionary containing the parameters.
             *args (Any): List of arguments.
             **kwargs (Any): The dictionary of keyword arguments.
         """
         # The classic implementation follows the original paper
         X = interactions.get_sparse()
-        l2 = params["l2"]
 
-        G = X.T @ X + l2 * np.identity(X.shape[1])
+        G = X.T @ X + self.l2 * np.identity(X.shape[1])
         B = np.linalg.inv(G)
         B /= -np.diag(B)
         np.fill_diagonal(B, 0.0)
@@ -69,22 +71,22 @@ class EASE_Elliot(EASE):
 
     This implementation was revised in the original Elliot framework.
 
-    The params allowed by this model are as follows:
-        l2 (float): Normalization parameter to use during train.
+    Attributes:
+        l2 (float): The normalization value.
     """
 
-    def fit(self, interactions: Interactions, params: dict, *args: Any, **kwargs: Any):
+    l2: float
+
+    def fit(self, interactions: Interactions, *args: Any, **kwargs: Any):
         """During training we will compute the B similarity matrix {item x item}.
 
         Args:
             interactions (Interactions): The interactions that will be
                 learned by the model.
-            params (dict): The dictionary containing the parameters.
             *args (Any): List of arguments.
             **kwargs (Any): The dictionary of keyword arguments.
         """
         X = interactions.get_sparse()
-        l2 = params["l2"]
 
         # The 'elliot' implementation add a popularity penalization
         B = safe_sparse_dot(X.T, X, dense_output=True)
@@ -94,7 +96,7 @@ class EASE_Elliot(EASE):
         item_popularity = np.ediff1d(X.tocsc().indptr)
 
         # Penalize item on the diagonal with l2 norm and popularity
-        B[diagonal_indices] = item_popularity + l2
+        B[diagonal_indices] = item_popularity + self.l2
 
         # Inverse and normalization
         P = np.linalg.inv(B)
