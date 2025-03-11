@@ -51,3 +51,4 @@ general:
     save_recs: True
     sep: \t
     ext: .tsv
+    k: 50
