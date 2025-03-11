@@ -81,7 +81,7 @@ class Trainer:
 
         properties = self._model_params.optimization.properties.model_dump()
         mode = self._model_params.optimization.properties.mode
-        save_all_checkpoints = self._model_params.optimization.save_all_checkpoints
+        save_all_checkpoints = self._model_params.meta.save_all_checkpoints
 
         # Ray Tune parameters
         obj_function = tune.with_parameters(
