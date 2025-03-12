@@ -1,6 +1,6 @@
 import os
 import tempfile
-from typing import Tuple
+from typing import List, TYPE_CHECKING
 
 import ray
 import torch
@@ -25,6 +25,9 @@ from elliotwo.utils.registry import (
     scheduler_registry,
 )
 
+if TYPE_CHECKING:
+    from elliotwo.data.writer import AbstractWriter
+
 
 class Trainer:
     """This class will be used to train a model and optimize the hyperparameters.
@@ -37,6 +40,7 @@ class Trainer:
         metric_name (str): The name of the metric that will be used
             as validation.
         top_k (int): The cutoff tu use as validation.
+        writer (AbstractWriter): The writer that will be used to store results.
         config (Configuration): The configuration of the experiment.
     """
 
@@ -47,6 +51,7 @@ class Trainer:
         dataset: AbstractDataset,
         metric_name: str,
         top_k: int,
+        writer: "AbstractWriter",
         config: Configuration,
     ):
         self.infos = dataset.info()
@@ -59,18 +64,17 @@ class Trainer:
         self._metric_name = metric_name
         self._top_k = top_k
         self._dataset = ray.put(dataset)
+        self._writer = writer
         self._config = config
 
-    def train_and_evaluate(self) -> Tuple[AbstractRecommender, dict]:
+    def train_and_evaluate(self) -> AbstractRecommender:
         """Main method of the Trainer class.
 
         This method will execute the training of the model and evaluation,
         according to information passed through configuration.
 
         Returns:
-            Tuple[AbstractRecommender, dict]:
-                AbstractRecommender: The model trained.
-                dict: A dictionary with the best params. The content depends on the model trained.
+            AbstractRecommender: The model trained.
         """
         logger.separator()
         logger.msg(
@@ -81,6 +85,7 @@ class Trainer:
 
         properties = self._model_params.optimization.properties.model_dump()
         mode = self._model_params.optimization.properties.mode
+        save_model = self._model_params.meta.save_model
         keep_all_ray_checkpoints = self._model_params.meta.keep_all_ray_checkpoints
 
         # Ray Tune parameters
@@ -122,21 +127,6 @@ class Trainer:
         best_trial = analysis.get_best_trial("score", mode)
         best_params = analysis.get_best_config("score", mode)
 
-        # Retrieve best model from checkpoint
-        checkpoint = torch.load(
-            os.path.join(
-                best_checkpoint_callback.get_best_checkpoint(), "checkpoint.pt"
-            )
-        )
-        model_state = checkpoint["model_state"]
-        best_model = model_registry.get(
-            self.model_name,
-            self._model_params.meta.implementation,
-            params=best_params,
-            **self.infos,
-        )
-        best_model.load_state_dict(model_state)
-
         # Best score obtained during hyperparameter optimization
         best_score = best_trial.last_result["score"]
 
@@ -150,12 +140,49 @@ class Trainer:
             f"Hyperparameter tuning for {self.model_name} ended successfully."
         )
 
+        if save_model and keep_all_ray_checkpoints:
+            logger.msg("Starting model serialization")
+            for checkpoint, param in best_checkpoint_callback.get_checkpoints():
+                checkpoint = torch.load(
+                    os.path.join(
+                        best_checkpoint_callback.get_best_checkpoint(), "checkpoint.pt"
+                    )
+                )
+                model_state = checkpoint["model_state"]
+                model = model_registry.get(
+                    self.model_name,
+                    self._model_params.meta.implementation,
+                    params=param,
+                    **self.infos,
+                )
+                model.load_state_dict(model_state)
+                self._writer.write_model(model)
+            logger.positive("Model serialization completed")
+
+        # Retrieve best model from checkpoint
+        checkpoint = torch.load(
+            os.path.join(
+                best_checkpoint_callback.get_best_checkpoint(), "checkpoint.pt"
+            )
+        )
+
+        model_state = checkpoint["model_state"]
+        best_model = model_registry.get(
+            self.model_name,
+            self._model_params.meta.implementation,
+            params=best_params,
+            **self.infos,
+        )
+        best_model.load_state_dict(model_state)
+
+        # Write best model only if requested and not
+        # saved already
+        if save_model and not keep_all_ray_checkpoints:
+            self._writer.write_model(best_model)
+
         ray.shutdown()
 
-        return (
-            best_model,
-            best_params,
-        )
+        return best_model
 
     def _objective_function(
         self,
@@ -216,9 +243,11 @@ class BestCheckpointCallback(tune.Callback):
         self.keep_all_ray_checkpoints = keep_all_ray_checkpoints
         self.best_score = -float("inf") if mode == "max" else float("inf")
         self.best_checkpoint = None
+        self.checkpoint_param: List[tuple] = []
 
     def on_trial_complete(self, iteration, trials, trial, **info):
         score = trial.last_result.get(self.metric, None)
+        self.checkpoint_param.append((trial.checkpoint.path, trial.config))
         if score is None:
             return
 
@@ -244,5 +273,8 @@ class BestCheckpointCallback(tune.Callback):
         ):
             shutil.rmtree(trial.checkpoint.path)
 
-    def get_best_checkpoint(self):
+    def get_best_checkpoint(self) -> str:
         return self.best_checkpoint
+
+    def get_checkpoints(self) -> List[tuple]:
+        return self.checkpoint_param

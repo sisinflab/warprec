@@ -64,8 +64,10 @@ def main(args: Namespace):
             params["optimization"]["validation_metric"]
         )
         train_params = parse_params(params)
-        trainer = Trainer(model_name, train_params, dataset, val_metric, val_k, config)
-        best_model, _ = trainer.train_and_evaluate()
+        trainer = Trainer(
+            model_name, train_params, dataset, val_metric, val_k, writer, config
+        )
+        best_model = trainer.train_and_evaluate()
 
         # Evaluation testing
         result_dict = {}
