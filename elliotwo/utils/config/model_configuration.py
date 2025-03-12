@@ -33,6 +33,15 @@ class Meta(BaseModel):
     load_from: Optional[str] = None
     implementation: Optional[str] = "latest"
 
+    @model_validator(mode="after")
+    def model_validation(self):
+        if not self.save_model and self.keep_all_ray_checkpoints:
+            raise ValueError(
+                "You have set save_model to False but keep_all_ray_checkpoints to True. "
+                "You cannot save all checkpoints if the save_model parameter has not been set."
+            )
+        return self
+
 
 class Properties(BaseModel):
     """Definition of the Properties of the search algorithm and
