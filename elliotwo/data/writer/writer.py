@@ -7,6 +7,7 @@ from abc import ABC, abstractmethod
 import pandas as pd
 import numpy as np
 import torch
+import shutil
 from pandas import DataFrame
 from elliotwo.utils.config import Configuration
 from elliotwo.data.dataset import AbstractDataset
@@ -55,6 +56,10 @@ class AbstractWriter(ABC):
     @abstractmethod
     def write_split(self, dataset: AbstractDataset):
         """This method writes the split of the dataset into a destination."""
+
+    @abstractmethod
+    def checkpoint_from_ray(self, source: str, new_name: str):
+        """This method takes a ray checkpoint and moves to a destination."""
 
 
 class LocalWriter(AbstractWriter):
@@ -208,3 +213,7 @@ class LocalWriter(AbstractWriter):
             dataset.test_set.get_df().to_csv(_path_test, sep="\t", index=None)
         if dataset.val_set is not None:
             dataset.val_set.get_df().to_csv(_path_val, sep="\t", index=None)
+
+    def checkpoint_from_ray(self, source: str, new_name: str):
+        destination = join(self._experiment_serialized_models_dir, new_name + ".pth")
+        shutil.move(source, destination)

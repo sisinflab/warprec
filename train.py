@@ -1,10 +1,12 @@
 import argparse
+import os
 from argparse import Namespace
 
 from elliotwo.data import LocalReader, LocalWriter, Splitter
 from elliotwo.utils.config import load_yaml, parse_params
 from elliotwo.utils.logger import logger
 from elliotwo.recommenders.trainer import Trainer
+from elliotwo.recommenders.abstract_recommender import generate_model_name
 from elliotwo.evaluation.evaluator import Evaluator
 
 
@@ -64,10 +66,8 @@ def main(args: Namespace):
             params["optimization"]["validation_metric"]
         )
         train_params = parse_params(params)
-        trainer = Trainer(
-            model_name, train_params, dataset, val_metric, val_k, writer, config
-        )
-        best_model = trainer.train_and_evaluate()
+        trainer = Trainer(model_name, train_params, dataset, val_metric, val_k, config)
+        best_model, checkpoint_param = trainer.train_and_evaluate()
 
         # Evaluation testing
         result_dict = {}
@@ -96,6 +96,13 @@ def main(args: Namespace):
         # Model serialization
         if params["meta"]["save_model"]:
             writer.write_model(best_model)
+
+            if params["meta"]["keep_all_ray_checkpoints"]:
+                for check_path, param in checkpoint_param:
+                    if os.path.exists(check_path):
+                        source_path = os.path.join(check_path, "checkpoint.pt")
+                        checkpoint_name = generate_model_name(model_name, param)
+                        writer.checkpoint_from_ray(source_path, checkpoint_name)
 
 
 if __name__ == "__main__":
