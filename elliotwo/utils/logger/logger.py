@@ -1,4 +1,5 @@
 from loguru import logger as loguru_logger
+from typing import Any
 import sys
 
 # Define custom logging levels
@@ -47,53 +48,53 @@ class CustomLogger:
             colorize=True,
         )
 
-    def msg(self, message: str, *args, **kwargs):
+    def msg(self, message: str, *args: Any, **kwargs: Any):
         """Logs a message with the CONSOLE_MSG level.
 
         Args:
             message (str): The log message.
-            *args: Additional positional arguments passed to the logger.
-            **kwargs: Additional keyword arguments passed to the logger.
+            *args (Any): Additional positional arguments passed to the logger.
+            **kwargs (Any): Additional keyword arguments passed to the logger.
         """
         self._logger.log("CONSOLE_MSG", message, *args, **kwargs)
 
-    def positive(self, message: str, *args, **kwargs):
+    def positive(self, message: str, *args: Any, **kwargs: Any):
         """Logs a message with the POSITIVE_MSG level.
 
         Args:
             message (str): The log message.
-            *args: Additional positional arguments passed to the logger.
-            **kwargs: Additional keyword arguments passed to the logger.
+            *args (Any): Additional positional arguments passed to the logger.
+            **kwargs (Any): Additional keyword arguments passed to the logger.
         """
         self._logger.log("POSITIVE_MSG", message, *args, **kwargs)
 
-    def negative(self, message: str, *args, **kwargs):
+    def negative(self, message: str, *args: Any, **kwargs: Any):
         """Logs a message with the NEGATIVE_MSG level.
 
         Args:
             message (str): The log message.
-            *args: Additional positional arguments passed to the logger.
-            **kwargs: Additional keyword arguments passed to the logger.
+            *args (Any): Additional positional arguments passed to the logger.
+            **kwargs (Any): Additional keyword arguments passed to the logger.
         """
         self._logger.log("NEGATIVE_MSG", message, *args, **kwargs)
 
-    def stats(self, message: str, *args, **kwargs):
+    def stats(self, message: str, *args: Any, **kwargs: Any):
         """Logs a message with the STATS level.
 
         Args:
             message (str): The log message.
-            *args: Additional positional arguments passed to the logger.
-            **kwargs: Additional keyword arguments passed to the logger.
+            *args (Any): Additional positional arguments passed to the logger.
+            **kwargs (Any): Additional keyword arguments passed to the logger.
         """
         self._logger.log("STATS", message, *args, **kwargs)
 
-    def attention(self, message: str, *args, **kwargs):
+    def attention(self, message: str, *args: Any, **kwargs: Any):
         """Logs a message with the ATTENTION level.
 
         Args:
             message (str): The log message.
-            *args: Additional positional arguments passed to the logger.
-            **kwargs: Additional keyword arguments passed to the logger.
+            *args (Any): Additional positional arguments passed to the logger.
+            **kwargs (Any): Additional keyword arguments passed to the logger.
         """
         self._logger.log("ATTENTION", message, *args, **kwargs)
 

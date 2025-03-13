@@ -1,5 +1,5 @@
 # pylint: disable=too-few-public-methods
-from typing import Callable
+from typing import Callable, Any
 
 from ray import tune
 from elliotwo.utils.enums import SearchSpace
@@ -9,7 +9,7 @@ from elliotwo.utils.registry import search_space_registry
 class SearchSpaceWrapper:
     """The Wrapper interface for Search Spaces supported by Ray Tune."""
 
-    def __call__(self, *args):
+    def __call__(self, *args: Any):
         raise NotImplementedError
 
 
@@ -17,7 +17,7 @@ class SearchSpaceWrapper:
 class GridSpaceWrapper(SearchSpaceWrapper):
     """The Grid Search Space Wrapper."""
 
-    def __call__(self, *args) -> Callable:
+    def __call__(self, *args: Any) -> Callable:
         return tune.grid_search(args)
 
 
@@ -25,7 +25,7 @@ class GridSpaceWrapper(SearchSpaceWrapper):
 class ChoiceSpaceWrapper(SearchSpaceWrapper):
     """The Choice Search Space Wrapper."""
 
-    def __call__(self, *args) -> Callable:
+    def __call__(self, *args: Any) -> Callable:
         return tune.choice(*args)
 
 
@@ -33,7 +33,7 @@ class ChoiceSpaceWrapper(SearchSpaceWrapper):
 class UniformSpaceWrapper(SearchSpaceWrapper):
     """The Uniform Search Space Wrapper."""
 
-    def __call__(self, *args) -> Callable:
+    def __call__(self, *args: Any) -> Callable:
         return tune.uniform(*args)
 
 
@@ -41,7 +41,7 @@ class UniformSpaceWrapper(SearchSpaceWrapper):
 class QUniformSpaceWrapper(SearchSpaceWrapper):
     """The QUniform Search Space Wrapper."""
 
-    def __call__(self, *args) -> Callable:
+    def __call__(self, *args: Any) -> Callable:
         return tune.quniform(*args)
 
 
@@ -49,7 +49,7 @@ class QUniformSpaceWrapper(SearchSpaceWrapper):
 class LogUniformSpaceWrapper(SearchSpaceWrapper):
     """The LogUniform Search Space Wrapper."""
 
-    def __call__(self, *args) -> Callable:
+    def __call__(self, *args: Any) -> Callable:
         return tune.loguniform(*args)
 
 
@@ -57,7 +57,7 @@ class LogUniformSpaceWrapper(SearchSpaceWrapper):
 class QLogUniformSpaceWrapper(SearchSpaceWrapper):
     """The QLogUniform Search Space Wrapper."""
 
-    def __call__(self, *args) -> Callable:
+    def __call__(self, *args: Any) -> Callable:
         return tune.qloguniform(*args)
 
 
@@ -65,7 +65,7 @@ class QLogUniformSpaceWrapper(SearchSpaceWrapper):
 class RandnSpaceWrapper(SearchSpaceWrapper):
     """The Randn Search Space Wrapper."""
 
-    def __call__(self, *args) -> Callable:
+    def __call__(self, *args: Any) -> Callable:
         return tune.randn(*args)
 
 
@@ -73,7 +73,7 @@ class RandnSpaceWrapper(SearchSpaceWrapper):
 class QRandnSpaceWrapper(SearchSpaceWrapper):
     """The QRandn Search Space Wrapper."""
 
-    def __call__(self, *args) -> Callable:
+    def __call__(self, *args: Any) -> Callable:
         return tune.qrandn(*args)
 
 
@@ -81,7 +81,7 @@ class QRandnSpaceWrapper(SearchSpaceWrapper):
 class RandintSpaceWrapper(SearchSpaceWrapper):
     """The Randint Search Space Wrapper."""
 
-    def __call__(self, *args) -> Callable:
+    def __call__(self, *args: Any) -> Callable:
         return tune.randint(*args)
 
 
@@ -89,7 +89,7 @@ class RandintSpaceWrapper(SearchSpaceWrapper):
 class QRandintSpaceWrapper(SearchSpaceWrapper):
     """The QRandint Search Space Wrapper."""
 
-    def __call__(self, *args) -> Callable:
+    def __call__(self, *args: Any) -> Callable:
         return tune.qrandint(*args)
 
 
@@ -97,7 +97,7 @@ class QRandintSpaceWrapper(SearchSpaceWrapper):
 class LogRandintSpaceWrapper(SearchSpaceWrapper):
     """The LogRandint Search Space Wrapper."""
 
-    def __call__(self, *args) -> Callable:
+    def __call__(self, *args: Any) -> Callable:
         return tune.lograndint(*args)
 
 
@@ -105,5 +105,5 @@ class LogRandintSpaceWrapper(SearchSpaceWrapper):
 class QLogRandintSpaceWrapper(SearchSpaceWrapper):
     """The QLogRandint Search Space Wrapper."""
 
-    def __call__(self, *args) -> Callable:
+    def __call__(self, *args: Any) -> Callable:
         return tune.qlograndint(*args)

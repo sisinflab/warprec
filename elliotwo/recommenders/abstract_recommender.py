@@ -30,7 +30,7 @@ class AbstractRecommender(nn.Module, ABC):
         self._name = ""
 
     @abstractmethod
-    def fit(self, *args, **kwargs):
+    def fit(self, *args: Any, **kwargs: Any):
         """This method will train the model on the dataset."""
 
     @abstractmethod
