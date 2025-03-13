@@ -150,6 +150,9 @@ class LocalReader(AbstractReader):
         test_inter = None
         val_inter = None
 
+        # Get batch size from config
+        batch_size = self.config.data.batch_size
+
         if isfile(_path_train):
             train_set = pd.read_csv(
                 _path_train,
@@ -170,7 +173,12 @@ class LocalReader(AbstractReader):
                 item: i for i, item in enumerate(train_set[self._item_label].unique())
             }
             train_inter = Interactions(
-                train_set, self.config, (_nuid, _niid), _umap, _imap
+                train_set,
+                self.config,
+                (_nuid, _niid),
+                _umap,
+                _imap,
+                batch_size=batch_size,
             )
 
             if isfile(_path_test):
@@ -186,7 +194,12 @@ class LocalReader(AbstractReader):
                     "Test split information",
                 )
                 test_inter = Interactions(
-                    test_set, self.config, (_nuid, _niid), _umap, _imap
+                    test_set,
+                    self.config,
+                    (_nuid, _niid),
+                    _umap,
+                    _imap,
+                    batch_size=batch_size,
                 )
 
             if isfile(_path_val):
@@ -202,7 +215,12 @@ class LocalReader(AbstractReader):
                     "Validation split information",
                 )
                 val_inter = Interactions(
-                    val_set, self.config, (_nuid, _niid), _umap, _imap
+                    val_set,
+                    self.config,
+                    (_nuid, _niid),
+                    _umap,
+                    _imap,
+                    batch_size=batch_size,
                 )
 
             return TransactionDataset(

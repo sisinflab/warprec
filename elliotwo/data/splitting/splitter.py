@@ -47,6 +47,9 @@ class Splitter:
         # Get indexes using chosen strategy
         idxs = self._splitting_strategy.split(data)
 
+        # Get batch size from config
+        batch_size = self._config.data.batch_size
+
         # Define train/val/test subset of _inter_df taking into account
         # only user and items present in train set.
         _train_set = data.iloc[idxs[0]]
@@ -75,12 +78,28 @@ class Splitter:
         _imap = {item: i for i, item in enumerate(_iid)}
 
         # Create splits inside Dataset class for future use
-        train_set = Interactions(_train_set, self._config, (_nuid, _niid), _umap, _imap)
+        train_set = Interactions(
+            _train_set,
+            self._config,
+            (_nuid, _niid),
+            _umap,
+            _imap,
+            batch_size=batch_size,
+        )
         if self._config.splitter.validation:
-            val_set = Interactions(_val_set, self._config, (_nuid, _niid), _umap, _imap)
+            val_set = Interactions(
+                _val_set,
+                self._config,
+                (_nuid, _niid),
+                _umap,
+                _imap,
+                batch_size=batch_size,
+            )
         else:
             val_set = None
-        test_set = Interactions(_test_set, self._config, (_nuid, _niid), _umap, _imap)
+        test_set = Interactions(
+            _test_set, self._config, (_nuid, _niid), _umap, _imap, batch_size=batch_size
+        )
 
         # Logging of splitting process
         logger.msg("Splitting process over.")
