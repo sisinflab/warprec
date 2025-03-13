@@ -9,7 +9,7 @@ from .data import (
     AbstractWriter,
     LocalWriter,
 )
-from .recommenders import EASE, Slim, Trainer, AbstractRecommender
+from .recommenders import EASE, Slim, Trainer, AbstractRecommender, generate_model_name
 from .evaluation import Evaluator, nDCG, Precision, Recall, HitRate
 from .utils import (
     Configuration,
@@ -56,4 +56,5 @@ __all__ = [
     "HitRate",
     "Trainer",
     "AbstractRecommender",
+    "generate_model_name",
 ]

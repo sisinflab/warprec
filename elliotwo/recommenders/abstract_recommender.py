@@ -105,6 +105,21 @@ class AbstractRecommender(nn.Module, ABC):
         return name
 
 
+def generate_model_name(model_name: str, params: dict) -> str:
+    """
+    Generate a model name string based on the model name and its parameters.
+
+    Args:
+        model_name (str): The base name of the model.
+        params (dict): Dictionary containing parameter names and values.
+
+    Returns:
+        str: The formatted model name including parameters.
+    """
+    param_str = "_".join(f"{key}={value:.4f}" for key, value in params.items())
+    return f"{model_name}_{param_str}"
+
+
 class ItemSimilarityRecommender(AbstractRecommender):
     """ItemSimilarityRecommender implementation.
 
