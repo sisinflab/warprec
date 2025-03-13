@@ -211,3 +211,73 @@ class nDCG(TopKMetric):
     def reset(self):
         self.ndcg.zero_()
         self.users.zero_()
+
+
+@metric_registry.register("UserCoverage")
+class UserCoverage(TopKMetric):
+    """The UserCoverage@k metric counts the number of users
+       that received at least one recommendation.
+
+    Attributes:
+        covered_users (Tensor): The number of users with at least one recommendation.
+
+    Args:
+        k (int): The cutoff.
+        dist_sync_on_step (bool): torchmetrics parameter.
+    """
+
+    covered_users: Tensor
+
+    def __init__(self, k: int, dist_sync_on_step: bool = False):
+        super().__init__(k, dist_sync_on_step)
+        self.add_state("covered_users", default=torch.tensor(0.0), dist_reduce_fx="sum")
+
+    def update(self, preds: Tensor, target: Tensor):
+        """Updates the metric state with the new batch of predictions."""
+        top_k = torch.topk(preds, self.k, dim=1).indices
+        self.covered_users += top_k.shape[0]
+
+    def compute(self):
+        """Computes the final metric value."""
+        return self.covered_users
+
+    def reset(self):
+        """Resets the metric state."""
+        self.covered_users.zero_()
+
+
+@metric_registry.register("ItemCoverage")
+class ItemCoverage(TopKMetric):
+    """The ItemCoverage@k metric counts the number of unique items
+       that were recommended across all users.
+
+    Attributes:
+        unique_items (list): The list of unique items per batch.
+
+    Args:
+        k (int): The cutoff.
+        dist_sync_on_step (bool): torchmetrics parameter.
+    """
+
+    unique_items: list
+
+    def __init__(self, k: int, dist_sync_on_step: bool = False):
+        super().__init__(k, dist_sync_on_step)
+        self.add_state("unique_items", default=[], dist_reduce_fx=None)
+
+    def update(self, preds: Tensor, target: Tensor):
+        """Updates the metric state with the new batch of predictions."""
+        top_k = torch.topk(preds, self.k, dim=1).indices
+        self.unique_items.append(top_k.detach().cpu())
+
+    def compute(self):
+        """Computes the final metric value."""
+        if len(self.unique_items) == 0:
+            return torch.tensor(0.0)
+        all_items_tensor = torch.cat(self.unique_items, dim=0)
+        unique_items: Tensor = torch.unique(all_items_tensor)
+        return torch.tensor(unique_items.numel())
+
+    def reset(self):
+        """Resets the metric state."""
+        self.unique_items = []
