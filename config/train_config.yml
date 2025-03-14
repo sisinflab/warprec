@@ -24,7 +24,7 @@ models:
   EASE:
     meta:
       save_model: True
-      keep_all_ray_checkpoints: True
+      #keep_all_ray_checkpoints: True
       implementation: elliot
     optimization:
       strategy: hopt
@@ -41,7 +41,7 @@ models:
   #  alpha: [0.1, 0.2, 0.5]
 evaluation:
   top_k: [10, 20, 50]
-  metrics: [nDCG, Precision, Recall, HitRate, F1]
+  metrics: [nDCG, Precision, Recall, HitRate, MAP, MAR, MRR]
   beta: 0.5
 general:
   seed: 42

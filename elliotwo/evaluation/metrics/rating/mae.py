@@ -1,4 +1,4 @@
-# pylint: disable=arguments-differ
+# pylint: disable=arguments-differ, unused-argument
 from typing import Any
 
 import torch

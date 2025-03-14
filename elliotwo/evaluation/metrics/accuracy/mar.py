@@ -1,0 +1,57 @@
+# pylint: disable=arguments-differ, unused-argument
+from typing import Any
+
+import torch
+from torch import Tensor
+from elliotwo.evaluation.base_metric import TopKMetric
+from elliotwo.utils.registry import metric_registry
+
+
+@metric_registry.register("MAR")
+class MAR(TopKMetric):
+    """Mean Average Recall (MAR) at K.
+
+    MAR@K calculates the mean of the Average Recall for all users.
+
+    Attributes:
+        ar_sum (Tensor): The average recall tensor.
+        users (Tensor): The number of users evaluated.
+
+    Args:
+        k (int): The recommendation cutoff.
+        dist_sync_on_step (bool): If True, synchronizes the state of the metric across different devices during distributed training.
+        *args (Any): Additional arguments to pass to the parent class.
+        **kwargs (Any): Additional keyword arguments to pass to the parent class.
+    """
+
+    ar_sum: Tensor
+    users: Tensor
+
+    def __init__(
+        self, k: int, dist_sync_on_step: bool = False, *args: Any, **kwargs: Any
+    ):
+        super().__init__(k, dist_sync_on_step)
+        self.add_state("ar_sum", default=torch.tensor(0.0), dist_reduce_fx="sum")
+        self.add_state("users", default=torch.tensor(0.0), dist_reduce_fx="sum")
+
+    def update(self, preds: Tensor, target: Tensor):
+        """Updates the MAR metric state with a batch of predictions."""
+        target = target.clone()
+        target[target > 0] = 1
+
+        top_k = torch.topk(preds, self.k, dim=1).indices
+        rel = torch.gather(target, 1, top_k)
+
+        recall_at_i = rel.cumsum(dim=1) / target.sum(dim=1).unsqueeze(1).clamp(min=1)
+        normalization = torch.minimum(
+            target.sum(dim=1),
+            torch.tensor(self.k, dtype=target.dtype, device=target.device),
+        )
+        ar = (recall_at_i * rel).sum(dim=1) / normalization
+
+        self.ar_sum += ar.sum()
+        self.users += target.shape[0]
+
+    def compute(self):
+        """Computes the final MAR@K value."""
+        return self.ar_sum / self.users if self.users > 0 else torch.tensor(0.0)
