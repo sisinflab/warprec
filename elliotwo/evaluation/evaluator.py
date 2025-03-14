@@ -25,7 +25,7 @@ class Evaluator:
     def __init__(self, metric_list: List[str], k_values: List[int]):
         self.k_values = k_values
         self.metrics: Dict[int, List[BaseMetric]] = {
-            k: [metric_registry.get(metric_name, k) for metric_name in metric_list]
+            k: [metric_registry.get(metric_name, k=k) for metric_name in metric_list]
             for k in k_values
         }
 

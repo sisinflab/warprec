@@ -41,7 +41,7 @@ models:
   #  alpha: [0.1, 0.2, 0.5]
 evaluation:
   top_k: [10, 20, 50]
-  metrics: [nDCG, Precision, Recall, HitRate, Gini]
+  metrics: [nDCG, Precision, Recall, HitRate, MAE, MSE, RMSE]
 general:
   seed: 42
   float_digits: 8

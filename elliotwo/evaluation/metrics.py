@@ -1,5 +1,6 @@
 # pylint: disable=arguments-differ
 from abc import abstractmethod, ABC
+from typing import Any
 
 import torch
 from torchmetrics import Metric
@@ -23,7 +24,7 @@ class BaseMetric(Metric, ABC):
 class TopKMetric(BaseMetric):
     """The definition of a Top-K metric."""
 
-    def __init__(self, k: int, dist_sync_on_step=False):
+    def __init__(self, k: int, dist_sync_on_step=False, *args: Any, **kwargs: Any):
         super().__init__(dist_sync_on_step=dist_sync_on_step)
         self.k = k
 
@@ -40,12 +41,16 @@ class Precision(TopKMetric):
     Args:
         k (int): The cutoff.
         dist_sync_on_step (bool): torchmetrics parameter.
+        *args (Any): The argument list.
+        **kwargs (Any): The keyword argument dictionary.
     """
 
     correct: Tensor
     users: Tensor
 
-    def __init__(self, k: int, dist_sync_on_step: bool = False):
+    def __init__(
+        self, k: int, dist_sync_on_step: bool = False, *args: Any, **kwargs: Any
+    ):
         super().__init__(k, dist_sync_on_step)
         self.add_state("correct", default=torch.tensor(0.0), dist_reduce_fx="sum")
         self.add_state("users", default=torch.tensor(0.0), dist_reduce_fx="sum")
@@ -82,12 +87,16 @@ class Recall(TopKMetric):
     Args:
         k (int): The cutoff.
         dist_sync_on_step (bool): torchmetrics parameter.
+        *args (Any): The argument list.
+        **kwargs (Any): The keyword argument dictionary.
     """
 
     correct: Tensor
     real_correct: Tensor
 
-    def __init__(self, k: int, dist_sync_on_step: bool = False):
+    def __init__(
+        self, k: int, dist_sync_on_step: bool = False, *args: Any, **kwargs: Any
+    ):
         super().__init__(k, dist_sync_on_step)
         self.add_state("correct", default=torch.tensor(0.0), dist_reduce_fx="sum")
         self.add_state("real_correct", default=torch.tensor(0.0), dist_reduce_fx="sum")
@@ -126,12 +135,16 @@ class HitRate(TopKMetric):
     Args:
         k (int): The cutoff.
         dist_sync_on_step (bool): torchmetrics parameter.
+        *args (Any): The argument list.
+        **kwargs (Any): The keyword argument dictionary.
     """
 
     hits: Tensor
     users: Tensor
 
-    def __init__(self, k: int, dist_sync_on_step: bool = False):
+    def __init__(
+        self, k: int, dist_sync_on_step: bool = False, *args: Any, **kwargs: Any
+    ):
         super().__init__(k, dist_sync_on_step)
         self.add_state("hits", default=torch.tensor(0.0), dist_reduce_fx="sum")
         self.add_state("users", default=torch.tensor(0.0), dist_reduce_fx="sum")
@@ -170,12 +183,16 @@ class nDCG(TopKMetric):
     Args:
         k (int): The cutoff.
         dist_sync_on_step (bool): torchmetrics parameter.
+        *args (Any): The argument list.
+        **kwargs (Any): The keyword argument dictionary.
     """
 
     ndcg: Tensor
     users: Tensor
 
-    def __init__(self, k: int, dist_sync_on_step: bool = False):
+    def __init__(
+        self, k: int, dist_sync_on_step: bool = False, *args: Any, **kwargs: Any
+    ):
         super().__init__(k, dist_sync_on_step)
         self.add_state("ndcg", default=torch.tensor(0.0), dist_reduce_fx="sum")
         self.add_state("users", default=torch.tensor(0.0), dist_reduce_fx="sum")
@@ -224,11 +241,15 @@ class UserCoverage(TopKMetric):
     Args:
         k (int): The cutoff.
         dist_sync_on_step (bool): torchmetrics parameter.
+        *args (Any): The argument list.
+        **kwargs (Any): The keyword argument dictionary.
     """
 
     covered_users: Tensor
 
-    def __init__(self, k: int, dist_sync_on_step: bool = False):
+    def __init__(
+        self, k: int, dist_sync_on_step: bool = False, *args: Any, **kwargs: Any
+    ):
         super().__init__(k, dist_sync_on_step)
         self.add_state("covered_users", default=torch.tensor(0.0), dist_reduce_fx="sum")
 
@@ -257,11 +278,15 @@ class ItemCoverage(TopKMetric):
     Args:
         k (int): The cutoff.
         dist_sync_on_step (bool): torchmetrics parameter.
+        *args (Any): The argument list.
+        **kwargs (Any): The keyword argument dictionary.
     """
 
     unique_items: list
 
-    def __init__(self, k: int, dist_sync_on_step: bool = False):
+    def __init__(
+        self, k: int, dist_sync_on_step: bool = False, *args: Any, **kwargs: Any
+    ):
         super().__init__(k, dist_sync_on_step)
         self.add_state("unique_items", default=[], dist_reduce_fx=None)
 
@@ -305,13 +330,17 @@ class Gini(TopKMetric):
     Args:
         k (int): The cutoff for recommendations.
         dist_sync_on_step (bool): Torchmetrics parameter.
+        *args (Any): The argument list.
+        **kwargs (Any): The keyword argument dictionary.
     """
 
     recommended_items: list
     free_norm: Tensor
     num_items: int
 
-    def __init__(self, k: int, dist_sync_on_step: bool = False):
+    def __init__(
+        self, k: int, dist_sync_on_step: bool = False, *args: Any, **kwargs: Any
+    ):
         super().__init__(k, dist_sync_on_step)
         # Accumulate recommended indices from each update call.
         self.add_state("recommended_items", default=[], dist_reduce_fx=None)
@@ -357,3 +386,148 @@ class Gini(TopKMetric):
         self.recommended_items = []
         self.free_norm = torch.tensor(0.0)
         self.num_items = None
+
+
+@metric_registry.register("MAE")
+class MAE(BaseMetric):
+    """
+    Mean Absolute Error (MAE) metric.
+
+    This metric computes the average absolute difference between the predictions and targets.
+
+    Attributes:
+        sum_absolute_errors (Tensor): Sum of absolute errors across all batches.
+        total_count (Tensor): Total number of elements processed.
+
+    Args:
+        dist_sync_on_step (bool): Torchmetrics parameter.
+        *args (Any): The argument list.
+        **kwargs (Any): The keyword argument dictionary.
+    """
+
+    sum_absolute_errors: Tensor
+    total_count: Tensor
+
+    def __init__(self, dist_sync_on_step: bool = False, *args: Any, **kwargs: Any):
+        super().__init__(dist_sync_on_step=dist_sync_on_step)
+        self.add_state(
+            "sum_absolute_errors", default=torch.tensor(0.0), dist_reduce_fx="sum"
+        )
+        self.add_state("total_count", default=torch.tensor(0.0), dist_reduce_fx="sum")
+
+    def update(self, preds: Tensor, target: Tensor):
+        """Updates the metric state with the new batch of predictions."""
+        mask = target > 0
+        abs_errors = torch.abs(preds[mask] - target[mask])
+        self.sum_absolute_errors += abs_errors.sum()
+        self.total_count += target.numel()
+
+    def compute(self):
+        """Computes the final metric value."""
+        return (
+            self.sum_absolute_errors / self.total_count
+            if self.total_count > 0
+            else torch.tensor(0.0)
+        )
+
+    def reset(self):
+        """Reset the metric state."""
+        self.sum_absolute_errors.zero_()
+        self.total_count.zero_()
+
+
+@metric_registry.register("MSE")
+class MSE(BaseMetric):
+    """
+    Mean Squared Error (MSE) metric.
+
+    This metric computes the average squared difference between the predictions and targets.
+
+    Attributes:
+        sum_squared_errors (Tensor): Sum of squared errors across all batches.
+        total_count (Tensor): Total number of elements processed.
+
+    Args:
+        dist_sync_on_step (bool): Torchmetrics parameter.
+        *args (Any): The argument list.
+        **kwargs (Any): The keyword argument dictionary.
+    """
+
+    sum_squared_errors: Tensor
+    total_count: Tensor
+
+    def __init__(self, dist_sync_on_step: bool = False, *args: Any, **kwargs: Any):
+        super().__init__(dist_sync_on_step=dist_sync_on_step)
+        self.add_state(
+            "sum_squared_errors", default=torch.tensor(0.0), dist_reduce_fx="sum"
+        )
+        self.add_state("total_count", default=torch.tensor(0.0), dist_reduce_fx="sum")
+
+    def update(self, preds: Tensor, target: Tensor):
+        """Updates the metric state with the new batch of predictions."""
+        mask = target > 0
+        squared_errors = (preds[mask] - target[mask]) ** 2
+        self.sum_squared_errors += squared_errors.sum()
+        self.total_count += target.numel()
+
+    def compute(self):
+        """Computes the final metric value."""
+        return (
+            self.sum_squared_errors / self.total_count
+            if self.total_count > 0
+            else torch.tensor(0.0)
+        )
+
+    def reset(self):
+        """Reset the metric state."""
+        self.sum_squared_errors.zero_()
+        self.total_count.zero_()
+
+
+@metric_registry.register("RMSE")
+class RMSE(BaseMetric):
+    """
+    Root Mean Squared Error (RMSE) metric.
+
+    This metric computes the square root of the average squared difference between the predictions and targets.
+
+    Attributes:
+        sum_squared_errors (Tensor): Sum of squared errors across all batches.
+        total_count (Tensor): Total number of elements processed.
+
+    Args:
+        dist_sync_on_step (bool): Torchmetrics parameter.
+        *args (Any): The argument list.
+        **kwargs (Any): The keyword argument dictionary.
+    """
+
+    sum_squared_errors: Tensor
+    total_count: Tensor
+
+    def __init__(self, dist_sync_on_step: bool = False, *args: Any, **kwargs: Any):
+        super().__init__(dist_sync_on_step=dist_sync_on_step)
+        self.add_state(
+            "sum_squared_errors", default=torch.tensor(0.0), dist_reduce_fx="sum"
+        )
+        self.add_state("total_count", default=torch.tensor(0.0), dist_reduce_fx="sum")
+
+    def update(self, preds: Tensor, target: Tensor):
+        """Updates the metric state with the new batch of predictions."""
+        mask = target > 0
+        squared_errors = (preds[mask] - target[mask]) ** 2
+        self.sum_squared_errors += squared_errors.sum()
+        self.total_count += target.numel()
+
+    def compute(self):
+        """Computes the final metric value."""
+        mse = (
+            self.sum_squared_errors / self.total_count
+            if self.total_count > 0
+            else torch.tensor(0.0)
+        )
+        return torch.sqrt(mse)
+
+    def reset(self):
+        """Reset the metric state."""
+        self.sum_squared_errors.zero_()
+        self.total_count.zero_()
