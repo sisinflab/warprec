@@ -3,7 +3,7 @@ from typing import TypeVar, Dict, Type, Optional, Callable, List, Generic, TYPE_
 if TYPE_CHECKING:
     from elliotwo.recommenders.abstract_recommender import AbstractRecommender
     from elliotwo.utils.config import RecomModel, SearchSpaceWrapper
-    from elliotwo.evaluation.metrics import BaseMetric
+    from elliotwo.evaluation.base_metric import BaseMetric
     from elliotwo.data.splitting.strategies import AbstractStrategy
     from elliotwo.recommenders.trainer.search_algorithm_wrapper import (
         BaseSearchWrapper,

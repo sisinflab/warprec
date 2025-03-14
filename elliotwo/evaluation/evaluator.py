@@ -3,7 +3,7 @@ from typing import List, Dict, Union
 import torch
 from tabulate import tabulate
 from elliotwo.data.dataset import AbstractDataset
-from elliotwo.evaluation.metrics import BaseMetric
+from elliotwo.evaluation.base_metric import BaseMetric
 from elliotwo.recommenders.abstract_recommender import AbstractRecommender
 from elliotwo.utils.logger import logger
 from elliotwo.utils.registry import metric_registry
