@@ -1,6 +1,7 @@
 from .evaluator import Evaluator
 from .base_metric import BaseMetric
 from .metrics import (
+    F1,
     HitRate,
     nDCG,
     Precision,
@@ -16,6 +17,7 @@ from .metrics import (
 __all__ = [
     "Evaluator",
     "BaseMetric",
+    "F1",
     "HitRate",
     "nDCG",
     "Precision",

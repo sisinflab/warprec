@@ -10,11 +10,13 @@ class EvaluationConfig(BaseModel):
     Attributes:
         top_k (List[int]): List of cutoffs to evaluate.
         metrics (List[str]): List of metrics to compute during evaluation.
+        beta (Optional[float]): The beta value used in some metrics like F1 score.
         save_evaluation (Optional[bool]): Wether or not to save the evaluation.
     """
 
     top_k: List[int]
     metrics: List[str]
+    beta: Optional[float] = 1.0
     save_evaluation: Optional[bool] = True
 
     @field_validator("metrics")

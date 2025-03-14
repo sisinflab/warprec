@@ -52,6 +52,7 @@ def main(args: Namespace):
     evaluator = Evaluator(
         list(config.evaluation.metrics),
         list(config.evaluation.top_k),
+        beta=config.evaluation.beta,
     )
 
     for model_name in models:
