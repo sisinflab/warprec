@@ -56,6 +56,7 @@ class Precision(TopKMetric):
         self.add_state("users", default=torch.tensor(0.0), dist_reduce_fx="sum")
 
     def update(self, preds: Tensor, target: Tensor):
+        """Updates the metric state with the new batch of predictions."""
         target = target.clone()
         target[target > 0] = 1
         top_k = torch.topk(preds, self.k, dim=1).indices
@@ -64,6 +65,7 @@ class Precision(TopKMetric):
         self.users += target.shape[0]
 
     def compute(self):
+        """Computes the final metric value."""
         return (
             self.correct / (self.users * self.k)
             if self.users > 0
@@ -71,6 +73,7 @@ class Precision(TopKMetric):
         )
 
     def reset(self):
+        """Resets the metric state."""
         self.correct.zero_()
         self.users.zero_()
 
@@ -102,6 +105,7 @@ class Recall(TopKMetric):
         self.add_state("real_correct", default=torch.tensor(0.0), dist_reduce_fx="sum")
 
     def update(self, preds: Tensor, target: Tensor):
+        """Updates the metric state with the new batch of predictions."""
         target = target.clone()
         target[target > 0] = 1
         top_k = torch.topk(preds, self.k, dim=1).indices
@@ -110,6 +114,7 @@ class Recall(TopKMetric):
         self.real_correct += target.sum().float()
 
     def compute(self):
+        """Computes the final metric value."""
         return (
             self.correct / self.real_correct
             if self.real_correct > 0
@@ -117,6 +122,7 @@ class Recall(TopKMetric):
         )
 
     def reset(self):
+        """Resets the metric state."""
         self.correct.zero_()
         self.real_correct.zero_()
 
@@ -150,6 +156,7 @@ class HitRate(TopKMetric):
         self.add_state("users", default=torch.tensor(0.0), dist_reduce_fx="sum")
 
     def update(self, preds: Tensor, target: Tensor):
+        """Updates the metric state with the new batch of predictions."""
         target = target.clone()
         target[target > 0] = 1
         top_k = torch.topk(preds, self.k, dim=1).indices
@@ -158,9 +165,11 @@ class HitRate(TopKMetric):
         self.users += target.shape[0]
 
     def compute(self):
+        """Computes the final metric value."""
         return self.hits / self.users if self.users > 0 else torch.tensor(0.0)
 
     def reset(self):
+        """Resets the metric state."""
         self.hits.zero_()
         self.users.zero_()
 
@@ -211,6 +220,7 @@ class nDCG(TopKMetric):
         ).sum(dim=1)
 
     def update(self, preds: Tensor, target: Tensor):
+        """Updates the metric state with the new batch of predictions."""
         target = torch.where(target > 0, 2 ** (target + 1) - 1, target)
         top_k = torch.topk(preds, self.k, dim=1, largest=True, sorted=True).indices
         rel = torch.gather(target, 1, top_k).float()
@@ -223,9 +233,11 @@ class nDCG(TopKMetric):
         self.users += target.shape[0]
 
     def compute(self):
+        """Computes the final metric value."""
         return self.ndcg / self.users if self.users > 0 else torch.tensor(0.0)
 
     def reset(self):
+        """Resets the metric state."""
         self.ndcg.zero_()
         self.users.zero_()
 
