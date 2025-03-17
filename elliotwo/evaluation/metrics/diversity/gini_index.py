@@ -28,6 +28,7 @@ class Gini(TopKMetric):
 
     Args:
         k (int): The cutoff for recommendations.
+        num_items (int): The total number of items in the dataset.
         dist_sync_on_step (bool): Torchmetrics parameter.
         *args (Any): The argument list.
         **kwargs (Any): The keyword argument dictionary.
@@ -38,20 +39,22 @@ class Gini(TopKMetric):
     num_items: int
 
     def __init__(
-        self, k: int, dist_sync_on_step: bool = False, *args: Any, **kwargs: Any
+        self,
+        k: int,
+        num_items: int,
+        dist_sync_on_step: bool = False,
+        *args: Any,
+        **kwargs: Any,
     ):
         super().__init__(k, dist_sync_on_step)
+        self.num_items = num_items
         # Accumulate recommended indices from each update call.
         self.add_state("recommended_items", default=[], dist_reduce_fx=None)
         # Accumulate the total number of recommendations given (free_norm).
         self.add_state("free_norm", default=torch.tensor(0.0), dist_reduce_fx="sum")
-        self.num_items = None
 
     def update(self, preds: Tensor, target: Tensor):
         """Updates the metric state with the new batch of predictions."""
-        if self.num_items is None:
-            self.num_items = preds.shape[1]
-
         top_k = torch.topk(preds, self.k, dim=1).indices
         batch_size = top_k.shape[0]
         self.free_norm += torch.tensor(batch_size * self.k, dtype=torch.float)

@@ -20,14 +20,21 @@ class Evaluator:
         metric_list (List[str]): The list of metric names that will
             be evaluated.
         k_values (List[int]): The cutoffs.
+        num_items (int): The total number of items in the dataset.
         beta (float): The beta value used in some metrics.
     """
 
-    def __init__(self, metric_list: List[str], k_values: List[int], beta: float = 1.0):
+    def __init__(
+        self,
+        metric_list: List[str],
+        k_values: List[int],
+        num_items: int = None,
+        beta: float = 1.0,
+    ):
         self.k_values = k_values
         self.metrics: Dict[int, List[BaseMetric]] = {
             k: [
-                metric_registry.get(metric_name, k=k, beta=beta)
+                metric_registry.get(metric_name, k=k, num_items=num_items, beta=beta)
                 for metric_name in metric_list
             ]
             for k in k_values

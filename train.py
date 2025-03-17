@@ -52,6 +52,9 @@ def main(args: Namespace):
     if config.splitter and config.splitter.save_split:
         writer.write_split(dataset)
 
+    # Dataset information
+    num_users, num_items = dataset.get_dims()
+
     # Trainer testing
     models = list(config.models.keys())
 
@@ -59,6 +62,7 @@ def main(args: Namespace):
         [metric for metric in config.evaluation.metrics],
         [k for k in config.evaluation.top_k],
         beta=config.evaluation.beta,
+        num_items=num_items,
     )
 
     for model_name in models:

@@ -34,14 +34,14 @@ models:
         seed: 42
       validation_metric: nDCG@10
       num_samples: 5
-      cpu_per_trial: 6
+      cpu_per_trial: 2
     l2: ['uniform', 5, 100]
   #Slim:
   #  l1: [0.1, 0.2, 0.5]
   #  alpha: [0.1, 0.2, 0.5]
 evaluation:
   top_k: [10, 20, 50]
-  metrics: [nDCG, Precision, Recall, HitRate, MAP, MAR, MRR]
+  metrics: [nDCG, Precision, Recall, HitRate, F1, MAP, MAR, ShannonEntropy]
   beta: 0.5
 general:
   seed: 42
