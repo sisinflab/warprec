@@ -146,7 +146,8 @@ class TransactionDataset(AbstractDataset):
         self._imap = item_mapping
 
         # Set novelty profile
-        self.novelty_profile = train_set.compute_novelty_profile()
+        self.log_novelty_profile = train_set.compute_novelty_profile(log_discount=True)
+        self.novelty_profile = train_set.compute_novelty_profile(log_discount=False)
 
     def get_dims(self) -> Tuple[int, int]:
         return (self.nuid, self.niid)

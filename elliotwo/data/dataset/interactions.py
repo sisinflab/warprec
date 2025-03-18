@@ -133,8 +133,11 @@ class Interactions:
         """
         return self._transactions
 
-    def compute_novelty_profile(self) -> Tensor:
-        """Compute the novelty profile based on the count of interactions (not rating sums).
+    def compute_novelty_profile(self, log_discount: bool = False) -> Tensor:
+        """Compute the novelty profile based on the count of interactions.
+
+        Args:
+            log_discount (bool): Whether or not to compute the discounted novelty.
 
         Returns:
             Tensor: A tensor that contains the novelty score for each item.
@@ -151,9 +154,9 @@ class Interactions:
         item_interactions[item_interactions == 0] = 1
 
         # Compute novelty scores
-        novelty_scores = -torch.log2(item_interactions / total_interactions)
-
-        return novelty_scores
+        if log_discount:
+            return -torch.log2(item_interactions / total_interactions)
+        return 1 - (item_interactions / self._nuid)
 
     def _to_sparse(self) -> csr_matrix:
         """This method will create the sparse representation of the data contained.

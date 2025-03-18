@@ -64,6 +64,7 @@ def main(args: Namespace):
         beta=config.evaluation.beta,
         num_items=num_items,
         novelty_profile=dataset.novelty_profile,
+        log_novelty_profile=dataset.log_novelty_profile,
     )
 
     for model_name in models:

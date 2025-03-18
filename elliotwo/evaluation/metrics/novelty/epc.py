@@ -5,40 +5,37 @@ from elliotwo.evaluation.base_metric import TopKMetric
 from elliotwo.utils.registry import metric_registry
 
 
-@metric_registry.register("EFD")
-class EFD(TopKMetric):
+@metric_registry.register("EPC")
+class EPC(TopKMetric):
     """
-    Expected Free Discovery at K metric.
-
-    This metric measures the recommender system's ability to suggest items
-    that the user has not already seen (i.e., not present in the training set).
+    Expected Popularity Complement at K metric.
 
     Attributes:
-        efd (Tensor): The EFD value for every user.
+        epc (Tensor): The EPC value for every user.
         users (Tensor): Number of users evaluated.
 
     Args:
         k (int): The cutoff for recommendations.
-        log_novelty_profile (Tensor): The log novelty profile tensor that measures popularity.
+        novelty_profile (Tensor): The novelty profile tensor that measures popularity.
         dist_sync_on_step (bool): Torchmetrics parameter for distributed synchronization.
         *args (Any): Additional arguments.
         **kwargs (Any): Additional keyword arguments.
     """
 
-    efd: Tensor
+    epc: Tensor
     users: Tensor
 
     def __init__(
         self,
         k: int,
-        log_novelty_profile: Tensor,
+        novelty_profile: Tensor,
         dist_sync_on_step: bool = False,
         *args: Any,
         **kwargs: Any,
     ):
         super().__init__(k, dist_sync_on_step)
-        self.novelty_profile = log_novelty_profile.unsqueeze(0)
-        self.add_state("efd", default=torch.tensor(0.0), dist_reduce_fx="sum")
+        self.novelty_profile = novelty_profile.unsqueeze(0)
+        self.add_state("epc", default=torch.tensor(0.0), dist_reduce_fx="sum")
         self.add_state("users", default=torch.tensor(0.0), dist_reduce_fx="sum")
 
     def update(self, preds: Tensor, target: Tensor):
@@ -55,13 +52,13 @@ class EFD(TopKMetric):
         novelty = torch.gather(batch_novelty, 1, top_k)  # [batch_size x top_k]
 
         # Update
-        self.efd += self.dcg(rel * novelty).sum()
+        self.epc += self.dcg(rel * novelty).sum()
         self.users += target.shape[0]
 
     def compute(self):
         """Computes the final value of the metric."""
         return (
-            self.efd / (self.users * self.discounted_sum(self.k))
+            self.epc / (self.users * self.discounted_sum(self.k))
             if self.users > 0
             else torch.tensor(0.0)
         )

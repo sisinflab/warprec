@@ -24,6 +24,7 @@ class Evaluator:
         num_items (int): The total number of items in the dataset.
         beta (float): The beta value used in some metrics.
         novelty_profile (Tensor): The novelty profile tensor that measures popularity.
+        log_novelty_profile (Tensor): The log novelty profile tensor that measures popularity.
     """
 
     def __init__(
@@ -33,6 +34,7 @@ class Evaluator:
         num_items: int = None,
         beta: float = 1.0,
         novelty_profile: Tensor = None,
+        log_novelty_profile: Tensor = None,
     ):
         self.k_values = k_values
         self.metrics: Dict[int, List[BaseMetric]] = {
@@ -43,6 +45,7 @@ class Evaluator:
                     num_items=num_items,
                     beta=beta,
                     novelty_profile=novelty_profile,
+                    log_novelty_profile=log_novelty_profile,
                 )
                 for metric_name in metric_list
             ]
