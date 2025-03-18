@@ -1,6 +1,8 @@
 from typing import Tuple
 
 import numpy as np
+import torch
+from torch import Tensor
 from pandas import DataFrame
 from scipy.sparse import csr_matrix, coo_matrix
 from elliotwo.utils.enums import RatingType
@@ -130,6 +132,28 @@ class Interactions:
             int: Number of transactions.
         """
         return self._transactions
+
+    def compute_novelty_profile(self) -> Tensor:
+        """Compute the novelty profile based on the count of interactions (not rating sums).
+
+        Returns:
+            Tensor: A tensor that contains the novelty score for each item.
+        """
+        sparse_matrix = self.get_sparse()
+
+        # Compute item frequencies
+        item_interactions = torch.tensor(
+            sparse_matrix.getnnz(axis=0)
+        ).float()  # Get number of non-zero elements in each column
+        total_interactions = item_interactions.sum()
+
+        # Avoid division by zero: set minimum interaction count to 1 if any item has zero interactions
+        item_interactions[item_interactions == 0] = 1
+
+        # Compute novelty scores
+        novelty_scores = -torch.log2(item_interactions / total_interactions)
+
+        return novelty_scores
 
     def _to_sparse(self) -> csr_matrix:
         """This method will create the sparse representation of the data contained.

@@ -63,6 +63,7 @@ def main(args: Namespace):
         [k for k in config.evaluation.top_k],
         beta=config.evaluation.beta,
         num_items=num_items,
+        novelty_profile=dataset.novelty_profile,
     )
 
     for model_name in models:

@@ -39,19 +39,6 @@ class nDCG(TopKMetric):
         self.add_state("ndcg", default=torch.tensor(0.0), dist_reduce_fx="sum")
         self.add_state("users", default=torch.tensor(0.0), dist_reduce_fx="sum")
 
-    def dcg(self, rel: Tensor) -> Tensor:
-        """The Discounted Cumulative Gain definition.
-
-        Args:
-            rel (Tensor): The relevance tensor.
-
-        Returns:
-            Tensor: The discounted tensor.
-        """
-        return (
-            rel / torch.log2(torch.arange(2, rel.size(1) + 2, device=rel.device))
-        ).sum(dim=1)
-
     def update(self, preds: Tensor, target: Tensor):
         """Updates the metric state with the new batch of predictions."""
         target = torch.where(target > 0, 2 ** (target + 1) - 1, target)

@@ -1,6 +1,7 @@
 from .accuracy import F1, HitRate, MAP, MAR, MRR, nDCG, Precision, Recall
 from .coverage import ItemCoverage, UserCoverage
 from .diversity import Gini, ShannonEntropy
+from .novelty import EFD
 from .rating import MAE, MSE, RMSE
 
 __all__ = [
@@ -16,6 +17,7 @@ __all__ = [
     "UserCoverage",
     "Gini",
     "ShannonEntropy",
+    "EFD",
     "MAE",
     "MSE",
     "RMSE",

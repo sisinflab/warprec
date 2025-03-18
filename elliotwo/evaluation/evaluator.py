@@ -1,6 +1,7 @@
 from typing import List, Dict, Union
 
 import torch
+from torch import Tensor
 from tabulate import tabulate
 from elliotwo.data.dataset import AbstractDataset
 from elliotwo.evaluation.base_metric import BaseMetric
@@ -22,6 +23,7 @@ class Evaluator:
         k_values (List[int]): The cutoffs.
         num_items (int): The total number of items in the dataset.
         beta (float): The beta value used in some metrics.
+        novelty_profile (Tensor): The novelty profile tensor that measures popularity.
     """
 
     def __init__(
@@ -30,11 +32,18 @@ class Evaluator:
         k_values: List[int],
         num_items: int = None,
         beta: float = 1.0,
+        novelty_profile: Tensor = None,
     ):
         self.k_values = k_values
         self.metrics: Dict[int, List[BaseMetric]] = {
             k: [
-                metric_registry.get(metric_name, k=k, num_items=num_items, beta=beta)
+                metric_registry.get(
+                    metric_name,
+                    k=k,
+                    num_items=num_items,
+                    beta=beta,
+                    novelty_profile=novelty_profile,
+                )
                 for metric_name in metric_list
             ]
             for k in k_values
