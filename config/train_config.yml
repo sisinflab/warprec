@@ -23,7 +23,7 @@ splitter:
 models:
   EASE:
     meta:
-      save_model: True
+      #save_model: True
       #keep_all_ray_checkpoints: True
       implementation: elliot
     optimization:
@@ -41,7 +41,7 @@ models:
   #  alpha: [0.1, 0.2, 0.5]
 evaluation:
   top_k: [10, 20, 50]
-  metrics: [nDCG, Precision, Recall, HitRate, EFD, EPC, PopREO, Gini]
+  metrics: [nDCG, Precision, Recall, HitRate, PopREO, PopRSP]
   beta: 0.5
   pop_ratio: 0.8
 general:

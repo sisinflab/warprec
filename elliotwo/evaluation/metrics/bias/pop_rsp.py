@@ -1,0 +1,127 @@
+# pylint: disable=arguments-differ, unused-argument
+from typing import Any
+
+import torch
+from torch import Tensor
+from scipy.sparse import csr_matrix
+from elliotwo.evaluation.base_metric import TopKMetric
+from elliotwo.utils.registry import metric_registry
+
+
+@metric_registry.register("PopRSP")
+class PopRSP(TopKMetric):
+    """Popularity-based Ranking-based Statistical Parity (PopRSP) metric.
+
+    This metric evaluates the disparity in recommendation performance
+    between popular (short head) and less popular (long tail) items.
+    It calculates the standard deviation of precision across these
+    two groups, normalized by their mean, to assess the balance in
+    recommendation exposure.
+
+    Attributes:
+        short_hits (Tensor): The short head recommendation hits.
+        long_hits (Tensor): The long tail recommendation hits.
+        short_gt (Tensor): The short head items in the target.
+        long_gt (Tensor): The long tail items in the target.
+
+    Args:
+        k (int): The cutoff for recommendations.
+        train_set (csr_matrix): The training interaction data.
+        pop_ratio (float): The percentile considered popular.
+        dist_sync_on_step (bool): Torchmetrics parameter.
+        *args (Any): The argument list.
+        **kwargs (Any): The keyword argument dictionary.
+    """
+
+    short_hits: Tensor
+    long_hits: Tensor
+    short_gt: Tensor
+    long_gt: Tensor
+
+    def __init__(
+        self,
+        k: int,
+        train_set: csr_matrix,
+        pop_ratio: float,
+        dist_sync_on_step: bool = False,
+        *args: Any,
+        **kwargs: Any,
+    ):
+        super().__init__(k, dist_sync_on_step)
+        sh, lt = self.compute_popularity(train_set, pop_ratio)
+        self.short_head = sh
+        self.long_tail = lt
+        self.add_state("short_hits", default=torch.tensor(0.0), dist_reduce_fx="sum")
+        self.add_state("long_hits", default=torch.tensor(0.0), dist_reduce_fx="sum")
+        self.add_state("short_gt", default=torch.tensor(0.0), dist_reduce_fx="sum")
+        self.add_state("long_gt", default=torch.tensor(0.0), dist_reduce_fx="sum")
+
+    def update(self, preds: Tensor, target: Tensor):
+        """Updates the metric state with the new batch of predictions."""
+        target = target.clone()
+        target[target > 0] = 1
+
+        top_k_values, top_k_indices = torch.topk(preds, self.k, dim=1)
+        rel = torch.zeros_like(preds)
+        rel.scatter_(
+            dim=1, index=top_k_indices, src=top_k_values
+        )  # [batch_size x items]
+        rel[rel > 0] = 1
+
+        # Retrieve user number (batch_size)
+        users = target.shape[0]
+
+        # Retrieve train tensor
+        train_batch = torch.zeros_like(preds)
+        train_batch = torch.where(
+            preds == -torch.inf, torch.tensor(1.0), train_batch
+        )  # [batch_size x items]
+
+        # Expand short head and long tail
+        short_head_matrix = self.short_head.expand(
+            users, -1
+        )  # [batch_size x short_head]
+        long_tail_matrix = self.long_tail.expand(users, -1)  # [batch_size x long_tail]
+
+        # Extract short head and long tail items from recommendations
+        short_hits = torch.gather(
+            rel, 1, short_head_matrix
+        )  # [batch_size x short_head]
+        long_hits = torch.gather(rel, 1, long_tail_matrix)  # [batch_size x long_tail]
+
+        # Extract short head and long tail items from gt
+        short_gt = torch.gather(
+            (1 - train_batch), 1, short_head_matrix
+        )  # [batch_size x short_head]
+        long_gt = torch.gather(
+            (1 - train_batch), 1, long_tail_matrix
+        )  # [batch_size x long_tail]
+
+        # Update
+        self.short_hits += short_hits.sum()
+        self.long_hits += long_hits.sum()
+        self.short_gt += short_gt.sum()
+        self.long_gt += long_gt.sum()
+
+    def compute(self):
+        """Computes the final metric value."""
+        # Handle division by zero
+        if self.short_gt == 0 or self.long_gt == 0:
+            return torch.tensor(0.0)
+
+        pr_short = self.short_hits / self.short_gt
+        pr_long = self.long_hits / self.long_gt
+
+        # Handle NaN/Inf when both groups have zero probability
+        if torch.isnan(pr_short) or torch.isnan(pr_long):
+            return torch.tensor(0.0)
+
+        pr = torch.stack([pr_short, pr_long])
+        return torch.std(pr, unbiased=False) / torch.mean(pr)
+
+    def reset(self):
+        """Resets the metric state."""
+        self.short_hits.zero_()
+        self.long_hits.zero_()
+        self.short_gt.zero_()
+        self.long_gt.zero_()

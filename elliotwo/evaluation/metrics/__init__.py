@@ -1,5 +1,5 @@
 from .accuracy import F1, HitRate, MAP, MAR, MRR, nDCG, Precision, Recall
-from .bias import PopREO
+from .bias import PopREO, PopRSP
 from .coverage import ItemCoverage, UserCoverage
 from .diversity import Gini, ShannonEntropy
 from .novelty import EFD, EPC
@@ -15,6 +15,7 @@ __all__ = [
     "Precision",
     "Recall",
     "PopREO",
+    "PopRSP",
     "ItemCoverage",
     "UserCoverage",
     "Gini",
