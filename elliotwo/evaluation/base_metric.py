@@ -15,7 +15,7 @@ class BaseMetric(Metric, ABC):
     def compute(self):
         pass
 
-    def compute_popularity(
+    def compute_head_tail(
         self, train_set: csr_matrix, pop_ratio: float = 0.8
     ) -> Tuple[Tensor, Tensor]:
         """Compute popularity as tensors of the short head and long tail.
@@ -53,6 +53,16 @@ class BaseMetric(Metric, ABC):
         long_tail_indices = sorted_indices[cutoff_index + 1 :]
 
         return short_head_indices, long_tail_indices
+
+    def compute_popularity(self, train_set: csr_matrix) -> Tensor:
+        # Compute item frequencies
+        item_interactions = torch.tensor(
+            train_set.getnnz(axis=0)
+        ).float()  # Get number of non-zero elements in each column
+
+        # Avoid division by zero: set minimum interaction count to 1 if any item has zero interactions
+        item_interactions[item_interactions == 0] = 1
+        return item_interactions
 
     def compute_novelty_profile(
         self, train_set: csr_matrix, log_discount: bool = False

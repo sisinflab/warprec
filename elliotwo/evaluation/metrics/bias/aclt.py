@@ -44,7 +44,7 @@ class ACLT(TopKMetric):
         **kwargs: Any,
     ):
         super().__init__(k, dist_sync_on_step)
-        _, lt = self.compute_popularity(train_set, pop_ratio)
+        _, lt = self.compute_head_tail(train_set, pop_ratio)
         self.long_tail = lt
         self.add_state("long_hits", default=torch.tensor(0.0), dist_reduce_fx="sum")
         self.add_state("users", default=torch.tensor(0.0), dist_reduce_fx="sum")

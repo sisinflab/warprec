@@ -49,7 +49,7 @@ class PopREO(TopKMetric):
         **kwargs: Any,
     ):
         super().__init__(k, dist_sync_on_step)
-        sh, lt = self.compute_popularity(train_set, pop_ratio)
+        sh, lt = self.compute_head_tail(train_set, pop_ratio)
         self.short_head = sh
         self.long_tail = lt
         self.add_state("short_hits", default=torch.tensor(0.0), dist_reduce_fx="sum")

@@ -41,7 +41,7 @@ models:
   #  alpha: [0.1, 0.2, 0.5]
 evaluation:
   top_k: [10, 20, 50]
-  metrics: [nDCG, Precision, Recall, HitRate, ACLT, APLT]
+  metrics: [nDCG, Precision, Recall, HitRate, ARP]
   beta: 0.5
   pop_ratio: 0.8
 general:
