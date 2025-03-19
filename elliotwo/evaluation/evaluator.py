@@ -25,6 +25,8 @@ class Evaluator:
         beta (float): The beta value used in some metrics.
         novelty_profile (Tensor): The novelty profile tensor that measures popularity.
         log_novelty_profile (Tensor): The log novelty profile tensor that measures popularity.
+        short_head (Tensor): The short head items indexes.
+        long_tail (Tensor): The long tail items indexes.
     """
 
     def __init__(
@@ -35,6 +37,8 @@ class Evaluator:
         beta: float = 1.0,
         novelty_profile: Tensor = None,
         log_novelty_profile: Tensor = None,
+        short_head: Tensor = None,
+        long_tail: Tensor = None,
     ):
         self.k_values = k_values
         self.metrics: Dict[int, List[BaseMetric]] = {
@@ -46,6 +50,8 @@ class Evaluator:
                     beta=beta,
                     novelty_profile=novelty_profile,
                     log_novelty_profile=log_novelty_profile,
+                    short_head=short_head,
+                    long_tail=long_tail,
                 )
                 for metric_name in metric_list
             ]

@@ -65,6 +65,8 @@ def main(args: Namespace):
         num_items=num_items,
         novelty_profile=dataset.novelty_profile,
         log_novelty_profile=dataset.log_novelty_profile,
+        short_head=dataset.short_head,
+        long_tail=dataset.long_tail,
     )
 
     for model_name in models:

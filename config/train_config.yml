@@ -41,9 +41,9 @@ models:
   #  alpha: [0.1, 0.2, 0.5]
 evaluation:
   top_k: [10, 20, 50]
-  metrics: [nDCG, Precision, Recall, HitRate, EFD, EPC]
+  metrics: [nDCG, Precision, Recall, HitRate, PopREO]
   beta: 0.5
-  long_tail_threshold: 0.8
+  pop_ratio: 0.8
 general:
   seed: 42
   float_digits: 8

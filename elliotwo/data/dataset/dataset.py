@@ -149,6 +149,9 @@ class TransactionDataset(AbstractDataset):
         self.log_novelty_profile = train_set.compute_novelty_profile(log_discount=True)
         self.novelty_profile = train_set.compute_novelty_profile(log_discount=False)
 
+        # Set popularity
+        self.short_head, self.long_tail = train_set.compute_popularity()
+
     def get_dims(self) -> Tuple[int, int]:
         return (self.nuid, self.niid)
 

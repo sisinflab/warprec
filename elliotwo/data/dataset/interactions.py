@@ -158,6 +158,34 @@ class Interactions:
             return -torch.log2(item_interactions / total_interactions)
         return 1 - (item_interactions / self._nuid)
 
+    def compute_popularity(self, pop_ratio: float = 0.8) -> Tuple[Tensor, Tensor]:
+        sparse_matrix = self.get_sparse()
+
+        # Compute item frequencies
+        item_interactions = torch.tensor(
+            sparse_matrix.getnnz(axis=0)
+        ).float()  # Get number of non-zero elements in each column
+
+        # Order item popularity
+        sorted_interactions, sorted_indices = torch.sort(
+            item_interactions, descending=True
+        )
+
+        # Determine short head cutoff based on cumulative popularity
+        cumulative_pop = torch.cumsum(sorted_interactions, dim=0)
+        total_interactions = item_interactions.sum()
+        cutoff_index = torch.where(cumulative_pop > total_interactions * pop_ratio)[0][
+            0
+        ]
+
+        # Extract indexes from sorted interactions
+        short_head_indices = sorted_indices[
+            : cutoff_index + 1
+        ]  # Include the item at the cutoff
+        long_tail_indices = sorted_indices[cutoff_index + 1 :]
+
+        return short_head_indices, long_tail_indices
+
     def _to_sparse(self) -> csr_matrix:
         """This method will create the sparse representation of the data contained.
 
