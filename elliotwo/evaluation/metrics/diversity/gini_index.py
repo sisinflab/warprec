@@ -3,6 +3,7 @@ from typing import Any
 
 import torch
 from torch import Tensor
+from scipy.sparse import csr_matrix
 from elliotwo.evaluation.base_metric import TopKMetric
 from elliotwo.utils.registry import metric_registry
 
@@ -28,7 +29,7 @@ class Gini(TopKMetric):
 
     Args:
         k (int): The cutoff for recommendations.
-        num_items (int): The total number of items in the dataset.
+        train_set (csr_matrix): The training interaction data.
         dist_sync_on_step (bool): Torchmetrics parameter.
         *args (Any): The argument list.
         **kwargs (Any): The keyword argument dictionary.
@@ -41,13 +42,13 @@ class Gini(TopKMetric):
     def __init__(
         self,
         k: int,
-        num_items: int,
+        train_set: csr_matrix,
         dist_sync_on_step: bool = False,
         *args: Any,
         **kwargs: Any,
     ):
         super().__init__(k, dist_sync_on_step)
-        self.num_items = num_items
+        self.num_items = train_set.shape[1]
         # Accumulate recommended indices from each update call.
         self.add_state("recommended_items", default=[], dist_reduce_fx=None)
         # Accumulate the total number of recommendations given (free_norm).
@@ -87,4 +88,3 @@ class Gini(TopKMetric):
         """Reset the metric state."""
         self.recommended_items = []
         self.free_norm = torch.tensor(0.0)
-        self.num_items = None

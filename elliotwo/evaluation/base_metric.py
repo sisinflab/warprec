@@ -1,10 +1,11 @@
 # pylint: disable=arguments-differ
 from abc import abstractmethod, ABC
-from typing import Any
+from typing import Any, Tuple
 
 import torch
 from torch import Tensor
 from torchmetrics import Metric
+from scipy.sparse import csr_matrix
 
 
 class BaseMetric(Metric, ABC):
@@ -13,6 +14,72 @@ class BaseMetric(Metric, ABC):
     @abstractmethod
     def compute(self):
         pass
+
+    def compute_popularity(
+        self, train_set: csr_matrix, pop_ratio: float = 0.8
+    ) -> Tuple[Tensor, Tensor]:
+        """Compute popularity as tensors of the short head and long tail.
+
+        Args:
+            train_set (csr_matrix): The training interaction data.
+            pop_ratio (float): The percentile considered popular.
+
+        Returns:
+            Tuple[Tensor, Tensor]:
+                - Tensor: The tensor containing indices of short head items.
+                - Tensor: The tensor containing indices of long tail items.
+        """
+        # Compute item frequencies
+        item_interactions = torch.tensor(
+            train_set.getnnz(axis=0)
+        ).float()  # Get number of non-zero elements in each column
+
+        # Order item popularity
+        sorted_interactions, sorted_indices = torch.sort(
+            item_interactions, descending=True
+        )
+
+        # Determine short head cutoff based on cumulative popularity
+        cumulative_pop = torch.cumsum(sorted_interactions, dim=0)
+        total_interactions = item_interactions.sum()
+        cutoff_index = torch.where(cumulative_pop > total_interactions * pop_ratio)[0][
+            0
+        ]
+
+        # Extract indexes from sorted interactions
+        short_head_indices = sorted_indices[
+            : cutoff_index + 1
+        ]  # Include the item at the cutoff
+        long_tail_indices = sorted_indices[cutoff_index + 1 :]
+
+        return short_head_indices, long_tail_indices
+
+    def compute_novelty_profile(
+        self, train_set: csr_matrix, log_discount: bool = False
+    ) -> Tensor:
+        """Compute the novelty profile based on the count of interactions.
+
+        Args:
+            train_set (csr_matrix): The training interaction data.
+            log_discount (bool): Whether or not to compute the discounted novelty.
+
+        Returns:
+            Tensor: A tensor that contains the novelty score for each item.
+        """
+        # Compute item frequencies
+        item_interactions = torch.tensor(
+            train_set.getnnz(axis=0)
+        ).float()  # Get number of non-zero elements in each column
+        total_interactions = item_interactions.sum()
+        users = train_set.shape[0]
+
+        # Avoid division by zero: set minimum interaction count to 1 if any item has zero interactions
+        item_interactions[item_interactions == 0] = 1
+
+        # Compute novelty scores
+        if log_discount:
+            return -torch.log2(item_interactions / total_interactions)
+        return 1 - (item_interactions / users)
 
     @property
     def name(self):

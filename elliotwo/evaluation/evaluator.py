@@ -1,7 +1,7 @@
 from typing import List, Dict, Union
 
 import torch
-from torch import Tensor
+from scipy.sparse import csr_matrix
 from tabulate import tabulate
 from elliotwo.data.dataset import AbstractDataset
 from elliotwo.evaluation.base_metric import BaseMetric
@@ -21,24 +21,18 @@ class Evaluator:
         metric_list (List[str]): The list of metric names that will
             be evaluated.
         k_values (List[int]): The cutoffs.
-        num_items (int): The total number of items in the dataset.
+        train_set (csr_matrix): The train set sparse matrix.
         beta (float): The beta value used in some metrics.
-        novelty_profile (Tensor): The novelty profile tensor that measures popularity.
-        log_novelty_profile (Tensor): The log novelty profile tensor that measures popularity.
-        short_head (Tensor): The short head items indexes.
-        long_tail (Tensor): The long tail items indexes.
+        pop_ratio (float): The percentile considered popular.
     """
 
     def __init__(
         self,
         metric_list: List[str],
         k_values: List[int],
-        num_items: int = None,
+        train_set: csr_matrix,
         beta: float = 1.0,
-        novelty_profile: Tensor = None,
-        log_novelty_profile: Tensor = None,
-        short_head: Tensor = None,
-        long_tail: Tensor = None,
+        pop_ratio: float = 0.8,
     ):
         self.k_values = k_values
         self.metrics: Dict[int, List[BaseMetric]] = {
@@ -46,12 +40,9 @@ class Evaluator:
                 metric_registry.get(
                     metric_name,
                     k=k,
-                    num_items=num_items,
+                    train_set=train_set,
                     beta=beta,
-                    novelty_profile=novelty_profile,
-                    log_novelty_profile=log_novelty_profile,
-                    short_head=short_head,
-                    long_tail=long_tail,
+                    pop_ratio=pop_ratio,
                 )
                 for metric_name in metric_list
             ]

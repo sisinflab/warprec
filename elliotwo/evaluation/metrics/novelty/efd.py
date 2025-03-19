@@ -1,6 +1,7 @@
 from typing import Any
 import torch
 from torch import Tensor
+from scipy.sparse import csr_matrix
 from elliotwo.evaluation.base_metric import TopKMetric
 from elliotwo.utils.registry import metric_registry
 
@@ -19,7 +20,7 @@ class EFD(TopKMetric):
 
     Args:
         k (int): The cutoff for recommendations.
-        log_novelty_profile (Tensor): The log novelty profile tensor that measures popularity.
+        train_set (csr_matrix): The training interaction data.
         dist_sync_on_step (bool): Torchmetrics parameter for distributed synchronization.
         *args (Any): Additional arguments.
         **kwargs (Any): Additional keyword arguments.
@@ -31,13 +32,15 @@ class EFD(TopKMetric):
     def __init__(
         self,
         k: int,
-        log_novelty_profile: Tensor,
+        train_set: csr_matrix,
         dist_sync_on_step: bool = False,
         *args: Any,
         **kwargs: Any,
     ):
         super().__init__(k, dist_sync_on_step)
-        self.novelty_profile = log_novelty_profile.unsqueeze(0)
+        self.novelty_profile = self.compute_novelty_profile(
+            train_set, log_discount=True
+        ).unsqueeze(0)
         self.add_state("efd", default=torch.tensor(0.0), dist_reduce_fx="sum")
         self.add_state("users", default=torch.tensor(0.0), dist_reduce_fx="sum")
 

@@ -52,7 +52,9 @@ def main(args: Namespace):
     evaluator = Evaluator(
         list(config.evaluation.metrics),
         list(config.evaluation.top_k),
+        train_set=dataset.train_set.get_sparse(),
         beta=config.evaluation.beta,
+        pop_ratio=config.evaluation.pop_ratio,
     )
 
     for model_name in models:

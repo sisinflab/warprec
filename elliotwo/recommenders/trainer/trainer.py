@@ -54,7 +54,13 @@ class Trainer:
             model_name, **config.models[model_name]
         )
         self.model_name = model_name
-        self._evaluator = Evaluator([metric_name], [top_k])
+        self._evaluator = Evaluator(
+            [metric_name],
+            [top_k],
+            train_set=dataset.train_set.get_sparse(),
+            beta=config.evaluation.beta,
+            pop_ratio=config.evaluation.pop_ratio,
+        )
         self._train_param = param
         self._metric_name = metric_name
         self._top_k = top_k

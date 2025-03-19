@@ -3,6 +3,7 @@ from typing import Any
 
 import torch
 from torch import Tensor
+from scipy.sparse import csr_matrix
 from elliotwo.evaluation.base_metric import TopKMetric
 from elliotwo.utils.registry import metric_registry
 
@@ -18,7 +19,7 @@ class ShannonEntropy(TopKMetric):
 
     Args:
         k (int): Recommendation list cutoff
-        num_items (int): Total number of unique items in the dataset
+        train_set (csr_matrix): The training interaction data.
         dist_sync_on_step (bool): Synchronize metric state across devices
         *args (Any): The argument list.
         **kwargs (Any): The keyword argument dictionary.
@@ -30,13 +31,13 @@ class ShannonEntropy(TopKMetric):
     def __init__(
         self,
         k: int,
-        num_items: int,
+        train_set: csr_matrix,
         dist_sync_on_step: bool = False,
         *args: Any,
         **kwargs: Any,
     ):
         super().__init__(k, dist_sync_on_step)
-        self.num_items = num_items
+        self.num_items = train_set.shape[1]
 
         self.add_state(
             "item_counts", default=torch.zeros(self.num_items), dist_reduce_fx="sum"

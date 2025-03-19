@@ -1,8 +1,6 @@
 from typing import Tuple
 
 import numpy as np
-import torch
-from torch import Tensor
 from pandas import DataFrame
 from scipy.sparse import csr_matrix, coo_matrix
 from elliotwo.utils.enums import RatingType
@@ -132,59 +130,6 @@ class Interactions:
             int: Number of transactions.
         """
         return self._transactions
-
-    def compute_novelty_profile(self, log_discount: bool = False) -> Tensor:
-        """Compute the novelty profile based on the count of interactions.
-
-        Args:
-            log_discount (bool): Whether or not to compute the discounted novelty.
-
-        Returns:
-            Tensor: A tensor that contains the novelty score for each item.
-        """
-        sparse_matrix = self.get_sparse()
-
-        # Compute item frequencies
-        item_interactions = torch.tensor(
-            sparse_matrix.getnnz(axis=0)
-        ).float()  # Get number of non-zero elements in each column
-        total_interactions = item_interactions.sum()
-
-        # Avoid division by zero: set minimum interaction count to 1 if any item has zero interactions
-        item_interactions[item_interactions == 0] = 1
-
-        # Compute novelty scores
-        if log_discount:
-            return -torch.log2(item_interactions / total_interactions)
-        return 1 - (item_interactions / self._nuid)
-
-    def compute_popularity(self, pop_ratio: float = 0.8) -> Tuple[Tensor, Tensor]:
-        sparse_matrix = self.get_sparse()
-
-        # Compute item frequencies
-        item_interactions = torch.tensor(
-            sparse_matrix.getnnz(axis=0)
-        ).float()  # Get number of non-zero elements in each column
-
-        # Order item popularity
-        sorted_interactions, sorted_indices = torch.sort(
-            item_interactions, descending=True
-        )
-
-        # Determine short head cutoff based on cumulative popularity
-        cumulative_pop = torch.cumsum(sorted_interactions, dim=0)
-        total_interactions = item_interactions.sum()
-        cutoff_index = torch.where(cumulative_pop > total_interactions * pop_ratio)[0][
-            0
-        ]
-
-        # Extract indexes from sorted interactions
-        short_head_indices = sorted_indices[
-            : cutoff_index + 1
-        ]  # Include the item at the cutoff
-        long_tail_indices = sorted_indices[cutoff_index + 1 :]
-
-        return short_head_indices, long_tail_indices
 
     def _to_sparse(self) -> csr_matrix:
         """This method will create the sparse representation of the data contained.

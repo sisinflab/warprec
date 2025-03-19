@@ -61,12 +61,9 @@ def main(args: Namespace):
     evaluator = Evaluator(
         [metric for metric in config.evaluation.metrics],
         [k for k in config.evaluation.top_k],
+        train_set=dataset.train_set.get_sparse(),
         beta=config.evaluation.beta,
-        num_items=num_items,
-        novelty_profile=dataset.novelty_profile,
-        log_novelty_profile=dataset.log_novelty_profile,
-        short_head=dataset.short_head,
-        long_tail=dataset.long_tail,
+        pop_ratio=config.evaluation.pop_ratio,
     )
 
     for model_name in models:

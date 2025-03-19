@@ -3,6 +3,7 @@ from typing import Any
 
 import torch
 from torch import Tensor
+from scipy.sparse import csr_matrix
 from elliotwo.evaluation.base_metric import TopKMetric
 from elliotwo.utils.registry import metric_registry
 
@@ -26,8 +27,8 @@ class PopREO(TopKMetric):
 
     Args:
         k (int): The cutoff for recommendations.
-        short_head (Tensor): Tensor of indices representing the most popular items.
-        long_tail (Tensor): Tensor of indices representing the less popular items.
+        train_set (csr_matrix): The training interaction data.
+        pop_ratio (float): The percentile considered popular.
         dist_sync_on_step (bool): Torchmetrics parameter.
         *args (Any): The argument list.
         **kwargs (Any): The keyword argument dictionary.
@@ -41,15 +42,16 @@ class PopREO(TopKMetric):
     def __init__(
         self,
         k: int,
-        short_head: Tensor,
-        long_tail: Tensor,
+        train_set: csr_matrix,
+        pop_ratio: float,
         dist_sync_on_step: bool = False,
         *args: Any,
         **kwargs: Any,
     ):
         super().__init__(k, dist_sync_on_step)
-        self.short_head = short_head
-        self.long_tail = long_tail
+        sh, lt = self.compute_popularity(train_set, pop_ratio)
+        self.short_head = sh
+        self.long_tail = lt
         self.add_state("short_hits", default=torch.tensor(0.0), dist_reduce_fx="sum")
         self.add_state("long_hits", default=torch.tensor(0.0), dist_reduce_fx="sum")
         self.add_state("short_gt", default=torch.tensor(0.0), dist_reduce_fx="sum")
