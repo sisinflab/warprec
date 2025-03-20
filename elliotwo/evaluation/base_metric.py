@@ -55,13 +55,21 @@ class BaseMetric(Metric, ABC):
         return short_head_indices, long_tail_indices
 
     def compute_popularity(self, train_set: csr_matrix) -> Tensor:
+        """Compute popularity tensor based on the interactions.
+
+        Args:
+            train_set (csr_matrix): The training interaction data.
+
+        Returns:
+            Tensor: The interaction count for each item.
+        """
         # Compute item frequencies
         item_interactions = torch.tensor(
             train_set.getnnz(axis=0)
         ).float()  # Get number of non-zero elements in each column
 
         # Avoid division by zero: set minimum interaction count to 1 if any item has zero interactions
-        item_interactions[item_interactions == 0] = 1
+        item_interactions = torch.clamp(item_interactions, min=1)
         return item_interactions
 
     def compute_novelty_profile(
@@ -84,7 +92,7 @@ class BaseMetric(Metric, ABC):
         users = train_set.shape[0]
 
         # Avoid division by zero: set minimum interaction count to 1 if any item has zero interactions
-        item_interactions[item_interactions == 0] = 1
+        item_interactions = torch.clamp(item_interactions, min=1)
 
         # Compute novelty scores
         if log_discount:
@@ -118,6 +126,13 @@ class TopKMetric(BaseMetric):
         ).sum(dim=1)
 
     def discounted_sum(self, k: int) -> Tensor:
-        """"""
+        """Computes the discounted sum for k values.
+
+        Args:
+            k (int): The length of the tensor to discount.
+
+        Returns:
+            Tensor: The sum of the discounts for k values.
+        """
         ranks = torch.arange(k)
         return torch.sum(1.0 / torch.log2(ranks.float() + 2))
