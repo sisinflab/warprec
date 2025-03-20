@@ -22,6 +22,15 @@ class EvaluationConfig(BaseModel):
     pop_ratio: Optional[float] = 0.8
     save_evaluation: Optional[bool] = True
 
+    @field_validator("top_k")
+    @classmethod
+    def top_k_validator(cls, v: List[int]):
+        """Validate top_k."""
+        for k in v:
+            if k <= 0:
+                raise ValueError("Values for top_k should be positive integers.")
+        return v
+
     @field_validator("metrics")
     @classmethod
     def metrics_validator(cls, v: List[str]):
