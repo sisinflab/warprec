@@ -77,10 +77,9 @@ class Evaluator:
                 metric.reset()
 
         for train_batch, val_batch, test_batch in dataset:
-            if test_set:
-                target = torch.tensor(test_batch.toarray(), device=device)
-            else:
-                target = torch.tensor(val_batch.toarray(), device=device)
+            target = torch.tensor(
+                (test_batch if test_set else val_batch).toarray(), device=device
+            )
             predictions = model.forward(train_batch).to(device)
 
             for _, metric_instances in self.metrics.items():
