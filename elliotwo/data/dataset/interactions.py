@@ -58,28 +58,19 @@ class Interactions:
 
         # Define the interaction dictionary, based on the RatingType selected
         if self._rating_type == RatingType.EXPLICIT:
-            for u in self._uid:
-                _user_interactions = self._inter_df[
-                    self._inter_df[self._user_label] == u
-                ]
-                self._inter_dict[u] = dict(
-                    zip(
-                        _user_interactions[self._item_label],
-                        _user_interactions[self._score_label],
-                    )
+            self._inter_dict = (
+                self._inter_df.groupby(self._user_label)
+                .apply(
+                    lambda df: dict(zip(df[self._item_label], df[self._score_label]))
                 )
+                .to_dict()
+            )
         elif self._rating_type == RatingType.IMPLICIT:
-            for u in self._uid:
-                _user_interactions = self._inter_df[
-                    self._inter_df[self._user_label] == u
-                ]
-                _user_int_len = len(_user_interactions)
-                self._inter_dict[u] = dict(
-                    zip(
-                        _user_interactions[self._item_label].tolist(),
-                        np.ones(_user_int_len).tolist(),
-                    )
-                )
+            self._inter_dict = (
+                self._inter_df.groupby(self._user_label)[self._item_label]
+                .apply(lambda items: dict(zip(items, np.ones(len(items), dtype=int))))
+                .to_dict()
+            )
         else:
             raise ValueError(f"Rating type {self._rating_type} not supported.")
 
