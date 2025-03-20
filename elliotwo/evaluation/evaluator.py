@@ -72,22 +72,30 @@ class Evaluator:
             logger.msg(f"Starting evaluation for model {model.name} on {partition}.")
 
         # Reset all metrics in evaluator
-        for _, metric_list in self.metrics.items():
-            for metric in metric_list:
-                metric.reset()
+        self.reset_metrics()
 
+        # Iter over batches
         for train_batch, val_batch, test_batch in dataset:
             target = torch.tensor(
                 (test_batch if test_set else val_batch).toarray(), device=device
-            )
-            predictions = model.forward(train_batch).to(device)
+            )  # Target tensor [batch_size x items]
+            predictions = model.forward(train_batch).to(
+                device
+            )  # Get ratings tensor [batch_size x items]
 
+            # Update all metrics on current batches
             for _, metric_instances in self.metrics.items():
                 for metric in metric_instances:
                     metric.update(predictions, target)
 
         if verbose:
             logger.positive(f"Evaluation completed for model {model.name}.")
+
+    def reset_metrics(self):
+        """Reset all metrics accumulated values."""
+        for metric_list in self.metrics.values():
+            for metric in metric_list:
+                metric.reset()
 
     def compute_results(self) -> Dict[int, Dict[str, float]]:
         """The method to retrieve computed results in dictionary format.
