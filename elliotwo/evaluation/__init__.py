@@ -1,8 +1,11 @@
 from .evaluator import Evaluator
 from .base_metric import BaseMetric
 from .metrics import (
+    AUC,
     F1,
+    GAUC,
     HitRate,
+    LAUC,
     MAP,
     MAR,
     MRR,
@@ -28,8 +31,11 @@ from .metrics import (
 __all__ = [
     "Evaluator",
     "BaseMetric",
+    "AUC",
     "F1",
+    "GAUC",
     "HitRate",
+    "LAUC",
     "MAP",
     "MAR",
     "MRR",
