@@ -139,18 +139,9 @@ class Interactions:
         Returns:
             csr_matrix: Sparse representation of the transactions (CSR Format).
         """
-        users = []
-        items = []
-        ratings = []
-
-        # Iter self and get all tuple of interactions
-        for u, i_r in self._inter_dict.items():
-            for i, r in i_r.items():
-                users.append(self._umap[u])
-                items.append(self._imap[i])
-                ratings.append(r)
-
-        # Create sparse structure
+        users = self._inter_df[self._user_label].map(self._umap).values
+        items = self._inter_df[self._item_label].map(self._imap).values
+        ratings = self._inter_df[self._score_label].values
         self._inter_sparse = coo_matrix(
             (ratings, (users, items)),
             shape=(self._og_nuid, self._og_niid),
