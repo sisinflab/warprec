@@ -52,7 +52,7 @@ class Configuration(BaseModel):
         "int64": np.int64,
         "float32": np.float32,
         "float64": np.float64,
-        "string": np.str_,
+        "str": np.str_,
     }
 
     # Supported sparse precisions in numpy
@@ -188,7 +188,7 @@ class Configuration(BaseModel):
         Raises:
             ValueError: If the dtype are not supported or incorrect.
         """
-        for dtype_str in self.data.dtype.model_dump().values():
+        for dtype_str in self.data.dtypes.model_dump().values():
             if dtype_str not in self.column_map_dtype:
                 raise ValueError(
                     f"Custom dtype {dtype_str} not supported as a column data type."
@@ -200,10 +200,12 @@ class Configuration(BaseModel):
         Returns:
             List[np.dtype]: A list containing the dtype to use for data loading.
         """
-        return [
-            self.column_map_dtype[dtype_str]
-            for dtype_str in self.data.dtype.model_dump().values()
-        ]
+        column_dtypes = [self.data.dtypes.user_id_type, self.data.dtypes.item_id_type]
+        if self.data.rating_type == RatingType.EXPLICIT:
+            column_dtypes.append(self.data.dtypes.rating_type)
+        if self.splitter.strategy == SplittingStrategies.TEMPORAL:
+            column_dtypes.append(self.data.dtypes.timestamp_type)
+        return [self.column_map_dtype[dtype] for dtype in column_dtypes]
 
     def column_names(self) -> List[str]:
         """This method returns the names of the column passed through configuration.
@@ -211,7 +213,12 @@ class Configuration(BaseModel):
         Returns:
             List[str]: The list of column names.
         """
-        return list(self.data.labels.model_dump().values())
+        column_names = [self.data.labels.user_id_label, self.data.labels.item_id_label]
+        if self.data.rating_type == RatingType.EXPLICIT:
+            column_names.append(self.data.labels.rating_label)
+        if self.splitter.strategy == SplittingStrategies.TEMPORAL:
+            column_names.append(self.data.labels.timestamp_label)
+        return column_names
 
     def check_precision(self) -> None:
         """This method checks the precision passed through configuration.

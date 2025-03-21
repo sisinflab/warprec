@@ -1,25 +1,26 @@
 data:
-  dataset_name: MovieLens
+  dataset_name: BookCrossing
   loading_strategy: dataset
   data_type: transaction
-  local_path: tests/test_dataset/movielens.csv
+  local_path: tests/test_dataset/book_crossing.csv
   experiment_path: experiment/test/
-  sep: ','
+  sep: ';'
   rating_type: explicit
   batch_size: 1024
   labels:
-    user_id_label: user_id
-    item_id_label: item_id
-    rating_label: rating
-    timestamp_label: timestamp
+    user_id_label: User-ID
+    item_id_label: ISBN
+    rating_label: Rating
+    #timestamp_label: timestamp
   dtypes:
-    user_id_type: int64
+    user_id_type: str
+    item_id_type: str
 splitter:
-  strategy: temporal
+  strategy: leave-one-out
   validation: True
-  ratio: [0.8, 0.1, 0.1]
-  save_split: True
-  #k: 3
+  #ratio: [0.8, 0.1, 0.1]
+  #save_split: True
+  k: 3
 models:
   EASE:
     meta:
@@ -34,15 +35,15 @@ models:
         seed: 42
       validation_metric: nDCG@10
       num_samples: 5
-      cpu_per_trial: 2
+      cpu_per_trial: 12
     l2: ['uniform', 5, 100]
   #Slim:
   #  l1: [0.1, 0.2, 0.5]
   #  alpha: [0.1, 0.2, 0.5]
 evaluation:
   top_k: [10, 20, 50]
-  metrics: [nDCG, Precision, Recall, HitRate, AUC, GAUC, LAUC]
-  beta: 0.5
+  metrics: [AUC, HitRate, nDCG, Precision, PopREO, ItemCoverage, Gini, EPC, MAE]
+  beta: 1
   pop_ratio: 0.8
 general:
   seed: 42

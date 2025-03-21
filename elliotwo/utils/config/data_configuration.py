@@ -57,7 +57,7 @@ class DataConfig(BaseModel):
         batch_size (Optional[int]): The batch size to be used during the reading process.
             If None is chosen, the data will be read in one pass.
         labels (Labels): The labels sub-configuration. Defaults to Labels default values.
-        dtype (CustomDtype): The list of column dtype.
+        dtypes (CustomDtype): The list of column dtype.
     """
 
     dataset_name: str
@@ -70,7 +70,7 @@ class DataConfig(BaseModel):
     rating_type: RatingType
     batch_size: Optional[int] = None
     labels: Labels = Field(default_factory=Labels)
-    dtype: CustomDtype = Field(default_factory=CustomDtype)
+    dtypes: CustomDtype = Field(default_factory=CustomDtype)
 
     @field_validator("loading_strategy")
     @classmethod
