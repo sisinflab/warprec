@@ -14,6 +14,23 @@ class MAE(BaseMetric):
 
     This metric computes the average absolute difference between the predictions and targets.
 
+    The metric formula is defines as:
+
+    MAE = sum(|preds - target|) / total_count
+
+    Matrix computation of the metric:
+        PREDS                   TARGETS
+    +---+---+---+---+       +---+---+---+---+
+    | 8 | 2 | 7 | 2 |       | 1 | 0 | 3 | 0 |
+    | 5 | 4 | 3 | 9 |       | 0 | 0 | 2 | 5 |
+    +---+---+---+---+       +---+---+---+---+
+
+    MAE = (|8 - 1| + |7 - 3| + |3 - 2| + |9 - 5|) / 4 = (7 + 4 + 1 + 4) / 4
+        = 4
+
+    The normalization happens only for the non-zero elements
+        in the target tensor (the real ratings of the user).
+
     Attributes:
         sum_absolute_errors (Tensor): Sum of absolute errors across all batches.
         total_count (Tensor): Total number of elements processed.

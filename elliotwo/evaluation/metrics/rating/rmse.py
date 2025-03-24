@@ -14,6 +14,23 @@ class RMSE(BaseMetric):
 
     This metric computes the square root of the average squared difference between the predictions and targets.
 
+    The metric formula is defines as:
+
+    RMSE = sqrt(sum((preds - target)^2) / total_count)
+
+    Matrix computation of the metric:
+        PREDS                   TARGETS
+    +---+---+---+---+       +---+---+---+---+
+    | 8 | 2 | 7 | 2 |       | 1 | 0 | 3 | 0 |
+    | 5 | 4 | 3 | 9 |       | 0 | 0 | 2 | 5 |
+    +---+---+---+---+       +---+---+---+---+
+
+    RMSE = sqrt(((8 - 1)^2 + (7 - 3)^2 + (3 - 2)^2 + (9 - 5)^2) / 4
+         = (49 + 16 + 1 + 16) / 4) = 4.52
+
+    The normalization happens only for the non-zero elements
+        in the target tensor (the real ratings of the user).
+
     Attributes:
         sum_squared_errors (Tensor): Sum of squared errors across all batches.
         total_count (Tensor): Total number of elements processed.
