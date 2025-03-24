@@ -18,6 +18,11 @@ class MSE(BaseMetric):
 
     MSE = sum((preds - target)^2) / total_count
 
+    where:
+        -preds is the predicted ratings.
+        -target are the real ratings of the user.
+        -total_count is the total number of elements processed.
+
     Matrix computation of the metric:
         PREDS                   TARGETS
     +---+---+---+---+       +---+---+---+---+
