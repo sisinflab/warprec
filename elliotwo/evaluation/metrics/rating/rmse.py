@@ -15,8 +15,7 @@ class RMSE(BaseMetric):
     This metric computes the square root of the average squared difference between the predictions and targets.
 
     The metric formula is defines as:
-
-    RMSE = sqrt(sum((preds - target)^2) / total_count)
+        RMSE = sqrt(sum((preds - target)^2) / total_count)
 
     where:
         -preds is the predicted ratings.

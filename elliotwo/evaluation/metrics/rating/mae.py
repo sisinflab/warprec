@@ -15,8 +15,7 @@ class MAE(BaseMetric):
     This metric computes the average absolute difference between the predictions and targets.
 
     The metric formula is defines as:
-
-    MAE = sum(|preds - target|) / total_count
+        MAE = sum(|preds - target|) / total_count
 
     where:
         -preds is the predicted ratings.

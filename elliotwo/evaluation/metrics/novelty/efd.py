@@ -17,8 +17,7 @@ class EFD(TopKMetric):
     that the user has not already seen (i.e., not present in the training set).
 
     The metric formula is defines as:
-
-    EFD = sum(DCG(rel * novelty)) / (users * discounted_sum)
+        EFD = sum(DCG(rel * novelty)) / (users * discounted_sum)
 
     where:
         - DCG is the discounted cumulative gain.
@@ -30,8 +29,8 @@ class EFD(TopKMetric):
     Matrix computation of the metric:
         PREDS                   TARGETS
     +---+---+---+---+       +---+---+---+---+
-    | 8 | 2 | 7 | 2 |       | 1 | 0 | 3 | 0 |
-    | 5 | 4 | 3 | 9 |       | 0 | 0 | 2 | 5 |
+    | 8 | 2 | 7 | 2 |       | 1 | 0 | 1 | 0 |
+    | 5 | 4 | 3 | 9 |       | 0 | 0 | 1 | 1 |
     +---+---+---+---+       +---+---+---+---+
 
     We extract the top-k predictions and get their column index. Let's assume k=2:
@@ -44,8 +43,8 @@ class EFD(TopKMetric):
     then we extract the relevance (original score) for that user in that column:
        REL
     +---+---+
-    | 1 | 3 |
-    | 5 | 0 |
+    | 0 | 1 |
+    | 1 | 0 |
     +---+---+
 
     The discounted novelty score of an item is computed as:

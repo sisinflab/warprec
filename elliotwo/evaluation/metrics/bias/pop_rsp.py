@@ -18,6 +18,44 @@ class PopRSP(TopKMetric):
     two groups, normalized by their mean, to assess the balance in
     recommendation exposure.
 
+    The metric formula is defined as:
+        PopRSP = std(pr_short, pr_long) / mean(pr_short, pr_long)
+
+    where:
+        -pr_short is the proportion of short head items in the recommendations.
+        -pr_long is the proportion of long tail items in the recommendations.
+
+    Matrix computation of the metric:
+        PREDS                   TARGETS
+    +---+---+---+---+       +---+---+---+---+
+    | 8 | 2 | 7 | 2 |       | 1 | 0 | 1 | 0 |
+    | 5 | 4 | 3 | 9 |       | 0 | 0 | 1 | 1 |
+    +---+---+---+---+       +---+---+---+---+
+
+    We extract the top-k predictions and get their column index. Let's assume k=2:
+      TOP-K
+    +---+---+
+    | 0 | 2 |
+    | 3 | 0 |
+    +---+---+
+
+    then we extract the relevance (original score) for that user in that column but maintaining the original dimensions:
+           REL
+    +---+---+---+---+
+    | 0 | 0 | 1 | 0 |
+    | 0 | 0 | 0 | 1 |
+    +---+---+---+---+
+
+    Then we finally extract the short head and long tail items
+    from the relevance matrix and training set matrix.
+    Check BaseMetric for more details on the long tail and short head definition.
+
+    We calculate the proportion of hits as follows:
+        - pr_short = sum(short_hits) / sum(short_gt)
+        - pr_long = sum(long_hits) / sum(long_gt)
+
+    For further details, please refer to this `paper <https://dl.acm.org/doi/abs/10.1145/3397271.3401177>`_.
+
     Attributes:
         short_hits (Tensor): The short head recommendation hits.
         long_hits (Tensor): The long tail recommendation hits.

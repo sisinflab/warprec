@@ -14,8 +14,9 @@ class Gini(TopKMetric):
     computed on a per-user basis and averaged over users. This implementation accounts
     for items that were never recommended by applying an offset.
 
-    The Gini coefficient is computed as:
+    The metric formula is defines as:
         Gini = 1 - (sum_{j=1}^{n_rec} (2*(j + offset) - num_items - 1) * (count_j / free_norm)) / (num_items - 1)
+
     where:
         - n_rec is the number of items that were recommended at least once,
         - offset = num_items - n_rec (to account for items with zero recommendations),
@@ -81,8 +82,7 @@ class Gini(TopKMetric):
             sorted_counts / self.free_norm
         )
         # Sum contributions and normalize.
-        gini = 1 - torch.sum(contributions) / (self.num_items - 1)
-        return gini
+        return 1 - torch.sum(contributions) / (self.num_items - 1)
 
     def reset(self):
         """Reset the metric state."""

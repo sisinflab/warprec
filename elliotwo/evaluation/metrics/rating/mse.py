@@ -15,8 +15,7 @@ class MSE(BaseMetric):
     This metric computes the average squared difference between the predictions and targets.
 
     The metric formula is defines as:
-
-    MSE = sum((preds - target)^2) / total_count
+        MSE = sum((preds - target)^2) / total_count
 
     where:
         -preds is the predicted ratings.

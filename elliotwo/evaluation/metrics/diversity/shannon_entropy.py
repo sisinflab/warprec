@@ -13,6 +13,40 @@ class ShannonEntropy(TopKMetric):
     """Shannon Entropy measures the diversity of recommendations by calculating
     the information entropy over item recommendation frequencies.
 
+    The metric formula is defines as:
+        ShannonEntropy = -sum(p_i * log(p_i))
+
+    where:
+        -p_i is the probability of item i being recommended.
+
+    Matrix computation of the metric:
+        PREDS
+    +---+---+---+---+
+    | 8 | 2 | 7 | 2 |
+    | 5 | 4 | 3 | 9 |
+    +---+---+---+---+
+
+    We extract the top-k predictions and get their column index. Let's assume k=2:
+      TOP-K
+    +---+---+
+    | 0 | 2 |
+    | 3 | 0 |
+    +---+---+
+
+    then we compute the item counts using the column indices:
+         COUNTS
+    +---+---+---+---+
+    | 0 | 0 | 1 | 1 |
+    +---+---+---+---+
+
+    The probability distribution is calculated by dividing the counts by the total number of recommendations:
+           PROBS
+    +---+---+-----+-----+
+    | 0 | 0 | .25 | .25 |
+    +---+---+-----+-----+
+
+    For further details, please refer to this `book <https://link.springer.com/referenceworkentry/10.1007/978-1-4939-7131-2_110158>`_.
+
     Attributes:
         item_counts (Tensor): Cumulative count of each item's recommendations
         users (Tensor): Total number of users evaluated
