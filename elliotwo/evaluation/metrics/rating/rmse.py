@@ -39,7 +39,7 @@ class RMSE(BaseMetric):
         mask = target > 0
         squared_errors = (preds[mask] - target[mask]) ** 2
         self.sum_squared_errors += squared_errors.sum()
-        self.total_count += target.numel()
+        self.total_count += torch.count_nonzero(target)
 
     def compute(self):
         """Computes the final metric value."""

@@ -39,7 +39,7 @@ class MAE(BaseMetric):
         mask = target > 0
         abs_errors = torch.abs(preds[mask] - target[mask])
         self.sum_absolute_errors += abs_errors.sum()
-        self.total_count += target.numel()
+        self.total_count += torch.count_nonzero(target)
 
     def compute(self):
         """Computes the final metric value."""
