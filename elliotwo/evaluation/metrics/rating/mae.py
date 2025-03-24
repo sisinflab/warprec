@@ -1,4 +1,4 @@
-# pylint: disable=arguments-differ, unused-argument
+# pylint: disable=arguments-differ, unused-argument, line-too-long
 from typing import Any
 
 import torch
@@ -28,8 +28,9 @@ class MAE(BaseMetric):
     MAE = (|8 - 1| + |7 - 3| + |3 - 2| + |9 - 5|) / 4 = (7 + 4 + 1 + 4) / 4
         = 4
 
-    The normalization happens only for the non-zero elements
-        in the target tensor (the real ratings of the user).
+    The normalization happens only for the non-zero elements in the target tensor (the real ratings of the user).
+
+    For further details, please refer to this `link <https://en.wikipedia.org/wiki/Mean_absolute_error>`_.
 
     Attributes:
         sum_absolute_errors (Tensor): Sum of absolute errors across all batches.

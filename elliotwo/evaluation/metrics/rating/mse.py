@@ -1,4 +1,4 @@
-# pylint: disable=arguments-differ, unused-argument
+# pylint: disable=arguments-differ, unused-argument, line-too-long
 from typing import Any
 
 import torch
@@ -28,8 +28,9 @@ class MSE(BaseMetric):
     MSE = ((8 - 1)^2 + (7 - 3)^2 + (3 - 2)^2 + (9 - 5)^2) / 4
         = (49 + 16 + 1 + 16) / 4 = 20.5
 
-    The normalization happens only for the non-zero elements
-        in the target tensor (the real ratings of the user).
+    The normalization happens only for the non-zero elements in the target tensor (the real ratings of the user).
+
+    For further details, please refer to this `link <https://en.wikipedia.org/wiki/Mean_squared_error>`_.
 
     Attributes:
         sum_squared_errors (Tensor): Sum of squared errors across all batches.
