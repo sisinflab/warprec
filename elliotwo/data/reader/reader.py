@@ -153,6 +153,7 @@ class LocalReader(AbstractReader):
         # Get batch size from config
         batch_size = self.config.data.batch_size
 
+        logger.msg(f"Starting reading process from local source in: {_path_train}")
         if isfile(_path_train):
             train_set = pd.read_csv(
                 _path_train,
@@ -162,10 +163,6 @@ class LocalReader(AbstractReader):
             )
             _nuid = train_set[self._user_label].nunique()
             _niid = train_set[self._item_label].nunique()
-            logger.stat_msg(
-                f"Number of users: {_nuid}      Number of items: {_niid}",
-                "Train split information",
-            )
             _umap = {
                 user: i for i, user in enumerate(train_set[self._user_label].unique())
             }
@@ -188,11 +185,7 @@ class LocalReader(AbstractReader):
                     usecols=self._column_names,
                     dtype=self._dtypes,
                 )
-                logger.stat_msg(
-                    f"Number of users: {test_set[self._user_label].nunique()}      "
-                    f"Number of items: {test_set[self._item_label].nunique()}",
-                    "Test split information",
-                )
+
                 test_inter = Interactions(
                     test_set,
                     self.config,
@@ -209,11 +202,7 @@ class LocalReader(AbstractReader):
                     usecols=self._column_names,
                     dtype=self._dtypes,
                 )
-                logger.stat_msg(
-                    f"Number of users: {val_set[self._user_label].nunique()}      "
-                    f"Number of items: {val_set[self._item_label].nunique()}",
-                    "Validation split information",
-                )
+
                 val_inter = Interactions(
                     val_set,
                     self.config,
@@ -221,6 +210,23 @@ class LocalReader(AbstractReader):
                     _umap,
                     _imap,
                     batch_size=batch_size,
+                )
+
+            logger.stat_msg(
+                f"Number of users: {_nuid}      Number of items: {_niid}",
+                "Train split information",
+            )
+            if test_inter is not None:
+                logger.stat_msg(
+                    f"Number of users: {test_set[self._user_label].nunique()}      "
+                    f"Number of items: {test_set[self._item_label].nunique()}",
+                    "Test split information",
+                )
+            if val_inter is not None:
+                logger.stat_msg(
+                    f"Number of users: {val_set[self._user_label].nunique()}      "
+                    f"Number of items: {val_set[self._item_label].nunique()}",
+                    "Validation split information",
                 )
 
             return TransactionDataset(

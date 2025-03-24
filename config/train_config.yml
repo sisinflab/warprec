@@ -1,26 +1,26 @@
 data:
-  dataset_name: BookCrossing
+  dataset_name: WomanOVS
   loading_strategy: dataset
   data_type: transaction
-  local_path: tests/test_dataset/book_crossing.csv
+  local_path: tests/test_dataset/woman.tsv
   experiment_path: experiment/test/
-  sep: ';'
+  sep: \t
   rating_type: explicit
   batch_size: 1024
   labels:
-    user_id_label: User-ID
-    item_id_label: ISBN
-    rating_label: Rating
-    #timestamp_label: timestamp
+    user_id_label: user_id
+    item_id_label: item_id
+    rating_label: rating
+    timestamp_label: timestamp
   dtypes:
     user_id_type: str
     item_id_type: str
 splitter:
-  strategy: leave-one-out
+  strategy: temporal
   validation: True
-  #ratio: [0.8, 0.1, 0.1]
+  ratio: [0.8, 0.1, 0.1]
   #save_split: True
-  k: 3
+  #k: 5
 models:
   EASE:
     meta:

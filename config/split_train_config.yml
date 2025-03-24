@@ -1,26 +1,40 @@
 data:
-  dataset_name: MovieLens
+  dataset_name: WomanOVS
   loading_strategy: split
   data_type: transaction
-  split_dir: experiment/test/MovieLens/1739898518265/
+  split_dir: tests/woman/
   sep: '\t'
   experiment_path: experiment/test/
   rating_type: explicit
 models:
   EASE:
-    l2: [0.0, 200.0]
-    implementation: ['elliot']
-splitter:
-  strategy: temporal
-  validation: True
-  ratio: [0.8, 0.1, 0.1]
+    meta:
+      #save_model: True
+      #keep_all_ray_checkpoints: True
+      implementation: elliot
+    optimization:
+      strategy: hopt
+      scheduler: fifo
+      properties:
+        mode: max
+        seed: 42
+      validation_metric: nDCG@10
+      num_samples: 5
+      cpu_per_trial: 12
+    l2: ['uniform', 5, 100]
 evaluation:
   top_k: [10, 20, 50]
-  metrics: [NDCG, Precision, Recall, HitRate]
+  metrics: [AUC, HitRate, nDCG, Precision, PopREO, ItemCoverage, Gini, EPC, MAE]
+  beta: 1
+  pop_ratio: 0.8
 general:
   seed: 42
   float_digits: 8
   device: cpu
-  validation_metric: NDCG@10
-  precision: float32
+  precision: float64
   max_eval: 10
+  recommendation:
+    save_recs: True
+    sep: \t
+    ext: .tsv
+    k: 50

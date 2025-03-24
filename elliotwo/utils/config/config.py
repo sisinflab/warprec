@@ -203,7 +203,7 @@ class Configuration(BaseModel):
         column_dtypes = [self.data.dtypes.user_id_type, self.data.dtypes.item_id_type]
         if self.data.rating_type == RatingType.EXPLICIT:
             column_dtypes.append(self.data.dtypes.rating_type)
-        if self.splitter.strategy == SplittingStrategies.TEMPORAL:
+        if self.splitter and self.splitter.strategy == SplittingStrategies.TEMPORAL:
             column_dtypes.append(self.data.dtypes.timestamp_type)
         return [self.column_map_dtype[dtype] for dtype in column_dtypes]
 
@@ -216,7 +216,7 @@ class Configuration(BaseModel):
         column_names = [self.data.labels.user_id_label, self.data.labels.item_id_label]
         if self.data.rating_type == RatingType.EXPLICIT:
             column_names.append(self.data.labels.rating_label)
-        if self.splitter.strategy == SplittingStrategies.TEMPORAL:
+        if self.splitter and self.splitter.strategy == SplittingStrategies.TEMPORAL:
             column_names.append(self.data.labels.timestamp_label)
         return column_names
 
