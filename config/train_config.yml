@@ -19,7 +19,7 @@ splitter:
   strategy: temporal
   validation: True
   ratio: [0.8, 0.1, 0.1]
-  #save_split: True
+  save_split: True
   #k: 5
 models:
   EASE:

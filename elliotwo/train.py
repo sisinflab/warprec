@@ -39,7 +39,6 @@ def main(args: Namespace):
                 dataset = splitter.split_transaction(data)
             else:
                 raise ValueError("Data type not yet supported.")
-        else:
             # This branch is for 100% train and 0% test
             pass
 
@@ -51,9 +50,6 @@ def main(args: Namespace):
 
     if config.splitter and config.splitter.save_split:
         writer.write_split(dataset)
-
-    # Dataset information
-    num_users, num_items = dataset.get_dims()
 
     # Trainer testing
     models = list(config.models.keys())

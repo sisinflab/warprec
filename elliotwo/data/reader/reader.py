@@ -212,20 +212,36 @@ class LocalReader(AbstractReader):
                     batch_size=batch_size,
                 )
 
+            train_nuid, train_niid = train_inter.get_dims()
+            train_transactions = train_inter.get_transactions()
             logger.stat_msg(
-                f"Number of users: {_nuid}      Number of items: {_niid}",
+                (
+                    f"Number of users: {train_nuid}      "
+                    f"Number of items: {train_niid}      "
+                    f"Transactions: {train_transactions}"
+                ),
                 "Train split information",
             )
             if test_inter is not None:
+                test_nuid, test_niid = test_inter.get_dims()
+                test_transactions = test_inter.get_transactions()
                 logger.stat_msg(
-                    f"Number of users: {test_set[self._user_label].nunique()}      "
-                    f"Number of items: {test_set[self._item_label].nunique()}",
+                    (
+                        f"Number of users: {test_nuid}      "
+                        f"Number of items: {test_niid}      "
+                        f"Transactions: {test_transactions}"
+                    ),
                     "Test split information",
                 )
             if val_inter is not None:
+                val_nuid, val_niid = val_inter.get_dims()
+                val_transactions = val_inter.get_transactions()
                 logger.stat_msg(
-                    f"Number of users: {val_set[self._user_label].nunique()}      "
-                    f"Number of items: {val_set[self._item_label].nunique()}",
+                    (
+                        f"Number of users: {val_nuid}      "
+                        f"Number of items: {val_niid}      "
+                        f"Transactions: {val_transactions}"
+                    ),
                     "Validation split information",
                 )
 

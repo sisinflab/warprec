@@ -270,6 +270,7 @@ class TemporalSplit(AbstractStrategy):
         # Calculate index where to split
         user_counts = data[user_label].value_counts().sort_index()
         split_indices: DataFrame = np.floor(user_counts * (1 - test_size)).astype(int)
+        split_indices[split_indices == 0] = 1  # Ensure at least one element in train
 
         # Generate a mask to efficiently split data
         split_mask = (
