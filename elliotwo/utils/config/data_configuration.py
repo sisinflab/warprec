@@ -68,7 +68,7 @@ class DataConfig(BaseModel):
     experiment_path: Optional[str] = "./experiments/"
     sep: Optional[str] = ","
     rating_type: RatingType
-    batch_size: Optional[int] = None
+    batch_size: Optional[int] = 1024
     labels: Labels = Field(default_factory=Labels)
     dtypes: CustomDtype = Field(default_factory=CustomDtype)
 
