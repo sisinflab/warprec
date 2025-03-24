@@ -131,7 +131,7 @@ class LocalWriter(AbstractWriter):
             top_k (List[int]): The list of top_k, or cutoffs, to retrieve from dictionary.
         """
         _path = join(self._experiment_evaluation_dir, model_name)
-        if self._config.splitter.validation:
+        if self._config.splitter and self._config.splitter.validation:
             _val_path = _path + "_Validation" + self._config.general.recommendation.ext
             df = self._result_to_dataframe(
                 result_dict["Validation"], metric_names, top_k
