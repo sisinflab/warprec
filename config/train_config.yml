@@ -42,7 +42,7 @@ models:
   #  alpha: [0.1, 0.2, 0.5]
 evaluation:
   top_k: [10, 20, 50]
-  metrics: [AUC, HitRate, nDCG, Precision, PopREO, ItemCoverage, Gini, EPC, MAE, MSE, RMSE]
+  metrics: [nDCG, Precision, Recall, HitRate]
   beta: 1
   pop_ratio: 0.8
 general:

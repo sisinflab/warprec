@@ -12,14 +12,56 @@ from elliotwo.utils.registry import metric_registry
 class GAUC(BaseMetric):
     """Computes Group Area Under the ROC Curve (GAUC) using the following approach:
 
-    1. For each user, sorts items by predicted score descending
-    2. For each positive item in the sorted list:
-       - Calculates its rank position (effective_rank)
-       - Counts how many positives precede it (progressive_position)
-       - Applies formula: (N - rank + pos_count) / N
-       Where N = total_negative_items = (total_items - train_items - target_positives + 1)
+    Matrix computation of the metric:
+        PREDS                   TARGETS
+    +---+---+---+---+       +---+---+---+---+
+    | 8 | 2 | 7 | 2 |       | 1 | 0 | 1 | 0 |
+    | 5 | 4 | 3 | 9 |       | 0 | 0 | 1 | 1 |
+    +---+---+---+---+       +---+---+---+---+
 
-    Final GAUC is averaged for each user based on positive hits.
+    We sort the entire prediction matrix and retrieve the column index:
+        SORT PREDS
+    +---+---+---+---+
+    | 0 | 2 | 1 | 3 |
+    | 3 | 0 | 1 | 2 |
+    +---+---+---+---+
+
+    then we extract the relevance (original score) for that user in that column:
+        SORT REL
+    +---+---+---+---+
+    | 1 | 1 | 0 | 0 |
+    | 1 | 0 | 0 | 1 |
+    +---+---+---+---+
+
+    For each user, we compute the negative samples as:
+        neg_samples = num_items - train_set - target_set + 1
+
+    the +1 is added to avoid division by zero. The training set
+    is extracted from the prediction, which is masked with negative infinite
+    in place of the positive samples. The target set is the sum of the
+    positive samples for each user.
+
+    We compute the effective extracting the column indices of the sorted relevance:
+      EFFECTIVE RANK
+    +---+---+---+---+
+    | 0 | 1 | 0 | 0 |
+    | 0 | 0 | 0 | 3 |
+    +---+---+---+---+
+
+    the progressive rank is calculated as the cumulative sum of the sorted relevance:
+     PROGRESSIVE RANK
+    +---+---+---+---+
+    | 1 | 2 | 0 | 0 |
+    | 1 | 0 | 0 | 2 |
+    +---+---+---+---+
+
+    the AUC scores are computed as follows:
+        AUC_{ui} = (neg_samples_{u} - effective_rank_{ui} + progressive_rank_{ui}) / neg_samples_{u}
+
+    The final GAUC is the sum of all AUC normalized by the number of positive samples per user:
+        GAUC = sum_{u=1}^{n_users} sum_{i=1}^{items} AUC_{ui} / positives_{u}
+
+    For further details, please refer to this `paper <https://www.ijcai.org/Proceedings/2019/0319.pdf>`_.
 
     Attributes:
         gauc (Tensor): The gauc value across all users.

@@ -1,4 +1,4 @@
-# pylint: disable=arguments-differ, unused-argument
+# pylint: disable=arguments-differ, unused-argument, line-too-long
 from typing import Any
 
 import torch
@@ -11,6 +11,37 @@ from elliotwo.utils.registry import metric_registry
 class Recall(TopKMetric):
     """The Recall@k counts the number of item retrieve correctly,
         over the total number of relevant item in the ground truth.
+
+    The metric formula is defined as:
+        Recall@k = sum_{u=1}^{n_users} sum_{i=1}^{k} rel_{u,i} / (n_items * n_users)
+
+    where:
+        - rel_{u,i} is the relevance of the i-th item for user u.
+
+    Matrix computation of the metric:
+        PREDS                   TARGETS
+    +---+---+---+---+       +---+---+---+---+
+    | 8 | 2 | 7 | 2 |       | 1 | 0 | 1 | 0 |
+    | 5 | 4 | 3 | 9 |       | 0 | 0 | 1 | 1 |
+    +---+---+---+---+       +---+---+---+---+
+
+    We extract the top-k predictions and get their column index. Let's assume k=2:
+      TOP-K
+    +---+---+
+    | 0 | 2 |
+    | 3 | 0 |
+    +---+---+
+
+    then we extract the relevance (original score) for that user in that column:
+       REL
+    +---+---+
+    | 0 | 1 |
+    | 1 | 0 |
+    +---+---+
+
+    Recall@2 = (1 + 1) / (2 * 4) = 0.25
+
+    For further details, please refer to this `link <https://en.wikipedia.org/wiki/Precision_and_recall>`_.
 
     Attributes:
         correct (Tensor): The number of hits in the top-k recommendations.

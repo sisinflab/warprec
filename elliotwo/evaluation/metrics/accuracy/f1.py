@@ -1,4 +1,4 @@
-# pylint: disable=arguments-differ, unused-argument
+# pylint: disable=arguments-differ, unused-argument, line-too-long
 from typing import Any
 
 import torch
@@ -13,11 +13,16 @@ class F1(TopKMetric):
     between the two to evaluate the relevance of the top-k recommended items.
 
     This implementation follows the standard F1 formula:
-        F1 = (1 + beta^2) * (precision * recall) / (beta^2 * precision + recall)
+        F1@k = (1 + beta^2) * (Precision@k * Recall@k) / (beta^2 * Precision@k + Recall@k)
 
-    Where:
-        precision = (true positive) / (true positive + false positive)
-        recall = (true positive) / (true positive + false negative)
+    where:
+        Precision@k = sum_{u=1}^{n_users} sum_{i=1}^{k} rel_{u,i} / (k * n_users)
+        Recall@k = sum_{u=1}^{n_users} sum_{i=1}^{k} rel_{u,i} / (n_items * n_users)
+
+    For the matrix computation of the metric, please refer to the Precision@k and Recall@k classes.
+
+    For further details, please refer to this `book <https://link.springer.com/chapter/10.1007/978-1-4899-7637-6_8>`_
+    and this `link <https://en.wikipedia.org/wiki/Precision_and_recall>`_.
 
     Attributes:
         correct (Tensor): The number of hits in the top-k recommendations.

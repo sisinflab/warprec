@@ -1,4 +1,4 @@
-# pylint: disable=arguments-differ, unused-argument
+# pylint: disable=arguments-differ, unused-argument, line-too-long
 from typing import Any
 
 import torch
@@ -17,6 +17,55 @@ class nDCG(TopKMetric):
     The IDCG@k represent the Ideal Discounted Cumulative Gain,
         which measures the maximum gain possible
         obtainable by a perfect model.
+
+    The metric formula is defined as:
+        nDCG@k = DCG@k / IDCG@k
+
+    where:
+        - DCG@k = sum_{i=1}^{k} (2^rel_i - 1) / log2(i + 1)
+        - IDCG@k = sum_{i=1}^{k} (2^ideal_rel_i - 1) / log2(i + 1)
+
+    Matrix computation of the metric:
+        PREDS                   TARGETS
+    +---+---+---+---+       +---+---+---+---+
+    | 8 | 2 | 7 | 2 |       | 3 | 0 | 1 | 0 |
+    | 5 | 4 | 3 | 9 |       | 0 | 0 | 2 | 5 |
+    +---+---+---+---+       +---+---+---+---+
+
+    We extract the top-k predictions and get their column index. Let's assume k=2:
+      TOP-K
+    +---+---+
+    | 0 | 2 |
+    | 3 | 0 |
+    +---+---+
+
+    then we extract the relevance (original score) for that user in that column:
+       REL
+    +---+---+
+    | 0 | 1 |
+    | 5 | 0 |
+    +---+---+
+
+    The relevance considered for the nDCG score is discounted as 2^(rel + 1) - 1.
+       REL
+    +----+---+
+    | 0  | 3 |
+    | 63 | 0 |
+    +----+---+
+
+    The ideal relevance is computed by taking the top-k items from the target tensor:
+    IDEAL REL
+    +----+---+
+    | 15 | 3 |
+    | 63 | 7 |
+    +----+---+
+
+    then we compute the DCG and IDCG scores, using the discount:
+    DCG@2 = 3 / log2(2 + 1) + 63 / log2(1 + 1) = 64.89
+    IDCG@2 = 15 / log2(1 + 1) + 3 / log2(2 + 1) + 63 / log2(1 + 1) + 7 / log2(2 + 1) = 84.30
+    nDCG@2 = 64.89 / 84.30 = 0.77
+
+    For further details, please refer to this `link <https://en.wikipedia.org/wiki/Discounted_cumulative_gain>`_.
 
     Attributes:
         ndcg (Tensor): The total value of ndcg per user.
@@ -41,6 +90,7 @@ class nDCG(TopKMetric):
 
     def update(self, preds: Tensor, target: Tensor):
         """Updates the metric state with the new batch of predictions."""
+        # The discounted relevance is computed as 2^(rel + 1) - 1
         target = torch.where(target > 0, 2 ** (target + 1) - 1, target)
         top_k = torch.topk(preds, self.k, dim=1, largest=True, sorted=True).indices
         rel = torch.gather(target, 1, top_k).float()

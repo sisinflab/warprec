@@ -1,4 +1,4 @@
-# pylint: disable=arguments-differ, unused-argument
+# pylint: disable=arguments-differ, unused-argument, line-too-long
 from typing import Any
 
 import torch
@@ -12,6 +12,52 @@ class MAR(TopKMetric):
     """Mean Average Recall (MAR) at K.
 
     MAR@K calculates the mean of the Average Recall for all users.
+
+    The metric formula is defined as:
+        MAR@K = sum_{u=1}^{n_users} sum_{i=1}^{k} (R@i * rel_{u,i}) / n_users
+
+    where:
+        - R@i is the recall at i-th position.
+        - rel_{u,i} is the relevance of the i-th item for user u.
+
+    Matrix computation of the metric:
+        PREDS                   TARGETS
+    +---+---+---+---+       +---+---+---+---+
+    | 8 | 2 | 7 | 2 |       | 1 | 0 | 1 | 0 |
+    | 5 | 4 | 3 | 9 |       | 0 | 0 | 1 | 1 |
+    +---+---+---+---+       +---+---+---+---+
+
+    We extract the top-k predictions and get their column index. Let's assume k=2:
+      TOP-K
+    +---+---+
+    | 0 | 2 |
+    | 3 | 0 |
+    +---+---+
+
+    then we extract the relevance (original score) for that user in that column:
+       REL
+    +---+---+
+    | 0 | 1 |
+    | 1 | 0 |
+    +---+---+
+
+    The recall at i-th position is calculated as the sum of the relevant items
+    divided by the number of relevant items:
+       RECALL
+    +----+----+
+    | 0  | .5 |
+    | .5 | 0  |
+    +----+----+
+
+    the normalization is the minimum between the number of relevant items and k:
+    NORMALIZATION
+    +---+---+
+    | 2 | 2 |
+    +---+---+
+
+    MAR@2 = 0.5 / 2 + 0.5 / 2 = 0.5
+
+    For further details, please refer to this `link <https://sdsawtelle.github.io/blog/output/mean-average-precision-MAP-for-recommender-systems.html#So-Why-Did-I-Bother-Defining-Recall?>`_.
 
     Attributes:
         ar_sum (Tensor): The average recall tensor.
@@ -42,12 +88,14 @@ class MAR(TopKMetric):
         top_k = torch.topk(preds, self.k, dim=1).indices
         rel = torch.gather(target, 1, top_k)
 
-        recall_at_i = rel.cumsum(dim=1) / target.sum(dim=1).unsqueeze(1).clamp(min=1)
+        recall_at_i = rel.cumsum(dim=1) / target.sum(dim=1).unsqueeze(1).clamp(
+            min=1
+        )  # [batch_size, k]
         normalization = torch.minimum(
             target.sum(dim=1),
             torch.tensor(self.k, dtype=target.dtype, device=target.device),
-        )
-        ar = (recall_at_i * rel).sum(dim=1) / normalization
+        )  # [batch_size]
+        ar = (recall_at_i * rel).sum(dim=1) / normalization  # [batch_size]
 
         self.ar_sum += ar.sum()
         self.users += target.shape[0]

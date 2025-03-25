@@ -1,4 +1,4 @@
-# pylint: disable=arguments-differ, unused-argument
+# pylint: disable=arguments-differ, unused-argument, line-too-long
 from typing import Any
 
 import torch
@@ -12,7 +12,36 @@ class HitRate(TopKMetric):
     """The HitRate@k metric counts the number of users for which
         the model retrieved at least one item.
 
-    This is normalized by the total number of users.
+    The metric formula is defined as:
+        HitRate@k = number_of_hits / n_users
+
+    where:
+        - number_of_hits is the number of users for which the model retrieved at least one item,
+
+    Matrix computation of the metric:
+        PREDS                   TARGETS
+    +---+---+---+---+       +---+---+---+---+
+    | 8 | 2 | 7 | 2 |       | 1 | 0 | 1 | 0 |
+    | 5 | 4 | 3 | 9 |       | 0 | 0 | 1 | 1 |
+    +---+---+---+---+       +---+---+---+---+
+
+    We extract the top-k predictions and get their column index. Let's assume k=2:
+      TOP-K
+    +---+---+
+    | 0 | 2 |
+    | 3 | 0 |
+    +---+---+
+
+    then we extract the relevance (original score) for that user in that column:
+       REL
+    +---+---+
+    | 0 | 1 |
+    | 1 | 0 |
+    +---+---+
+
+    HitRate@2 = (1 + 1) / 2 = 1.0
+
+    For further details, please refer to this `link <https://en.wikipedia.org/wiki/Hit_rate>`_.
 
     Attributes:
         hits (Tensor): The number of hits in the top-k recommendations.
