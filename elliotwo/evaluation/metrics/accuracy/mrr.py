@@ -73,9 +73,7 @@ class MRR(TopKMetric):
 
     def update(self, preds: Tensor, target: Tensor):
         """Updates the MRR metric state with a batch of predictions."""
-        target = target.clone()
-        target[target > 0] = 1
-
+        target = self.binary_relevance(target)
         top_k = torch.topk(preds, self.k, dim=1).indices
         rel = torch.gather(target, 1, top_k)
 

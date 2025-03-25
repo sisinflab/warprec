@@ -15,6 +15,28 @@ class BaseMetric(Metric, ABC):
     def compute(self):
         pass
 
+    def binary_relevance(self, target: Tensor) -> Tensor:
+        """Compute the binary relevance tensor.
+
+        Args:
+            target (Tensor): The target tensor.
+
+        Returns:
+            Tensor: The binary relevance tensor.
+        """
+        return target.clone().clamp(max=1)
+
+    def discounted_relevance(self, target: Tensor) -> Tensor:
+        """Compute the discounted relevance tensor.
+
+        Args:
+            target (Tensor): The target tensor.
+
+        Returns:
+            Tensor: The discounted relevance tensor.
+        """
+        return torch.where(target > 0, 2 ** (target + 1) - 1, target)
+
     def compute_head_tail(
         self, train_set: csr_matrix, pop_ratio: float = 0.8
     ) -> Tuple[Tensor, Tensor]:

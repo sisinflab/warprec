@@ -91,7 +91,7 @@ class nDCG(TopKMetric):
     def update(self, preds: Tensor, target: Tensor):
         """Updates the metric state with the new batch of predictions."""
         # The discounted relevance is computed as 2^(rel + 1) - 1
-        target = torch.where(target > 0, 2 ** (target + 1) - 1, target)
+        target = self.discounted_relevance(target)
         top_k = torch.topk(preds, self.k, dim=1, largest=True, sorted=True).indices
         rel = torch.gather(target, 1, top_k).float()
         ideal_rel = torch.topk(target, self.k, dim=1, largest=True, sorted=True).values

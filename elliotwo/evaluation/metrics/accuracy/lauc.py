@@ -101,8 +101,7 @@ class LAUC(TopKMetric):
 
     def update(self, preds: Tensor, target: Tensor):
         """Updates the metric state with the new batch of predictions."""
-        target = target.clone()
-        target[target > 0] = 1
+        target = self.binary_relevance(target)
 
         # Negative samples
         train_set = torch.isinf(preds).logical_and(preds < 0).sum(dim=1)  # [batch_size]
