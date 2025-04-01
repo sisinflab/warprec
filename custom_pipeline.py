@@ -5,7 +5,7 @@ from elliotwo.utils.enums import SplittingStrategies, RatingType
 def main():
     # Writer module testing
     writer = LocalReader()
-    data = writer.read("tests/test_dataset/movielens.csv")
+    data = writer.read("tests/test_dataset/movielens.csv", sep=",")
 
     splitter = Splitter()
     dataset = splitter.split_transaction(

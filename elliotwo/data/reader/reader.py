@@ -28,7 +28,7 @@ class AbstractReader(ABC):
     TODO: Use Factory Pattern for different reader.
     """
 
-    config: Configuration
+    config: Configuration = None
 
     @abstractmethod
     def read(self, **kwargs: Any) -> DataFrame:
@@ -60,7 +60,6 @@ class LocalReader(AbstractReader):
         local_path: str = None,
         rating_type: RatingType = RatingType.IMPLICIT,
         sep: str = "\t",
-        ext: str = ".tsv",
         batch_size: int = 1024,
         column_names: List[str] | None = None,
         dtypes: List[str] | None = None,
@@ -72,7 +71,6 @@ class LocalReader(AbstractReader):
             local_path (str): The path to the local file.
             rating_type (RatingType): The rating type used in the dataset.
             sep (str): The separator used in the file.
-            ext (str): The extension used in the file.
             batch_size (int): The batch size that will be used to
                 iterate over the interactions.
             column_names (List[str] | None): The column names of the data.
@@ -85,15 +83,21 @@ class LocalReader(AbstractReader):
         if self.config:
             read_config = self.config.reader
         else:
+            if not column_names:
+                column_names = ["user_id", "item_id", "rating", "timestamp"]
+            if not dtypes:
+                dtypes = ["int32", "int32", "float32", "int32"]
+            dtypes_map = {name: dtype for name, dtype in zip(column_names, dtypes)}
+
             read_config = ReaderConfig(
                 loading_strategy="dataset",
                 data_type="transaction",
                 reading_method=ReadingMethods.LOCAL,
                 local_path=local_path,
                 rating_type=rating_type,
-                labels=Labels(*column_names),
-                dtypes=CustomDtype(*dtypes),
-                reading_params=ReadingParams(ext=ext, sep=sep, batch_size=batch_size),
+                labels=Labels.from_list(column_names),
+                dtypes=CustomDtype(**dtypes_map),
+                reading_params=ReadingParams(sep=sep, batch_size=batch_size),
             )
 
         logger.msg(

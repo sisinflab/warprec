@@ -43,12 +43,10 @@ class ReadingParams(BaseModel):
     This class reads all the information needed to read the data correctly.
 
     Attributes:
-        ext (Optional[str]): The extension of the file to read.
         sep (Optional[str]): The separator of the file to read.
         batch_size (Optional[int]): The batch size used during the reading process.
     """
 
-    ext: Optional[str] = ".tsv"
     sep: Optional[str] = "\t"
     batch_size: Optional[int] = 1024
 
@@ -82,6 +80,17 @@ class Labels(BaseModel):
     item_id_label: Optional[str] = "item_id"
     rating_label: Optional[str] = "rating"
     timestamp_label: Optional[str] = "timestamp"
+
+    @classmethod
+    def from_list(cls, labels: List[str]):
+        if not isinstance(labels, list) | len(labels) != 4:
+            raise ValueError("Input must be a list of length 4.")
+        return cls(
+            user_id_label=labels[0],
+            item_id_label=labels[1],
+            rating_label=labels[2],
+            timestamp_label=labels[3],
+        )
 
 
 class CustomDtype(BaseModel):
