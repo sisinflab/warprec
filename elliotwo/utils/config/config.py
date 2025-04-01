@@ -1,5 +1,5 @@
 import os
-from typing import Tuple, List, ClassVar, Dict
+from typing import Tuple, ClassVar, Dict
 from copy import deepcopy
 
 import yaml
@@ -32,8 +32,6 @@ class Configuration(BaseModel):
             in the format {model_name: dict{param_1: value, param_2: value, ...}, ...}
         evaluation (EvaluationConfig): Configuration of the evaluation process.
         general (GeneralConfig): General configuration of the experiment
-        column_map_dtype (ClassVar[dict]): The mapping between the string dtype
-            and their numpy counterpart.
         sparse_np_dtype (ClassVar[dict]): The mapping between the string dtype
             and their numpy sparse counterpart.
         sparse_torch_dtype (ClassVar[dict]): The mapping between the string dtype
@@ -46,17 +44,6 @@ class Configuration(BaseModel):
     models: Dict[str, dict]
     evaluation: EvaluationConfig
     general: GeneralConfig = None
-
-    # Supported dtype
-    column_map_dtype: ClassVar[dict] = {
-        "int8": np.int8,
-        "int16": np.int16,
-        "int32": np.int32,
-        "int64": np.int64,
-        "float32": np.float32,
-        "float64": np.float64,
-        "str": np.str_,
-    }
 
     # Supported sparse precisions in numpy
     sparse_np_dtype: ClassVar[dict] = {
@@ -158,7 +145,6 @@ class Configuration(BaseModel):
                 )
 
         # Final checks and parsing
-        self.check_column_dtype()
         self.check_precision()
         self.models = self.parse_models()
 
@@ -187,50 +173,6 @@ class Configuration(BaseModel):
 
             parsed_models[model_name] = model_class.model_dump()
         return parsed_models
-
-    def check_column_dtype(self) -> None:
-        """This method validates the custom dtype passed with the configuration file.
-
-        Raises:
-            ValueError: If the dtype are not supported or incorrect.
-        """
-        for dtype_str in self.reader.dtypes.model_dump().values():
-            if dtype_str not in self.column_map_dtype:
-                raise ValueError(
-                    f"Custom dtype {dtype_str} not supported as a column data type."
-                )
-
-    def column_dtype(self) -> List[np.dtype]:
-        """This method will parse the dtype from the string forma to their numpy counterpart.
-
-        Returns:
-            List[np.dtype]: A list containing the dtype to use for data loading.
-        """
-        column_dtypes = [
-            self.reader.dtypes.user_id_type,
-            self.reader.dtypes.item_id_type,
-        ]
-        if self.reader.rating_type == RatingType.EXPLICIT:
-            column_dtypes.append(self.reader.dtypes.rating_type)
-        if self.splitter and self.splitter.strategy == SplittingStrategies.TEMPORAL:
-            column_dtypes.append(self.reader.dtypes.timestamp_type)
-        return [self.column_map_dtype[dtype] for dtype in column_dtypes]
-
-    def column_names(self) -> List[str]:
-        """This method returns the names of the column passed through configuration.
-
-        Returns:
-            List[str]: The list of column names.
-        """
-        column_names = [
-            self.reader.labels.user_id_label,
-            self.reader.labels.item_id_label,
-        ]
-        if self.reader.rating_type == RatingType.EXPLICIT:
-            column_names.append(self.reader.labels.rating_label)
-        if self.splitter and self.splitter.strategy == SplittingStrategies.TEMPORAL:
-            column_names.append(self.reader.labels.timestamp_label)
-        return column_names
 
     def check_precision(self) -> None:
         """This method checks the precision passed through configuration.

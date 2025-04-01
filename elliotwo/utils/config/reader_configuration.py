@@ -1,5 +1,6 @@
-from typing import Optional
+from typing import Optional, List, ClassVar, Dict
 
+import numpy as np
 from pydantic import BaseModel, Field, field_validator, model_validator
 from elliotwo.utils.enums import RatingType, ReadingMethods
 from elliotwo.utils.logger import logger
@@ -14,11 +15,13 @@ class SplitReading(BaseModel):
         local_path (Optional[str | None]): The directory where the splits are saved.
         ext (Optional[str]): The extension of the split files.
         sep (Optional[str]): The separator of the split files.
+        batch_size (Optional[int]): The batch size values used in the split dataset.
     """
 
     local_path: Optional[str | None] = None
     ext: Optional[str] = ".tsv"
     sep: Optional[str] = "\t"
+    batch_size: Optional[int] = 1024
 
     @field_validator("sep")
     @classmethod
@@ -106,24 +109,37 @@ class ReaderConfig(BaseModel):
         loading_strategy (str): The strategy to use to load the data. Can be 'dataset' or 'split'.
         data_type (str): The type of data to be loaded. Can be 'transaction'.
         reading_method (ReadingMethods): The strategy used to read the data.
-        local_path (Optional[str]): The path to the local dataset.
+        local_path (Optional[str | None]): The path to the local dataset.
         rating_type (RatingType): The type of rating to be used. If 'implicit' is chosen,
             the reader will not look for a score.
         reading_params (Optional[ReadingParams]): The parameters of the reading process.
         split (Optional[SplitReading]): The information of the split reading process.
         labels (Labels): The labels sub-configuration. Defaults to Labels default values.
         dtypes (CustomDtype): The list of column dtype.
+        column_map_dtype (ClassVar[dict]): The mapping between the string dtype
+            and their numpy counterpart.
     """
 
     loading_strategy: str
     data_type: str
     reading_method: ReadingMethods
-    local_path: Optional[str] = None
+    local_path: Optional[str | None] = None
     rating_type: RatingType
     reading_params: Optional[ReadingParams] = Field(default_factory=ReadingParams)
     split: Optional[SplitReading] = Field(default_factory=SplitReading)
     labels: Labels = Field(default_factory=Labels)
     dtypes: CustomDtype = Field(default_factory=CustomDtype)
+
+    # Supported dtype
+    column_map_dtype: ClassVar[dict] = {
+        "int8": np.int8,
+        "int16": np.int16,
+        "int32": np.int32,
+        "int64": np.int64,
+        "float32": np.float32,
+        "float64": np.float64,
+        "str": np.str_,
+    }
 
     @field_validator("loading_strategy")
     @classmethod
@@ -173,4 +189,51 @@ class ReaderConfig(BaseModel):
                 "You have chosen dataset loading strategy but the split_dir field "
                 "has been filled. Check your configuration file for possible errors."
             )
+
+        # Final checks and parsing
+        self.check_column_dtype()
+
         return self
+
+    def column_names(self) -> List[str]:
+        """This method returns the names of the column passed through configuration.
+
+        Returns:
+            List[str]: The list of column names.
+        """
+        return [
+            self.labels.user_id_label,
+            self.labels.item_id_label,
+            self.labels.rating_label,
+            self.labels.timestamp_label,
+        ]
+
+    def column_dtype(self) -> Dict[str, np.dtype]:
+        """This method will parse the dtype from the string forma to their numpy counterpart.
+
+        Returns:
+            Dict[str, np.dtype]: A list containing the dtype to use for data loading.
+        """
+        column_names = self.column_names()
+        column_dtypes = [
+            self.dtypes.user_id_type,
+            self.dtypes.item_id_type,
+            self.dtypes.rating_type,
+            self.dtypes.timestamp_type,
+        ]
+        return {
+            name: self.column_map_dtype[dtype]
+            for name, dtype in zip(column_names, column_dtypes)
+        }
+
+    def check_column_dtype(self) -> None:
+        """This method validates the custom dtype passed with the configuration file.
+
+        Raises:
+            ValueError: If the dtype are not supported or incorrect.
+        """
+        for dtype_str in self.dtypes.model_dump().values():
+            if dtype_str not in self.column_map_dtype:
+                raise ValueError(
+                    f"Custom dtype {dtype_str} not supported as a column data type."
+                )

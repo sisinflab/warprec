@@ -13,7 +13,7 @@ from elliotwo.utils.config import Configuration
 from elliotwo.data.dataset import AbstractDataset
 from elliotwo.recommenders.abstract_recommender import AbstractRecommender
 from elliotwo.utils.enums import WritingMethods
-from elliotwo.utils.config import WriterConfig, WritingResultConfig
+from elliotwo.utils.config import WriterConfig, WritingParams
 from elliotwo.utils.logger import logger
 
 
@@ -84,23 +84,15 @@ class LocalWriter(AbstractWriter):
     ):
         if config:
             self.config = config
-
-            # Setup experiment information from config
-            self.experiment_name = config.writer.dataset_name
-            self.local_path = config.writer.local_experiment_path
-            self.setup = config.writer.setup_experiment
+            writer_params = config.writer
         else:
             # Setup experiment information from args
-            self.experiment_name = dataset_name
-            self.local_path = local_path
-            self.setup = setup
-
-        writer_params = WriterConfig(
-            dataset_name=self.experiment_name,
-            writing_method=WritingMethods.LOCAL,
-            local_experiment_path=self.local_path,
-            setup_experiment=self.setup,
-        )
+            writer_params = WriterConfig(
+                dataset_name=dataset_name,
+                writing_method=WritingMethods.LOCAL,
+                local_experiment_path=local_path,
+                setup_experiment=setup,
+            )
 
         self._timestamp = str(int(time.time() * 1000))
         self.experiment_path = Path(
@@ -164,22 +156,18 @@ class LocalWriter(AbstractWriter):
             ext (str): The extension of the file.
         """
         if self.config:
-            _sep = self.config.writer.result.sep
-            _ext = self.config.writer.result.ext
+            writing_params = self.config.writer.writing_params
         else:
-            _sep = sep
-            _ext = ext
-
-        result_params = WritingResultConfig(sep=_sep, ext=_ext)
+            writing_params = WritingParams(sep=sep, ext=ext)
 
         _path = join(self.experiment_evaluation_dir, model_name)
         if validation:
-            _path = _path + "_Validation" + result_params.ext
+            _path = _path + "_Validation" + writing_params.ext
         else:
-            _path = _path + "_Test" + result_params.ext
+            _path = _path + "_Test" + writing_params.ext
 
         df = self._result_to_dataframe(result_dict, metric_names, top_k)
-        df.to_csv(_path, sep=result_params.sep)
+        df.to_csv(_path, sep=writing_params.sep)
 
     def _result_to_dataframe(
         self, result_dict: dict, metric_names: List[str], top_k: List[int]
@@ -227,33 +215,25 @@ class LocalWriter(AbstractWriter):
             item_label (str): The label of the item data.
         """
         if self.config:
-            _sep = self.config.writer.result.sep
-            _ext = self.config.writer.result.ext
-            _user_label = self.config.writer.result.user_label
-            _item_label = self.config.writer.result.item_label
+            writing_params = self.config.writer.writing_params
         else:
-            _sep = sep
-            _ext = ext
-            _user_label = user_label
-            _item_label = item_label
-
-        result_params = WritingResultConfig(
-            sep=_sep, ext=_ext, user_label=_user_label, item_label=_item_label
-        )
+            writing_params = WritingParams(
+                sep=sep, ext=ext, user_label=user_label, item_label=item_label
+            )
 
         # experiment_path/recs/model_name.{custom_extension}
         _path = join(
             self.experiment_recommendation_dir,
-            model_name + result_params.ext,
+            model_name + writing_params.ext,
         )
 
         # Save in path
         recs.to_csv(
             _path,
-            sep=result_params.sep,
+            sep=writing_params.sep,
             header=[
-                result_params.user_label,
-                result_params.item_label,
+                writing_params.user_label,
+                writing_params.item_label,
             ],
             index=None,
         )
@@ -279,28 +259,26 @@ class LocalWriter(AbstractWriter):
             ext (str): The extension that will be used to write the results.
         """
         if self.config:
-            _sep = self.config.writer.result.sep
-            _ext = self.config.writer.result.ext
+            writing_params = self.config.writer.writing_params
         else:
-            _sep = sep
-            _ext = ext
+            writing_params = WritingParams(sep=sep, ext=ext)
 
-        result_params = WritingResultConfig(sep=_sep, ext=_ext)
-
-        path_train = join(self.experiment_split_dir, "train" + result_params.ext)
-        path_test = join(self.experiment_split_dir, "test" + result_params.ext)
-        path_val = join(self.experiment_split_dir, "val" + result_params.ext)
+        path_train = join(self.experiment_split_dir, "train" + writing_params.ext)
+        path_test = join(self.experiment_split_dir, "test" + writing_params.ext)
+        path_val = join(self.experiment_split_dir, "val" + writing_params.ext)
 
         if dataset.train_set is not None:
             dataset.train_set.get_df().to_csv(
-                path_train, sep=result_params.sep, index=None
+                path_train, sep=writing_params.sep, index=None
             )
         if dataset.test_set is not None:
             dataset.test_set.get_df().to_csv(
-                path_test, sep=result_params.sep, index=None
+                path_test, sep=writing_params.sep, index=None
             )
         if dataset.val_set is not None:
-            dataset.val_set.get_df().to_csv(path_val, sep=result_params.sep, index=None)
+            dataset.val_set.get_df().to_csv(
+                path_val, sep=writing_params.sep, index=None
+            )
 
     def checkpoint_from_ray(self, source: str, new_name: str):
         destination = join(self.experiment_serialized_models_dir, new_name + ".pth")

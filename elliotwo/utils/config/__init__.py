@@ -1,6 +1,12 @@
 from .general_configuration import GeneralConfig
-from .reader_configuration import ReaderConfig
-from .writer_configuration import WriterConfig, WritingResultConfig
+from .reader_configuration import (
+    ReaderConfig,
+    Labels,
+    CustomDtype,
+    ReadingParams,
+    SplitReading,
+)
+from .writer_configuration import WriterConfig, WritingParams
 from .splitter_configuration import SplittingConfig
 from .model_configuration import RecomModel
 from .evaluation_configuration import EvaluationConfig
@@ -13,8 +19,12 @@ __all__ = [
     "parse_params",
     "GeneralConfig",
     "ReaderConfig",
+    "Labels",
+    "CustomDtype",
+    "ReadingParams",
+    "SplitReading",
     "WriterConfig",
-    "WritingResultConfig",
+    "WritingParams",
     "SplittingConfig",
     "RecomModel",
     "EvaluationConfig",

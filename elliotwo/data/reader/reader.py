@@ -5,27 +5,30 @@ from pathlib import Path
 
 import pandas as pd
 import joblib
-import numpy as np
 from pandas import DataFrame
 from elliotwo.data.dataset import Interactions, TransactionDataset
-from elliotwo.utils.config import Configuration
-from elliotwo.utils.enums import RatingType
+from elliotwo.utils.config import (
+    Configuration,
+    ReaderConfig,
+    Labels,
+    CustomDtype,
+    ReadingParams,
+    SplitReading,
+)
+from elliotwo.utils.enums import RatingType, ReadingMethods
 from elliotwo.utils.logger import logger
 
 
 class AbstractReader(ABC):
     """The abstract definition of a reader. All readers must extend this class.
 
-    Args:
-        config (Configuration): Configuration file.
-
     Attributes:
-        read_from_config (bool): Flag to check if the reader is reading from the config file.
+        config (Configuration): Configuration file.
 
     TODO: Use Factory Pattern for different reader.
     """
 
-    read_from_config: bool = False
+    config: Configuration
 
     @abstractmethod
     def read(self, **kwargs: Any) -> DataFrame:
@@ -50,32 +53,14 @@ class LocalReader(AbstractReader):
 
     def __init__(self, config: Configuration = None) -> None:
         if config:
-            self.read_from_config = True
-
-            # Retrieve the path from the config. This isn't an optional value
-            self.path = config.reader.local_path
-
-            # Check if the optional reading parameters have been set
-            self.sep = config.reader.reading_params.sep
-            self.batch_size = config.reader.reading_params.batch_size
-            self.column_names = config.column_names()
-            self.dtypes = dict(zip(self.column_names, config.column_dtype()))
-            self.rating_type = config.reader.rating_type
-
-            # Split parameters
-            self.split_dir = config.reader.split.local_path
-            self.split_ext = config.reader.split.ext
-            self.split_sep = config.reader.split.sep
-
-            # Check if the optional label parameters have been set
-            self.user_label = config.reader.labels.user_id_label
-            self.item_label = config.reader.labels.item_id_label
-            self.rating_label = config.reader.labels.rating_label
+            self.config = config
 
     def read(
         self,
         local_path: str = None,
-        sep: str = ",",
+        rating_type: RatingType = RatingType.IMPLICIT,
+        sep: str = "\t",
+        ext: str = ".tsv",
         batch_size: int = 1024,
         column_names: List[str] | None = None,
         dtypes: List[str] | None = None,
@@ -85,7 +70,9 @@ class LocalReader(AbstractReader):
 
         Args:
             local_path (str): The path to the local file.
+            rating_type (RatingType): The rating type used in the dataset.
             sep (str): The separator used in the file.
+            ext (str): The extension used in the file.
             batch_size (int): The batch size that will be used to
                 iterate over the interactions.
             column_names (List[str] | None): The column names of the data.
@@ -95,48 +82,43 @@ class LocalReader(AbstractReader):
         Returns:
             DataFrame: The data read from the local source.
         """
-        # Default values
-        column_names = (
-            column_names
-            if column_names is not None
-            else ["user_id", "item_id", "rating", "timestamp"]
-        )
-        dtypes = (
-            dtypes if dtypes is not None else ["int32", "int32", "float32", "int32"]
-        )
+        if self.config:
+            read_config = self.config.reader
+        else:
+            read_config = ReaderConfig(
+                loading_strategy="dataset",
+                data_type="transaction",
+                reading_method=ReadingMethods.LOCAL,
+                local_path=local_path,
+                rating_type=rating_type,
+                labels=Labels(*column_names),
+                dtypes=CustomDtype(*dtypes),
+                reading_params=ReadingParams(ext=ext, sep=sep, batch_size=batch_size),
+            )
 
-        # Initialize the variables to be used
-        _path = self.path if self.read_from_config else local_path
-        _sep = self.sep if self.read_from_config else sep
-        _batch_size = self.batch_size if self.read_from_config else batch_size
-        _column_names = self.column_names if self.read_from_config else column_names
-        _dtypes = (
-            self.dtypes
-            if self.read_from_config
-            else dict(zip(_column_names, map(np.dtype, dtypes)))
+        logger.msg(
+            f"Starting reading process from local source in: {read_config.local_path}"
         )
 
-        logger.msg(f"Starting reading process from local source in: {_path}")
-
-        if _batch_size is not None:
+        if read_config.reading_params.batch_size is not None:
             # In case batch_size has been set, read data in batches and then create the dataframe
             chunks = []
             for chunk in pd.read_csv(
-                _path,
-                sep=_sep,
-                chunksize=_batch_size,
-                usecols=_column_names,
-                dtype=_dtypes,
+                read_config.local_path,
+                sep=read_config.reading_params.sep,
+                chunksize=read_config.reading_params.batch_size,
+                usecols=read_config.column_names(),
+                dtype=read_config.column_dtype(),
             ):
                 chunks.append(chunk)
             data = pd.concat(chunks, ignore_index=True)
         else:
             # In case batch_size hasn't been set, read the data in one go
             data = pd.read_csv(
-                _path,
-                sep=_sep,
-                usecols=_column_names,
-                dtype=_dtypes,
+                read_config.local_path,
+                sep=read_config.reading_params.sep,
+                usecols=read_config.column_names(),
+                dtype=read_config.column_dtype(),
             )
         logger.msg("Data loaded correctly from local source.")
 
@@ -194,41 +176,25 @@ class LocalReader(AbstractReader):
         Raises:
             FileNotFoundError: If the train split file was not found.
         """
-        # Default values
-        column_names = (
-            column_names
-            if column_names is not None
-            else ["user_id", "item_id", "rating", "timestamp"]
-        )
-        dtypes = (
-            dtypes if dtypes is not None else ["int32", "int32", "float32", "int32"]
-        )
-
-        # Initialize the variables to be used
-        _split_dir = self.split_dir if self.read_from_config else split_dir
-        _sep = self.split_sep if self.read_from_config else sep
-        _ext = self.split_ext if self.read_from_config else ext
-        _batch_size = self.batch_size if self.read_from_config else batch_size
-        _column_names = self.column_names if self.read_from_config else column_names
-        _dtypes = (
-            self.dtypes
-            if self.read_from_config
-            else dict(zip(_column_names, map(np.dtype, dtypes)))
-        )
-        _user_label = self.user_label if self.read_from_config else _column_names[0]
-        _item_label = self.item_label if self.read_from_config else _column_names[1]
-        _rating_type = self.rating_type if self.read_from_config else rating_type
-        if _rating_type == RatingType.EXPLICIT:
-            _rating_label = (
-                self.rating_label if self.read_from_config else _column_names[2]
-            )
+        if self.config:
+            read_config = self.config.reader
         else:
-            _rating_label = None
+            read_config = ReaderConfig(
+                loading_strategy="dataset",
+                data_type="dataset",
+                reading_method=ReadingMethods.LOCAL,
+                rating_type=rating_type,
+                labels=Labels(*column_names),
+                dtypes=CustomDtype(*dtypes),
+                split=SplitReading(
+                    local_path=split_dir, ext=ext, sep=sep, batch_size=batch_size
+                ),
+            )
 
         # Define the paths to the split files
-        path_train = join(_split_dir, "train" + _ext)
-        path_test = join(_split_dir, "test" + _ext)
-        path_val = join(_split_dir, "val" + _ext)
+        path_train = join(read_config.split.local_path, "train" + read_config.split.ext)
+        path_test = join(read_config.split.local_path, "test" + read_config.split.ext)
+        path_val = join(read_config.split.local_path, "val" + read_config.split.ext)
 
         train_inter = None
         test_inter = None
@@ -238,32 +204,42 @@ class LocalReader(AbstractReader):
         if isfile(path_train):
             train_set = pd.read_csv(
                 path_train,
-                sep=_sep,
-                usecols=_column_names,
-                dtype=_dtypes,
+                sep=read_config.split.sep,
+                usecols=read_config.column_names(),
+                dtype=read_config.column_dtype(),
             )
-            _nuid = train_set[_user_label].nunique()
-            _niid = train_set[_item_label].nunique()
-            _umap = {user: i for i, user in enumerate(train_set[_user_label].unique())}
-            _imap = {item: i for i, item in enumerate(train_set[_item_label].unique())}
+            _nuid = train_set[read_config.labels.user_id_label].nunique()
+            _niid = train_set[read_config.labels.item_id_label].nunique()
+            _umap = {
+                user: i
+                for i, user in enumerate(
+                    train_set[read_config.labels.user_id_label].unique()
+                )
+            }
+            _imap = {
+                item: i
+                for i, item in enumerate(
+                    train_set[read_config.labels.item_id_label].unique()
+                )
+            }
             train_inter = Interactions(
                 train_set,
                 (_nuid, _niid),
                 _umap,
                 _imap,
-                batch_size=_batch_size,
-                user_id_label=_user_label,
-                item_id_label=_item_label,
-                rating_label=_rating_label,
-                rating_type=_rating_type,
+                batch_size=read_config.split.batch_size,
+                user_id_label=read_config.labels.user_id_label,
+                item_id_label=read_config.labels.item_id_label,
+                rating_label=read_config.labels.rating_label,
+                rating_type=read_config.rating_type,
             )
 
             if isfile(path_test):
                 test_set = pd.read_csv(
                     path_test,
-                    sep=_sep,
-                    usecols=_column_names,
-                    dtype=_dtypes,
+                    sep=read_config.split.sep,
+                    usecols=read_config.column_names(),
+                    dtype=read_config.column_dtype(),
                 )
 
                 test_inter = Interactions(
@@ -271,19 +247,19 @@ class LocalReader(AbstractReader):
                     (_nuid, _niid),
                     _umap,
                     _imap,
-                    batch_size=_batch_size,
-                    user_id_label=_user_label,
-                    item_id_label=_item_label,
-                    rating_label=_rating_label,
-                    rating_type=_rating_type,
+                    batch_size=read_config.split.batch_size,
+                    user_id_label=read_config.labels.user_id_label,
+                    item_id_label=read_config.labels.item_id_label,
+                    rating_label=read_config.labels.rating_label,
+                    rating_type=read_config.rating_type,
                 )
 
             if isfile(path_val):
                 val_set = pd.read_csv(
                     path_val,
-                    sep=_sep,
-                    usecols=_column_names,
-                    dtype=_dtypes,
+                    sep=read_config.split.sep,
+                    usecols=read_config.column_names(),
+                    dtype=read_config.column_dtype(),
                 )
 
                 val_inter = Interactions(
@@ -291,11 +267,11 @@ class LocalReader(AbstractReader):
                     (_nuid, _niid),
                     _umap,
                     _imap,
-                    batch_size=_batch_size,
-                    user_id_label=_user_label,
-                    item_id_label=_item_label,
-                    rating_label=_rating_label,
-                    rating_type=_rating_type,
+                    batch_size=read_config.split.batch_size,
+                    user_id_label=read_config.labels.user_id_label,
+                    item_id_label=read_config.labels.item_id_label,
+                    rating_label=read_config.labels.rating_label,
+                    rating_type=read_config.rating_type,
                 )
 
             train_nuid, train_niid = train_inter.get_dims()

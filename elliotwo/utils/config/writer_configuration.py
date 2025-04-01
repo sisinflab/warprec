@@ -6,8 +6,8 @@ from elliotwo.utils.enums import WritingMethods
 from elliotwo.utils.logger import logger
 
 
-class WritingResultConfig(BaseModel):
-    """Definition of the result writing configuration part of the configuration file.
+class WritingParams(BaseModel):
+    """Definition of the writing params sub-configuration part of the configuration file.
 
     Attributes:
         sep (str): The separator to use for the recommendation files.
@@ -44,7 +44,7 @@ class WriterConfig(BaseModel):
         local_experiment_path (Optional[str]): Path to the file containing the transaction data.
         setup_experiment (bool): Flag value for the setup of the experiment.
         save_split (Optional[bool]): Whether or not to save the splits created for later use.
-        result (WritingResultConfig): The configuration of the result writing process.
+        writing_params (WritingParams): The configuration of the result writing process.
     """
 
     dataset_name: str
@@ -52,7 +52,7 @@ class WriterConfig(BaseModel):
     local_experiment_path: Optional[str] = None
     setup_experiment: bool = True
     save_split: Optional[bool] = False
-    result: WritingResultConfig = Field(default_factory=WritingResultConfig)
+    writing_params: WritingParams = Field(default_factory=WritingParams)
 
     @model_validator(mode="after")
     def model_validation(self):
