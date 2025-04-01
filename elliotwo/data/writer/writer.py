@@ -1,4 +1,5 @@
 import time
+import shutil
 from os.path import join
 from pathlib import Path
 from typing import List
@@ -7,7 +8,6 @@ from abc import ABC, abstractmethod
 import pandas as pd
 import numpy as np
 import torch
-import shutil
 from pandas import DataFrame
 from elliotwo.utils.config import Configuration
 from elliotwo.data.dataset import AbstractDataset

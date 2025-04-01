@@ -1,10 +1,9 @@
-from typing import Tuple
+from typing import Tuple, Any
 
 import numpy as np
 from pandas import DataFrame
 from scipy.sparse import csr_matrix, coo_matrix
 from elliotwo.utils.enums import RatingType
-from elliotwo.utils.config import Configuration
 
 
 class Interactions:
@@ -12,7 +11,6 @@ class Interactions:
 
     Args:
         data (DataFrame): Transaction data in DataFrame format.
-        config (Configuration): Configuration file.
         original_dims (Tuple[int, int]):
             int: Number of users.
             int: Number of items.
@@ -20,59 +18,73 @@ class Interactions:
         item_mapping (dict): Mapping of item ID -> item idx.
         batch_size (int): The batch size that will be used to
             iterate over the interactions.
+        user_id_label (str): The label of the user ID column.
+        item_id_label (str): The label of the item ID column.
+        rating_label (str): The label of the rating column.
+        rating_type (RatingType): The type of rating to be used.
+
+    Attributes:
+        inter_dict (dict): The transaction information in the current
+            representation {user ID: {item ID: rating}}.
+        inter_df (DataFrame): The raw data in tabular format.
+        inter_sparse (csr_matrix): Sparse representation of the transactions (CSR Format).
 
     Raises:
         ValueError: If the rating type is not supported.
     """
 
+    inter_dict: dict = {}
+    inter_df: DataFrame = None
+    inter_sparse: csr_matrix = None
+
     def __init__(
         self,
         data: DataFrame,
-        config: Configuration,
         original_dims: Tuple[int, int],
         user_mapping: dict,
         item_mapping: dict,
         batch_size: int = 1024,
+        user_id_label: str = "user_id",
+        item_id_label: str = "item_id",
+        rating_label: str = "rating",
+        rating_type: RatingType = RatingType.IMPLICIT,
     ) -> None:
-        self._inter_dict = {}
-        self._inter_df = data
-        self._index = 0
-        self._inter_sparse = None
-        self._config = config
+        # Setup the variables
+        self.inter_df = data
         self._batch_size = batch_size
-
-        # Retrieve information from config
-        self._rating_type = self._config.data.rating_type
-        self._user_label = self._config.data.labels.user_id_label
-        self._item_label = self._config.data.labels.item_id_label
-        self._score_label = self._config.data.labels.rating_label
+        self._user_label = user_id_label
+        self._item_label = item_id_label
+        self._rating_label = rating_label
 
         # Definition of important attributes
-        self._uid = self._inter_df[self._user_label].unique()
-        self._nuid = self._inter_df[self._user_label].nunique()
-        self._niid = self._inter_df[self._item_label].nunique()
+        self._uid = self.inter_df[user_id_label].unique()
+        self._nuid = self.inter_df[user_id_label].nunique()
+        self._niid = self.inter_df[item_id_label].nunique()
         self._og_nuid, self._og_niid = original_dims
-        self._transactions = len(self._inter_df)
+        self._transactions = len(self.inter_df)
         self._umap = user_mapping
         self._imap = item_mapping
 
+        # Set the index
+        self._index = 0
+
         # Define the interaction dictionary, based on the RatingType selected
-        if self._rating_type == RatingType.EXPLICIT:
-            self._inter_dict = (
-                self._inter_df.groupby(self._user_label)
+        if rating_type == RatingType.EXPLICIT:
+            self.inter_dict = (
+                self.inter_df.groupby(self._user_label)
                 .apply(
-                    lambda df: dict(zip(df[self._item_label], df[self._score_label]))
+                    lambda df: dict(zip(df[self._item_label], df[self._rating_label]))
                 )
                 .to_dict()
             )
-        elif self._rating_type == RatingType.IMPLICIT:
-            self._inter_dict = (
-                self._inter_df.groupby(self._user_label)[self._item_label]
+        elif rating_type == RatingType.IMPLICIT:
+            self.inter_dict = (
+                self.inter_df.groupby(self._user_label)[self._item_label]
                 .apply(lambda items: dict(zip(items, np.ones(len(items), dtype=int))))
                 .to_dict()
             )
         else:
-            raise ValueError(f"Rating type {self._rating_type} not supported.")
+            raise ValueError(f"Rating type {rating_type} not supported.")
 
     def get_dict(self) -> dict:
         """This method will return the transaction information in dict format.
@@ -81,7 +93,7 @@ class Interactions:
             dict: The transaction information in the current
                 representation {user ID: {item ID: rating}}.
         """
-        return self._inter_dict
+        return self.inter_dict
 
     def get_df(self) -> DataFrame:
         """This method will return the raw data.
@@ -89,7 +101,7 @@ class Interactions:
         Returns:
             DataFrame: The raw data in tabular format.
         """
-        return self._inter_df
+        return self.inter_df
 
     def get_sparse(self) -> csr_matrix:
         """This method retrieves the sparse representation of data.
@@ -100,8 +112,8 @@ class Interactions:
         Returns:
             csr_matrix: Sparse representation of the transactions (CSR Format).
         """
-        if isinstance(self._inter_sparse, csr_matrix):
-            return self._inter_sparse
+        if isinstance(self.inter_sparse, csr_matrix):
+            return self.inter_sparse
         return self._to_sparse()
 
     def get_dims(self) -> Tuple[int, int]:
@@ -122,23 +134,26 @@ class Interactions:
         """
         return self._transactions
 
-    def _to_sparse(self) -> csr_matrix:
+    def _to_sparse(self, precision: Any | None = None) -> csr_matrix:
         """This method will create the sparse representation of the data contained.
 
         This method must not be called if the sparse representation has already be defined.
 
+        Args:
+            precision (Any | None): The precision of the sparse matrix.
+
         Returns:
             csr_matrix: Sparse representation of the transactions (CSR Format).
         """
-        users = self._inter_df[self._user_label].map(self._umap).values
-        items = self._inter_df[self._item_label].map(self._imap).values
-        ratings = self._inter_df[self._score_label].values
-        self._inter_sparse = coo_matrix(
+        users = self.inter_df[self._user_label].map(self._umap).values
+        items = self.inter_df[self._item_label].map(self._imap).values
+        ratings = self.inter_df[self._rating_label].values
+        self.inter_sparse = coo_matrix(
             (ratings, (users, items)),
             shape=(self._og_nuid, self._og_niid),
-            dtype=self._config.precision_numpy(),
+            dtype=precision,
         ).tocsr()
-        return self._inter_sparse
+        return self.inter_sparse
 
     def __iter__(self) -> "Interactions":
         """This method will return the iterator of the interactions.
@@ -147,7 +162,7 @@ class Interactions:
             Interactions: The iterator of the interactions.
         """
         self._index = 0
-        if not isinstance(self._inter_sparse, csr_matrix):
+        if not isinstance(self.inter_sparse, csr_matrix):
             self._to_sparse()
         return self
 
@@ -162,13 +177,13 @@ class Interactions:
         """
         if self._index >= self._og_nuid:
             raise StopIteration
-        if self._inter_sparse is None:
+        if self.inter_sparse is None:
             raise ValueError("The sparse matrix is None.")
 
         start = self._index
         end = min(start + self._batch_size, self._og_nuid)
         self._index = end
-        return self._inter_sparse[start:end]
+        return self.inter_sparse[start:end]
 
     def __len__(self) -> int:
         """This method calculates the length of the interactions.
@@ -178,4 +193,4 @@ class Interactions:
         Returns:
             int: number of ratings present in the structure.
         """
-        return sum(len(ir) for _, ir in self._inter_dict.items())
+        return sum(len(ir) for _, ir in self.inter_dict.items())

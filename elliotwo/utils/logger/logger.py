@@ -1,6 +1,7 @@
-from loguru import logger as loguru_logger
-from typing import Any
 import sys
+from typing import Any
+
+from loguru import logger as loguru_logger
 
 # Define custom logging levels
 MSG = 10

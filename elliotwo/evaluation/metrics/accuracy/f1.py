@@ -32,8 +32,8 @@ class F1(TopKMetric):
     Args:
         k (int): The number of top recommendations to consider (cutoff).
         beta (float): The weight of recall in the harmonic mean. Default is 1.0.
-        dist_sync_on_step (bool): If True, synchronizes the state of the metric across different devices during distributed training.
         *args (Any): Additional arguments to pass to the parent class.
+        dist_sync_on_step (bool): Torchmetrics parameter.
         **kwargs (Any): Additional keyword arguments to pass to the parent class.
     """
 
@@ -45,8 +45,8 @@ class F1(TopKMetric):
         self,
         k: int,
         beta: float = 1.0,
-        dist_sync_on_step: bool = False,
         *args: Any,
+        dist_sync_on_step: bool = False,
         **kwargs: Any,
     ):
         super().__init__(k, dist_sync_on_step)

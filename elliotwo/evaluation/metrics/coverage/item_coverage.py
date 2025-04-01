@@ -17,15 +17,15 @@ class ItemCoverage(TopKMetric):
 
     Args:
         k (int): The cutoff.
-        dist_sync_on_step (bool): torchmetrics parameter.
         *args (Any): The argument list.
+        dist_sync_on_step (bool): Torchmetrics parameter.
         **kwargs (Any): The keyword argument dictionary.
     """
 
     unique_items: list
 
     def __init__(
-        self, k: int, dist_sync_on_step: bool = False, *args: Any, **kwargs: Any
+        self, k: int, *args: Any, dist_sync_on_step: bool = False, **kwargs: Any
     ):
         super().__init__(k, dist_sync_on_step)
         self.add_state("unique_items", default=[], dist_reduce_fx=None)

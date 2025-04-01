@@ -69,8 +69,8 @@ class AUC(BaseMetric):
 
     Args:
         train_set (csr_matrix): The training interaction data.
-        dist_sync_on_step (bool): torchmetrics parameter.
         *args (Any): The argument list.
+        dist_sync_on_step (bool): Torchmetrics parameter.
         **kwargs (Any): The keyword argument dictionary.
     """
 
@@ -80,8 +80,8 @@ class AUC(BaseMetric):
     def __init__(
         self,
         train_set: csr_matrix,
-        dist_sync_on_step: bool = False,
         *args: Any,
+        dist_sync_on_step: bool = False,
         **kwargs: Any,
     ):
         super().__init__(dist_sync_on_step=dist_sync_on_step)

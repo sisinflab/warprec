@@ -35,6 +35,7 @@ class Meta(BaseModel):
 
     @model_validator(mode="after")
     def model_validation(self):
+        """Meta model validation."""
         if not self.save_model and self.keep_all_ray_checkpoints:
             raise ValueError(
                 "You have set save_model to False but keep_all_ray_checkpoints to True. "
@@ -97,7 +98,8 @@ class Optimization(BaseModel):
             - asha: ASHA Scheduler, more information can be found at:
                 https://docs.ray.io/en/latest/tune/api/doc/ray.tune.schedulers.ASHAScheduler.html.
         properties (Optional[Properties]): The attributes required for Ray Tune to work.
-        validation_metric (Optional[str]): The metric/loss that will validate each trial in Ray Tune.
+        validation_metric (Optional[str]): The metric/loss that will
+            validate each trial in Ray Tune.
         num_samples (Optional[int]): The number of trials that Ray Tune will try.
             In case of a grid search, this parameter should be set to 1.
         cpu_per_trial (Optional[float]): The number of cpu cores dedicated to
@@ -286,7 +288,8 @@ class RecomModel(BaseModel, ABC):
         if all(isinstance(item, type(value[0])) for item in value):
             return [SearchSpace.GRID] + value
         raise ValueError(
-            f"For the Grid Search optimization, the field {field} must have values of the same type. "
+            f"For the Grid Search optimization, the field {field} must "
+            f"have values of the same type. "
             f"Values received: {value}."
         )
 
@@ -310,7 +313,8 @@ class RecomModel(BaseModel, ABC):
 
         if len(value) < 2 or len(value) > 4:
             raise ValueError(
-                f"Invalid range format for field {field}. Expected [1.0, 5.0] or ['uniform', 1.0, 5.0]. "
+                f"Invalid range format for field {field}. "
+                f"Expected [1.0, 5.0] or ['uniform', 1.0, 5.0]. "
                 f"Received: {value}."
             )
 
@@ -418,7 +422,8 @@ class RecomModel(BaseModel, ABC):
             )
         if search_space not in _rounded_search_spaces and len(value) == 4:
             raise ValueError(
-                f"{search_space} does not require a rounding factor, but extra values were provided. "
+                f"{search_space} does not require a rounding factor, "
+                f"but extra values were provided. "
                 f"Received: {value} for field {field}."
             )
         if search_space in _rounded_search_spaces:
@@ -442,7 +447,8 @@ class EASE(RecomModel):
     """Definition of the model EASE.
 
     Attributes:
-        l2 (Union[List[Union[str, float, int]], float, int]): List of values that l2 regularization can take.
+        l2 (Union[List[Union[str, float, int]], float, int]):
+            List of values that l2 regularization can take.
     """
 
     l2: Union[List[Union[str, float, int]], float, int]
@@ -453,7 +459,8 @@ class Slim(RecomModel):
     """Definition of the model Slim.
 
     Attributes:
-        l1 (Union[List[Union[str, float, int]], float, int]): List of values that l1 regularization can take.
+        l1 (Union[List[Union[str, float, int]], float, int]): List of values
+            that l1 regularization can take.
         alpha (Union[List[Union[str, float, int]], float, int]): List of values that alpha can take.
     """
 

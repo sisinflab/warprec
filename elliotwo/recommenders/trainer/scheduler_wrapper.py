@@ -38,7 +38,7 @@ class FIFOSchedulerWrapper(FIFOScheduler, BaseSchedulerWrapper):
         **kwargs (Any): Keyword arguments.
     """
 
-    def __init__(self, **kwargs: Any):
+    def __init__(self, **kwargs: Any):  # pylint: disable=W0231
         return None
 
 

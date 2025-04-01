@@ -71,8 +71,8 @@ class EPC(TopKMetric):
     Args:
         k (int): The cutoff for recommendations.
         train_set (csr_matrix): The training interaction data.
-        dist_sync_on_step (bool): Torchmetrics parameter for distributed synchronization.
         *args (Any): Additional arguments.
+        dist_sync_on_step (bool): Torchmetrics parameter.
         **kwargs (Any): Additional keyword arguments.
     """
 
@@ -83,8 +83,8 @@ class EPC(TopKMetric):
         self,
         k: int,
         train_set: csr_matrix,
-        dist_sync_on_step: bool = False,
         *args: Any,
+        dist_sync_on_step: bool = False,
         **kwargs: Any,
     ):
         super().__init__(k, dist_sync_on_step)

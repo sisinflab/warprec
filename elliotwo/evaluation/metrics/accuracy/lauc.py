@@ -69,7 +69,8 @@ class LAUC(TopKMetric):
     The final LAUC is the sum of all AUC normalized by the number of positive samples limited to k:
         LAUC = sum_{u=1}^{n_users} sum_{i=1}^{items} AUC_{ui} / positives@k_{u}
 
-    For further details, please refer to this `paper <https://wiki.epfl.ch/edicpublic/documents/Candidacy%20exam/Evaluation.pdf>`_.
+    For further details, please refer to this
+        `paper <https://wiki.epfl.ch/edicpublic/documents/Candidacy%20exam/Evaluation.pdf>`_.
 
     Attributes:
         lauc (Tensor): The lauc value across all users.
@@ -78,8 +79,8 @@ class LAUC(TopKMetric):
     Args:
         k (int): The cutoff.
         train_set (csr_matrix): The training interaction data.
-        dist_sync_on_step (bool): torchmetrics parameter.
         *args (Any): The argument list.
+        dist_sync_on_step (bool): Torchmetrics parameter.
         **kwargs (Any): The keyword argument dictionary.
     """
 
@@ -90,8 +91,8 @@ class LAUC(TopKMetric):
         self,
         k: int,
         train_set: csr_matrix,
-        dist_sync_on_step: bool = False,
         *args: Any,
+        dist_sync_on_step: bool = False,
         **kwargs: Any,
     ):
         super().__init__(k, dist_sync_on_step)

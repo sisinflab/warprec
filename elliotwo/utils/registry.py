@@ -145,15 +145,15 @@ class ModelRegistry:
         return decorator
 
     def get(
-        self, name: str, implementation: str = None, *args, **kwargs
+        self, name: str, *args, implementation: str = None, **kwargs
     ) -> "AbstractRecommender":
         """
         Get an instance from the registry by name.
 
         Args:
             name (str): Name of the registered recommender.
-            implementation (str): The name of the implementation of the recommender.
             *args: Arguments to pass to the class constructor.
+            implementation (str): The name of the implementation of the recommender.
             **kwargs: Keyword arguments to pass to the class constructor.
 
         Returns:

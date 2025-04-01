@@ -66,8 +66,8 @@ class MAP(TopKMetric):
 
     Args:
         k (int): The recommendation cutoff.
-        dist_sync_on_step (bool): If True, synchronizes the state of the metric across different devices during distributed training.
         *args (Any): Additional arguments to pass to the parent class.
+        dist_sync_on_step (bool): Torchmetrics parameter.
         **kwargs (Any): Additional keyword arguments to pass to the parent class.
     """
 
@@ -75,7 +75,7 @@ class MAP(TopKMetric):
     users: Tensor
 
     def __init__(
-        self, k: int, dist_sync_on_step: bool = False, *args: Any, **kwargs: Any
+        self, k: int, *args: Any, dist_sync_on_step: bool = False, **kwargs: Any
     ):
         super().__init__(k, dist_sync_on_step)
         self.add_state("ap_sum", default=torch.tensor(0.0), dist_reduce_fx="sum")

@@ -50,6 +50,8 @@ class DataConfig(BaseModel):
         data_type (str): The type of data to be loaded. Can be 'transaction'.
         local_path (Optional[str]): Path to the file containing the transaction data.
         split_dir (Optional[str]): The directory where the splits are saved.
+        split_ext (Optional[str]): The extension of the split files.
+        split_sep (Optional[str]): The separator of the split files.
         experiment_path (Optional[str]): The local experiment path.
         sep (Optional[str]): Custom separator for the file containing the transaction data.
         rating_type (RatingType): The type of rating to be used. If 'implicit' is chosen,
@@ -65,6 +67,8 @@ class DataConfig(BaseModel):
     data_type: str
     local_path: Optional[str] = None
     split_dir: Optional[str] = None
+    split_ext: Optional[str] = ".csv"
+    split_sep: Optional[str] = ","
     experiment_path: Optional[str] = "./experiments/"
     sep: Optional[str] = ","
     rating_type: RatingType

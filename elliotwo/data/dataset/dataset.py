@@ -1,7 +1,6 @@
 from abc import ABC, abstractmethod
 
 from typing import Tuple, Any
-from elliotwo.utils.config import Configuration
 from elliotwo.data.dataset import Interactions
 
 
@@ -17,9 +16,6 @@ class AbstractDataset(ABC):
         test_set (Interactions): Test set, not mandatory, used in evaluation to calculate metrics.
         nuid (int): Number of user IDs.
         niid (int): Number of item IDs.
-
-    Args:
-        config (Configuration): The configuration file.
     """
 
     train_set: Interactions
@@ -28,13 +24,7 @@ class AbstractDataset(ABC):
     nuid: int
     niid: int
 
-    def __init__(self, config: Configuration):
-        self._config = config
-
-        # Get information from config file
-        self._user_label = self._config.data.labels.user_id_label
-        self._item_label = self._config.data.labels.item_id_label
-
+    def __init__(self):
         # Set mappings
         self._umap: dict[Any, int] = {}
         self._imap: dict[Any, int] = {}
@@ -118,7 +108,6 @@ class TransactionDataset(AbstractDataset):
         item_mapping (dict): The mapping of item ID -> item idx.
         nuid (int): Number of user IDs.
         niid (int): Number of item IDs.
-        config (Configuration): The configuration file.
         val_set (Interactions): The validation set.
         test_set (Interactions): The test set.
     """
@@ -130,12 +119,10 @@ class TransactionDataset(AbstractDataset):
         item_mapping: dict,
         nuid: int,
         niid: int,
-        config: Configuration,
         val_set: Interactions = None,
         test_set: Interactions = None,
     ):
-        super().__init__(config)
-
+        super().__init__()
         # Set the datasets
         self.train_set = train_set
         self.val_set = val_set

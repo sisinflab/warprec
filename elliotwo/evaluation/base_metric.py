@@ -90,7 +90,8 @@ class BaseMetric(Metric, ABC):
             train_set.getnnz(axis=0)
         ).float()  # Get number of non-zero elements in each column
 
-        # Avoid division by zero: set minimum interaction count to 1 if any item has zero interactions
+        # Avoid division by zero: set minimum interaction
+        # count to 1 if any item has zero interactions
         item_interactions = torch.clamp(item_interactions, min=1)
         return item_interactions
 
@@ -113,7 +114,8 @@ class BaseMetric(Metric, ABC):
         total_interactions = item_interactions.sum()
         users = train_set.shape[0]
 
-        # Avoid division by zero: set minimum interaction count to 1 if any item has zero interactions
+        # Avoid division by zero: set minimum interaction
+        # count to 1 if any item has zero interactions
         item_interactions = torch.clamp(item_interactions, min=1)
 
         # Compute novelty scores
@@ -130,7 +132,7 @@ class BaseMetric(Metric, ABC):
 class TopKMetric(BaseMetric):
     """The definition of a Top-K metric."""
 
-    def __init__(self, k: int, dist_sync_on_step=False, *args: Any, **kwargs: Any):
+    def __init__(self, k: int, *args: Any, dist_sync_on_step=False, **kwargs: Any):
         super().__init__(dist_sync_on_step=dist_sync_on_step)
         self.k = k
 

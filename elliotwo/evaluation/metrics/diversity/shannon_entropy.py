@@ -54,8 +54,8 @@ class ShannonEntropy(TopKMetric):
     Args:
         k (int): Recommendation list cutoff
         train_set (csr_matrix): The training interaction data.
-        dist_sync_on_step (bool): Synchronize metric state across devices
         *args (Any): The argument list.
+        dist_sync_on_step (bool): Torchmetrics parameter.
         **kwargs (Any): The keyword argument dictionary.
     """
 
@@ -66,8 +66,8 @@ class ShannonEntropy(TopKMetric):
         self,
         k: int,
         train_set: csr_matrix,
-        dist_sync_on_step: bool = False,
         *args: Any,
+        dist_sync_on_step: bool = False,
         **kwargs: Any,
     ):
         super().__init__(k, dist_sync_on_step)

@@ -66,8 +66,8 @@ class PopRSP(TopKMetric):
         k (int): The cutoff for recommendations.
         train_set (csr_matrix): The training interaction data.
         pop_ratio (float): The percentile considered popular.
-        dist_sync_on_step (bool): Torchmetrics parameter.
         *args (Any): The argument list.
+        dist_sync_on_step (bool): Torchmetrics parameter.
         **kwargs (Any): The keyword argument dictionary.
     """
 
@@ -81,8 +81,8 @@ class PopRSP(TopKMetric):
         k: int,
         train_set: csr_matrix,
         pop_ratio: float,
-        dist_sync_on_step: bool = False,
         *args: Any,
+        dist_sync_on_step: bool = False,
         **kwargs: Any,
     ):
         super().__init__(k, dist_sync_on_step)

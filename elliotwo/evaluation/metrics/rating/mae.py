@@ -41,15 +41,15 @@ class MAE(BaseMetric):
         total_count (Tensor): Total number of elements processed.
 
     Args:
-        dist_sync_on_step (bool): Torchmetrics parameter.
         *args (Any): The argument list.
+        dist_sync_on_step (bool): Torchmetrics parameter.
         **kwargs (Any): The keyword argument dictionary.
     """
 
     sum_absolute_errors: Tensor
     total_count: Tensor
 
-    def __init__(self, dist_sync_on_step: bool = False, *args: Any, **kwargs: Any):
+    def __init__(self, *args: Any, dist_sync_on_step: bool = False, **kwargs: Any):
         super().__init__(dist_sync_on_step=dist_sync_on_step)
         self.add_state(
             "sum_absolute_errors", default=torch.tensor(0.0), dist_reduce_fx="sum"
