@@ -21,34 +21,34 @@ def main(args: Namespace):
     config = load_yaml(args.config)
 
     # Writer module testing
-    writer = LocalWriter(config)
+    writer = LocalWriter(config=config)
 
     # Reader module testing
     reader = LocalReader(config)
 
     # Dataset loading
     dataset = None
-    if config.data.loading_strategy == "dataset":
+    if config.reader.loading_strategy == "dataset":
         data = reader.read()
 
         # Splitter testing
         if config.splitter:
             splitter = Splitter(config)
 
-            if config.data.data_type == "transaction":
+            if config.reader.data_type == "transaction":
                 dataset = splitter.split_transaction(data)
             else:
                 raise ValueError("Data type not yet supported.")
             # This branch is for 100% train and 0% test
             pass
 
-    elif config.data.loading_strategy == "split":
-        if config.data.data_type == "transaction":
+    elif config.reader.loading_strategy == "split":
+        if config.reader.data_type == "transaction":
             dataset = reader.read_transaction_split()
         else:
             raise ValueError("Data type not yet supported.")
 
-    if config.splitter and config.splitter.save_split:
+    if config.splitter and config.writer.save_split:
         writer.write_split(dataset)
 
     # Trainer testing
@@ -84,9 +84,20 @@ def main(args: Namespace):
         result_dict["Test"] = results
 
         writer.write_results(
-            result_dict, model_name, config.evaluation.metrics, config.evaluation.top_k
+            result_dict["Test"],
+            model_name,
+            config.evaluation.metrics,
+            config.evaluation.top_k,
         )
 
+        if config.splitter.validation:
+            writer.write_results(
+                result_dict["Validation"],
+                model_name,
+                config.evaluation.metrics,
+                config.evaluation.top_k,
+                validation=True,
+            )
         # Recommendation
         if config.general.recommendation.save_recs:
             umap_i, imap_i = dataset.get_inverse_mappings()

@@ -1,6 +1,6 @@
 from typing import Optional
 
-from pydantic import BaseModel, Field, field_validator, model_validator
+from pydantic import BaseModel, Field, field_validator
 from elliotwo.utils.logger import logger
 
 
@@ -48,7 +48,6 @@ class GeneralConfig(BaseModel):
         max_eval (Optional[int]): The maximum number of evaluations to compute with hyperopt.
         recommendation (Optional[GeneralRecommendation]): The general information
             about the recommendation.
-        setup_experiment (Optional[bool]): Wether or not to setup the experiment ambient.
     """
 
     seed: Optional[int] = 42
@@ -60,7 +59,6 @@ class GeneralConfig(BaseModel):
     recommendation: Optional[GeneralRecommendation] = Field(
         default_factory=GeneralRecommendation
     )
-    setup_experiment: Optional[bool] = True
 
     @field_validator("device")
     @classmethod
@@ -73,13 +71,3 @@ class GeneralConfig(BaseModel):
             if len(parts) == 2 and parts[1].isdigit():
                 return v
         raise ValueError(f'Device {v} is not supported. Use "cpu" or "cuda[:index]".')
-
-    @model_validator(mode="after")
-    def model_validation(self):
-        """This method validates the General configuration."""
-        if self.recommendation.save_recs and not self.setup_experiment:
-            raise ValueError(
-                "You are trying to save the recommendations without "
-                "setting up the directory. Set setup_experiment to True."
-            )
-        return self

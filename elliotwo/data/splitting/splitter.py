@@ -23,13 +23,13 @@ class Splitter:
         if config:
             self.read_from_config = True
             self.strategy = config.splitter.strategy
-            self._batch_size = config.data.batch_size
+            self._batch_size = config.reader.reading_params.batch_size
             self._seed = config.splitter.seed
-            self._user_label = config.data.labels.user_id_label
-            self._item_label = config.data.labels.item_id_label
-            self._time_label = config.data.labels.timestamp_label
-            self._rating_label = config.data.labels.rating_label
-            self._rating_type = config.data.rating_type
+            self._user_label = config.reader.labels.user_id_label
+            self._item_label = config.reader.labels.item_id_label
+            self._time_label = config.reader.labels.timestamp_label
+            self._rating_label = config.reader.labels.rating_label
+            self._rating_type = config.reader.rating_type
             self._validation = config.splitter.validation
             self._test_size = (
                 config.splitter.ratio[1] if config.splitter.ratio else None

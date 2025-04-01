@@ -34,6 +34,26 @@ class SplittingStrategies(str, Enum):
     TEMPORAL = "temporal"
 
 
+class ReadingMethods(str, Enum):
+    """Represents the types of reding strategies supported.
+
+    This enum is used to track the possible reading methods:
+        - LOCAL: Read data locally.
+    """
+
+    LOCAL = "local"
+
+
+class WritingMethods(str, Enum):
+    """Represents the types of writing strategies supported.
+
+    This enum is used to track the possible writing methods:
+        - LOCAL: Writes results locally.
+    """
+
+    LOCAL = "local"
+
+
 class SearchAlgorithms(str, Enum):
     """Represents the types of search algorithms supported.
 

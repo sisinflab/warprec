@@ -25,14 +25,14 @@ def main(args: Namespace):
 
     # Dataset loading
     dataset = None
-    if config.data.loading_strategy == "dataset":
+    if config.reader.loading_strategy == "dataset":
         data = reader.read()
 
         # Splitter testing
         if config.splitter:
             splitter = elliotwo.Splitter(config)
 
-            if config.data.data_type == "transaction":
+            if config.reader.data_type == "transaction":
                 dataset = splitter.split_transaction(data)
             else:
                 raise ValueError("Data type not yet supported.")
@@ -40,8 +40,8 @@ def main(args: Namespace):
             # This branch is for 100% train and 0% test
             pass
 
-    elif config.data.loading_strategy == "split":
-        if config.data.data_type == "transaction":
+    elif config.reader.loading_strategy == "split":
+        if config.reader.data_type == "transaction":
             dataset = reader.read_transaction_split()
         else:
             raise ValueError("Data type not yet supported.")

@@ -1,6 +1,8 @@
 from .enums import (
     RatingType,
     SplittingStrategies,
+    ReadingMethods,
+    WritingMethods,
     SearchAlgorithms,
     Schedulers,
     SearchSpace,
@@ -20,6 +22,8 @@ from .logger import logger
 __all__ = [
     "RatingType",
     "SplittingStrategies",
+    "ReadingMethods",
+    "WritingMethods",
     "SearchAlgorithms",
     "Schedulers",
     "SearchSpace",

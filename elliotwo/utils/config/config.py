@@ -8,12 +8,13 @@ import torch
 from pydantic import BaseModel, field_validator, model_validator
 from elliotwo.utils.config import (
     GeneralConfig,
-    DataConfig,
+    ReaderConfig,
+    WriterConfig,
     SplittingConfig,
     RecomModel,
     EvaluationConfig,
 )
-from elliotwo.utils.enums import RatingType, SplittingStrategies
+from elliotwo.utils.enums import RatingType, SplittingStrategies, ReadingMethods
 from elliotwo.utils.registry import params_registry, search_space_registry
 from elliotwo.utils.logger import logger
 
@@ -24,7 +25,8 @@ class Configuration(BaseModel):
     This class defines the structure of the configuration file accepted by the framework.
 
     Attributes:
-        data (DataConfig): Configuration of the data loading process.
+        reader (ReaderConfig): Configuration of the reading process.
+        writer (WriterConfig): Configuration of the writing process.
         splitter (SplittingConfig): Configuration of the splitting process.
         models (Dict[str, dict]): The dictionary containing model information
             in the format {model_name: dict{param_1: value, param_2: value, ...}, ...}
@@ -38,7 +40,8 @@ class Configuration(BaseModel):
             and their torch sparse counterpart.
     """
 
-    data: DataConfig
+    reader: ReaderConfig
+    writer: WriterConfig
     splitter: SplittingConfig = None
     models: Dict[str, dict]
     evaluation: EvaluationConfig
@@ -96,15 +99,18 @@ class Configuration(BaseModel):
             FileNotFoundError: If the local file has not been found.
             ValueError: If any information between parts of the configuration file is inconsistent.
         """
-        _local_path = self.data.local_path
 
         # Check if file exists
-        if _local_path:
+        if (
+            self.reader.reading_method == ReadingMethods.LOCAL
+            and self.reader.local_path
+        ):
+            _local_path = self.reader.local_path
             if not os.path.exists(_local_path):
                 raise FileNotFoundError(
                     f"Configuration file not found at {_local_path}."
                 )
-            _sep = self.data.sep
+            _sep = self.reader.reading_params.sep
             # Read the header of file to later check
             with open(_local_path, "r", encoding="utf-8") as f:
                 first_line = f.readline()
@@ -113,17 +119,17 @@ class Configuration(BaseModel):
             # Define column names to read after, if the input file
             # contains more columns this is more efficient.
             _column_names = [
-                self.data.labels.user_id_label,
-                self.data.labels.item_id_label,
+                self.reader.labels.user_id_label,
+                self.reader.labels.item_id_label,
             ]
-            if self.data.rating_type == RatingType.EXPLICIT:
+            if self.reader.rating_type == RatingType.EXPLICIT:
                 # In case the RatingType is explicit, we add the
                 # score label and read scores from the source.
-                _column_names.append(self.data.labels.rating_label)
+                _column_names.append(self.reader.labels.rating_label)
             if self.splitter.strategy == SplittingStrategies.TEMPORAL:
                 # In case the SplittingStrategy is temporal, we add the
                 # timestamp label and read timestamps from the source.
-                _column_names.append(self.data.labels.timestamp_label)
+                _column_names.append(self.reader.labels.timestamp_label)
 
             # Check if column name defined in config are present in the header of the local file
             if not set(_column_names).issubset(set(_header)):
@@ -133,14 +139,14 @@ class Configuration(BaseModel):
                 )
 
         # Check if experiment has been set up correctly
-        if not self.general.setup_experiment:
+        if not self.writer.setup_experiment:
             for model_name, model_data in self.models.items():
                 if model_data["meta"]["save_model"]:
                     raise ValueError(
                         f"You are trying to save the model state for {model_name} model but "
                         "experiment must be setup first. Set setup_experiment to True."
                     )
-            if self.splitter.save_split:
+            if self.writer.save_split:
                 raise ValueError(
                     "You are trying to save the splits but experiment must be "
                     "setup first. Set setup_experiment to True."
@@ -188,7 +194,7 @@ class Configuration(BaseModel):
         Raises:
             ValueError: If the dtype are not supported or incorrect.
         """
-        for dtype_str in self.data.dtypes.model_dump().values():
+        for dtype_str in self.reader.dtypes.model_dump().values():
             if dtype_str not in self.column_map_dtype:
                 raise ValueError(
                     f"Custom dtype {dtype_str} not supported as a column data type."
@@ -200,11 +206,14 @@ class Configuration(BaseModel):
         Returns:
             List[np.dtype]: A list containing the dtype to use for data loading.
         """
-        column_dtypes = [self.data.dtypes.user_id_type, self.data.dtypes.item_id_type]
-        if self.data.rating_type == RatingType.EXPLICIT:
-            column_dtypes.append(self.data.dtypes.rating_type)
+        column_dtypes = [
+            self.reader.dtypes.user_id_type,
+            self.reader.dtypes.item_id_type,
+        ]
+        if self.reader.rating_type == RatingType.EXPLICIT:
+            column_dtypes.append(self.reader.dtypes.rating_type)
         if self.splitter and self.splitter.strategy == SplittingStrategies.TEMPORAL:
-            column_dtypes.append(self.data.dtypes.timestamp_type)
+            column_dtypes.append(self.reader.dtypes.timestamp_type)
         return [self.column_map_dtype[dtype] for dtype in column_dtypes]
 
     def column_names(self) -> List[str]:
@@ -213,11 +222,14 @@ class Configuration(BaseModel):
         Returns:
             List[str]: The list of column names.
         """
-        column_names = [self.data.labels.user_id_label, self.data.labels.item_id_label]
-        if self.data.rating_type == RatingType.EXPLICIT:
-            column_names.append(self.data.labels.rating_label)
+        column_names = [
+            self.reader.labels.user_id_label,
+            self.reader.labels.item_id_label,
+        ]
+        if self.reader.rating_type == RatingType.EXPLICIT:
+            column_names.append(self.reader.labels.rating_label)
         if self.splitter and self.splitter.strategy == SplittingStrategies.TEMPORAL:
-            column_names.append(self.data.labels.timestamp_label)
+            column_names.append(self.reader.labels.timestamp_label)
         return column_names
 
     def check_precision(self) -> None:

@@ -152,8 +152,8 @@ class Trainer:
 
         model_state = checkpoint["model_state"]
         best_model = model_registry.get(
-            self.model_name,
-            self._model_params.meta.implementation,
+            name=self.model_name,
+            implementation=self._model_params.meta.implementation,
             params=best_params,
             **self.infos,
         )
@@ -182,8 +182,8 @@ class Trainer:
                 validation metric.
         """
         model = model_registry.get(
-            model_name,
-            self._model_params.meta.implementation,
+            name=model_name,
+            implementation=self._model_params.meta.implementation,
             params=params,
             **self.infos,
         )

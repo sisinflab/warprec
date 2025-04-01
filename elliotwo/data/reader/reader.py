@@ -53,24 +53,24 @@ class LocalReader(AbstractReader):
             self.read_from_config = True
 
             # Retrieve the path from the config. This isn't an optional value
-            self.path = config.data.local_path
+            self.path = config.reader.local_path
 
             # Check if the optional reading parameters have been set
-            self.sep = config.data.sep
-            self.batch_size = config.data.batch_size
+            self.sep = config.reader.reading_params.sep
+            self.batch_size = config.reader.reading_params.batch_size
             self.column_names = config.column_names()
             self.dtypes = dict(zip(self.column_names, config.column_dtype()))
-            self.rating_type = config.data.rating_type
+            self.rating_type = config.reader.rating_type
 
             # Split parameters
-            self.split_dir = config.data.split_dir
-            self.split_ext = config.data.split_ext
-            self.split_sep = config.data.split_sep
+            self.split_dir = config.reader.split.local_path
+            self.split_ext = config.reader.split.ext
+            self.split_sep = config.reader.split.sep
 
             # Check if the optional label parameters have been set
-            self.user_label = config.data.labels.user_id_label
-            self.item_label = config.data.labels.item_id_label
-            self.rating_label = config.data.labels.rating_label
+            self.user_label = config.reader.labels.user_id_label
+            self.item_label = config.reader.labels.item_id_label
+            self.rating_label = config.reader.labels.rating_label
 
     def read(
         self,

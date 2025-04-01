@@ -12,6 +12,8 @@ from pandas import DataFrame
 from elliotwo.utils.config import Configuration
 from elliotwo.data.dataset import AbstractDataset
 from elliotwo.recommenders.abstract_recommender import AbstractRecommender
+from elliotwo.utils.enums import WritingMethods
+from elliotwo.utils.config import WriterConfig, WritingResultConfig
 from elliotwo.utils.logger import logger
 
 
@@ -19,15 +21,13 @@ class AbstractWriter(ABC):
     """AbstractWriter is the abstract definition of a writer,
     during an experiment multiple writers can be defined.
 
-    Args:
-        config (Configuration): The configuration of the experiment.
+    Attributes:
+        config (Configuration | None): The configuration of the experiment.
 
     TODO: Use Factory Pattern for different writer.
     """
 
-    def __init__(self, config: Configuration):
-        self._config = config
-        self._experiment_name = self._config.data.dataset_name
+    config: Configuration | None
 
     @abstractmethod
     def setup_experiment(self):
@@ -67,49 +67,76 @@ class LocalWriter(AbstractWriter):
     the experiment want to be saved locally.
 
     Args:
+        dataset_name (str): The name of the dataset.
+        local_path (str): The path to the dataset.
         config (Configuration): The configuration of the experiment.
+        setup (bool): Flag value for the setup of the experiment.
 
     TODO: Using context manager
     """
 
-    def __init__(self, config: Configuration):
-        super().__init__(config)
+    def __init__(
+        self,
+        dataset_name: str = None,
+        local_path: str = None,
+        config: Configuration = None,
+        setup: bool = True,
+    ):
+        if config:
+            self.config = config
+
+            # Setup experiment information from config
+            self.experiment_name = config.writer.dataset_name
+            self.local_path = config.writer.local_experiment_path
+            self.setup = config.writer.setup_experiment
+        else:
+            # Setup experiment information from args
+            self.experiment_name = dataset_name
+            self.local_path = local_path
+            self.setup = setup
+
+        writer_params = WriterConfig(
+            dataset_name=self.experiment_name,
+            writing_method=WritingMethods.LOCAL,
+            local_experiment_path=self.local_path,
+            setup_experiment=self.setup,
+        )
+
         self._timestamp = str(int(time.time() * 1000))
-        self._experiment_path = Path(
+        self.experiment_path = Path(
             join(
-                self._config.data.experiment_path,
-                self._experiment_name,
+                writer_params.local_experiment_path,
+                writer_params.dataset_name,
                 self._timestamp,
             )
         )
-        self._experiment_evaluation_dir = Path(
-            join(self._experiment_path, "evaluation")
+        self.experiment_evaluation_dir = Path(join(self.experiment_path, "evaluation"))
+        self.experiment_recommendation_dir = Path(join(self.experiment_path, "recs"))
+        self.experiment_serialized_models_dir = Path(
+            join(self.experiment_path, "serialized")
         )
-        self._experiment_recommendation_dir = Path(join(self._experiment_path, "recs"))
-        self._experiment_serialized_models_dir = Path(
-            join(self._experiment_path, "serialized")
-        )
-        self._experiment_split_dir = Path(join(self._experiment_path, "split"))
+        self.experiment_split_dir = Path(join(self.experiment_path, "split"))
 
-        if self._config.general.setup_experiment:
-            self.setup_experiment()
+        if writer_params.setup_experiment:
+            self.setup_experiment(config)
 
-    def setup_experiment(self):
+    def setup_experiment(self, config: Configuration = None):
         """This is the main function to be executed, it sets up all
         the important directory to then later save results."""
         logger.msg("Setting up experiment local folder.")
 
         # Check if directory exists and create the non existing one
-        self._experiment_path.mkdir(parents=True, exist_ok=True)
-        self._experiment_evaluation_dir.mkdir(parents=True, exist_ok=True)
-        self._experiment_recommendation_dir.mkdir(parents=True, exist_ok=True)
-        self._experiment_serialized_models_dir.mkdir(parents=True, exist_ok=True)
-        self._experiment_split_dir.mkdir(parents=True, exist_ok=True)
+        self.experiment_path.mkdir(parents=True, exist_ok=True)
+        self.experiment_evaluation_dir.mkdir(parents=True, exist_ok=True)
+        self.experiment_recommendation_dir.mkdir(parents=True, exist_ok=True)
+        self.experiment_serialized_models_dir.mkdir(parents=True, exist_ok=True)
+        self.experiment_split_dir.mkdir(parents=True, exist_ok=True)
 
         # Write locally the json file of the configuration
-        json_dump = self._config.model_dump_json(indent=2)
-        json_path = Path(join(self._experiment_path, "config.json"))
-        json_path.write_text(json_dump, encoding="utf-8")
+        if config:
+            json_dump = config.model_dump_json(indent=2)
+            json_path = Path(join(self.experiment_path, "config.json"))
+            json_path.write_text(json_dump, encoding="utf-8")
 
         logger.msg("Experiment folder created successfully.")
 
@@ -119,6 +146,9 @@ class LocalWriter(AbstractWriter):
         model_name: str,
         metric_names: List[str],
         top_k: List[int],
+        validation: bool = False,
+        sep: str = "\t",
+        ext: str = ".tsv",
     ) -> None:
         """This function writes locally all the results of the experiment.
 
@@ -129,17 +159,27 @@ class LocalWriter(AbstractWriter):
             model_name (str): The name of the model which was evaluated.
             metric_names (List[str]): The names of the metrics to be retrieved from the dictionary.
             top_k (List[int]): The list of top_k, or cutoffs, to retrieve from dictionary.
+            validation (bool): Flag value for the validation data.
+            sep (str): The separator of the file.
+            ext (str): The extension of the file.
         """
-        _path = join(self._experiment_evaluation_dir, model_name)
-        if self._config.splitter and self._config.splitter.validation:
-            _val_path = _path + "_Validation" + self._config.general.recommendation.ext
-            df = self._result_to_dataframe(
-                result_dict["Validation"], metric_names, top_k
-            )
-            df.to_csv(_val_path, sep=self._config.general.recommendation.sep)
-        _test_path = _path + "_Test" + self._config.general.recommendation.ext
-        df = self._result_to_dataframe(result_dict["Test"], metric_names, top_k)
-        df.to_csv(_test_path, sep=self._config.general.recommendation.sep)
+        if self.config:
+            _sep = self.config.writer.result.sep
+            _ext = self.config.writer.result.ext
+        else:
+            _sep = sep
+            _ext = ext
+
+        result_params = WritingResultConfig(sep=_sep, ext=_ext)
+
+        _path = join(self.experiment_evaluation_dir, model_name)
+        if validation:
+            _path = _path + "_Validation" + result_params.ext
+        else:
+            _path = _path + "_Test" + result_params.ext
+
+        df = self._result_to_dataframe(result_dict, metric_names, top_k)
+        df.to_csv(_path, sep=result_params.sep)
 
     def _result_to_dataframe(
         self, result_dict: dict, metric_names: List[str], top_k: List[int]
@@ -167,53 +207,101 @@ class LocalWriter(AbstractWriter):
         result_array = np.array(result_list)
         return pd.DataFrame(result_array, columns=metric_names, index=indexes)
 
-    def write_recs(self, recs: DataFrame, model_name: str) -> None:
+    def write_recs(
+        self,
+        recs: DataFrame,
+        model_name: str,
+        sep: str = "\t",
+        ext: str = ".tsv",
+        user_label: str = "user_id",
+        item_label: str = "item_id",
+    ) -> None:
         """This method writes recommendations in the local path.
 
         Args:
             recs (DataFrame): The recommendations in DataFrame format.
             model_name (str): The name of the model which produced the recommendations.
+            sep (str): The separator of the file.
+            ext (str): The extension of the file.
+            user_label (str): The label of the user data.
+            item_label (str): The label of the item data.
         """
+        if self.config:
+            _sep = self.config.writer.result.sep
+            _ext = self.config.writer.result.ext
+            _user_label = self.config.writer.result.user_label
+            _item_label = self.config.writer.result.item_label
+        else:
+            _sep = sep
+            _ext = ext
+            _user_label = user_label
+            _item_label = item_label
+
+        result_params = WritingResultConfig(
+            sep=_sep, ext=_ext, user_label=_user_label, item_label=_item_label
+        )
+
         # experiment_path/recs/model_name.{custom_extension}
         _path = join(
-            self._experiment_recommendation_dir,
-            model_name + self._config.general.recommendation.ext,
+            self.experiment_recommendation_dir,
+            model_name + result_params.ext,
         )
 
         # Save in path
         recs.to_csv(
             _path,
-            sep=self._config.general.recommendation.sep,
+            sep=result_params.sep,
             header=[
-                self._config.data.labels.user_id_label,
-                self._config.data.labels.item_id_label,
+                result_params.user_label,
+                result_params.item_label,
             ],
             index=None,
         )
 
     def write_model(self, model: AbstractRecommender):
-        """This method writes the model state into a local path,
-        using joblib for the serialization.
+        """This method writes the model state into a local path.
 
         Args:
             model (AbstractRecommender): The model to write locally.
         """
         # experiment_path/serialized/model_name.pth
-        _path = join(self._experiment_serialized_models_dir, model.name_param + ".pth")
+        _path = join(self.experiment_serialized_models_dir, model.name_param + ".pth")
         torch.save(model.state_dict(), _path)
 
-    def write_split(self, dataset: AbstractDataset) -> None:
-        _path_train = join(self._experiment_split_dir, "train.tsv")
-        _path_test = join(self._experiment_split_dir, "test.tsv")
-        _path_val = join(self._experiment_split_dir, "val.tsv")
+    def write_split(
+        self, dataset: AbstractDataset, sep: str = "\t", ext: str = ".tsv"
+    ) -> None:
+        """This method writes the split into a local path.
+
+        Args:
+            dataset (AbstractDataset): The dataset splitted.
+            sep (str): The separator that will be used to write the results.
+            ext (str): The extension that will be used to write the results.
+        """
+        if self.config:
+            _sep = self.config.writer.result.sep
+            _ext = self.config.writer.result.ext
+        else:
+            _sep = sep
+            _ext = ext
+
+        result_params = WritingResultConfig(sep=_sep, ext=_ext)
+
+        path_train = join(self.experiment_split_dir, "train" + result_params.ext)
+        path_test = join(self.experiment_split_dir, "test" + result_params.ext)
+        path_val = join(self.experiment_split_dir, "val" + result_params.ext)
 
         if dataset.train_set is not None:
-            dataset.train_set.get_df().to_csv(_path_train, sep="\t", index=None)
+            dataset.train_set.get_df().to_csv(
+                path_train, sep=result_params.sep, index=None
+            )
         if dataset.test_set is not None:
-            dataset.test_set.get_df().to_csv(_path_test, sep="\t", index=None)
+            dataset.test_set.get_df().to_csv(
+                path_test, sep=result_params.sep, index=None
+            )
         if dataset.val_set is not None:
-            dataset.val_set.get_df().to_csv(_path_val, sep="\t", index=None)
+            dataset.val_set.get_df().to_csv(path_val, sep=result_params.sep, index=None)
 
     def checkpoint_from_ray(self, source: str, new_name: str):
-        destination = join(self._experiment_serialized_models_dir, new_name + ".pth")
+        destination = join(self.experiment_serialized_models_dir, new_name + ".pth")
         shutil.move(source, destination)

@@ -1,5 +1,6 @@
 from .general_configuration import GeneralConfig
-from .data_configuration import DataConfig
+from .reader_configuration import ReaderConfig
+from .writer_configuration import WriterConfig, WritingResultConfig
 from .splitter_configuration import SplittingConfig
 from .model_configuration import RecomModel
 from .evaluation_configuration import EvaluationConfig
@@ -11,7 +12,9 @@ __all__ = [
     "load_yaml",
     "parse_params",
     "GeneralConfig",
-    "DataConfig",
+    "ReaderConfig",
+    "WriterConfig",
+    "WritingResultConfig",
     "SplittingConfig",
     "RecomModel",
     "EvaluationConfig",

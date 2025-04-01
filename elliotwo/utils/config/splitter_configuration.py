@@ -15,7 +15,6 @@ class SplittingConfig(BaseModel):
         ratio (Optional[List[float]]): The ratios of the splitting to be created.
         k (Optional[List[int]]): The number of examples to remove during leave-k-out strategy.
         validation (Optional[bool]): Whether or not to create a validation set.
-        save_split (Optional[bool]): Whether or not to save the splits created for later use.
         seed (Optional[int]): The seed to be used during the splitting process.
     """
 
@@ -23,7 +22,6 @@ class SplittingConfig(BaseModel):
     ratio: Optional[List[float]] = None
     k: Optional[List[int]] = None
     validation: Optional[bool] = False
-    save_split: Optional[bool] = False
     seed: Optional[int] = 42
 
     @field_validator("ratio")

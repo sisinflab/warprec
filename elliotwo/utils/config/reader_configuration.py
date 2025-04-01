@@ -1,8 +1,66 @@
 from typing import Optional
 
 from pydantic import BaseModel, Field, field_validator, model_validator
-from elliotwo.utils.enums import RatingType
+from elliotwo.utils.enums import RatingType, ReadingMethods
 from elliotwo.utils.logger import logger
+
+
+class SplitReading(BaseModel):
+    """Definition of the split reading sub-configuration.
+
+    This class reads all the information needed to load previously split data.
+
+    Attributes:
+        local_path (Optional[str | None]): The directory where the splits are saved.
+        ext (Optional[str]): The extension of the split files.
+        sep (Optional[str]): The separator of the split files.
+    """
+
+    local_path: Optional[str | None] = None
+    ext: Optional[str] = ".tsv"
+    sep: Optional[str] = "\t"
+
+    @field_validator("sep")
+    @classmethod
+    def check_sep(cls, v: str):
+        """Validates the separator."""
+        try:
+            v = v.encode().decode("unicode_escape")
+        except UnicodeDecodeError:
+            logger.negative(
+                f"The string {v} is not a valid separator. Using default separator {'\t'}."
+            )
+            v = "\t"
+        return v
+
+
+class ReadingParams(BaseModel):
+    """Definition of the reading params sub-configuration.
+
+    This class reads all the information needed to read the data correctly.
+
+    Attributes:
+        ext (Optional[str]): The extension of the file to read.
+        sep (Optional[str]): The separator of the file to read.
+        batch_size (Optional[int]): The batch size used during the reading process.
+    """
+
+    ext: Optional[str] = ".tsv"
+    sep: Optional[str] = "\t"
+    batch_size: Optional[int] = 1024
+
+    @field_validator("sep")
+    @classmethod
+    def check_sep(cls, v: str):
+        """Validates the separator."""
+        try:
+            v = v.encode().decode("unicode_escape")
+        except UnicodeDecodeError:
+            logger.negative(
+                f"The string {v} is not a valid separator. Using default separator {'\t'}."
+            )
+            v = "\t"
+        return v
 
 
 class Labels(BaseModel):
@@ -41,38 +99,29 @@ class CustomDtype(BaseModel):
     timestamp_type: Optional[str] = "int32"
 
 
-class DataConfig(BaseModel):
-    """Definition of the data configuration part of the configuration file.
+class ReaderConfig(BaseModel):
+    """Definition of the reader configuration part of the configuration file.
 
     Attributes:
-        dataset_name (str): Name of the dataset.
         loading_strategy (str): The strategy to use to load the data. Can be 'dataset' or 'split'.
         data_type (str): The type of data to be loaded. Can be 'transaction'.
-        local_path (Optional[str]): Path to the file containing the transaction data.
-        split_dir (Optional[str]): The directory where the splits are saved.
-        split_ext (Optional[str]): The extension of the split files.
-        split_sep (Optional[str]): The separator of the split files.
-        experiment_path (Optional[str]): The local experiment path.
-        sep (Optional[str]): Custom separator for the file containing the transaction data.
+        reading_method (ReadingMethods): The strategy used to read the data.
+        local_path (Optional[str]): The path to the local dataset.
         rating_type (RatingType): The type of rating to be used. If 'implicit' is chosen,
             the reader will not look for a score.
-        batch_size (Optional[int]): The batch size to be used during the reading process.
-            If None is chosen, the data will be read in one pass.
+        reading_params (Optional[ReadingParams]): The parameters of the reading process.
+        split (Optional[SplitReading]): The information of the split reading process.
         labels (Labels): The labels sub-configuration. Defaults to Labels default values.
         dtypes (CustomDtype): The list of column dtype.
     """
 
-    dataset_name: str
     loading_strategy: str
     data_type: str
+    reading_method: ReadingMethods
     local_path: Optional[str] = None
-    split_dir: Optional[str] = None
-    split_ext: Optional[str] = ".csv"
-    split_sep: Optional[str] = ","
-    experiment_path: Optional[str] = "./experiments/"
-    sep: Optional[str] = ","
     rating_type: RatingType
-    batch_size: Optional[int] = 1024
+    reading_params: Optional[ReadingParams] = Field(default_factory=ReadingParams)
+    split: Optional[SplitReading] = Field(default_factory=SplitReading)
     labels: Labels = Field(default_factory=Labels)
     dtypes: CustomDtype = Field(default_factory=CustomDtype)
 
@@ -98,24 +147,11 @@ class DataConfig(BaseModel):
             )
         return v
 
-    @field_validator("sep")
-    @classmethod
-    def check_sep(cls, v: str):
-        """Validates the separator."""
-        try:
-            v = v.encode().decode("unicode_escape")
-        except UnicodeDecodeError:
-            logger.negative(
-                f"The string {v} is not a valid separator. Using default separator {','}."
-            )
-            v = ","
-        return v
-
     @model_validator(mode="after")
     def check_data(self):
         """This method checks if the required information have been passed to the configuration."""
         # ValueError checks
-        if self.loading_strategy == "split" and not self.split_dir:
+        if self.loading_strategy == "split" and not self.split.local_path:
             raise ValueError(
                 "You have chosen split loading strategy but the split_dir "
                 "field has not been filled."
@@ -132,7 +168,7 @@ class DataConfig(BaseModel):
                 "You have chosen split loading strategy but the local_path field "
                 "has been filled. Check your configuration file for possible errors."
             )
-        if self.loading_strategy == "dataset" and self.split_dir:
+        if self.loading_strategy == "dataset" and self.split.local_path:
             logger.attention(
                 "You have chosen dataset loading strategy but the split_dir field "
                 "has been filled. Check your configuration file for possible errors."

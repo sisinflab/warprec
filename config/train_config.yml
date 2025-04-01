@@ -1,12 +1,13 @@
-data:
-  dataset_name: MovieLens
+reader:
   loading_strategy: dataset
   data_type: transaction
+  reading_method: local
   local_path: tests/test_dataset/movielens.csv
-  experiment_path: experiment/test/
-  sep: ','
   rating_type: explicit
-  batch_size: 1024
+  reading_params:
+    sep: ','
+    ext: '.csv'
+    batch_size: 1024
   labels:
     user_id_label: user_id
     item_id_label: item_id
@@ -15,11 +16,19 @@ data:
   dtypes:
     user_id_type: str
     item_id_type: str
+writer:
+  dataset_name: MovieLens
+  writing_method: local
+  local_experiment_path: experiment/test/
+  setup_experiment: True
+  save_split: True
+  result:
+    sep: ','
+    ext: '.csv'
 splitter:
   strategy: temporal
   validation: True
   ratio: [0.8, 0.1, 0.1]
-  save_split: True
   #k: 5
 models:
   EASE:

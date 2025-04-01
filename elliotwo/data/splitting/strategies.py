@@ -26,9 +26,9 @@ class AbstractStrategy(ABC):
         if config:
             self.read_from_config = True
             self._seed = config.general.seed
-            self._user_label = config.data.labels.user_id_label
-            self._item_label = config.data.labels.item_id_label
-            self._time_label = config.data.labels.timestamp_label
+            self._user_label = config.reader.labels.user_id_label
+            self._item_label = config.reader.labels.item_id_label
+            self._time_label = config.reader.labels.timestamp_label
             self._test_size = config.splitter.ratio[1]
             self._val_size = config.splitter.ratio[2]
             self._test_k = config.splitter.k[0]
