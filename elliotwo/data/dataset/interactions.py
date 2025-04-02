@@ -73,11 +73,12 @@ class Interactions:
                 .to_dict()
             )
         elif rating_type == RatingType.IMPLICIT:
-            self._inter_dict = (
-                self._inter_df.groupby(self._user_label)[self._item_label]
-                .apply(lambda items: dict(zip(items, np.ones(len(items), dtype=int))))
-                .to_dict()
-            )
+            self._inter_dict = {
+                user: dict.fromkeys(items, 1)
+                for user, items in self._inter_df.groupby(self._user_label)[
+                    self._item_label
+                ]
+            }
         else:
             raise ValueError(f"Rating type {rating_type} not supported.")
 
