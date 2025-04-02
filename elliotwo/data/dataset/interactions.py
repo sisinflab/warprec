@@ -18,24 +18,15 @@ class Interactions:
         item_mapping (dict): Mapping of item ID -> item idx.
         batch_size (int): The batch size that will be used to
             iterate over the interactions.
-        user_id_label (str): The label of the user ID column.
-        item_id_label (str): The label of the item ID column.
-        rating_label (str): The label of the rating column.
         rating_type (RatingType): The type of rating to be used.
-
-    Attributes:
-        inter_dict (dict): The transaction information in the current
-            representation {user ID: {item ID: rating}}.
-        inter_df (DataFrame): The raw data in tabular format.
-        inter_sparse (csr_matrix): Sparse representation of the transactions (CSR Format).
 
     Raises:
         ValueError: If the rating type is not supported.
     """
 
-    inter_dict: dict = {}
-    inter_df: DataFrame = None
-    inter_sparse: csr_matrix = None
+    _inter_dict: dict = {}
+    _inter_df: DataFrame = None
+    _inter_sparse: csr_matrix = None
 
     def __init__(
         self,
@@ -44,24 +35,28 @@ class Interactions:
         user_mapping: dict,
         item_mapping: dict,
         batch_size: int = 1024,
-        user_id_label: str = "user_id",
-        item_id_label: str = "item_id",
-        rating_label: str = "rating",
         rating_type: RatingType = RatingType.IMPLICIT,
     ) -> None:
         # Setup the variables
-        self.inter_df = data
-        self._batch_size = batch_size
-        self._user_label = user_id_label
-        self._item_label = item_id_label
-        self._rating_label = rating_label
+        self._inter_df = data
+        self.batch_size = batch_size
+        self.rating_type = rating_type
 
-        # Definition of important attributes
-        self._uid = self.inter_df[user_id_label].unique()
-        self._nuid = self.inter_df[user_id_label].nunique()
-        self._niid = self.inter_df[item_id_label].nunique()
+        # Set user and item label
+        self._user_label = data.columns[0]
+        self._item_label = data.columns[1]
+        self._rating_label = (
+            data.columns[2] if rating_type == RatingType.EXPLICIT else None
+        )
+
+        # Definition of dimensions
+        self._uid = self._inter_df[self._user_label].unique()
+        self._nuid = self._inter_df[self._user_label].nunique()
+        self._niid = self._inter_df[self._item_label].nunique()
         self._og_nuid, self._og_niid = original_dims
-        self._transactions = len(self.inter_df)
+        self._transactions = len(self._inter_df)
+
+        # Set mappings
         self._umap = user_mapping
         self._imap = item_mapping
 
@@ -70,16 +65,16 @@ class Interactions:
 
         # Define the interaction dictionary, based on the RatingType selected
         if rating_type == RatingType.EXPLICIT:
-            self.inter_dict = (
-                self.inter_df.groupby(self._user_label)
+            self._inter_dict = (
+                self._inter_df.groupby(self._user_label)
                 .apply(
                     lambda df: dict(zip(df[self._item_label], df[self._rating_label]))
                 )
                 .to_dict()
             )
         elif rating_type == RatingType.IMPLICIT:
-            self.inter_dict = (
-                self.inter_df.groupby(self._user_label)[self._item_label]
+            self._inter_dict = (
+                self._inter_df.groupby(self._user_label)[self._item_label]
                 .apply(lambda items: dict(zip(items, np.ones(len(items), dtype=int))))
                 .to_dict()
             )
@@ -93,7 +88,7 @@ class Interactions:
             dict: The transaction information in the current
                 representation {user ID: {item ID: rating}}.
         """
-        return self.inter_dict
+        return self._inter_dict
 
     def get_df(self) -> DataFrame:
         """This method will return the raw data.
@@ -101,20 +96,23 @@ class Interactions:
         Returns:
             DataFrame: The raw data in tabular format.
         """
-        return self.inter_df
+        return self._inter_df
 
-    def get_sparse(self) -> csr_matrix:
+    def get_sparse(self, precision: Any = np.float32) -> csr_matrix:
         """This method retrieves the sparse representation of data.
 
         This method also checks if the sparse structure has
         already been created, if not then it also create it first.
 
+        Args:
+            precision (Any): The precision of the sparse matrix.
+
         Returns:
             csr_matrix: Sparse representation of the transactions (CSR Format).
         """
-        if isinstance(self.inter_sparse, csr_matrix):
-            return self.inter_sparse
-        return self._to_sparse()
+        if isinstance(self._inter_sparse, csr_matrix):
+            return self._inter_sparse
+        return self._to_sparse(precision=precision)
 
     def get_dims(self) -> Tuple[int, int]:
         """This method will return the dimensions of the data.
@@ -134,26 +132,30 @@ class Interactions:
         """
         return self._transactions
 
-    def _to_sparse(self, precision: Any | None = None) -> csr_matrix:
+    def _to_sparse(self, precision: Any = np.float32) -> csr_matrix:
         """This method will create the sparse representation of the data contained.
 
         This method must not be called if the sparse representation has already be defined.
 
         Args:
-            precision (Any | None): The precision of the sparse matrix.
+            precision (Any): The precision of the sparse matrix.
 
         Returns:
             csr_matrix: Sparse representation of the transactions (CSR Format).
         """
-        users = self.inter_df[self._user_label].map(self._umap).values
-        items = self.inter_df[self._item_label].map(self._imap).values
-        ratings = self.inter_df[self._rating_label].values
-        self.inter_sparse = coo_matrix(
+        users = self._inter_df[self._user_label].map(self._umap).values
+        items = self._inter_df[self._item_label].map(self._imap).values
+        ratings = (
+            self._inter_df[self._rating_label].values
+            if self.rating_type == RatingType.EXPLICIT
+            else np.ones(self._transactions)
+        )
+        self._inter_sparse = coo_matrix(
             (ratings, (users, items)),
             shape=(self._og_nuid, self._og_niid),
             dtype=precision,
         ).tocsr()
-        return self.inter_sparse
+        return self._inter_sparse
 
     def __iter__(self) -> "Interactions":
         """This method will return the iterator of the interactions.
@@ -162,7 +164,7 @@ class Interactions:
             Interactions: The iterator of the interactions.
         """
         self._index = 0
-        if not isinstance(self.inter_sparse, csr_matrix):
+        if not isinstance(self._inter_sparse, csr_matrix):
             self._to_sparse()
         return self
 
@@ -177,13 +179,13 @@ class Interactions:
         """
         if self._index >= self._og_nuid:
             raise StopIteration
-        if self.inter_sparse is None:
+        if self._inter_sparse is None:
             raise ValueError("The sparse matrix is None.")
 
         start = self._index
-        end = min(start + self._batch_size, self._og_nuid)
+        end = min(start + self.batch_size, self._og_nuid)
         self._index = end
-        return self.inter_sparse[start:end]
+        return self._inter_sparse[start:end]
 
     def __len__(self) -> int:
         """This method calculates the length of the interactions.
@@ -193,4 +195,4 @@ class Interactions:
         Returns:
             int: number of ratings present in the structure.
         """
-        return sum(len(ir) for _, ir in self.inter_dict.items())
+        return sum(len(ir) for _, ir in self._inter_dict.items())

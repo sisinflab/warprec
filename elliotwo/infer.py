@@ -4,6 +4,7 @@ from os.path import join
 
 import torch
 import elliotwo
+from elliotwo.data.dataset import TransactionDataset
 from elliotwo.utils.config import load_yaml
 from elliotwo.utils.logger import logger
 from elliotwo.evaluation.evaluator import Evaluator
@@ -33,7 +34,14 @@ def main(args: Namespace):
             splitter = elliotwo.Splitter(config)
 
             if config.reader.data_type == "transaction":
-                dataset = splitter.split_transaction(data)
+                train, test, val = splitter.split_transaction(data)
+                dataset = TransactionDataset(
+                    train,
+                    test,
+                    val,
+                    batch_size=1024,
+                    rating_type=config.reader.rating_type,
+                )
             else:
                 raise ValueError("Data type not yet supported.")
         else:
@@ -42,7 +50,10 @@ def main(args: Namespace):
 
     elif config.reader.loading_strategy == "split":
         if config.reader.data_type == "transaction":
-            dataset = reader.read_transaction_split()
+            train, test, val = reader.read_transaction_split()
+            dataset = TransactionDataset(
+                train, test, val, batch_size=1024, rating_type=config.reader.rating_type
+            )
         else:
             raise ValueError("Data type not yet supported.")
 

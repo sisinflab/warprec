@@ -2,7 +2,7 @@ import argparse
 import os
 from argparse import Namespace
 
-from elliotwo.data import LocalReader, LocalWriter, Splitter
+from elliotwo.data import LocalReader, LocalWriter, Splitter, TransactionDataset
 from elliotwo.utils.config import load_yaml, parse_params
 from elliotwo.utils.logger import logger
 from elliotwo.recommenders.trainer import Trainer
@@ -36,7 +36,14 @@ def main(args: Namespace):
             splitter = Splitter(config)
 
             if config.reader.data_type == "transaction":
-                dataset = splitter.split_transaction(data)
+                train, test, val = splitter.split_transaction(data)
+                dataset = TransactionDataset(
+                    train,
+                    test,
+                    val,
+                    batch_size=1024,
+                    rating_type=config.reader.rating_type,
+                )
             else:
                 raise ValueError("Data type not yet supported.")
             # This branch is for 100% train and 0% test
@@ -44,7 +51,10 @@ def main(args: Namespace):
 
     elif config.reader.loading_strategy == "split":
         if config.reader.data_type == "transaction":
-            dataset = reader.read_transaction_split()
+            train, test, val = reader.read_transaction_split()
+            dataset = TransactionDataset(
+                train, test, val, batch_size=1024, rating_type=config.reader.rating_type
+            )
         else:
             raise ValueError("Data type not yet supported.")
 
@@ -90,7 +100,7 @@ def main(args: Namespace):
             config.evaluation.top_k,
         )
 
-        if config.splitter.validation:
+        if "Validation" in result_dict:
             writer.write_results(
                 result_dict["Validation"],
                 model_name,

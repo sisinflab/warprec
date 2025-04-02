@@ -1,4 +1,4 @@
-from typing import Any, List
+from typing import Any, List, Tuple
 from os.path import join, isfile
 from abc import ABC, abstractmethod
 from pathlib import Path
@@ -6,7 +6,6 @@ from pathlib import Path
 import pandas as pd
 import joblib
 from pandas import DataFrame
-from elliotwo.data.dataset import Interactions, TransactionDataset
 from elliotwo.utils.config import (
     Configuration,
     ReaderConfig,
@@ -38,7 +37,9 @@ class AbstractReader(ABC):
         """This method will load a model state from a source."""
 
     @abstractmethod
-    def read_transaction_split(self, **kwargs: Any) -> TransactionDataset:
+    def read_transaction_split(
+        self, **kwargs: Any
+    ) -> Tuple[DataFrame, DataFrame | None, DataFrame | None]:
         """This method will read the split data from the source."""
 
 
@@ -133,14 +134,13 @@ class LocalReader(AbstractReader):
     def read_transaction_split(
         self,
         split_dir: str = None,
-        sep: str = ",",
-        ext: str = ".csv",
-        batch_size: int = 1024,
+        sep: str = "\t",
+        ext: str = ".tsv",
         column_names: List[str] | None = None,
         dtypes: List[str] | None = None,
         rating_type: RatingType = RatingType.IMPLICIT,
         **kwargs: Any,
-    ) -> TransactionDataset:
+    ) -> Tuple[DataFrame, DataFrame | None, DataFrame | None]:
         """This method will read the split data from the local source,
         using parameters from the config file.
 
@@ -148,15 +148,16 @@ class LocalReader(AbstractReader):
             split_dir (str): The path to the split directory.
             sep (str): The separator used in the file.
             ext (str): The extension of the split files.
-            batch_size (int): The batch size that will be used to
-                iterate over the interactions.
             column_names (List[str] | None): The column names of the data.
             dtypes (List[str] | None): The data types of the columns.
             rating_type (RatingType): The type of rating to be used.
             **kwargs (Any): The keyword arguments.
 
         Returns:
-            TransactionDataset: The dataset object containing the split transaction data.
+            Tuple[DataFrame, DataFrame | None, DataFrame | None]:
+                DataFrame: The training set data.
+                DataFrame: The test set data if present.
+                DataFrame | None: The validation set data if present.
 
         Raises:
             FileNotFoundError: If the train split file was not found.
@@ -164,16 +165,20 @@ class LocalReader(AbstractReader):
         if self.config:
             read_config = self.config.reader
         else:
+            if not column_names:
+                column_names = ["user_id", "item_id", "rating", "timestamp"]
+            if not dtypes:
+                dtypes = ["int32", "int32", "float32", "int32"]
+            dtypes_map = {name: dtype for name, dtype in zip(column_names, dtypes)}
+
             read_config = ReaderConfig(
-                loading_strategy="dataset",
-                data_type="dataset",
+                loading_strategy="split",
+                data_type="transaction",
                 reading_method=ReadingMethods.LOCAL,
                 rating_type=rating_type,
-                labels=Labels(*column_names),
-                dtypes=CustomDtype(*dtypes),
-                split=SplitReading(
-                    local_path=split_dir, ext=ext, sep=sep, batch_size=batch_size
-                ),
+                labels=Labels.from_list(column_names),
+                dtypes=CustomDtype(**dtypes_map),
+                split=SplitReading(local_path=split_dir, ext=ext, sep=sep),
             )
 
         # Define the paths to the split files
@@ -181,42 +186,19 @@ class LocalReader(AbstractReader):
         path_test = join(read_config.split.local_path, "test" + read_config.split.ext)
         path_val = join(read_config.split.local_path, "val" + read_config.split.ext)
 
-        train_inter = None
-        test_inter = None
-        val_inter = None
-
         logger.msg(f"Starting reading process from local source in: {path_train}")
+
+        # DataFrame init
+        train_set = None
+        test_set = None
+        val_set = None
+
         if isfile(path_train):
             train_set = pd.read_csv(
                 path_train,
                 sep=read_config.split.sep,
                 usecols=read_config.column_names(),
                 dtype=read_config.column_dtype(),
-            )
-            _nuid = train_set[read_config.labels.user_id_label].nunique()
-            _niid = train_set[read_config.labels.item_id_label].nunique()
-            _umap = {
-                user: i
-                for i, user in enumerate(
-                    train_set[read_config.labels.user_id_label].unique()
-                )
-            }
-            _imap = {
-                item: i
-                for i, item in enumerate(
-                    train_set[read_config.labels.item_id_label].unique()
-                )
-            }
-            train_inter = Interactions(
-                train_set,
-                (_nuid, _niid),
-                _umap,
-                _imap,
-                batch_size=read_config.split.batch_size,
-                user_id_label=read_config.labels.user_id_label,
-                item_id_label=read_config.labels.item_id_label,
-                rating_label=read_config.labels.rating_label,
-                rating_type=read_config.rating_type,
             )
 
             if isfile(path_test):
@@ -227,18 +209,6 @@ class LocalReader(AbstractReader):
                     dtype=read_config.column_dtype(),
                 )
 
-                test_inter = Interactions(
-                    test_set,
-                    (_nuid, _niid),
-                    _umap,
-                    _imap,
-                    batch_size=read_config.split.batch_size,
-                    user_id_label=read_config.labels.user_id_label,
-                    item_id_label=read_config.labels.item_id_label,
-                    rating_label=read_config.labels.rating_label,
-                    rating_type=read_config.rating_type,
-                )
-
             if isfile(path_val):
                 val_set = pd.read_csv(
                     path_val,
@@ -247,58 +217,5 @@ class LocalReader(AbstractReader):
                     dtype=read_config.column_dtype(),
                 )
 
-                val_inter = Interactions(
-                    val_set,
-                    (_nuid, _niid),
-                    _umap,
-                    _imap,
-                    batch_size=read_config.split.batch_size,
-                    user_id_label=read_config.labels.user_id_label,
-                    item_id_label=read_config.labels.item_id_label,
-                    rating_label=read_config.labels.rating_label,
-                    rating_type=read_config.rating_type,
-                )
-
-            train_nuid, train_niid = train_inter.get_dims()
-            train_transactions = train_inter.get_transactions()
-            logger.stat_msg(
-                (
-                    f"Number of users: {train_nuid}      "
-                    f"Number of items: {train_niid}      "
-                    f"Transactions: {train_transactions}"
-                ),
-                "Train split information",
-            )
-            if test_inter is not None:
-                test_nuid, test_niid = test_inter.get_dims()
-                test_transactions = test_inter.get_transactions()
-                logger.stat_msg(
-                    (
-                        f"Number of users: {test_nuid}      "
-                        f"Number of items: {test_niid}      "
-                        f"Transactions: {test_transactions}"
-                    ),
-                    "Test split information",
-                )
-            if val_inter is not None:
-                val_nuid, val_niid = val_inter.get_dims()
-                val_transactions = val_inter.get_transactions()
-                logger.stat_msg(
-                    (
-                        f"Number of users: {val_nuid}      "
-                        f"Number of items: {val_niid}      "
-                        f"Transactions: {val_transactions}"
-                    ),
-                    "Validation split information",
-                )
-
-            return TransactionDataset(
-                train_set=train_set,
-                val_set=val_set,
-                test_set=test_set,
-                user_mapping=_umap,
-                item_mapping=_imap,
-                nuid=_nuid,
-                niid=_niid,
-            )
+            return (train_set, test_set, val_set)
         raise FileNotFoundError(f"Train split not found in {path_train}")

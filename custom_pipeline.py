@@ -1,25 +1,21 @@
-from elliotwo.data import LocalReader, Splitter
-from elliotwo.utils.enums import SplittingStrategies, RatingType
+from elliotwo.data import LocalReader, Splitter, TransactionDataset
 
 
 def main():
-    # Writer module testing
-    writer = LocalReader()
-    data = writer.read("tests/test_dataset/movielens.csv", sep=",")
+    reader = LocalReader()
+    data = reader.read("tests/test_dataset/movielens.csv", sep=",")
 
     splitter = Splitter()
-    dataset = splitter.split_transaction(
-        data,
-        strategy=SplittingStrategies.TEMPORAL,
-        rating_type=RatingType.EXPLICIT,
-        validation=True,
-        test_size=0.3,
-        val_size=0.1,
+    train, test, val = splitter.split_transaction(
+        data, strategy="temporal", test_ratio=0.2, val_ratio=0.1
     )
 
-    print(len(dataset.train_set))
-    print(len(dataset.test_set))
-    print(len(dataset.val_set))
+    dataset = TransactionDataset(
+        train, test, val, batch_size=1024, rating_type="explicit"
+    )
+    train_sparse = dataset.train_set.get_sparse()
+    print(train_sparse.dtype)
+    print(dataset.train_set.get_transactions())
 
 
 if __name__ == "__main__":

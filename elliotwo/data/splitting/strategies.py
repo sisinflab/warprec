@@ -1,38 +1,15 @@
 # pylint: disable=too-few-public-methods
-from typing import Tuple, List, Any
+from typing import Tuple, List, Any, Optional
 from abc import ABC, abstractmethod
 
 import numpy as np
 from pandas import DataFrame
-from elliotwo.utils.config import Configuration
 from elliotwo.utils.enums import SplittingStrategies
 from elliotwo.utils.registry import splitting_registry
 
 
 class AbstractStrategy(ABC):
-    """Abstract definition of a splitting strategy.
-
-    Args:
-        config (Configuration): The configuration of the experiment.
-        **kwargs (Any): The keyword arguments.
-
-    Attributes:
-        read_from_config (bool): Flag to check if the reader is reading from the config file.
-    """
-
-    read_from_config: bool = False
-
-    def __init__(self, config: Configuration = None, **kwargs: Any):
-        if config:
-            self.read_from_config = True
-            self._seed = config.general.seed
-            self._user_label = config.reader.labels.user_id_label
-            self._item_label = config.reader.labels.item_id_label
-            self._time_label = config.reader.labels.timestamp_label
-            self._test_size = config.splitter.ratio[1]
-            self._val_size = config.splitter.ratio[2]
-            self._test_k = config.splitter.k[0]
-            self._val_k = config.splitter.k[1]
+    """Abstract definition of a splitting strategy."""
 
     @abstractmethod
     def split(
@@ -64,8 +41,9 @@ class RandomSplit(AbstractStrategy):
     def split(
         self,
         data: DataFrame,
-        test_size: float = 0.2,
-        val_size: float | None = None,
+        test_ratio: float = 0.2,
+        val_ratio: Optional[float] = None,
+        seed: int = 42,
         **kwargs: Any,
     ) -> Tuple[List[int], List[int], List[int]]:
         """Implementation of the random splitting. Original data will
@@ -73,35 +51,32 @@ class RandomSplit(AbstractStrategy):
 
         Args:
             data (DataFrame): The DataFrame to be splitted.
-            test_size (float): The size of the test set.
-            val_size (float | None): The size of the validation set.
+            test_ratio (float): The size of the test set.
+            val_ratio (Optional[float]): The size of the validation set.
+            seed (int): The seed to use during the split.
             **kwargs (Any): The keyword arguments.
 
         Returns:
             Tuple[List[int], List[int], List[int]]:
                 List[int]: List of indexes that will end up in the training set.
-                List[int]: List of indexes that will end up in the validation set.
                 List[int]: List of indexes that will end up in the test set.
+                List[int]: List of indexes that will end up in the validation set.
         """
-        # Initialize the variables to be used
-        _test_size = self._test_size if self.read_from_config else test_size
-        _val_size = self._val_size if self.read_from_config else val_size
-
         # Get interactions in DataFrame and calculate train/test indices
-        train_idxs, test_idxs = self._ratio_split(data, test_size=_test_size)
+        train_idxs, test_idxs = self._ratio_split(data, test_size=test_ratio, seed=seed)
         val_idxs = None
 
         # Check if validation set size has been set, if so we return indices for train/val/test
-        if _val_size:
+        if val_ratio:
             train_idxs, val_idxs = self._ratio_split(
-                data.iloc[train_idxs], test_size=_val_size
+                data.iloc[train_idxs], test_size=val_ratio / (1 - test_ratio), seed=seed
             )
 
         # Otherwise return train/test indices
-        return train_idxs, val_idxs, test_idxs
+        return train_idxs, test_idxs, val_idxs
 
     def _ratio_split(
-        self, data: DataFrame, test_size: float = 0.2
+        self, data: DataFrame, test_size: float = 0.2, seed: int = 42
     ) -> Tuple[List[int], List[int]]:
         """Method used to split a set of data into two partition,
         respecting the ratio given as input.
@@ -113,6 +88,7 @@ class RandomSplit(AbstractStrategy):
             data (DataFrame): The original data in DataFrame format.
             test_size (float): This value represent the percentage of
                 data that will be taken out.
+            seed (int): The seed to use during the split.
 
         Returns:
             Tuple[List[int], List[int]]:
@@ -121,7 +97,7 @@ class RandomSplit(AbstractStrategy):
 
         TODO: This method does not ensures that every user is in the training set.
         """
-        np.random.seed(self._seed)
+        np.random.seed(seed)
 
         user_groups = data.groupby(
             "user_id"
@@ -152,8 +128,7 @@ class LeaveOneOutSplit(AbstractStrategy):
         self,
         data: DataFrame,
         test_k: int = 1,
-        val_k: int | None = None,
-        user_label: str = "user_id",
+        val_k: Optional[int] = None,
         **kwargs: Any,
     ) -> Tuple[List[int], List[int], List[int]]:
         """Implementation of the leave-one-out splitting. If a seed has
@@ -162,8 +137,7 @@ class LeaveOneOutSplit(AbstractStrategy):
         Args:
             data (DataFrame): The DataFrame to be splitted.
             test_k (int): The test k.
-            val_k (int | None): The validation k.
-            user_label (str): The user label in the DataFrame.
+            val_k (Optional[int]): The validation k.
             **kwargs (Any): The keyword arguments.
 
         Returns:
@@ -172,27 +146,18 @@ class LeaveOneOutSplit(AbstractStrategy):
                 List[int]: List of indexes that will end up in the validation set.
                 List[int]: List of indexes that will end up in the test set.
         """
-        # Initialize the variables to be used
-        _test_k = self._test_k if self.read_from_config else test_k
-        _val_k = self._val_k if self.read_from_config else val_k
-        _user_label = self._user_label if self.read_from_config else user_label
-
         # Get interactions in DataFrame and calculate train/test indices
-        train_idxs, test_idxs = self._k_split(data, _test_k, _user_label)
+        train_idxs, test_idxs = self._k_split(data, test_k)
         val_idxs = None
 
         # Check if validation set size has been set, if so we return indices for train/val/test
-        if _val_k:
-            train_idxs, val_idxs = self._k_split(
-                data.iloc[train_idxs], _val_k, _user_label
-            )
+        if val_k:
+            train_idxs, val_idxs = self._k_split(data.iloc[train_idxs], val_k)
 
         # Otherwise return train/test indices
-        return train_idxs, val_idxs, test_idxs
+        return train_idxs, test_idxs, val_idxs
 
-    def _k_split(
-        self, data: DataFrame, k: int = 1, user_label: str = "user_id"
-    ) -> Tuple[List[int], List[int]]:
+    def _k_split(self, data: DataFrame, k: int = 1) -> Tuple[List[int], List[int]]:
         """Method to split data in two partitions, using a fixed number.
 
         This method will take in account some limit examples like
@@ -201,15 +166,14 @@ class LeaveOneOutSplit(AbstractStrategy):
         Args:
             data (DataFrame): The original data in DataFrame format.
             k (int): The number of elements to be included in the second partition.
-            user_label (str): The user label in the DataFrame.
 
         Returns:
             Tuple[List[int], List[int]]:
                 List[int]: List of indexes of the first partition.
                 List[int]: List of indexes of the second partition.
         """
-        # Set random seed for reproducibility
-        np.random.seed(self._seed)
+        # Set user label
+        user_label = data.columns[0]
 
         # Sort by user id label
         df_sorted: DataFrame = data.sort_values(by=[user_label])
@@ -242,10 +206,8 @@ class TemporalSplit(AbstractStrategy):
     def split(
         self,
         data: DataFrame,
-        test_size: float = 0.2,
-        val_size: float | None = None,
-        user_label: str = "user_id",
-        time_label: str = "user_id",
+        test_ratio: float = 0.2,
+        val_ratio: Optional[float] = None,
         **kwargs: Any,
     ) -> Tuple[List[int], List[int], List[int]]:
         """Implementation of the temporal splitting. Original data will be splitted
@@ -253,48 +215,31 @@ class TemporalSplit(AbstractStrategy):
 
         Args:
             data (DataFrame): The DataFrame to be splitted.
-            test_size (float): The test set size.
-            val_size (float | None): The validation set size.
-            user_label (str): The user label in the DataFrame.
-            time_label (str): The timestamp label in the DataFrame.
+            test_ratio (float): The test set size.
+            val_ratio (Optional[float]): The validation set size.
             **kwargs (Any): The keyword arguments.
 
         Returns:
             Tuple[List[int], List[int], List[int]]:
                 List[int]: List of indexes that will end up in the training set.
-                List[int]: List of indexes that will end up in the validation set.
                 List[int]: List of indexes that will end up in the test set.
+                List[int]: List of indexes that will end up in the validation set.
         """
-        # Initialize the variables to be used
-        _test_size = self._test_size if self.read_from_config else test_size
-        _val_size = self._val_size if self.read_from_config else val_size
-        _user_label = self._user_label if self.read_from_config else user_label
-        _time_label = self._time_label if self.read_from_config else time_label
-
         # Get interactions in DataFrame and calculate train/test indices
-        train_idxs, test_idxs = self._temp_split(
-            data, test_size=_test_size, user_label=_user_label, time_label=_time_label
-        )
+        train_idxs, test_idxs = self._temp_split(data, test_size=test_ratio)
         val_idxs = None
 
         # Check if validation set size has been set, if so we return indices for train/val/test
-        if _val_size:
+        if val_ratio:
             train_idxs, val_idxs = self._temp_split(
-                data.iloc[train_idxs],
-                test_size=_val_size,
-                user_label=_user_label,
-                time_label=_time_label,
+                data.iloc[train_idxs], test_size=val_ratio / (1 - test_ratio)
             )
 
         # Otherwise return train/test indices
-        return train_idxs, val_idxs, test_idxs
+        return train_idxs, test_idxs, val_idxs
 
     def _temp_split(
-        self,
-        data: DataFrame,
-        test_size: float = 0.2,
-        user_label: str = "user_id",
-        time_label: str = "timestamp",
+        self, data: DataFrame, test_size: float = 0.2
     ) -> Tuple[List[int], List[int]]:
         """Method to split data in two partitions, using a timestamp.
 
@@ -304,14 +249,16 @@ class TemporalSplit(AbstractStrategy):
         Args:
             data (DataFrame): The original data in DataFrame format.
             test_size (float): Percentage of data that will end up in the second partition.
-            user_label (str): The user label in the DataFrame.
-            time_label (str): The timestamp label in the DataFrame.
 
         Returns:
             Tuple[List[int], List[int]]:
                 List[int]: List of indexes of the first partition.
                 List[int]: List of indexes of the second partition.
         """
+        # Set user and time label
+        user_label = data.columns[0]
+        time_label = data.columns[-1]
+
         # Single sorting by user and timestamp
         data = data.sort_values(by=[user_label, time_label])
 

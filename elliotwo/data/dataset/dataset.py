@@ -1,7 +1,10 @@
+from typing import Tuple, Any, Optional
 from abc import ABC, abstractmethod
 
-from typing import Tuple, Any
+from pandas import DataFrame
 from elliotwo.data.dataset import Interactions
+from elliotwo.utils.enums import RatingType
+from elliotwo.utils.logger import logger
 
 
 class AbstractDataset(ABC):
@@ -14,15 +17,15 @@ class AbstractDataset(ABC):
         val_set (Interactions): Validation set, not mandatory,
             used during training to validate the process.
         test_set (Interactions): Test set, not mandatory, used in evaluation to calculate metrics.
-        nuid (int): Number of user IDs.
-        niid (int): Number of item IDs.
     """
 
     train_set: Interactions
     val_set: Interactions
     test_set: Interactions
-    nuid: int
-    niid: int
+    _nuid: int
+    _niid: int
+    _umap: dict
+    _imap: dict
 
     def __init__(self):
         # Set mappings
@@ -68,7 +71,7 @@ class AbstractDataset(ABC):
                 the dataset.
         """
         return {
-            "items": self.niid,
+            "items": self._niid,
         }
 
     def update_mappings(self, user_mapping: dict, item_mapping: dict):
@@ -78,8 +81,8 @@ class AbstractDataset(ABC):
             user_mapping (dict): The mapping of user_id -> user_idx.
             item_mapping (dict): The mapping of item_id -> item_idx.
         """
-        self._umap = user_mapping
-        self._imap = item_mapping
+        self.umap = user_mapping
+        self.imap = item_mapping
 
     def __iter__(self):
         self.train_iter = iter(self.train_set)
@@ -103,40 +106,103 @@ class TransactionDataset(AbstractDataset):
     """The definition of the Dataset class that will handle transaction data.
 
     Args:
-        train_set (Interactions): The training set.
-        user_mapping (dict): The mapping of user ID -> user idx.
-        item_mapping (dict): The mapping of item ID -> item idx.
-        nuid (int): Number of user IDs.
-        niid (int): Number of item IDs.
-        val_set (Interactions): The validation set.
-        test_set (Interactions): The test set.
+        train_data (DataFrame): The train data.
+        test_data (Optional[DataFrame]): The test data.
+        val_data (Optional[DataFrame]): The validation data.
+        batch_size (int): The batch size that will be used in training and evaluation.
+        rating_type (RatingType): The type of rating used in the dataset.
     """
 
     def __init__(
         self,
-        train_set: Interactions,
-        user_mapping: dict,
-        item_mapping: dict,
-        nuid: int,
-        niid: int,
-        val_set: Interactions = None,
-        test_set: Interactions = None,
+        train_data: DataFrame,
+        test_data: Optional[DataFrame] = None,
+        val_data: Optional[DataFrame] = None,
+        batch_size: int = 1024,
+        rating_type: RatingType = RatingType.IMPLICIT,
     ):
         super().__init__()
-        # Set the datasets
-        self.train_set = train_set
-        self.val_set = val_set
-        self.test_set = test_set
-        self.nuid = nuid
-        self.niid = niid
-        self._umap = user_mapping
-        self._imap = item_mapping
+        # Set user and item label
+        user_label = train_data.columns[0]
+        item_label = train_data.columns[1]
+
+        # Define dimensions that will lead the experiment
+        self._nuid = train_data[user_label].nunique()
+        self._niid = train_data[item_label].nunique()
+
+        # Update mappings inside Dataset structure
+        _uid = train_data[user_label].unique()
+        _iid = train_data[item_label].unique()
+
+        # Calculate mapping for users and items
+        self._umap = {user: i for i, user in enumerate(_uid)}
+        self._imap = {item: i for i, item in enumerate(_iid)}
+
+        self.train_set = Interactions(
+            train_data,
+            (self._nuid, self._niid),
+            self._umap,
+            self._imap,
+            batch_size=batch_size,
+            rating_type=rating_type,
+        )
+
+        # Train set stats
+        train_nuid, train_niid = self.train_set.get_dims()
+        train_transactions = self.train_set.get_transactions()
+        logger.stat_msg(
+            (
+                f"Number of users: {train_nuid}      "
+                f"Number of items: {train_niid}      "
+                f"Transactions: {train_transactions}"
+            ),
+            "Train set",
+        )
+
+        if test_data is not None:
+            self.test_set = Interactions(
+                test_data,
+                (self._nuid, self._niid),
+                self._umap,
+                self._imap,
+                batch_size=batch_size,
+                rating_type=rating_type,
+            )
+            test_nuid, test_niid = self.test_set.get_dims()
+            test_transactions = self.test_set.get_transactions()
+            logger.stat_msg(
+                (
+                    f"Number of users: {test_nuid}      "
+                    f"Number of items: {test_niid}      "
+                    f"Transactions: {test_transactions}"
+                ),
+                "Test set",
+            )
+        if val_data is not None:
+            self.val_set = Interactions(
+                val_data,
+                (self._nuid, self._niid),
+                self._umap,
+                self._imap,
+                batch_size=batch_size,
+                rating_type=rating_type,
+            )
+            val_nuid, val_niid = self.val_set.get_dims()
+            val_transactions = self.val_set.get_transactions()
+            logger.stat_msg(
+                (
+                    f"Number of users: {val_nuid}      "
+                    f"Number of items: {val_niid}      "
+                    f"Transactions: {val_transactions}"
+                ),
+                "Validation set",
+            )
 
     def get_dims(self) -> Tuple[int, int]:
-        return (self.nuid, self.niid)
+        return (self._nuid, self._niid)
 
     def get_mappings(self) -> Tuple[dict, dict]:
-        return (self._umap, self._imap)
+        return (self.umap, self.imap)
 
     def get_inverse_mappings(self) -> Tuple[dict, dict]:
         return {v: k for k, v in self._umap.items()}, {
