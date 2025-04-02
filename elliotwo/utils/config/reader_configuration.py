@@ -37,33 +37,6 @@ class SplitReading(BaseModel):
         return v
 
 
-class ReadingParams(BaseModel):
-    """Definition of the reading params sub-configuration.
-
-    This class reads all the information needed to read the data correctly.
-
-    Attributes:
-        sep (Optional[str]): The separator of the file to read.
-        batch_size (Optional[int]): The batch size used during the reading process.
-    """
-
-    sep: Optional[str] = "\t"
-    batch_size: Optional[int] = 1024
-
-    @field_validator("sep")
-    @classmethod
-    def check_sep(cls, v: str):
-        """Validates the separator."""
-        try:
-            v = v.encode().decode("unicode_escape")
-        except UnicodeDecodeError:
-            logger.negative(
-                f"The string {v} is not a valid separator. Using default separator {'\t'}."
-            )
-            v = "\t"
-        return v
-
-
 class Labels(BaseModel):
     """Definition of the label sub-configuration.
 
@@ -119,9 +92,9 @@ class ReaderConfig(BaseModel):
         data_type (str): The type of data to be loaded. Can be 'transaction'.
         reading_method (ReadingMethods): The strategy used to read the data.
         local_path (Optional[str | None]): The path to the local dataset.
+        sep (Optional[str]): The separator of the file to read.
         rating_type (RatingType): The type of rating to be used. If 'implicit' is chosen,
             the reader will not look for a score.
-        reading_params (Optional[ReadingParams]): The parameters of the reading process.
         split (Optional[SplitReading]): The information of the split reading process.
         labels (Labels): The labels sub-configuration. Defaults to Labels default values.
         dtypes (CustomDtype): The list of column dtype.
@@ -133,8 +106,8 @@ class ReaderConfig(BaseModel):
     data_type: str
     reading_method: ReadingMethods
     local_path: Optional[str | None] = None
+    sep: Optional[str] = "\t"
     rating_type: RatingType
-    reading_params: Optional[ReadingParams] = Field(default_factory=ReadingParams)
     split: Optional[SplitReading] = Field(default_factory=SplitReading)
     labels: Labels = Field(default_factory=Labels)
     dtypes: CustomDtype = Field(default_factory=CustomDtype)
@@ -170,6 +143,19 @@ class ReaderConfig(BaseModel):
             raise ValueError(
                 f"Data type {v} not supported. Supported data types: {supported_data_types}."
             )
+        return v
+
+    @field_validator("sep")
+    @classmethod
+    def check_sep(cls, v: str):
+        """Validates the separator."""
+        try:
+            v = v.encode().decode("unicode_escape")
+        except UnicodeDecodeError:
+            logger.negative(
+                f"The string {v} is not a valid separator. Using default separator {'\t'}."
+            )
+            v = "\t"
         return v
 
     @model_validator(mode="after")

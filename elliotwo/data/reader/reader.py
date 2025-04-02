@@ -12,7 +12,6 @@ from elliotwo.utils.config import (
     ReaderConfig,
     Labels,
     CustomDtype,
-    ReadingParams,
     SplitReading,
 )
 from elliotwo.utils.enums import RatingType, ReadingMethods
@@ -60,7 +59,6 @@ class LocalReader(AbstractReader):
         local_path: str = None,
         rating_type: RatingType = RatingType.IMPLICIT,
         sep: str = "\t",
-        batch_size: int = 1024,
         column_names: List[str] | None = None,
         dtypes: List[str] | None = None,
         **kwargs: Any,
@@ -71,8 +69,6 @@ class LocalReader(AbstractReader):
             local_path (str): The path to the local file.
             rating_type (RatingType): The rating type used in the dataset.
             sep (str): The separator used in the file.
-            batch_size (int): The batch size that will be used to
-                iterate over the interactions.
             column_names (List[str] | None): The column names of the data.
             dtypes (List[str] | None): The data types of the columns.
             **kwargs (Any): The keyword arguments.
@@ -94,36 +90,21 @@ class LocalReader(AbstractReader):
                 data_type="transaction",
                 reading_method=ReadingMethods.LOCAL,
                 local_path=local_path,
+                sep=sep,
                 rating_type=rating_type,
                 labels=Labels.from_list(column_names),
                 dtypes=CustomDtype(**dtypes_map),
-                reading_params=ReadingParams(sep=sep, batch_size=batch_size),
             )
 
         logger.msg(
             f"Starting reading process from local source in: {read_config.local_path}"
         )
-
-        if read_config.reading_params.batch_size is not None:
-            # In case batch_size has been set, read data in batches and then create the dataframe
-            chunks = []
-            for chunk in pd.read_csv(
-                read_config.local_path,
-                sep=read_config.reading_params.sep,
-                chunksize=read_config.reading_params.batch_size,
-                usecols=read_config.column_names(),
-                dtype=read_config.column_dtype(),
-            ):
-                chunks.append(chunk)
-            data = pd.concat(chunks, ignore_index=True)
-        else:
-            # In case batch_size hasn't been set, read the data in one go
-            data = pd.read_csv(
-                read_config.local_path,
-                sep=read_config.reading_params.sep,
-                usecols=read_config.column_names(),
-                dtype=read_config.column_dtype(),
-            )
+        data = pd.read_csv(
+            read_config.local_path,
+            sep=read_config.sep,
+            usecols=read_config.column_names(),
+            dtype=read_config.column_dtype(),
+        )
         logger.msg("Data loaded correctly from local source.")
 
         return data

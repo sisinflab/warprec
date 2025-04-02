@@ -97,7 +97,7 @@ class Configuration(BaseModel):
                 raise FileNotFoundError(
                     f"Configuration file not found at {_local_path}."
                 )
-            _sep = self.reader.reading_params.sep
+            _sep = self.reader.sep
             # Read the header of file to later check
             with open(_local_path, "r", encoding="utf-8") as f:
                 first_line = f.readline()

@@ -6,7 +6,6 @@ reader:
   rating_type: explicit
   reading_params:
     sep: ','
-    ext: '.csv'
     batch_size: 1024
   labels:
     user_id_label: user_id
