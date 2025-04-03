@@ -19,6 +19,7 @@ from elliotwo.recommenders.trainer.scheduler_wrapper import (
     BaseSchedulerWrapper,
 )
 from elliotwo.utils.config import Configuration, RecomModel
+from elliotwo.utils.enums import SearchSpace
 from elliotwo.utils.logger import logger
 from elliotwo.utils.registry import (
     model_registry,
@@ -254,7 +255,10 @@ class Trainer:
         if "optimization" in params_copy:
             params_copy.pop("optimization")
         for k, v in params_copy.items():
-            tune_params[k] = search_space_registry.get(v[0])(*v[1:])
+            if v[0] is not SearchSpace.CHOICE:
+                tune_params[k] = search_space_registry.get(v[0])(*v[1:])
+            else:
+                tune_params[k] = search_space_registry.get(v[0])(v[1:])
 
         return tune_params
 

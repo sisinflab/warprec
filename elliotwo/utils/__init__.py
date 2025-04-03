@@ -3,6 +3,7 @@ from .enums import (
     SplittingStrategies,
     ReadingMethods,
     WritingMethods,
+    Similarities,
     SearchAlgorithms,
     Schedulers,
     SearchSpace,
@@ -15,6 +16,7 @@ from .registry import (
     search_algorithm_registry,
     scheduler_registry,
     search_space_registry,
+    similarities_registry,
 )
 from .config import Configuration, load_yaml
 from .logger import logger
@@ -24,6 +26,7 @@ __all__ = [
     "SplittingStrategies",
     "ReadingMethods",
     "WritingMethods",
+    "Similarities",
     "SearchAlgorithms",
     "Schedulers",
     "SearchSpace",
@@ -34,6 +37,7 @@ __all__ = [
     "search_algorithm_registry",
     "scheduler_registry",
     "search_space_registry",
+    "similarities_registry",
     "Configuration",
     "load_yaml",
     "logger",

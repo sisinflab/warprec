@@ -11,6 +11,7 @@ if TYPE_CHECKING:
     from elliotwo.recommenders.trainer.scheduler_wrapper import (
         BaseSchedulerWrapper,
     )
+    from elliotwo.recommenders.similarities.similarities import Similarity
 
 T = TypeVar("T")
 
@@ -95,6 +96,7 @@ scheduler_registry: BasicRegistry["BaseSchedulerWrapper"] = BasicRegistry("Sched
 search_space_registry: BasicRegistry["SearchSpaceWrapper"] = BasicRegistry(
     "SearchSpace"
 )
+similarities_registry: BasicRegistry["Similarity"] = BasicRegistry("Similarity")
 
 
 class ModelRegistry:

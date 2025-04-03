@@ -54,6 +54,22 @@ class WritingMethods(str, Enum):
     LOCAL = "local"
 
 
+class Similarities(str, Enum):
+    """Represents the types of similarities supported.
+
+    This enum is used to track the possible similarities:
+        - COSINE: Cosine similarity.
+        - DOT: Dot similarity.
+        - EUCLIDEAN: Euclidean similarity.
+        - MANHATTAN: Manhattan similarity.
+    """
+
+    COSINE = "cosine"
+    DOT = "dot"
+    EUCLIDEAN = "euclidean"
+    MANHATTAN = "manhattan"
+
+
 class SearchAlgorithms(str, Enum):
     """Represents the types of search algorithms supported.
 

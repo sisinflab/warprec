@@ -508,3 +508,16 @@ class Slim(RecomModel):
                     f"Values received as input: {v}"
                 )
         return v
+
+
+@params_registry.register("ItemKNN")
+class ItemKNN(RecomModel):
+    """Definition of the model ItemKNN.
+
+    Attributes:
+        k (Union[List[Union[str, int]], int]): List of values for neighbor.
+        similarity (Union[List[str], str]): List of names of similarity functions.
+    """
+
+    k: Union[List[Union[str, int]], int]
+    similarity: Union[List[str], str]

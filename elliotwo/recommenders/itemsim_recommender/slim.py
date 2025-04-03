@@ -21,7 +21,7 @@ class Slim(ItemSimilarityRecommender):
         params (dict): The dictionary with the model params.
         items (int): The number of items that will be learned.
         *args (Any): Variable length argument list.
-        **kwargs (Any): Arbitrary keyword arguments
+        **kwargs (Any): Arbitrary keyword arguments.
 
     The params allowed by this model are as follows:
         l1 (float): Normalization parameter to use during train.

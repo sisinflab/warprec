@@ -28,11 +28,7 @@ splitter:
   val_ratio: 0.1
   seed: 42
 models:
-  EASE:
-    meta:
-      #save_model: True
-      #keep_all_ray_checkpoints: True
-      implementation: elliot
+  ItemKNN:
     optimization:
       strategy: hopt
       scheduler: fifo
@@ -41,22 +37,10 @@ models:
         seed: 42
       device: cpu
       validation_metric: nDCG@10
-      num_samples: 5
+      num_samples: 10
       cpu_per_trial: 2
-    l2: ['uniform', 5, 100]
-  Slim:
-    optimization:
-      strategy: hopt
-      scheduler: fifo
-      properties:
-        mode: max
-        seed: 69
-      device: cpu
-      validation_metric: nDCG@10
-      num_samples: 5
-      cpu_per_trial: 2
-    l1: ['uniform', 0, 1]
-    alpha: ['uniform', 0, 1]
+    k: ['randint', 1, 500]
+    similarity: [cosine, dot, manhattan]
 evaluation:
   top_k: [10, 20, 50]
   metrics: [nDCG, Precision, Recall, HitRate]
