@@ -42,11 +42,21 @@ models:
       device: cpu
       validation_metric: nDCG@10
       num_samples: 5
-      cpu_per_trial: 12
+      cpu_per_trial: 2
     l2: ['uniform', 5, 100]
-  #Slim:
-  #  l1: [0.1, 0.2, 0.5]
-  #  alpha: [0.1, 0.2, 0.5]
+  Slim:
+    optimization:
+      strategy: hopt
+      scheduler: fifo
+      properties:
+        mode: max
+        seed: 69
+      device: cpu
+      validation_metric: nDCG@10
+      num_samples: 5
+      cpu_per_trial: 2
+    l1: ['uniform', 0, 1]
+    alpha: ['uniform', 0, 1]
 evaluation:
   top_k: [10, 20, 50]
   metrics: [nDCG, Precision, Recall, HitRate]

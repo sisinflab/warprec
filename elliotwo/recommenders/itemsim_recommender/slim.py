@@ -1,7 +1,7 @@
 from typing import Any
 
-import numpy as np
 import torch
+import scipy.sparse as sp
 from torch import nn
 from sklearn.linear_model import ElasticNet
 from elliotwo.recommenders.abstract_recommender import ItemSimilarityRecommender
@@ -39,25 +39,37 @@ class Slim(ItemSimilarityRecommender):
         """During training we will compute the B similarity matrix {item x item}."""
         # Predefine the number of items, similarity matrix and ElasticNet
         X = interactions.get_sparse()
+        X = X.tolil()
 
         num_items = X.shape[1]
-        item_sim = np.zeros((num_items, num_items))
+        item_coeffs = []
+        model = ElasticNet(
+            alpha=self.alpha,
+            l1_ratio=self.l1,
+            positive=True,
+            fit_intercept=False,
+            copy_X=False,
+            precompute=True,
+            selection="random",
+            max_iter=100,
+            tol=1e-4,
+        )
 
-        for i in range(num_items):
-            # x_i represent the item column from training set
-            x_i = X[:, i].toarray().ravel()
+        for j in range(num_items):
+            # Current column
+            r = X[:, j]
 
-            # X_j will contain all the other columns
-            mask = np.arange(num_items) != i
-            X_j = X[:, mask]
+            # ElasticNet fitting
+            model.fit(X, r.todense().getA1())
 
-            # Use ElasticNet as in the paper
-            model = ElasticNet(
-                alpha=self.alpha, l1_ratio=self.l1, fit_intercept=False, positive=True
-            )
-            model.fit(X_j, x_i)
+            # Get coefficients in sparse format
+            coeffs = model.sparse_coef_
 
-            # Get coefficients and use them in the similarity matrix
-            coef = model.coef_
-            item_sim[i, mask] = coef
-        self.item_similarity = nn.Parameter(torch.from_numpy(item_sim))
+            # Add them to list
+            item_coeffs.append(coeffs)
+
+        # Stack the coefficients, make the matrix dense and
+        # convert to tensor
+        self.item_similarity = nn.Parameter(
+            torch.from_numpy(sp.vstack(item_coeffs).T.todense())
+        ).to(self._device)

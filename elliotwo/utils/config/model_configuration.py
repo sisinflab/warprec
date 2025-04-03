@@ -270,10 +270,16 @@ class RecomModel(BaseModel, ABC):
         Raises:
             ValueError: If model or implementation is not registered.
         """
-        if name not in model_registry.list_registered():
-            raise ValueError(f"Model {name} not in model_registry.")
-        if imp not in model_registry.list_implementations(name):
-            raise ValueError(f"Model {name} does not have {imp} implementation.")
+        if name.upper() not in model_registry.list_registered():
+            raise ValueError(
+                f"Model {name} not in model_registry. "
+                f"These are the available models: {model_registry.list_registered()}."
+            )
+        if imp not in model_registry.list_implementations(name.upper()):
+            raise ValueError(
+                f"Model {name} does not have {imp} implementation. "
+                f"These are the available implementations: {model_registry.list_implementations(name.upper())}."
+            )
 
     def normalize_values(self, values: dict) -> dict:
         """Ensures all values are lists.
@@ -490,3 +496,15 @@ class Slim(RecomModel):
 
     l1: Union[List[Union[str, float, int]], float, int]
     alpha: Union[List[Union[str, float, int]], float, int]
+
+    @field_validator("l1")
+    @classmethod
+    def check_l1(cls, v: list):
+        """Validate l1."""
+        for value in v:
+            if isinstance(value, (float, int)) and (value < 0 or value > 1):
+                raise ValueError(
+                    "Values of l1 for Slim model must be in [0, 1] range. "
+                    f"Values received as input: {v}"
+                )
+        return v
