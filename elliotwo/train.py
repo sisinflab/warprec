@@ -41,7 +41,7 @@ def main(args: Namespace):
                     train,
                     test,
                     val,
-                    batch_size=1024,
+                    batch_size=config.general.batch_size,
                     rating_type=config.reader.rating_type,
                 )
             else:
@@ -53,7 +53,11 @@ def main(args: Namespace):
         if config.reader.data_type == "transaction":
             train, test, val = reader.read_transaction_split()
             dataset = TransactionDataset(
-                train, test, val, batch_size=1024, rating_type=config.reader.rating_type
+                train,
+                test,
+                val,
+                batch_size=config.general.batch_size,
+                rating_type=config.reader.rating_type,
             )
         else:
             raise ValueError("Data type not yet supported.")

@@ -39,23 +39,16 @@ class GeneralConfig(BaseModel):
     This class reads all the side information about the experiment from the configuration file.
 
     Attributes:
-        seed (Optional[int]): The seed that will be used during the experiment for reproducibility.
-        float_digits (Optional[int]): The number of floating point digits to show on console.
         device (Optional[str]): The device that will be used for most operations.
-        validation_metric (Optional[str]): The validation metric to use,
-            in the format of metric_name@top_k.
         precision (Optional[str]): The precision to use during computation.
-        max_eval (Optional[int]): The maximum number of evaluations to compute with hyperopt.
+        batch_size (Optional[int]): The batch_size used during the experiment.
         recommendation (Optional[GeneralRecommendation]): The general information
             about the recommendation.
     """
 
-    seed: Optional[int] = 42
-    float_digits: Optional[int] = 16
     device: Optional[str] = "cpu"
-    validation_metric: Optional[str] = "nDCG@5"
     precision: Optional[str] = "float32"
-    max_eval: Optional[int] = 10
+    batch_size: Optional[int] = 1024
     recommendation: Optional[GeneralRecommendation] = Field(
         default_factory=GeneralRecommendation
     )

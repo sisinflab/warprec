@@ -51,11 +51,8 @@ evaluation:
   beta: 1
   pop_ratio: 0.8
 general:
-  seed: 42
-  float_digits: 8
   device: cpu
   precision: float64
-  max_eval: 10
   recommendation:
     save_recs: True
     sep: \t
