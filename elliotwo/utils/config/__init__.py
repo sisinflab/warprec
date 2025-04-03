@@ -10,12 +10,11 @@ from .splitter_configuration import SplittingConfig
 from .model_configuration import RecomModel
 from .evaluation_configuration import EvaluationConfig
 from .search_space_wrapper import SearchSpaceWrapper
-from .config import Configuration, load_yaml, parse_params
+from .config import Configuration, load_yaml
 
 __all__ = [
     "Configuration",
     "load_yaml",
-    "parse_params",
     "GeneralConfig",
     "ReaderConfig",
     "Labels",

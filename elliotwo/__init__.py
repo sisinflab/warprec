@@ -14,7 +14,6 @@ from .evaluation import Evaluator
 from .utils import (
     Configuration,
     load_yaml,
-    parse_params,
     logger,
     splitting_registry,
     metric_registry,
@@ -35,7 +34,6 @@ __all__ = [
     "AbstractStrategy",
     "Configuration",
     "load_yaml",
-    "parse_params",
     "logger",
     "splitting_registry",
     "metric_registry",

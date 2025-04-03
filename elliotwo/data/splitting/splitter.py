@@ -110,8 +110,7 @@ class Splitter:
                 )  # Filter items from training set
             ]
             return (train_set, test_set, val_set)
-        else:
-            return (train_set, test_set, None)
+        return (train_set, test_set, None)
 
     def split_context(
         self, data: DataFrame

@@ -1,12 +1,14 @@
 import os
 import tempfile
-from typing import List, Tuple
+from typing import List, Tuple, Optional
+from copy import deepcopy
 
 import ray
 import torch
 import shutil
 from ray import tune
 from ray.tune import Checkpoint
+from ray.tune.experiment.trial import Trial
 from elliotwo.recommenders.abstract_recommender import AbstractRecommender
 from elliotwo.data.dataset import AbstractDataset
 from elliotwo.evaluation.evaluator import Evaluator
@@ -23,6 +25,7 @@ from elliotwo.utils.registry import (
     params_registry,
     search_algorithm_registry,
     scheduler_registry,
+    search_space_registry,
 )
 
 
@@ -37,6 +40,8 @@ class Trainer:
         metric_name (str): The name of the metric that will be used
             as validation.
         top_k (int): The cutoff tu use as validation.
+        beta (float): The beta value for the evaluation.
+        pop_ratio (float): The pop ratio value for the evaluation.
         config (Configuration): The configuration of the experiment.
     """
 
@@ -47,25 +52,29 @@ class Trainer:
         dataset: AbstractDataset,
         metric_name: str,
         top_k: int,
-        config: Configuration,
+        beta: float = 1.0,
+        pop_ratio: float = 0.8,
+        config: Configuration = None,
     ):
+        if config:
+            model_params = config.models[model_name]
+        else:
+            model_params = param
+
         self.infos = dataset.info()
-        self._model_params: RecomModel = params_registry.get(
-            model_name, **config.models[model_name]
-        )
+        self._model_params: RecomModel = params_registry.get(model_name, **model_params)
         self.model_name = model_name
         self._evaluator = Evaluator(
             [metric_name],
             [top_k],
             train_set=dataset.train_set.get_sparse(),
-            beta=config.evaluation.beta,
-            pop_ratio=config.evaluation.pop_ratio,
+            beta=beta,
+            pop_ratio=pop_ratio,
         )
-        self._train_param = param
+        self._train_param = self.parse_params(param)
         self._metric_name = metric_name
         self._top_k = top_k
         self._dataset = ray.put(dataset)
-        self._config = config
 
     def train_and_evaluate(self) -> Tuple[AbstractRecommender, List[Tuple[str, dict]]]:
         """Main method of the Trainer class.
@@ -137,7 +146,7 @@ class Trainer:
             f"Best params combination: {best_params} with a score of "
             f"{self._metric_name}@"
             f"{self._top_k}: "
-            f"{best_score:.{self._config.general.float_digits}f}."
+            f"{best_score}."
         )
         logger.positive(
             f"Hyperparameter tuning for {self.model_name} ended successfully."
@@ -191,7 +200,8 @@ class Trainer:
             model.fit(dataset.train_set)
         except Exception as e:
             logger.negative(
-                f"The fitting of the model {model.name}, failed with parameters: {params}. Error: {e}"
+                f"The fitting of the model {model.name}, failed "
+                f"with parameters: {params}. Error: {e}"
             )
             if mode == "max":
                 tune.report(
@@ -214,17 +224,63 @@ class Trainer:
                 metrics={"score": score}, checkpoint=Checkpoint.from_directory(tmpdir)
             )
 
+    def parse_params(self, params: dict) -> dict:
+        """This method parses the parameters of a model.
+
+        From simple lists it creates the correct data format for
+        Ray Tune hyperparameter optimization. The correct format depends
+        on the search space desired. An example could be:
+        ['uniform', 5.0, 100.0] -> tune.uniform(5.0, 100.0)
+
+        Args:
+            params (dict): The parameters of the model.
+
+        Returns:
+            dict: The parameters in the Ray Tune format.
+        """
+        tune_params = {}
+        params_copy = deepcopy(params)
+        if "meta" in params_copy:
+            params_copy.pop("meta")
+        if "optimization" in params_copy:
+            params_copy.pop("optimization")
+        for k, v in params_copy.items():
+            tune_params[k] = search_space_registry.get(v[0])(*v[1:])
+
+        return tune_params
+
 
 class BestCheckpointCallback(tune.Callback):
+    """The Callback that handles the definition of the best checkpoint.
+
+    Args:
+        metric (str): Name of the metric.
+        mode (str): Hyperparameter tuning mode. Either 'max' or 'min'.
+        keep_all_ray_checkpoints (bool): Wether or not to keep all checkpoints.
+    """
+
     def __init__(self, metric: str, mode: str, keep_all_ray_checkpoints: bool):
         self.metric = metric
         self.mode = mode
         self.keep_all_ray_checkpoints = keep_all_ray_checkpoints
         self.best_score = -float("inf") if mode == "max" else float("inf")
-        self.best_checkpoint = None
+        self.best_checkpoint: Optional[str] = None
         self.checkpoint_param: List[Tuple[str, dict]] = []
 
-    def on_trial_complete(self, iteration, trials, trial, **info):
+    def on_trial_complete(
+        self, iteration: int, trials: List[Trial], trial: Trial, **info
+    ) -> None:
+        """Callback when trial is completed.
+
+        Args:
+            iteration (int): Number of iteration.
+            trials (List[Trial]): List of trials.
+            trial (Trial): The trial that has just been completed.
+            **info: The keyword arguments.
+
+        Returns:
+            None: If the score is None.
+        """
         score = trial.last_result.get(self.metric, None)
         self.checkpoint_param.append((trial.checkpoint.path, trial.config))
         if score is None:
@@ -253,7 +309,19 @@ class BestCheckpointCallback(tune.Callback):
             shutil.rmtree(trial.checkpoint.path)
 
     def get_best_checkpoint(self) -> str:
+        """Method to retrieve the best checkpoint.
+
+        Returns:
+            str: The path to the best checkpoint.
+        """
         return self.best_checkpoint
 
     def get_checkpoints(self) -> List[Tuple[str, dict]]:
+        """Method to retrieve checkpoint and their params.
+
+        Returns:
+            List[Tuple[str, dict]]:
+                str: The path to the checkpoint.
+                dict: The dictionary of the params.
+        """
         return self.checkpoint_param

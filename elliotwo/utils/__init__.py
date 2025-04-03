@@ -16,7 +16,7 @@ from .registry import (
     scheduler_registry,
     search_space_registry,
 )
-from .config import Configuration, load_yaml, parse_params
+from .config import Configuration, load_yaml
 from .logger import logger
 
 __all__ = [
@@ -36,7 +36,5 @@ __all__ = [
     "search_space_registry",
     "Configuration",
     "load_yaml",
-    "parse_params",
     "logger",
-    "parse_params",
 ]

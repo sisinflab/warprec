@@ -84,7 +84,7 @@ class LocalReader(AbstractReader):
                 column_names = ["user_id", "item_id", "rating", "timestamp"]
             if not dtypes:
                 dtypes = ["int32", "int32", "float32", "int32"]
-            dtypes_map = {name: dtype for name, dtype in zip(column_names, dtypes)}
+            dtypes_map = dict(zip(column_names, dtypes))
 
             read_config = ReaderConfig(
                 loading_strategy="dataset",
@@ -169,7 +169,7 @@ class LocalReader(AbstractReader):
                 column_names = ["user_id", "item_id", "rating", "timestamp"]
             if not dtypes:
                 dtypes = ["int32", "int32", "float32", "int32"]
-            dtypes_map = {name: dtype for name, dtype in zip(column_names, dtypes)}
+            dtypes_map = dict(zip(column_names, dtypes))
 
             read_config = ReaderConfig(
                 loading_strategy="split",

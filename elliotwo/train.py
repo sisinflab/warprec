@@ -3,7 +3,7 @@ import os
 from argparse import Namespace
 
 from elliotwo.data import LocalReader, LocalWriter, Splitter, TransactionDataset
-from elliotwo.utils.config import load_yaml, parse_params
+from elliotwo.utils.config import load_yaml
 from elliotwo.utils.logger import logger
 from elliotwo.recommenders.trainer import Trainer
 from elliotwo.recommenders.abstract_recommender import generate_model_name
@@ -77,8 +77,15 @@ def main(args: Namespace):
         val_metric, val_k = config.validation_metric(
             params["optimization"]["validation_metric"]
         )
-        train_params = parse_params(params)
-        trainer = Trainer(model_name, train_params, dataset, val_metric, val_k, config)
+        trainer = Trainer(
+            model_name,
+            params,
+            dataset,
+            val_metric,
+            val_k,
+            beta=config.evaluation.beta,
+            pop_ratio=config.evaluation.pop_ratio,
+        )
         best_model, checkpoint_param = trainer.train_and_evaluate()
 
         # Evaluation testing

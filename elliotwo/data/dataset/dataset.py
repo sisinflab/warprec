@@ -22,13 +22,11 @@ class AbstractDataset(ABC):
     train_set: Interactions
     val_set: Interactions
     test_set: Interactions
-    _nuid: int
-    _niid: int
-    _umap: dict
-    _imap: dict
 
     def __init__(self):
         # Set mappings
+        self._nuid: int = 0
+        self._niid: int = 0
         self._umap: dict[Any, int] = {}
         self._imap: dict[Any, int] = {}
 

@@ -63,7 +63,7 @@ class Properties(BaseModel):
         reduction_factor (Optional[float]): Halving rate of trials.
     """
 
-    mode: Optional[str] = None
+    mode: Optional[str] = "max"
     seed: Optional[int] = 42
     time_attr: Optional[str] = None
     max_t: Optional[int] = None
@@ -110,7 +110,7 @@ class Optimization(BaseModel):
 
     strategy: Optional[SearchAlgorithms] = SearchAlgorithms.GRID
     scheduler: Optional[Schedulers] = Schedulers.FIFO
-    properties: Optional[Properties] = None
+    properties: Optional[Properties] = Field(default_factory=Properties)
     validation_metric: Optional[str] = None
     num_samples: Optional[int] = 1
     cpu_per_trial: Optional[float] = 1.0

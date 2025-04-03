@@ -1,6 +1,5 @@
 import os
 from typing import Tuple, ClassVar, Dict
-from copy import deepcopy
 
 import yaml
 import numpy as np
@@ -15,7 +14,7 @@ from elliotwo.utils.config import (
     EvaluationConfig,
 )
 from elliotwo.utils.enums import RatingType, SplittingStrategies, ReadingMethods
-from elliotwo.utils.registry import params_registry, search_space_registry
+from elliotwo.utils.registry import params_registry
 from elliotwo.utils.logger import logger
 
 
@@ -214,30 +213,6 @@ class Configuration(BaseModel):
         """
         metric_name, top_k = val_metric.split("@")
         return metric_name, int(top_k)
-
-
-def parse_params(params: dict) -> dict:
-    """This method parses the parameters of a model.
-
-    From simple lists it creates the correct data format for
-    Ray Tune hyperparameter optimization. The correct format depends
-    on the search space desired. An example could be:
-    ['uniform', 5.0, 100.0] -> tune.uniform(5.0, 100.0)
-
-    Args:
-        params (dict): The parameters of the model.
-
-    Returns:
-        dict: The parameters in the Ray Tune format.
-    """
-    tune_params = {}
-    params_copy = deepcopy(params)
-    params_copy.pop("meta")
-    params_copy.pop("optimization")
-    for k, v in params_copy.items():
-        tune_params[k] = search_space_registry.get(v[0])(*v[1:])
-
-    return tune_params
 
 
 def load_yaml(path: str) -> Configuration:

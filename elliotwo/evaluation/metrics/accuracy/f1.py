@@ -31,8 +31,8 @@ class F1(TopKMetric):
 
     Args:
         k (int): The number of top recommendations to consider (cutoff).
-        beta (float): The weight of recall in the harmonic mean. Default is 1.0.
         *args (Any): Additional arguments to pass to the parent class.
+        beta (float): The weight of recall in the harmonic mean. Default is 1.0.
         dist_sync_on_step (bool): Torchmetrics parameter.
         **kwargs (Any): Additional keyword arguments to pass to the parent class.
     """
@@ -44,8 +44,8 @@ class F1(TopKMetric):
     def __init__(
         self,
         k: int,
-        beta: float = 1.0,
         *args: Any,
+        beta: float = 1.0,
         dist_sync_on_step: bool = False,
         **kwargs: Any,
     ):
