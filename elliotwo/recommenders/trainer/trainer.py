@@ -42,6 +42,7 @@ class Trainer:
         top_k (int): The cutoff tu use as validation.
         beta (float): The beta value for the evaluation.
         pop_ratio (float): The pop ratio value for the evaluation.
+        ray_verbose (int): The Ray level of verbosity.
         config (Configuration): The configuration of the experiment.
     """
 
@@ -54,6 +55,7 @@ class Trainer:
         top_k: int,
         beta: float = 1.0,
         pop_ratio: float = 0.8,
+        ray_verbose: int = 1,
         config: Configuration = None,
     ):
         if config:
@@ -73,6 +75,7 @@ class Trainer:
         self._train_param = self.parse_params(param)
         self._metric_name = metric_name
         self._top_k = top_k
+        self._verbose = ray_verbose
         self._dataset = ray.put(dataset)
 
     def train_and_evaluate(self) -> Tuple[AbstractRecommender, List[Tuple[str, dict]]]:
@@ -130,7 +133,7 @@ class Trainer:
             search_alg=search_alg,
             scheduler=scheduler,
             num_samples=self._model_params.optimization.num_samples,
-            verbose=1,
+            verbose=self._verbose,
             callbacks=[best_checkpoint_callback],
         )
 

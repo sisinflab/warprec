@@ -55,6 +55,7 @@ general:
   device: cpu
   precision: float64
   batch_size: 1024
+  verbose: 1
   recommendation:
     save_recs: True
     sep: \t

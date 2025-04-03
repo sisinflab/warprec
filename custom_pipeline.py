@@ -33,6 +33,7 @@ def main():
         dataset=dataset,
         metric_name=val_metric,
         top_k=top_k,
+        ray_verbose=1,
     )
     best_model, _ = trainer.train_and_evaluate()
 

@@ -91,6 +91,7 @@ def main(args: Namespace):
             val_k,
             beta=config.evaluation.beta,
             pop_ratio=config.evaluation.pop_ratio,
+            ray_verbose=config.general.ray_verbose,
         )
         best_model, checkpoint_param = trainer.train_and_evaluate()
 

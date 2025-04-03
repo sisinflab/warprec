@@ -42,6 +42,7 @@ class GeneralConfig(BaseModel):
         device (Optional[str]): The device that will be used for most operations.
         precision (Optional[str]): The precision to use during computation.
         batch_size (Optional[int]): The batch_size used during the experiment.
+        ray_verbose (Optional[int]): The Ray level of verbosity.
         recommendation (Optional[GeneralRecommendation]): The general information
             about the recommendation.
     """
@@ -49,6 +50,7 @@ class GeneralConfig(BaseModel):
     device: Optional[str] = "cpu"
     precision: Optional[str] = "float32"
     batch_size: Optional[int] = 1024
+    ray_verbose: Optional[int] = 1
     recommendation: Optional[GeneralRecommendation] = Field(
         default_factory=GeneralRecommendation
     )
