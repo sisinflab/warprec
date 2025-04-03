@@ -26,6 +26,7 @@ splitter:
   strategy: temporal
   test_ratio: 0.1
   val_ratio: 0.1
+  seed: 42
 models:
   EASE:
     meta:
@@ -53,6 +54,7 @@ evaluation:
 general:
   device: cpu
   precision: float64
+  batch_size: 1024
   recommendation:
     save_recs: True
     sep: \t

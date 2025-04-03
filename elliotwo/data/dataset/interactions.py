@@ -19,6 +19,7 @@ class Interactions:
         batch_size (int): The batch size that will be used to
             iterate over the interactions.
         rating_type (RatingType): The type of rating to be used.
+        precision (Any): The precision of the internal representation of the data.
 
     Raises:
         ValueError: If the rating type is not supported.
@@ -36,11 +37,13 @@ class Interactions:
         item_mapping: dict,
         batch_size: int = 1024,
         rating_type: RatingType = RatingType.IMPLICIT,
+        precision: Any = np.float32,
     ) -> None:
         # Setup the variables
         self._inter_df = data
         self.batch_size = batch_size
         self.rating_type = rating_type
+        self.precision = precision
 
         # Set user and item label
         self._user_label = data.columns[0]
@@ -99,21 +102,18 @@ class Interactions:
         """
         return self._inter_df
 
-    def get_sparse(self, precision: Any = np.float32) -> csr_matrix:
+    def get_sparse(self) -> csr_matrix:
         """This method retrieves the sparse representation of data.
 
         This method also checks if the sparse structure has
         already been created, if not then it also create it first.
-
-        Args:
-            precision (Any): The precision of the sparse matrix.
 
         Returns:
             csr_matrix: Sparse representation of the transactions (CSR Format).
         """
         if isinstance(self._inter_sparse, csr_matrix):
             return self._inter_sparse
-        return self._to_sparse(precision=precision)
+        return self._to_sparse()
 
     def get_dims(self) -> Tuple[int, int]:
         """This method will return the dimensions of the data.
@@ -133,13 +133,10 @@ class Interactions:
         """
         return self._transactions
 
-    def _to_sparse(self, precision: Any = np.float32) -> csr_matrix:
+    def _to_sparse(self) -> csr_matrix:
         """This method will create the sparse representation of the data contained.
 
         This method must not be called if the sparse representation has already be defined.
-
-        Args:
-            precision (Any): The precision of the sparse matrix.
 
         Returns:
             csr_matrix: Sparse representation of the transactions (CSR Format).
@@ -154,7 +151,7 @@ class Interactions:
         self._inter_sparse = coo_matrix(
             (ratings, (users, items)),
             shape=(self._og_nuid, self._og_niid),
-            dtype=precision,
+            dtype=self.precision,
         ).tocsr()
         return self._inter_sparse
 

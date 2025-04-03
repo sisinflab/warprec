@@ -1,3 +1,4 @@
+import numpy as np
 from elliotwo.data import LocalReader, Splitter, TransactionDataset
 from elliotwo.recommenders import Trainer
 from elliotwo.evaluation import Evaluator
@@ -13,7 +14,7 @@ def main():
     )
 
     dataset = TransactionDataset(
-        train, test, val, batch_size=1024, rating_type="explicit"
+        train, test, val, batch_size=1024, rating_type="explicit", precision=np.float64
     )
 
     # Tuning parameters

@@ -43,6 +43,7 @@ def main(args: Namespace):
                     val,
                     batch_size=config.general.batch_size,
                     rating_type=config.reader.rating_type,
+                    precision=config.general.precision,
                 )
             else:
                 raise ValueError("Data type not yet supported.")
@@ -58,6 +59,7 @@ def main(args: Namespace):
                 val,
                 batch_size=config.general.batch_size,
                 rating_type=config.reader.rating_type,
+                precision=config.general.precision,
             )
         else:
             raise ValueError("Data type not yet supported.")

@@ -1,6 +1,7 @@
 from typing import Tuple, Any, Optional
 from abc import ABC, abstractmethod
 
+import numpy as np
 from pandas import DataFrame
 from elliotwo.data.dataset import Interactions
 from elliotwo.utils.enums import RatingType
@@ -109,6 +110,7 @@ class TransactionDataset(AbstractDataset):
         val_data (Optional[DataFrame]): The validation data.
         batch_size (int): The batch size that will be used in training and evaluation.
         rating_type (RatingType): The type of rating used in the dataset.
+        precision (Any): The precision of the internal representation of the data.
     """
 
     def __init__(
@@ -118,6 +120,7 @@ class TransactionDataset(AbstractDataset):
         val_data: Optional[DataFrame] = None,
         batch_size: int = 1024,
         rating_type: RatingType = RatingType.IMPLICIT,
+        precision: Any = np.float32,
     ):
         super().__init__()
         # Set user and item label
@@ -143,6 +146,7 @@ class TransactionDataset(AbstractDataset):
             self._imap,
             batch_size=batch_size,
             rating_type=rating_type,
+            precision=precision,
         )
 
         # Train set stats
@@ -165,6 +169,7 @@ class TransactionDataset(AbstractDataset):
                 self._imap,
                 batch_size=batch_size,
                 rating_type=rating_type,
+                precision=precision,
             )
             test_nuid, test_niid = self.test_set.get_dims()
             test_transactions = self.test_set.get_transactions()
@@ -184,6 +189,7 @@ class TransactionDataset(AbstractDataset):
                 self._imap,
                 batch_size=batch_size,
                 rating_type=rating_type,
+                precision=precision,
             )
             val_nuid, val_niid = self.val_set.get_dims()
             val_transactions = self.val_set.get_transactions()
