@@ -61,7 +61,6 @@ class Trainer:
         else:
             model_params = param
 
-        self.infos = dataset.info()
         self._model_params: RecomModel = params_registry.get(model_name, **model_params)
         self.model_name = model_name
         self._evaluator = Evaluator(
@@ -164,7 +163,6 @@ class Trainer:
             name=self.model_name,
             implementation=self._model_params.meta.implementation,
             params=best_params,
-            **self.infos,
         )
         best_model.load_state_dict(model_state)
 
@@ -194,7 +192,6 @@ class Trainer:
             name=model_name,
             implementation=self._model_params.meta.implementation,
             params=params,
-            **self.infos,
         )
         try:
             model.fit(dataset.train_set)

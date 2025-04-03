@@ -61,18 +61,6 @@ class AbstractDataset(ABC):
                 dict: Mapping of item_idxs -> item_id.
         """
 
-    def info(self) -> dict:
-        """This method returns the main information of the
-        dataset in dict format.
-
-        Returns:
-            dict: The dictionary with the main information of
-                the dataset.
-        """
-        return {
-            "items": self._niid,
-        }
-
     def update_mappings(self, user_mapping: dict, item_mapping: dict):
         """Update the mappings of the dataset.
 
