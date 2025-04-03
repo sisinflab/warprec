@@ -39,7 +39,6 @@ class GeneralConfig(BaseModel):
     This class reads all the side information about the experiment from the configuration file.
 
     Attributes:
-        device (Optional[str]): The device that will be used for most operations.
         precision (Optional[str]): The precision to use during computation.
         batch_size (Optional[int]): The batch_size used during the experiment.
         ray_verbose (Optional[int]): The Ray level of verbosity.
@@ -47,22 +46,9 @@ class GeneralConfig(BaseModel):
             about the recommendation.
     """
 
-    device: Optional[str] = "cpu"
     precision: Optional[str] = "float32"
     batch_size: Optional[int] = 1024
     ray_verbose: Optional[int] = 1
     recommendation: Optional[GeneralRecommendation] = Field(
         default_factory=GeneralRecommendation
     )
-
-    @field_validator("device")
-    @classmethod
-    def check_device(cls, v: str):
-        """Validate device."""
-        if v in ("cuda", "cpu"):
-            return v
-        if v.startswith("cuda:"):
-            parts = v.split(":")
-            if len(parts) == 2 and parts[1].isdigit():
-                return v
-        raise ValueError(f'Device {v} is not supported. Use "cpu" or "cuda[:index]".')

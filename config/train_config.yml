@@ -39,6 +39,7 @@ models:
       properties:
         mode: max
         seed: 42
+      device: cpu
       validation_metric: nDCG@10
       num_samples: 5
       cpu_per_trial: 12
@@ -52,7 +53,6 @@ evaluation:
   beta: 1
   pop_ratio: 0.8
 general:
-  device: cpu
   precision: float64
   batch_size: 1024
   verbose: 1

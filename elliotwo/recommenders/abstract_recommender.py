@@ -16,6 +16,7 @@ class AbstractRecommender(nn.Module, ABC):
     Args:
         params (dict): The dictionary with the model params.
         *args (Any): Argument for PyTorch nn.Module.
+        device (str): The device used for tensor operations.
         **kwargs (Any): Keyword argument for PyTorch nn.Module.
     """
 
@@ -23,10 +24,12 @@ class AbstractRecommender(nn.Module, ABC):
         self,
         params: dict,
         *args: Any,
+        device: str = "cpu",
         **kwargs: Any,
     ):
         super().__init__(*args, **kwargs)
         self.init_params(params)
+        self._device = device
         self._name = ""
 
     @abstractmethod
@@ -130,6 +133,7 @@ class ItemSimilarityRecommender(AbstractRecommender):
         params (dict): The dictionary with the model params.
         items (int): The number of items that will be learned.
         *args (Any): Argument for PyTorch nn.Module.
+        device (str): The device used for tensor operations.
         **kwargs (Any): Keyword argument for PyTorch nn.Module.
     """
 
@@ -138,10 +142,11 @@ class ItemSimilarityRecommender(AbstractRecommender):
         params: dict,
         items: int,
         *args: Any,
+        device: str = "cpu",
         **kwargs: Any,
     ):
-        super().__init__(params, *args, **kwargs)
-        self.item_similarity = nn.Parameter(torch.rand(items, items))
+        super().__init__(params, device=device, *args, **kwargs)
+        self.item_similarity = nn.Parameter(torch.rand(items, items)).to(self._device)
 
     def forward(
         self, interaction_matrix: csr_matrix, *args: Any, **kwargs: Any
@@ -161,4 +166,4 @@ class ItemSimilarityRecommender(AbstractRecommender):
 
         # Masking interaction already seen in train
         r[interaction_matrix.nonzero()] = -torch.inf
-        return torch.from_numpy(r)
+        return torch.from_numpy(r).to(self._device)

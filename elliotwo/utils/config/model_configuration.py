@@ -1,6 +1,7 @@
 from typing import List, Optional, Union
 from abc import ABC
 
+import torch
 from pydantic import BaseModel, Field, model_validator, field_validator
 from elliotwo.utils.enums import (
     SearchAlgorithms,
@@ -100,6 +101,7 @@ class Optimization(BaseModel):
         properties (Optional[Properties]): The attributes required for Ray Tune to work.
         validation_metric (Optional[str]): The metric/loss that will
             validate each trial in Ray Tune.
+        device (Optional[str]): The device that will be used for tensor operations.
         num_samples (Optional[int]): The number of trials that Ray Tune will try.
             In case of a grid search, this parameter should be set to 1.
         cpu_per_trial (Optional[float]): The number of cpu cores dedicated to
@@ -112,6 +114,7 @@ class Optimization(BaseModel):
     scheduler: Optional[Schedulers] = Schedulers.FIFO
     properties: Optional[Properties] = Field(default_factory=Properties)
     validation_metric: Optional[str] = None
+    device: Optional[str] = "cpu"
     num_samples: Optional[int] = 1
     cpu_per_trial: Optional[float] = 1.0
     gpu_per_trial: Optional[float] = 0.0
@@ -153,6 +156,27 @@ class Optimization(BaseModel):
                 "Validation metric should be provided with a top_k number."
             )
         return v
+
+    @field_validator("device")
+    @classmethod
+    def check_device(cls, v: str):
+        """Validate device."""
+        if v in ("cuda", "cpu"):
+            if v == "cuda" and not torch.cuda.is_available():
+                raise ValueError(
+                    "Cuda device was selected but not available on current machine."
+                )
+            return v
+        if v.startswith("cuda:"):
+            parts = v.split(":")
+            if len(parts) == 2 and parts[1].isdigit():
+                if parts[1] not in list(range(torch.cuda.device_count())):
+                    raise ValueError(
+                        f"The GPU with the idx {parts[1]} is not available. "
+                        f"This is a list of available GPU idxs: {list(range(torch.cuda.device_count()))}."
+                    )
+                return v
+        raise ValueError(f'Device {v} is not supported. Use "cpu" or "cuda[:index]".')
 
     @model_validator(mode="after")
     def model_validation(self):

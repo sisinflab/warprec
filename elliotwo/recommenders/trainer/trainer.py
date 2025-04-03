@@ -63,6 +63,7 @@ class Trainer:
         else:
             model_params = param
 
+        self.infos = dataset.info()
         self._model_params: RecomModel = params_registry.get(model_name, **model_params)
         self.model_name = model_name
         self._evaluator = Evaluator(
@@ -100,6 +101,7 @@ class Trainer:
 
         properties = self._model_params.optimization.properties.model_dump()
         mode = self._model_params.optimization.properties.mode
+        device = self._model_params.optimization.device
         keep_all_ray_checkpoints = self._model_params.meta.keep_all_ray_checkpoints
 
         # Ray Tune parameters
@@ -109,6 +111,7 @@ class Trainer:
             dataset=self._dataset,
             mode=mode,
             evaluator=self._evaluator,
+            device=device,
         )
 
         search_alg: BaseSearchWrapper = search_algorithm_registry.get(
@@ -166,6 +169,8 @@ class Trainer:
             name=self.model_name,
             implementation=self._model_params.meta.implementation,
             params=best_params,
+            device=device,
+            **self.infos,
         )
         best_model.load_state_dict(model_state)
 
@@ -180,6 +185,7 @@ class Trainer:
         dataset: AbstractDataset,
         mode: str,
         evaluator: Evaluator,
+        device: str,
     ):
         """Objective function to optimize the hyperparameters.
 
@@ -190,11 +196,14 @@ class Trainer:
             mode (str): Wether or not to maximize or minimize the metric.
             evaluator (Evaluator): The evaluator that will calculate the
                 validation metric.
+            device (str): The device used for tensor operations.
         """
         model = model_registry.get(
             name=model_name,
             implementation=self._model_params.meta.implementation,
             params=params,
+            device=device,
+            **self.infos,
         )
         try:
             model.fit(dataset.train_set)
