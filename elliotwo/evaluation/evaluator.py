@@ -5,7 +5,7 @@ from scipy.sparse import csr_matrix
 from tabulate import tabulate
 from elliotwo.data.dataset import AbstractDataset
 from elliotwo.evaluation.base_metric import BaseMetric
-from elliotwo.recommenders.abstract_recommender import AbstractRecommender
+from elliotwo.recommenders.base_recommender import Recommender
 from elliotwo.utils.logger import logger
 from elliotwo.utils.registry import metric_registry
 
@@ -51,7 +51,7 @@ class Evaluator:
 
     def evaluate(
         self,
-        model: AbstractRecommender,
+        model: Recommender,
         dataset: AbstractDataset,
         device: str = "cpu",
         test_set: bool = True,
@@ -60,7 +60,7 @@ class Evaluator:
         """The main method to evaluate a list of metrics on the prediction of a model.
 
         Args:
-            model (AbstractRecommender): The trained model.
+            model (Recommender): The trained model.
             dataset (AbstractDataset): The dataset from which retrieve train/val/test data.
             device (str): The device on which the metrics will be calculated.
             test_set (bool): Wether or not to compute metrics on test set.

@@ -5,7 +5,7 @@ import numpy as np
 from torch import Tensor, nn
 from scipy.sparse import csr_matrix
 from elliotwo.data.dataset import Interactions
-from elliotwo.recommenders.abstract_recommender import ItemSimilarityRecommender
+from elliotwo.recommenders.base_recommender import ItemSimilarityRecommender
 from elliotwo.utils.registry import model_registry, similarities_registry
 
 

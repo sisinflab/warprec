@@ -10,7 +10,7 @@ from pandas import DataFrame
 from elliotwo.data.dataset import Interactions
 
 
-class AbstractRecommender(nn.Module, ABC):
+class Recommender(nn.Module, ABC):
     """Abstract class that defines the basic functionalities of a recommendation model.
 
     Args:
@@ -123,7 +123,7 @@ def generate_model_name(model_name: str, params: dict) -> str:
     return f"{model_name}_{param_str}"
 
 
-class ItemSimilarityRecommender(AbstractRecommender):
+class ItemSimilarityRecommender(Recommender):
     """ItemSimilarityRecommender implementation.
 
     A ItemSimilarityRecommender is a Collaborative Filtering recommendation model
@@ -177,7 +177,7 @@ class ItemSimilarityRecommender(AbstractRecommender):
         return torch.from_numpy(r).to(self._device)
 
 
-class UserSimilarityRecommender(AbstractRecommender):
+class UserSimilarityRecommender(Recommender):
     """UserSimilarityRecommender implementation.
 
     A UserSimilarityRecommender is a Collaborative Filtering recommendation model

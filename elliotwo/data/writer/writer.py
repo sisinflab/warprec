@@ -11,7 +11,7 @@ import torch
 from pandas import DataFrame
 from elliotwo.utils.config import Configuration
 from elliotwo.data.dataset import AbstractDataset
-from elliotwo.recommenders.abstract_recommender import AbstractRecommender
+from elliotwo.recommenders.base_recommender import Recommender
 from elliotwo.utils.enums import WritingMethods
 from elliotwo.utils.config import WriterConfig, WritingParams
 from elliotwo.utils.logger import logger
@@ -50,7 +50,7 @@ class AbstractWriter(ABC):
         """This method writes recommendations in the destination."""
 
     @abstractmethod
-    def write_model(self, model: AbstractRecommender):
+    def write_model(self, model: Recommender):
         """This method writes the model state into a destination."""
 
     @abstractmethod
@@ -238,11 +238,11 @@ class LocalWriter(AbstractWriter):
             index=None,
         )
 
-    def write_model(self, model: AbstractRecommender):
+    def write_model(self, model: Recommender):
         """This method writes the model state into a local path.
 
         Args:
-            model (AbstractRecommender): The model to write locally.
+            model (Recommender): The model to write locally.
         """
         # experiment_path/serialized/model_name.pth
         _path = join(self.experiment_serialized_models_dir, model.name_param + ".pth")

@@ -4,7 +4,7 @@ import numpy as np
 import torch
 from torch import nn
 from sklearn.utils.extmath import safe_sparse_dot
-from elliotwo.recommenders.abstract_recommender import ItemSimilarityRecommender
+from elliotwo.recommenders.base_recommender import ItemSimilarityRecommender
 from elliotwo.data.dataset import Interactions
 from elliotwo.utils.registry import model_registry
 

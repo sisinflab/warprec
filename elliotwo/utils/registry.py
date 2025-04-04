@@ -1,7 +1,7 @@
 from typing import TypeVar, Dict, Type, Optional, Callable, List, Generic, TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from elliotwo.recommenders.abstract_recommender import AbstractRecommender
+    from elliotwo.recommenders.base_recommender import Recommender
     from elliotwo.utils.config import RecomModel, SearchSpaceWrapper
     from elliotwo.evaluation.base_metric import BaseMetric
     from elliotwo.data.splitting.strategies import AbstractStrategy
@@ -107,7 +107,7 @@ class ModelRegistry:
     """
 
     def __init__(self, registry_name: str):
-        self._registry: Dict[str, Dict[str, "AbstractRecommender"]] = {}
+        self._registry: Dict[str, Dict[str, "Recommender"]] = {}
         self.registry_name = registry_name
 
     def register(
@@ -125,14 +125,14 @@ class ModelRegistry:
             Callable: The decorator to register new data.
         """
 
-        def decorator(cls: "AbstractRecommender") -> "AbstractRecommender":
+        def decorator(cls: "Recommender") -> "Recommender":
             """The definition of the decorator.
 
             Args:
-                cls (AbstractRecommender): A recommender class.
+                cls (Recommender): A recommender class.
 
             Returns:
-                AbstractRecommender: A recommender class.
+                Recommender: A recommender class.
             """
             key = (name or cls.name).upper()
             imp = (implementation or "latest").lower()
@@ -148,7 +148,7 @@ class ModelRegistry:
 
     def get(
         self, name: str, *args, implementation: str = None, **kwargs
-    ) -> "AbstractRecommender":
+    ) -> "Recommender":
         """
         Get an instance from the registry by name.
 
@@ -159,7 +159,7 @@ class ModelRegistry:
             **kwargs: Keyword arguments to pass to the class constructor.
 
         Returns:
-            AbstractRecommender: The recommender model.
+            Recommender: The recommender model.
 
         Raises:
             ValueError: If name is not to be found in registry.

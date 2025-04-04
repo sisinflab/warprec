@@ -6,7 +6,7 @@ from elliotwo.data import LocalReader, LocalWriter, Splitter, TransactionDataset
 from elliotwo.utils.config import load_yaml
 from elliotwo.utils.logger import logger
 from elliotwo.recommenders.trainer import Trainer
-from elliotwo.recommenders.abstract_recommender import generate_model_name
+from elliotwo.recommenders.base_recommender import generate_model_name
 from elliotwo.evaluation.evaluator import Evaluator
 
 

@@ -4,7 +4,7 @@ import torch
 import scipy.sparse as sp
 from torch import nn
 from sklearn.linear_model import ElasticNet
-from elliotwo.recommenders.abstract_recommender import ItemSimilarityRecommender
+from elliotwo.recommenders.base_recommender import ItemSimilarityRecommender
 from elliotwo.data.dataset import Interactions
 from elliotwo.utils.registry import model_registry
 

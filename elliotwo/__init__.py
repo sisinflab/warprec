@@ -9,7 +9,7 @@ from .data import (
     AbstractWriter,
     LocalWriter,
 )
-from .recommenders import EASE, Slim, Trainer, AbstractRecommender, generate_model_name
+from .recommenders import EASE, Slim, Trainer, Recommender, generate_model_name
 from .evaluation import Evaluator
 from .utils import (
     Configuration,
@@ -49,6 +49,6 @@ __all__ = [
     "Slim",
     "Evaluator",
     "Trainer",
-    "AbstractRecommender",
+    "Recommender",
     "generate_model_name",
 ]

@@ -9,7 +9,7 @@ import shutil
 from ray import tune
 from ray.tune import Checkpoint
 from ray.tune.experiment.trial import Trial
-from elliotwo.recommenders.abstract_recommender import AbstractRecommender
+from elliotwo.recommenders.base_recommender import Recommender
 from elliotwo.data.dataset import AbstractDataset
 from elliotwo.evaluation.evaluator import Evaluator
 from elliotwo.recommenders.trainer.search_algorithm_wrapper import (
@@ -80,15 +80,15 @@ class Trainer:
         self._verbose = ray_verbose
         self._dataset = ray.put(dataset)
 
-    def train_and_evaluate(self) -> Tuple[AbstractRecommender, List[Tuple[str, dict]]]:
+    def train_and_evaluate(self) -> Tuple[Recommender, List[Tuple[str, dict]]]:
         """Main method of the Trainer class.
 
         This method will execute the training of the model and evaluation,
         according to information passed through configuration.
 
         Returns:
-            Tuple[AbstractRecommender, List[Tuple[str, dict]]]:
-                - AbstractRecommender: The model trained.
+            Tuple[Recommender, List[Tuple[str, dict]]]:
+                - Recommender: The model trained.
                 - List[Tuple[str, dict]]:
                     - str: Path of checkpoint
                     - dict: Params of the model
