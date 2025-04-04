@@ -100,7 +100,9 @@ class nDCG(TopKMetric):
         idcg_score = self.dcg(ideal_rel).clamp(min=1e-10)
 
         self.ndcg += (dcg_score / idcg_score).nan_to_num(0).sum()
-        self.users += target.shape[0]
+
+        # Count only users with at least one interaction
+        self.users += (target > 0).any(dim=1).sum().item()
 
     def compute(self):
         """Computes the final metric value."""

@@ -25,7 +25,9 @@ splitter:
   val_ratio: 0.1
   seed: 42
 models:
-  ItemKNN:
+  EASE:
+    meta:
+      implementation: elliot
     optimization:
       strategy: hopt
       scheduler: fifo
@@ -34,25 +36,9 @@ models:
         seed: 42
       device: cpu
       validation_metric: nDCG@10
-      num_samples: 20
+      num_samples: 5
       cpu_per_trial: 2
-    k: ['randint', 1, 500]
-    similarity: [cosine, dot, manhattan, haversine]
-    normalize: False
-  UserKNN:
-    optimization:
-      strategy: hopt
-      scheduler: fifo
-      properties:
-        mode: max
-        seed: 42
-      device: cpu
-      validation_metric: nDCG@10
-      num_samples: 20
-      cpu_per_trial: 2
-    k: ['randint', 1, 500]
-    similarity: [cosine, dot, manhattan, haversine]
-    normalize: False
+    l2: ['uniform', 1, 100]
 evaluation:
   top_k: [10, 20, 50]
   metrics: [nDCG, Precision, Recall, HitRate]

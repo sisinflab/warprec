@@ -145,7 +145,9 @@ class LAUC(TopKMetric):
 
         # Update
         self.lauc += lauc_values.sum()
-        self.users += target.shape[0]
+
+        # Count only users with at least one interaction
+        self.users += (target > 0).any(dim=1).sum().item()
 
     def compute(self):
         """Computes the final metric value."""

@@ -98,7 +98,9 @@ class ARP(TopKMetric):
         batch_pop = self.pop.repeat(target.shape[0], 1)  # [batch_size x items]
 
         self.total_pop += (rel * batch_pop).sum()
-        self.users += target.shape[0]
+
+        # Count only users with at least one interaction
+        self.users += (target > 0).any(dim=1).sum().item()
 
     def compute(self):
         """Computes the final metric value."""

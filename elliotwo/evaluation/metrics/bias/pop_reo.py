@@ -106,8 +106,9 @@ class PopREO(TopKMetric):
         rel = rel * target  # [batch_size x items]
         rel[rel > 0] = 1
 
-        # Retrieve user number (batch_size)
-        users = target.shape[0]
+        # Retrieve user number (consider only user with at least
+        # one interaction)
+        users = int((target > 0).any(dim=1).sum().item())
 
         # Expand short head and long tail
         short_head_matrix = self.short_head.expand(

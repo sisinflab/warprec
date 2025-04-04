@@ -66,7 +66,9 @@ class F1(TopKMetric):
         # Update precision and recall
         self.correct += rel.sum().float()
         self.total_relevant += target.sum().float()
-        self.users += target.shape[0]
+
+        # Count only users with at least one interaction
+        self.users += (target > 0).any(dim=1).sum().item()
 
     def compute(self):
         """Computes the F1 score using precision and recall."""

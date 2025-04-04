@@ -92,18 +92,20 @@ class APLT(TopKMetric):
         rel = rel * target  # [batch_size x items]
         rel[rel > 0] = 1
 
-        # Retrieve user number (batch_size)
-        users = target.shape[0]
+        # Retrieve user number (consider only user with at least
+        # one interaction)
+        self.users += (target > 0).any(dim=1).sum().item()
 
         # Expand long tail
-        long_tail_matrix = self.long_tail.expand(users, -1)  # [batch_size x long_tail]
+        long_tail_matrix = self.long_tail.expand(
+            int(self.users), -1
+        )  # [batch_size x long_tail]
 
         # Extract long tail items from recommendations
         long_hits = torch.gather(rel, 1, long_tail_matrix)  # [batch_size x long_tail]
 
         # Update
         self.long_hits += long_hits.sum()
-        self.users += users
 
     def compute(self):
         """Computes the final metric value."""

@@ -104,8 +104,10 @@ class PopRSP(TopKMetric):
         )  # [batch_size x items]
         rel[rel > 0] = 1
 
-        # Retrieve user number (batch_size)
-        users = target.shape[0]
+        # Retrieve user number (consider only user with at least
+        # one interaction)
+        # The cast to int is used for a mypy check
+        users = int((target > 0).any(dim=1).sum().item())
 
         # Retrieve train tensor
         train_batch = torch.zeros_like(preds)

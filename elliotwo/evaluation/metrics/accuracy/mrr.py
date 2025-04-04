@@ -82,7 +82,9 @@ class MRR(TopKMetric):
         reciprocal_ranks[rel.sum(dim=1) == 0] = 0  # Assign 0 if no relevant items
 
         self.reciprocal_rank_sum += reciprocal_ranks.sum()
-        self.users += target.shape[0]
+
+        # Count only users with at least one interaction
+        self.users += (target > 0).any(dim=1).sum().item()
 
     def compute(self):
         """Computes the final MRR@K value."""
