@@ -11,7 +11,8 @@ from elliotwo.utils.registry import model_registry, similarities_registry
 
 @model_registry.register(name="ItemKNN")
 class ItemKNN(ItemSimilarityRecommender):
-    """ItemKNN implementation supporting multiple similarity measures.
+    """Implementation of ItemKNN algorithm from
+        Amazon.com recommendations: item-to-item collaborative filtering 2003.
 
     Args:
         params (dict): Model parameters.
@@ -33,8 +34,15 @@ class ItemKNN(ItemSimilarityRecommender):
         super().__init__(params, items, *args, **kwargs)
         self._name = "ItemKNN"
 
-    def fit(self, interactions: Interactions, *args: Any, **kwargs: Any) -> None:
-        """Compute item similarity matrix using specified similarity measure"""
+    def fit(self, interactions: Interactions, *args: Any, **kwargs: Any):
+        """During training we will compute the B similarity matrix {item x item}.
+
+        Args:
+            interactions (Interactions): The interactions that will be
+                learned by the model.
+            *args (Any): List of arguments.
+            **kwargs (Any): The dictionary of keyword arguments.
+        """
         X = interactions.get_sparse()
         similarity = similarities_registry.get(self.similarity)
 
@@ -46,24 +54,39 @@ class ItemKNN(ItemSimilarityRecommender):
         sim_matrix = torch.from_numpy(similarity.compute(X.T)).to(self._device)
 
         # Compute top_k filtering
-        self._apply_topk_filtering(sim_matrix)
+        filtered_sim_matrix = self._apply_topk_filtering(sim_matrix, self.k)
+
+        # Update item_similarity with a new nn.Parameter
+        self.item_similarity = nn.Parameter(filtered_sim_matrix.to(self._device))
 
     def _normalize(self, X: csr_matrix) -> csr_matrix:
-        """Normalize matrix rows to unit length"""
+        """Normalize matrix rows to unit length.
+
+        Args:
+            X (csr_matrix): The matrix to normalize.
+
+        Returns:
+            csr_matrix: The normalized matrix.
+        """
         norms = np.sqrt(X.power(2).sum(axis=1))
         norms[norms == 0] = 1e-10
         return X.multiply(1 / norms)
 
-    def _apply_topk_filtering(self, sim_matrix: Tensor):
-        """Keep only top-k similarities per item"""
+    def _apply_topk_filtering(self, sim_matrix: Tensor, k: int) -> Tensor:
+        """Keep only top-k similarities per item.
+
+        Args:
+            sim_matrix (Tensor): The similarity tensor to filter.
+            k (int): The top k values to filter.
+
+        Returns:
+            Tensor: The filtered similarity tensor.
+        """
         # Safety check for k size
-        k = min(self.k, sim_matrix.size(1) - 1)
+        k = min(k, sim_matrix.size(1) - 1)
 
         # Get top-k values and indices
         values, indices = torch.topk(sim_matrix, k=k, dim=1)
 
         # Create sparse similarity matrix with top-k values
-        filtered_sim_matrix = torch.zeros_like(sim_matrix).scatter_(1, indices, values)
-
-        # Update item_similarity with a new nn.Parameter
-        self.item_similarity = nn.Parameter(filtered_sim_matrix.to(self._device))
+        return torch.zeros_like(sim_matrix).scatter_(1, indices, values)
