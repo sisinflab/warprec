@@ -338,7 +338,7 @@ class RecomModel(BaseModel, ABC):
         Raises:
             ValueError: If the range is not in a correct format.
         """
-        if all(isinstance(item, str) for item in value):
+        if all(isinstance(item, (str, bool)) for item in value):
             return [SearchSpace.CHOICE] + value
 
         if len(value) < 2 or len(value) > 4:
@@ -517,7 +517,9 @@ class ItemKNN(RecomModel):
     Attributes:
         k (Union[List[Union[str, int]], int]): List of values for neighbor.
         similarity (Union[List[str], str]): List of names of similarity functions.
+        normalize (Union[List[Union[str, bool]], bool]): List of values for normalization flag.
     """
 
     k: Union[List[Union[str, int]], int]
     similarity: Union[List[str], str]
+    normalize: Union[List[Union[str, bool]], bool]

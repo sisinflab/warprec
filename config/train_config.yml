@@ -19,9 +19,6 @@ writer:
   local_experiment_path: experiment/test/
   setup_experiment: True
   save_split: True
-  result:
-    sep: ','
-    ext: '.csv'
 splitter:
   strategy: temporal
   test_ratio: 0.1
@@ -41,6 +38,7 @@ models:
       cpu_per_trial: 2
     k: ['randint', 1, 500]
     similarity: [cosine, dot, manhattan]
+    normalize: False
 evaluation:
   top_k: [10, 20, 50]
   metrics: [nDCG, Precision, Recall, HitRate]
