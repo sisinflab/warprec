@@ -71,6 +71,7 @@ class AbstractDataset(ABC):
         """
         return {
             "items": self._niid,
+            "users": self._nuid,
         }
 
     def update_mappings(self, user_mapping: dict, item_mapping: dict):

@@ -171,7 +171,7 @@ class Trainer:
             implementation=self._model_params.meta.implementation,
             params=best_params,
             device=device,
-            **self.infos,
+            info=self.infos,
         )
         best_model.load_state_dict(model_state)
 
@@ -204,7 +204,7 @@ class Trainer:
             implementation=self._model_params.meta.implementation,
             params=params,
             device=device,
-            **self.infos,
+            info=self.infos,
         )
         try:
             model.fit(dataset.train_set)

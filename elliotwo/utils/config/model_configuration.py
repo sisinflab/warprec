@@ -523,3 +523,18 @@ class ItemKNN(RecomModel):
     k: Union[List[Union[str, int]], int]
     similarity: Union[List[str], str]
     normalize: Union[List[Union[str, bool]], bool]
+
+
+@params_registry.register("UserKNN")
+class UserKNN(RecomModel):
+    """Definition of the model UserKNN.
+
+    Attributes:
+        k (Union[List[Union[str, int]], int]): List of values for neighbor.
+        similarity (Union[List[str], str]): List of names of similarity functions.
+        normalize (Union[List[Union[str, bool]], bool]): List of values for normalization flag.
+    """
+
+    k: Union[List[Union[str, int]], int]
+    similarity: Union[List[str], str]
+    normalize: Union[List[Union[str, bool]], bool]

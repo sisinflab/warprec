@@ -39,6 +39,20 @@ models:
     k: ['randint', 1, 500]
     similarity: [cosine, dot, manhattan, haversine]
     normalize: False
+  UserKNN:
+    optimization:
+      strategy: hopt
+      scheduler: fifo
+      properties:
+        mode: max
+        seed: 42
+      device: cpu
+      validation_metric: nDCG@10
+      num_samples: 20
+      cpu_per_trial: 2
+    k: ['randint', 1, 500]
+    similarity: [cosine, dot, manhattan, haversine]
+    normalize: False
 evaluation:
   top_k: [10, 20, 50]
   metrics: [nDCG, Precision, Recall, HitRate]

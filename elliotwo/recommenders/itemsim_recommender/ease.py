@@ -17,7 +17,7 @@ class EASE(ItemSimilarityRecommender):
 
     Args:
         params (dict): The dictionary with the model params.
-        items (int): The number of items that will be learned.
+        info (dict): The dictionary containing dataset information.
         *args (Any): Argument for PyTorch nn.Module.
         **kwargs (Any): Keyword argument for PyTorch nn.Module.
     """
@@ -25,11 +25,11 @@ class EASE(ItemSimilarityRecommender):
     def __init__(
         self,
         params: dict,
-        items: int,
+        info: dict,
         *args: Any,
         **kwargs: Any,
     ):
-        super().__init__(params, items, *args, **kwargs)
+        super().__init__(params, info, *args, **kwargs)
         self._name = "EASE"
 
 

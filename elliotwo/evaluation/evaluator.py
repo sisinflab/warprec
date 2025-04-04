@@ -75,11 +75,13 @@ class Evaluator:
         self.reset_metrics()
 
         # Iter over batches
+        _start = 0
         for train_batch, val_batch, test_batch in dataset:
+            _end = _start + train_batch.shape[0]  # Track strat - end of batch iteration
             target = torch.tensor(
                 (test_batch if test_set else val_batch).toarray(), device=device
             )  # Target tensor [batch_size x items]
-            predictions = model.forward(train_batch).to(
+            predictions = model.forward(train_batch, start=_start, end=_end).to(
                 device
             )  # Get ratings tensor [batch_size x items]
 
@@ -87,6 +89,8 @@ class Evaluator:
             for _, metric_instances in self.metrics.items():
                 for metric in metric_instances:
                     metric.update(predictions, target)
+
+            _start = _end
 
         if verbose:
             logger.positive(f"Evaluation completed for model {model.name}.")

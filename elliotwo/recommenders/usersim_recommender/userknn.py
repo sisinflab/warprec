@@ -5,14 +5,13 @@ import numpy as np
 from torch import Tensor, nn
 from scipy.sparse import csr_matrix
 from elliotwo.data.dataset import Interactions
-from elliotwo.recommenders.abstract_recommender import ItemSimilarityRecommender
+from elliotwo.recommenders.abstract_recommender import UserSimilarityRecommender
 from elliotwo.utils.registry import model_registry, similarities_registry
 
 
-@model_registry.register(name="ItemKNN")
-class ItemKNN(ItemSimilarityRecommender):
-    """Implementation of ItemKNN algorithm from
-        Amazon.com recommendations: item-to-item collaborative filtering 2003.
+@model_registry.register(name="UserKNN")
+class UserKNN(UserSimilarityRecommender):
+    """Implementation of UserKNN algorithm from.
 
     Args:
         params (dict): Model parameters.
@@ -32,10 +31,10 @@ class ItemKNN(ItemSimilarityRecommender):
 
     def __init__(self, params: dict, info: dict, *args: Any, **kwargs: Any):
         super().__init__(params, info, *args, **kwargs)
-        self._name = "ItemKNN"
+        self._name = "UserKNN"
 
     def fit(self, interactions: Interactions, *args: Any, **kwargs: Any):
-        """During training we will compute the B similarity matrix {item x item}.
+        """During training we will compute the B similarity matrix {user x user}.
 
         Args:
             interactions (Interactions): The interactions that will be
@@ -51,13 +50,13 @@ class ItemKNN(ItemSimilarityRecommender):
             X = self._normalize(X)
 
         # Compute similarity matrix
-        sim_matrix = torch.from_numpy(similarity.compute(X.T)).to(self._device)
+        sim_matrix = torch.from_numpy(similarity.compute(X)).to(self._device)
 
         # Compute top_k filtering
         filtered_sim_matrix = self._apply_topk_filtering(sim_matrix, self.k)
 
         # Update item_similarity with a new nn.Parameter
-        self.item_similarity = nn.Parameter(filtered_sim_matrix.to(self._device))
+        self.user_similarity = nn.Parameter(filtered_sim_matrix.to(self._device))
 
     def _normalize(self, X: csr_matrix) -> csr_matrix:
         """Normalize matrix rows to unit length.

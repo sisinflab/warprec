@@ -19,7 +19,7 @@ class Slim(ItemSimilarityRecommender):
 
     Args:
         params (dict): The dictionary with the model params.
-        items (int): The number of items that will be learned.
+        info (dict): The dictionary containing dataset information.
         *args (Any): Variable length argument list.
         **kwargs (Any): Arbitrary keyword arguments.
 
@@ -31,8 +31,8 @@ class Slim(ItemSimilarityRecommender):
     l1: float
     alpha: float
 
-    def __init__(self, params: dict, items: int, *args: Any, **kwargs: Any):
-        super().__init__(params, items, *args, **kwargs)
+    def __init__(self, params: dict, info: dict, *args: Any, **kwargs: Any):
+        super().__init__(params, info, *args, **kwargs)
         self._name = "Slim"
 
     def fit(self, interactions: Interactions, *args: Any, **kwargs: Any):

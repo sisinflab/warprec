@@ -131,21 +131,29 @@ class ItemSimilarityRecommender(AbstractRecommender):
 
     Args:
         params (dict): The dictionary with the model params.
-        items (int): The number of items that will be learned.
+        info (dict): The dictionary containing dataset information.
         *args (Any): Argument for PyTorch nn.Module.
         device (str): The device used for tensor operations.
         **kwargs (Any): Keyword argument for PyTorch nn.Module.
+
+    Raises:
+        ValueError: If the item number was not provided.
     """
 
     def __init__(
         self,
         params: dict,
-        items: int,
+        info: dict,
         *args: Any,
         device: str = "cpu",
         **kwargs: Any,
     ):
         super().__init__(params, device=device, *args, **kwargs)
+        items = info.get("items", None)
+        if not items:
+            raise ValueError(
+                "Items value must be provided to correctly initialize the model."
+            )
         self.item_similarity = nn.Parameter(torch.rand(items, items)).to(self._device)
 
     def forward(
@@ -163,6 +171,65 @@ class ItemSimilarityRecommender(AbstractRecommender):
             Tensor: The score matrix {user x item}.
         """
         r = interaction_matrix @ self.item_similarity.detach().numpy()  # pylint: disable=not-callable
+
+        # Masking interaction already seen in train
+        r[interaction_matrix.nonzero()] = -torch.inf
+        return torch.from_numpy(r).to(self._device)
+
+
+class UserSimilarityRecommender(AbstractRecommender):
+    """UserSimilarityRecommender implementation.
+
+    A UserSimilarityRecommender is a Collaborative Filtering recommendation model
+    which learns a similarity matrix B and produces recommendations using the computation: B@X.
+
+    Args:
+        params (dict): The dictionary with the model params.
+        info (dict): The dictionary containing dataset information.
+        *args (Any): Argument for PyTorch nn.Module.
+        device (str): The device used for tensor operations.
+        **kwargs (Any): Keyword argument for PyTorch nn.Module.
+
+    Raises:
+        ValueError: If the user number was not provided.
+    """
+
+    def __init__(
+        self,
+        params: dict,
+        info: dict,
+        *args: Any,
+        device: str = "cpu",
+        **kwargs: Any,
+    ):
+        super().__init__(params, device=device, *args, **kwargs)
+        users = info.get("users", None)
+        if not users:
+            raise ValueError(
+                "Users value must be provided to correctly initialize the model."
+            )
+        self.user_similarity = nn.Parameter(torch.rand(users, users)).to(self._device)
+
+    def forward(
+        self, interaction_matrix: csr_matrix, *args: Any, **kwargs: Any
+    ) -> Tensor:
+        """Prediction in the form of X@B where B is a {user x user} similarity matrix.
+
+        Args:
+            interaction_matrix (csr_matrix): The interactions matrix
+                that will be used to predict.
+            *args (Any): List of arguments.
+            **kwargs (Any): The dictionary of keyword arguments.
+
+        Returns:
+            Tensor: The score matrix {user x item}.
+        """
+        start_idx = kwargs.get("start", 0)
+        end_idx = kwargs.get("end", interaction_matrix.shape[0])
+        r = (
+            self.user_similarity.detach().numpy()[start_idx:end_idx, start_idx:end_idx]
+            @ interaction_matrix
+        )  # pylint: disable=not-callable
 
         # Masking interaction already seen in train
         r[interaction_matrix.nonzero()] = -torch.inf

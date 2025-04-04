@@ -2,6 +2,7 @@ from .abstract_recommender import AbstractRecommender, generate_model_name
 from .itemsim_recommender import EASE, ItemKNN, Slim
 from .similarities import Similarity
 from .trainer import Trainer
+from .usersim_recommender import UserKNN
 
 __all__ = [
     "AbstractRecommender",
@@ -11,4 +12,5 @@ __all__ = [
     "Slim",
     "Similarity",
     "Trainer",
+    "UserKNN",
 ]
