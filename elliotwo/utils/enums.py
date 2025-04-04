@@ -62,12 +62,14 @@ class Similarities(str, Enum):
         - DOT: Dot similarity.
         - EUCLIDEAN: Euclidean similarity.
         - MANHATTAN: Manhattan similarity.
+        - HAVERSINE: Haversine similarity.
     """
 
     COSINE = "cosine"
     DOT = "dot"
     EUCLIDEAN = "euclidean"
     MANHATTAN = "manhattan"
+    HAVERSINE = "haversine"
 
 
 class SearchAlgorithms(str, Enum):
