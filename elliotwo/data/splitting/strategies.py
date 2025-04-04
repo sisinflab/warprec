@@ -8,7 +8,7 @@ from elliotwo.utils.enums import SplittingStrategies
 from elliotwo.utils.registry import splitting_registry
 
 
-class AbstractStrategy(ABC):
+class SplittingStrategy(ABC):
     """Abstract definition of a splitting strategy."""
 
     @abstractmethod
@@ -32,7 +32,7 @@ class AbstractStrategy(ABC):
 
 
 @splitting_registry.register(SplittingStrategies.RANDOM)
-class RandomSplit(AbstractStrategy):
+class RandomSplit(SplittingStrategy):
     """The definition of the random split strategy.
 
     This splitting will be executed randomly, unless a seed is set.
@@ -121,7 +121,7 @@ class RandomSplit(AbstractStrategy):
 
 
 @splitting_registry.register(SplittingStrategies.LEAVE_ONE_OUT)
-class LeaveOneOutSplit(AbstractStrategy):
+class LeaveOneOutSplit(SplittingStrategy):
     """The definition of a leave-one-out splitting strategy."""
 
     def split(
@@ -197,7 +197,7 @@ class LeaveOneOutSplit(AbstractStrategy):
 
 
 @splitting_registry.register(SplittingStrategies.TEMPORAL)
-class TemporalSplit(AbstractStrategy):
+class TemporalSplit(SplittingStrategy):
     """The definition of a temporal splitting strategy.
 
     Timestamp must be provided to use this strategy.

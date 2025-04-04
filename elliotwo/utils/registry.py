@@ -4,7 +4,7 @@ if TYPE_CHECKING:
     from elliotwo.recommenders.base_recommender import Recommender
     from elliotwo.utils.config import RecomModel, SearchSpaceWrapper
     from elliotwo.evaluation.base_metric import BaseMetric
-    from elliotwo.data.splitting.strategies import AbstractStrategy
+    from elliotwo.data.splitting.strategies import SplittingStrategy
     from elliotwo.recommenders.trainer.search_algorithm_wrapper import (
         BaseSearchWrapper,
     )
@@ -87,7 +87,7 @@ class BasicRegistry(Generic[T]):
 
 # Singleton basic registries
 metric_registry: BasicRegistry["BaseMetric"] = BasicRegistry("Metrics")
-splitting_registry: BasicRegistry["AbstractStrategy"] = BasicRegistry("Splitting")
+splitting_registry: BasicRegistry["SplittingStrategy"] = BasicRegistry("Splitting")
 params_registry: BasicRegistry["RecomModel"] = BasicRegistry("Params")
 search_algorithm_registry: BasicRegistry["BaseSearchWrapper"] = BasicRegistry(
     "SearchAlgorithms"

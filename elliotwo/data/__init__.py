@@ -1,6 +1,6 @@
 from .dataset import Interactions, Dataset, TransactionDataset, ContextDataset
 from .reader import LocalReader
-from .splitting import Splitter, AbstractStrategy
+from .splitting import Splitter, SplittingStrategy
 from .writer import Writer, LocalWriter
 
 __all__ = [
@@ -10,7 +10,7 @@ __all__ = [
     "ContextDataset",
     "Interactions",
     "Splitter",
-    "AbstractStrategy",
+    "SplittingStrategy",
     "Writer",
     "LocalWriter",
 ]

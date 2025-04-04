@@ -1,4 +1,4 @@
 from .splitter import Splitter
-from .strategies import AbstractStrategy
+from .strategies import SplittingStrategy
 
-__all__ = ["Splitter", "AbstractStrategy"]
+__all__ = ["Splitter", "SplittingStrategy"]
