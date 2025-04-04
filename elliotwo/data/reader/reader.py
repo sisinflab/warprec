@@ -17,7 +17,7 @@ from elliotwo.utils.enums import RatingType, ReadingMethods
 from elliotwo.utils.logger import logger
 
 
-class AbstractReader(ABC):
+class Reader(ABC):
     """The abstract definition of a reader. All readers must extend this class.
 
     Attributes:
@@ -43,7 +43,7 @@ class AbstractReader(ABC):
         """This method will read the split data from the source."""
 
 
-class LocalReader(AbstractReader):
+class LocalReader(Reader):
     """This class extends the AbstractReader, it handles
     all the data reading part from a local machine.
 

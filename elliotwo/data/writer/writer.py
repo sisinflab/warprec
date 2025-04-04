@@ -17,8 +17,8 @@ from elliotwo.utils.config import WriterConfig, WritingParams
 from elliotwo.utils.logger import logger
 
 
-class AbstractWriter(ABC):
-    """AbstractWriter is the abstract definition of a writer,
+class Writer(ABC):
+    """Writer is the abstract definition of a writer,
     during an experiment multiple writers can be defined.
 
     Attributes:
@@ -62,7 +62,7 @@ class AbstractWriter(ABC):
         """This method takes a ray checkpoint and moves to a destination."""
 
 
-class LocalWriter(AbstractWriter):
+class LocalWriter(Writer):
     """LocalWriter is the class to be used when the results of
     the experiment want to be saved locally.
 

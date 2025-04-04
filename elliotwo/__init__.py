@@ -6,7 +6,7 @@ from .data import (
     Splitter,
     AbstractStrategy,
     LocalReader,
-    AbstractWriter,
+    Writer,
     LocalWriter,
 )
 from .recommenders import EASE, Slim, Trainer, Recommender, generate_model_name
@@ -42,7 +42,7 @@ __all__ = [
     "search_algorithm_registry",
     "scheduler_registry",
     "search_space_registry",
-    "AbstractWriter",
+    "Writer",
     "LocalWriter",
     "LocalReader",
     "EASE",
