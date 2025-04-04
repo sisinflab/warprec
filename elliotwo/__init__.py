@@ -1,6 +1,6 @@
 from .data import (
     Interactions,
-    AbstractDataset,
+    Dataset,
     TransactionDataset,
     ContextDataset,
     Splitter,
@@ -26,7 +26,7 @@ from .utils import (
 
 __all__ = [
     "LocalReader",
-    "AbstractDataset",
+    "Dataset",
     "TransactionDataset",
     "ContextDataset",
     "Interactions",

@@ -8,7 +8,7 @@ from elliotwo.utils.enums import RatingType
 from elliotwo.utils.logger import logger
 
 
-class AbstractDataset(ABC):
+class Dataset(ABC):
     """Abstract base class for Dataset object.
 
     This class defines a common interface for all Datasets.
@@ -102,7 +102,7 @@ class AbstractDataset(ABC):
             raise exc
 
 
-class TransactionDataset(AbstractDataset):
+class TransactionDataset(Dataset):
     """The definition of the Dataset class that will handle transaction data.
 
     Args:
@@ -215,7 +215,7 @@ class TransactionDataset(AbstractDataset):
         }
 
 
-class ContextDataset(AbstractDataset):
+class ContextDataset(Dataset):
     """The definition of the Dataset class that will handle context-aware data.
 
     TODO: Implement

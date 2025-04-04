@@ -3,7 +3,7 @@ from typing import List, Dict, Union
 import torch
 from scipy.sparse import csr_matrix
 from tabulate import tabulate
-from elliotwo.data.dataset import AbstractDataset
+from elliotwo.data.dataset import Dataset
 from elliotwo.evaluation.base_metric import BaseMetric
 from elliotwo.recommenders.base_recommender import Recommender
 from elliotwo.utils.logger import logger
@@ -52,7 +52,7 @@ class Evaluator:
     def evaluate(
         self,
         model: Recommender,
-        dataset: AbstractDataset,
+        dataset: Dataset,
         device: str = "cpu",
         test_set: bool = True,
         verbose: bool = False,
@@ -61,7 +61,7 @@ class Evaluator:
 
         Args:
             model (Recommender): The trained model.
-            dataset (AbstractDataset): The dataset from which retrieve train/val/test data.
+            dataset (Dataset): The dataset from which retrieve train/val/test data.
             device (str): The device on which the metrics will be calculated.
             test_set (bool): Wether or not to compute metrics on test set.
             verbose (bool): Wether of not the method should write with logger.

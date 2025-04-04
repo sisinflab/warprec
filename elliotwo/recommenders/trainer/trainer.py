@@ -10,7 +10,7 @@ from ray import tune
 from ray.tune import Checkpoint
 from ray.tune.experiment.trial import Trial
 from elliotwo.recommenders.base_recommender import Recommender
-from elliotwo.data.dataset import AbstractDataset
+from elliotwo.data.dataset import Dataset
 from elliotwo.evaluation.evaluator import Evaluator
 from elliotwo.recommenders.trainer.search_algorithm_wrapper import (
     BaseSearchWrapper,
@@ -37,7 +37,7 @@ class Trainer:
         model_name (str): The name of the model to optimize.
         param (dict): The parameters of the model already in
             Ray Tune format.
-        dataset (AbstractDataset): The dataset to use during training.
+        dataset (Dataset): The dataset to use during training.
         metric_name (str): The name of the metric that will be used
             as validation.
         top_k (int): The cutoff tu use as validation.
@@ -51,7 +51,7 @@ class Trainer:
         self,
         model_name: str,
         param: dict,
-        dataset: AbstractDataset,
+        dataset: Dataset,
         metric_name: str,
         top_k: int,
         beta: float = 1.0,
@@ -183,7 +183,7 @@ class Trainer:
         self,
         params: dict,
         model_name: str,
-        dataset: AbstractDataset,
+        dataset: Dataset,
         mode: str,
         evaluator: Evaluator,
         device: str,
@@ -193,7 +193,7 @@ class Trainer:
         Args:
             params (dict): The parameter to train the model.
             model_name (str): The name of the model to train.
-            dataset (AbstractDataset): The dataset to train the model on.
+            dataset (Dataset): The dataset to train the model on.
             mode (str): Wether or not to maximize or minimize the metric.
             evaluator (Evaluator): The evaluator that will calculate the
                 validation metric.

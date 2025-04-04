@@ -10,7 +10,7 @@ import numpy as np
 import torch
 from pandas import DataFrame
 from elliotwo.utils.config import Configuration
-from elliotwo.data.dataset import AbstractDataset
+from elliotwo.data.dataset import Dataset
 from elliotwo.recommenders.base_recommender import Recommender
 from elliotwo.utils.enums import WritingMethods
 from elliotwo.utils.config import WriterConfig, WritingParams
@@ -54,7 +54,7 @@ class Writer(ABC):
         """This method writes the model state into a destination."""
 
     @abstractmethod
-    def write_split(self, dataset: AbstractDataset):
+    def write_split(self, dataset: Dataset):
         """This method writes the split of the dataset into a destination."""
 
     @abstractmethod
@@ -248,13 +248,11 @@ class LocalWriter(Writer):
         _path = join(self.experiment_serialized_models_dir, model.name_param + ".pth")
         torch.save(model.state_dict(), _path)
 
-    def write_split(
-        self, dataset: AbstractDataset, sep: str = "\t", ext: str = ".tsv"
-    ) -> None:
+    def write_split(self, dataset: Dataset, sep: str = "\t", ext: str = ".tsv") -> None:
         """This method writes the split into a local path.
 
         Args:
-            dataset (AbstractDataset): The dataset splitted.
+            dataset (Dataset): The dataset splitted.
             sep (str): The separator that will be used to write the results.
             ext (str): The extension that will be used to write the results.
         """
