@@ -1,3 +1,4 @@
+# pylint: disable = R0801, E1102
 from typing import Any
 
 import torch
@@ -5,12 +6,12 @@ import numpy as np
 from torch import Tensor, nn
 from scipy.sparse import csr_matrix
 from elliotwo.data.dataset import Interactions
-from elliotwo.recommenders.base_recommender import ItemSimilarityRecommender
+from elliotwo.recommenders.base_recommender import Recommender
 from elliotwo.utils.registry import model_registry, similarities_registry
 
 
 @model_registry.register(name="ItemKNN")
-class ItemKNN(ItemSimilarityRecommender):
+class ItemKNN(Recommender):
     """Implementation of ItemKNN algorithm from
         Amazon.com recommendations: item-to-item collaborative filtering 2003.
 
@@ -18,9 +19,13 @@ class ItemKNN(ItemSimilarityRecommender):
 
     Args:
         params (dict): Model parameters.
-        info (dict): The dictionary containing dataset information.
         *args (Any): Variable length argument list.
+        device (str): The device used for tensor operations.
+        info (dict): The dictionary containing dataset information.
         **kwargs (Any): Arbitrary keyword arguments.
+
+    Raises:
+        ValueError: If the items value was not passed through the info dict.
 
     Attributes:
         k (int): Number of nearest neighbors.
@@ -32,9 +37,23 @@ class ItemKNN(ItemSimilarityRecommender):
     similarity: str
     normalize: bool
 
-    def __init__(self, params: dict, info: dict, *args: Any, **kwargs: Any):
-        super().__init__(params, info, *args, **kwargs)
+    def __init__(
+        self,
+        params: dict,
+        *args: Any,
+        device: str = "cpu",
+        info: dict = None,
+        **kwargs: Any,
+    ):
+        super().__init__(params, device=device, *args, **kwargs)
         self._name = "ItemKNN"
+        items = info.get("items", None)
+        if not items:
+            raise ValueError(
+                "Items value must be provided to correctly initialize the model."
+            )
+        # Model initialization
+        self.item_similarity = nn.Parameter(torch.rand(items, items)).to(self._device)
 
     def fit(self, interactions: Interactions, *args: Any, **kwargs: Any):
         """During training we will compute the B similarity matrix {item x item}.
@@ -60,6 +79,26 @@ class ItemKNN(ItemSimilarityRecommender):
 
         # Update item_similarity with a new nn.Parameter
         self.item_similarity = nn.Parameter(filtered_sim_matrix.to(self._device))
+
+    def forward(
+        self, interaction_matrix: csr_matrix, *args: Any, **kwargs: Any
+    ) -> Tensor:
+        """Prediction in the form of X@B where B is a {item x item} similarity matrix.
+
+        Args:
+            interaction_matrix (csr_matrix): The interactions matrix
+                that will be used to predict.
+            *args (Any): List of arguments.
+            **kwargs (Any): The dictionary of keyword arguments.
+
+        Returns:
+            Tensor: The score matrix {user x item}.
+        """
+        r = interaction_matrix @ self.item_similarity.detach().numpy()
+
+        # Masking interaction already seen in train
+        r[interaction_matrix.nonzero()] = -torch.inf
+        return torch.from_numpy(r).to(self._device)
 
     def _normalize(self, X: csr_matrix) -> csr_matrix:
         """Normalize matrix rows to unit length.

@@ -1,15 +1,18 @@
+# pylint: disable = R0801, E1102
 from typing import Any
 
 import numpy as np
 import torch
 from torch import nn
+from torch import Tensor
+from scipy.sparse import csr_matrix
 from sklearn.utils.extmath import safe_sparse_dot
-from elliotwo.recommenders.base_recommender import ItemSimilarityRecommender
+from elliotwo.recommenders.base_recommender import Recommender
 from elliotwo.data.dataset import Interactions
 from elliotwo.utils.registry import model_registry
 
 
-class EASE(ItemSimilarityRecommender):
+class EASE(Recommender):
     """The main class for EASE models.
 
     Main definition of attributes and data
@@ -17,20 +20,52 @@ class EASE(ItemSimilarityRecommender):
 
     Args:
         params (dict): The dictionary with the model params.
-        info (dict): The dictionary containing dataset information.
         *args (Any): Argument for PyTorch nn.Module.
+        device (str): The device used for tensor operations.
+        info (dict): The dictionary containing dataset information.
         **kwargs (Any): Keyword argument for PyTorch nn.Module.
+
+    Raises:
+        ValueError: If the items value was not passed through the info dict.
     """
 
     def __init__(
         self,
         params: dict,
-        info: dict,
         *args: Any,
+        device: str = "cpu",
+        info: dict = None,
         **kwargs: Any,
     ):
-        super().__init__(params, info, *args, **kwargs)
+        super().__init__(params, device=device, *args, **kwargs)
         self._name = "EASE"
+        items = info.get("items", None)
+        if not items:
+            raise ValueError(
+                "Items value must be provided to correctly initialize the model."
+            )
+        # Model initialization
+        self.item_similarity = nn.Parameter(torch.rand(items, items)).to(self._device)
+
+    def forward(
+        self, interaction_matrix: csr_matrix, *args: Any, **kwargs: Any
+    ) -> Tensor:
+        """Prediction in the form of X@B where B is a {item x item} similarity matrix.
+
+        Args:
+            interaction_matrix (csr_matrix): The interactions matrix
+                that will be used to predict.
+            *args (Any): List of arguments.
+            **kwargs (Any): The dictionary of keyword arguments.
+
+        Returns:
+            Tensor: The score matrix {user x item}.
+        """
+        r = interaction_matrix @ self.item_similarity.detach().numpy()
+
+        # Masking interaction already seen in train
+        r[interaction_matrix.nonzero()] = -torch.inf
+        return torch.from_numpy(r).to(self._device)
 
 
 @model_registry.register(name="EASE")

@@ -1,3 +1,4 @@
+# pylint: disable = R0801, E1102
 from typing import Any
 
 import torch
@@ -5,12 +6,12 @@ import numpy as np
 from torch import Tensor, nn
 from scipy.sparse import csr_matrix
 from elliotwo.data.dataset import Interactions
-from elliotwo.recommenders.base_recommender import UserSimilarityRecommender
+from elliotwo.recommenders.base_recommender import Recommender
 from elliotwo.utils.registry import model_registry, similarities_registry
 
 
 @model_registry.register(name="UserKNN")
-class UserKNN(UserSimilarityRecommender):
+class UserKNN(Recommender):
     """Implementation of UserKNN algorithm from
         GroupLens: an open architecture for collaborative filtering of netnews 1994.
 
@@ -18,9 +19,13 @@ class UserKNN(UserSimilarityRecommender):
 
     Args:
         params (dict): Model parameters.
-        info (dict): The dictionary containing dataset information.
         *args (Any): Variable length argument list.
+        device (str): The device used for tensor operations.
+        info (dict): The dictionary containing dataset information.
         **kwargs (Any): Arbitrary keyword arguments.
+
+    Raises:
+        ValueError: If the items value was not passed through the info dict.
 
     Attributes:
         k (int): Number of nearest neighbors.
@@ -32,9 +37,23 @@ class UserKNN(UserSimilarityRecommender):
     similarity: str
     normalize: bool
 
-    def __init__(self, params: dict, info: dict, *args: Any, **kwargs: Any):
-        super().__init__(params, info, *args, **kwargs)
+    def __init__(
+        self,
+        params: dict,
+        *args: Any,
+        device: str = "cpu",
+        info: dict = None,
+        **kwargs: Any,
+    ):
+        super().__init__(params, device=device, *args, **kwargs)
         self._name = "UserKNN"
+        users = info.get("users", None)
+        if not users:
+            raise ValueError(
+                "Users value must be provided to correctly initialize the model."
+            )
+        # Model initialization
+        self.user_similarity = nn.Parameter(torch.rand(users, users)).to(self._device)
 
     def fit(self, interactions: Interactions, *args: Any, **kwargs: Any):
         """During training we will compute the B similarity matrix {user x user}.
@@ -60,6 +79,31 @@ class UserKNN(UserSimilarityRecommender):
 
         # Update item_similarity with a new nn.Parameter
         self.user_similarity = nn.Parameter(filtered_sim_matrix.to(self._device))
+
+    def forward(
+        self, interaction_matrix: csr_matrix, *args: Any, **kwargs: Any
+    ) -> Tensor:
+        """Prediction in the form of B@X where B is a {user x user} similarity matrix.
+
+        Args:
+            interaction_matrix (csr_matrix): The interactions matrix
+                that will be used to predict.
+            *args (Any): List of arguments.
+            **kwargs (Any): The dictionary of keyword arguments.
+
+        Returns:
+            Tensor: The score matrix {user x item}.
+        """
+        start_idx = kwargs.get("start", 0)
+        end_idx = kwargs.get("end", interaction_matrix.shape[0])
+        r = (
+            self.user_similarity.detach().numpy()[start_idx:end_idx, start_idx:end_idx]
+            @ interaction_matrix
+        )
+
+        # Masking interaction already seen in train
+        r[interaction_matrix.nonzero()] = -torch.inf
+        return torch.from_numpy(r).to(self._device)
 
     def _normalize(self, X: csr_matrix) -> csr_matrix:
         """Normalize matrix rows to unit length.
