@@ -11,7 +11,10 @@ from elliotwo.utils.registry import model_registry, similarities_registry
 
 @model_registry.register(name="UserKNN")
 class UserKNN(UserSimilarityRecommender):
-    """Implementation of UserKNN algorithm from.
+    """Implementation of UserKNN algorithm from
+        GroupLens: an open architecture for collaborative filtering of netnews 1994.
+
+    For further details, check the `paper <https://dl.acm.org/doi/10.1145/192844.192905>`_.
 
     Args:
         params (dict): Model parameters.

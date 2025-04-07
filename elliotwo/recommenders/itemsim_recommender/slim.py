@@ -11,7 +11,10 @@ from elliotwo.utils.registry import model_registry
 
 @model_registry.register(name="Slim")
 class Slim(ItemSimilarityRecommender):
-    """Implementation of Slim model from Sparse Linear Methods for Top-N Recommender Systems 2011.
+    """Implementation of Slim model from
+        Sparse Linear Methods for Top-N Recommender Systems 2011.
+
+    For further details, check the `paper <https://ieeexplore.ieee.org/document/6137254>`_.
 
     Attributes:
         l1 (float): The normalization value.

@@ -14,6 +14,8 @@ class ItemKNN(ItemSimilarityRecommender):
     """Implementation of ItemKNN algorithm from
         Amazon.com recommendations: item-to-item collaborative filtering 2003.
 
+    For further details, check the `paper <http://ieeexplore.ieee.org/document/1167344/>`_.
+
     Args:
         params (dict): Model parameters.
         info (dict): The dictionary containing dataset information.
