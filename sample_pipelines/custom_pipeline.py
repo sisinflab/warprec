@@ -1,3 +1,10 @@
+"""
+This is a sample pipeline without the usage of a configuration file.
+You can customize your process in this way, creating multiple reader/writer
+or more training loops if needed.
+This approach is advised for expert user of the framework.
+"""
+
 import numpy as np
 from elliotwo.data import LocalReader, Splitter, TransactionDataset
 from elliotwo.recommenders import Trainer

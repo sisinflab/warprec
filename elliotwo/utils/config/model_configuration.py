@@ -483,6 +483,18 @@ class EASE(RecomModel):
 
     l2: Union[List[Union[str, float, int]], float, int]
 
+    @field_validator("l2")
+    @classmethod
+    def check_l2(cls, v: list):
+        """Validate l2."""
+        for value in v:
+            if isinstance(value, (float, int)) and value <= 0:
+                raise ValueError(
+                    f"Values of l2 for EASE model must be > 0. "
+                    f"Values received as input: {v}"
+                )
+        return v
+
 
 @params_registry.register("Slim")
 class Slim(RecomModel):
@@ -509,6 +521,19 @@ class Slim(RecomModel):
                 )
         return v
 
+    @field_validator("alpha")
+    @classmethod
+    def check_alpha(cls, v: list):
+        """Validate alpha"""
+        for value in v:
+            if isinstance(value, (float, int)) and value < 0:
+                raise ValueError(
+                    "Values of alpha for Slim model must be >= 0. "
+                    "In case of alpha=0, ordinary least square will be solved. "
+                    f"Values received as input: {v}"
+                )
+        return v
+
 
 @params_registry.register("ItemKNN")
 class ItemKNN(RecomModel):
@@ -523,6 +548,11 @@ class ItemKNN(RecomModel):
     k: Union[List[Union[str, int]], int]
     similarity: Union[List[str], str]
     normalize: Union[List[Union[str, bool]], bool]
+
+    @field_validator("k")
+    @classmethod
+    def check_k(cls, v: list):
+        """TODO: Continue"""
 
 
 @params_registry.register("UserKNN")

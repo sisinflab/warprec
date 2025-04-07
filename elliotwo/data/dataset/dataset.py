@@ -140,8 +140,53 @@ class TransactionDataset(Dataset):
         self._umap = {user: i for i, user in enumerate(_uid)}
         self._imap = {item: i for i, item in enumerate(_iid)}
 
-        self.train_set = Interactions(
+        self.train_set = self._create_inner_set(
             train_data,
+            "Train",
+            batch_size=batch_size,
+            rating_type=rating_type,
+            precision=precision,
+        )
+
+        if test_data is not None:
+            self.test_set = self._create_inner_set(
+                test_data,
+                "Test",
+                batch_size=batch_size,
+                rating_type=rating_type,
+                precision=precision,
+            )
+        if val_data is not None:
+            self.val_set = self._create_inner_set(
+                val_data,
+                "Validation",
+                batch_size=batch_size,
+                rating_type=rating_type,
+                precision=precision,
+            )
+
+    def _create_inner_set(
+        self,
+        data: DataFrame,
+        header_msg: str = "Train",
+        batch_size: int = 1024,
+        rating_type: RatingType = RatingType.IMPLICIT,
+        precision: Any = np.float32,
+    ) -> Interactions:
+        """Functionality to create Interaction data from DataFrame.
+
+        Args:
+            data (DataFrame): The data used to create the interaction object.
+            header_msg (str): The header of the logger output.
+            batch_size (int): The batch size of the interaction.
+            rating_type (RatingType): The type of rating used.
+            precision (Any): The precision that will be used to store interactions.
+
+        Returns:
+            Interactions: The final interaction object.
+        """
+        inter_set = Interactions(
+            data,
             (self._nuid, self._niid),
             self._umap,
             self._imap,
@@ -149,59 +194,18 @@ class TransactionDataset(Dataset):
             rating_type=rating_type,
             precision=precision,
         )
-
-        # Train set stats
-        train_nuid, train_niid = self.train_set.get_dims()
-        train_transactions = self.train_set.get_transactions()
+        nuid, niid = inter_set.get_dims()
+        transactions = inter_set.get_transactions()
         logger.stat_msg(
             (
-                f"Number of users: {train_nuid}      "
-                f"Number of items: {train_niid}      "
-                f"Transactions: {train_transactions}"
+                f"Number of users: {nuid}      "
+                f"Number of items: {niid}      "
+                f"Transactions: {transactions}"
             ),
-            "Train set",
+            f"{header_msg} set",
         )
 
-        if test_data is not None:
-            self.test_set = Interactions(
-                test_data,
-                (self._nuid, self._niid),
-                self._umap,
-                self._imap,
-                batch_size=batch_size,
-                rating_type=rating_type,
-                precision=precision,
-            )
-            test_nuid, test_niid = self.test_set.get_dims()
-            test_transactions = self.test_set.get_transactions()
-            logger.stat_msg(
-                (
-                    f"Number of users: {test_nuid}      "
-                    f"Number of items: {test_niid}      "
-                    f"Transactions: {test_transactions}"
-                ),
-                "Test set",
-            )
-        if val_data is not None:
-            self.val_set = Interactions(
-                val_data,
-                (self._nuid, self._niid),
-                self._umap,
-                self._imap,
-                batch_size=batch_size,
-                rating_type=rating_type,
-                precision=precision,
-            )
-            val_nuid, val_niid = self.val_set.get_dims()
-            val_transactions = self.val_set.get_transactions()
-            logger.stat_msg(
-                (
-                    f"Number of users: {val_nuid}      "
-                    f"Number of items: {val_niid}      "
-                    f"Transactions: {val_transactions}"
-                ),
-                "Validation set",
-            )
+        return inter_set
 
     def get_dims(self) -> Tuple[int, int]:
         return (self._nuid, self._niid)

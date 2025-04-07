@@ -144,9 +144,13 @@ class Interactions:
         users = self._inter_df[self._user_label].map(self._umap).values
         items = self._inter_df[self._item_label].map(self._imap).values
         ratings = (
-            self._inter_df[self._rating_label].values
+            self._inter_df[
+                self._rating_label
+            ].values  # With explicit rating we read from dictionary
             if self.rating_type == RatingType.EXPLICIT
-            else np.ones(self._transactions)
+            else np.ones(
+                self._transactions
+            )  # With implicit rating we create an array directly (faster)
         )
         self._inter_sparse = coo_matrix(
             (ratings, (users, items)),

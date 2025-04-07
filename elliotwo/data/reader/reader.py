@@ -80,6 +80,7 @@ class LocalReader(Reader):
         if self.config:
             read_config = self.config.reader
         else:
+            # Column names and dtypes default values are here for mypy waring
             if not column_names:
                 column_names = ["user_id", "item_id", "rating", "timestamp"]
             if not dtypes:
@@ -165,6 +166,7 @@ class LocalReader(Reader):
         if self.config:
             read_config = self.config.reader
         else:
+            # Column names and dtypes default values are here for mypy waring
             if not column_names:
                 column_names = ["user_id", "item_id", "rating", "timestamp"]
             if not dtypes:
@@ -189,12 +191,12 @@ class LocalReader(Reader):
         logger.msg(f"Starting reading process from local source in: {path_train}")
 
         # DataFrame init
-        train_set = None
-        test_set = None
-        val_set = None
+        train_data = None
+        test_data = None
+        val_data = None
 
         if isfile(path_train):
-            train_set = pd.read_csv(
+            train_data = pd.read_csv(
                 path_train,
                 sep=read_config.split.sep,
                 usecols=read_config.column_names(),
@@ -202,7 +204,7 @@ class LocalReader(Reader):
             )
 
             if isfile(path_test):
-                test_set = pd.read_csv(
+                test_data = pd.read_csv(
                     path_test,
                     sep=read_config.split.sep,
                     usecols=read_config.column_names(),
@@ -210,12 +212,12 @@ class LocalReader(Reader):
                 )
 
             if isfile(path_val):
-                val_set = pd.read_csv(
+                val_data = pd.read_csv(
                     path_val,
                     sep=read_config.split.sep,
                     usecols=read_config.column_names(),
                     dtype=read_config.column_dtype(),
                 )
 
-            return (train_set, test_set, val_set)
+            return (train_data, test_data, val_data)
         raise FileNotFoundError(f"Train split not found in {path_train}")
