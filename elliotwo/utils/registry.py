@@ -11,7 +11,7 @@ if TYPE_CHECKING:
     from elliotwo.recommenders.trainer.scheduler_wrapper import (
         BaseSchedulerWrapper,
     )
-    from elliotwo.recommenders.similarities.similarities import Similarity
+    from elliotwo.recommenders.similarities import Similarity
 
 T = TypeVar("T")
 
