@@ -3,6 +3,7 @@ from typing import List
 from torch import nn, Tensor
 from torch.nn import Module
 from torch.nn.init import normal_, xavier_normal_, xavier_uniform_
+from elliotwo.utils.enums import Activations
 
 
 class MLP(nn.Module):
@@ -11,7 +12,7 @@ class MLP(nn.Module):
     Args:
         layers (List[int]): The hidden layers size list.
         dropout (float): The dropout probability.
-        activation (str): The activation function to apply.
+        activation (Activations): The activation function to apply.
         batch_normalization (bool): Wether or not to apply batch normalization.
         initialization_method (str): The method of initialization to use.
         last_activation (bool): Wether or not to keep last non-linearity function.
@@ -21,7 +22,7 @@ class MLP(nn.Module):
         self,
         layers: List[int],
         dropout: float = 0.0,
-        activation: str = "relu",
+        activation: Activations = Activations.RELU,
         batch_normalization: bool = False,
         initialization_method: str = None,
         last_activation: bool = True,
@@ -48,17 +49,17 @@ class MLP(nn.Module):
         """
         return self.mlp_layers(input_feature)
 
-    def _get_activation(self, activation: str = "relu"):
+    def _get_activation(self, activation: Activations = Activations.RELU):
         """Retrieve the activation to use at the end
         of a MLP layer.
         """
-        if activation == "relu":
+        if activation == Activations.SIGMOID:
             return nn.Sigmoid()
-        if activation == "tanh":
+        if activation == Activations.TANH:
             return nn.Tanh()
-        if activation == "relu":
+        if activation == Activations.RELU:
             return nn.ReLU()
-        if activation == "leakyrelu":
+        if activation == Activations.LEAKYRELU:
             return nn.LeakyReLU()
         raise ValueError("Activation function not supported.")
 
