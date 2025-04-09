@@ -126,7 +126,11 @@ def main(args: Namespace):
         if config.general.recommendation.save_recs:
             umap_i, imap_i = dataset.get_inverse_mappings()
             recs = best_model.get_recs(
-                dataset.train_set, umap_i, imap_i, k=config.general.recommendation.k
+                dataset.train_set,
+                umap_i,
+                imap_i,
+                k=config.general.recommendation.k,
+                batch_size=config.general.batch_size,
             )
             writer.write_recs(recs, model_name)
 

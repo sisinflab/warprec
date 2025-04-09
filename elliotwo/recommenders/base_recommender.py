@@ -78,7 +78,12 @@ class Recommender(nn.Module, ABC):
         """
 
     def get_recs(
-        self, X: Interactions, umap_i: dict, imap_i: dict, k: int
+        self,
+        X: Interactions,
+        umap_i: dict,
+        imap_i: dict,
+        k: int,
+        batch_size: int = 1024,
     ) -> DataFrame:
         """This method turns the learned parameters into new
         recommendations in DataFrame format.
@@ -89,15 +94,36 @@ class Recommender(nn.Module, ABC):
             umap_i (dict): The inverse mapping from index -> user_id.
             imap_i (dict): The inverse mapping from index -> item_id.
             k (int): The top k recommendation to be produced.
+            batch_size (int): Number of users per batch
 
         Returns:
             DataFrame: A DataFrame containing the top k recommendations for each user.
         """
-        # Extract information from model
-        scores = self.predict(X.get_sparse())
-        top_k_items = torch.topk(scores, k, dim=1).indices
-        user_ids = torch.arange(scores.shape[0]).unsqueeze(1).expand(-1, k)
-        recommendations = torch.stack((user_ids, top_k_items), dim=2).reshape(-1, 2)
+        sparse_matrix = X.get_sparse()
+        num_users = sparse_matrix.shape[0]
+        all_recommendations = []
+
+        for batch_start in range(0, num_users, batch_size):
+            batch_end = min(batch_start + batch_size, num_users)
+
+            # Process current batch
+            batch_slice = slice(batch_start, batch_end)
+            batch_scores = self.predict(
+                sparse_matrix[batch_slice], start=batch_start, end=batch_end
+            )
+
+            # Get top-k items for current batch
+            top_k_items = torch.topk(batch_scores, k, dim=1).indices
+            batch_users = (
+                torch.arange(batch_start, batch_end).unsqueeze(1).expand(-1, k)
+            )
+
+            # Store batch recommendations
+            batch_recs = torch.stack((batch_users, top_k_items), dim=2).reshape(-1, 2)
+            all_recommendations.append(batch_recs)
+
+        # Combine all batches
+        recommendations = torch.cat(all_recommendations, dim=0)
 
         # Extract user and items idxs
         user_idxs = recommendations[:, 0].tolist()
