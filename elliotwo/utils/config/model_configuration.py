@@ -1,4 +1,4 @@
-from typing import List, Optional, Union
+from typing import List, Optional, Union, Any
 from abc import ABC
 
 import torch
@@ -15,6 +15,14 @@ from elliotwo.utils.registry import (
     search_space_registry,
 )
 from elliotwo.utils.logger import logger
+
+# Accepted field formats for model parameters
+LIST_INT_FIELD = Union[List[Union[str, List[int]]], List[List[int]], List[int]]
+FLOAT_INT_FIELD = Union[List[Union[str, float, int]], float, int]
+INT_FIELD = Union[List[Union[str, int]], int]
+FLOAT_FIELD = Union[List[Union[str, float]], float]
+STR_FIELD = Union[List[str], str]
+BOOL_FIELD = Union[List[Union[str, bool]], bool]
 
 
 class Meta(BaseModel):
@@ -244,18 +252,23 @@ class RecomModel(BaseModel, ABC):
         _name = self.__class__.__name__
         _imp = self.meta.implementation
 
+        # Create mapping of {field: typing}
+        field_to_type = {}
+        for field, typing in self.__class__.__annotations__.items():
+            field_to_type[field] = typing
+
         # Basic controls
         self.validate_model_and_implementation(_name, _imp)
 
         # General parameters control
         updated_values = self.model_dump(exclude=["meta", "optimization"])
-        updated_values = self.normalize_values(updated_values)
 
         for field, value in updated_values.items():
+            typing = field_to_type[field]
             if self.optimization.strategy == SearchAlgorithms.GRID:
                 updated_values[field] = self.validate_grid_search(field, value)
             else:
-                updated_values[field] = self.validate_other_search(field, value)
+                updated_values[field] = self.validate_other_search(field, value, typing)
 
         self.__dict__.update(updated_values)
         return self
@@ -281,21 +294,6 @@ class RecomModel(BaseModel, ABC):
                 f"These are the available implementations: "
                 f"{model_registry.list_implementations(name.upper())}."
             )
-
-    def normalize_values(self, values: dict) -> dict:
-        """Ensures all values are lists.
-
-        Args:
-            values (dict): The dictionary with all the parameters
-                of the model.
-
-        Returns:
-            dict: The dictionary of all normalized parameters.
-        """
-        for field, value in values.items():
-            if not isinstance(value, list):
-                values[field] = [value]
-        return values
 
     def validate_grid_search(
         self, field: str, value: List[Union[str, float, int]]
@@ -325,13 +323,14 @@ class RecomModel(BaseModel, ABC):
         )
 
     def validate_other_search(
-        self, field: str, value: List[Union[str, float, int]]
+        self, field: str, value: List[Union[str, float, int]], typing: Any
     ) -> List[Union[str, float, int]]:
         """Validates search strategies other than Grid Search.
 
         Args:
             field (str): The name of the field.
             value (List[Union[str, float, int]]): The parameter list.
+            typing (Any): The type of the field.
 
         Returns:
             List[Union[str, float, int]]: The validated parameter list.
@@ -339,20 +338,57 @@ class RecomModel(BaseModel, ABC):
         Raises:
             ValueError: If the range is not in a correct format.
         """
-        if all(isinstance(item, (str, bool)) for item in value):
-            return [SearchSpace.CHOICE] + value
+        # This mapping will be used to check the typing based on
+        # the field typing
+        choice_strat_map = {
+            INT_FIELD: int,
+            STR_FIELD: str,
+            BOOL_FIELD: bool,
+            LIST_INT_FIELD: list,
+        }
+        # We check if a search space has been provided
+        # if yes, then we temporary remove it
+        _strat = None
+        if isinstance(value[0], str) and value[0].lower() in [
+            space.value for space in SearchSpace
+        ]:
+            _strat = value.pop(0)
 
-        if len(value) < 2 or len(value) > 4:
-            raise ValueError(
-                f"Invalid range format for field {field}. "
-                f"Expected [1.0, 5.0] or ['uniform', 1.0, 5.0]. "
-                f"Received: {value}."
-            )
+        # We check that values of the choice field are all of the same type
+        if typing in choice_strat_map.keys():
+            if all(isinstance(item, choice_strat_map[typing]) for item in value):
+                if (
+                    _strat
+                    and isinstance(_strat, str)
+                    and _strat.lower() != SearchSpace.CHOICE.value
+                ):
+                    logger.attention(
+                        f"A different strategy from choice has been provided for a {typing}. "
+                        f"The strategy has been set to choice."
+                    )
+                return [SearchSpace.CHOICE] + value
+            else:
+                raise ValueError(
+                    f"{typing} expect the values to be all {str(choice_strat_map[typing])}. "
+                    f"Values received: {value}"
+                )
 
-        if len(value) == 2:
-            return self.validate_basic_range(field, value)
+        if typing in [FLOAT_FIELD, FLOAT_INT_FIELD]:
+            if _strat:
+                value.insert(0, _strat)
+            if (len(value) < 2 or len(value) > 4) and typing is not INT_FIELD:
+                raise ValueError(
+                    f"Invalid range format for field {field}. "
+                    f"Expected [1.0, 5.0] or ['uniform', 1.0, 5.0]. "
+                    f"Received: {value}."
+                )
 
-        return self.validate_advanced_distribution(field, value)
+            if len(value) == 2:
+                return self.validate_basic_range(field, value)
+
+            return self.validate_advanced_distribution(field, value)
+
+        raise ValueError("Something went wrong during model field validation.")
 
     def validate_basic_range(
         self, field: str, value: List[Union[str, float, int]]
@@ -370,7 +406,7 @@ class RecomModel(BaseModel, ABC):
             ValueError: If values are not numbers.
         """
         if all(isinstance(item, (float, int)) for item in value):
-            return [str(SearchSpace.UNIFORM)] + [float(item) for item in value]
+            return [SearchSpace.UNIFORM.value] + [float(item) for item in value]
         raise ValueError(
             f"The range for field {field} must contain numbers. Received: {value}."
         )
