@@ -97,7 +97,7 @@ class Dataset(ABC):
             val_batch = next(self.val_iter) if self.val_iter else None
             test_batch = next(self.test_iter) if self.test_iter else None
 
-            return train_batch, val_batch, test_batch
+            return train_batch, test_batch, val_batch
         except StopIteration as exc:
             raise exc
 

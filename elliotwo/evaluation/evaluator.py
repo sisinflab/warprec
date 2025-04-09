@@ -73,15 +73,18 @@ class Evaluator:
 
         # Reset all metrics in evaluator
         self.reset_metrics()
+        model.eval()
 
         # Iter over batches
         _start = 0
-        for train_batch, val_batch, test_batch in dataset:
+        for train_batch, test_batch, val_batch in dataset:
             _end = _start + train_batch.shape[0]  # Track strat - end of batch iteration
+            eval_set = test_batch if test_set else val_batch
             target = torch.tensor(
-                (test_batch if test_set else val_batch).toarray(), device=device
+                (eval_set).toarray(), device=device
             )  # Target tensor [batch_size x items]
-            predictions = model.forward(train_batch, start=_start, end=_end).to(
+
+            predictions = model.predict(train_batch, start=_start, end=_end).to(
                 device
             )  # Get ratings tensor [batch_size x items]
 
