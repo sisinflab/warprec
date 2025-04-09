@@ -6,6 +6,7 @@ import pandas as pd
 import numpy as np
 from torch import nn, Tensor
 from pandas import DataFrame
+from scipy.sparse import csr_matrix
 from elliotwo.data.dataset import Interactions
 
 
@@ -34,14 +35,37 @@ class Recommender(nn.Module, ABC):
         self._name = ""
 
     @abstractmethod
-    def fit(self, *args: Any, **kwargs: Any):
-        """This method will train the model on the dataset."""
-
-    @abstractmethod
-    def forward(self, *args: Any, **kwargs: Any) -> Tensor:
-        """This method will return the prediction of the model.
+    def fit(self, interactions: Interactions, *args: Any, **kwargs: Any):
+        """This method will train the model on the dataset.
 
         Args:
+            interactions (Interactions): The interactions object used for the training.
+            *args (Any): List of arguments.
+            **kwargs (Any): The dictionary of keyword arguments.
+        """
+
+    @abstractmethod
+    def forward(self, *args: Any, **kwargs: Any):
+        """This method process a forward step of the model.
+
+        All recommendation models that implement a neural network or any
+        kind of backpropagation must implement this method, other model
+        can leave this empty.
+
+        Args:
+            *args (Any): List of arguments.
+            **kwargs (Any): The dictionary of keyword arguments.
+        """
+
+    @abstractmethod
+    def predict(
+        self, interaction_matrix: csr_matrix, *args: Any, **kwargs: Any
+    ) -> Tensor:
+        """This method will produce the final predictions in the form of
+        a dense Tensor.
+
+        Args:
+            interaction_matrix (csr_matrix): The sparse interaction matrix.
             *args (Any): List of arguments.
             **kwargs (Any): The dictionary of keyword arguments.
 
@@ -66,7 +90,7 @@ class Recommender(nn.Module, ABC):
             DataFrame: A DataFrame containing the top k recommendations for each user.
         """
         # Extract information from model
-        scores = self.forward(X.get_sparse())
+        scores = self.predict(X.get_sparse())
         top_k_items = torch.topk(scores, k, dim=1).indices
         user_ids = torch.arange(scores.shape[0]).unsqueeze(1).expand(-1, k)
         recommendations = torch.stack((user_ids, top_k_items), dim=2).reshape(-1, 2)
