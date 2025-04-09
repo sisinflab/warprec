@@ -56,11 +56,13 @@ class ItemKNN(Recommender):
         self.item_similarity = nn.Parameter(torch.rand(items, items)).to(self._device)
 
     def fit(self, interactions: Interactions, *args: Any, **kwargs: Any):
-        """During training we will compute the B similarity matrix {item x item}.
+        """Main train method.
+
+        The training will be conducted on the sparse representation of the interactions.
+        During the train a similarity matrix {item x item} will be learned.
 
         Args:
-            interactions (Interactions): The interactions that will be
-                learned by the model.
+            interactions (Interactions): The interactions that will be used to train the model.
             *args (Any): List of arguments.
             **kwargs (Any): The dictionary of keyword arguments.
         """
@@ -80,7 +82,8 @@ class ItemKNN(Recommender):
         # Update item_similarity with a new nn.Parameter
         self.item_similarity = nn.Parameter(filtered_sim_matrix.to(self._device))
 
-    def forward(
+    @torch.no_grad()
+    def predict(
         self, interaction_matrix: csr_matrix, *args: Any, **kwargs: Any
     ) -> Tensor:
         """Prediction in the form of X@B where B is a {item x item} similarity matrix.
@@ -99,6 +102,12 @@ class ItemKNN(Recommender):
         # Masking interaction already seen in train
         r[interaction_matrix.nonzero()] = -torch.inf
         return torch.from_numpy(r).to(self._device)
+
+    def forward(self, *args, **kwargs):
+        """Forward method is empty because we don't need
+        back propagation.
+        """
+        pass
 
     def _normalize(self, X: csr_matrix) -> csr_matrix:
         """Normalize matrix rows to unit length.

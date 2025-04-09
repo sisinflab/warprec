@@ -47,14 +47,15 @@ class EASE(Recommender):
         # Model initialization
         self.item_similarity = nn.Parameter(torch.rand(items, items)).to(self._device)
 
-    def forward(
+    @torch.no_grad()
+    def predict(
         self, interaction_matrix: csr_matrix, *args: Any, **kwargs: Any
     ) -> Tensor:
         """Prediction in the form of X@B where B is a {item x item} similarity matrix.
 
         Args:
-            interaction_matrix (csr_matrix): The interactions matrix
-                that will be used to predict.
+            interaction_matrix (csr_matrix): The matrix containing the
+                pairs of interactions to evaluate.
             *args (Any): List of arguments.
             **kwargs (Any): The dictionary of keyword arguments.
 
@@ -66,6 +67,12 @@ class EASE(Recommender):
         # Masking interaction already seen in train
         r[interaction_matrix.nonzero()] = -torch.inf
         return torch.from_numpy(r).to(self._device)
+
+    def forward(self, *args, **kwargs):
+        """Forward method is empty because we don't need
+        back propagation.
+        """
+        pass
 
 
 @model_registry.register(name="EASE")
@@ -82,11 +89,14 @@ class EASE_Classic(EASE):
     l2: float
 
     def fit(self, interactions: Interactions, *args: Any, **kwargs: Any):
-        """During training we will compute the B similarity matrix {item x item}.
+        """Main train method.
+
+        The training will be conducted on the sparse representation of the interactions.
+        This is the classic implementation for the EASE model.
+        During the train a similarity matrix {item x item} will be learned.
 
         Args:
-            interactions (Interactions): The interactions that will be
-                learned by the model.
+            interactions (Interactions): The interactions that will be used to train the model.
             *args (Any): List of arguments.
             **kwargs (Any): The dictionary of keyword arguments.
         """
@@ -117,11 +127,14 @@ class EASE_Elliot(EASE):
     l2: float
 
     def fit(self, interactions: Interactions, *args: Any, **kwargs: Any):
-        """During training we will compute the B similarity matrix {item x item}.
+        """Main train method.
+
+        The training will be conducted on the sparse representation of the interactions.
+        This implementation was revised in the original Elliot framework.
+        During the train a similarity matrix {item x item} will be learned.
 
         Args:
-            interactions (Interactions): The interactions that will be
-                learned by the model.
+            interactions (Interactions): The interactions that will be used to train the model.
             *args (Any): List of arguments.
             **kwargs (Any): The dictionary of keyword arguments.
         """

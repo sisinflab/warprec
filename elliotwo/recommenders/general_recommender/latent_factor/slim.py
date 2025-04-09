@@ -56,7 +56,17 @@ class Slim(Recommender):
         self.item_similarity = nn.Parameter(torch.rand(items, items)).to(self._device)
 
     def fit(self, interactions: Interactions, *args: Any, **kwargs: Any):
-        """During training we will compute the B similarity matrix {item x item}."""
+        """Main train method.
+
+        The training will be conducted for each user using ElasticNet.
+        This train loop might not scale much for large dataset with a lot of users.
+        During the train a similarity matrix {item x item} will be learned.
+
+        Args:
+            interactions (Interactions): The interactions that will be used to train the model.
+            *args (Any): List of arguments.
+            **kwargs (Any): The dictionary of keyword arguments.
+        """
         # Predefine the number of items, similarity matrix and ElasticNet
         X = interactions.get_sparse()
         X = X.tolil()
@@ -94,7 +104,8 @@ class Slim(Recommender):
             torch.from_numpy(sp.vstack(item_coeffs).T.todense())
         ).to(self._device)
 
-    def forward(
+    @torch.no_grad()
+    def predict(
         self, interaction_matrix: csr_matrix, *args: Any, **kwargs: Any
     ) -> Tensor:
         """Prediction in the form of X@B where B is a {item x item} similarity matrix.
@@ -113,3 +124,9 @@ class Slim(Recommender):
         # Masking interaction already seen in train
         r[interaction_matrix.nonzero()] = -torch.inf
         return torch.from_numpy(r).to(self._device)
+
+    def forward(self, *args, **kwargs):
+        """Forward method is empty because we don't need
+        back propagation.
+        """
+        pass
