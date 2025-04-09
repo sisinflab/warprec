@@ -88,6 +88,20 @@ class Activations(str, Enum):
     LEAKYRELU = "leakyrelu"
 
 
+class Initializations(str, Enum):
+    """Represents the types of initialization supported.
+
+    This enum is used to track the possible initialization:
+        - NORM: Normal distribution initialization.
+        - XAVIER_NORM: Xavier normal distribution.
+        - XAVIER_UNI: Xavier uniform distribution.
+    """
+
+    NORM = "norm"
+    XAVIER_NORM = "xavier_norm"
+    XAVIER_UNI = "xavier_uni"
+
+
 class SearchAlgorithms(str, Enum):
     """Represents the types of search algorithms supported.
 

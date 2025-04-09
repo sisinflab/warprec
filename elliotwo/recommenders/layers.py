@@ -3,7 +3,7 @@ from typing import List
 from torch import nn, Tensor
 from torch.nn import Module
 from torch.nn.init import normal_, xavier_normal_, xavier_uniform_
-from elliotwo.utils.enums import Activations
+from elliotwo.utils.enums import Activations, Initializations
 
 
 class MLP(nn.Module):
@@ -14,7 +14,7 @@ class MLP(nn.Module):
         dropout (float): The dropout probability.
         activation (Activations): The activation function to apply.
         batch_normalization (bool): Wether or not to apply batch normalization.
-        initialization_method (str): The method of initialization to use.
+        initialization_method (Initializations): The method of initialization to use.
         last_activation (bool): Wether or not to keep last non-linearity function.
     """
 
@@ -24,7 +24,7 @@ class MLP(nn.Module):
         dropout: float = 0.0,
         activation: Activations = Activations.RELU,
         batch_normalization: bool = False,
-        initialization_method: str = None,
+        initialization_method: Initializations = None,
         last_activation: bool = True,
     ):
         super().__init__()
@@ -66,11 +66,11 @@ class MLP(nn.Module):
     def _init_weights(self, module: Module):
         """Initialize the weights of a module."""
         if isinstance(module, nn.Linear):
-            if self.init == "norm":
+            if self.init == Initializations.NORM:
                 normal_(module.weight.data, mean=0, std=0.01)
-            elif self.init == "xavier_normal":
+            elif self.init == Initializations.XAVIER_NORM:
                 xavier_normal_(module.weight.data)
-            elif self.init == "xavier_uniform":
+            elif self.init == Initializations.XAVIER_UNI:
                 xavier_uniform_(module.weight.data)
             else:
                 raise ValueError("Initialization mode not supported.")
