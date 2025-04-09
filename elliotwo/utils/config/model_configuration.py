@@ -173,7 +173,8 @@ class Optimization(BaseModel):
                 if parts[1] not in list(range(torch.cuda.device_count())):
                     raise ValueError(
                         f"The GPU with the idx {parts[1]} is not available. "
-                        f"This is a list of available GPU idxs: {list(range(torch.cuda.device_count()))}."
+                        f"This is a list of available GPU idxs: "
+                        f"{list(range(torch.cuda.device_count()))}."
                     )
                 return v
         raise ValueError(f'Device {v} is not supported. Use "cpu" or "cuda[:index]".')
@@ -278,7 +279,8 @@ class RecomModel(BaseModel, ABC):
         if imp not in model_registry.list_implementations(name.upper()):
             raise ValueError(
                 f"Model {name} does not have {imp} implementation. "
-                f"These are the available implementations: {model_registry.list_implementations(name.upper())}."
+                f"These are the available implementations: "
+                f"{model_registry.list_implementations(name.upper())}."
             )
 
     def normalize_values(self, values: dict) -> dict:
@@ -568,3 +570,30 @@ class UserKNN(RecomModel):
     k: Union[List[Union[str, int]], int]
     similarity: Union[List[str], str]
     normalize: Union[List[Union[str, bool]], bool]
+
+
+@params_registry.register("NeuMF")
+class NeuMF(RecomModel):
+    """Definition of the model NeuMF.
+
+    Attributes:
+        mf_embedding_size (Union[List[Union[str, int]], int]): List of mf embedding size.
+        mlp_embedding_size (Union[List[Union[str, int]], int]): List of mlp embedding size.
+        mlp_hidden_size (Union[List[Union[str, List[int]]], List[List[int]], List[int]]):
+            List of mlp_hidden_size values.
+        mf_train (Union[List[Union[str, bool]], bool]): List of values for mf_train flag.
+        mlp_train (Union[List[Union[str, bool]], bool]): List of values for mlp_train flag.
+        dropout (Union[List[Union[str, float, int]], float, int]): List of values for dropout.
+        epochs (Union[List[Union[str, int]], int]): List of values for epochs.
+        learning_rate (Union[List[Union[str, float, int]], float, int]):
+            List of values for learning rate.
+    """
+
+    mf_embedding_size: Union[List[Union[str, int]], int]
+    mlp_embedding_size: Union[List[Union[str, int]], int]
+    mlp_hidden_size: Union[List[Union[str, List[int]]], List[List[int]], List[int]]
+    mf_train: Union[List[Union[str, bool]], bool]
+    mlp_train: Union[List[Union[str, bool]], bool]
+    dropout: Union[List[Union[str, float, int]], float, int]
+    epochs: Union[List[Union[str, int]], int]
+    learning_rate: Union[List[Union[str, float, int]], float, int]

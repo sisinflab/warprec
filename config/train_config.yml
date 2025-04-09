@@ -25,31 +25,36 @@ splitter:
   val_ratio: 0.1
   seed: 42
 models:
-  EASE:
-    meta:
-      implementation: elliot
+  NeuMF:
     optimization:
-      strategy: hopt
+      strategy: grid
       scheduler: fifo
       properties:
         mode: max
         seed: 42
       device: cpu
       validation_metric: nDCG@10
-      num_samples: 5
-      cpu_per_trial: 2
-    l2: ['uniform', 1, 100]
+      #num_samples: 5
+      cpu_per_trial: 12
+    mf_embedding_size: 10
+    mlp_embedding_size: 10
+    mlp_hidden_size: [[64, 32]]
+    mf_train: True
+    mlp_train: True
+    dropout: 0.1
+    epochs: 5
+    learning_rate: 0.05
 evaluation:
   top_k: [10, 20, 50]
   metrics: [nDCG, Precision, Recall, HitRate]
   beta: 1
   pop_ratio: 0.8
 general:
-  precision: float64
+  precision: float32
   batch_size: 1024
   verbose: 1
-  recommendation:
-    save_recs: True
-    sep: \t
-    ext: .tsv
-    k: 50
+  #recommendation:
+  #  save_recs: True
+  #  sep: \t
+  #  ext: .tsv
+  #  k: 50
