@@ -171,6 +171,7 @@ class Trainer:
             implementation=self._model_params.meta.implementation,
             params=best_params,
             device=device,
+            seed=self._model_params.optimization.properties.seed,
             info=self.infos,
         )
         best_model.load_state_dict(model_state)
@@ -204,6 +205,7 @@ class Trainer:
             implementation=self._model_params.meta.implementation,
             params=params,
             device=device,
+            seed=self._model_params.optimization.properties.seed,
             info=self.infos,
         )
         try:
