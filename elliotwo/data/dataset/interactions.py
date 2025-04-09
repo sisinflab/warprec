@@ -1,7 +1,10 @@
+import typing
 from typing import Tuple, Any
 
+import torch
 import numpy as np
 from pandas import DataFrame
+from torch.utils.data import DataLoader, TensorDataset
 from scipy.sparse import csr_matrix, coo_matrix
 from elliotwo.utils.enums import RatingType
 
@@ -114,6 +117,74 @@ class Interactions:
         if isinstance(self._inter_sparse, csr_matrix):
             return self._inter_sparse
         return self._to_sparse()
+
+    @typing.no_type_check
+    def get_dataloader(
+        self, num_negatives: int = 0, shuffle: bool = True
+    ) -> DataLoader:
+        """
+        Create a PyTorch DataLoader with implicit feedback and negative sampling.
+
+        Args:
+            num_negatives (int): Number of negative samples per user.
+            shuffle (bool): Whether to shuffle the data.
+
+        Returns:
+            DataLoader: Yields (user, item, rating) with negative samples.
+        """
+        # Define main variables
+        sparse_matrix = self.get_sparse().tocoo()
+        users_pos = sparse_matrix.row
+        items_pos = sparse_matrix.col
+        num_items = self._niid
+        num_positives = len(users_pos)
+
+        # Create positive interactions tensor (implicit feedback)
+        pos_users = torch.LongTensor(users_pos)
+        pos_items = torch.LongTensor(items_pos)
+        pos_ratings = torch.ones_like(pos_users, dtype=torch.float)
+
+        # Precompute negative candidates for each user
+        user_pos_items = {
+            u: set(items_pos[users_pos == u]) for u in np.unique(users_pos)
+        }
+        all_items = np.arange(num_items)
+
+        # Preallocate arrays for negatives
+        neg_users = np.empty(num_positives * num_negatives, dtype=np.int64)
+        neg_items = np.empty_like(neg_users)
+
+        start_idx = 0
+        for u, pos_set in user_pos_items.items():
+            user_mask = users_pos == u
+            user_count = np.sum(user_mask)
+            neg_candidates = np.setdiff1d(all_items, list(pos_set))
+
+            # Sample all negatives for this user at once
+            replace = len(neg_candidates) < num_negatives * user_count
+            sampled = np.random.choice(
+                neg_candidates, size=num_negatives * user_count, replace=replace
+            )
+
+            # Fill preallocated arrays
+            end_idx = start_idx + num_negatives * user_count
+            neg_users[start_idx:end_idx] = u
+            neg_items[start_idx:end_idx] = sampled
+            start_idx = end_idx
+
+        # Create negative interactions tensor
+        neg_users = torch.LongTensor(neg_users)
+        neg_items = torch.LongTensor(neg_items)
+        neg_ratings = torch.zeros_like(neg_users, dtype=torch.float)
+
+        # Combine positive and negative samples
+        all_users = torch.cat([pos_users, neg_users])
+        all_items = torch.cat([pos_items, neg_items])
+        all_ratings = torch.cat([pos_ratings, neg_ratings])
+
+        # Create final dataset
+        dataset = TensorDataset(all_users, all_items, all_ratings)
+        return DataLoader(dataset, batch_size=self.batch_size, shuffle=shuffle)
 
     def get_dims(self) -> Tuple[int, int]:
         """This method will return the dimensions of the data.
