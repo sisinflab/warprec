@@ -147,13 +147,16 @@ class Trainer:
 
         # Best score obtained during hyperparameter optimization
         best_score = best_trial.last_result["score"]
+        best_iter = best_trial.last_result["training_iteration"]
 
         logger.msg(
             f"Best params combination: {best_params} with a score of "
             f"{self._metric_name}@"
             f"{self._top_k}: "
-            f"{best_score}."
+            f"{best_score} "
+            f"during iteration {best_iter}."
         )
+
         logger.positive(
             f"Hyperparameter tuning for {self.model_name} ended successfully."
         )
@@ -202,6 +205,11 @@ class Trainer:
         """
 
         def _report(model: Recommender):
+            """Reporting function. Will be used as a callback for Tune reporting.
+
+            Args:
+                model (Recommender): The trained model to report.
+            """
             evaluator.evaluate(model, dataset, test_set=False)
             results = evaluator.compute_results()
             score = results[self._top_k][self._metric_name]
