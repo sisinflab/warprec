@@ -1,5 +1,5 @@
 # pylint: disable = R0801, E1102
-from typing import Any
+from typing import Optional, Callable, Any
 
 import torch
 import numpy as np
@@ -57,7 +57,13 @@ class UserKNN(Recommender):
         # Model initialization
         self.user_similarity = nn.Parameter(torch.rand(users, users)).to(self._device)
 
-    def fit(self, interactions: Interactions, *args: Any, **kwargs: Any):
+    def fit(
+        self,
+        interactions: Interactions,
+        report_fn: Optional[Callable],
+        *args: Any,
+        **kwargs: Any,
+    ):
         """Main train method.
 
         The training will be conducted on the sparse representation of the interactions.
@@ -65,6 +71,7 @@ class UserKNN(Recommender):
 
         Args:
             interactions (Interactions): The interactions that will be used to train the model.
+            report_fn (Optional[Callable]): The Ray Tune function to report the iteration.
             *args (Any): List of arguments.
             **kwargs (Any): The dictionary of keyword arguments.
         """
@@ -83,6 +90,9 @@ class UserKNN(Recommender):
 
         # Update item_similarity with a new nn.Parameter
         self.user_similarity = nn.Parameter(filtered_sim_matrix.to(self._device))
+
+        if report_fn is not None:
+            report_fn(self)
 
     @torch.no_grad()
     def predict(

@@ -1,5 +1,5 @@
 import random
-from typing import Any
+from typing import Callable, Optional, Any
 from abc import ABC, abstractmethod
 
 import torch
@@ -39,11 +39,18 @@ class Recommender(nn.Module, ABC):
         self._name = ""
 
     @abstractmethod
-    def fit(self, interactions: Interactions, *args: Any, **kwargs: Any):
+    def fit(
+        self,
+        interactions: Interactions,
+        report_fn: Optional[Callable],
+        *args: Any,
+        **kwargs: Any,
+    ):
         """This method will train the model on the dataset.
 
         Args:
             interactions (Interactions): The interactions object used for the training.
+            report_fn (Optional[Callable]): The Ray Tune function to report the iteration.
             *args (Any): List of arguments.
             **kwargs (Any): The dictionary of keyword arguments.
         """

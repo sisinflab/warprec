@@ -1,5 +1,5 @@
 # pylint: disable = R0801, E1102
-from typing import Any
+from typing import Optional, Callable, Any
 
 import numpy as np
 import torch
@@ -90,7 +90,13 @@ class EASE_Classic(EASE):
 
     l2: float
 
-    def fit(self, interactions: Interactions, *args: Any, **kwargs: Any):
+    def fit(
+        self,
+        interactions: Interactions,
+        report_fn: Optional[Callable],
+        *args: Any,
+        **kwargs: Any,
+    ):
         """Main train method.
 
         The training will be conducted on the sparse representation of the interactions.
@@ -99,6 +105,7 @@ class EASE_Classic(EASE):
 
         Args:
             interactions (Interactions): The interactions that will be used to train the model.
+            report_fn (Optional[Callable]): The Ray Tune function to report the iteration.
             *args (Any): List of arguments.
             **kwargs (Any): The dictionary of keyword arguments.
         """
@@ -114,6 +121,9 @@ class EASE_Classic(EASE):
             self._device
         )
 
+        if report_fn is not None:
+            report_fn(self)
+
 
 @model_registry.register(name="EASE", implementation="Elliot")
 class EASE_Elliot(EASE):
@@ -128,7 +138,13 @@ class EASE_Elliot(EASE):
 
     l2: float
 
-    def fit(self, interactions: Interactions, *args: Any, **kwargs: Any):
+    def fit(
+        self,
+        interactions: Interactions,
+        report_fn: Optional[Callable],
+        *args: Any,
+        **kwargs: Any,
+    ):
         """Main train method.
 
         The training will be conducted on the sparse representation of the interactions.
@@ -137,6 +153,7 @@ class EASE_Elliot(EASE):
 
         Args:
             interactions (Interactions): The interactions that will be used to train the model.
+            report_fn (Optional[Callable]): The Ray Tune function to report the iteration.
             *args (Any): List of arguments.
             **kwargs (Any): The dictionary of keyword arguments.
         """
@@ -162,3 +179,6 @@ class EASE_Elliot(EASE):
         self.item_similarity = nn.Parameter(torch.tensor(B, dtype=torch.float32)).to(
             self._device
         )
+
+        if report_fn is not None:
+            report_fn(self)

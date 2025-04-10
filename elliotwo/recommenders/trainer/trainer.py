@@ -200,6 +200,22 @@ class Trainer:
                 validation metric.
             device (str): The device used for tensor operations.
         """
+
+        def _report(model: Recommender):
+            evaluator.evaluate(model, dataset, test_set=False)
+            results = evaluator.compute_results()
+            score = results[self._top_k][self._metric_name]
+
+            with tempfile.TemporaryDirectory() as tmpdir:
+                torch.save(
+                    {"model_state": model.state_dict()},
+                    os.path.join(tmpdir, "checkpoint.pt"),
+                )
+                tune.report(
+                    metrics={"score": score},
+                    checkpoint=Checkpoint.from_directory(tmpdir),
+                )
+
         model = model_registry.get(
             name=model_name,
             implementation=self._model_params.meta.implementation,
@@ -209,7 +225,7 @@ class Trainer:
             info=self.infos,
         )
         try:
-            model.fit(dataset.train_set)
+            model.fit(dataset.train_set, report_fn=lambda model: _report(model))
         except Exception as e:
             logger.negative(
                 f"The fitting of the model {model.name}, failed "
@@ -221,19 +237,6 @@ class Trainer:
                 )
             tune.report(
                 metrics={"score": torch.inf},
-            )
-
-        evaluator.evaluate(model, dataset, test_set=False)
-        results = evaluator.compute_results()
-        score = results[self._top_k][self._metric_name]
-
-        with tempfile.TemporaryDirectory() as tmpdir:
-            torch.save(
-                {"model_state": model.state_dict()},
-                os.path.join(tmpdir, "checkpoint.pt"),
-            )
-            tune.report(
-                metrics={"score": score}, checkpoint=Checkpoint.from_directory(tmpdir)
             )
 
     def parse_params(self, params: dict) -> dict:

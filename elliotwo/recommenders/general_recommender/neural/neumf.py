@@ -1,5 +1,5 @@
 # pylint: disable = R0801, E1102
-from typing import List, Any
+from typing import List, Optional, Callable, Any
 
 import torch
 from torch import nn, Tensor
@@ -117,7 +117,13 @@ class NeuMF(Recommender):
         if isinstance(module, nn.Embedding):
             normal_(module.weight.data, mean=0.0, std=0.01)
 
-    def fit(self, interactions: Interactions, *args: Any, **kwargs: Any):
+    def fit(
+        self,
+        interactions: Interactions,
+        report_fn: Optional[Callable],
+        *args: Any,
+        **kwargs: Any,
+    ):
         """Main train method.
 
         The training will be conducted on triplets of (user, item, rating).
@@ -126,6 +132,7 @@ class NeuMF(Recommender):
 
         Args:
             interactions (Interactions): The interactions that will be used to train the model.
+            report_fn (Optional[Callable]): The Ray Tune function to report the iteration.
             *args (Any): List of arguments.
             **kwargs (Any): The dictionary of keyword arguments.
         """
@@ -149,6 +156,9 @@ class NeuMF(Recommender):
                 self.optimizer.step()
 
                 epoch_loss += loss.item()
+
+            if report_fn is not None:
+                report_fn(self)
 
     # pylint: disable = E0606
     def forward(self, user: Tensor, item: Tensor) -> Tensor:

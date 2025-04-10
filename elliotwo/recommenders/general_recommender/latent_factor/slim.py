@@ -1,5 +1,5 @@
 # pylint: disable = R0801, E1102
-from typing import Any
+from typing import Optional, Callable, Any
 
 import torch
 import scipy.sparse as sp
@@ -57,7 +57,13 @@ class Slim(Recommender):
         # Model initialization
         self.item_similarity = nn.Parameter(torch.rand(items, items)).to(self._device)
 
-    def fit(self, interactions: Interactions, *args: Any, **kwargs: Any):
+    def fit(
+        self,
+        interactions: Interactions,
+        report_fn: Optional[Callable],
+        *args: Any,
+        **kwargs: Any,
+    ):
         """Main train method.
 
         The training will be conducted for each user using ElasticNet.
@@ -66,6 +72,7 @@ class Slim(Recommender):
 
         Args:
             interactions (Interactions): The interactions that will be used to train the model.
+            report_fn (Optional[Callable]): The Ray Tune function to report the iteration.
             *args (Any): List of arguments.
             **kwargs (Any): The dictionary of keyword arguments.
         """
@@ -105,6 +112,9 @@ class Slim(Recommender):
         self.item_similarity = nn.Parameter(
             torch.from_numpy(sp.vstack(item_coeffs).T.todense())
         ).to(self._device)
+
+        if report_fn is not None:
+            report_fn(self)
 
     @torch.no_grad()
     def predict(
