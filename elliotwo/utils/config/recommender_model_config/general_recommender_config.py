@@ -122,7 +122,8 @@ class ItemKNN(RecomModel):
             ):
                 raise ValueError(
                     "Values of similarity for ItemKNN model must be supported similarities. "
-                    f"Values received as input: {v}. Supported similarities: {similarities_registry.list_registered()}"
+                    f"Values received as input: {v}. "
+                    f"Supported similarities: {similarities_registry.list_registered()}"
                 )
         return v
 
@@ -171,14 +172,15 @@ class UserKNN(RecomModel):
             v = [v]
         for value in v:
             if (
-                isinstance(v, str)
-                and v.lower() != SearchSpace.CHOICE.value
-                and v.lower() != SearchSpace.GRID.value
-                and v.upper() not in similarities_registry.list_registered()
+                isinstance(value, str)
+                and value.lower() != SearchSpace.CHOICE.value
+                and value.lower() != SearchSpace.GRID.value
+                and value.upper() not in similarities_registry.list_registered()
             ):
                 raise ValueError(
                     "Values of similarity for UserKNN model must be supported similarities. "
-                    f"Values received as input: {v}. Supported similarities: {similarities_registry.list_registered()}"
+                    f"Values received as input: {v}. "
+                    f"Supported similarities: {similarities_registry.list_registered()}"
                 )
         return v
 
@@ -337,4 +339,71 @@ class NeuMF(RecomModel):
                     "Values of neg_samples for NeuMF model must be >= 0. "
                     f"Values received as input: {v}"
                 )
+        return v
+
+
+@params_registry.register("RP3Beta")
+class RP3Beta(RecomModel):
+    """Definition of the model RP3Beta.
+
+    Attributes:
+        k (INT_FIELD): List of values for k.
+        alpha (FLOAT_INT_FIELD): List of values for alpha.
+        beta (FLOAT_INT_FIELD): List of values for beta.
+        normalize (BOOL_FIELD): List of values for normalize.
+    """
+
+    k: INT_FIELD
+    alpha: FLOAT_INT_FIELD
+    beta: FLOAT_INT_FIELD
+    normalize: BOOL_FIELD
+
+    @field_validator("k")
+    @classmethod
+    def check_k(cls, v: list):
+        """Validate k."""
+        if not isinstance(v, list):
+            v = [v]
+        for value in v:
+            if isinstance(value, int) and value <= 0:
+                raise ValueError(
+                    "Values of k for RP3Beta model must be > 0. "
+                    f"Values received as input: {v}"
+                )
+        return v
+
+    @field_validator("alpha")
+    @classmethod
+    def check_alpha(cls, v: list):
+        """Validate alpha."""
+        if not isinstance(v, list):
+            v = [v]
+        for value in v:
+            if isinstance(value, (float, int)) and value < 0:
+                raise ValueError(
+                    "Values of alpha for RP3Beta model must be >= 0. "
+                    f"Values received as input: {v}"
+                )
+        return v
+
+    @field_validator("beta")
+    @classmethod
+    def check_beta(cls, v: list):
+        """Validate beta."""
+        if not isinstance(v, list):
+            v = [v]
+        for value in v:
+            if isinstance(value, (float, int)) and value < 0:
+                raise ValueError(
+                    "Values of beta for RP3Beta model must be >= 0. "
+                    f"Values received as input: {v}"
+                )
+        return v
+
+    @field_validator("normalize")
+    @classmethod
+    def check_normalize(cls, v: list):
+        """Validate normalize."""
+        if not isinstance(v, list):
+            v = [v]
         return v
