@@ -93,7 +93,7 @@ class EASE_Classic(EASE):
     def fit(
         self,
         interactions: Interactions,
-        report_fn: Optional[Callable],
+        report_fn: Optional[Callable] = None,
         *args: Any,
         **kwargs: Any,
     ):
@@ -141,7 +141,7 @@ class EASE_Elliot(EASE):
     def fit(
         self,
         interactions: Interactions,
-        report_fn: Optional[Callable],
+        report_fn: Optional[Callable] = None,
         *args: Any,
         **kwargs: Any,
     ):

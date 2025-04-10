@@ -60,7 +60,7 @@ class ItemKNN(Recommender):
     def fit(
         self,
         interactions: Interactions,
-        report_fn: Optional[Callable],
+        report_fn: Optional[Callable] = None,
         *args: Any,
         **kwargs: Any,
     ):
