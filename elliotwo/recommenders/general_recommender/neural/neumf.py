@@ -39,6 +39,7 @@ class NeuMF(Recommender):
         dropout (float): The dropout probability.
         epochs (int): The number of epochs.
         learning_rate (float): The learning rate value.
+        neg_samples (int): The number of negative samples per positive interaction.
     """
 
     # Model hyperparameters
@@ -50,6 +51,7 @@ class NeuMF(Recommender):
     dropout: float
     epochs: int
     learning_rate: float
+    neg_samples: int
 
     def __init__(
         self,
@@ -128,7 +130,7 @@ class NeuMF(Recommender):
             **kwargs (Any): The dictionary of keyword arguments.
         """
         # Get the dataloader from interactions
-        dataloader = interactions.get_dataloader()
+        dataloader = interactions.get_dataloader(num_negatives=self.neg_samples)
 
         # Training loop
         self.train()

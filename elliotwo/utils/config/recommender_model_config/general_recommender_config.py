@@ -204,6 +204,7 @@ class NeuMF(RecomModel):
         dropout (FLOAT_FIELD): List of values for dropout.
         epochs (INT_FIELD): List of values for epochs.
         learning_rate (FLOAT_FIELD): List of values for learning rate.
+        neg_samples (INT_FIELD): List of values for negative sampling.
     """
 
     mf_embedding_size: INT_FIELD
@@ -214,6 +215,7 @@ class NeuMF(RecomModel):
     dropout: FLOAT_FIELD
     epochs: INT_FIELD
     learning_rate: FLOAT_FIELD
+    neg_samples: INT_FIELD
 
     @field_validator("mf_embedding_size")
     @classmethod
@@ -319,6 +321,20 @@ class NeuMF(RecomModel):
             if isinstance(value, float) and value <= 0:
                 raise ValueError(
                     "Values of learning_rate for NeuMF model must be > 0. "
+                    f"Values received as input: {v}"
+                )
+        return v
+
+    @field_validator("neg_samples")
+    @classmethod
+    def check_neg_samples(cls, v: list):
+        """Validate neg_samples."""
+        if not isinstance(v, list):
+            v = [v]
+        for value in v:
+            if isinstance(value, int) and value < 0:
+                raise ValueError(
+                    "Values of neg_samples for NeuMF model must be >= 0. "
                     f"Values received as input: {v}"
                 )
         return v
