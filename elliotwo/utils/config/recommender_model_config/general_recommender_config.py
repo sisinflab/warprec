@@ -247,18 +247,14 @@ class NeuMF(RecomModel):
     @classmethod
     def check_mlp_hidden_size(cls, v: list):
         """Validate mlp_hidden_size."""
+        strat = None
         if not isinstance(v, list):
             v = [v]
-        new_v = []
-        strat = None
+        if not isinstance(v[-1], list):
+            v = [v]
         if isinstance(v[0], str):
             strat = v.pop(0)
-        for value in v:
-            if not isinstance(value, list):
-                new_v.append([value])
-            else:
-                new_v.append(value)
-        for hidden_size in new_v:
+        for hidden_size in v:
             for value in hidden_size:
                 if value <= 0:
                     raise ValueError(
@@ -266,8 +262,8 @@ class NeuMF(RecomModel):
                         f"Values received as input: {v}"
                     )
         if strat:
-            new_v.insert(0, strat)
-        return new_v
+            v.insert(0, strat)
+        return v
 
     @field_validator("mf_train")
     @classmethod
