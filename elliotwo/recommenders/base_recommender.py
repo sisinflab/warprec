@@ -181,7 +181,10 @@ class Recommender(nn.Module, ABC):
         name = self._name
         for ann, _ in self.__class__.__annotations__.items():
             value = getattr(self, ann, None)
-            name += f"_{ann}={value:.4f}"
+            if isinstance(value, float):
+                name += f"_{ann}={value:.4f}"
+            else:
+                name += f"_{ann}={value}"
         return name
 
 
