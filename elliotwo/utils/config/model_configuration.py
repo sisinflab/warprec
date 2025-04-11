@@ -12,7 +12,6 @@ from elliotwo.utils.registry import (
     model_registry,
     metric_registry,
     search_algorithm_registry,
-    search_space_registry,
 )
 from elliotwo.utils.logger import logger
 
@@ -346,48 +345,105 @@ class RecomModel(BaseModel, ABC):
             LIST_INT_FIELD: list,
         }
         # We check if a search space has been provided
-        # if yes, then we temporary remove it
-        _strat = None
+        # if yes, then we validate the strategy the user provided
         if isinstance(value[0], str) and value[0].lower() in [
             space.value for space in SearchSpace
         ]:
-            _strat = value.pop(0)
-
-        # We check that values of the choice field are all of the same type
-        if typing in choice_strat_map.keys():
-            if all(isinstance(item, choice_strat_map[typing]) for item in value):
-                if (
-                    _strat
-                    and isinstance(_strat, str)
-                    and _strat.lower() != SearchSpace.CHOICE.value
-                ):
-                    logger.attention(
-                        f"A different strategy from choice has been provided for a {typing}. "
-                        f"The strategy has been set to choice."
-                    )
-                return [SearchSpace.CHOICE] + value
+            value = self.check_valid_strategy(value[0], typing, value)
+        else:
+            # If a strategy has not been provided, we use a default one
+            if typing in choice_strat_map.keys():
+                value.insert(0, SearchSpace.CHOICE)
             else:
-                raise ValueError(
-                    f"{typing} expect the values to be all {str(choice_strat_map[typing])}. "
-                    f"Values received: {value}"
-                )
+                value.insert(0, SearchSpace.UNIFORM)
 
-        if typing in [FLOAT_FIELD]:
-            if _strat:
-                value.insert(0, _strat)
-            if (len(value) < 2 or len(value) > 4) and typing is not INT_FIELD:
-                raise ValueError(
-                    f"Invalid range format for field {field}. "
-                    f"Expected [1.0, 5.0] or ['uniform', 1.0, 5.0]. "
-                    f"Received: {value}."
-                )
+        # If the typing is simple, then we don't need further checks
+        if (
+            typing in [STR_FIELD, BOOL_FIELD, LIST_INT_FIELD]
+            or value[0] == SearchSpace.CHOICE
+        ):
+            return value
 
-            if len(value) == 2:
-                return self.validate_basic_range(field, value)
+        # Final checks for list of values length and distribution constraint
+        if len(value) < 3 or len(value) > 4:
+            raise ValueError(
+                f"Invalid range format for field {field}. "
+                f"Expected [1.0, 5.0] or ['uniform', 1.0, 5.0]. "
+                f"Received: {value}."
+            )
 
-            return self.validate_advanced_distribution(field, value)
+        return self.validate_advanced_distribution(field, value)
 
-        raise ValueError("Something went wrong during model field validation.")
+    def check_valid_strategy(
+        self,
+        strat: Union[SearchSpace, str],
+        typing: Any,
+        value: List[Union[str, float, int]],
+    ) -> List[Union[str, float, int]]:
+        """Checks if the strategy provided is valid for the field type.
+
+        Args:
+            strat (Union[SearchSpace, str]): The search space strategy.
+            typing (Any): The type of the field.
+            value (List[Union[str, float, int]]): The parameter list.
+
+        Returns:
+            List[Union[str, float, int]]: The validated parameter list.
+        """
+        if typing == INT_FIELD and strat not in [
+            SearchSpace.RANDINT,
+            SearchSpace.QRANDINT,
+            SearchSpace.LOGRANDINT,
+            SearchSpace.QLOGRANDINT,
+        ]:
+            value.pop(0)
+            value.insert(0, SearchSpace.RANDINT)
+            logger.attention(
+                f"Strategy {strat} is not valid for field {typing}. "
+                f"Randint strategy will be used instead. "
+            )
+        if typing == FLOAT_FIELD and strat not in [
+            SearchSpace.UNIFORM,
+            SearchSpace.QUNIFORM,
+            SearchSpace.LOGUNIFORM,
+            SearchSpace.QLOGUNIFORM,
+            SearchSpace.RANDN,
+            SearchSpace.QRANDN,
+        ]:
+            value.pop(0)
+            value.insert(0, SearchSpace.UNIFORM)
+            logger.attention(
+                f"Strategy {strat} is not valid for field {typing}. "
+                f"Uniform strategy will be used instead. "
+            )
+        if typing == STR_FIELD and strat not in [
+            SearchSpace.CHOICE,
+        ]:
+            value.pop(0)
+            value.insert(0, SearchSpace.CHOICE)
+            logger.attention(
+                f"Strategy {strat} is not valid for field {typing}. "
+                f"Choice strategy will be used instead. "
+            )
+        if typing == BOOL_FIELD and strat not in [
+            SearchSpace.CHOICE,
+        ]:
+            value.pop(0)
+            value.insert(0, SearchSpace.CHOICE)
+            logger.attention(
+                f"Strategy {strat} is not valid for field {typing}. "
+                f"Choice strategy will be used instead. "
+            )
+        if typing == LIST_INT_FIELD and strat not in [
+            SearchSpace.CHOICE,
+        ]:
+            value.pop(0)
+            value.insert(0, SearchSpace.CHOICE)
+            logger.attention(
+                f"Strategy {strat} is not valid for field {typing}. "
+                f"Choice strategy will be used instead. "
+            )
+        return value
 
     def validate_basic_range(
         self, field: str, value: List[Union[str, float, int]]
@@ -425,84 +481,45 @@ class RecomModel(BaseModel, ABC):
         Raises:
             ValueError: If the SearchSpace is not in the registry.
         """
-        if not isinstance(value[0], str):
-            raise ValueError(
-                f"Expected the first element of the parameter list to be "
-                f"a valid SearchSpace. Value received {value[0]}, "
-                f"SearchSpace supported {search_space_registry.list_registered()} "
-            )
-        _selected_search_space: str = value[0]
-        _int_search_spaces = [
-            SearchSpace.RANDINT,
-            SearchSpace.QRANDINT,
-            SearchSpace.LOGRANDINT,
-            SearchSpace.QLOGRANDINT,
-        ]
-
-        if (
-            _selected_search_space.upper()
-            not in search_space_registry.list_registered()
-        ):
-            raise ValueError(
-                f"{_selected_search_space} not found in SearchSpace registry. "
-                f"Available options: {search_space_registry.list_registered()}."
-            )
-
-        self.check_distribution_constraints(field, value, _selected_search_space)
-
-        if _selected_search_space not in _int_search_spaces:
-            return [_selected_search_space] + [float(item) for item in value[1:]]
-
-        return [_selected_search_space] + [int(item) for item in value[1:]]
-
-    def check_distribution_constraints(
-        self, field: str, value: List[Union[str, float, int]], search_space: str
-    ):
-        """Ensures that specific distributions meet their constraints.
-
-        Args:
-            field (str): The name of the field.
-            value (List[Union[str, float, int]]): The parameter list.
-            search_space (str): The search space selected for the field.
-
-        Raises:
-            ValueError: If the values provided do not respect the SearchSpace format.
-        """
-        _rounded_search_spaces = [
+        rounded_search_spaces = [
             SearchSpace.QUNIFORM,
             SearchSpace.QLOGUNIFORM,
             SearchSpace.QRANDN,
             SearchSpace.QRANDINT,
             SearchSpace.QLOGRANDINT,
         ]
-        _log_search_spaces = [
+        log_search_spaces = [
             SearchSpace.LOGUNIFORM,
             SearchSpace.QLOGUNIFORM,
             SearchSpace.LOGRANDINT,
             SearchSpace.QLOGRANDINT,
         ]
-        if search_space in _rounded_search_spaces and len(value) != 4:
+        strat = value[0]  # Selected SearchSpace
+
+        if strat in rounded_search_spaces and len(value) != 4:
             raise ValueError(
-                f"{search_space} requires a rounding factor, but none was provided. "
+                f"{strat} requires a rounding factor, but none was provided. "
                 f"Received: {value} for field {field}."
             )
-        if search_space not in _rounded_search_spaces and len(value) == 4:
+        if strat not in rounded_search_spaces and len(value) == 4:
             raise ValueError(
-                f"{search_space} does not require a rounding factor, "
+                f"{strat} does not require a rounding factor, "
                 f"but extra values were provided. "
                 f"Received: {value} for field {field}."
             )
-        if search_space in _rounded_search_spaces:
+        if strat in rounded_search_spaces:
             i1, i2, i3 = int(value[1]), int(value[2]), int(value[3])
             if i1 % i3 != 0 or i2 % i3 != 0:
                 raise ValueError(
                     f"Rounded distributions require values divisible by the round term. "
                     f"Received: {value} for field {field}."
                 )
-        if search_space in _log_search_spaces:
+        if strat in log_search_spaces:
             f1, f2 = float(value[1]), float(value[2])
             if f1 <= 0 or f2 <= 0:
                 raise ValueError(
                     f"Logarithmic distributions require positive values. "
                     f"Received: {value} for field {field}."
                 )
+
+        return value
