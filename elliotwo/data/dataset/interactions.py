@@ -119,11 +119,10 @@ class Interactions:
         return self._to_sparse()
 
     @typing.no_type_check
-    def get_dataloader(
+    def get_item_rating_dataloader(
         self, num_negatives: int = 0, shuffle: bool = True
     ) -> DataLoader:
-        """
-        Create a PyTorch DataLoader with implicit feedback and negative sampling.
+        """Create a PyTorch DataLoader with implicit feedback and negative sampling.
 
         Args:
             num_negatives (int): Number of negative samples per user.
@@ -144,7 +143,7 @@ class Interactions:
         pos_items = torch.LongTensor(items_pos)
         pos_ratings = torch.ones_like(pos_users, dtype=torch.float)
 
-        # Precompute negative candidates for each user
+        # Precompute positive for each user
         user_pos_items = {
             u: set(items_pos[users_pos == u]) for u in np.unique(users_pos)
         }
@@ -156,6 +155,8 @@ class Interactions:
 
         start_idx = 0
         for u, pos_set in user_pos_items.items():
+            # For each user, find the items they have not interacted with
+            # and sample negative items
             user_mask = users_pos == u
             user_count = np.sum(user_mask)
             neg_candidates = np.setdiff1d(all_items, list(pos_set))
@@ -184,6 +185,62 @@ class Interactions:
 
         # Create final dataset
         dataset = TensorDataset(all_users, all_items, all_ratings)
+        return DataLoader(dataset, batch_size=self.batch_size, shuffle=shuffle)
+
+    @typing.no_type_check
+    def get_pos_neg_dataloader(self, shuffle: bool = True) -> DataLoader:
+        """Create a PyTorch DataLoader with triplets for implicit feedback.
+
+        Args:
+            shuffle (bool): Whether to shuffle the data.
+
+        Returns:
+            DataLoader: Yields triplets of (user, positive_item, negative_item).
+        """
+        # Define main variables
+        sparse_matrix = self.get_sparse().tocoo()
+        users_pos = sparse_matrix.row
+        items_pos = sparse_matrix.col
+        num_items = self._niid
+        num_positives = len(users_pos)
+
+        # Precompute positive items for each user
+        user_pos_items = {u: items_pos[users_pos == u] for u in np.unique(users_pos)}
+        all_items = np.arange(num_items)
+
+        # Preallocate arrays for triplets
+        users_triplet = np.empty(num_positives, dtype=np.int64)
+        positives_triplet = np.empty_like(users_triplet)
+        negatives_triplet = np.empty_like(users_triplet)
+
+        start_idx = 0
+        for u, pos_items in user_pos_items.items():
+            user_count = len(pos_items)
+            if user_count == 0:  # Skip the user if it has 0 interactions
+                continue
+
+            neg_candidates = np.setdiff1d(all_items, pos_items)
+            if len(neg_candidates) == 0:  # Extreme edge case. Normally not a problem
+                continue
+
+            # Sample negatives for all positives in this user
+            replace = len(neg_candidates) < user_count
+            sampled = np.random.choice(neg_candidates, size=user_count, replace=replace)
+
+            # Create triplet components
+            end_idx = start_idx + user_count
+            users_triplet[start_idx:end_idx] = np.full(user_count, u)
+            positives_triplet[start_idx:end_idx] = pos_items
+            negatives_triplet[start_idx:end_idx] = sampled
+            start_idx = end_idx
+
+        # Trim to actual size and convert to tensors
+        users_tensor = torch.LongTensor(users_triplet[:start_idx])
+        positives_tensor = torch.LongTensor(positives_triplet[:start_idx])
+        negatives_tensor = torch.LongTensor(negatives_triplet[:start_idx])
+
+        # Create final dataset
+        dataset = TensorDataset(users_tensor, positives_tensor, negatives_tensor)
         return DataLoader(dataset, batch_size=self.batch_size, shuffle=shuffle)
 
     def get_dims(self) -> Tuple[int, int]:

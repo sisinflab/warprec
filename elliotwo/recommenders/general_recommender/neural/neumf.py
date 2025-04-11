@@ -137,7 +137,9 @@ class NeuMF(Recommender):
             **kwargs (Any): The dictionary of keyword arguments.
         """
         # Get the dataloader from interactions
-        dataloader = interactions.get_dataloader(num_negatives=self.neg_samples)
+        dataloader = interactions.get_item_rating_dataloader(
+            num_negatives=self.neg_samples
+        )
 
         # Training loop
         self.train()
