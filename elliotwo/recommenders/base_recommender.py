@@ -42,16 +42,16 @@ class Recommender(nn.Module, ABC):
     def fit(
         self,
         interactions: Interactions,
-        report_fn: Optional[Callable],
         *args: Any,
+        report_fn: Optional[Callable],
         **kwargs: Any,
     ):
         """This method will train the model on the dataset.
 
         Args:
             interactions (Interactions): The interactions object used for the training.
-            report_fn (Optional[Callable]): The Ray Tune function to report the iteration.
             *args (Any): List of arguments.
+            report_fn (Optional[Callable]): The Ray Tune function to report the iteration.
             **kwargs (Any): The dictionary of keyword arguments.
         """
 

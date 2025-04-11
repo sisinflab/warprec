@@ -60,8 +60,8 @@ class Slim(Recommender):
     def fit(
         self,
         interactions: Interactions,
-        report_fn: Optional[Callable] = None,
         *args: Any,
+        report_fn: Optional[Callable] = None,
         **kwargs: Any,
     ):
         """Main train method.
@@ -72,8 +72,8 @@ class Slim(Recommender):
 
         Args:
             interactions (Interactions): The interactions that will be used to train the model.
-            report_fn (Optional[Callable]): The Ray Tune function to report the iteration.
             *args (Any): List of arguments.
+            report_fn (Optional[Callable]): The Ray Tune function to report the iteration.
             **kwargs (Any): The dictionary of keyword arguments.
         """
         # Predefine the number of items, similarity matrix and ElasticNet
