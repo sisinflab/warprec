@@ -1,6 +1,6 @@
 import os
 import tempfile
-from typing import List, Tuple, Optional
+from typing import List, Tuple, Optional, Dict, Any
 from copy import deepcopy
 
 import ray
@@ -127,7 +127,7 @@ class Trainer:
         )
 
         # Run the hyperparameter tuning
-        analysis = tune.run(
+        tune.run(
             obj_function,
             resources_per_trial={
                 "cpu": self._model_params.optimization.cpu_per_trial,
@@ -141,13 +141,10 @@ class Trainer:
             callbacks=[best_checkpoint_callback],
         )
 
-        # Train and retrieve results
-        best_trial = analysis.get_best_trial("score", mode)
-        best_params = analysis.get_best_config("score", mode)
-
-        # Best score obtained during hyperparameter optimization
-        best_score = best_trial.last_result["score"]
-        best_iter = best_trial.last_result["training_iteration"]
+        # Retrieve results from callback
+        best_params = best_checkpoint_callback.best_params
+        best_score = best_checkpoint_callback.best_score
+        best_iter = best_checkpoint_callback.best_iteration
 
         logger.msg(
             f"Best params combination: {best_params} with a score of "
@@ -292,8 +289,10 @@ class BestCheckpointCallback(tune.Callback):
         self.best_score = -float("inf") if mode == "max" else float("inf")
         self.best_checkpoint: Optional[str] = None
         self.checkpoint_param: List[Tuple[str, dict]] = []
+        self.best_params: Dict[str, Any] = {}
+        self.best_iteration: int = 0
 
-    def on_trial_complete(
+    def on_trial_save(
         self, iteration: int, trials: List[Trial], trial: Trial, **info
     ) -> None:
         """Callback when trial is completed.
@@ -328,6 +327,8 @@ class BestCheckpointCallback(tune.Callback):
             # Update best score and checkpoint
             self.best_score = score
             self.best_checkpoint = trial.checkpoint.path
+            self.best_params = trial.config
+            self.best_iteration = trial.last_result["training_iteration"]
 
         elif not self.keep_all_ray_checkpoints and os.path.exists(
             trial.checkpoint.path
