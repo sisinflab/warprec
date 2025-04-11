@@ -212,27 +212,29 @@ class NeuMF(Recommender):
         batch_size, num_items = interaction_matrix.shape
         start_idx = kwargs.get("start", 0)
         end_idx = kwargs.get("end", interaction_matrix.shape[0])
+        block_size = 200  # Better memory management
 
-        # Pre-allocate output tensor
-        predictions = torch.zeros(batch_size, num_items, device=self._device)
+        preds = []
+        for start in range(
+            0, num_items, block_size
+        ):  # We proceed with the evaluation in blocks
+            end = min(start + block_size, num_items)
+            items_block = torch.arange(start, end, device=self._device).unsqueeze(0)
+            items_block = items_block.expand(batch_size, -1).reshape(
+                -1
+            )  # [batch_size * block]
+            users_block = torch.arange(
+                start_idx, end_idx, device=self._device
+            ).unsqueeze(1)
+            users_block = users_block.expand(-1, end - start).reshape(
+                -1
+            )  # [batch_size * block]
+            preds_block = self.sigmoid(self.forward(users_block, items_block))
+            preds.append(
+                preds_block.view(batch_size, end - start)
+            )  # [batch_size x block]
+        predictions = torch.cat(preds, dim=1)  # [batch_size x num_items]
 
-        # Create the proper user-item grid
-        users = torch.arange(start_idx, end_idx, device=self._device).unsqueeze(
-            1
-        )  # [batch_size x 1]
-        items = torch.arange(num_items, device=self._device).unsqueeze(
-            0
-        )  # [1 x num_items]
-
-        # Create all combinations through broadcasting
-        users = users.expand(-1, num_items).reshape(-1)  # [batch_size * num_items]
-        items = items.expand(batch_size, -1).reshape(-1)  # [batch_size * num_items]
-
-        # Get predictions in one shot
-        preds = self.sigmoid(self.forward(users, items))
-        predictions = preds.view(batch_size, num_items)
-
-        # Mask known interactions
         coo = interaction_matrix.tocoo()
         user_indices = torch.from_numpy(coo.row).to(self._device)
         item_indices = torch.from_numpy(coo.col).to(self._device)
