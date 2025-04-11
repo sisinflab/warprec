@@ -4,16 +4,14 @@ from typing import Optional, Callable, Any
 import torch
 import scipy.sparse as sp
 from torch import nn
-from torch import Tensor
-from scipy.sparse import csr_matrix
 from sklearn.linear_model import ElasticNet
-from elliotwo.recommenders.base_recommender import Recommender
+from elliotwo.recommenders.base_recommender import ItemSimRecommender
 from elliotwo.data.dataset import Interactions
 from elliotwo.utils.registry import model_registry
 
 
 @model_registry.register(name="Slim")
-class Slim(Recommender):
+class Slim(ItemSimRecommender):
     """Implementation of Slim model from
         Sparse Linear Methods for Top-N Recommender Systems 2011.
 
@@ -26,9 +24,6 @@ class Slim(Recommender):
         seed (int): The seed to use for reproducibility.
         info (dict): The dictionary containing dataset information.
         **kwargs (Any): Arbitrary keyword arguments.
-
-    Raises:
-        ValueError: If the items value was not passed through the info dict.
 
     Attributes:
         l1 (float): The normalization value.
@@ -49,13 +44,6 @@ class Slim(Recommender):
     ):
         super().__init__(params, device=device, seed=seed, *args, **kwargs)
         self._name = "Slim"
-        items = info.get("items", None)
-        if not items:
-            raise ValueError(
-                "Items value must be provided to correctly initialize the model."
-            )
-        # Model initialization
-        self.item_similarity = nn.Parameter(torch.rand(items, items)).to(self._device)
 
     def fit(
         self,
@@ -115,30 +103,3 @@ class Slim(Recommender):
 
         if report_fn is not None:
             report_fn(self)
-
-    @torch.no_grad()
-    def predict(
-        self, interaction_matrix: csr_matrix, *args: Any, **kwargs: Any
-    ) -> Tensor:
-        """Prediction in the form of X@B where B is a {item x item} similarity matrix.
-
-        Args:
-            interaction_matrix (csr_matrix): The interactions matrix
-                that will be used to predict.
-            *args (Any): List of arguments.
-            **kwargs (Any): The dictionary of keyword arguments.
-
-        Returns:
-            Tensor: The score matrix {user x item}.
-        """
-        r = interaction_matrix @ self.item_similarity.detach().numpy()
-
-        # Masking interaction already seen in train
-        r[interaction_matrix.nonzero()] = -torch.inf
-        return torch.from_numpy(r).to(self._device)
-
-    def forward(self, *args, **kwargs):
-        """Forward method is empty because we don't need
-        back propagation.
-        """
-        pass

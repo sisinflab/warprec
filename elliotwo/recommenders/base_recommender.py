@@ -201,3 +201,71 @@ def generate_model_name(model_name: str, params: dict) -> str:
     """
     param_str = "_".join(f"{key}={value:.4f}" for key, value in params.items())
     return f"{model_name}_{param_str}"
+
+
+"""
+    In this section we have some common interfaces that Recommender model might use.
+    If you want to implement your own Recommender model you can either use the
+    Recommender class or one of the classes below. These function as a common
+    starting point.
+"""
+
+
+class ItemSimRecommender(Recommender):
+    """ItemSimilarity common interface.
+
+    Args:
+        params (dict): The dictionary with the model params.
+        *args (Any): Argument for PyTorch nn.Module.
+        device (str): The device used for tensor operations.
+        seed (int): The seed to use for reproducibility.
+        info (dict): The dictionary containing dataset information.
+        **kwargs (Any): Keyword argument for PyTorch nn.Module.
+
+    Raises:
+        ValueError: If the items value was not passed through the info dict.
+    """
+
+    def __init__(
+        self,
+        params: dict,
+        *args: Any,
+        device: str = "cpu",
+        seed: int = 42,
+        info: dict = None,
+        **kwargs: Any,
+    ):
+        super().__init__(params, device=device, seed=seed, *args, **kwargs)
+        items = info.get("items", None)
+        if not items:
+            raise ValueError(
+                "Items value must be provided to correctly initialize the model."
+            )
+        # Model initialization
+        self.item_similarity = nn.Parameter(torch.rand(items, items)).to(self._device)
+
+    @torch.no_grad()
+    def predict(
+        self, interaction_matrix: csr_matrix, *args: Any, **kwargs: Any
+    ) -> Tensor:
+        """Prediction in the form of X@B where B is a {item x item} similarity matrix.
+
+        Args:
+            interaction_matrix (csr_matrix): The matrix containing the
+                pairs of interactions to evaluate.
+            *args (Any): List of arguments.
+            **kwargs (Any): The dictionary of keyword arguments.
+
+        Returns:
+            Tensor: The score matrix {user x item}.
+        """
+        r = interaction_matrix @ self.item_similarity.detach().numpy()
+
+        # Masking interaction already seen in train
+        r[interaction_matrix.nonzero()] = -torch.inf
+        return torch.from_numpy(r).to(self._device)
+
+    def forward(self, *args, **kwargs):
+        """Forward method is empty because we don't need
+        back propagation.
+        """

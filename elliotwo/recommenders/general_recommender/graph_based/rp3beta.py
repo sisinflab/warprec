@@ -3,16 +3,16 @@ from typing import Union, Optional, Callable, Any
 
 import torch
 import numpy as np
-from torch import Tensor, nn
+from torch import nn
 from scipy.sparse import csr_matrix, coo_matrix, lil_matrix
 from sklearn.preprocessing import normalize
 from elliotwo.data.dataset import Interactions
-from elliotwo.recommenders.base_recommender import Recommender
+from elliotwo.recommenders.base_recommender import ItemSimRecommender
 from elliotwo.utils.registry import model_registry
 
 
 @model_registry.register(name="RP3Beta")
-class RP3Beta(Recommender):
+class RP3Beta(ItemSimRecommender):
     """Implementation of RP3Beta algorithm from
         Updatable, accurate, diverse, and scalable recommendations for interactive applications 2016.
 
@@ -25,9 +25,6 @@ class RP3Beta(Recommender):
         seed (int): The seed to use for reproducibility.
         info (dict): The dictionary containing dataset information.
         **kwargs (Any): Arbitrary keyword arguments.
-
-    Raises:
-        ValueError: If the items value was not passed through the info dict.
 
     Attributes:
         k (int): Number of nearest neighbors.
@@ -50,15 +47,8 @@ class RP3Beta(Recommender):
         info: dict = None,
         **kwargs: Any,
     ):
-        super().__init__(params, device=device, seed=seed, *args, **kwargs)
+        super().__init__(params, device=device, seed=seed, info=info, *args, **kwargs)
         self._name = "RP3Beta"
-        items = info.get("items", None)
-        if not items:
-            raise ValueError(
-                "Items value must be provided to correctly initialize the model."
-            )
-        # Model initialization
-        self.item_similarity = nn.Parameter(torch.rand(items, items)).to(self._device)
 
     def fit(
         self,
@@ -222,30 +212,3 @@ class RP3Beta(Recommender):
 
         # Convert to CSR format for efficient subsequent operations
         return filtered_matrix.tocsr()
-
-    @torch.no_grad()
-    def predict(
-        self, interaction_matrix: csr_matrix, *args: Any, **kwargs: Any
-    ) -> Tensor:
-        """Prediction in the form of X@B where B is a {item x item} similarity matrix.
-
-        Args:
-            interaction_matrix (csr_matrix): The interactions matrix
-                that will be used to predict.
-            *args (Any): List of arguments.
-            **kwargs (Any): The dictionary of keyword arguments.
-
-        Returns:
-            Tensor: The score matrix {user x item}.
-        """
-        r = interaction_matrix @ self.item_similarity.detach().numpy()
-
-        # Masking interaction already seen in train
-        r[interaction_matrix.nonzero()] = -torch.inf
-        return torch.from_numpy(r).to(self._device)
-
-    def forward(self, *args, **kwargs):
-        """Forward method is empty because we don't need
-        back propagation.
-        """
-        pass

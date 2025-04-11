@@ -4,15 +4,13 @@ from typing import Optional, Callable, Any
 import numpy as np
 import torch
 from torch import nn
-from torch import Tensor
-from scipy.sparse import csr_matrix
 from sklearn.utils.extmath import safe_sparse_dot
-from elliotwo.recommenders.base_recommender import Recommender
+from elliotwo.recommenders.base_recommender import ItemSimRecommender
 from elliotwo.data.dataset import Interactions
 from elliotwo.utils.registry import model_registry
 
 
-class EASE(Recommender):
+class EASE(ItemSimRecommender):
     """The main class for EASE models.
 
     Main definition of attributes and data
@@ -25,9 +23,6 @@ class EASE(Recommender):
         seed (int): The seed to use for reproducibility.
         info (dict): The dictionary containing dataset information.
         **kwargs (Any): Keyword argument for PyTorch nn.Module.
-
-    Raises:
-        ValueError: If the items value was not passed through the info dict.
     """
 
     def __init__(
@@ -39,42 +34,8 @@ class EASE(Recommender):
         info: dict = None,
         **kwargs: Any,
     ):
-        super().__init__(params, device=device, seed=seed, *args, **kwargs)
+        super().__init__(params, device=device, seed=seed, info=info, *args, **kwargs)
         self._name = "EASE"
-        items = info.get("items", None)
-        if not items:
-            raise ValueError(
-                "Items value must be provided to correctly initialize the model."
-            )
-        # Model initialization
-        self.item_similarity = nn.Parameter(torch.rand(items, items)).to(self._device)
-
-    @torch.no_grad()
-    def predict(
-        self, interaction_matrix: csr_matrix, *args: Any, **kwargs: Any
-    ) -> Tensor:
-        """Prediction in the form of X@B where B is a {item x item} similarity matrix.
-
-        Args:
-            interaction_matrix (csr_matrix): The matrix containing the
-                pairs of interactions to evaluate.
-            *args (Any): List of arguments.
-            **kwargs (Any): The dictionary of keyword arguments.
-
-        Returns:
-            Tensor: The score matrix {user x item}.
-        """
-        r = interaction_matrix @ self.item_similarity.detach().numpy()
-
-        # Masking interaction already seen in train
-        r[interaction_matrix.nonzero()] = -torch.inf
-        return torch.from_numpy(r).to(self._device)
-
-    def forward(self, *args, **kwargs):
-        """Forward method is empty because we don't need
-        back propagation.
-        """
-        pass
 
 
 @model_registry.register(name="EASE")
