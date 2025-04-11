@@ -407,3 +407,60 @@ class RP3Beta(RecomModel):
         if not isinstance(v, list):
             v = [v]
         return v
+
+
+@params_registry.register("BPR")
+class BPR(RecomModel):
+    """Definition of the model BPR.
+
+    Attributes:
+        embedding_size (INT_FIELD): List of embedding size.
+        epochs (INT_FIELD): List of values for epochs.
+        learning_rate (FLOAT_FIELD): List of values for learning rate.
+    """
+
+    embedding_size: INT_FIELD
+    epochs: INT_FIELD
+    learning_rate: FLOAT_FIELD
+
+    @field_validator("embedding_size")
+    @classmethod
+    def check_embedding_size(cls, v: list):
+        """Validate embedding_size."""
+        if not isinstance(v, list):
+            v = [v]
+        for value in v:
+            if isinstance(value, int) and value <= 0:
+                raise ValueError(
+                    "Values of embedding_size for BPR model must be > 0. "
+                    f"Values received as input: {v}"
+                )
+        return v
+
+    @field_validator("epochs")
+    @classmethod
+    def check_epochs(cls, v: list):
+        """Validate epochs."""
+        if not isinstance(v, list):
+            v = [v]
+        for value in v:
+            if isinstance(value, int) and value <= 0:
+                raise ValueError(
+                    "Values of epochs for BPR model must be > 0. "
+                    f"Values received as input: {v}"
+                )
+        return v
+
+    @field_validator("learning_rate")
+    @classmethod
+    def check_learning_rate(cls, v: list):
+        """Validate learning_rate."""
+        if not isinstance(v, list):
+            v = [v]
+        for value in v:
+            if isinstance(value, float) and value <= 0:
+                raise ValueError(
+                    "Values of learning_rate for BPR model must be > 0. "
+                    f"Values received as input: {v}"
+                )
+        return v
