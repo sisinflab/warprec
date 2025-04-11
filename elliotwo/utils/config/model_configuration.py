@@ -18,7 +18,6 @@ from elliotwo.utils.logger import logger
 
 # Accepted field formats for model parameters
 LIST_INT_FIELD = Union[List[Union[str, List[int]]], List[List[int]], List[int]]
-FLOAT_INT_FIELD = Union[List[Union[str, float, int]], float, int]
 INT_FIELD = Union[List[Union[str, int]], int]
 FLOAT_FIELD = Union[List[Union[str, float]], float]
 STR_FIELD = Union[List[str], str]
@@ -373,7 +372,7 @@ class RecomModel(BaseModel, ABC):
                     f"Values received: {value}"
                 )
 
-        if typing in [FLOAT_FIELD, FLOAT_INT_FIELD]:
+        if typing in [FLOAT_FIELD]:
             if _strat:
                 value.insert(0, _strat)
             if (len(value) < 2 or len(value) > 4) and typing is not INT_FIELD:

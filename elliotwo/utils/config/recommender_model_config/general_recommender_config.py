@@ -2,7 +2,6 @@ from pydantic import field_validator
 from elliotwo.utils.config.model_configuration import (
     RecomModel,
     LIST_INT_FIELD,
-    FLOAT_INT_FIELD,
     INT_FIELD,
     FLOAT_FIELD,
     STR_FIELD,
@@ -17,10 +16,10 @@ class EASE(RecomModel):
     """Definition of the model EASE.
 
     Attributes:
-        l2 (FLOAT_INT_FIELD): List of values that l2 regularization can take.
+        l2 (FLOAT_FIELD): List of values that l2 regularization can take.
     """
 
-    l2: FLOAT_INT_FIELD
+    l2: FLOAT_FIELD
 
     @field_validator("l2")
     @classmethod
@@ -42,12 +41,12 @@ class Slim(RecomModel):
     """Definition of the model Slim.
 
     Attributes:
-        l1 (FLOAT_INT_FIELD): List of values that l1 regularization can take.
-        alpha (FLOAT_INT_FIELD): List of values that alpha can take.
+        l1 (FLOAT_FIELD): List of values that l1 regularization can take.
+        alpha (FLOAT_FIELD): List of values that alpha can take.
     """
 
-    l1: FLOAT_INT_FIELD
-    alpha: FLOAT_INT_FIELD
+    l1: FLOAT_FIELD
+    alpha: FLOAT_FIELD
 
     @field_validator("l1")
     @classmethod
@@ -348,14 +347,14 @@ class RP3Beta(RecomModel):
 
     Attributes:
         k (INT_FIELD): List of values for k.
-        alpha (FLOAT_INT_FIELD): List of values for alpha.
-        beta (FLOAT_INT_FIELD): List of values for beta.
+        alpha (FLOAT_FIELD): List of values for alpha.
+        beta (FLOAT_FIELD): List of values for beta.
         normalize (BOOL_FIELD): List of values for normalize.
     """
 
     k: INT_FIELD
-    alpha: FLOAT_INT_FIELD
-    beta: FLOAT_INT_FIELD
+    alpha: FLOAT_FIELD
+    beta: FLOAT_FIELD
     normalize: BOOL_FIELD
 
     @field_validator("k")
