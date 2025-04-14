@@ -236,13 +236,15 @@ class ItemSimRecommender(Recommender):
         **kwargs: Any,
     ):
         super().__init__(params, device=device, seed=seed, *args, **kwargs)
-        items = info.get("items", None)
-        if not items:
+        self.items = info.get("items", None)
+        if not self.items:
             raise ValueError(
                 "Items value must be provided to correctly initialize the model."
             )
         # Model initialization
-        self.item_similarity = nn.Parameter(torch.rand(items, items)).to(self._device)
+        self.item_similarity = nn.Parameter(torch.rand(self.items, self.items)).to(
+            self._device
+        )
 
     @torch.no_grad()
     def predict(

@@ -7,6 +7,7 @@ from .general_recommender_config import (
     RP3Beta,
     MultiDAE,
     MultiVAE,
+    ADMMSlim,
 )
 
 __all__ = [
@@ -18,4 +19,5 @@ __all__ = [
     "RP3Beta",
     "MultiDAE",
     "MultiVAE",
+    "ADMMSlim",
 ]

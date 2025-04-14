@@ -699,3 +699,112 @@ class MultiVAE(RecomModel):
         if not isinstance(v, list):
             v = [v]
         return v
+
+
+@params_registry.register("ADMMSlim")
+class ADMMSlim(RecomModel):
+    """Definition of the model ADMMSlim.
+
+    Attributes:
+        lambda_1 (FLOAT_FIELD): List of values for lambda_1.
+        lambda_2 (FLOAT_FIELD): List of values for lambda_2.
+        alpha (FLOAT_FIELD): List of values for alpha.
+        rho (FLOAT_FIELD): List of values for rho.
+        it (INT_FIELD): List of values for it.
+        positive_only (BOOL_FIELD): List of values for positive_only.
+        center_columns (BOOL_FIELD): List of values for center_columns.
+    """
+
+    lambda_1: FLOAT_FIELD
+    lambda_2: FLOAT_FIELD
+    alpha: FLOAT_FIELD
+    rho: FLOAT_FIELD
+    it: INT_FIELD
+    positive_only: BOOL_FIELD
+    center_columns: BOOL_FIELD
+
+    @field_validator("lambda_1")
+    @classmethod
+    def check_lambda_1(cls, v: list):
+        """Validate lambda_1."""
+        if not isinstance(v, list):
+            v = [v]
+        for value in v:
+            if isinstance(value, float) and value < 0:
+                raise ValueError(
+                    "Values of lambda_1 for ADMMSlim model must be >= 0. "
+                    f"Values received as input: {v}"
+                )
+        return v
+
+    @field_validator("lambda_2")
+    @classmethod
+    def check_lambda_2(cls, v: list):
+        """Validate lambda_2."""
+        if not isinstance(v, list):
+            v = [v]
+        for value in v:
+            if isinstance(value, float) and value < 0:
+                raise ValueError(
+                    "Values of lambda_2 for ADMMSlim model must be >= 0. "
+                    f"Values received as input: {v}"
+                )
+        return v
+
+    @field_validator("alpha")
+    @classmethod
+    def check_alpha(cls, v: list):
+        """Validate alpha."""
+        if not isinstance(v, list):
+            v = [v]
+        for value in v:
+            if isinstance(value, float) and value < 0:
+                raise ValueError(
+                    "Values of alpha for ADMMSlim model must be >= 0. "
+                    f"Values received as input: {v}"
+                )
+        return v
+
+    @field_validator("rho")
+    @classmethod
+    def check_rho(cls, v: list):
+        """Validate rho."""
+        if not isinstance(v, list):
+            v = [v]
+        for value in v:
+            if isinstance(value, float) and value < 0:
+                raise ValueError(
+                    "Values of rho for ADMMSlim model must be >= 0. "
+                    f"Values received as input: {v}"
+                )
+        return v
+
+    @field_validator("it")
+    @classmethod
+    def check_it(cls, v: list):
+        """Validate it."""
+        if not isinstance(v, list):
+            v = [v]
+        for value in v:
+            if isinstance(value, float) and value < 0:
+                raise ValueError(
+                    "Values of it for ADMMSlim model must be >= 0. "
+                    f"Values received as input: {v}"
+                )
+        return v
+
+    @field_validator("positive_only")
+    @classmethod
+    def check_positive_only(cls, v: list):
+        """Validate positive_only."""
+        if not isinstance(v, list):
+            v = [v]
+        return v
+
+    @field_validator("center_columns")
+    @classmethod
+    def check_center_columns(cls, v: list):
+        """Validate center_columns."""
+        if not isinstance(v, list):
+            v = [v]
+        return v

@@ -16,6 +16,8 @@ from .recommender_model_config import (
     NeuMF,
     RP3Beta,
     MultiDAE,
+    MultiVAE,
+    ADMMSlim,
 )
 from .evaluation_configuration import EvaluationConfig
 from .search_space_wrapper import SearchSpaceWrapper
@@ -40,6 +42,8 @@ __all__ = [
     "NeuMF",
     "RP3Beta",
     "MultiDAE",
+    "MultiVAE",
+    "ADMMSlim",
     "EvaluationConfig",
     "SearchSpaceWrapper",
 ]
