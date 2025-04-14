@@ -51,28 +51,31 @@ class MLP(nn.Module):
 
     def _get_activation(self, activation: Activations = Activations.RELU):
         """Retrieve the activation to use at the end
-        of a MLP layer.
+        of a MLP layer using structural pattern matching.
         """
-        if activation == Activations.SIGMOID:
-            return nn.Sigmoid()
-        if activation == Activations.TANH:
-            return nn.Tanh()
-        if activation == Activations.RELU:
-            return nn.ReLU()
-        if activation == Activations.LEAKYRELU:
-            return nn.LeakyReLU()
-        raise ValueError("Activation function not supported.")
+        match activation:
+            case Activations.SIGMOID:
+                return nn.Sigmoid()
+            case Activations.TANH:
+                return nn.Tanh()
+            case Activations.RELU:
+                return nn.ReLU()
+            case Activations.LEAKYRELU:
+                return nn.LeakyReLU()
+            case _:
+                raise ValueError("Activation function not supported.")
 
     def _init_weights(self, module: Module):
         """Initialize the weights of a module."""
         if isinstance(module, nn.Linear):
-            if self.init == Initializations.NORM:
-                normal_(module.weight.data, mean=0, std=0.01)
-            elif self.init == Initializations.XAVIER_NORM:
-                xavier_normal_(module.weight.data)
-            elif self.init == Initializations.XAVIER_UNI:
-                xavier_uniform_(module.weight.data)
-            else:
-                raise ValueError("Initialization mode not supported.")
+            match self.init:
+                case Initializations.NORM:
+                    normal_(module.weight.data, mean=0, std=0.01)
+                case Initializations.XAVIER_NORM:
+                    xavier_normal_(module.weight.data)
+                case Initializations.XAVIER_UNI:
+                    xavier_uniform_(module.weight.data)
+                case _:
+                    raise ValueError("Initialization mode not supported.")
             if module.bias is not None:
                 module.bias.data.fill_(0.0)
