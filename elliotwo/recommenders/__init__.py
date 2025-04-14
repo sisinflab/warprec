@@ -2,6 +2,7 @@ from .base_recommender import Recommender, ItemSimRecommender, generate_model_na
 from .general_recommender import (
     EASE,
     MultiDAE,
+    MultiVAE,
     ItemKNN,
     UserKNN,
     BPR,
@@ -20,6 +21,7 @@ __all__ = [
     "generate_model_name",
     "EASE",
     "MultiDAE",
+    "MultiVAE",
     "ItemKNN",
     "UserKNN",
     "BPR",
