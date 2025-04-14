@@ -475,6 +475,7 @@ class MultiDAE(RecomModel):
         dropout (FLOAT_FIELD): List of values for dropout.
         epochs (INT_FIELD): List of values for epochs.
         learning_rate (FLOAT_FIELD): List of values for learning rate.
+        l2_lambda (FLOAT_FIELD): List of values for l2_lambda.
     """
 
     intermediate_dim: INT_FIELD
@@ -482,6 +483,7 @@ class MultiDAE(RecomModel):
     dropout: FLOAT_FIELD
     epochs: INT_FIELD
     learning_rate: FLOAT_FIELD
+    l2_lambda: FLOAT_FIELD
 
     @field_validator("intermediate_dim")
     @classmethod
@@ -549,6 +551,20 @@ class MultiDAE(RecomModel):
             if isinstance(value, float) and value <= 0:
                 raise ValueError(
                     "Values of learning_rate for MultiDAE model must be > 0. "
+                    f"Values received as input: {v}"
+                )
+        return v
+
+    @field_validator("l2_lambda")
+    @classmethod
+    def check_l2_lambda(cls, v: list):
+        """Validate l2_lambda."""
+        if not isinstance(v, list):
+            v = [v]
+        for value in v:
+            if isinstance(value, float) and value < 0:
+                raise ValueError(
+                    "Values of l2_lambda for MultiDAE model must be >= 0. "
                     f"Values received as input: {v}"
                 )
         return v

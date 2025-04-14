@@ -94,6 +94,7 @@ class MultiDAE(Recommender):
         dropout (float): Dropout probability.
         epochs (int): The number of epochs.
         learning_rate (float): The learning rate value.
+        l2_lambda (float): L2 regularization parameter.
     """
 
     intermediate_dim: int
@@ -101,6 +102,7 @@ class MultiDAE(Recommender):
     dropout: float
     epochs: int
     learning_rate: float
+    l2_lambda: float
 
     def __init__(
         self,
@@ -136,7 +138,9 @@ class MultiDAE(Recommender):
 
         # Initialize weights
         self.apply(self._init_weights)
-        self.optimizer = torch.optim.Adam(self.parameters(), lr=self.learning_rate)
+        self.optimizer = torch.optim.Adam(
+            self.parameters(), lr=self.learning_rate, weight_decay=self.l2_lambda
+        )
 
     def _init_weights(self, module: nn.Module):
         if isinstance(module, nn.Linear):
