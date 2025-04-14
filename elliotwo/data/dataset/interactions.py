@@ -174,6 +174,7 @@ class Interactions:
             start_idx = end_idx
 
         # Create negative interactions tensor
+        # Note: PyTorch tensors require long integers for indices
         neg_users = torch.LongTensor(neg_users)
         neg_items = torch.LongTensor(neg_items)
         neg_ratings = torch.zeros_like(neg_users, dtype=torch.float)
@@ -235,6 +236,7 @@ class Interactions:
             start_idx = end_idx
 
         # Trim to actual size and convert to tensors
+        # Note: PyTorch tensors require long integers for indices
         users_tensor = torch.LongTensor(users_triplet[:start_idx])
         positives_tensor = torch.LongTensor(positives_triplet[:start_idx])
         negatives_tensor = torch.LongTensor(negatives_triplet[:start_idx])
