@@ -8,7 +8,15 @@ from .reader_configuration import (
 from .writer_configuration import WriterConfig, WritingParams
 from .splitter_configuration import SplittingConfig
 from .model_configuration import RecomModel
-from .recommender_model_config import EASE, ItemKNN, UserKNN, Slim, NeuMF, RP3Beta
+from .recommender_model_config import (
+    EASE,
+    ItemKNN,
+    UserKNN,
+    Slim,
+    NeuMF,
+    RP3Beta,
+    MultiDAE,
+)
 from .evaluation_configuration import EvaluationConfig
 from .search_space_wrapper import SearchSpaceWrapper
 from .config import Configuration, load_yaml
@@ -31,6 +39,7 @@ __all__ = [
     "Slim",
     "NeuMF",
     "RP3Beta",
+    "MultiDAE",
     "EvaluationConfig",
     "SearchSpaceWrapper",
 ]

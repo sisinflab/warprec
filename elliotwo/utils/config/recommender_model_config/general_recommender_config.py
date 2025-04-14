@@ -463,3 +463,92 @@ class BPR(RecomModel):
                     f"Values received as input: {v}"
                 )
         return v
+
+
+@params_registry.register("MultiDAE")
+class MultiDAE(RecomModel):
+    """Definition of the model MultiDAE.
+
+    Attributes:
+        intermediate_dim (INT_FIELD): List of intermediate_dim values.
+        latent_dim (INT_FIELD): List of values for latent_dim values.
+        dropout (FLOAT_FIELD): List of values for dropout.
+        epochs (INT_FIELD): List of values for epochs.
+        learning_rate (FLOAT_FIELD): List of values for learning rate.
+    """
+
+    intermediate_dim: INT_FIELD
+    latent_dim: INT_FIELD
+    dropout: FLOAT_FIELD
+    epochs: INT_FIELD
+    learning_rate: FLOAT_FIELD
+
+    @field_validator("intermediate_dim")
+    @classmethod
+    def check_intermediate_dim(cls, v: list):
+        """Validate intermediate_dim."""
+        if not isinstance(v, list):
+            v = [v]
+        for value in v:
+            if isinstance(value, int) and value <= 0:
+                raise ValueError(
+                    "Values of intermediate_dim for MultiDAE model must be > 0. "
+                    f"Values received as input: {v}"
+                )
+        return v
+
+    @field_validator("latent_dim")
+    @classmethod
+    def check_latent_dim(cls, v: list):
+        """Validate latent_dim."""
+        if not isinstance(v, list):
+            v = [v]
+        for value in v:
+            if isinstance(value, int) and value <= 0:
+                raise ValueError(
+                    "Values of latent_dim for MultiDAE model must be > 0. "
+                    f"Values received as input: {v}"
+                )
+        return v
+
+    @field_validator("dropout")
+    @classmethod
+    def check_dropout(cls, v: list):
+        """Validate dropout."""
+        if not isinstance(v, list):
+            v = [v]
+        for value in v:
+            if isinstance(value, float) and value < 0:
+                raise ValueError(
+                    "Values of dropout for MultiDAE model must be >= 0. "
+                    f"Values received as input: {v}"
+                )
+        return v
+
+    @field_validator("epochs")
+    @classmethod
+    def check_epochs(cls, v: list):
+        """Validate epochs."""
+        if not isinstance(v, list):
+            v = [v]
+        for value in v:
+            if isinstance(value, int) and value <= 0:
+                raise ValueError(
+                    "Values of epochs for MultiDAE model must be > 0. "
+                    f"Values received as input: {v}"
+                )
+        return v
+
+    @field_validator("learning_rate")
+    @classmethod
+    def check_learning_rate(cls, v: list):
+        """Validate learning_rate."""
+        if not isinstance(v, list):
+            v = [v]
+        for value in v:
+            if isinstance(value, float) and value <= 0:
+                raise ValueError(
+                    "Values of learning_rate for MultiDAE model must be > 0. "
+                    f"Values received as input: {v}"
+                )
+        return v
