@@ -28,7 +28,7 @@ class SplittingStrategies(str, Enum):
             Timestamps will be mandatory if this strategy is chosen.
         - TEMPORAL_LEAVE_K_OUT: The splitting will be based on the timestamp and k.
             Timestamps will be mandatory if this strategy is chosen.
-        - FIXED_TIMESTAMP: The splitting will be based on a fixed timestamp.
+        - TIMESTAMP_SLICING: The splitting will be based on a timestamp. Either fixed or 'best'.
             The timestamp will be mandatory if this strategy is chosen.
     """
 
@@ -37,7 +37,7 @@ class SplittingStrategies(str, Enum):
     LEAVE_ONE_OUT = "leave-one-out"
     TEMPORAL_HOLDOUT = "temporal_holdout"
     TEMPORAL_LEAVE_K_OUT = "temporal_leave_k_out"
-    FIXED_TIMESTAMP = "fixed_timestamp"
+    TIMESTAMP_SLICING = "timestamp_slicing"
 
 
 class ReadingMethods(str, Enum):

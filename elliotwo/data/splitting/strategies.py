@@ -1,5 +1,5 @@
 # pylint: disable=too-few-public-methods
-from typing import Tuple, List, Any, Optional
+from typing import Tuple, List, Any, Optional, Union
 from abc import ABC, abstractmethod
 
 import numpy as np
@@ -367,9 +367,10 @@ class TemporalLeaveKOutSplit(SplittingStrategy):
         return train_idxs, test_idxs
 
 
-@splitting_registry.register(SplittingStrategies.FIXED_TIMESTAMP)
-class FixedTimestampSplit(SplittingStrategy):
-    """Splits data based on a fixed timestamp.
+@splitting_registry.register(SplittingStrategies.TIMESTAMP_SLICING)
+class TimestampSplit(SplittingStrategy):
+    """Splits data based on a timestamp. Either a fixed timestamp or a
+    'best' timestamp can be used.
 
     Timestamp must be provided to use this strategy.
     """
@@ -377,14 +378,14 @@ class FixedTimestampSplit(SplittingStrategy):
     def split(
         self,
         data: DataFrame,
-        timestamp: int = 0,
+        timestamp: Union[int, str] = 0,
         **kwargs: Any,
     ) -> Tuple[List[int], List[int], List[int]]:
         """Implementation of the fixed timestamp splitting.
 
         Args:
             data (DataFrame): The DataFrame to be split.
-            timestamp (int): The timestamp to split data for test set.
+            timestamp (Union[int, str]): The timestamp to split data for test set.
             **kwargs (Any): The keyword arguments.
 
         Returns:
@@ -392,6 +393,70 @@ class FixedTimestampSplit(SplittingStrategy):
                 List[int]: List of indexes for the training set.
                 List[int]: List of indexes for the test set.
                 List[int]: List of indexes for the validation set.
+        """
+        if timestamp == "best":
+            best_timestamp = self._best_split(data)
+            train_idxs, test_idxs = self._fixed_split(data, best_timestamp)
+        else:
+            train_idxs, test_idxs = self._fixed_split(data, int(timestamp))
+
+        # Return train/test indices
+        return train_idxs, test_idxs, None
+
+    def _best_split(
+        self, data: DataFrame, min_below: int = 1, min_over: int = 1
+    ) -> int:
+        """Optimized method to find the best split timestamp for partitioning data.
+
+        Args:
+            data (DataFrame): The original data in DataFrame format.
+            min_below (int): Minimum number of transactions below the timestamp.
+            min_over (int): Minimum number of transactions above the timestamp.
+
+        Returns:
+            int: Best timestamp for splitting user transactions.
+        """
+        user_label = data.columns[0]  # Assuming first column is user ID
+        time_label = data.columns[-1]  # Assuming last column is timestamp
+
+        unique_timestamps = np.sort(data[time_label].unique())
+        n_candidates = unique_timestamps.shape[0]
+
+        candidate_scores = np.zeros(n_candidates, dtype=int)
+
+        user_groups = data.groupby(user_label)
+
+        for user, group in user_groups:
+            user_ts = np.sort(group[time_label].values)
+            total_events = user_ts.shape[0]
+            below_counts = np.searchsorted(user_ts, unique_timestamps, side="left")
+            over_counts = total_events - below_counts
+
+            valid = (below_counts >= min_below) & (over_counts >= min_over)
+            candidate_scores += valid.astype(int)
+
+        max_score = candidate_scores.max()
+
+        valid_candidates = unique_timestamps[candidate_scores == max_score]
+        best_timestamp = valid_candidates.max()
+
+        return best_timestamp
+
+    def _fixed_split(
+        self, data: DataFrame, timestamp: int
+    ) -> Tuple[List[int], List[int]]:
+        """Method to split data in two partitions, using a fixed timestamp.
+
+        This method will split data based on the timestamp provided.
+
+        Args:
+            data (DataFrame): The original data in DataFrame format.
+            timestamp (int): The timestamp to be used for splitting.
+
+        Returns:
+            Tuple[List[int], List[int]]:
+                List[int]: List of indexes of the first partition.
+                List[int]: List of indexes of the second partition.
         """
         # Set time label
         time_label = data.columns[-1]  # Assuming last column is timestamp
@@ -403,5 +468,4 @@ class FixedTimestampSplit(SplittingStrategy):
         train_idxs = data.index[split_mask].tolist()
         test_idxs = data.index[~split_mask].tolist()
 
-        # Return train/test indices
-        return train_idxs, test_idxs, None
+        return train_idxs, test_idxs

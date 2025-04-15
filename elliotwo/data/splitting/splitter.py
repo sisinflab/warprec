@@ -1,4 +1,4 @@
-from typing import Tuple, Optional
+from typing import Tuple, Optional, Union
 
 from pandas import DataFrame
 from elliotwo.utils.config import Configuration, SplittingConfig
@@ -31,7 +31,7 @@ class Splitter:
         val_ratio: Optional[float] = None,
         test_k: Optional[int] = None,
         val_k: Optional[int] = None,
-        timestamp: Optional[int] = None,
+        timestamp: Optional[Union[int, str]] = None,
         seed: int = 42,
     ) -> Tuple[DataFrame, DataFrame, Optional[DataFrame]]:
         """The main method of the class. This method must be called to split the data.
@@ -50,7 +50,8 @@ class Splitter:
             val_ratio (Optional[float]): The validation set size.
             test_k (Optional[int]): The k value for test set.
             val_k (Optional[int]): The k value for validation set.
-            timestamp (Optional[int]): The timestamp to be used for the test set.
+            timestamp (Optional[Union[int, str]]): The timestamp to be used for the test set.
+                Either an integer or 'best'.
             seed (int): The seed used during splitting.
 
         Returns:

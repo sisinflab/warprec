@@ -1,6 +1,6 @@
-from typing import Optional
+from typing import Optional, Union
 
-from pydantic import BaseModel, model_validator
+from pydantic import BaseModel, model_validator, field_validator
 from elliotwo.utils.enums import SplittingStrategies
 from elliotwo.utils.logger import logger
 
@@ -16,7 +16,8 @@ class SplittingConfig(BaseModel):
         val_ratio (Optional[float]): The ratio of the val set.
         test_k (Optional[int]): The k value for the test set.
         val_k (Optional[int]): The k value for the val set.
-        timestamp (Optional[int]): The timestamp to be used for the test set.
+        timestamp (Optional[Union[int, str]]): The timestamp to be used for the test set.
+            Either and integer or 'best'.
         seed (Optional[int]): The seed to be used during the splitting process.
     """
 
@@ -25,8 +26,18 @@ class SplittingConfig(BaseModel):
     val_ratio: Optional[float] = None
     test_k: Optional[int] = None
     val_k: Optional[int] = None
-    timestamp: Optional[int] = None
+    timestamp: Optional[Union[int, str]] = None
     seed: Optional[int] = 42
+
+    @field_validator("timestamp")
+    @classmethod
+    def check_timestamp(cls, v: Optional[Union[int, str]]):
+        if v and isinstance(v, str):
+            if v != "best":
+                raise ValueError(
+                    f"Timestamp must be either an integer or 'best'. You passed {v}."
+                )
+        return v
 
     @model_validator(mode="after")
     def check_dependencies(self):
@@ -66,7 +77,7 @@ class SplittingConfig(BaseModel):
             )
 
         if (
-            self.strategy == SplittingStrategies.FIXED_TIMESTAMP
+            self.strategy == SplittingStrategies.TIMESTAMP_SLICING
             and self.timestamp is None
         ):
             raise ValueError(
