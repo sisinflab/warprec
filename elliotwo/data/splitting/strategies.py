@@ -196,9 +196,9 @@ class LeaveOneOutSplit(SplittingStrategy):
         return train_idxs, test_idxs
 
 
-@splitting_registry.register(SplittingStrategies.TEMPORAL)
-class TemporalSplit(SplittingStrategy):
-    """The definition of a temporal splitting strategy.
+@splitting_registry.register(SplittingStrategies.TEMPORAL_HOLDOUT)
+class TemporalHoldoutSplit(SplittingStrategy):
+    """The definition of a temporal holdout splitting strategy.
 
     Timestamp must be provided to use this strategy.
     """
@@ -210,7 +210,7 @@ class TemporalSplit(SplittingStrategy):
         val_ratio: Optional[float] = None,
         **kwargs: Any,
     ) -> Tuple[List[int], List[int], List[int]]:
-        """Implementation of the temporal splitting. Original data will be splitted
+        """Implementation of the temporal holdout splitting. Original data will be splitted
         according to timestamp. If a seed has been set, the split will be reproducible.
 
         Args:

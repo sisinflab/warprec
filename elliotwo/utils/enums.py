@@ -24,14 +24,14 @@ class SplittingStrategies(str, Enum):
             A seed will bi used to ensure reproducibility.
         - LEAVE_ONE_OUT: The splitting will remove just one element.
             The elements chosen will be the same if a seed is set.
-        - TEMPORAL: The splitting will be based on the timestamp.
+        - TEMPORAL_HOLDOUT: The splitting will be based on the timestamp and ratio.
             Timestamps will be mandatory if this strategy is chosen.
     """
 
     NONE = "none"
     RANDOM = "random"
     LEAVE_ONE_OUT = "leave-one-out"
-    TEMPORAL = "temporal"
+    TEMPORAL_HOLDOUT = "temporal_holdout"
 
 
 class ReadingMethods(str, Enum):

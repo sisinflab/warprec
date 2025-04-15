@@ -37,7 +37,10 @@ class SplittingConfig(BaseModel):
         tol = 1e-6  # Tolerance will be used to check ratios
 
         # ValueError checks
-        if self.strategy in [SplittingStrategies.RANDOM, SplittingStrategies.TEMPORAL]:
+        if self.strategy in [
+            SplittingStrategies.RANDOM,
+            SplittingStrategies.TEMPORAL_HOLDOUT,
+        ]:
             if self.test_ratio is None:
                 raise ValueError(
                     f"You have chosen {self.strategy.value} splitting but "
@@ -54,7 +57,7 @@ class SplittingConfig(BaseModel):
         # Attention checks
         if self.strategy in [
             SplittingStrategies.RANDOM,
-            SplittingStrategies.TEMPORAL,
+            SplittingStrategies.TEMPORAL_HOLDOUT,
         ] and (self.test_k or self.val_k):
             logger.attention(
                 f"You have filled the k field but the splitting strategy "
