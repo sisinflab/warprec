@@ -25,11 +25,17 @@ class SplittingStrategies(str, Enum):
             Timestamps will be mandatory if this strategy is chosen.
         - TIMESTAMP_SLICING: The splitting will be based on a timestamp. Either fixed or 'best'.
             The timestamp will be mandatory if this strategy is chosen.
+        - RANDOM_RATIO: The splitting will be based on a ratio. If a seed has been provided,
+            the splitting will be deterministic.
+        - RANDOM_LEAVE_K_OUT: The splitting will be based on k. If a seed has been provided,
+            the splitting will be deterministic.
     """
 
     TEMPORAL_HOLDOUT = "temporal_holdout"
     TEMPORAL_LEAVE_K_OUT = "temporal_leave_k_out"
     TIMESTAMP_SLICING = "timestamp_slicing"
+    RANDOM_RATIO = "random_ratio"
+    RANDOM_LEAVE_K_OUT = "random_leave_k_out"
 
 
 class ReadingMethods(str, Enum):

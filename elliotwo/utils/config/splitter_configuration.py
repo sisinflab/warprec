@@ -84,6 +84,24 @@ class SplittingConfig(BaseModel):
                 "the test timestamp field has not been filled."
             )
 
+        if (
+            self.strategy == SplittingStrategies.RANDOM_RATIO
+            and self.test_ratio is None
+        ):
+            raise ValueError(
+                "You have chosen random ratio splitting but "
+                "the test ratio field has not been filled."
+            )
+
+        if (
+            self.strategy == SplittingStrategies.RANDOM_LEAVE_K_OUT
+            and self.test_k is None
+        ):
+            raise ValueError(
+                "You have chosen random leave k out splitting but "
+                "the test k field has not been filled."
+            )
+
         # Attention checks
         if self.strategy in SplittingStrategies.TEMPORAL_HOLDOUT and (
             self.test_k or self.val_k

@@ -14,7 +14,7 @@ class SplittingStrategy(ABC):
     @abstractmethod
     def split(
         self, data: DataFrame, **kwargs: Any
-    ) -> Tuple[List[int], List[int], List[int]]:
+    ) -> Tuple[List[int], List[int], Optional[List[int]]]:
         """This method will split the data in train/test/validation splits.
 
         If the validation split was not set then it will be None.
@@ -24,10 +24,10 @@ class SplittingStrategy(ABC):
             **kwargs (Any): The keyword arguments.
 
         Returns:
-            Tuple[List[int], List[int], List[int]]:
+            Tuple[List[int], List[int], Optional[List[int]]]:
                 List[int]: List of indexes that will end up in the training set.
                 List[int]: List of indexes that will end up in the test set.
-                List[int]: List of indexes that will end up in the validation set.
+                Optional[List[int]]: List of indexes that will end up in the validation set.
         """
 
 
@@ -44,7 +44,7 @@ class TemporalHoldoutSplit(SplittingStrategy):
         test_ratio: float = 0.2,
         val_ratio: Optional[float] = None,
         **kwargs: Any,
-    ) -> Tuple[List[int], List[int], List[int]]:
+    ) -> Tuple[List[int], List[int], Optional[List[int]]]:
         """Implementation of the temporal holdout splitting. Original data will be splitted
         according to timestamp. If a seed has been set, the split will be reproducible.
 
@@ -55,10 +55,10 @@ class TemporalHoldoutSplit(SplittingStrategy):
             **kwargs (Any): The keyword arguments.
 
         Returns:
-            Tuple[List[int], List[int], List[int]]:
+            Tuple[List[int], List[int], Optional[List[int]]]:
                 List[int]: List of indexes that will end up in the training set.
                 List[int]: List of indexes that will end up in the test set.
-                List[int]: List of indexes that will end up in the validation set.
+                Optional[List[int]]: List of indexes that will end up in the validation set.
         """
         # Get interactions in DataFrame and calculate train/test indices
         train_idxs, test_idxs = self._temp_split(data, test_size=test_ratio)
@@ -128,7 +128,7 @@ class TemporalLeaveKOutSplit(SplittingStrategy):
         test_k: int = 5,
         val_k: Optional[int] = None,
         **kwargs: Any,
-    ) -> Tuple[List[int], List[int], List[int]]:
+    ) -> Tuple[List[int], List[int], Optional[List[int]]]:
         """Implementation of the temporal leave k out splitting. Original data will be splitted
         according to timestamp. If a seed has been set, the split will be reproducible.
 
@@ -139,10 +139,10 @@ class TemporalLeaveKOutSplit(SplittingStrategy):
             **kwargs (Any): The keyword arguments.
 
         Returns:
-            Tuple[List[int], List[int], List[int]]:
+            Tuple[List[int], List[int], Optional[List[int]]]:
                 List[int]: List of indexes that will end up in the training set.
                 List[int]: List of indexes that will end up in the test set.
-                List[int]: List of indexes that will end up in the validation set.
+                Optional[List[int]]: List of indexes that will end up in the validation set.
         """
         # Get interactions in DataFrame and calculate train/test indices
         train_idxs, test_idxs = self._temp_split(data, test_k=test_k)
@@ -207,6 +207,8 @@ class TimestampSplit(SplittingStrategy):
     """Splits data based on a timestamp. Either a fixed timestamp or a
     'best' timestamp can be used.
 
+    For further details about the 'best' timestamp, check the `paper <https://link.springer.com/chapter/10.1007/978-3-030-15712-8_63>`_.
+
     Timestamp must be provided to use this strategy.
     """
 
@@ -215,7 +217,7 @@ class TimestampSplit(SplittingStrategy):
         data: DataFrame,
         timestamp: Union[int, str] = 0,
         **kwargs: Any,
-    ) -> Tuple[List[int], List[int], List[int]]:
+    ) -> Tuple[List[int], List[int], Optional[List[int]]]:
         """Implementation of the fixed timestamp splitting.
 
         Args:
@@ -224,10 +226,10 @@ class TimestampSplit(SplittingStrategy):
             **kwargs (Any): The keyword arguments.
 
         Returns:
-            Tuple[List[int], List[int], List[int]]:
-                List[int]: List of indexes for the training set.
-                List[int]: List of indexes for the test set.
-                List[int]: List of indexes for the validation set.
+            Tuple[List[int], List[int], Optional[List[int]]]:
+                List[int]: List of indexes that will end up in the training set.
+                List[int]: List of indexes that will end up in the test set.
+                Optional[List[int]]: List of indexes that will end up in the validation set.
         """
         if timestamp == "best":
             best_timestamp = self._best_split(data)
@@ -304,3 +306,155 @@ class TimestampSplit(SplittingStrategy):
         test_idxs = data.index[~split_mask].tolist()
 
         return train_idxs, test_idxs
+
+
+@splitting_registry.register(SplittingStrategies.RANDOM_RATIO)
+class RandomRatioSplit(SplittingStrategy):
+    """The definition of a random ratio splitting strategy."""
+
+    def split(
+        self,
+        data: DataFrame,
+        test_ratio: float = 0.2,
+        val_ratio: Optional[float] = None,
+        seed: int = 42,
+        **kwargs: Any,
+    ) -> Tuple[List[int], List[int], Optional[List[int]]]:
+        """Implementation of the random ratio splitting.
+        If a seed has been set, the split will be reproducible.
+
+        Args:
+            data (DataFrame): The DataFrame to be splitted.
+            test_ratio (float): The test set size.
+            val_ratio (Optional[float]): The validation set size.
+            seed (int): The seed for the random number generator.
+            **kwargs (Any): The keyword arguments.
+
+        Returns:
+            Tuple[List[int], List[int], Optional[List[int]]]:
+                List[int]: List of indexes that will end up in the training set.
+                List[int]: List of indexes that will end up in the test set.
+                Optional[List[int]]: List of indexes that will end up in the validation set.
+        """
+        np.random.seed(seed)
+
+        # Get interactions in DataFrame and calculate train/test indices
+        train_idxs, test_idxs = self._random_ratio(data, test_size=test_ratio)
+        val_idxs = None
+
+        # Check if validation set size has been set, if so we return indices for train/val/test
+        if val_ratio:
+            train_idxs, val_idxs = self._random_ratio(
+                data.iloc[train_idxs], test_size=val_ratio / (1 - test_ratio)
+            )
+
+        # Otherwise return train/test indices
+        return train_idxs, test_idxs, val_idxs
+
+    def _random_ratio(
+        self, data: DataFrame, test_size: float = 0.2
+    ) -> Tuple[List[int], List[int]]:
+        """Method to split data in two partitions, using a ratio.
+
+        This method will split data based on the ratio provided.
+
+        Args:
+            data (DataFrame): The original data in DataFrame format.
+            test_size (float): Percentage of data that will end up in the second partition.
+
+        Returns:
+            Tuple[List[int], List[int]]:
+                List[int]: List of indexes of the first partition.
+                List[int]: List of indexes of the second partition.
+        """
+        all_indices = data.index.to_numpy()
+        permuted = np.random.permutation(all_indices)
+        n_total = len(permuted)
+        n_test = int(n_total * test_size)
+
+        test_idxs = permuted[:n_test].tolist()
+        train_idxs = permuted[n_test:].tolist()
+
+        return train_idxs, test_idxs  # type: ignore[return-value]
+
+
+@splitting_registry.register(SplittingStrategies.RANDOM_LEAVE_K_OUT)
+class RandomLeaveKOutSplit(SplittingStrategy):
+    """The definition of a random leave k out splitting strategy."""
+
+    def split(
+        self,
+        data: DataFrame,
+        test_k: int = 5,
+        val_k: Optional[int] = None,
+        seed: int = 42,
+        **kwargs: Any,
+    ) -> Tuple[List[int], List[int], Optional[List[int]]]:
+        """Implementation of the random leave k out splitting.
+        If a seed has been set, the split will be reproducible.
+
+        Args:
+            data (DataFrame): The DataFrame to be splitted.
+            test_k (int): The test set k.
+            val_k (Optional[int]): The validation set k.
+            seed (int): The seed for the random number generator.
+            **kwargs (Any): The keyword arguments.
+
+        Returns:
+            Tuple[List[int], List[int], Optional[List[int]]]:
+                List[int]: List of indexes that will end up in the training set.
+                List[int]: List of indexes that will end up in the test set.
+                Optional[List[int]]: List of indexes that will end up in the validation set.
+        """
+        np.random.seed(seed)
+
+        # Get interactions in DataFrame and calculate train/test indices
+        train_idxs, test_idxs = self._random_leave(data, test_k=test_k)
+        val_idxs = None
+
+        # Check if validation set size has been set, if so we return indices for train/val/test
+        if val_k:
+            train_idxs, val_idxs = self._random_leave(
+                data.iloc[train_idxs], test_k=val_k
+            )
+
+        # Otherwise return train/test indices
+        return train_idxs, test_idxs, val_idxs
+
+    def _random_leave(
+        self, data: DataFrame, test_k: int = 1
+    ) -> Tuple[List[int], List[int]]:
+        """Method to split data in two partitions, using a ratio.
+
+        This method will split data based on the ratio provided.
+
+        Args:
+            data (DataFrame): The original data in DataFrame format.
+            test_k (int): Number of transaction that will end up in the second partition.
+        Returns:
+            Tuple[List[int], List[int]]:
+                List[int]: List of indexes of the first partition.
+                List[int]: List of indexes of the second partition.
+        """
+        user_label = data.columns[0]  # Assuming first column is the user ID
+        train_all = []  # type: ignore[var-annotated]
+        test_all = []  # type: ignore[var-annotated]
+
+        # Process each user group separately
+        for user, group in data.groupby(user_label):
+            indices = group.index.tolist()
+            # Proceed only if the user has more than test_k interactions
+            if len(indices) <= test_k:
+                continue
+
+            # Shuffle the indices for the current user
+            permuted = np.random.permutation(indices).tolist()
+
+            # Select first test_k indices for the second partition and the rest for the first partition
+            user_test = permuted[:test_k]
+            user_train = permuted[test_k:]
+
+            train_all.extend(user_train)
+            test_all.extend(user_test)
+
+        return train_all, test_all
