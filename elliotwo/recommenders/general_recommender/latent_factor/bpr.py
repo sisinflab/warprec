@@ -77,6 +77,9 @@ class BPR(Recommender):
         self.optimizer = torch.optim.Adam(self.parameters(), lr=self.learning_rate)
         self.loss = BPRLoss()
 
+        # Move to device
+        self.to(self._device)
+
     def _init_weights(self, module: Module):
         """Internal method to initialize weights.
 

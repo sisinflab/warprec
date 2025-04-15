@@ -165,6 +165,9 @@ class MultiVAE(Recommender):
             self.parameters(), lr=self.learning_rate, weight_decay=self.l2_lambda
         )
 
+        # Move to device
+        self.to(self._device)
+
     def _init_weights(self, module: nn.Module):
         if isinstance(module, nn.Linear):
             xavier_normal_(module.weight.data)
