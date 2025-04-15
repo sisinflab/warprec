@@ -19,11 +19,6 @@ class SplittingStrategies(str, Enum):
     """Represents the types of splitting strategies supported.
 
     This enum is used to track the possible splitting strategies:
-        - NONE: The splitting will not be performed.
-        - RANDOM: The splitting will be random.
-            A seed will bi used to ensure reproducibility.
-        - LEAVE_ONE_OUT: The splitting will remove just one element.
-            The elements chosen will be the same if a seed is set.
         - TEMPORAL_HOLDOUT: The splitting will be based on the timestamp and ratio.
             Timestamps will be mandatory if this strategy is chosen.
         - TEMPORAL_LEAVE_K_OUT: The splitting will be based on the timestamp and k.
@@ -32,9 +27,6 @@ class SplittingStrategies(str, Enum):
             The timestamp will be mandatory if this strategy is chosen.
     """
 
-    NONE = "none"
-    RANDOM = "random"
-    LEAVE_ONE_OUT = "leave-one-out"
     TEMPORAL_HOLDOUT = "temporal_holdout"
     TEMPORAL_LEAVE_K_OUT = "temporal_leave_k_out"
     TIMESTAMP_SLICING = "timestamp_slicing"

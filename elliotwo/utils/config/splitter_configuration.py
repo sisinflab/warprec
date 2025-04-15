@@ -21,7 +21,7 @@ class SplittingConfig(BaseModel):
         seed (Optional[int]): The seed to be used during the splitting process.
     """
 
-    strategy: Optional[SplittingStrategies] = SplittingStrategies.NONE
+    strategy: Optional[SplittingStrategies] = None
     test_ratio: Optional[float] = None
     val_ratio: Optional[float] = None
     test_k: Optional[int] = None
@@ -50,15 +50,14 @@ class SplittingConfig(BaseModel):
         tol = 1e-6  # Tolerance will be used to check ratios
 
         # ValueError checks
-        if self.strategy in [
-            SplittingStrategies.RANDOM,
-            SplittingStrategies.TEMPORAL_HOLDOUT,
-        ]:
-            if self.test_ratio is None:
-                raise ValueError(
-                    f"You have chosen {self.strategy.value} splitting but "
-                    "the test ratio field has not been filled."
-                )
+        if (
+            self.strategy == SplittingStrategies.TEMPORAL_HOLDOUT
+            and self.test_ratio is None
+        ):
+            raise ValueError(
+                f"You have chosen {self.strategy.value} splitting but "
+                "the test ratio field has not been filled."
+            )
 
         if self.test_ratio and self.val_ratio:
             if self.test_ratio + self.val_ratio + tol >= 1.0:
@@ -86,21 +85,12 @@ class SplittingConfig(BaseModel):
             )
 
         # Attention checks
-        if self.strategy in [
-            SplittingStrategies.RANDOM,
-            SplittingStrategies.TEMPORAL_HOLDOUT,
-        ] and (self.test_k or self.val_k):
+        if self.strategy in SplittingStrategies.TEMPORAL_HOLDOUT and (
+            self.test_k or self.val_k
+        ):
             logger.attention(
                 f"You have filled the k field but the splitting strategy "
                 f"has been set to {self.strategy.value}. Check your "
-                "configuration file for possible errors."
-            )
-        if self.strategy == SplittingStrategies.LEAVE_ONE_OUT and (
-            self.test_ratio or self.val_ratio
-        ):
-            logger.attention(
-                "You have filled the ratio field but splitting strategy "
-                "has been set to leave-one-out. Check your "
                 "configuration file for possible errors."
             )
 
