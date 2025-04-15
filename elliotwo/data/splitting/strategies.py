@@ -207,6 +207,11 @@ class TimestampSplit(SplittingStrategy):
     """Splits data based on a timestamp. Either a fixed timestamp or a
     'best' timestamp can be used.
 
+    In case of best timestamp strategy, the slicing will be conducted finding the
+    timestamp that better separates the transactions. Using the normal fixed strategy
+    some users might be completely cut out of the train or the test. With the best
+    strategy we ensure that the most amount of users will be represented in both sets.
+
     For further details about the 'best' timestamp, check the `paper <https://link.springer.com/chapter/10.1007/978-3-030-15712-8_63>`_.
 
     Timestamp must be provided to use this strategy.
