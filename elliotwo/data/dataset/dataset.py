@@ -20,9 +20,9 @@ class Dataset(ABC):
         test_set (Interactions): Test set, not mandatory, used in evaluation to calculate metrics.
     """
 
-    train_set: Interactions
-    val_set: Interactions
-    test_set: Interactions
+    train_set: Interactions = None
+    val_set: Interactions = None
+    test_set: Interactions = None
 
     def __init__(self):
         # Set mappings
