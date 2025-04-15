@@ -35,7 +35,7 @@ class Recommender(nn.Module, ABC):
         super().__init__(*args, **kwargs)
         self.init_params(params)
         self.set_seed(seed)
-        self._device = device
+        self._device = torch.device(device)
         self._name = ""
 
     @abstractmethod
