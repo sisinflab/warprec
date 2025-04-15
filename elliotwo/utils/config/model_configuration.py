@@ -184,6 +184,22 @@ class Optimization(BaseModel):
                 return v
         raise ValueError(f'Device {v} is not supported. Use "cpu" or "cuda[:index]".')
 
+    @field_validator("cpu_per_trial")
+    @classmethod
+    def check_cpu_per_trial(cls, v: float):
+        """Validate cpu_per_trial."""
+        if v <= 0:
+            raise ValueError("Value for cpu_per_trial must be > 0.")
+        return v
+
+    @field_validator("gpu_per_trial")
+    @classmethod
+    def check_gpu_per_trial(cls, v: float):
+        """Validate gpu_per_trial."""
+        if v < 0:
+            raise ValueError("Value for gpu_per_trial must be >= 0.")
+        return v
+
     @model_validator(mode="after")
     def model_validation(self):
         """Optimization model validation."""
@@ -230,6 +246,11 @@ class Optimization(BaseModel):
                     "Reduction_factor property is required for ASHA scheduling. "
                     "Change type of scheduling or provide the reduction_factor attribute."
                 )
+        if self.device != "cpu" and self.gpu_per_trial == 0:
+            raise ValueError(
+                "You are trying to use one (or more) CUDA device(s) but you did "
+                "not pass a value for gpu_per_trial. Check your configuration."
+            )
         return self
 
 
