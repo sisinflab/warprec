@@ -16,8 +16,7 @@ class SplittingConfig(BaseModel):
         val_ratio (Optional[float]): The ratio of the val set.
         test_k (Optional[int]): The k value for the test set.
         val_k (Optional[int]): The k value for the val set.
-        test_timestamp (Optional[int]): The timestamp to be used for the test set.
-        val_timestamp (Optional[int]): The timestamp to be used for the val set.
+        timestamp (Optional[int]): The timestamp to be used for the test set.
         seed (Optional[int]): The seed to be used during the splitting process.
     """
 
@@ -26,8 +25,7 @@ class SplittingConfig(BaseModel):
     val_ratio: Optional[float] = None
     test_k: Optional[int] = None
     val_k: Optional[int] = None
-    test_timestamp: Optional[int] = None
-    val_timestamp: Optional[int] = None
+    timestamp: Optional[int] = None
     seed: Optional[int] = 42
 
     @model_validator(mode="after")
@@ -69,7 +67,7 @@ class SplittingConfig(BaseModel):
 
         if (
             self.strategy == SplittingStrategies.FIXED_TIMESTAMP
-            and self.test_timestamp is None
+            and self.timestamp is None
         ):
             raise ValueError(
                 "You have chosen fixed timestamp splitting but "

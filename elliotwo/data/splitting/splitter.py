@@ -31,8 +31,7 @@ class Splitter:
         val_ratio: Optional[float] = None,
         test_k: Optional[int] = None,
         val_k: Optional[int] = None,
-        test_timestamp: Optional[int] = None,
-        val_timestamp: Optional[int] = None,
+        timestamp: Optional[int] = None,
         seed: int = 42,
     ) -> Tuple[DataFrame, DataFrame, Optional[DataFrame]]:
         """The main method of the class. This method must be called to split the data.
@@ -51,8 +50,7 @@ class Splitter:
             val_ratio (Optional[float]): The validation set size.
             test_k (Optional[int]): The k value for test set.
             val_k (Optional[int]): The k value for validation set.
-            test_timestamp (Optional[int]): The timestamp to be used for the test set.
-            val_timestamp (Optional[int]): The timestamp to be used for the validation set.
+            timestamp (Optional[int]): The timestamp to be used for the test set.
             seed (int): The seed used during splitting.
 
         Returns:
@@ -70,8 +68,7 @@ class Splitter:
                 val_ratio=val_ratio,
                 test_k=test_k,
                 val_k=val_k,
-                test_timestamp=test_timestamp,
-                val_timestamp=val_timestamp,
+                timestamp=timestamp,
                 seed=seed,
             )
 
@@ -87,8 +84,7 @@ class Splitter:
             val_ratio=split_config.val_ratio,
             test_k=split_config.test_k,
             val_k=split_config.val_k,
-            test_timestamp=split_config.test_timestamp,
-            val_timestamp=split_config.val_timestamp,
+            timestamp=split_config.timestamp,
             seed=split_config.seed,
         )
 
