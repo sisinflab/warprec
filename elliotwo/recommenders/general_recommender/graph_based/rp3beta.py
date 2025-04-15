@@ -102,9 +102,7 @@ class RP3Beta(ItemSimRecommender):
             filtered_matrix = normalize(filtered_matrix, norm="l1", axis=1)
 
         # Update item_similarity with a new nn.Parameter, doing the proper casting
-        self.item_similarity = nn.Parameter(
-            torch.from_numpy(filtered_matrix.toarray()).to(self._device)
-        )
+        self.item_similarity = nn.Parameter(torch.from_numpy(filtered_matrix.toarray()))
 
         if report_fn is not None:
             report_fn(self)

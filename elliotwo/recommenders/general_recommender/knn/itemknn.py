@@ -73,13 +73,13 @@ class ItemKNN(ItemSimRecommender):
             X = self._normalize(X)
 
         # Compute similarity matrix
-        sim_matrix = torch.from_numpy(similarity.compute(X.T)).to(self._device)
+        sim_matrix = torch.from_numpy(similarity.compute(X.T))
 
         # Compute top_k filtering
         filtered_sim_matrix = self._apply_topk_filtering(sim_matrix, self.k)
 
         # Update item_similarity with a new nn.Parameter
-        self.item_similarity = nn.Parameter(filtered_sim_matrix.to(self._device))
+        self.item_similarity = nn.Parameter(filtered_sim_matrix)
 
         if report_fn is not None:
             report_fn(self)

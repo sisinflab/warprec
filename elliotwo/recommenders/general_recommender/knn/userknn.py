@@ -55,7 +55,7 @@ class UserKNN(Recommender):
                 "Users value must be provided to correctly initialize the model."
             )
         # Model initialization
-        self.user_similarity = nn.Parameter(torch.rand(users, users)).to(self._device)
+        self.user_similarity = nn.Parameter(torch.rand(users, users))
 
     def fit(
         self,
@@ -83,13 +83,13 @@ class UserKNN(Recommender):
             X = self._normalize(X)
 
         # Compute similarity matrix
-        sim_matrix = torch.from_numpy(similarity.compute(X)).to(self._device)
+        sim_matrix = torch.from_numpy(similarity.compute(X))
 
         # Compute top_k filtering
         filtered_sim_matrix = self._apply_topk_filtering(sim_matrix, self.k)
 
         # Update item_similarity with a new nn.Parameter
-        self.user_similarity = nn.Parameter(filtered_sim_matrix.to(self._device))
+        self.user_similarity = nn.Parameter(filtered_sim_matrix)
 
         if report_fn is not None:
             report_fn(self)
@@ -124,7 +124,6 @@ class UserKNN(Recommender):
         """Forward method is empty because we don't need
         back propagation.
         """
-        pass
 
     def _normalize(self, X: csr_matrix) -> csr_matrix:
         """Normalize matrix rows to unit length.

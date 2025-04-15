@@ -99,7 +99,7 @@ class Slim(ItemSimRecommender):
         # convert to tensor
         self.item_similarity = nn.Parameter(
             torch.from_numpy(sp.vstack(item_coeffs).T.todense())
-        ).to(self._device)
+        )
 
         if report_fn is not None:
             report_fn(self)

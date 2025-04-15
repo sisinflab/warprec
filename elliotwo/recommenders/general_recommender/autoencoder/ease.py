@@ -78,9 +78,7 @@ class EASE_Classic(EASE):
         B /= -np.diag(B)
         np.fill_diagonal(B, 0.0)
 
-        self.item_similarity = nn.Parameter(torch.tensor(B, dtype=torch.float32)).to(
-            self._device
-        )
+        self.item_similarity = nn.Parameter(torch.tensor(B, dtype=torch.float32))
 
         if report_fn is not None:
             report_fn(self)
@@ -137,9 +135,7 @@ class EASE_Elliot(EASE):
         # Remove diagonal items as in the classic implementation
         B[diagonal_indices] = 0.0
 
-        self.item_similarity = nn.Parameter(torch.tensor(B, dtype=torch.float32)).to(
-            self._device
-        )
+        self.item_similarity = nn.Parameter(torch.tensor(B, dtype=torch.float32))
 
         if report_fn is not None:
             report_fn(self)

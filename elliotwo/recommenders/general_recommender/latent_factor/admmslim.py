@@ -54,6 +54,7 @@ class ADMMSlim(ItemSimRecommender):
     ):
         super().__init__(params, device=device, seed=seed, info=info, *args, **kwargs)
         self._name = "ADMMSlim"
+        self.item_means = None
 
     def fit(
         self,
@@ -113,7 +114,7 @@ class ADMMSlim(ItemSimRecommender):
             Gamma += self.rho * (B - C)
 
         # Update item_similarity with a new nn.Parameter
-        self.item_similarity = nn.Parameter(torch.from_numpy(C).to(self._device))
+        self.item_similarity = nn.Parameter(torch.from_numpy(C))
 
         if report_fn is not None:
             report_fn(self)
