@@ -103,11 +103,35 @@ class SplittingConfig(BaseModel):
             )
 
         # Attention checks
-        if self.strategy in SplittingStrategies.TEMPORAL_HOLDOUT and (
-            self.test_k or self.val_k
-        ):
+        if self.strategy in [
+            SplittingStrategies.TEMPORAL_HOLDOUT,
+            SplittingStrategies.TIMESTAMP_SLICING,
+            SplittingStrategies.RANDOM_RATIO,
+        ] and (self.test_k or self.val_k):
             logger.attention(
                 f"You have filled the k field but the splitting strategy "
+                f"has been set to {self.strategy.value}. Check your "
+                "configuration file for possible errors."
+            )
+
+        if self.strategy in [
+            SplittingStrategies.TEMPORAL_LEAVE_K_OUT,
+            SplittingStrategies.RANDOM_LEAVE_K_OUT,
+        ] and (self.test_ratio or self.val_ratio):
+            logger.attention(
+                f"You have filled the ratio field but the splitting strategy "
+                f"has been set to {self.strategy.value}. Check your "
+                "configuration file for possible errors."
+            )
+
+        if self.strategy in [
+            SplittingStrategies.TEMPORAL_HOLDOUT,
+            SplittingStrategies.TEMPORAL_LEAVE_K_OUT,
+            SplittingStrategies.RANDOM_RATIO,
+            SplittingStrategies.RANDOM_LEAVE_K_OUT,
+        ] and (self.timestamp):
+            logger.attention(
+                f"You have filled the timestamp field but the splitting strategy "
                 f"has been set to {self.strategy.value}. Check your "
                 "configuration file for possible errors."
             )
