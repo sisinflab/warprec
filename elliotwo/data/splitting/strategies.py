@@ -278,3 +278,90 @@ class TemporalHoldoutSplit(SplittingStrategy):
         test_idxs = data.index[~split_mask].tolist()
 
         return train_idxs, test_idxs
+
+
+@splitting_registry.register(SplittingStrategies.TEMPORAL_LEAVE_K_OUT)
+class TemporalLeaveKOutSplit(SplittingStrategy):
+    """The definition of a temporal leave k out splitting strategy.
+
+    Timestamp must be provided to use this strategy.
+    """
+
+    def split(
+        self,
+        data: DataFrame,
+        test_k: int = 5,
+        val_k: Optional[int] = None,
+        **kwargs: Any,
+    ) -> Tuple[List[int], List[int], List[int]]:
+        """Implementation of the temporal leave k out splitting. Original data will be splitted
+        according to timestamp. If a seed has been set, the split will be reproducible.
+
+        Args:
+            data (DataFrame): The DataFrame to be splitted.
+            test_k (int): The test set k value.
+            val_k (Optional[int]): The validation set k value.
+            **kwargs (Any): The keyword arguments.
+
+        Returns:
+            Tuple[List[int], List[int], List[int]]:
+                List[int]: List of indexes that will end up in the training set.
+                List[int]: List of indexes that will end up in the test set.
+                List[int]: List of indexes that will end up in the validation set.
+        """
+        # Get interactions in DataFrame and calculate train/test indices
+        train_idxs, test_idxs = self._temp_split(data, test_k=test_k)
+        val_idxs = None
+
+        # Check if validation set size has been set, if so we return indices for train/val/test
+        if val_k:
+            train_idxs, val_idxs = self._temp_split(data.iloc[train_idxs], test_k=val_k)
+
+        # Otherwise return train/test indices
+        return train_idxs, test_idxs, val_idxs
+
+    def _temp_split(
+        self, data: DataFrame, test_k: int = 1
+    ) -> Tuple[List[int], List[int]]:
+        """Method to split data in two partitions, using a timestamp.
+
+        This method will split data based on time, using as test
+        samples the more recent transactions.
+
+        Args:
+            data (DataFrame): The original data in DataFrame format.
+            test_k (int): Number of transaction that will end up in the second partition.
+
+        Returns:
+            Tuple[List[int], List[int]]:
+                List[int]: List of indexes of the first partition.
+                List[int]: List of indexes of the second partition.
+        """
+        # Set user and time label
+        user_label = data.columns[0]  # Assuming first column is user ID
+        time_label = data.columns[-1]  # Assuming last column is timestamp
+
+        # Single sorting by user and timestamp
+        data = data.sort_values(by=[user_label, time_label])
+
+        # Determine the split indices for each user
+        user_counts = data[user_label].value_counts().sort_index()
+        valid_users = user_counts[user_counts > test_k].index  # Users with enough data
+
+        # Filter out users with insufficient transactions
+        data = data[data[user_label].isin(valid_users)]
+
+        # Determine the split indices for each user
+        split_indices = user_counts - test_k
+
+        # Create a split mask: True for training, False for test
+        split_mask = (
+            data.groupby(user_label).cumcount()
+            < split_indices.loc[data[user_label]].values
+        )
+
+        # Splitting based on the mask
+        train_idxs = data.index[split_mask].tolist()
+        test_idxs = data.index[~split_mask].tolist()
+
+        return train_idxs, test_idxs

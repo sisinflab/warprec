@@ -54,6 +54,15 @@ class SplittingConfig(BaseModel):
                     "there is no space for train set. Check you values."
                 )
 
+        if (
+            self.strategy == SplittingStrategies.TEMPORAL_LEAVE_K_OUT
+            and self.test_k is None
+        ):
+            raise ValueError(
+                "You have chosen temporal leave k out splitting but "
+                "the test k field has not been filled."
+            )
+
         # Attention checks
         if self.strategy in [
             SplittingStrategies.RANDOM,

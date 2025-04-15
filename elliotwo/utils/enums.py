@@ -26,12 +26,15 @@ class SplittingStrategies(str, Enum):
             The elements chosen will be the same if a seed is set.
         - TEMPORAL_HOLDOUT: The splitting will be based on the timestamp and ratio.
             Timestamps will be mandatory if this strategy is chosen.
+        - TEMPORAL_LEAVE_K_OUT: The splitting will be based on the timestamp and k.
+            Timestamps will be mandatory if this strategy is chosen.
     """
 
     NONE = "none"
     RANDOM = "random"
     LEAVE_ONE_OUT = "leave-one-out"
     TEMPORAL_HOLDOUT = "temporal_holdout"
+    TEMPORAL_LEAVE_K_OUT = "temporal_leave_k_out"
 
 
 class ReadingMethods(str, Enum):
