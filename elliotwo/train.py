@@ -97,10 +97,11 @@ def main(args: Namespace):
 
         # Evaluation testing
         result_dict = {}
-        evaluator.evaluate(best_model, dataset, test_set=False, verbose=True)
-        results = evaluator.compute_results()
-        evaluator.print_console(results, config.evaluation.metrics, "Validation")
-        result_dict["Validation"] = results
+        if dataset.val_set is not None:
+            evaluator.evaluate(best_model, dataset, test_set=False, verbose=True)
+            results = evaluator.compute_results()
+            evaluator.print_console(results, config.evaluation.metrics, "Validation")
+            result_dict["Validation"] = results
 
         evaluator.evaluate(best_model, dataset, test_set=True, verbose=True)
         results = evaluator.compute_results()

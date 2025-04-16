@@ -112,7 +112,10 @@ class Configuration(BaseModel):
                 # In case the RatingType is explicit, we add the
                 # score label and read scores from the source.
                 _column_names.append(self.reader.labels.rating_label)
-            if self.splitter.strategy == SplittingStrategies.TEMPORAL:
+            if self.splitter.strategy in [
+                SplittingStrategies.TEMPORAL_HOLDOUT,
+                SplittingStrategies.TEMPORAL_LEAVE_K_OUT,
+            ]:
                 # In case the SplittingStrategy is temporal, we add the
                 # timestamp label and read timestamps from the source.
                 _column_names.append(self.reader.labels.timestamp_label)

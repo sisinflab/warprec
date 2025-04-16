@@ -10,22 +10,16 @@ reader:
     item_id_label: item_id
     rating_label: rating
     timestamp_label: timestamp
-  dtypes:
-    user_id_type: str
-    item_id_type: str
 writer:
   dataset_name: MovieLens
   writing_method: local
   local_experiment_path: experiment/test/
-  setup_experiment: True
-  save_split: True
 splitter:
-  strategy: temporal
-  test_ratio: 0.1
-  val_ratio: 0.1
-  seed: 42
+  strategy: random_leave_k_out
+  test_k: 5
+  val_k: 5
 models:
-  NeuMF:
+  EASE:
     optimization:
       strategy: grid
       scheduler: fifo
@@ -36,19 +30,10 @@ models:
       validation_metric: nDCG@10
       #num_samples: 5
       cpu_per_trial: 12
-    mf_embedding_size: 10
-    mlp_embedding_size: 10
-    mlp_hidden_size: [[64, 32]]
-    mf_train: True
-    mlp_train: True
-    dropout: 0.1
-    epochs: 5
-    learning_rate: 0.05
+    l2: 10
 evaluation:
   top_k: [10, 20, 50]
   metrics: [nDCG, Precision, Recall, HitRate]
-  beta: 1
-  pop_ratio: 0.8
 general:
   precision: float32
   batch_size: 1024

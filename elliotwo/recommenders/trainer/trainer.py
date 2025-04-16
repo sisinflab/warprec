@@ -207,7 +207,8 @@ class Trainer:
             Args:
                 model (Recommender): The trained model to report.
             """
-            evaluator.evaluate(model, dataset, test_set=False)
+            test_set = True if dataset.val_set is None else False
+            evaluator.evaluate(model, dataset, test_set=test_set)
             results = evaluator.compute_results()
             score = results[self._top_k][self._metric_name]
 
