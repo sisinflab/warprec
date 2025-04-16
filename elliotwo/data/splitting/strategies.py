@@ -203,7 +203,7 @@ class TemporalLeaveKOutSplit(SplittingStrategy):
 
 
 @splitting_registry.register(SplittingStrategies.TIMESTAMP_SLICING)
-class TimestampSplit(SplittingStrategy):
+class TimestampSlicingSplit(SplittingStrategy):
     """Splits data based on a timestamp. Either a fixed timestamp or a
     'best' timestamp can be used.
 
@@ -314,7 +314,7 @@ class TimestampSplit(SplittingStrategy):
 
 
 @splitting_registry.register(SplittingStrategies.RANDOM_RATIO)
-class RandomRatioSplit(SplittingStrategy):
+class RandomHoldoutSplit(SplittingStrategy):
     """The definition of a random ratio splitting strategy."""
 
     def split(
