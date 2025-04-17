@@ -1,5 +1,5 @@
 import typing
-from typing import Tuple, Any
+from typing import Tuple, Any, Optional
 
 import torch
 import numpy as np
@@ -19,6 +19,7 @@ class Interactions:
             int: Number of items.
         user_mapping (dict): Mapping of user ID -> user idx.
         item_mapping (dict): Mapping of item ID -> item idx.
+        side_data (Optional[DataFrame]): The side information features in DataFrame format.
         batch_size (int): The batch size that will be used to
             iterate over the interactions.
         rating_type (RatingType): The type of rating to be used.
@@ -31,6 +32,7 @@ class Interactions:
     _inter_dict: dict = {}
     _inter_df: DataFrame = None
     _inter_sparse: csr_matrix = None
+    _inter_side_sparse: csr_matrix = None
 
     def __init__(
         self,
@@ -38,12 +40,14 @@ class Interactions:
         original_dims: Tuple[int, int],
         user_mapping: dict,
         item_mapping: dict,
+        side_data: Optional[DataFrame] = None,
         batch_size: int = 1024,
         rating_type: RatingType = RatingType.IMPLICIT,
         precision: Any = np.float32,
     ) -> None:
         # Setup the variables
         self._inter_df = data
+        self._inter_side = side_data if side_data is not None else None
         self.batch_size = batch_size
         self.rating_type = rating_type
         self.precision = precision
@@ -117,6 +121,22 @@ class Interactions:
         if isinstance(self._inter_sparse, csr_matrix):
             return self._inter_sparse
         return self._to_sparse()
+
+    def get_side_sparse(self) -> csr_matrix:
+        """This method retrieves the sparse representation of side data.
+
+        This method also checks if the sparse structure has
+        already been created, if not then it also create it first.
+
+        Returns:
+            csr_matrix: Sparse representation of the features (CSR Format).
+        """
+        if isinstance(self._inter_side_sparse, csr_matrix):
+            return self._inter_side_sparse
+        self._inter_side_sparse = csr_matrix(
+            self._inter_side.drop(self._item_label, axis=1), dtype=self.precision
+        )
+        return self._inter_side_sparse
 
     @typing.no_type_check
     def get_item_rating_dataloader(

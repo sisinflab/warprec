@@ -28,8 +28,13 @@ def main(args: Namespace):
 
     # Dataset loading
     dataset = None
+    side_data = None
     if config.reader.loading_strategy == "dataset":
         data = reader.read()
+
+        # Side information reading
+        if config.reader.side:
+            side_data = reader.read_side()
 
         # Splitter testing
         if config.splitter:
@@ -41,6 +46,7 @@ def main(args: Namespace):
                     train,
                     test,
                     val,
+                    side_data=side_data,
                     batch_size=config.general.batch_size,
                     rating_type=config.reader.rating_type,
                     precision=config.general.precision,
@@ -53,10 +59,16 @@ def main(args: Namespace):
     elif config.reader.loading_strategy == "split":
         if config.reader.data_type == "transaction":
             train, test, val = reader.read_transaction_split()
+
+            # Side information reading
+            if config.reader.side:
+                side_data = reader.read_side()
+
             dataset = TransactionDataset(
                 train,
                 test,
                 val,
+                side_data=side_data,
                 batch_size=config.general.batch_size,
                 rating_type=config.reader.rating_type,
                 precision=config.general.precision,

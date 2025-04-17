@@ -137,7 +137,7 @@ class ReaderConfig(BaseModel):
     sep: Optional[str] = "\t"
     rating_type: RatingType
     split: Optional[SplitReading] = Field(default_factory=SplitReading)
-    side: Optional[SideReading] = Field(default_factory=SideReading)
+    side: Optional[SideReading] = None
     labels: Labels = Field(default_factory=Labels)
     dtypes: CustomDtype = Field(default_factory=CustomDtype)
 
