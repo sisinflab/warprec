@@ -10,6 +10,9 @@ reader:
     item_id_label: item_id
     rating_label: rating
     timestamp_label: timestamp
+  side:
+    local_path: tests/test_dataset/movielens_side.csv
+    sep: ','
 writer:
   dataset_name: MovieLens
   writing_method: local

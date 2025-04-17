@@ -12,16 +12,43 @@ class SplitReading(BaseModel):
     This class reads all the information needed to load previously split data.
 
     Attributes:
-        local_path (Optional[str | None]): The directory where the splits are saved.
+        local_path (Optional[str]): The directory where the splits are saved.
         ext (Optional[str]): The extension of the split files.
         sep (Optional[str]): The separator of the split files.
         batch_size (Optional[int]): The batch size values used in the split dataset.
     """
 
-    local_path: Optional[str | None] = None
+    local_path: Optional[str] = None
     ext: Optional[str] = ".tsv"
     sep: Optional[str] = "\t"
     batch_size: Optional[int] = 1024
+
+    @field_validator("sep")
+    @classmethod
+    def check_sep(cls, v: str):
+        """Validates the separator."""
+        try:
+            v = v.encode().decode("unicode_escape")
+        except UnicodeDecodeError:
+            logger.negative(
+                f"The string {v} is not a valid separator. Using default separator {'\t'}."
+            )
+            v = "\t"
+        return v
+
+
+class SideReading(BaseModel):
+    """Definition of the side information reading sub-configuration.
+
+    This class reads all the information needed to load side information data.
+
+    Attributes:
+        local_path (Optional[str]): The directory where the side information are saved.
+        sep (Optional[str]): The separator of the split files.
+    """
+
+    local_path: Optional[str] = None
+    sep: Optional[str] = "\t"
 
     @field_validator("sep")
     @classmethod
