@@ -123,6 +123,7 @@ class ReaderConfig(BaseModel):
         rating_type (RatingType): The type of rating to be used. If 'implicit' is chosen,
             the reader will not look for a score.
         split (Optional[SplitReading]): The information of the split reading process.
+        side (Optional[SideReading]): The side information of the dataset.
         labels (Labels): The labels sub-configuration. Defaults to Labels default values.
         dtypes (CustomDtype): The list of column dtype.
         column_map_dtype (ClassVar[dict]): The mapping between the string dtype
@@ -136,6 +137,7 @@ class ReaderConfig(BaseModel):
     sep: Optional[str] = "\t"
     rating_type: RatingType
     split: Optional[SplitReading] = Field(default_factory=SplitReading)
+    side: Optional[SideReading] = Field(default_factory=SideReading)
     labels: Labels = Field(default_factory=Labels)
     dtypes: CustomDtype = Field(default_factory=CustomDtype)
 
