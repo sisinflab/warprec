@@ -1,4 +1,5 @@
 from .general_recommender_config import (
+    AddEASE,
     CEASE,
     EASE,
     ItemKNN,
@@ -13,6 +14,7 @@ from .general_recommender_config import (
 )
 
 __all__ = [
+    "AddEASE",
     "CEASE",
     "EASE",
     "ItemKNN",

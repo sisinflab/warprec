@@ -10,6 +10,7 @@ from .writer_configuration import WriterConfig, WritingParams
 from .splitter_configuration import SplittingConfig
 from .model_configuration import RecomModel
 from .recommender_model_config import (
+    AddEASE,
     CEASE,
     EASE,
     ItemKNN,
@@ -39,6 +40,7 @@ __all__ = [
     "WritingParams",
     "SplittingConfig",
     "RecomModel",
+    "AddEASE",
     "CEASE",
     "EASE",
     "ItemKNN",

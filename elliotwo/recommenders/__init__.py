@@ -1,5 +1,6 @@
 from .base_recommender import Recommender, ItemSimRecommender, generate_model_name
 from .general_recommender import (
+    AddEASE,
     CEASE,
     EASE,
     MultiDAE,
@@ -22,6 +23,7 @@ __all__ = [
     "Recommender",
     "ItemSimRecommender",
     "generate_model_name",
+    "AddEASE",
     "CEASE",
     "EASE",
     "MultiDAE",
