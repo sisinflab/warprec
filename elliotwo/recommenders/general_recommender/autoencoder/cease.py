@@ -12,7 +12,7 @@ from elliotwo.utils.registry import model_registry
 
 @model_registry.register(name="CEASE")
 class CEASE(ItemSimRecommender):
-    """Implementation of MultiDAE algorithm from
+    """Implementation of CEASE algorithm from
         Closed-Form Models for Collaborative Filtering with Side-Information 2020.
 
     For further details, check the `paper <https://dl.acm.org/doi/10.1145/3383313.3418480>`_.
