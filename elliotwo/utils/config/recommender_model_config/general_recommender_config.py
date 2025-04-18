@@ -963,3 +963,60 @@ class AddEASE(RecomModel):
                     f"Values received as input: {v}"
                 )
         return v
+
+
+@params_registry.register("AttributeItemKNN")
+class AttributeItemKNN(RecomModel):
+    """Definition of the model AttributeItemKNN.
+
+    Attributes:
+        k (INT_FIELD): List of values for neighbor.
+        similarity (STR_FIELD): List of names of similarity functions.
+        normalize (BOOL_FIELD): List of values for normalization flag.
+    """
+
+    k: INT_FIELD
+    similarity: STR_FIELD
+    normalize: BOOL_FIELD
+
+    @field_validator("k")
+    @classmethod
+    def check_k(cls, v: list):
+        """Validate k."""
+        if not isinstance(v, list):
+            v = [v]
+        for value in v:
+            if isinstance(value, int) and value <= 0:
+                raise ValueError(
+                    "Values of k for AttributeItemKNN model must be > 0. "
+                    f"Values received as input: {v}"
+                )
+        return v
+
+    @field_validator("similarity")
+    @classmethod
+    def check_similarity(cls, v: list):
+        """Validate similarity."""
+        if not isinstance(v, list):
+            v = [v]
+        for value in v:
+            if (
+                isinstance(value, str)
+                and value.lower() != SearchSpace.CHOICE.value
+                and value.lower() != SearchSpace.GRID.value
+                and value.upper() not in similarities_registry.list_registered()
+            ):
+                raise ValueError(
+                    "Values of similarity for AttributeItemKNN model must be supported similarities. "
+                    f"Values received as input: {v}. "
+                    f"Supported similarities: {similarities_registry.list_registered()}"
+                )
+        return v
+
+    @field_validator("normalize")
+    @classmethod
+    def check_normalize(cls, v: list):
+        """Validate normalize."""
+        if not isinstance(v, list):
+            v = [v]
+        return v
