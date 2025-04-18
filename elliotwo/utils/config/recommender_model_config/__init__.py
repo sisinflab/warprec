@@ -8,6 +8,7 @@ from .general_recommender_config import (
     MultiDAE,
     MultiVAE,
     ADMMSlim,
+    VSM,
 )
 
 __all__ = [
@@ -20,4 +21,5 @@ __all__ = [
     "MultiDAE",
     "MultiVAE",
     "ADMMSlim",
+    "VSM",
 ]

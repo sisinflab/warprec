@@ -1,4 +1,5 @@
 from .autoencoder import EASE, MultiDAE, MultiVAE
+from .content_based import VSM
 from .graph_based import RP3Beta
 from .knn import ItemKNN, UserKNN
 from .latent_factor import ADMMSlim, BPR, Slim
@@ -8,6 +9,7 @@ __all__ = [
     "EASE",
     "MultiDAE",
     "MultiVAE",
+    "VSM",
     "RP3Beta",
     "ItemKNN",
     "UserKNN",

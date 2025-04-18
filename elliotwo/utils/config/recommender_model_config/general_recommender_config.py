@@ -808,3 +808,76 @@ class ADMMSlim(RecomModel):
         if not isinstance(v, list):
             v = [v]
         return v
+
+
+@params_registry.register("VSM")
+class VSM(RecomModel):
+    """Definition of the model VSM.
+
+    Attributes:
+        similarity (STR_FIELD): List of names of similarity functions.
+        user_profile (STR_FIELD): List of user profile computations.
+        item_profile (STR_FIELD): List of item profile computations.
+    """
+
+    similarity: STR_FIELD
+    user_profile: STR_FIELD
+    item_profile: STR_FIELD
+
+    @field_validator("similarity")
+    @classmethod
+    def check_similarity(cls, v: list):
+        """Validate similarity."""
+        if not isinstance(v, list):
+            v = [v]
+        for value in v:
+            if (
+                isinstance(value, str)
+                and value.lower() != SearchSpace.CHOICE.value
+                and value.lower() != SearchSpace.GRID.value
+                and value.upper() not in similarities_registry.list_registered()
+            ):
+                raise ValueError(
+                    "Values of similarity for ItemKNN model must be supported similarities. "
+                    f"Values received as input: {v}. "
+                    f"Supported similarities: {similarities_registry.list_registered()}"
+                )
+        return v
+
+    @field_validator("user_profile")
+    @classmethod
+    def check_user_profile(cls, v: list):
+        """Validate user_profile."""
+        if not isinstance(v, list):
+            v = [v]
+        for value in v:
+            if (
+                isinstance(value, str)
+                and value.lower() != SearchSpace.CHOICE.value
+                and value.lower() != SearchSpace.GRID.value
+                and value.lower() not in ["binary", "tfidf"]
+            ):
+                raise ValueError(
+                    "Values of user_profile for VSM model must be 'binary' or 'tfidf'. "
+                    f"Values received as input: {v}. "
+                )
+        return v
+
+    @field_validator("item_profile")
+    @classmethod
+    def check_item_profile(cls, v: list):
+        """Validate item_profile."""
+        if not isinstance(v, list):
+            v = [v]
+        for value in v:
+            if (
+                isinstance(value, str)
+                and value.lower() != SearchSpace.CHOICE.value
+                and value.lower() != SearchSpace.GRID.value
+                and value.lower() not in ["binary", "tfidf"]
+            ):
+                raise ValueError(
+                    "Values of item_profile for VSM model must be 'binary' or 'tfidf'. "
+                    f"Values received as input: {v}. "
+                )
+        return v

@@ -19,6 +19,7 @@ from .recommender_model_config import (
     MultiDAE,
     MultiVAE,
     ADMMSlim,
+    VSM,
 )
 from .evaluation_configuration import EvaluationConfig
 from .search_space_wrapper import SearchSpaceWrapper
@@ -46,6 +47,7 @@ __all__ = [
     "MultiDAE",
     "MultiVAE",
     "ADMMSlim",
+    "VSM",
     "EvaluationConfig",
     "SearchSpaceWrapper",
 ]
