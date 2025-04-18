@@ -881,3 +881,44 @@ class VSM(RecomModel):
                     f"Values received as input: {v}. "
                 )
         return v
+
+
+@params_registry.register("CEASE")
+class CEASE(RecomModel):
+    """Definition of the model CEASE.
+
+    Attributes:
+        l2 (FLOAT_FIELD): List of values that l2 regularization can take.
+        alpha (FLOAT_FIELD): List of values for alpha regularization.
+    """
+
+    l2: FLOAT_FIELD
+    alpha: FLOAT_FIELD
+
+    @field_validator("l2")
+    @classmethod
+    def check_l2(cls, v: list):
+        """Validate l2."""
+        if not isinstance(v, list):
+            v = [v]
+        for value in v:
+            if isinstance(value, (float, int)) and value <= 0:
+                raise ValueError(
+                    f"Values of l2 for CEASE model must be > 0. "
+                    f"Values received as input: {v}"
+                )
+        return v
+
+    @field_validator("alpha")
+    @classmethod
+    def check_alpha(cls, v: list):
+        """Validate alpha."""
+        if not isinstance(v, list):
+            v = [v]
+        for value in v:
+            if isinstance(value, (float, int)) and value < 0:
+                raise ValueError(
+                    f"Values of alpha for CEASE model must be >= 0. "
+                    f"Values received as input: {v}"
+                )
+        return v
