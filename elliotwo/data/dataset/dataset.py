@@ -143,6 +143,7 @@ class TransactionDataset(Dataset):
                 if val_data is not None
                 else None
             )
+            side_data = side_data[side_data[item_label].isin(train_data[item_label])]
 
         # Define dimensions that will lead the experiment
         self._nuid = train_data[user_label].nunique()
