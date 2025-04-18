@@ -28,6 +28,7 @@ class Dataset(ABC):
         # Set mappings
         self._nuid: int = 0
         self._niid: int = 0
+        self._nfeat: int = 0
         self._umap: dict[Any, int] = {}
         self._imap: dict[Any, int] = {}
 
@@ -72,6 +73,7 @@ class Dataset(ABC):
         return {
             "items": self._niid,
             "users": self._nuid,
+            "features": self._nfeat,
         }
 
     def update_mappings(self, user_mapping: dict, item_mapping: dict):
@@ -148,6 +150,7 @@ class TransactionDataset(Dataset):
         # Define dimensions that will lead the experiment
         self._nuid = train_data[user_label].nunique()
         self._niid = train_data[item_label].nunique()
+        self._nfeat = len(side_data.columns) - 1 if side_data is not None else 0
 
         # Values that will be used to calculate mappings
         _uid = train_data[user_label].unique()
