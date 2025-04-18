@@ -1,4 +1,4 @@
-from typing import List, Optional, Union, Any
+from typing import List, Optional, Union, ClassVar, Any
 from abc import ABC
 
 import torch
@@ -260,10 +260,12 @@ class RecomModel(BaseModel, ABC):
     Attributes:
         meta (Meta): The meta-information about the model. Defaults to Meta default values.
         optimization (Optimization): The optimization information that will be used by Ray Tune.
+        need_side_information (ClassVar[bool]): Wether or not the model needs side information.
     """
 
     meta: Meta = Field(default_factory=Meta)
     optimization: Optimization = Field(default_factory=Optimization)
+    need_side_information: ClassVar[bool] = False
 
     @model_validator(mode="after")
     def model_validation(self):

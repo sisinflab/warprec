@@ -1,3 +1,5 @@
+from typing import ClassVar
+
 from pydantic import field_validator
 from elliotwo.utils.config.model_configuration import (
     RecomModel,
@@ -818,11 +820,13 @@ class VSM(RecomModel):
         similarity (STR_FIELD): List of names of similarity functions.
         user_profile (STR_FIELD): List of user profile computations.
         item_profile (STR_FIELD): List of item profile computations.
+        need_side_information (ClassVar[bool]): Wether or not the model needs side information.
     """
 
     similarity: STR_FIELD
     user_profile: STR_FIELD
     item_profile: STR_FIELD
+    need_side_information: ClassVar[bool] = True
 
     @field_validator("similarity")
     @classmethod
@@ -890,10 +894,12 @@ class CEASE(RecomModel):
     Attributes:
         l2 (FLOAT_FIELD): List of values that l2 regularization can take.
         alpha (FLOAT_FIELD): List of values for alpha regularization.
+        need_side_information (ClassVar[bool]): Wether or not the model needs side information.
     """
 
     l2: FLOAT_FIELD
     alpha: FLOAT_FIELD
+    need_side_information: ClassVar[bool] = True
 
     @field_validator("l2")
     @classmethod
@@ -931,10 +937,12 @@ class AddEASE(RecomModel):
     Attributes:
         l2 (FLOAT_FIELD): List of values that l2 regularization can take.
         alpha (FLOAT_FIELD): List of values for alpha regularization.
+        need_side_information (ClassVar[bool]): Wether or not the model needs side information.
     """
 
     l2: FLOAT_FIELD
     alpha: FLOAT_FIELD
+    need_side_information: ClassVar[bool] = True
 
     @field_validator("l2")
     @classmethod
@@ -973,11 +981,13 @@ class AttributeItemKNN(RecomModel):
         k (INT_FIELD): List of values for neighbor.
         similarity (STR_FIELD): List of names of similarity functions.
         normalize (BOOL_FIELD): List of values for normalization flag.
+        need_side_information (ClassVar[bool]): Wether or not the model needs side information.
     """
 
     k: INT_FIELD
     similarity: STR_FIELD
     normalize: BOOL_FIELD
+    need_side_information: ClassVar[bool] = True
 
     @field_validator("k")
     @classmethod
@@ -1031,12 +1041,14 @@ class AttributeUserKNN(RecomModel):
         similarity (STR_FIELD): List of names of similarity functions.
         user_profile (STR_FIELD): List of user profile computations.
         normalize (BOOL_FIELD): List of values for normalization flag.
+        need_side_information (ClassVar[bool]): Wether or not the model needs side information.
     """
 
     k: INT_FIELD
     similarity: STR_FIELD
     user_profile: STR_FIELD
     normalize: BOOL_FIELD
+    need_side_information: ClassVar[bool] = True
 
     @field_validator("k")
     @classmethod
