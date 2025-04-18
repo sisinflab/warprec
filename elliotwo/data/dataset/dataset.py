@@ -134,18 +134,23 @@ class TransactionDataset(Dataset):
 
         # If side information data has been provided, we filter the main dataset
         if side_data is not None:
-            train_data = train_data[train_data[item_label].isin(side_data[item_label])]
-            test_data = (
-                test_data[test_data[item_label].isin(side_data[item_label])]
-                if test_data is not None
-                else None
+            # Compute shared items first
+            shared_items = set(train_data[item_label]).intersection(
+                side_data[item_label]
             )
-            val_data = (
-                val_data[val_data[item_label].isin(side_data[item_label])]
-                if val_data is not None
-                else None
-            )
-            side_data = side_data[side_data[item_label].isin(train_data[item_label])]
+
+            # Filter all the data based on items present in both train data and side
+            # information data. This procedure is fundamental because we need
+            # dimension to match
+            train_data = train_data[train_data[item_label].isin(shared_items)]
+            side_data = side_data[side_data[item_label].isin(shared_items)]
+
+            # Check the optional data and also filter them
+            if test_data is not None:
+                test_data = test_data[test_data[item_label].isin(shared_items)]
+
+            if val_data is not None:
+                val_data = val_data[val_data[item_label].isin(shared_items)]
 
         # Define dimensions that will lead the experiment
         self._nuid = train_data[user_label].nunique()
