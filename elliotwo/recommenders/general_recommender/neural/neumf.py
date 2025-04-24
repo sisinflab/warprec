@@ -108,6 +108,9 @@ class NeuMF(Recommender):
         self.loss = nn.BCEWithLogitsLoss()
         self.sigmoid = nn.Sigmoid()
 
+        # Move to device
+        self.to(self._device)
+
     def _init_weights(self, module: Module):
         """Internal method to initialize weights.
 

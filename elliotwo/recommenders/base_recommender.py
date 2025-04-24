@@ -35,7 +35,7 @@ class Recommender(nn.Module, ABC):
         super().__init__(*args, **kwargs)
         self.init_params(params)
         self.set_seed(seed)
-        self._device = device
+        self._device = torch.device(device)
         self._name = ""
 
     @abstractmethod
@@ -242,9 +242,7 @@ class ItemSimRecommender(Recommender):
                 "Items value must be provided to correctly initialize the model."
             )
         # Model initialization
-        self.item_similarity = nn.Parameter(torch.rand(self.items, self.items)).to(
-            self._device
-        )
+        self.item_similarity = nn.Parameter(torch.rand(self.items, self.items))
 
     @torch.no_grad()
     def predict(
@@ -261,7 +259,7 @@ class ItemSimRecommender(Recommender):
         Returns:
             Tensor: The score matrix {user x item}.
         """
-        r = interaction_matrix @ self.item_similarity.detach().numpy()
+        r = interaction_matrix @ self.item_similarity.detach().numpy()  # pylint: disable=not-callable
 
         # Masking interaction already seen in train
         r[interaction_matrix.nonzero()] = -torch.inf
