@@ -6,6 +6,8 @@ from copy import deepcopy
 import ray
 import torch
 import shutil
+import psutil
+import GPUtil
 from ray import tune
 from ray.tune import Checkpoint
 from ray.tune.logger import TBXLoggerCallback
@@ -201,6 +203,7 @@ class Trainer:
                 validation metric.
             device (str): The device used for tensor operations.
         """
+        proc = psutil.Process(os.getpid())
 
         def _report(model: Recommender, **kwargs: Any):
             """Reporting function. Will be used as a callback for Tune reporting.
@@ -214,13 +217,37 @@ class Trainer:
             results = evaluator.compute_results()
             score = results[self._top_k][self._metric_name]
 
+            # Resources computation
+            cpu_usage = proc.cpu_percent(interval=0.2)
+            num_cpu = psutil.cpu_count(logical=True)
+            cpu_percent = cpu_usage / num_cpu
+            ram_used_gb = psutil.virtual_memory().used / (8 * 1024**3)  # Convert to GB
+
+            # If GPU is available and is used, we monitor also GPU usage
+            if torch.cuda.is_available() and device != "cpu":
+                vram_used_gb = torch.cuda.memory_allocated(device) / (
+                    8 * 1024**3
+                )  # Convert to GB
+                gpus = GPUtil.getGPUs()
+                gpu_percent = gpus[0].load * 100 if gpus else None
+            else:
+                vram_used_gb = None
+                gpu_percent = None
+
             with tempfile.TemporaryDirectory() as tmpdir:
                 torch.save(
                     {"model_state": model.state_dict()},
                     os.path.join(tmpdir, "checkpoint.pt"),
                 )
                 tune.report(
-                    metrics={"score": score, **kwargs},
+                    metrics={
+                        "score": score,
+                        "cpu_percent": cpu_percent,
+                        "ram_used_gb": ram_used_gb,
+                        "gpu_percent": gpu_percent,
+                        "vram_user_gb": vram_used_gb,
+                        **kwargs,  # Other metrics from the model itself
+                    },
                     checkpoint=Checkpoint.from_directory(tmpdir),
                 )
 
