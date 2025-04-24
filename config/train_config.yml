@@ -19,7 +19,7 @@ splitter:
   test_k: 5
   val_k: 5
 models:
-  EASE:
+  BPR:
     optimization:
       strategy: grid
       scheduler: fifo
@@ -28,9 +28,11 @@ models:
         seed: 42
       device: cpu
       validation_metric: nDCG@10
-      #num_samples: 5
-      cpu_per_trial: 12
-    l2: 10
+      #num_samples: 20
+      cpu_per_trial: 6
+    embedding_size: [10, 12, 15]
+    epochs: [10, 20, 30, 40]
+    learning_rate: [0.001, 0.01]
 evaluation:
   top_k: [10, 20, 50]
   metrics: [nDCG, Precision, Recall, HitRate]

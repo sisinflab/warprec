@@ -8,6 +8,7 @@ import torch
 import shutil
 from ray import tune
 from ray.tune import Checkpoint
+from ray.tune.logger import TBXLoggerCallback
 from ray.tune.experiment.trial import Trial
 from elliotwo.recommenders.base_recommender import Recommender
 from elliotwo.data.dataset import Dataset
@@ -138,7 +139,7 @@ class Trainer:
             scheduler=scheduler,
             num_samples=self._model_params.optimization.num_samples,
             verbose=self._verbose,
-            callbacks=[best_checkpoint_callback],
+            callbacks=[best_checkpoint_callback, TBXLoggerCallback()],
         )
 
         # Retrieve results from callback
@@ -201,11 +202,19 @@ class Trainer:
             device (str): The device used for tensor operations.
         """
 
-        def _report(model: Recommender):
+        def _report(
+            model: Recommender,
+            loss: Optional[float] = None,
+            lr: Optional[float] = None,
+            epoch: Optional[int] = None,
+        ):
             """Reporting function. Will be used as a callback for Tune reporting.
 
             Args:
                 model (Recommender): The trained model to report.
+                loss (Optional[float]): The loss of the model.
+                lr (Optional[float]): The learning rate of the model.
+                epoch (Optional[int]): The epoch of the model.
             """
             test_set = True if dataset.val_set is None else False
             evaluator.evaluate(model, dataset, test_set=test_set)
@@ -218,7 +227,12 @@ class Trainer:
                     os.path.join(tmpdir, "checkpoint.pt"),
                 )
                 tune.report(
-                    metrics={"score": score},
+                    metrics={
+                        "score": score,
+                        "loss": loss,
+                        "lr": lr,
+                        "epoch": epoch,
+                    },
                     checkpoint=Checkpoint.from_directory(tmpdir),
                 )
 
@@ -231,7 +245,7 @@ class Trainer:
             info=self.infos,
         )
         try:
-            model.fit(dataset.train_set, report_fn=lambda model: _report(model))
+            model.fit(dataset.train_set, report_fn=_report)
         except Exception as e:
             logger.negative(
                 f"The fitting of the model {model.name}, failed "
