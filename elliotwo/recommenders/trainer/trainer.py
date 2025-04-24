@@ -202,19 +202,12 @@ class Trainer:
             device (str): The device used for tensor operations.
         """
 
-        def _report(
-            model: Recommender,
-            loss: Optional[float] = None,
-            lr: Optional[float] = None,
-            epoch: Optional[int] = None,
-        ):
+        def _report(model: Recommender, **kwargs: Any):
             """Reporting function. Will be used as a callback for Tune reporting.
 
             Args:
                 model (Recommender): The trained model to report.
-                loss (Optional[float]): The loss of the model.
-                lr (Optional[float]): The learning rate of the model.
-                epoch (Optional[int]): The epoch of the model.
+                **kwargs (Any): The parameters of the model.
             """
             test_set = True if dataset.val_set is None else False
             evaluator.evaluate(model, dataset, test_set=test_set)
@@ -227,12 +220,7 @@ class Trainer:
                     os.path.join(tmpdir, "checkpoint.pt"),
                 )
                 tune.report(
-                    metrics={
-                        "score": score,
-                        "loss": loss,
-                        "lr": lr,
-                        "epoch": epoch,
-                    },
+                    metrics={"score": score, **kwargs},
                     checkpoint=Checkpoint.from_directory(tmpdir),
                 )
 

@@ -111,7 +111,7 @@ class BPR(Recommender):
 
         # Training loop
         self.train()
-        for epoch in range(self.epochs):
+        for _ in range(self.epochs):
             epoch_loss = 0.0
             for batch in dataloader:
                 user, pos_item, neg_item = [x.to(self._device) for x in batch]
@@ -129,7 +129,7 @@ class BPR(Recommender):
                 epoch_loss += loss.item()
 
             if report_fn is not None:
-                report_fn(self, loss=epoch_loss, lr=self.learning_rate, epoch=epoch)
+                report_fn(self, loss=epoch_loss)
 
     def forward(self, user: Tensor, item: Tensor) -> Tensor:
         """Forward pass of the BPR model.

@@ -214,7 +214,7 @@ class MultiDAE(Recommender):
                 epoch_loss += loss.item()
 
             if report_fn is not None:
-                report_fn(self)
+                report_fn(self, loss=epoch_loss)
 
     @torch.no_grad()
     def predict(

@@ -163,7 +163,7 @@ class NeuMF(Recommender):
                 epoch_loss += loss.item()
 
             if report_fn is not None:
-                report_fn(self)
+                report_fn(self, loss=epoch_loss)
 
     # pylint: disable = E0606
     def forward(self, user: Tensor, item: Tensor) -> Tensor:
