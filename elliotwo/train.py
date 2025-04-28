@@ -34,7 +34,7 @@ def main(args: Namespace):
 
         # Side information reading
         if config.reader.side:
-            side_data = reader.read_side()
+            side_data = reader.read_side_information()
 
         # Splitter testing
         if config.splitter:
@@ -62,7 +62,7 @@ def main(args: Namespace):
 
             # Side information reading
             if config.reader.side:
-                side_data = reader.read_side()
+                side_data = reader.read_side_information()
 
             dataset = TransactionDataset(
                 train,

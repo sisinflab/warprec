@@ -223,7 +223,7 @@ class LocalReader(Reader):
             return (train_data, test_data, val_data)
         raise FileNotFoundError(f"Train split not found in {path_train}")
 
-    def read_side(
+    def read_side_information(
         self,
         local_path: str = None,
         sep: str = "\t",
