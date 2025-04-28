@@ -11,6 +11,7 @@ import GPUtil
 from ray import tune
 from ray.tune import Checkpoint
 from ray.tune.logger import TBXLoggerCallback
+from ray.air.integrations.wandb import WandbLoggerCallback
 from ray.tune.experiment.trial import Trial
 from elliotwo.recommenders.base_recommender import Recommender
 from elliotwo.data.dataset import Dataset
@@ -141,7 +142,16 @@ class Trainer:
             scheduler=scheduler,
             num_samples=self._model_params.optimization.num_samples,
             verbose=self._verbose,
-            callbacks=[best_checkpoint_callback, TBXLoggerCallback()],
+            callbacks=[
+                best_checkpoint_callback,
+                TBXLoggerCallback(),
+                WandbLoggerCallback(
+                    project="Test",
+                    name=self.model_name,
+                    log_config=True,
+                    save_checkpoints=True,
+                ),
+            ],
         )
 
         # Retrieve results from callback

@@ -19,7 +19,10 @@ splitter:
   test_k: 5
   val_k: 5
 models:
-  BPR:
+  MultiDAE:
+    meta:
+      save_model: True
+      keep_all_ray_checkpoints: True
     optimization:
       strategy: grid
       scheduler: fifo
@@ -30,9 +33,12 @@ models:
       validation_metric: nDCG@10
       #num_samples: 20
       cpu_per_trial: 6
-    embedding_size: [10, 12, 15]
-    epochs: [10, 20, 30, 40]
+    intermediate_dim: [800, 600, 400]
+    latent_dim: [400, 300, 200]
+    dropout: [0.9, 0.8]
+    epochs: [10, 20, 30]
     learning_rate: [0.001, 0.01]
+    l2_lambda: [0.01, 0.1]
 evaluation:
   top_k: [10, 20, 50]
   metrics: [nDCG, Precision, Recall, HitRate]
