@@ -139,6 +139,9 @@ class TransactionDataset(Dataset):
                 side_data[item_label]
             )
 
+            # Count the number of items before filtering
+            train_items_before_filter = train_data[item_label].nunique()
+
             # Filter all the data based on items present in both train data and side
             # information data. This procedure is fundamental because we need
             # dimension to match
@@ -151,6 +154,14 @@ class TransactionDataset(Dataset):
 
             if val_data is not None:
                 val_data = val_data[val_data[item_label].isin(shared_items)]
+
+            # Count the number of items after filtering
+            train_items_after_filter = train_data[item_label].nunique()
+
+            logger.msg(
+                ""
+                f"Filtered out {train_items_before_filter - train_items_after_filter} items."
+            )
 
         # Define dimensions that will lead the experiment
         self._nuid = train_data[user_label].nunique()
