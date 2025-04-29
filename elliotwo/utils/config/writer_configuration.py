@@ -3,7 +3,6 @@ from typing import Optional
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 from elliotwo.utils.enums import WritingMethods
-from elliotwo.utils.logger import logger
 
 
 class WritingParams(BaseModel):
@@ -25,14 +24,9 @@ class WritingParams(BaseModel):
     @classmethod
     def check_sep(cls, v: str):
         """Validates the separator."""
-        try:
-            v = v.encode().decode("unicode_escape")
-        except UnicodeDecodeError:
-            logger.negative(
-                f"The string {v} is not a valid separator. Using default separator {','}."
-            )
-            v = ","
-        return v
+        from elliotwo.utils.config import check_separator
+
+        return check_separator(v)
 
 
 class WriterConfig(BaseModel):

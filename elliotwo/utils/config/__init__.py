@@ -4,7 +4,7 @@ from .reader_configuration import (
     Labels,
     CustomDtype,
     SplitReading,
-    SideReading,
+    SideInformationReading,
 )
 from .writer_configuration import WriterConfig, WritingParams
 from .splitter_configuration import SplittingConfig
@@ -27,17 +27,18 @@ from .recommender_model_config import (
 )
 from .evaluation_configuration import EvaluationConfig
 from .search_space_wrapper import SearchSpaceWrapper
-from .config import Configuration, load_yaml
+from .config import Configuration, load_yaml, check_separator
 
 __all__ = [
     "Configuration",
     "load_yaml",
+    "check_separator",
     "GeneralConfig",
     "ReaderConfig",
     "Labels",
     "CustomDtype",
     "SplitReading",
-    "SideReading",
+    "SideInformationReading",
     "WriterConfig",
     "WritingParams",
     "SplittingConfig",

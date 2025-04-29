@@ -27,14 +27,9 @@ class SplitReading(BaseModel):
     @classmethod
     def check_sep(cls, v: str):
         """Validates the separator."""
-        try:
-            v = v.encode().decode("unicode_escape")
-        except UnicodeDecodeError:
-            logger.negative(
-                f"The string {v} is not a valid separator. Using default separator {'\t'}."
-            )
-            v = "\t"
-        return v
+        from elliotwo.utils.config import check_separator
+
+        return check_separator(v)
 
 
 class SideInformationReading(BaseModel):
@@ -54,14 +49,9 @@ class SideInformationReading(BaseModel):
     @classmethod
     def check_sep(cls, v: str):
         """Validates the separator."""
-        try:
-            v = v.encode().decode("unicode_escape")
-        except UnicodeDecodeError:
-            logger.negative(
-                f"The string {v} is not a valid separator. Using default separator {'\t'}."
-            )
-            v = "\t"
-        return v
+        from elliotwo.utils.config import check_separator
+
+        return check_separator(v)
 
 
 class Labels(BaseModel):
@@ -82,7 +72,18 @@ class Labels(BaseModel):
     timestamp_label: Optional[str] = "timestamp"
 
     @classmethod
-    def from_list(cls, labels: List[str]):
+    def from_list(cls, labels: List[str]) -> "Labels":
+        """Creates a Labels instance from a list of labels.
+
+        Args:
+            labels (List[str]): A list of labels in the order of user_id, item_id, rating, timestamp.
+
+        Returns:
+            Labels: An instance of the Labels class with the provided labels.
+
+        Raises:
+            ValueError: If the input is not a list of length 4.
+        """
         if not isinstance(labels, list) | len(labels) != 4:
             raise ValueError("Input must be a list of length 4.")
         return cls(
@@ -178,14 +179,9 @@ class ReaderConfig(BaseModel):
     @classmethod
     def check_sep(cls, v: str):
         """Validates the separator."""
-        try:
-            v = v.encode().decode("unicode_escape")
-        except UnicodeDecodeError:
-            logger.negative(
-                f"The string {v} is not a valid separator. Using default separator {'\t'}."
-            )
-            v = "\t"
-        return v
+        from elliotwo.utils.config import check_separator
+
+        return check_separator(v)
 
     @model_validator(mode="after")
     def check_data(self):
