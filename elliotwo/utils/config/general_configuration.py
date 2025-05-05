@@ -1,7 +1,7 @@
 from typing import Optional
 
 from pydantic import BaseModel, Field, field_validator
-from elliotwo.utils.config.config_utils import check_separator
+from elliotwo.utils.config.common import check_separator
 
 
 class GeneralRecommendation(BaseModel):
