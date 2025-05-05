@@ -3,6 +3,7 @@ from typing import Optional, List, ClassVar, Dict
 import numpy as np
 from pydantic import BaseModel, Field, field_validator, model_validator
 from elliotwo.utils.enums import RatingType, ReadingMethods
+from elliotwo.utils.config import check_separator
 from elliotwo.utils.logger import logger
 
 
@@ -27,8 +28,6 @@ class SplitReading(BaseModel):
     @classmethod
     def check_sep(cls, v: str):
         """Validates the separator."""
-        from elliotwo.utils.config import check_separator
-
         return check_separator(v)
 
 
@@ -49,8 +48,6 @@ class SideInformationReading(BaseModel):
     @classmethod
     def check_sep(cls, v: str):
         """Validates the separator."""
-        from elliotwo.utils.config import check_separator
-
         return check_separator(v)
 
 
@@ -179,8 +176,6 @@ class ReaderConfig(BaseModel):
     @classmethod
     def check_sep(cls, v: str):
         """Validates the separator."""
-        from elliotwo.utils.config import check_separator
-
         return check_separator(v)
 
     @model_validator(mode="after")

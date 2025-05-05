@@ -27,7 +27,8 @@ from .recommender_model_config import (
 )
 from .evaluation_configuration import EvaluationConfig
 from .search_space_wrapper import SearchSpaceWrapper
-from .config import Configuration, load_yaml, check_separator
+from .config import Configuration, load_yaml
+from .config_utils import check_separator
 
 __all__ = [
     "Configuration",

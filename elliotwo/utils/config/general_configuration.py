@@ -1,6 +1,7 @@
 from typing import Optional
 
 from pydantic import BaseModel, Field, field_validator
+from elliotwo.utils.config import check_separator
 
 
 class GeneralRecommendation(BaseModel):
@@ -22,8 +23,6 @@ class GeneralRecommendation(BaseModel):
     @classmethod
     def check_sep(cls, v: str):
         """Validates the separator."""
-        from elliotwo.utils.config import check_separator
-
         return check_separator(v)
 
 

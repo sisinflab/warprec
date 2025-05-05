@@ -2,6 +2,7 @@ import os
 from typing import Optional
 
 from pydantic import BaseModel, Field, field_validator, model_validator
+from elliotwo.utils.config import check_separator
 from elliotwo.utils.enums import WritingMethods
 
 
@@ -24,8 +25,6 @@ class WritingParams(BaseModel):
     @classmethod
     def check_sep(cls, v: str):
         """Validates the separator."""
-        from elliotwo.utils.config import check_separator
-
         return check_separator(v)
 
 
