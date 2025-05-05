@@ -27,6 +27,7 @@ from elliotwo.utils.config import (
     DashboardConfig,
     Wandb,
     CodeCarbon,
+    MLflow,
 )
 from elliotwo.utils.enums import SearchSpace
 from elliotwo.utils.logger import logger
@@ -69,6 +70,11 @@ class Trainer:
             CodeCarbon results.
         tracking_mode_codecarbon (str): The tracking mode for
             CodeCarbon. Either "machine" or "process".
+        enable_mlflow (bool): Wether or not to enable MLflow.
+        tracking_uri_mlflow (str): The URI of the MLflow tracking server.
+        experiment_name_mlflow (Optional[str]): The name of the MLflow experiment.
+        save_artifacts_mlflow (bool): Wether or not to save artifacts
+            in MLflow.
         config (Configuration): The configuration of the experiment.
     """
 
@@ -91,6 +97,10 @@ class Trainer:
         save_to_file_codecarbon: bool = False,
         output_dir_codecarbon: str = "./",
         tracking_mode_codecarbon: str = "machine",
+        enable_mlflow: bool = False,
+        tracking_uri_mlflow: str = "mlruns/",
+        experiment_name_mlflow: Optional[str] = None,
+        save_artifacts_mlflow: bool = False,
         config: Configuration = None,
     ):
         if config:
@@ -112,6 +122,12 @@ class Trainer:
                     save_to_file=save_to_file_codecarbon,
                     output_dir=output_dir_codecarbon,
                     tracking_mode=tracking_mode_codecarbon,
+                ),
+                mlflow=MLflow(
+                    enabled=enable_mlflow,
+                    tracking_uri=tracking_uri_mlflow,
+                    experiment_name=experiment_name_mlflow,
+                    save_artifacts=save_artifacts_mlflow,
                 ),
             )
 

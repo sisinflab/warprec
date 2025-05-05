@@ -7,7 +7,7 @@ from .reader_configuration import (
 )
 from .writer_configuration import WriterConfig, WritingParams
 from .splitter_configuration import SplittingConfig
-from .dashboard_configuration import DashboardConfig, Wandb, CodeCarbon
+from .dashboard_configuration import DashboardConfig, Wandb, CodeCarbon, MLflow
 from .model_configuration import RecomModel
 from .recommender_model_config import (
     EASE,
@@ -38,6 +38,7 @@ __all__ = [
     "DashboardConfig",
     "Wandb",
     "CodeCarbon",
+    "MLflow",
     "RecomModel",
     "EASE",
     "ItemKNN",
