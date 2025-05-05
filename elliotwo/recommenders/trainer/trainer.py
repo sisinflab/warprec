@@ -9,6 +9,7 @@ import shutil
 from ray import tune
 from ray.tune import Checkpoint
 from ray.air.integrations.wandb import WandbLoggerCallback
+from ray.air.integrations.mlflow import MLflowLoggerCallback
 from ray.tune.experiment.trial import Trial
 from codecarbon import EmissionsTracker
 from elliotwo.recommenders.base_recommender import Recommender
@@ -197,6 +198,15 @@ class Trainer:
                     save_to_file=self._dashboard.codecarbon.save_to_file,
                     output_dir=self._dashboard.codecarbon.output_dir,
                     tracking_mode=self._dashboard.codecarbon.tracking_mode,
+                )
+            )
+
+        if self._dashboard.mlflow.enabled:
+            callbacks.append(
+                MLflowLoggerCallback(
+                    tracking_uri=self._dashboard.mlflow.tracking_uri,
+                    experiment_name=self._dashboard.mlflow.experiment_name,
+                    save_artifact=self._dashboard.mlflow.save_artifacts,
                 )
             )
 
