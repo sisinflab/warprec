@@ -8,17 +8,23 @@ class Wandb(BaseModel):
 
     Attributes:
         enabled (bool): Whether to enable Wandb tracking.
-        project_name (Optional[str]): Name of the Wandb project.
+        project (str): Name of the Wandb project. Defaults to WarpRec.
+        group (Optional[str]): Name of the Wandb group.
+        api_key_file (Optional[str]): Path to the file containing the Wandb API key.
+        api_key (Optional[str]): Wandb API key. Alternative to api_key_file.
+        excludes (list): List of attributes to exclude from logging.
         log_config (bool): Whether to log the configuration.
         upload_checkpoints (bool): Whether to upload checkpoints.
-        save_checkpoints (bool): Whether to save checkpoints.
     """
 
     enabled: bool = False
-    project_name: Optional[str] = None
+    project: str = "WarpRec"
+    group: Optional[str] = None
+    api_key_file: Optional[str] = None
+    api_key: Optional[str] = None
+    excludes: list = []
     log_config: bool = False
     upload_checkpoints: bool = False
-    save_checkpoints: bool = False
 
 
 class MLflow(BaseModel):

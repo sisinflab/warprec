@@ -55,12 +55,17 @@ class Trainer:
         pop_ratio (float): The pop ratio value for the evaluation.
         ray_verbose (int): The Ray level of verbosity.
         enable_wandb (bool): Wether or not to enable Wandb.
-        log_config_wandb (bool): Wether or not to log the configuration
+        project_wandb (str): The name of the Wandb project.
+        group_wandb (Optional[str]): The name of the Wandb group.
+        api_key_file_wandb (Optional[str]): The path to the Wandb
+            API key file.
+        api_key_wandb (Optional[str]): The Wandb API key.
+        excludes_wandb (list): The list of parameters to exclude
+            from Wandb logging.
+        log_config_wandb (bool): Wether or not to log the config
             in Wandb.
         upload_checkpoints_wandb (bool): Wether or not to upload
-            checkpoints in Wandb.
-        save_checkpoints_wandb (bool): Wether or not to save
-            checkpoints in Wandb.
+            checkpoints to Wandb.
         enable_codecarbon (bool): Wether or not to enable CodeCarbon.
         save_to_api_codecarbon (bool): Wether or not to save
             CodeCarbon results to API.
@@ -92,9 +97,13 @@ class Trainer:
         pop_ratio: float = 0.8,
         ray_verbose: int = 1,
         enable_wandb: bool = False,
+        project_wandb: str = "WarpRec",
+        group_wandb: Optional[str] = None,
+        api_key_file_wandb: Optional[str] = None,
+        api_key_wandb: Optional[str] = None,
+        excludes_wandb: list = [],
         log_config_wandb: bool = False,
         upload_checkpoints_wandb: bool = False,
-        save_checkpoints_wandb: bool = False,
         enable_codecarbon: bool = False,
         save_to_api_codecarbon: bool = False,
         save_to_file_codecarbon: bool = False,
@@ -117,10 +126,13 @@ class Trainer:
             dashboard = DashboardConfig(
                 wandb=Wandb(
                     enabled=enable_wandb,
-                    project_name=model_name,
+                    project=project_wandb,
+                    group=group_wandb,
+                    api_key_file=api_key_file_wandb,
+                    api_key=api_key_wandb,
+                    excludes=excludes_wandb,
                     log_config=log_config_wandb,
                     upload_checkpoints=upload_checkpoints_wandb,
-                    save_checkpoints=save_checkpoints_wandb,
                 ),
                 codecarbon=CodeCarbon(
                     enabled=enable_codecarbon,
@@ -209,11 +221,13 @@ class Trainer:
         if self._dashboard.wandb.enabled:
             callbacks.append(
                 WandbLoggerCallback(
-                    project=self._dashboard.wandb.project_name,
-                    name=self.model_name,
+                    project=self._dashboard.wandb.project,
+                    group=self._dashboard.wandb.group,
+                    api_key_file=self._dashboard.wandb.api_key_file,
+                    api_key=self._dashboard.wandb.api_key,
+                    excludes=self._dashboard.wandb.excludes,
                     log_config=self._dashboard.wandb.log_config,
                     upload_checkpoints=self._dashboard.wandb.upload_checkpoints,
-                    save_checkpoints=self._dashboard.wandb.save_checkpoints,
                 )
             )
         if self._dashboard.codecarbon.enabled:
@@ -230,7 +244,10 @@ class Trainer:
             callbacks.append(
                 MLflowLoggerCallback(
                     tracking_uri=self._dashboard.mlflow.tracking_uri,
+                    registry_uri=self._dashboard.mlflow.registry_uri,
                     experiment_name=self._dashboard.mlflow.experiment_name,
+                    tags=self._dashboard.mlflow.tags,
+                    tracking_token=self._dashboard.mlflow.tracking_token,
                     save_artifact=self._dashboard.mlflow.save_artifacts,
                 )
             )
