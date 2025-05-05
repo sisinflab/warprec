@@ -158,7 +158,7 @@ class TransactionDataset(Dataset):
             # Count the number of items after filtering
             train_items_after_filter = train_data[item_label].nunique()
 
-            logger.msg(
+            logger.attention(
                 ""
                 f"Filtered out {train_items_before_filter - train_items_after_filter} items."
             )
