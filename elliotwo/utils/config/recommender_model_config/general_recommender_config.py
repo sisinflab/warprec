@@ -9,7 +9,14 @@ from elliotwo.utils.config.model_configuration import (
     STR_FIELD,
     BOOL_FIELD,
 )
-from elliotwo.utils.enums import SearchSpace
+from elliotwo.utils.config.common import (
+    convert_to_list,
+    check_less_equal_zero,
+    check_zero_to_one,
+    check_less_than_zero,
+    check_similarity,
+    check_user_profile,
+)
 from elliotwo.utils.registry import params_registry, similarities_registry
 
 
@@ -27,10 +34,9 @@ class EASE(RecomModel):
     @classmethod
     def check_l2(cls, v: list):
         """Validate l2."""
-        if not isinstance(v, list):
-            v = [v]
+        v = convert_to_list(v)
         for value in v:
-            if isinstance(value, (float, int)) and value <= 0:
+            if check_less_equal_zero(value):
                 raise ValueError(
                     f"Values of l2 for EASE model must be > 0. "
                     f"Values received as input: {v}"
@@ -54,10 +60,9 @@ class Slim(RecomModel):
     @classmethod
     def check_l1(cls, v: list):
         """Validate l1."""
-        if not isinstance(v, list):
-            v = [v]
+        v = convert_to_list(v)
         for value in v:
-            if isinstance(value, (float, int)) and (value < 0 or value > 1):
+            if not check_zero_to_one(value):
                 raise ValueError(
                     "Values of l1 for Slim model must be in [0, 1] range. "
                     f"Values received as input: {v}"
@@ -68,10 +73,9 @@ class Slim(RecomModel):
     @classmethod
     def check_alpha(cls, v: list):
         """Validate alpha."""
-        if not isinstance(v, list):
-            v = [v]
+        v = convert_to_list(v)
         for value in v:
-            if isinstance(value, (float, int)) and value < 0:
+            if check_less_than_zero(value):
                 raise ValueError(
                     "Values of alpha for Slim model must be >= 0. "
                     "In case of alpha=0, ordinary least square will be solved. "
@@ -98,10 +102,9 @@ class ItemKNN(RecomModel):
     @classmethod
     def check_k(cls, v: list):
         """Validate k."""
-        if not isinstance(v, list):
-            v = [v]
+        v = convert_to_list(v)
         for value in v:
-            if isinstance(value, int) and value <= 0:
+            if check_less_equal_zero(value):
                 raise ValueError(
                     "Values of k for ItemKNN model must be > 0. "
                     f"Values received as input: {v}"
@@ -112,15 +115,9 @@ class ItemKNN(RecomModel):
     @classmethod
     def check_similarity(cls, v: list):
         """Validate similarity."""
-        if not isinstance(v, list):
-            v = [v]
+        v = convert_to_list(v)
         for value in v:
-            if (
-                isinstance(value, str)
-                and value.lower() != SearchSpace.CHOICE.value
-                and value.lower() != SearchSpace.GRID.value
-                and value.upper() not in similarities_registry.list_registered()
-            ):
+            if not check_similarity(value):
                 raise ValueError(
                     "Values of similarity for ItemKNN model must be supported similarities. "
                     f"Values received as input: {v}. "
@@ -132,8 +129,7 @@ class ItemKNN(RecomModel):
     @classmethod
     def check_normalize(cls, v: list):
         """Validate normalize."""
-        if not isinstance(v, list):
-            v = [v]
+        v = convert_to_list(v)
         return v
 
 
@@ -155,10 +151,9 @@ class UserKNN(RecomModel):
     @classmethod
     def check_k(cls, v: list):
         """Validate k."""
-        if not isinstance(v, list):
-            v = [v]
+        v = convert_to_list(v)
         for value in v:
-            if isinstance(value, int) and value <= 0:
+            if check_less_equal_zero(value):
                 raise ValueError(
                     "Values of k for UserKNN model must be > 0. "
                     f"Values received as input: {v}"
@@ -169,15 +164,9 @@ class UserKNN(RecomModel):
     @classmethod
     def check_similarity(cls, v: list):
         """Validate similarity."""
-        if not isinstance(v, list):
-            v = [v]
+        v = convert_to_list(v)
         for value in v:
-            if (
-                isinstance(value, str)
-                and value.lower() != SearchSpace.CHOICE.value
-                and value.lower() != SearchSpace.GRID.value
-                and value.upper() not in similarities_registry.list_registered()
-            ):
+            if not check_similarity(value):
                 raise ValueError(
                     "Values of similarity for UserKNN model must be supported similarities. "
                     f"Values received as input: {v}. "
@@ -189,8 +178,7 @@ class UserKNN(RecomModel):
     @classmethod
     def check_normalize(cls, v: list):
         """Validate normalize."""
-        if not isinstance(v, list):
-            v = [v]
+        v = convert_to_list(v)
         return v
 
 
@@ -224,10 +212,9 @@ class NeuMF(RecomModel):
     @classmethod
     def check_mf_embedding_size(cls, v: list):
         """Validate mf_embedding_size."""
-        if not isinstance(v, list):
-            v = [v]
+        v = convert_to_list(v)
         for value in v:
-            if isinstance(value, int) and value <= 0:
+            if check_less_equal_zero(value):
                 raise ValueError(
                     "Values of mf_embedding_size for NeuMF model must be > 0. "
                     f"Values received as input: {v}"
@@ -238,10 +225,9 @@ class NeuMF(RecomModel):
     @classmethod
     def check_mlp_embedding_size(cls, v: list):
         """Validate mlp_embedding_size."""
-        if not isinstance(v, list):
-            v = [v]
+        v = convert_to_list(v)
         for value in v:
-            if isinstance(value, int) and value <= 0:
+            if check_less_equal_zero(value):
                 raise ValueError(
                     "Values of mlp_embedding_size for NeuMF model must be > 0. "
                     f"Values received as input: {v}"
@@ -253,6 +239,10 @@ class NeuMF(RecomModel):
     def check_mlp_hidden_size(cls, v: list):
         """Validate mlp_hidden_size."""
         strat = None
+
+        # This should be a list of lists
+        # for a more precise validation we do not
+        # use the common methods
         if not isinstance(v, list):
             v = [v]
         if not isinstance(v[-1], list):
@@ -274,26 +264,23 @@ class NeuMF(RecomModel):
     @classmethod
     def check_mf_train(cls, v: list):
         """Validate mf_train."""
-        if not isinstance(v, list):
-            v = [v]
+        v = convert_to_list(v)
         return v
 
     @field_validator("mlp_train")
     @classmethod
     def check_mlp_train(cls, v: list):
         """Validate mlp_train."""
-        if not isinstance(v, list):
-            v = [v]
+        v = convert_to_list(v)
         return v
 
     @field_validator("dropout")
     @classmethod
     def check_dropout(cls, v: list):
         """Validate dropout."""
-        if not isinstance(v, list):
-            v = [v]
+        v = convert_to_list(v)
         for value in v:
-            if isinstance(value, float) and value < 0:
+            if check_less_than_zero(value):
                 raise ValueError(
                     "Values of dropout for NeuMF model must be >= 0. "
                     f"Values received as input: {v}"
@@ -304,10 +291,9 @@ class NeuMF(RecomModel):
     @classmethod
     def check_epochs(cls, v: list):
         """Validate epochs."""
-        if not isinstance(v, list):
-            v = [v]
+        v = convert_to_list(v)
         for value in v:
-            if isinstance(value, int) and value <= 0:
+            if check_less_equal_zero(value):
                 raise ValueError(
                     "Values of epochs for NeuMF model must be > 0. "
                     f"Values received as input: {v}"
@@ -318,10 +304,9 @@ class NeuMF(RecomModel):
     @classmethod
     def check_learning_rate(cls, v: list):
         """Validate learning_rate."""
-        if not isinstance(v, list):
-            v = [v]
+        v = convert_to_list(v)
         for value in v:
-            if isinstance(value, float) and value <= 0:
+            if check_less_equal_zero(value):
                 raise ValueError(
                     "Values of learning_rate for NeuMF model must be > 0. "
                     f"Values received as input: {v}"
@@ -332,10 +317,9 @@ class NeuMF(RecomModel):
     @classmethod
     def check_neg_samples(cls, v: list):
         """Validate neg_samples."""
-        if not isinstance(v, list):
-            v = [v]
+        v = convert_to_list(v)
         for value in v:
-            if isinstance(value, int) and value < 0:
+            if check_less_than_zero(value):
                 raise ValueError(
                     "Values of neg_samples for NeuMF model must be >= 0. "
                     f"Values received as input: {v}"
@@ -363,10 +347,9 @@ class RP3Beta(RecomModel):
     @classmethod
     def check_k(cls, v: list):
         """Validate k."""
-        if not isinstance(v, list):
-            v = [v]
+        v = convert_to_list(v)
         for value in v:
-            if isinstance(value, int) and value <= 0:
+            if check_less_equal_zero(value):
                 raise ValueError(
                     "Values of k for RP3Beta model must be > 0. "
                     f"Values received as input: {v}"
@@ -377,10 +360,9 @@ class RP3Beta(RecomModel):
     @classmethod
     def check_alpha(cls, v: list):
         """Validate alpha."""
-        if not isinstance(v, list):
-            v = [v]
+        v = convert_to_list(v)
         for value in v:
-            if isinstance(value, (float, int)) and value < 0:
+            if check_less_than_zero(value):
                 raise ValueError(
                     "Values of alpha for RP3Beta model must be >= 0. "
                     f"Values received as input: {v}"
@@ -391,10 +373,9 @@ class RP3Beta(RecomModel):
     @classmethod
     def check_beta(cls, v: list):
         """Validate beta."""
-        if not isinstance(v, list):
-            v = [v]
+        v = convert_to_list(v)
         for value in v:
-            if isinstance(value, (float, int)) and value < 0:
+            if check_less_than_zero(value):
                 raise ValueError(
                     "Values of beta for RP3Beta model must be >= 0. "
                     f"Values received as input: {v}"
@@ -405,8 +386,7 @@ class RP3Beta(RecomModel):
     @classmethod
     def check_normalize(cls, v: list):
         """Validate normalize."""
-        if not isinstance(v, list):
-            v = [v]
+        v = convert_to_list(v)
         return v
 
 
@@ -428,10 +408,9 @@ class BPR(RecomModel):
     @classmethod
     def check_embedding_size(cls, v: list):
         """Validate embedding_size."""
-        if not isinstance(v, list):
-            v = [v]
+        v = convert_to_list(v)
         for value in v:
-            if isinstance(value, int) and value <= 0:
+            if check_less_equal_zero(value):
                 raise ValueError(
                     "Values of embedding_size for BPR model must be > 0. "
                     f"Values received as input: {v}"
@@ -442,10 +421,9 @@ class BPR(RecomModel):
     @classmethod
     def check_epochs(cls, v: list):
         """Validate epochs."""
-        if not isinstance(v, list):
-            v = [v]
+        v = convert_to_list(v)
         for value in v:
-            if isinstance(value, int) and value <= 0:
+            if check_less_equal_zero(value):
                 raise ValueError(
                     "Values of epochs for BPR model must be > 0. "
                     f"Values received as input: {v}"
@@ -456,10 +434,9 @@ class BPR(RecomModel):
     @classmethod
     def check_learning_rate(cls, v: list):
         """Validate learning_rate."""
-        if not isinstance(v, list):
-            v = [v]
+        v = convert_to_list(v)
         for value in v:
-            if isinstance(value, float) and value <= 0:
+            if check_less_equal_zero(value):
                 raise ValueError(
                     "Values of learning_rate for BPR model must be > 0. "
                     f"Values received as input: {v}"
@@ -494,7 +471,7 @@ class MultiDAE(RecomModel):
         if not isinstance(v, list):
             v = [v]
         for value in v:
-            if isinstance(value, int) and value <= 0:
+            if check_less_equal_zero(value):
                 raise ValueError(
                     "Values of intermediate_dim for MultiDAE model must be > 0. "
                     f"Values received as input: {v}"
@@ -505,10 +482,9 @@ class MultiDAE(RecomModel):
     @classmethod
     def check_latent_dim(cls, v: list):
         """Validate latent_dim."""
-        if not isinstance(v, list):
-            v = [v]
+        v = convert_to_list(v)
         for value in v:
-            if isinstance(value, int) and value <= 0:
+            if check_less_equal_zero(value):
                 raise ValueError(
                     "Values of latent_dim for MultiDAE model must be > 0. "
                     f"Values received as input: {v}"
@@ -519,10 +495,9 @@ class MultiDAE(RecomModel):
     @classmethod
     def check_dropout(cls, v: list):
         """Validate dropout."""
-        if not isinstance(v, list):
-            v = [v]
+        v = convert_to_list(v)
         for value in v:
-            if isinstance(value, float) and value < 0:
+            if check_less_than_zero(value):
                 raise ValueError(
                     "Values of dropout for MultiDAE model must be >= 0. "
                     f"Values received as input: {v}"
@@ -533,10 +508,9 @@ class MultiDAE(RecomModel):
     @classmethod
     def check_epochs(cls, v: list):
         """Validate epochs."""
-        if not isinstance(v, list):
-            v = [v]
+        v = convert_to_list(v)
         for value in v:
-            if isinstance(value, int) and value <= 0:
+            if check_less_equal_zero(value):
                 raise ValueError(
                     "Values of epochs for MultiDAE model must be > 0. "
                     f"Values received as input: {v}"
@@ -547,10 +521,9 @@ class MultiDAE(RecomModel):
     @classmethod
     def check_learning_rate(cls, v: list):
         """Validate learning_rate."""
-        if not isinstance(v, list):
-            v = [v]
+        v = convert_to_list(v)
         for value in v:
-            if isinstance(value, float) and value <= 0:
+            if check_less_equal_zero(value):
                 raise ValueError(
                     "Values of learning_rate for MultiDAE model must be > 0. "
                     f"Values received as input: {v}"
@@ -561,10 +534,9 @@ class MultiDAE(RecomModel):
     @classmethod
     def check_l2_lambda(cls, v: list):
         """Validate l2_lambda."""
-        if not isinstance(v, list):
-            v = [v]
+        v = convert_to_list(v)
         for value in v:
-            if isinstance(value, float) and value < 0:
+            if check_less_than_zero(value):
                 raise ValueError(
                     "Values of l2_lambda for MultiDAE model must be >= 0. "
                     f"Values received as input: {v}"
@@ -600,10 +572,9 @@ class MultiVAE(RecomModel):
     @classmethod
     def check_intermediate_dim(cls, v: list):
         """Validate intermediate_dim."""
-        if not isinstance(v, list):
-            v = [v]
+        v = convert_to_list(v)
         for value in v:
-            if isinstance(value, int) and value <= 0:
+            if check_less_equal_zero(value):
                 raise ValueError(
                     "Values of intermediate_dim for MultiVAE model must be > 0. "
                     f"Values received as input: {v}"
@@ -614,10 +585,9 @@ class MultiVAE(RecomModel):
     @classmethod
     def check_latent_dim(cls, v: list):
         """Validate latent_dim."""
-        if not isinstance(v, list):
-            v = [v]
+        v = convert_to_list(v)
         for value in v:
-            if isinstance(value, int) and value <= 0:
+            if check_less_equal_zero(value):
                 raise ValueError(
                     "Values of latent_dim for MultiVAE model must be > 0. "
                     f"Values received as input: {v}"
@@ -628,10 +598,9 @@ class MultiVAE(RecomModel):
     @classmethod
     def check_dropout(cls, v: list):
         """Validate dropout."""
-        if not isinstance(v, list):
-            v = [v]
+        v = convert_to_list(v)
         for value in v:
-            if isinstance(value, float) and value < 0:
+            if check_less_than_zero(value):
                 raise ValueError(
                     "Values of dropout for MultiVAE model must be >= 0. "
                     f"Values received as input: {v}"
@@ -642,10 +611,9 @@ class MultiVAE(RecomModel):
     @classmethod
     def check_epochs(cls, v: list):
         """Validate epochs."""
-        if not isinstance(v, list):
-            v = [v]
+        v = convert_to_list(v)
         for value in v:
-            if isinstance(value, int) and value <= 0:
+            if check_less_equal_zero(value):
                 raise ValueError(
                     "Values of epochs for MultiVAE model must be > 0. "
                     f"Values received as input: {v}"
@@ -656,10 +624,9 @@ class MultiVAE(RecomModel):
     @classmethod
     def check_learning_rate(cls, v: list):
         """Validate learning_rate."""
-        if not isinstance(v, list):
-            v = [v]
+        v = convert_to_list(v)
         for value in v:
-            if isinstance(value, float) and value <= 0:
+            if check_less_equal_zero(value):
                 raise ValueError(
                     "Values of learning_rate for MultiVAE model must be > 0. "
                     f"Values received as input: {v}"
@@ -670,10 +637,9 @@ class MultiVAE(RecomModel):
     @classmethod
     def check_l2_lambda(cls, v: list):
         """Validate l2_lambda."""
-        if not isinstance(v, list):
-            v = [v]
+        v = convert_to_list(v)
         for value in v:
-            if isinstance(value, float) and value < 0:
+            if check_less_than_zero(value):
                 raise ValueError(
                     "Values of l2_lambda for MultiVAE model must be >= 0. "
                     f"Values received as input: {v}"
@@ -684,10 +650,9 @@ class MultiVAE(RecomModel):
     @classmethod
     def check_anneal_cap(cls, v: list):
         """Validate anneal_cap."""
-        if not isinstance(v, list):
-            v = [v]
+        v = convert_to_list(v)
         for value in v:
-            if isinstance(value, float) and value < 0:
+            if check_less_than_zero(value):
                 raise ValueError(
                     "Values of anneal_cap for MultiVAE model must be >= 0. "
                     f"Values received as input: {v}"
@@ -698,8 +663,7 @@ class MultiVAE(RecomModel):
     @classmethod
     def check_anneal_step(cls, v: list):
         """Validate anneal_step."""
-        if not isinstance(v, list):
-            v = [v]
+        v = convert_to_list(v)
         return v
 
 
@@ -729,10 +693,9 @@ class ADMMSlim(RecomModel):
     @classmethod
     def check_lambda_1(cls, v: list):
         """Validate lambda_1."""
-        if not isinstance(v, list):
-            v = [v]
+        v = convert_to_list(v)
         for value in v:
-            if isinstance(value, float) and value < 0:
+            if check_less_than_zero(value):
                 raise ValueError(
                     "Values of lambda_1 for ADMMSlim model must be >= 0. "
                     f"Values received as input: {v}"
@@ -743,10 +706,9 @@ class ADMMSlim(RecomModel):
     @classmethod
     def check_lambda_2(cls, v: list):
         """Validate lambda_2."""
-        if not isinstance(v, list):
-            v = [v]
+        v = convert_to_list(v)
         for value in v:
-            if isinstance(value, float) and value < 0:
+            if check_less_than_zero(value):
                 raise ValueError(
                     "Values of lambda_2 for ADMMSlim model must be >= 0. "
                     f"Values received as input: {v}"
@@ -757,10 +719,9 @@ class ADMMSlim(RecomModel):
     @classmethod
     def check_alpha(cls, v: list):
         """Validate alpha."""
-        if not isinstance(v, list):
-            v = [v]
+        v = convert_to_list(v)
         for value in v:
-            if isinstance(value, float) and value < 0:
+            if check_less_than_zero(value):
                 raise ValueError(
                     "Values of alpha for ADMMSlim model must be >= 0. "
                     f"Values received as input: {v}"
@@ -771,10 +732,9 @@ class ADMMSlim(RecomModel):
     @classmethod
     def check_rho(cls, v: list):
         """Validate rho."""
-        if not isinstance(v, list):
-            v = [v]
+        v = convert_to_list(v)
         for value in v:
-            if isinstance(value, float) and value < 0:
+            if check_less_than_zero(value):
                 raise ValueError(
                     "Values of rho for ADMMSlim model must be >= 0. "
                     f"Values received as input: {v}"
@@ -785,10 +745,9 @@ class ADMMSlim(RecomModel):
     @classmethod
     def check_it(cls, v: list):
         """Validate it."""
-        if not isinstance(v, list):
-            v = [v]
+        v = convert_to_list(v)
         for value in v:
-            if isinstance(value, float) and value < 0:
+            if check_less_than_zero(value):
                 raise ValueError(
                     "Values of it for ADMMSlim model must be >= 0. "
                     f"Values received as input: {v}"
@@ -799,16 +758,14 @@ class ADMMSlim(RecomModel):
     @classmethod
     def check_positive_only(cls, v: list):
         """Validate positive_only."""
-        if not isinstance(v, list):
-            v = [v]
+        v = convert_to_list(v)
         return v
 
     @field_validator("center_columns")
     @classmethod
     def check_center_columns(cls, v: list):
         """Validate center_columns."""
-        if not isinstance(v, list):
-            v = [v]
+        v = convert_to_list(v)
         return v
 
 
@@ -832,15 +789,9 @@ class VSM(RecomModel):
     @classmethod
     def check_similarity(cls, v: list):
         """Validate similarity."""
-        if not isinstance(v, list):
-            v = [v]
+        v = convert_to_list(v)
         for value in v:
-            if (
-                isinstance(value, str)
-                and value.lower() != SearchSpace.CHOICE.value
-                and value.lower() != SearchSpace.GRID.value
-                and value.upper() not in similarities_registry.list_registered()
-            ):
+            if not check_similarity(value):
                 raise ValueError(
                     "Values of similarity for ItemKNN model must be supported similarities. "
                     f"Values received as input: {v}. "
@@ -852,15 +803,9 @@ class VSM(RecomModel):
     @classmethod
     def check_user_profile(cls, v: list):
         """Validate user_profile."""
-        if not isinstance(v, list):
-            v = [v]
+        v = convert_to_list(v)
         for value in v:
-            if (
-                isinstance(value, str)
-                and value.lower() != SearchSpace.CHOICE.value
-                and value.lower() != SearchSpace.GRID.value
-                and value.lower() not in ["binary", "tfidf"]
-            ):
+            if not check_user_profile(value):
                 raise ValueError(
                     "Values of user_profile for VSM model must be 'binary' or 'tfidf'. "
                     f"Values received as input: {v}. "
@@ -871,15 +816,9 @@ class VSM(RecomModel):
     @classmethod
     def check_item_profile(cls, v: list):
         """Validate item_profile."""
-        if not isinstance(v, list):
-            v = [v]
+        v = convert_to_list(v)
         for value in v:
-            if (
-                isinstance(value, str)
-                and value.lower() != SearchSpace.CHOICE.value
-                and value.lower() != SearchSpace.GRID.value
-                and value.lower() not in ["binary", "tfidf"]
-            ):
+            if not check_user_profile(value):
                 raise ValueError(
                     "Values of item_profile for VSM model must be 'binary' or 'tfidf'. "
                     f"Values received as input: {v}. "
@@ -905,10 +844,9 @@ class CEASE(RecomModel):
     @classmethod
     def check_l2(cls, v: list):
         """Validate l2."""
-        if not isinstance(v, list):
-            v = [v]
+        v = convert_to_list(v)
         for value in v:
-            if isinstance(value, (float, int)) and value <= 0:
+            if check_less_equal_zero(value):
                 raise ValueError(
                     f"Values of l2 for CEASE model must be > 0. "
                     f"Values received as input: {v}"
@@ -919,10 +857,9 @@ class CEASE(RecomModel):
     @classmethod
     def check_alpha(cls, v: list):
         """Validate alpha."""
-        if not isinstance(v, list):
-            v = [v]
+        v = convert_to_list(v)
         for value in v:
-            if isinstance(value, (float, int)) and value < 0:
+            if check_less_than_zero(value):
                 raise ValueError(
                     f"Values of alpha for CEASE model must be >= 0. "
                     f"Values received as input: {v}"
@@ -948,10 +885,9 @@ class AddEASE(RecomModel):
     @classmethod
     def check_l2(cls, v: list):
         """Validate l2."""
-        if not isinstance(v, list):
-            v = [v]
+        v = convert_to_list(v)
         for value in v:
-            if isinstance(value, (float, int)) and value <= 0:
+            if check_less_equal_zero(value):
                 raise ValueError(
                     f"Values of l2 for AddEASE model must be > 0. "
                     f"Values received as input: {v}"
@@ -962,10 +898,9 @@ class AddEASE(RecomModel):
     @classmethod
     def check_alpha(cls, v: list):
         """Validate alpha."""
-        if not isinstance(v, list):
-            v = [v]
+        v = convert_to_list(v)
         for value in v:
-            if isinstance(value, (float, int)) and value < 0:
+            if check_less_than_zero(value):
                 raise ValueError(
                     f"Values of alpha for AddEASE model must be >= 0. "
                     f"Values received as input: {v}"
@@ -993,10 +928,9 @@ class AttributeItemKNN(RecomModel):
     @classmethod
     def check_k(cls, v: list):
         """Validate k."""
-        if not isinstance(v, list):
-            v = [v]
+        v = convert_to_list(v)
         for value in v:
-            if isinstance(value, int) and value <= 0:
+            if check_less_equal_zero(value):
                 raise ValueError(
                     "Values of k for AttributeItemKNN model must be > 0. "
                     f"Values received as input: {v}"
@@ -1007,15 +941,9 @@ class AttributeItemKNN(RecomModel):
     @classmethod
     def check_similarity(cls, v: list):
         """Validate similarity."""
-        if not isinstance(v, list):
-            v = [v]
+        v = convert_to_list(v)
         for value in v:
-            if (
-                isinstance(value, str)
-                and value.lower() != SearchSpace.CHOICE.value
-                and value.lower() != SearchSpace.GRID.value
-                and value.upper() not in similarities_registry.list_registered()
-            ):
+            if not check_similarity(value):
                 raise ValueError(
                     "Values of similarity for AttributeItemKNN model must be supported similarities. "
                     f"Values received as input: {v}. "
@@ -1027,8 +955,7 @@ class AttributeItemKNN(RecomModel):
     @classmethod
     def check_normalize(cls, v: list):
         """Validate normalize."""
-        if not isinstance(v, list):
-            v = [v]
+        v = convert_to_list(v)
         return v
 
 
@@ -1054,10 +981,9 @@ class AttributeUserKNN(RecomModel):
     @classmethod
     def check_k(cls, v: list):
         """Validate k."""
-        if not isinstance(v, list):
-            v = [v]
+        v = convert_to_list(v)
         for value in v:
-            if isinstance(value, int) and value <= 0:
+            if check_less_equal_zero(value):
                 raise ValueError(
                     "Values of k for AttributeUserKNN model must be > 0. "
                     f"Values received as input: {v}"
@@ -1068,15 +994,9 @@ class AttributeUserKNN(RecomModel):
     @classmethod
     def check_similarity(cls, v: list):
         """Validate similarity."""
-        if not isinstance(v, list):
-            v = [v]
+        v = convert_to_list(v)
         for value in v:
-            if (
-                isinstance(value, str)
-                and value.lower() != SearchSpace.CHOICE.value
-                and value.lower() != SearchSpace.GRID.value
-                and value.upper() not in similarities_registry.list_registered()
-            ):
+            if not check_similarity(value):
                 raise ValueError(
                     "Values of similarity for AttributeUserKNN model must be supported similarities. "
                     f"Values received as input: {v}. "
@@ -1088,15 +1008,9 @@ class AttributeUserKNN(RecomModel):
     @classmethod
     def check_user_profile(cls, v: list):
         """Validate user_profile."""
-        if not isinstance(v, list):
-            v = [v]
+        v = convert_to_list(v)
         for value in v:
-            if (
-                isinstance(value, str)
-                and value.lower() != SearchSpace.CHOICE.value
-                and value.lower() != SearchSpace.GRID.value
-                and value.lower() not in ["binary", "tfidf"]
-            ):
+            if not check_user_profile(value):
                 raise ValueError(
                     "Values of user_profile for AttributeUserKNN model must be 'binary' or 'tfidf'. "
                     f"Values received as input: {v}. "
@@ -1107,6 +1021,5 @@ class AttributeUserKNN(RecomModel):
     @classmethod
     def check_normalize(cls, v: list):
         """Validate normalize."""
-        if not isinstance(v, list):
-            v = [v]
+        v = convert_to_list(v)
         return v
