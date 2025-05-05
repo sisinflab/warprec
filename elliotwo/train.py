@@ -92,6 +92,7 @@ def main(args: Namespace):
             beta=config.evaluation.beta,
             pop_ratio=config.evaluation.pop_ratio,
             ray_verbose=config.general.ray_verbose,
+            config=config,
         )
         best_model, checkpoint_param = trainer.train_and_evaluate()
 

@@ -18,6 +18,17 @@ splitter:
   strategy: random_leave_k_out
   test_k: 5
   val_k: 5
+dashboard:
+  wandb:
+    enabled: False
+    project_name: Test
+    log_config: False
+    upload_checkpoints: False
+    save_checkpoints: False
+  codecarbon:
+    enabled: True
+    save_to_file: False
+    save_to_api: True
 models:
   MultiDAE:
     meta:
@@ -34,9 +45,9 @@ models:
       #num_samples: 20
       cpu_per_trial: 6
     intermediate_dim: [800, 600, 400]
-    latent_dim: [400, 300, 200]
+    latent_dim: [200, 400]
     dropout: [0.9, 0.8]
-    epochs: [10, 20, 30]
+    epochs: 10
     learning_rate: [0.001, 0.01]
     l2_lambda: [0.01, 0.1]
 evaluation:

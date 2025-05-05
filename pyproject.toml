@@ -22,9 +22,8 @@ loguru = "^0.7.3"
 torchmetrics = "^1.6.2"
 tensorboard = "^2.19.0"
 tensorboardx = "^2.6.2.2"
-psutil = "^7.0.0"
-gputil = "^1.4.0"
 wandb = "^0.19.10"
+codecarbon = "^3.0.0"
 
 
 [tool.poetry.group.dev.dependencies]

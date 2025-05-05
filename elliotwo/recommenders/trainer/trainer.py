@@ -6,13 +6,11 @@ from copy import deepcopy
 import ray
 import torch
 import shutil
-import psutil
-import GPUtil
 from ray import tune
 from ray.tune import Checkpoint
-from ray.tune.logger import TBXLoggerCallback
 from ray.air.integrations.wandb import WandbLoggerCallback
 from ray.tune.experiment.trial import Trial
+from codecarbon import EmissionsTracker
 from elliotwo.recommenders.base_recommender import Recommender
 from elliotwo.data.dataset import Dataset
 from elliotwo.evaluation.evaluator import Evaluator
@@ -22,7 +20,13 @@ from elliotwo.recommenders.trainer.search_algorithm_wrapper import (
 from elliotwo.recommenders.trainer.scheduler_wrapper import (
     BaseSchedulerWrapper,
 )
-from elliotwo.utils.config import Configuration, RecomModel
+from elliotwo.utils.config import (
+    Configuration,
+    RecomModel,
+    DashboardConfig,
+    Wandb,
+    CodeCarbon,
+)
 from elliotwo.utils.enums import SearchSpace
 from elliotwo.utils.logger import logger
 from elliotwo.utils.registry import (
@@ -48,6 +52,22 @@ class Trainer:
         beta (float): The beta value for the evaluation.
         pop_ratio (float): The pop ratio value for the evaluation.
         ray_verbose (int): The Ray level of verbosity.
+        enable_wandb (bool): Wether or not to enable Wandb.
+        log_config_wandb (bool): Wether or not to log the configuration
+            in Wandb.
+        upload_checkpoints_wandb (bool): Wether or not to upload
+            checkpoints in Wandb.
+        save_checkpoints_wandb (bool): Wether or not to save
+            checkpoints in Wandb.
+        enable_codecarbon (bool): Wether or not to enable CodeCarbon.
+        save_to_api_codecarbon (bool): Wether or not to save
+            CodeCarbon results to API.
+        save_to_file_codecarbon (bool): Wether or not to save
+            CodeCarbon results to file.
+        output_dir_codecarbon (str): The directory to save
+            CodeCarbon results.
+        tracking_mode_codecarbon (str): The tracking mode for
+            CodeCarbon. Either "machine" or "process".
         config (Configuration): The configuration of the experiment.
     """
 
@@ -61,15 +81,42 @@ class Trainer:
         beta: float = 1.0,
         pop_ratio: float = 0.8,
         ray_verbose: int = 1,
+        enable_wandb: bool = False,
+        log_config_wandb: bool = False,
+        upload_checkpoints_wandb: bool = False,
+        save_checkpoints_wandb: bool = False,
+        enable_codecarbon: bool = False,
+        save_to_api_codecarbon: bool = False,
+        save_to_file_codecarbon: bool = False,
+        output_dir_codecarbon: str = "./",
+        tracking_mode_codecarbon: str = "machine",
         config: Configuration = None,
     ):
         if config:
             model_params = config.models[model_name]
+            dashboard = config.dashboard
         else:
             model_params = param
+            dashboard = DashboardConfig(
+                wandb=Wandb(
+                    enabled=enable_wandb,
+                    project_name=model_name,
+                    log_config=log_config_wandb,
+                    upload_checkpoints=upload_checkpoints_wandb,
+                    save_checkpoints=save_checkpoints_wandb,
+                ),
+                codecarbon=CodeCarbon(
+                    enabled=enable_codecarbon,
+                    save_to_api=save_to_api_codecarbon,
+                    save_to_file=save_to_file_codecarbon,
+                    output_dir=output_dir_codecarbon,
+                    tracking_mode=tracking_mode_codecarbon,
+                ),
+            )
 
         self.infos = dataset.info()
         self._model_params: RecomModel = params_registry.get(model_name, **model_params)
+        self._dashboard = dashboard
         self.model_name = model_name
         self._evaluator = Evaluator(
             [metric_name],
@@ -130,6 +177,29 @@ class Trainer:
             "score", mode, keep_all_ray_checkpoints
         )
 
+        # Setup callbacks
+        callbacks: List[tune.Callback] = [best_checkpoint_callback]
+
+        if self._dashboard.wandb.enabled:
+            callbacks.append(
+                WandbLoggerCallback(
+                    project=self._dashboard.wandb.project_name,
+                    name=self.model_name,
+                    log_config=self._dashboard.wandb.log_config,
+                    upload_checkpoints=self._dashboard.wandb.upload_checkpoints,
+                    save_checkpoints=self._dashboard.wandb.save_checkpoints,
+                )
+            )
+        if self._dashboard.codecarbon.enabled:
+            callbacks.append(
+                CodeCarbonCallback(
+                    save_to_api=self._dashboard.codecarbon.save_to_api,
+                    save_to_file=self._dashboard.codecarbon.save_to_file,
+                    output_dir=self._dashboard.codecarbon.output_dir,
+                    tracking_mode=self._dashboard.codecarbon.tracking_mode,
+                )
+            )
+
         # Run the hyperparameter tuning
         tune.run(
             obj_function,
@@ -142,16 +212,7 @@ class Trainer:
             scheduler=scheduler,
             num_samples=self._model_params.optimization.num_samples,
             verbose=self._verbose,
-            callbacks=[
-                best_checkpoint_callback,
-                TBXLoggerCallback(),
-                WandbLoggerCallback(
-                    project="Test",
-                    name=self.model_name,
-                    log_config=True,
-                    save_checkpoints=True,
-                ),
-            ],
+            callbacks=callbacks,
         )
 
         # Retrieve results from callback
@@ -213,7 +274,6 @@ class Trainer:
                 validation metric.
             device (str): The device used for tensor operations.
         """
-        proc = psutil.Process(os.getpid())
 
         def _report(model: Recommender, **kwargs: Any):
             """Reporting function. Will be used as a callback for Tune reporting.
@@ -227,23 +287,6 @@ class Trainer:
             results = evaluator.compute_results()
             score = results[self._top_k][self._metric_name]
 
-            # Resources computation
-            cpu_usage = proc.cpu_percent(interval=0.2)
-            num_cpu = psutil.cpu_count(logical=True)
-            cpu_percent = cpu_usage / num_cpu
-            ram_used_gb = psutil.virtual_memory().used / (8 * 1024**3)  # Convert to GB
-
-            # If GPU is available and is used, we monitor also GPU usage
-            if torch.cuda.is_available() and device != "cpu":
-                vram_used_gb = torch.cuda.memory_allocated(device) / (
-                    8 * 1024**3
-                )  # Convert to GB
-                gpus = GPUtil.getGPUs()
-                gpu_percent = gpus[0].load * 100 if gpus else None
-            else:
-                vram_used_gb = None
-                gpu_percent = None
-
             with tempfile.TemporaryDirectory() as tmpdir:
                 torch.save(
                     {"model_state": model.state_dict()},
@@ -252,10 +295,6 @@ class Trainer:
                 tune.report(
                     metrics={
                         "score": score,
-                        "cpu_percent": cpu_percent,
-                        "ram_used_gb": ram_used_gb,
-                        "gpu_percent": gpu_percent,
-                        "vram_user_gb": vram_used_gb,
                         **kwargs,  # Other metrics from the model itself
                     },
                     checkpoint=Checkpoint.from_directory(tmpdir),
@@ -392,3 +431,38 @@ class BestCheckpointCallback(tune.Callback):
                 dict: The dictionary of the params.
         """
         return self.checkpoint_param
+
+
+class CodeCarbonCallback(tune.Callback):
+    def __init__(
+        self,
+        save_to_api: bool = False,
+        save_to_file: bool = False,
+        output_dir: str = "./",
+        tracking_mode: str = "machine",
+    ):
+        self.trackers: Dict[str, EmissionsTracker] = {}
+        self.save_to_api = save_to_api
+        self.save_to_file = save_to_file
+        self.output_dir = output_dir
+        self.tracking_mode = tracking_mode
+
+    def on_trial_start(self, iteration, trials, trial, **info):
+        tracker = EmissionsTracker(
+            save_to_api=self.save_to_api,
+            save_to_file=self.save_to_file,
+            output_dir=self.output_dir,
+            tracking_mode=self.tracking_mode,
+        )
+        tracker.start()
+        self.trackers[trial.trial_id] = tracker
+
+    def on_trial_complete(self, iteration, trials, trial, **info):
+        tracker = self.trackers.pop(trial.trial_id, None)
+        if tracker:
+            tracker.stop()
+
+    def on_trial_fail(self, iteration, trials, trial, **info):
+        tracker = self.trackers.pop(trial.trial_id, None)
+        if tracker:
+            tracker.stop()
