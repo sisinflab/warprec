@@ -3,7 +3,7 @@ from typing import Optional, List, ClassVar, Dict
 import numpy as np
 from pydantic import BaseModel, Field, field_validator, model_validator
 from elliotwo.utils.enums import RatingType, ReadingMethods
-from elliotwo.utils.config import check_separator
+from elliotwo.utils.config.config_utils import check_separator
 from elliotwo.utils.logger import logger
 
 
