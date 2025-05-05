@@ -12,7 +12,7 @@ from elliotwo.utils.config import (
     Labels,
     CustomDtype,
     SplitReading,
-    SideReading,
+    SideInformationReading,
 )
 from elliotwo.utils.enums import RatingType, ReadingMethods
 from elliotwo.utils.logger import logger
@@ -242,7 +242,7 @@ class LocalReader(Reader):
         if self.config:
             read_config = self.config.reader.side
         else:
-            read_config = SideReading(local_path=local_path, sep=sep)
+            read_config = SideInformationReading(local_path=local_path, sep=sep)
 
         logger.msg(
             f"Reading side information from local source in: {read_config.local_path}"
