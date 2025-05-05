@@ -72,7 +72,10 @@ class Trainer:
             CodeCarbon. Either "machine" or "process".
         enable_mlflow (bool): Wether or not to enable MLflow.
         tracking_uri_mlflow (str): The URI of the MLflow tracking server.
+        registry_uri_mlflow (str): The URI of the MLflow model registry.
         experiment_name_mlflow (Optional[str]): The name of the MLflow experiment.
+        tags_mlflow (dict): The tags to be added to the MLflow run.
+        tracking_token_mlflow (Optional[str]): The token for MLflow tracking.
         save_artifacts_mlflow (bool): Wether or not to save artifacts
             in MLflow.
         config (Configuration): The configuration of the experiment.
@@ -99,7 +102,10 @@ class Trainer:
         tracking_mode_codecarbon: str = "machine",
         enable_mlflow: bool = False,
         tracking_uri_mlflow: str = "mlruns/",
+        registry_uri_mlflow: str = "mlruns/",
         experiment_name_mlflow: Optional[str] = None,
+        tags_mlflow: dict = {},
+        tracking_token_mlflow: Optional[str] = None,
         save_artifacts_mlflow: bool = False,
         config: Configuration = None,
     ):
@@ -126,7 +132,10 @@ class Trainer:
                 mlflow=MLflow(
                     enabled=enable_mlflow,
                     tracking_uri=tracking_uri_mlflow,
+                    registry_uri=registry_uri_mlflow,
                     experiment_name=experiment_name_mlflow,
+                    tags=tags_mlflow,
+                    tracking_token=tracking_token_mlflow,
                     save_artifacts=save_artifacts_mlflow,
                 ),
             )

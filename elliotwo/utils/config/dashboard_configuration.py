@@ -27,13 +27,19 @@ class MLflow(BaseModel):
     Attributes:
         enabled (bool): Whether to enable MLflow tracking.
         tracking_uri (str): URI of the MLflow tracking server.
+        registry_uri (str): URI of the MLflow model registry.
         experiment_name (Optional[str]): Name of the MLflow experiment.
+        tags (dict): Tags to be added to the MLflow run.
+        tracking_token (Optional[str]): Token for MLflow tracking.
         save_artifacts (bool): Whether to save the artifacts.
     """
 
     enabled: bool = False
     tracking_uri: str = "mlruns/"
+    registry_uri: str = "mlruns/"
     experiment_name: Optional[str] = None
+    tags: dict = {}
+    tracking_token: Optional[str] = None
     save_artifacts: bool = False
 
 
