@@ -6,9 +6,9 @@ This approach is advised for expert user of the framework.
 """
 
 import numpy as np
-from elliotwo.data import LocalReader, Splitter, TransactionDataset
-from elliotwo.recommenders import Trainer
-from elliotwo.evaluation import Evaluator
+from warprec.data import LocalReader, Splitter, TransactionDataset
+from warprec.recommenders import Trainer
+from warprec.evaluation import Evaluator
 
 
 def main():
