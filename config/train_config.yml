@@ -10,14 +10,17 @@ reader:
     item_id_label: item_id
     rating_label: rating
     timestamp_label: timestamp
+  side:
+    local_path: tests/test_dataset/movielens_side.csv
+    sep: ','
 writer:
   dataset_name: MovieLens
   writing_method: local
   local_experiment_path: experiment/test/
 splitter:
-  strategy: random_leave_k_out
-  test_k: 5
-  val_k: 5
+  strategy: temporal_holdout
+  test_ratio: 0.1
+  val_ratio: 0.1
 dashboard:
   wandb:
     enabled: False
