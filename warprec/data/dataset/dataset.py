@@ -183,13 +183,31 @@ class TransactionDataset(Dataset):
         self.side = side_data if side_data is not None else None
 
         # Save user and item cluster information inside the dataset
-        self.user_cluster = user_cluster if user_cluster is not None else None
-        self.item_cluster = item_cluster if item_cluster is not None else None
+        self.user_cluster = (
+            dict(
+                zip(
+                    user_cluster[user_label], user_cluster["cluster"]
+                )  # TODO: use config
+            )
+            if user_cluster is not None
+            else None
+        )
+        self.item_cluster = (
+            dict(
+                zip(
+                    item_cluster[item_label], item_cluster["cluster"]
+                )  # TODO: use config
+            )
+            if item_cluster is not None
+            else None
+        )
 
         # Create the main data structures
         self.train_set = self._create_inner_set(
             train_data,
             side_data=side_data,
+            user_cluster=self.user_cluster,
+            item_cluster=self.item_cluster,
             header_msg="Train",
             batch_size=batch_size,
             rating_type=rating_type,
@@ -200,6 +218,8 @@ class TransactionDataset(Dataset):
             self.test_set = self._create_inner_set(
                 test_data,
                 side_data=side_data,
+                user_cluster=self.user_cluster,
+                item_cluster=self.item_cluster,
                 header_msg="Test",
                 batch_size=batch_size,
                 rating_type=rating_type,
@@ -209,6 +229,8 @@ class TransactionDataset(Dataset):
             self.val_set = self._create_inner_set(
                 val_data,
                 side_data=side_data,
+                user_cluster=self.user_cluster,
+                item_cluster=self.item_cluster,
                 header_msg="Validation",
                 batch_size=batch_size,
                 rating_type=rating_type,
@@ -270,6 +292,8 @@ class TransactionDataset(Dataset):
         self,
         data: DataFrame,
         side_data: Optional[DataFrame] = None,
+        user_cluster: Optional[dict] = None,
+        item_cluster: Optional[dict] = None,
         header_msg: str = "Train",
         batch_size: int = 1024,
         rating_type: RatingType = RatingType.IMPLICIT,
@@ -280,6 +304,8 @@ class TransactionDataset(Dataset):
         Args:
             data (DataFrame): The data used to create the interaction object.
             side_data (Optional[DataFrame]): The side data information about the dataset.
+            user_cluster (Optional[dict]): The user cluster information.
+            item_cluster (Optional[dict]): The item cluster information.
             header_msg (str): The header of the logger output.
             batch_size (int): The batch size of the interaction.
             rating_type (RatingType): The type of rating used.
@@ -294,6 +320,8 @@ class TransactionDataset(Dataset):
             self._umap,
             self._imap,
             side_data=side_data,
+            user_cluster=user_cluster,
+            item_cluster=item_cluster,
             batch_size=batch_size,
             rating_type=rating_type,
             precision=precision,

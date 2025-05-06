@@ -20,6 +20,8 @@ class Interactions:
         user_mapping (dict): Mapping of user ID -> user idx.
         item_mapping (dict): Mapping of item ID -> item idx.
         side_data (Optional[DataFrame]): The side information features in DataFrame format.
+        user_cluster (Optional[dict]): The user cluster information.
+        item_cluster (Optional[dict]): The item cluster information.
         batch_size (int): The batch size that will be used to
             iterate over the interactions.
         rating_type (RatingType): The type of rating to be used.
@@ -41,6 +43,8 @@ class Interactions:
         user_mapping: dict,
         item_mapping: dict,
         side_data: Optional[DataFrame] = None,
+        user_cluster: Optional[dict] = None,
+        item_cluster: Optional[dict] = None,
         batch_size: int = 1024,
         rating_type: RatingType = RatingType.IMPLICIT,
         precision: Any = np.float32,
@@ -48,6 +52,8 @@ class Interactions:
         # Setup the variables
         self._inter_df = data
         self._inter_side = side_data if side_data is not None else None
+        self._inter_user_cluster = user_cluster if user_cluster is not None else None
+        self._inter_item_cluster = item_cluster if item_cluster is not None else None
         self.batch_size = batch_size
         self.rating_type = rating_type
         self.precision = precision
