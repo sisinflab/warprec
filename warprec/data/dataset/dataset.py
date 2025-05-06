@@ -238,30 +238,30 @@ class TransactionDataset(Dataset):
                 - Optional[DataFrame]: The filtered test dataset.
                 - Optional[DataFrame]: The filtered validation dataset.
         """
-        # Compute shared items first
-        shared_items = set(train[label]).intersection(filter_data[label])
+        # Compute shared data points first
+        shared_data = set(train[label]).intersection(filter_data[label])
 
-        # Count the number of items before filtering
-        train_items_before_filter = train[label].nunique()
+        # Count the number of data points before filtering
+        train_data_before_filter = train[label].nunique()
 
-        # Filter all the data based on items present in both train data and filter.
+        # Filter all the data based on data points present in both train data and filter.
         # This procedure is fundamental because we need dimensions to match
-        train = train[train[label].isin(shared_items)]
-        filter_data = filter_data[filter_data[label].isin(shared_items)]
+        train = train[train[label].isin(shared_data)]
+        filter_data = filter_data[filter_data[label].isin(shared_data)]
 
         # Check the optional data and also filter them
         if test is not None:
-            test = test[test[label].isin(shared_items)]
+            test = test[test[label].isin(shared_data)]
 
         if val is not None:
-            val = val[val[label].isin(shared_items)]
+            val = val[val[label].isin(shared_data)]
 
-        # Count the number of items after filtering
-        train_items_after_filter = train[label].nunique()
+        # Count the number of data points after filtering
+        train_data_after_filter = train[label].nunique()
 
         logger.attention(
             ""
-            f"Filtered out {train_items_before_filter - train_items_after_filter} items."
+            f"Filtered out {train_data_before_filter - train_data_after_filter} {label}."
         )
 
         return train, test, val
