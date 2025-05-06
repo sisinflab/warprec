@@ -21,21 +21,6 @@ splitter:
   strategy: temporal_holdout
   test_ratio: 0.1
   val_ratio: 0.1
-dashboard:
-  wandb:
-    enabled: False
-    project_name: Test
-    log_config: False
-    upload_checkpoints: False
-    save_checkpoints: False
-  mlflow:
-    enabled: True
-    experiment_name: Test
-    save_artifacts: False
-  codecarbon:
-    enabled: False
-    save_to_file: False
-    save_to_api: True
 models:
   EASE:
     optimization:
@@ -46,9 +31,9 @@ models:
         seed: 42
       device: cpu
       validation_metric: nDCG@10
-      #num_samples: 20
-      cpu_per_trial: 6
-    l2: [10, 20, 30, 40, 50]
+      #num_samples: 5
+      cpu_per_trial: 12
+    l2: 10
 evaluation:
   top_k: [10, 20, 50]
   metrics: [nDCG, Precision, Recall, HitRate]
