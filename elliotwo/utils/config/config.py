@@ -160,11 +160,20 @@ class Configuration(BaseModel):
 
         Returns:
             dict: The dictionary containing all the models and their parameters.
+
+        Raises:
+            ValueError: If a model requires side information and they have not been provided.
         """
         parsed_models = {}
 
         for model_name, model_data in self.models.items():
             model_class: RecomModel = params_registry.get(model_name, **model_data)
+
+            if model_class.need_side_information and self.reader.side is None:
+                raise ValueError(
+                    f"The model {model_name} requires side information to be provided, "
+                    "but none have been provided. Check the configuration file."
+                )
 
             # Extract model train parameters, removing the meta infos
             model_data = {

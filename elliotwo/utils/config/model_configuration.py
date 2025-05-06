@@ -1,4 +1,4 @@
-from typing import List, Optional, Union, Any
+from typing import List, Optional, Union, ClassVar, Any
 from abc import ABC
 
 import torch
@@ -260,10 +260,12 @@ class RecomModel(BaseModel, ABC):
     Attributes:
         meta (Meta): The meta-information about the model. Defaults to Meta default values.
         optimization (Optimization): The optimization information that will be used by Ray Tune.
+        need_side_information (ClassVar[bool]): Wether or not the model needs side information.
     """
 
     meta: Meta = Field(default_factory=Meta)
     optimization: Optimization = Field(default_factory=Optimization)
+    need_side_information: ClassVar[bool] = False
 
     @model_validator(mode="after")
     def model_validation(self):
@@ -386,7 +388,7 @@ class RecomModel(BaseModel, ABC):
             return value
 
         # Final checks for list of values length and distribution constraint
-        if len(value) < 3 or len(value) > 4:
+        if len(value) < 3 or len(value) > 5:
             raise ValueError(
                 f"Invalid range format for field {field}. "
                 f"Expected [1.0, 5.0] or ['uniform', 1.0, 5.0]. "
@@ -502,45 +504,89 @@ class RecomModel(BaseModel, ABC):
         Raises:
             ValueError: If the SearchSpace is not in the registry.
         """
-        rounded_search_spaces = [
-            SearchSpace.QUNIFORM,
-            SearchSpace.QLOGUNIFORM,
-            SearchSpace.QRANDN,
-            SearchSpace.QRANDINT,
-            SearchSpace.QLOGRANDINT,
-        ]
-        log_search_spaces = [
-            SearchSpace.LOGUNIFORM,
-            SearchSpace.QLOGUNIFORM,
-            SearchSpace.LOGRANDINT,
-            SearchSpace.QLOGRANDINT,
-        ]
+        # Extract the main values
         strat = value[0]  # Selected SearchSpace
+        f1, f2 = float(value[1]), float(value[2])  # Lower and upper bound
 
-        if strat in rounded_search_spaces and len(value) != 4:
+        # This check is shared between all search spaces
+        if f2 <= f1:
             raise ValueError(
-                f"{strat} requires a rounding factor, but none was provided. "
-                f"Received: {value} for field {field}."
+                "The upper bound must be higher than the lower bound. "
+                f"Received: {value} for field {field}"
             )
-        if strat not in rounded_search_spaces and len(value) == 4:
-            raise ValueError(
-                f"{strat} does not require a rounding factor, "
-                f"but extra values were provided. "
-                f"Received: {value} for field {field}."
-            )
-        if strat in rounded_search_spaces:
-            i1, i2, i3 = int(value[1]), int(value[2]), int(value[3])
-            if i1 % i3 != 0 or i2 % i3 != 0:
-                raise ValueError(
-                    f"Rounded distributions require values divisible by the round term. "
-                    f"Received: {value} for field {field}."
-                )
-        if strat in log_search_spaces:
-            f1, f2 = float(value[1]), float(value[2])
-            if f1 <= 0 or f2 <= 0:
-                raise ValueError(
-                    f"Logarithmic distributions require positive values. "
-                    f"Received: {value} for field {field}."
-                )
+
+        match strat:
+            case SearchSpace.QUNIFORM | SearchSpace.QRANDN | SearchSpace.QRANDINT:
+                # Check if the list of values is of expected length
+                if len(value) != 4:
+                    raise ValueError(
+                        "Quantized distributions require 3 values: "
+                        "the first and second value represent the "
+                        "lower and upper bound. The third value is the quantization constant. "
+                        "Expected value: ['quniform', 5, 100, 5]. "
+                        f"Received: {value} for field {field}"
+                    )
+                # Check on the quantization constant
+                q = float(value[3])
+                if q <= 0:
+                    raise ValueError(
+                        "The quantization constant must be positive. "
+                        f"Received: {value} for field {field}"
+                    )
+                if f1 % q != 0 or f2 % q != 0:
+                    raise ValueError(
+                        "The upper and lower bound must be divisible by the "
+                        "quantization factor. "
+                        f"Received: {value} for field {field}"
+                    )
+            case SearchSpace.LOGUNIFORM | SearchSpace.LOGRANDINT:
+                # Check if the list of values is of expected length
+                if len(value) not in [3, 4]:
+                    raise ValueError(
+                        "Logarithmic distributions require 2 or 3 values: "
+                        "the first and second value are required and represent the "
+                        "lower and upper bound. The third value is optional and is the base of "
+                        "the logarithm. Expected value: ['loguniform', 1e-4, 1e-2] or ['loguniform', 1e-4, 1e-2, 2]. "
+                        f"Received: {value} for field {field}"
+                    )
+
+                # Check for the optional log base
+                f3 = int(value[3]) if len(value) == 4 else None
+                if f3 is not None and f3 <= 0:
+                    raise ValueError(
+                        f"Logarithm base must be positive. "
+                        f"Received: {value} for field {field}."
+                    )
+            case SearchSpace.QLOGUNIFORM | SearchSpace.QLOGRANDINT:
+                # Check if the list of values is of expected length
+                if len(value) not in [4, 5]:
+                    raise ValueError(
+                        "Quantized logarithmic distributions require 3 or 4 values: "
+                        "the first and second value are required and represent the "
+                        "lower and upper bound. The third value is the quantization constant. "
+                        "The fourth value is optional and is the base of the logarithm."
+                        "Expected value: ['qloguniform', 1e-4, 1e-2, 1e-3] or ['qloguniform', 1e-4, 1e-2, 1e-3, 2]. "
+                        f"Received: {value} for field {field}"
+                    )
+                # Check on the quantization constant
+                q = float(value[3])
+                if q <= 0:
+                    raise ValueError(
+                        "The quantization constant must be positive. "
+                        f"Received: {value} for field {field}"
+                    )
+                if q > f2:
+                    raise ValueError(
+                        "The quantization constant must be lower then "
+                        "the upper bound. "
+                        f"Received: {value} for field {field}"
+                    )
+                # Check for the optional log base
+                f3 = int(value[4]) if len(value) == 5 else None
+                if f3 is not None and f3 <= 0:
+                    raise ValueError(
+                        f"Logarithm base must be positive. "
+                        f"Received: {value} for field {field}."
+                    )
 
         return value

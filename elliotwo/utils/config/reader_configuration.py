@@ -3,6 +3,7 @@ from typing import Optional, List, ClassVar, Dict
 import numpy as np
 from pydantic import BaseModel, Field, field_validator, model_validator
 from elliotwo.utils.enums import RatingType, ReadingMethods
+from elliotwo.utils.config.common import check_separator
 from elliotwo.utils.logger import logger
 
 
@@ -12,13 +13,13 @@ class SplitReading(BaseModel):
     This class reads all the information needed to load previously split data.
 
     Attributes:
-        local_path (Optional[str | None]): The directory where the splits are saved.
+        local_path (Optional[str]): The directory where the splits are saved.
         ext (Optional[str]): The extension of the split files.
         sep (Optional[str]): The separator of the split files.
         batch_size (Optional[int]): The batch size values used in the split dataset.
     """
 
-    local_path: Optional[str | None] = None
+    local_path: Optional[str] = None
     ext: Optional[str] = ".tsv"
     sep: Optional[str] = "\t"
     batch_size: Optional[int] = 1024
@@ -27,14 +28,27 @@ class SplitReading(BaseModel):
     @classmethod
     def check_sep(cls, v: str):
         """Validates the separator."""
-        try:
-            v = v.encode().decode("unicode_escape")
-        except UnicodeDecodeError:
-            logger.negative(
-                f"The string {v} is not a valid separator. Using default separator {'\t'}."
-            )
-            v = "\t"
-        return v
+        return check_separator(v)
+
+
+class SideInformationReading(BaseModel):
+    """Definition of the side information reading sub-configuration.
+
+    This class reads all the information needed to load side information data.
+
+    Attributes:
+        local_path (Optional[str]): The directory where the side information are saved.
+        sep (Optional[str]): The separator of the split files.
+    """
+
+    local_path: Optional[str] = None
+    sep: Optional[str] = "\t"
+
+    @field_validator("sep")
+    @classmethod
+    def check_sep(cls, v: str):
+        """Validates the separator."""
+        return check_separator(v)
 
 
 class Labels(BaseModel):
@@ -55,7 +69,18 @@ class Labels(BaseModel):
     timestamp_label: Optional[str] = "timestamp"
 
     @classmethod
-    def from_list(cls, labels: List[str]):
+    def from_list(cls, labels: List[str]) -> "Labels":
+        """Creates a Labels instance from a list of labels.
+
+        Args:
+            labels (List[str]): A list of labels in the order of user_id, item_id, rating, timestamp.
+
+        Returns:
+            Labels: An instance of the Labels class with the provided labels.
+
+        Raises:
+            ValueError: If the input is not a list of length 4.
+        """
         if not isinstance(labels, list) | len(labels) != 4:
             raise ValueError("Input must be a list of length 4.")
         return cls(
@@ -96,6 +121,7 @@ class ReaderConfig(BaseModel):
         rating_type (RatingType): The type of rating to be used. If 'implicit' is chosen,
             the reader will not look for a score.
         split (Optional[SplitReading]): The information of the split reading process.
+        side (Optional[SideInformationReading]): The side information of the dataset.
         labels (Labels): The labels sub-configuration. Defaults to Labels default values.
         dtypes (CustomDtype): The list of column dtype.
         column_map_dtype (ClassVar[dict]): The mapping between the string dtype
@@ -109,6 +135,7 @@ class ReaderConfig(BaseModel):
     sep: Optional[str] = "\t"
     rating_type: RatingType
     split: Optional[SplitReading] = Field(default_factory=SplitReading)
+    side: Optional[SideInformationReading] = None
     labels: Labels = Field(default_factory=Labels)
     dtypes: CustomDtype = Field(default_factory=CustomDtype)
 
@@ -149,14 +176,7 @@ class ReaderConfig(BaseModel):
     @classmethod
     def check_sep(cls, v: str):
         """Validates the separator."""
-        try:
-            v = v.encode().decode("unicode_escape")
-        except UnicodeDecodeError:
-            logger.negative(
-                f"The string {v} is not a valid separator. Using default separator {'\t'}."
-            )
-            v = "\t"
-        return v
+        return check_separator(v)
 
     @model_validator(mode="after")
     def check_data(self):

@@ -28,6 +28,7 @@ class Dataset(ABC):
         # Set mappings
         self._nuid: int = 0
         self._niid: int = 0
+        self._nfeat: int = 0
         self._umap: dict[Any, int] = {}
         self._imap: dict[Any, int] = {}
 
@@ -72,6 +73,7 @@ class Dataset(ABC):
         return {
             "items": self._niid,
             "users": self._nuid,
+            "features": self._nfeat,
         }
 
     def update_mappings(self, user_mapping: dict, item_mapping: dict):
@@ -109,6 +111,7 @@ class TransactionDataset(Dataset):
         train_data (DataFrame): The train data.
         test_data (Optional[DataFrame]): The test data.
         val_data (Optional[DataFrame]): The validation data.
+        side_data (Optional[DataFrame]): The side information data.
         batch_size (int): The batch size that will be used in training and evaluation.
         rating_type (RatingType): The type of rating used in the dataset.
         precision (Any): The precision of the internal representation of the data.
@@ -119,6 +122,7 @@ class TransactionDataset(Dataset):
         train_data: DataFrame,
         test_data: Optional[DataFrame] = None,
         val_data: Optional[DataFrame] = None,
+        side_data: Optional[DataFrame] = None,
         batch_size: int = 1024,
         rating_type: RatingType = RatingType.IMPLICIT,
         precision: Any = np.float32,
@@ -128,11 +132,43 @@ class TransactionDataset(Dataset):
         user_label = train_data.columns[0]
         item_label = train_data.columns[1]
 
+        # If side information data has been provided, we filter the main dataset
+        if side_data is not None:
+            # Compute shared items first
+            shared_items = set(train_data[item_label]).intersection(
+                side_data[item_label]
+            )
+
+            # Count the number of items before filtering
+            train_items_before_filter = train_data[item_label].nunique()
+
+            # Filter all the data based on items present in both train data and side
+            # information data. This procedure is fundamental because we need
+            # dimension to match
+            train_data = train_data[train_data[item_label].isin(shared_items)]
+            side_data = side_data[side_data[item_label].isin(shared_items)]
+
+            # Check the optional data and also filter them
+            if test_data is not None:
+                test_data = test_data[test_data[item_label].isin(shared_items)]
+
+            if val_data is not None:
+                val_data = val_data[val_data[item_label].isin(shared_items)]
+
+            # Count the number of items after filtering
+            train_items_after_filter = train_data[item_label].nunique()
+
+            logger.attention(
+                ""
+                f"Filtered out {train_items_before_filter - train_items_after_filter} items."
+            )
+
         # Define dimensions that will lead the experiment
         self._nuid = train_data[user_label].nunique()
         self._niid = train_data[item_label].nunique()
+        self._nfeat = len(side_data.columns) - 1 if side_data is not None else 0
 
-        # Update mappings inside Dataset structure
+        # Values that will be used to calculate mappings
         _uid = train_data[user_label].unique()
         _iid = train_data[item_label].unique()
 
@@ -140,9 +176,14 @@ class TransactionDataset(Dataset):
         self._umap = {user: i for i, user in enumerate(_uid)}
         self._imap = {item: i for i, item in enumerate(_iid)}
 
+        # Save side information inside the dataset
+        self.side = side_data if side_data is not None else None
+
+        # Create the main data structures
         self.train_set = self._create_inner_set(
             train_data,
-            "Train",
+            side_data=side_data,
+            header_msg="Train",
             batch_size=batch_size,
             rating_type=rating_type,
             precision=precision,
@@ -151,7 +192,8 @@ class TransactionDataset(Dataset):
         if test_data is not None:
             self.test_set = self._create_inner_set(
                 test_data,
-                "Test",
+                side_data=side_data,
+                header_msg="Test",
                 batch_size=batch_size,
                 rating_type=rating_type,
                 precision=precision,
@@ -159,7 +201,8 @@ class TransactionDataset(Dataset):
         if val_data is not None:
             self.val_set = self._create_inner_set(
                 val_data,
-                "Validation",
+                side_data=side_data,
+                header_msg="Validation",
                 batch_size=batch_size,
                 rating_type=rating_type,
                 precision=precision,
@@ -168,6 +211,7 @@ class TransactionDataset(Dataset):
     def _create_inner_set(
         self,
         data: DataFrame,
+        side_data: Optional[DataFrame] = None,
         header_msg: str = "Train",
         batch_size: int = 1024,
         rating_type: RatingType = RatingType.IMPLICIT,
@@ -177,6 +221,7 @@ class TransactionDataset(Dataset):
 
         Args:
             data (DataFrame): The data used to create the interaction object.
+            side_data (Optional[DataFrame]): The side data information about the dataset.
             header_msg (str): The header of the logger output.
             batch_size (int): The batch size of the interaction.
             rating_type (RatingType): The type of rating used.
@@ -190,6 +235,7 @@ class TransactionDataset(Dataset):
             (self._nuid, self._niid),
             self._umap,
             self._imap,
+            side_data=side_data,
             batch_size=batch_size,
             rating_type=rating_type,
             precision=precision,

@@ -1,5 +1,6 @@
 # pylint: disable = too-few-public-methods
 from abc import ABC, abstractmethod
+from typing import Optional
 
 from numpy import ndarray
 from scipy.sparse import csr_matrix
@@ -17,11 +18,12 @@ class Similarity(ABC):
     """Abstract definition of a similarity measure."""
 
     @abstractmethod
-    def compute(self, X: csr_matrix) -> ndarray:
+    def compute(self, X: csr_matrix, Y: Optional[csr_matrix] = None) -> ndarray:
         """Compute the similarity.
 
         Args:
             X (csr_matrix): The interaction matrix.
+            Y (Optional[csr_matrix]): Optional secondary matrix.
 
         Returns:
             ndarray: The similarity matrix.
@@ -32,7 +34,9 @@ class Similarity(ABC):
 class Cosine(Similarity):
     """Cosine similarity wrapper."""
 
-    def compute(self, X: csr_matrix) -> ndarray:
+    def compute(self, X: csr_matrix, Y: Optional[csr_matrix] = None) -> ndarray:
+        if Y is not None:
+            return cosine_similarity(X, Y)
         return cosine_similarity(X)
 
 
@@ -40,7 +44,9 @@ class Cosine(Similarity):
 class Dot(Similarity):
     """Dot similarity wrapper."""
 
-    def compute(self, X: csr_matrix) -> ndarray:
+    def compute(self, X: csr_matrix, Y: Optional[csr_matrix] = None) -> ndarray:
+        if Y is not None:
+            return (X @ Y.T).toarray()
         return (X @ X.T).toarray()
 
 
@@ -48,7 +54,9 @@ class Dot(Similarity):
 class Euclidean(Similarity):
     """Euclidean similarity wrapper."""
 
-    def compute(self, X: csr_matrix) -> ndarray:
+    def compute(self, X: csr_matrix, Y: Optional[csr_matrix] = None) -> ndarray:
+        if Y is not None:
+            return 1 / (1 + euclidean_distances(X, Y))
         return 1 / (1 + euclidean_distances(X))
 
 
@@ -56,7 +64,9 @@ class Euclidean(Similarity):
 class Manhattan(Similarity):
     """Manhattan similarity wrapper."""
 
-    def compute(self, X: csr_matrix) -> ndarray:
+    def compute(self, X: csr_matrix, Y: Optional[csr_matrix] = None) -> ndarray:
+        if Y is not None:
+            return 1 / (1 + manhattan_distances(X, Y))
         return 1 / (1 + manhattan_distances(X))
 
 
@@ -64,5 +74,7 @@ class Manhattan(Similarity):
 class Haversine(Similarity):
     """Haversine similarity wrapper."""
 
-    def compute(self, X: csr_matrix) -> ndarray:
+    def compute(self, X: csr_matrix, Y: Optional[csr_matrix] = None) -> ndarray:
+        if Y is not None:
+            return 1 / (1 + haversine_distances(X, Y))
         return 1 / (1 + haversine_distances(X))

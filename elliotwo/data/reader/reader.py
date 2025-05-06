@@ -12,6 +12,7 @@ from elliotwo.utils.config import (
     Labels,
     CustomDtype,
     SplitReading,
+    SideInformationReading,
 )
 from elliotwo.utils.enums import RatingType, ReadingMethods
 from elliotwo.utils.logger import logger
@@ -221,3 +222,32 @@ class LocalReader(Reader):
 
             return (train_data, test_data, val_data)
         raise FileNotFoundError(f"Train split not found in {path_train}")
+
+    def read_side_information(
+        self,
+        local_path: str = None,
+        sep: str = "\t",
+        **kwargs: Any,
+    ) -> DataFrame:
+        """This method will read the side information locally, using parameters from the config file.
+
+        Args:
+            local_path (str): The path to the local file.
+            sep (str): The separator used in the file.
+            **kwargs (Any): The keyword arguments.
+
+        Returns:
+            DataFrame: The data read from the local source.
+        """
+        if self.config:
+            read_config = self.config.reader.side
+        else:
+            read_config = SideInformationReading(local_path=local_path, sep=sep)
+
+        logger.msg(
+            f"Reading side information from local source in: {read_config.local_path}"
+        )
+        data = pd.read_csv(read_config.local_path, sep=read_config.sep)
+        logger.msg("Data loaded correctly from local source.")
+
+        return data

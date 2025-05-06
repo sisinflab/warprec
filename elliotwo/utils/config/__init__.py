@@ -4,13 +4,18 @@ from .reader_configuration import (
     Labels,
     CustomDtype,
     SplitReading,
+    SideInformationReading,
 )
 from .writer_configuration import WriterConfig, WritingParams
 from .splitter_configuration import SplittingConfig
 from .dashboard_configuration import DashboardConfig, Wandb, CodeCarbon, MLflow
 from .model_configuration import RecomModel
 from .recommender_model_config import (
+    AddEASE,
+    CEASE,
     EASE,
+    AttributeItemKNN,
+    AttributeUserKNN,
     ItemKNN,
     UserKNN,
     Slim,
@@ -19,6 +24,7 @@ from .recommender_model_config import (
     MultiDAE,
     MultiVAE,
     ADMMSlim,
+    VSM,
 )
 from .evaluation_configuration import EvaluationConfig
 from .search_space_wrapper import SearchSpaceWrapper
@@ -32,6 +38,7 @@ __all__ = [
     "Labels",
     "CustomDtype",
     "SplitReading",
+    "SideInformationReading",
     "WriterConfig",
     "WritingParams",
     "SplittingConfig",
@@ -40,7 +47,11 @@ __all__ = [
     "CodeCarbon",
     "MLflow",
     "RecomModel",
+    "AddEASE",
+    "CEASE",
     "EASE",
+    "AttributeItemKNN",
+    "AttributeUserKNN",
     "ItemKNN",
     "UserKNN",
     "Slim",
@@ -49,6 +60,7 @@ __all__ = [
     "MultiDAE",
     "MultiVAE",
     "ADMMSlim",
+    "VSM",
     "EvaluationConfig",
     "SearchSpaceWrapper",
 ]

@@ -8,12 +8,12 @@ from elliotwo.recommenders.base_recommender import ItemSimRecommender
 from elliotwo.utils.registry import model_registry, similarities_registry
 
 
-@model_registry.register(name="ItemKNN")
-class ItemKNN(ItemSimRecommender):
-    """Implementation of ItemKNN algorithm from
-        Amazon.com recommendations: item-to-item collaborative filtering 2003.
+@model_registry.register(name="AttributeItemKNN")
+class AttributeItemKNN(ItemSimRecommender):
+    """Implementation of AttributeItemKNN algorithm from
+        MyMediaLite: A free recommender system library 2011.
 
-    For further details, check the `paper <http://ieeexplore.ieee.org/document/1167344/>`_.
+    For further details, check the `paper <https://www.researchgate.net/publication/221141162_MyMediaLite_A_free_recommender_system_library>`_.
 
     Args:
         params (dict): Model parameters.
@@ -43,7 +43,7 @@ class ItemKNN(ItemSimRecommender):
         **kwargs: Any,
     ):
         super().__init__(params, device=device, seed=seed, info=info, *args, **kwargs)
-        self._name = "ItemKNN"
+        self._name = "AttributeItemKNN"
 
     def fit(
         self,
@@ -54,7 +54,7 @@ class ItemKNN(ItemSimRecommender):
     ):
         """Main train method.
 
-        The training will be conducted on the sparse representation of the interactions.
+        The training will be conducted on the sparse representation of the features.
         During the train a similarity matrix {item x item} will be learned.
 
         Args:
@@ -63,15 +63,15 @@ class ItemKNN(ItemSimRecommender):
             report_fn (Optional[Callable]): The Ray Tune function to report the iteration.
             **kwargs (Any): The dictionary of keyword arguments.
         """
-        X = interactions.get_sparse()
+        X_feat = interactions.get_side_sparse()
         similarity = similarities_registry.get(self.similarity)
 
-        # Apply normalization of interactions if requested
+        # Apply normalization of features if requested
         if self.normalize:
-            X = self._normalize(X)
+            X_feat = self._normalize(X_feat)
 
         # Compute similarity matrix
-        sim_matrix = torch.from_numpy(similarity.compute(X.T))
+        sim_matrix = torch.from_numpy(similarity.compute(X_feat))
 
         # Compute top_k filtering
         filtered_sim_matrix = self._apply_topk_filtering(sim_matrix, self.k)

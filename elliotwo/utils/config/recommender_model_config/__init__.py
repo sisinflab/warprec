@@ -1,5 +1,9 @@
 from .general_recommender_config import (
+    AddEASE,
+    CEASE,
     EASE,
+    AttributeItemKNN,
+    AttributeUserKNN,
     ItemKNN,
     UserKNN,
     Slim,
@@ -8,10 +12,15 @@ from .general_recommender_config import (
     MultiDAE,
     MultiVAE,
     ADMMSlim,
+    VSM,
 )
 
 __all__ = [
+    "AddEASE",
+    "CEASE",
     "EASE",
+    "AttributeItemKNN",
+    "AttributeUserKNN",
     "ItemKNN",
     "UserKNN",
     "Slim",
@@ -20,4 +29,5 @@ __all__ = [
     "MultiDAE",
     "MultiVAE",
     "ADMMSlim",
+    "VSM",
 ]
