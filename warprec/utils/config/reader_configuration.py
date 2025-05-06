@@ -51,6 +51,30 @@ class SideInformationReading(BaseModel):
         return check_separator(v)
 
 
+class ClusteringInformationReading(BaseModel):
+    """Definition of the clustering information reading sub-configuration.
+
+    This class reads all the information needed to load clustering information data.
+
+    Attributes:
+        user_local_path (Optional[str]): The path to the user clustering information.
+        item_local_path (Optional[str]): The path to the item clustering information.
+        user_sep (Optional[str]): The separator of the user clustering file.
+        item_sep (Optional[str]): The separator of the item clustering file.
+    """
+
+    user_local_path: Optional[str] = None
+    item_local_path: Optional[str] = None
+    user_sep: Optional[str] = "\t"
+    item_sep: Optional[str] = "\t"
+
+    @field_validator("user_sep", "item_sep")
+    @classmethod
+    def check_sep(cls, v: str):
+        """Validates the separator."""
+        return check_separator(v)
+
+
 class Labels(BaseModel):
     """Definition of the label sub-configuration.
 
@@ -61,19 +85,22 @@ class Labels(BaseModel):
         item_id_label (Optional[str]): Name of the item ID label. Defaults to 'item_id'.
         rating_label (Optional[str]): Name of the rating label. Defaults to 'rating'.
         timestamp_label (Optional[str]): Name of the timestamp label. Defaults to 'timestamp'.
+        cluster_label (Optional[str]): Name of the cluster label. Defaults to 'cluster'.
     """
 
     user_id_label: Optional[str] = "user_id"
     item_id_label: Optional[str] = "item_id"
     rating_label: Optional[str] = "rating"
     timestamp_label: Optional[str] = "timestamp"
+    cluster_label: Optional[str] = "cluster"
 
     @classmethod
     def from_list(cls, labels: List[str]) -> "Labels":
         """Creates a Labels instance from a list of labels.
 
         Args:
-            labels (List[str]): A list of labels in the order of user_id, item_id, rating, timestamp.
+            labels (List[str]): A list of labels in the order of:
+                user_id, item_id, rating, timestamp.
 
         Returns:
             Labels: An instance of the Labels class with the provided labels.
@@ -101,12 +128,14 @@ class CustomDtype(BaseModel):
         item_id_type (Optional[str]): The dtype to format the item_id column.
         rating_type (Optional[str]): The dtype to format the rating column.
         timestamp_type (Optional[str]): The dtype to format the timestamp column.
+        cluster_type (Optional[str]): The dtype to format the cluster column.
     """
 
     user_id_type: Optional[str] = "int32"
     item_id_type: Optional[str] = "int32"
     rating_type: Optional[str] = "float32"
     timestamp_type: Optional[str] = "int32"
+    cluster_type: Optional[str] = "int32"
 
 
 class ReaderConfig(BaseModel):
@@ -122,6 +151,8 @@ class ReaderConfig(BaseModel):
             the reader will not look for a score.
         split (Optional[SplitReading]): The information of the split reading process.
         side (Optional[SideInformationReading]): The side information of the dataset.
+        clustering (Optional[ClusteringInformationReading]): The clustering information
+            of the dataset.
         labels (Labels): The labels sub-configuration. Defaults to Labels default values.
         dtypes (CustomDtype): The list of column dtype.
         column_map_dtype (ClassVar[dict]): The mapping between the string dtype
@@ -136,6 +167,7 @@ class ReaderConfig(BaseModel):
     rating_type: RatingType
     split: Optional[SplitReading] = Field(default_factory=SplitReading)
     side: Optional[SideInformationReading] = None
+    clustering: Optional[ClusteringInformationReading] = None
     labels: Labels = Field(default_factory=Labels)
     dtypes: CustomDtype = Field(default_factory=CustomDtype)
 

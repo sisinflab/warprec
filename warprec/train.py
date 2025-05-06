@@ -29,12 +29,18 @@ def main(args: Namespace):
     # Dataset loading
     dataset = None
     side_data = None
+    user_cluster = None
+    item_cluster = None
     if config.reader.loading_strategy == "dataset":
         data = reader.read()
 
         # Side information reading
         if config.reader.side:
             side_data = reader.read_side_information()
+
+        # Cluster information reading
+        if config.reader.clustering:
+            user_cluster, item_cluster = reader.read_cluster_information()
 
         # Splitter testing
         if config.splitter:
@@ -47,6 +53,8 @@ def main(args: Namespace):
                     test,
                     val,
                     side_data=side_data,
+                    user_cluster=user_cluster,
+                    item_cluster=item_cluster,
                     batch_size=config.general.batch_size,
                     rating_type=config.reader.rating_type,
                     precision=config.general.precision,
@@ -64,11 +72,17 @@ def main(args: Namespace):
             if config.reader.side:
                 side_data = reader.read_side_information()
 
+            # Cluster information reading
+            if config.reader.clustering:
+                user_cluster, item_cluster = reader.read_cluster_information()
+
             dataset = TransactionDataset(
                 train,
                 test,
                 val,
                 side_data=side_data,
+                user_cluster=user_cluster,
+                item_cluster=item_cluster,
                 batch_size=config.general.batch_size,
                 rating_type=config.reader.rating_type,
                 precision=config.general.precision,

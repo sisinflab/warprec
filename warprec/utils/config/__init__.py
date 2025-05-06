@@ -5,6 +5,7 @@ from .reader_configuration import (
     CustomDtype,
     SplitReading,
     SideInformationReading,
+    ClusteringInformationReading,
 )
 from .writer_configuration import WriterConfig, WritingParams
 from .splitter_configuration import SplittingConfig
@@ -39,6 +40,7 @@ __all__ = [
     "CustomDtype",
     "SplitReading",
     "SideInformationReading",
+    "ClusteringInformationReading",
     "WriterConfig",
     "WritingParams",
     "SplittingConfig",

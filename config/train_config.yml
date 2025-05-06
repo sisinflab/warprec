@@ -13,6 +13,11 @@ reader:
   side:
     local_path: tests/test_dataset/movielens_side.csv
     sep: ','
+  clustering:
+    user_local_path: tests/test_dataset/movielens_user_cluster.csv
+    item_local_path: tests/test_dataset/movielens_item_cluster.csv
+    user_sep: ','
+    item_sep: ','
 writer:
   dataset_name: MovieLens
   writing_method: local

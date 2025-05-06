@@ -112,6 +112,8 @@ class TransactionDataset(Dataset):
         test_data (Optional[DataFrame]): The test data.
         val_data (Optional[DataFrame]): The validation data.
         side_data (Optional[DataFrame]): The side information data.
+        user_cluster (Optional[DataFrame]): The user cluster data.
+        item_cluster (Optional[DataFrame]): The item cluster data.
         batch_size (int): The batch size that will be used in training and evaluation.
         rating_type (RatingType): The type of rating used in the dataset.
         precision (Any): The precision of the internal representation of the data.
@@ -123,6 +125,8 @@ class TransactionDataset(Dataset):
         test_data: Optional[DataFrame] = None,
         val_data: Optional[DataFrame] = None,
         side_data: Optional[DataFrame] = None,
+        user_cluster: Optional[DataFrame] = None,
+        item_cluster: Optional[DataFrame] = None,
         batch_size: int = 1024,
         rating_type: RatingType = RatingType.IMPLICIT,
         precision: Any = np.float32,
@@ -134,33 +138,32 @@ class TransactionDataset(Dataset):
 
         # If side information data has been provided, we filter the main dataset
         if side_data is not None:
-            # Compute shared items first
-            shared_items = set(train_data[item_label]).intersection(
-                side_data[item_label]
+            train_data, test_data, val_data = self._filter_data(
+                train=train_data,
+                filter_data=side_data,
+                label=item_label,
+                test=test_data,
+                val=val_data,
             )
 
-            # Count the number of items before filtering
-            train_items_before_filter = train_data[item_label].nunique()
+        # If user cluster data has been provided, we filter the main dataset
+        if user_cluster is not None:
+            train_data, test_data, val_data = self._filter_data(
+                train=train_data,
+                filter_data=user_cluster,
+                label=user_label,
+                test=test_data,
+                val=val_data,
+            )
 
-            # Filter all the data based on items present in both train data and side
-            # information data. This procedure is fundamental because we need
-            # dimension to match
-            train_data = train_data[train_data[item_label].isin(shared_items)]
-            side_data = side_data[side_data[item_label].isin(shared_items)]
-
-            # Check the optional data and also filter them
-            if test_data is not None:
-                test_data = test_data[test_data[item_label].isin(shared_items)]
-
-            if val_data is not None:
-                val_data = val_data[val_data[item_label].isin(shared_items)]
-
-            # Count the number of items after filtering
-            train_items_after_filter = train_data[item_label].nunique()
-
-            logger.attention(
-                ""
-                f"Filtered out {train_items_before_filter - train_items_after_filter} items."
+        # If item cluster data has been provided, we filter the main dataset
+        if item_cluster is not None:
+            train_data, test_data, val_data = self._filter_data(
+                train=train_data,
+                filter_data=item_cluster,
+                label=item_label,
+                test=test_data,
+                val=val_data,
             )
 
         # Define dimensions that will lead the experiment
@@ -178,6 +181,10 @@ class TransactionDataset(Dataset):
 
         # Save side information inside the dataset
         self.side = side_data if side_data is not None else None
+
+        # Save user and item cluster information inside the dataset
+        self.user_cluster = user_cluster if user_cluster is not None else None
+        self.item_cluster = item_cluster if item_cluster is not None else None
 
         # Create the main data structures
         self.train_set = self._create_inner_set(
@@ -207,6 +214,57 @@ class TransactionDataset(Dataset):
                 rating_type=rating_type,
                 precision=precision,
             )
+
+    def _filter_data(
+        self,
+        train: DataFrame,
+        filter_data: DataFrame,
+        label: str,
+        test: Optional[DataFrame],
+        val: Optional[DataFrame],
+    ) -> Tuple[DataFrame, Optional[DataFrame], Optional[DataFrame]]:
+        """Filter the data based on a given additional information set and label.
+
+        Args:
+            train (DataFrame): The main dataset.
+            filter_data (DataFrame): The additional information dataset.
+            label (str): The label used to filter the data.
+            test (Optional[DataFrame]): The test dataset.
+            val (Optional[DataFrame]): The validation dataset.
+
+        Returns:
+            Tuple[DataFrame, Optional[DataFrame], Optional[DataFrame]]:
+                - DataFrame: The filtered train dataset.
+                - Optional[DataFrame]: The filtered test dataset.
+                - Optional[DataFrame]: The filtered validation dataset.
+        """
+        # Compute shared items first
+        shared_items = set(train[label]).intersection(filter_data[label])
+
+        # Count the number of items before filtering
+        train_items_before_filter = train[label].nunique()
+
+        # Filter all the data based on items present in both train data and filter.
+        # This procedure is fundamental because we need dimensions to match
+        train = train[train[label].isin(shared_items)]
+        filter_data = filter_data[filter_data[label].isin(shared_items)]
+
+        # Check the optional data and also filter them
+        if test is not None:
+            test = test[test[label].isin(shared_items)]
+
+        if val is not None:
+            val = val[val[label].isin(shared_items)]
+
+        # Count the number of items after filtering
+        train_items_after_filter = train[label].nunique()
+
+        logger.attention(
+            ""
+            f"Filtered out {train_items_before_filter - train_items_after_filter} items."
+        )
+
+        return train, test, val
 
     def _create_inner_set(
         self,

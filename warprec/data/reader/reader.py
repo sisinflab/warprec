@@ -13,6 +13,7 @@ from warprec.utils.config import (
     CustomDtype,
     SplitReading,
     SideInformationReading,
+    ClusteringInformationReading,
 )
 from warprec.utils.enums import RatingType, ReadingMethods
 from warprec.utils.logger import logger
@@ -227,14 +228,12 @@ class LocalReader(Reader):
         self,
         local_path: str = None,
         sep: str = "\t",
-        **kwargs: Any,
     ) -> DataFrame:
         """This method will read the side information locally, using parameters from the config file.
 
         Args:
             local_path (str): The path to the local file.
             sep (str): The separator used in the file.
-            **kwargs (Any): The keyword arguments.
 
         Returns:
             DataFrame: The data read from the local source.
@@ -251,3 +250,47 @@ class LocalReader(Reader):
         logger.msg("Data loaded correctly from local source.")
 
         return data
+
+    def read_cluster_information(
+        self,
+        user_local_path: str = None,
+        item_local_path: str = None,
+        user_sep: str = "\t",
+        item_sep: str = "\t",
+    ) -> Tuple[DataFrame, DataFrame]:
+        """This method will read the cluster information locally, using parameters from the config file.
+
+        Args:
+            user_local_path (str): The path to the user cluster file.
+            item_local_path (str): The path to the item cluster file.
+            user_sep (str): The separator used in the user cluster file.
+            item_sep (str): The separator used in the item cluster file.
+
+        Returns:
+            Tuple[DataFrame, DataFrame]: The user and item clusters data.
+        """
+        if self.config:
+            read_config = self.config.reader.clustering
+        else:
+            read_config = ClusteringInformationReading(
+                user_local_path=user_local_path,
+                item_local_path=item_local_path,
+                user_sep=user_sep,
+                item_sep=item_sep,
+            )
+
+        # User clustering
+        logger.msg(
+            f"Reading user clustering information from local source in: {read_config.user_local_path}"
+        )
+        user_data = pd.read_csv(read_config.user_local_path, sep=read_config.user_sep)
+        logger.msg("User data loaded correctly from local source.")
+
+        # Item clustering
+        logger.msg(
+            f"Reading item clustering information from local source in: {read_config.item_local_path}"
+        )
+        item_data = pd.read_csv(read_config.item_local_path, sep=read_config.item_sep)
+        logger.msg("Item data loaded correctly from local source.")
+
+        return user_data, item_data
