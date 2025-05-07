@@ -9,8 +9,7 @@ from warprec.evaluation.base_metric import BaseMetric
 
 @metric_registry.register("BiasDisparityBS")
 class BiasDisparityBS(BaseMetric):
-    """
-    BiasDisparityBS measures the disparity in recommendation bias across user and item clusters.
+    """BiasDisparityBS measures the disparity in recommendation bias across user and item clusters.
 
     This metric quantifies how the distribution of recommended items deviates from the global item
     distribution within each user cluster. It helps to identify whether certain user groups are

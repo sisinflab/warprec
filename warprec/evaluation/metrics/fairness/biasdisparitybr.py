@@ -9,8 +9,7 @@ from warprec.evaluation.base_metric import TopKMetric
 
 @metric_registry.register("BiasDisparityBR")
 class BiasDisparityBR(TopKMetric):
-    """
-    Bias Disparity - Bias Recommendations (BR) metric.
+    """The BiasDisparityBR@K (Bias Disparity - Bias Recommendations) metric.
 
     This metric computes the disparity between the distribution of recommended items and the global
     item distribution per user cluster, averaged over users in the cluster.
@@ -28,6 +27,8 @@ class BiasDisparityBR(TopKMetric):
 
     A value > 1 indicates over-recommendation of items from cluster c to user cluster u,
     while a value < 1 indicates under-recommendation.
+
+    For further details, please refer to this `link <https://arxiv.org/pdf/1811.01461>`_.
 
     Attributes:
         user_clusters (Tensor): Tensor mapping each user to a user cluster.
