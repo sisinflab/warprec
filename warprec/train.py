@@ -102,6 +102,8 @@ def main(args: Namespace):
         train_set=dataset.train_set.get_sparse(),
         beta=config.evaluation.beta,
         pop_ratio=config.evaluation.pop_ratio,
+        user_cluster=dataset.user_cluster,
+        item_cluster=dataset.item_cluster,
     )
 
     for model_name in models:
@@ -127,12 +129,12 @@ def main(args: Namespace):
         if dataset.val_set is not None:
             evaluator.evaluate(best_model, dataset, test_set=False, verbose=True)
             results = evaluator.compute_results()
-            evaluator.print_console(results, config.evaluation.metrics, "Validation")
+            evaluator.print_console(results, "Validation")
             result_dict["Validation"] = results
 
         evaluator.evaluate(best_model, dataset, test_set=True, verbose=True)
         results = evaluator.compute_results()
-        evaluator.print_console(results, config.evaluation.metrics, "Test")
+        evaluator.print_console(results, "Test")
         result_dict["Test"] = results
 
         writer.write_results(

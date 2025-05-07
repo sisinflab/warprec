@@ -1,8 +1,9 @@
-from typing import List, Dict, Union
+from typing import List, Dict
 
 import torch
 from scipy.sparse import csr_matrix
 from tabulate import tabulate
+from math import ceil
 from warprec.data.dataset import Dataset
 from warprec.evaluation.base_metric import BaseMetric
 from warprec.recommenders.base_recommender import Recommender
@@ -24,6 +25,8 @@ class Evaluator:
         train_set (csr_matrix): The train set sparse matrix.
         beta (float): The beta value used in some metrics.
         pop_ratio (float): The percentile considered popular.
+        user_cluster (Dict[int, int]): The user cluster mapping.
+        item_cluster (Dict[int, int]): The item cluster mapping.
     """
 
     def __init__(
@@ -33,6 +36,8 @@ class Evaluator:
         train_set: csr_matrix,
         beta: float = 1.0,
         pop_ratio: float = 0.8,
+        user_cluster: Dict[int, int] = None,
+        item_cluster: Dict[int, int] = None,
     ):
         self.k_values = k_values
         self.metrics: Dict[int, List[BaseMetric]] = {
@@ -43,6 +48,8 @@ class Evaluator:
                     train_set=train_set,
                     beta=beta,
                     pop_ratio=pop_ratio,
+                    user_cluster=user_cluster,
+                    item_cluster=item_cluster,
                 )
                 for metric_name in metric_list
             ]
@@ -91,7 +98,7 @@ class Evaluator:
             # Update all metrics on current batches
             for _, metric_instances in self.metrics.items():
                 for metric in metric_instances:
-                    metric.update(predictions, target)
+                    metric.update(predictions, target, start=_start)
 
             _start = _end
 
@@ -110,35 +117,69 @@ class Evaluator:
         Returns:
             Dict[int, Dict[str, float]]: The dictionary containing the results.
         """
-        results = {}
+        results: Dict[int, Dict[str, float]] = {}
         for k, metric_instances in self.metrics.items():
-            results[k] = {
-                metric.name: metric.compute().item() for metric in metric_instances
-            }
+            results[k] = {}
+            for metric in metric_instances:
+                metric_result = metric.compute()
+                if isinstance(metric_result, dict):
+                    # Merge dict entries into results
+                    results[k].update(metric_result)
+                else:
+                    # Single scalar value
+                    results[k][metric.name] = metric_result.item()
         return results
 
     def print_console(
         self,
         res_dict: Dict[int, Dict[str, float]],
-        metrics_list: List[str],
         header: str,
+        max_metrics_per_row: int = 4,  # TODO: Add to config
     ):
         """Utility function to print results using tabulate.
 
         Args:
             res_dict (Dict[int, Dict[str, float]]): The dictionary containing all the results.
-            metrics_list (List[str]): The names of the metrics.
             header (str): The header of the evaluation grid,
                 usually set with the name of evaluation.
+            max_metrics_per_row (int): The number of metrics
+                to print in each row.
         """
-        _tab = []
-        for k, metrics in res_dict.items():
-            _metric_tab: List[Union[str, float]] = ["Top@" + str(k)]
-            for _, score in metrics.items():
-                _metric_tab.append(score)
-            _tab.append(_metric_tab)
-        table = tabulate(_tab, headers=metrics_list, tablefmt="grid")
-        _rlen = len(table.split("\n", maxsplit=1)[0])
-        logger.msg(header.center(_rlen, "-"))
-        for row in table.split("\n"):
-            logger.msg(row)
+        # Collect all unique metric keys across all cutoffs
+        all_metric_keys: set[str] = set()
+        for metrics in res_dict.values():
+            all_metric_keys.update(metrics.keys())
+        sorted_metric_keys = sorted(all_metric_keys)
+
+        # Split metric keys into chunks of size max_metrics_per_row
+        n_chunks = ceil(len(sorted_metric_keys) / max_metrics_per_row)
+        chunks = [
+            sorted_metric_keys[i * max_metrics_per_row : (i + 1) * max_metrics_per_row]
+            for i in range(n_chunks)
+        ]
+
+        # For each chunk, print a table with subset of metric columns
+        for chunk_idx, chunk_keys in enumerate(chunks):
+            _tab = []
+            for k, metrics in res_dict.items():
+                _metric_tab = [f"Top@{k}"]
+                for key in chunk_keys:
+                    _metric_tab.append(str(metrics.get(key, float("nan"))))
+                _tab.append(_metric_tab)
+
+            table = tabulate(
+                _tab,
+                headers=["Cutoff"] + chunk_keys,
+                tablefmt="grid",
+            )
+            _rlen = len(table.split("\n", maxsplit=1)[0])
+            title = header
+            if n_chunks > 1:
+                start_idx = chunk_idx * max_metrics_per_row + 1
+                end_idx = min(
+                    (chunk_idx + 1) * max_metrics_per_row, len(all_metric_keys)
+                )
+                title += f" (metrics {start_idx} - {end_idx})"
+            logger.msg(title.center(_rlen, "-"))
+            for row in table.split("\n"):
+                logger.msg(row)
