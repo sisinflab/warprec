@@ -3,7 +3,7 @@ import torch
 from torch import Tensor
 from scipy.sparse import csr_matrix
 from warprec.utils.registry import metric_registry
-from warprec.evaluation.base_metric import TopKMetric
+from warprec.evaluation.base_metric import TopKMetric, BaseMetric
 
 
 @metric_registry.register("BiasDisparityBD")
@@ -31,6 +31,8 @@ class BiasDisparityBD(TopKMetric):
     For further details, please refer to this `link <https://arxiv.org/pdf/1811.01461>`_.
 
     Attributes:
+        bs_metric (BaseMetric): BiasDisparityBS metric instance.
+        br_metric (BaseMetric): BiasDisparityBR metric instance.
         n_user_clusters (int): Number of user clusters.
         n_item_clusters (int): Number of item clusters.
 
@@ -44,6 +46,8 @@ class BiasDisparityBD(TopKMetric):
         **kwargs (Any): Additional keyword arguments.
     """
 
+    bs_metric: BaseMetric
+    br_metric: BaseMetric
     n_user_clusters: int
     n_item_clusters: int
 
@@ -59,19 +63,17 @@ class BiasDisparityBD(TopKMetric):
     ):
         super().__init__(k, dist_sync_on_step)
 
-        # Local imports to avoid circular import
-        from warprec.evaluation.metrics.fairness.biasdisparitybs import BiasDisparityBS
-        from warprec.evaluation.metrics.fairness.biasdisparitybr import BiasDisparityBR
-
         # Initialize BiasDisparityBS and BiasDisparityBR
-        self.bs_metric = BiasDisparityBS(
+        self.bs_metric = metric_registry.get(
+            "BiasDisparityBS",
             train_set=train_set,
             user_cluster=user_cluster,
             item_cluster=item_cluster,
             dist_sync_on_step=dist_sync_on_step,
             **kwargs,
         )
-        self.br_metric = BiasDisparityBR(
+        self.br_metric = metric_registry.get(
+            "BiasDisparityBR",
             k=k,
             train_set=train_set,
             user_cluster=user_cluster,
@@ -81,8 +83,8 @@ class BiasDisparityBD(TopKMetric):
         )
 
         # Save cluster counts for output formatting
-        self.n_user_clusters = self.bs_metric.n_user_clusters
-        self.n_item_clusters = self.bs_metric.n_item_clusters
+        self.n_user_clusters = self.bs_metric.n_user_clusters  # type: ignore[assignment]
+        self.n_item_clusters = self.bs_metric.n_item_clusters  # type: ignore[assignment]
 
     def update(self, preds: Tensor, target: Tensor, start: int, **kwargs: Any):
         """Updates the metric state with the new batch of predictions."""
