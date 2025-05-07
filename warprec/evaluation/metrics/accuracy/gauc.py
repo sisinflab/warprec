@@ -140,7 +140,8 @@ class GAUC(BaseMetric):
 
     def compute(self):
         """Computes the final metric value."""
-        return self.gauc / self.users if self.users > 0 else torch.tensor(0.0)
+        score = self.gauc / self.users if self.users > 0 else torch.tensor(0.0)
+        return {self.name: score.item()}
 
     def reset(self):
         """Resets the metric state."""

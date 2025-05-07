@@ -109,7 +109,8 @@ class ACLT(TopKMetric):
 
     def compute(self):
         """Computes the final metric value."""
-        return self.long_hits / self.users
+        aclt = self.long_hits / self.users if self.users > 0 else torch.tensor(0.0)
+        return {self.name: aclt.item()}
 
     def reset(self):
         """Resets the metric state."""

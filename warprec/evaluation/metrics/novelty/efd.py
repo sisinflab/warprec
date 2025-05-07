@@ -114,8 +114,9 @@ class EFD(TopKMetric):
 
     def compute(self):
         """Computes the final value of the metric."""
-        return (
+        score = (
             self.efd / (self.users * self.discounted_sum(self.k))
             if self.users > 0
             else torch.tensor(0.0)
         )
+        return {self.name: score.item()}

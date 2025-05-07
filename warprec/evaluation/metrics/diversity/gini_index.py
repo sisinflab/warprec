@@ -82,7 +82,8 @@ class Gini(TopKMetric):
             sorted_counts / self.free_norm
         )
         # Sum contributions and normalize.
-        return 1 - torch.sum(contributions) / (self.num_items - 1)
+        gini_index = torch.sum(contributions) / (self.num_items - 1)
+        return {self.name: gini_index.item()}
 
     def reset(self):
         """Reset the metric state."""

@@ -102,4 +102,5 @@ class MAR(TopKMetric):
 
     def compute(self):
         """Computes the final MAR@K value."""
-        return self.ar_sum / self.users if self.users > 0 else torch.tensor(0.0)
+        mar = self.ar_sum / self.users if self.users > 0 else torch.tensor(0.0)
+        return {self.name: mar.item()}

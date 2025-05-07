@@ -109,7 +109,12 @@ class APLT(TopKMetric):
 
     def compute(self):
         """Computes the final metric value."""
-        return self.long_hits / (self.users * self.k)
+        aplt = (
+            self.long_hits / (self.users * self.k)
+            if self.users > 0
+            else torch.tensor(0.0)
+        )
+        return {self.name: aplt.item()}
 
     def reset(self):
         """Resets the metric state."""

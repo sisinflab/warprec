@@ -101,8 +101,8 @@ class ShannonEntropy(TopKMetric):
         probs = self.item_counts / total_recs
 
         # Compute entropy with numerical stability
-        entropy = -torch.sum(probs * torch.log(probs + 1e-12))  # Avoid log(0)
-        return entropy
+        shannon_entropy = -torch.sum(probs * torch.log(probs + 1e-12))  # Avoid log(0)
+        return {self.name: shannon_entropy.item()}
 
     def reset(self):
         """Reset metric state."""

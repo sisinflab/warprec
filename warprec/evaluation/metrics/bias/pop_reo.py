@@ -148,7 +148,8 @@ class PopREO(TopKMetric):
             return torch.tensor(0.0)
 
         pr = torch.stack([pr_short, pr_long])
-        return torch.std(pr, unbiased=False) / torch.mean(pr)
+        pop_reo = torch.std(pr, unbiased=False) / torch.mean(pr)
+        return {self.name: pop_reo.item()}
 
     def reset(self):
         """Resets the metric state."""

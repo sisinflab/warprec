@@ -122,12 +122,7 @@ class Evaluator:
             results[k] = {}
             for metric in metric_instances:
                 metric_result = metric.compute()
-                if isinstance(metric_result, dict):
-                    # Merge dict entries into results
-                    results[k].update(metric_result)
-                else:
-                    # Single scalar value
-                    results[k][metric.name] = metric_result.item()
+                results[k].update(metric_result)
         return results
 
     def print_console(

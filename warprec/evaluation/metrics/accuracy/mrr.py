@@ -88,8 +88,9 @@ class MRR(TopKMetric):
 
     def compute(self):
         """Computes the final MRR@K value."""
-        return (
+        mrr = (
             self.reciprocal_rank_sum / self.users
             if self.users > 0
             else torch.tensor(0.0)
         )
+        return {self.name: mrr.item()}

@@ -76,11 +76,12 @@ class Recall(TopKMetric):
 
     def compute(self):
         """Computes the final metric value."""
-        return (
+        recall = (
             self.correct / self.total_relevant
             if self.total_relevant > 0
             else torch.tensor(0.0)
         )
+        return {self.name: recall.item()}
 
     def reset(self):
         """Resets the metric state."""

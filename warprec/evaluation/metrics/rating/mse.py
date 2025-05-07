@@ -65,11 +65,12 @@ class MSE(BaseMetric):
 
     def compute(self):
         """Computes the final metric value."""
-        return (
+        mse = (
             self.sum_squared_errors / self.total_count
             if self.total_count > 0
             else torch.tensor(0.0)
         )
+        return {self.name: mse.item()}
 
     def reset(self):
         """Reset the metric state."""

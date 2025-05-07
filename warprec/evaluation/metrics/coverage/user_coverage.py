@@ -13,7 +13,7 @@ class UserCoverage(TopKMetric):
        that received at least one recommendation.
 
     Attributes:
-        covered_users (Tensor): The number of users with at least one recommendation.
+        user_coverage (Tensor): The number of users with at least one recommendation.
 
     Args:
         k (int): The cutoff.
@@ -22,23 +22,23 @@ class UserCoverage(TopKMetric):
         **kwargs (Any): The keyword argument dictionary.
     """
 
-    covered_users: Tensor
+    user_coverage: Tensor
 
     def __init__(
         self, k: int, *args: Any, dist_sync_on_step: bool = False, **kwargs: Any
     ):
         super().__init__(k, dist_sync_on_step)
-        self.add_state("covered_users", default=torch.tensor(0.0), dist_reduce_fx="sum")
+        self.add_state("user_coverage", default=torch.tensor(0.0), dist_reduce_fx="sum")
 
     def update(self, preds: Tensor, target: Tensor, **kwargs: Any):
         """Updates the metric state with the new batch of predictions."""
         top_k = torch.topk(preds, self.k, dim=1).indices
-        self.covered_users += top_k.shape[0]
+        self.user_coverage += top_k.shape[0]
 
     def compute(self):
         """Computes the final metric value."""
-        return self.covered_users
+        return {self.name: self.user_coverage.item()}
 
     def reset(self):
         """Resets the metric state."""
-        self.covered_users.zero_()
+        self.user_coverage.zero_()

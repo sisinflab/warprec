@@ -76,7 +76,8 @@ class HitRate(TopKMetric):
 
     def compute(self):
         """Computes the final metric value."""
-        return self.hits / self.users if self.users > 0 else torch.tensor(0.0)
+        hr = self.hits / self.users if self.users > 0 else torch.tensor(0.0)
+        return {self.name: hr.item()}
 
     def reset(self):
         """Resets the metric state."""

@@ -41,7 +41,8 @@ class ItemCoverage(TopKMetric):
             return torch.tensor(0.0)
         all_items_tensor = torch.cat(self.unique_items, dim=0)
         unique_items: Tensor = torch.unique(all_items_tensor)
-        return torch.tensor(unique_items.numel())
+        item_coverage = torch.tensor(unique_items.numel())
+        return {self.name: item_coverage.item()}
 
     def reset(self):
         """Resets the metric state."""

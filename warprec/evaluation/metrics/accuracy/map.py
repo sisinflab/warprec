@@ -103,4 +103,5 @@ class MAP(TopKMetric):
 
     def compute(self):
         """Computes the final MAP@K value."""
-        return self.ap_sum / self.users if self.users > 0 else torch.tensor(0.0)
+        map = self.ap_sum / self.users if self.users > 0 else torch.tensor(0.0)
+        return {self.name: map.item()}

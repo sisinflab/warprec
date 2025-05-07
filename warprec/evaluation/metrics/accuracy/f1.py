@@ -90,7 +90,7 @@ class F1(TopKMetric):
             if precision + recall > 0
             else torch.tensor(0.0)
         )
-        return f1_score
+        return {self.name: f1_score.item()}
 
     def reset(self):
         """Resets the metric state."""

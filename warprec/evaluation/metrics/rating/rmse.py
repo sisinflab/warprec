@@ -66,11 +66,11 @@ class RMSE(BaseMetric):
     def compute(self):
         """Computes the final metric value."""
         mse = (
-            self.sum_squared_errors / self.total_count
+            torch.sqrt(self.sum_squared_errors / self.total_count)
             if self.total_count > 0
             else torch.tensor(0.0)
         )
-        return torch.sqrt(mse)
+        return {self.name: mse.item()}
 
     def reset(self):
         """Reset the metric state."""

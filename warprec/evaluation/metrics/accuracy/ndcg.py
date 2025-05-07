@@ -106,7 +106,8 @@ class nDCG(TopKMetric):
 
     def compute(self):
         """Computes the final metric value."""
-        return self.ndcg / self.users if self.users > 0 else torch.tensor(0.0)
+        ndcg = self.ndcg / self.users if self.users > 0 else torch.tensor(0.0)
+        return {self.name: ndcg.item()}
 
     def reset(self):
         """Resets the metric state."""
