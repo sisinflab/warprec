@@ -18,11 +18,15 @@ class Dataset(ABC):
         val_set (Interactions): Validation set, not mandatory,
             used during training to validate the process.
         test_set (Interactions): Test set, not mandatory, used in evaluation to calculate metrics.
+        user_cluster (Optional[dict]): User cluster information.
+        item_cluster (Optional[dict]): Item cluster information.
     """
 
     train_set: Interactions = None
     val_set: Interactions = None
     test_set: Interactions = None
+    user_cluster: Optional[dict] = None
+    item_cluster: Optional[dict] = None
 
     def __init__(self):
         # Set mappings
@@ -184,20 +188,24 @@ class TransactionDataset(Dataset):
 
         # Save user and item cluster information inside the dataset
         self.user_cluster = (
-            dict(
-                zip(
+            {
+                self._umap[user_id]: cluster
+                for user_id, cluster in zip(
                     user_cluster[user_label], user_cluster["cluster"]
                 )  # TODO: use config
-            )
+                if user_id in self._umap
+            }
             if user_cluster is not None
             else None
         )
         self.item_cluster = (
-            dict(
-                zip(
+            {
+                self._imap[item_id]: cluster
+                for item_id, cluster in zip(
                     item_cluster[item_label], item_cluster["cluster"]
                 )  # TODO: use config
-            )
+                if item_id in self._imap
+            }
             if item_cluster is not None
             else None
         )
