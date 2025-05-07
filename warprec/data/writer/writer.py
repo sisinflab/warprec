@@ -166,12 +166,10 @@ class LocalWriter(Writer):
         else:
             _path = _path + "_Test" + writing_params.ext
 
-        df = self._result_to_dataframe(result_dict, metric_names, top_k)
+        df = self._result_to_dataframe(result_dict, top_k)
         df.to_csv(_path, sep=writing_params.sep)
 
-    def _result_to_dataframe(
-        self, result_dict: dict, metric_names: List[str], top_k: List[int]
-    ) -> DataFrame:
+    def _result_to_dataframe(self, result_dict: dict, top_k: List[int]) -> DataFrame:
         """This is a utility method to transform a dictionary of
         results in the corresponding DataFrame format.
 
@@ -179,21 +177,26 @@ class LocalWriter(Writer):
             result_dict (dict): The dictionary containing the results.
                 The first index is the top_k integer, the second
                 the name of the metric.
-            metric_names (List[str]): The names of the metrics to be retrieved from the dictionary.
             top_k (List[int]): The list of top_k, or cutoffs, to retrieve from dictionary.
 
         Returns:
             DataFrame: The DataFrame format of the results.
         """
+        # Collect all unique metric keys across all k
+        all_metric_keys = set()
+        for k in top_k:
+            all_metric_keys.update(result_dict[k].keys())
+        sorted_metric_keys = sorted(all_metric_keys)
+
         result_list = []
         indexes = ["Top@" + str(k) for k in top_k]
         for k in top_k:
             row = []
-            for metric in metric_names:
-                row.append(result_dict[k][metric])
+            for metric in sorted_metric_keys:
+                row.append(result_dict[k].get(metric, float("nan")))
             result_list.append(row)
         result_array = np.array(result_list)
-        return pd.DataFrame(result_array, columns=metric_names, index=indexes)
+        return pd.DataFrame(result_array, columns=sorted_metric_keys, index=indexes)
 
     def write_recs(
         self,
