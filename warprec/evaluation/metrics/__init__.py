@@ -14,7 +14,7 @@ from .accuracy import (
 from .bias import ACLT, APLT, ARP, PopREO, PopRSP
 from .coverage import ItemCoverage, UserCoverage
 from .diversity import Gini, ShannonEntropy
-from .fairness import BiasDisparityBS
+from .fairness import BiasDisparityBR, BiasDisparityBS
 from .novelty import EFD, EPC
 from .rating import MAE, MSE, RMSE
 
@@ -39,6 +39,7 @@ __all__ = [
     "UserCoverage",
     "Gini",
     "ShannonEntropy",
+    "BiasDisparityBR",
     "BiasDisparityBS",
     "EFD",
     "EPC",
