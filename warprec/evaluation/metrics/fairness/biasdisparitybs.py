@@ -41,6 +41,7 @@ class BiasDisparityBS(BaseMetric):
 
     Args:
         train_set (csr_matrix): Sparse matrix of training interactions (users x items).
+        *args (Any): The argument list.
         user_cluster (Optional[Dict[int, int]]): Mapping from user IDs to user cluster IDs.
         item_cluster (Optional[Dict[int, int]]): Mapping from item IDs to item cluster IDs.
         dist_sync_on_step (bool): Whether to synchronize metric state across distributed processes.
@@ -56,6 +57,7 @@ class BiasDisparityBS(BaseMetric):
     def __init__(
         self,
         train_set: csr_matrix,
+        *args: Any,
         user_cluster: Optional[Dict[int, int]] = None,
         item_cluster: Optional[Dict[int, int]] = None,
         dist_sync_on_step: bool = False,
@@ -142,3 +144,8 @@ class BiasDisparityBS(BaseMetric):
                 key = f"{self.name}_UC{uc}_IC{ic}"
                 results[key] = bias_src[uc, ic].item()
         return results
+
+    def reset(self):
+        """Resets the metric state."""
+        self.category_sum.zero_()
+        self.total_sum.zero_()
