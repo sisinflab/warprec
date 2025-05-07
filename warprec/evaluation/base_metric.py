@@ -12,7 +12,7 @@ class BaseMetric(Metric, ABC):
     """The base definition of a metric using Torchmetrics."""
 
     @abstractmethod
-    def compute(self):
+    def compute(self) -> dict[str, float]:
         pass
 
     def binary_relevance(self, target: Tensor) -> Tensor:
