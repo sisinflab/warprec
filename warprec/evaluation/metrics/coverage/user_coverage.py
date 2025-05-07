@@ -30,7 +30,7 @@ class UserCoverage(TopKMetric):
         super().__init__(k, dist_sync_on_step)
         self.add_state("covered_users", default=torch.tensor(0.0), dist_reduce_fx="sum")
 
-    def update(self, preds: Tensor, target: Tensor):
+    def update(self, preds: Tensor, target: Tensor, **kwargs: Any):
         """Updates the metric state with the new batch of predictions."""
         top_k = torch.topk(preds, self.k, dim=1).indices
         self.covered_users += top_k.shape[0]

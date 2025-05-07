@@ -81,7 +81,7 @@ class MAP(TopKMetric):
         self.add_state("ap_sum", default=torch.tensor(0.0), dist_reduce_fx="sum")
         self.add_state("users", default=torch.tensor(0.0), dist_reduce_fx="sum")
 
-    def update(self, preds: Tensor, target: Tensor):
+    def update(self, preds: Tensor, target: Tensor, **kwargs: Any):
         """Updates the MAP metric state with a batch of predictions."""
         target = self.binary_relevance(target)
         top_k = torch.topk(preds, self.k, dim=1).indices

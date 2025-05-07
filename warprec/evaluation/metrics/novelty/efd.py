@@ -94,7 +94,7 @@ class EFD(TopKMetric):
         self.add_state("efd", default=torch.tensor(0.0), dist_reduce_fx="sum")
         self.add_state("users", default=torch.tensor(0.0), dist_reduce_fx="sum")
 
-    def update(self, preds: Tensor, target: Tensor):
+    def update(self, preds: Tensor, target: Tensor, **kwargs: Any):
         """Updates the metric state with a new batch of predictions."""
         target = self.binary_relevance(target)
         top_k = torch.topk(preds, self.k, dim=1, largest=True, sorted=True).indices

@@ -88,7 +88,7 @@ class nDCG(TopKMetric):
         self.add_state("ndcg", default=torch.tensor(0.0), dist_reduce_fx="sum")
         self.add_state("users", default=torch.tensor(0.0), dist_reduce_fx="sum")
 
-    def update(self, preds: Tensor, target: Tensor):
+    def update(self, preds: Tensor, target: Tensor, **kwargs: Any):
         """Updates the metric state with the new batch of predictions."""
         # The discounted relevance is computed as 2^(rel + 1) - 1
         target = self.discounted_relevance(target)
