@@ -16,7 +16,7 @@ class UserCoverageAtN(TopKMetric):
     recommendation list for users.
 
     The metric formula is defined as:
-        UserCoverageAtN = (1 / N_total) * sum_{u=1}^{N_total} [|L_u| >= k]
+        UserCoverageAtN = sum_{u=1}^{N_total} [|L_u| >= k]
 
     where:
         - N_total is the total number of users processed across all batches.
