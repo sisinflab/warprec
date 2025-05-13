@@ -1,7 +1,9 @@
 from typing import List, Optional
 
+import re
 from pydantic import BaseModel, field_validator
 from warprec.utils.registry import metric_registry
+from warprec.utils.logger import logger
 
 
 class EvaluationConfig(BaseModel):
@@ -38,11 +40,48 @@ class EvaluationConfig(BaseModel):
     def metrics_validator(cls, v: List[str]):
         """Validate metrics."""
         for metric in v:
+            # Check for F1-extended metric
+            match = re.match(
+                r"F1\[\s*(.*?)\s*,\s*(.*?)\s*\]", metric
+            )  # Expected syntax: F1[metric_1, metric_2]
+
+            if match:
+                # Extract sub metrics
+                metric_1 = match.group(1)
+                metric_2 = match.group(2)
+
+                # Check if sub metrics exists inside registry
+                if metric_1.upper() not in metric_registry.list_registered():
+                    raise ValueError(
+                        f"In {metric} the sub metric {metric_1} not in metric registry. This is the list"
+                        f"of supported metrics: {metric_registry.list_registered()}"
+                    )
+
+                if metric_2.upper() not in metric_registry.list_registered():
+                    raise ValueError(
+                        f"In {metric} the sub metric {metric_2} not in metric registry. This is the list"
+                        f"of supported metrics: {metric_registry.list_registered()}"
+                    )
+
+                continue  # Skip normal metric check
+
+            # Check for normal metrics
             if metric.upper() not in metric_registry.list_registered():
                 raise ValueError(
                     f"Metric {metric} not in metric registry. This is the list"
                     f"of supported metrics: {metric_registry.list_registered()}"
                 )
+
+        # Check for duplicates
+        len_before = len(v)
+        v = list(set(v))
+        len_after = len(v)
+
+        if len_after < len_before:
+            logger.attention(
+                f"Duplicated metrics found inside evaluation. "
+                f"{len_before - len_after} metrics removed."
+            )
         return v
 
     @field_validator("beta")

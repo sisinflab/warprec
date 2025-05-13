@@ -1,6 +1,7 @@
 from typing import List, Dict
 
 import torch
+import re
 from scipy.sparse import csr_matrix
 from tabulate import tabulate
 from math import ceil
@@ -40,21 +41,42 @@ class Evaluator:
         item_cluster: Dict[int, int] = None,
     ):
         self.k_values = k_values
-        self.metrics: Dict[int, List[BaseMetric]] = {
-            k: [
-                metric_registry.get(
-                    metric_name,
-                    k=k,
-                    train_set=train_set,
-                    beta=beta,
-                    pop_ratio=pop_ratio,
-                    user_cluster=user_cluster,
-                    item_cluster=item_cluster,
-                )
-                for metric_name in metric_list
-            ]
-            for k in k_values
-        }
+        self.metrics: Dict[int, List[BaseMetric]] = {}
+
+        for k in self.k_values:
+            self.metrics[k] = []
+            for metric_name in metric_list:
+                # Check for F1-extended
+                match = re.match(r"F1\[\s*(.*?)\s*,\s*(.*?)\s*\]", metric_name)
+
+                if match:
+                    metric_1 = match.group(1)
+                    metric_2 = match.group(2)
+
+                    # F1-extended custom initialization
+                    metric_instance = metric_registry.get(
+                        "F1",
+                        k=k,
+                        train_set=train_set,
+                        beta=beta,
+                        pop_ratio=pop_ratio,
+                        user_cluster=user_cluster,
+                        item_cluster=item_cluster,
+                        metric_name_1=metric_1,
+                        metric_name_2=metric_2,
+                    )
+
+                else:
+                    metric_instance = metric_registry.get(
+                        metric_name,
+                        k=k,
+                        train_set=train_set,
+                        beta=beta,
+                        pop_ratio=pop_ratio,
+                        user_cluster=user_cluster,
+                        item_cluster=item_cluster,
+                    )
+                self.metrics[k].append(metric_instance)
 
     def evaluate(
         self,
