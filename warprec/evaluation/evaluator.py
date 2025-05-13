@@ -43,39 +43,38 @@ class Evaluator:
         self.k_values = k_values
         self.metrics: Dict[int, List[BaseMetric]] = {}
 
+        common_params = {
+            "train_set": train_set,
+            "beta": beta,
+            "pop_ratio": pop_ratio,
+            "user_cluster": user_cluster,
+            "item_cluster": item_cluster,
+        }
+
         for k in self.k_values:
             self.metrics[k] = []
-            for metric_name in metric_list:
+            for metric_string in metric_list:
+                metric_name = metric_string
+                metric_params = {}
+
                 # Check for F1-extended
-                match = re.match(r"F1\[\s*(.*?)\s*,\s*(.*?)\s*\]", metric_name)
+                match = re.match(r"F1\[\s*(.*?)\s*,\s*(.*?)\s*\]", metric_string)
 
                 if match:
-                    metric_1 = match.group(1)
-                    metric_2 = match.group(2)
+                    metric_name = "F1"  # Generic name for F1-Extended
 
-                    # F1-extended custom initialization
-                    metric_instance = metric_registry.get(
-                        "F1",
-                        k=k,
-                        train_set=train_set,
-                        beta=beta,
-                        pop_ratio=pop_ratio,
-                        user_cluster=user_cluster,
-                        item_cluster=item_cluster,
-                        metric_name_1=metric_1,
-                        metric_name_2=metric_2,
-                    )
+                    # Retrieve sub metric names
+                    # validation has been done inside Pydantic
+                    metric_params["metric_name_1"] = match.group(1)
+                    metric_params["metric_name_2"] = match.group(2)
 
-                else:
-                    metric_instance = metric_registry.get(
-                        metric_name,
-                        k=k,
-                        train_set=train_set,
-                        beta=beta,
-                        pop_ratio=pop_ratio,
-                        user_cluster=user_cluster,
-                        item_cluster=item_cluster,
-                    )
+                # Generic metric initialization
+                metric_instance = metric_registry.get(
+                    metric_name,
+                    k=k,
+                    **common_params,
+                    **metric_params,  # Add specific params if needed
+                )
                 self.metrics[k].append(metric_instance)
 
     def evaluate(
