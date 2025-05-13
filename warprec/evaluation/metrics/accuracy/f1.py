@@ -3,7 +3,8 @@ from typing import Any
 
 import torch
 from torch import Tensor
-from warprec.evaluation.base_metric import TopKMetric
+from scipy.sparse import csr_matrix
+from warprec.evaluation.base_metric import TopKMetric, BaseMetric
 from warprec.utils.registry import metric_registry
 
 
@@ -25,25 +26,25 @@ class F1(TopKMetric):
     and this `link <https://en.wikipedia.org/wiki/Precision_and_recall>`_.
 
     Attributes:
-        correct (Tensor): The number of hits in the top-k recommendations.
-        total_relevant (Tensor): The number of real hits in user transactions.
-        users (Tensor): The number of users evaluated.
+        metric_1 (BaseMetric): First metric to use inside F1-score computation.
+        metric_2 (BaseMetric): Second metric to use inside F1-score computation.
 
     Args:
         k (int): The number of top recommendations to consider (cutoff).
+        train_set (csr_matrix): Sparse matrix of training interactions (users x items).
         *args (Any): Additional arguments to pass to the parent class.
         beta (float): The weight of recall in the harmonic mean. Default is 1.0.
         dist_sync_on_step (bool): Torchmetrics parameter.
         **kwargs (Any): Additional keyword arguments to pass to the parent class.
     """
 
-    correct: Tensor
-    total_relevant: Tensor
-    users: Tensor
+    metric_1: BaseMetric
+    metric_2: BaseMetric
 
     def __init__(
         self,
         k: int,
+        train_set: csr_matrix,
         *args: Any,
         beta: float = 1.0,
         dist_sync_on_step: bool = False,
@@ -51,49 +52,44 @@ class F1(TopKMetric):
     ):
         super().__init__(k, dist_sync_on_step)
         self.beta = beta
-        self.add_state("correct", default=torch.tensor(0.0), dist_reduce_fx="sum")
-        self.add_state(
-            "total_relevant", default=torch.tensor(0.0), dist_reduce_fx="sum"
+        self.metric_1 = metric_registry.get(
+            "Precision",
+            k=k,
+            train_set=train_set,
+            dist_sync_on_step=dist_sync_on_step,
+            **kwargs,
         )
-        self.add_state("users", default=torch.tensor(0.0), dist_reduce_fx="sum")
+        self.metric_2 = metric_registry.get(
+            "Recall",
+            k=k,
+            train_set=train_set,
+            dist_sync_on_step=dist_sync_on_step,
+            **kwargs,
+        )
 
     def update(self, preds: Tensor, target: Tensor, **kwargs: Any):
         """Updates the metric state with the new batch of predictions."""
-        target = self.binary_relevance(target)
-        top_k = torch.topk(preds, self.k, dim=1).indices
-        rel = torch.gather(target, 1, top_k)
+        # Update first metric
+        self.metric_1.update(preds, target, **kwargs)
 
-        # Update precision and recall
-        self.correct += rel.sum().float()
-        self.total_relevant += target.sum().float()
-
-        # Count only users with at least one interaction
-        self.users += (target > 0).any(dim=1).sum().item()
+        # Update second metric
+        self.metric_2.update(preds, target, **kwargs)
 
     def compute(self):
         """Computes the F1 score using precision and recall."""
-        precision = (
-            self.correct / (self.users * self.k)
-            if self.users > 0
-            else torch.tensor(0.0)
-        )
-        recall = (
-            self.correct / self.total_relevant
-            if self.total_relevant > 0
-            else torch.tensor(0.0)
-        )
+        score_1 = self.metric_1.compute().get("Precision", 0)
+        score_2 = self.metric_2.compute().get("Recall", 0)
 
         f1_score = (
             (1 + self.beta**2)
-            * (precision * recall)
-            / (self.beta**2 * precision + recall)
-            if precision + recall > 0
+            * (score_1 * score_2)
+            / (self.beta**2 * score_1 + score_2)
+            if score_1 + score_2 > 0
             else torch.tensor(0.0)
         )
-        return {self.name: f1_score.item()}
+        return {self.name: f1_score}
 
     def reset(self):
         """Resets the metric state."""
-        self.correct.zero_()
-        self.total_relevant.zero_()
-        self.users.zero_()
+        self.metric_1.reset()
+        self.metric_2.reset()
