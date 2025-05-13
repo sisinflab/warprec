@@ -39,16 +39,23 @@ class EvaluationConfig(BaseModel):
     @classmethod
     def metrics_validator(cls, v: List[str]):
         """Validate metrics."""
+        supported_relevance = ["binary", "discounted"]
+
         for metric in v:
             # Check for F1-extended metric
-            match = re.match(
+            match_f1 = re.match(
                 r"F1\[\s*(.*?)\s*,\s*(.*?)\s*\]", metric
             )  # Expected syntax: F1[metric_1, metric_2]
 
-            if match:
+            # Check for EFD or EPC extended metric
+            match_efd_epc = re.match(
+                r"(EFD|EPC)\[\s*(.*?)\s*\]", metric
+            )  # Expected syntax: EFD[value] or EPC[value]
+
+            if match_f1:
                 # Extract sub metrics
-                metric_1 = match.group(1)
-                metric_2 = match.group(2)
+                metric_1 = match_f1.group(1)
+                metric_2 = match_f1.group(2)
 
                 # Check if sub metrics exists inside registry
                 if metric_1.upper() not in metric_registry.list_registered():
@@ -61,6 +68,17 @@ class EvaluationConfig(BaseModel):
                     raise ValueError(
                         f"In {metric} the sub metric {metric_2} not in metric registry. This is the list"
                         f"of supported metrics: {metric_registry.list_registered()}"
+                    )
+
+                continue  # Skip normal metric check
+
+            elif match_efd_epc:
+                relevance = match_efd_epc.group(2)
+
+                if relevance.lower() not in supported_relevance:
+                    raise ValueError(
+                        f"In {metric} the relevance score {relevance} is not supported. "
+                        f"These are the supported relevance scores: {supported_relevance}."
                     )
 
                 continue  # Skip normal metric check

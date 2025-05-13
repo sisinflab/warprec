@@ -58,15 +58,23 @@ class Evaluator:
                 metric_params = {}
 
                 # Check for F1-extended
-                match = re.match(r"F1\[\s*(.*?)\s*,\s*(.*?)\s*\]", metric_string)
+                match_f1 = re.match(r"F1\[\s*(.*?)\s*,\s*(.*?)\s*\]", metric_string)
+                match_efd_epc = re.match(r"(EFD|EPC)\[\s*(.*?)\s*\]", metric_string)
 
-                if match:
+                if match_f1:
                     metric_name = "F1"  # Generic name for F1-Extended
 
                     # Retrieve sub metric names
                     # validation has been done inside Pydantic
-                    metric_params["metric_name_1"] = match.group(1)
-                    metric_params["metric_name_2"] = match.group(2)
+                    metric_params["metric_name_1"] = match_f1.group(1)
+                    metric_params["metric_name_2"] = match_f1.group(2)
+
+                if match_efd_epc:
+                    metric_name = match_efd_epc.group(1)
+
+                    # Retrieve relevance
+                    # validation has been done inside Pydantic
+                    metric_params["relevance"] = match_efd_epc.group(2)
 
                 # Generic metric initialization
                 metric_instance = metric_registry.get(

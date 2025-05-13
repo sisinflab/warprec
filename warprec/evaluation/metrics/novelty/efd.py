@@ -73,6 +73,7 @@ class EFD(TopKMetric):
         train_set (csr_matrix): The training interaction data.
         *args (Any): Additional arguments.
         dist_sync_on_step (bool): Torchmetrics parameter.
+        relevance (str): The type of relevance to use for computation.
         **kwargs (Any): Additional keyword arguments.
     """
 
@@ -85,18 +86,24 @@ class EFD(TopKMetric):
         train_set: csr_matrix,
         *args: Any,
         dist_sync_on_step: bool = False,
+        relevance: str = "binary",
         **kwargs: Any,
     ):
         super().__init__(k, dist_sync_on_step)
         self.novelty_profile = self.compute_novelty_profile(
             train_set, log_discount=True
         ).unsqueeze(0)
+        self.relevance = relevance
         self.add_state("efd", default=torch.tensor(0.0), dist_reduce_fx="sum")
         self.add_state("users", default=torch.tensor(0.0), dist_reduce_fx="sum")
 
     def update(self, preds: Tensor, target: Tensor, **kwargs: Any):
         """Updates the metric state with a new batch of predictions."""
-        target = self.binary_relevance(target)
+        if self.relevance == "discounted":
+            target = self.discounted_relevance(target)
+        else:
+            target = self.binary_relevance(target)
+
         top_k = torch.topk(preds, self.k, dim=1, largest=True, sorted=True).indices
         rel = torch.gather(target, 1, top_k).float()
 
@@ -120,3 +127,10 @@ class EFD(TopKMetric):
             else torch.tensor(0.0)
         )
         return {self.name: score.item()}
+
+    @property
+    def name(self):
+        """The name of the metric."""
+        if self.relevance == "binary":
+            return self.__class__.__name__
+        return f"EFD[{self.relevance}]"
