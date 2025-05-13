@@ -87,19 +87,18 @@ class UserMADRanking(TopKMetric):
     def update(self, preds: Tensor, target: Tensor, start: int, **kwargs: Any):
         """Updates the metric state with the new batch of predictions."""
         # Apply discounted relevance (2^rel - 1) to target
-        discounted = self.discounted_relevance(target)
+        target = self.discounted_relevance(target)
 
         # Top-k item indices by prediction
-        topk = torch.topk(preds, self.k, dim=1, largest=True, sorted=True)
-        topk_idx, _ = topk.indices, topk.values  # indices: (batch, k)
+        top_k_indices = torch.topk(
+            preds, self.k, dim=1, largest=True, sorted=True
+        ).indices
 
         # Gather relevance at top-k
-        rel = discounted.gather(1, topk_idx)
+        rel = torch.gather(target, 1, top_k_indices)
 
         # Compute ideal (best) relevance for IDCG
-        ideal_rel = torch.topk(
-            discounted, self.k, dim=1, largest=True, sorted=True
-        ).values
+        ideal_rel = torch.topk(target, self.k, dim=1, largest=True, sorted=True).values
 
         # Compute DCG and IDCG per user
         dcg_score = self.dcg(rel)
