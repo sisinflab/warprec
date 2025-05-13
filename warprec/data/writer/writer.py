@@ -206,6 +206,7 @@ class LocalWriter(Writer):
         ext: str = ".tsv",
         user_label: str = "user_id",
         item_label: str = "item_id",
+        rating_label: str = "rating",
     ) -> None:
         """This method writes recommendations in the local path.
 
@@ -216,12 +217,17 @@ class LocalWriter(Writer):
             ext (str): The extension of the file.
             user_label (str): The label of the user data.
             item_label (str): The label of the item data.
+            rating_label (str): The label of the rating data.
         """
         if self.config:
             writing_params = self.config.writer.writing_params
         else:
             writing_params = WritingParams(
-                sep=sep, ext=ext, user_label=user_label, item_label=item_label
+                sep=sep,
+                ext=ext,
+                user_label=user_label,
+                item_label=item_label,
+                rating_label=rating_label,
             )
 
         # experiment_path/recs/model_name.{custom_extension}
@@ -237,6 +243,7 @@ class LocalWriter(Writer):
             header=[
                 writing_params.user_label,
                 writing_params.item_label,
+                writing_params.rating_label,
             ],
             index=None,
         )
