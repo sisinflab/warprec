@@ -41,7 +41,7 @@ class ItemMADRanking(TopKMetric):
         n_items (int): Total number of items.
 
     Args:
-        k (int): Cutoff for top-k recommendations (used by BiasDisparityBR).
+        k (int): Cutoff for top-k recommendations.
         train_set (csr_matrix): Sparse matrix of training interactions (users x items).
         *args (Any): The argument list.
         item_cluster (Optional[Dict[int, int]]): Mapping from item IDs to item cluster IDs.
