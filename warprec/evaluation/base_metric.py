@@ -24,7 +24,7 @@ class BaseMetric(Metric, ABC):
         Returns:
             Tensor: The binary relevance tensor.
         """
-        return target.clone().clamp(max=1)
+        return (target > 0).int()
 
     def discounted_relevance(self, target: Tensor) -> Tensor:
         """Compute the discounted relevance tensor.
