@@ -25,6 +25,8 @@ class NumRetrieved(TopKMetric):
           Since the prediction tensor usually has scores for all possible items,
           |L_u| is effectively the total number of items.
 
+    For further details, please refer to the `link <https://github.com/RankSys/RankSys/blob/master/RankSys-metrics/src/main/java/es/uam/eps/ir/ranksys/metrics/basic/NumRetrieved.java>`_
+
     Attributes:
         cumulative_count (Tensor): Sum of retrieved items per user.
         users (Tensor): Number of user with at least 1 relevant item.
