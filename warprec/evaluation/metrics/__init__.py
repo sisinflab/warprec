@@ -19,7 +19,9 @@ from .fairness import (
     BiasDisparityBR,
     BiasDisparityBS,
     ItemMADRanking,
+    ItemMADRating,
     UserMADRanking,
+    UserMADRating,
 )
 from .novelty import EFD, EPC
 from .rating import MAE, MSE, RMSE
@@ -49,7 +51,9 @@ __all__ = [
     "BiasDisparityBR",
     "BiasDisparityBS",
     "ItemMADRanking",
+    "ItemMADRating",
     "UserMADRanking",
+    "UserMADRating",
     "EFD",
     "EPC",
     "MAE",
