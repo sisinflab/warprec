@@ -93,7 +93,7 @@ class Recommender(nn.Module, ABC):
         batch_size: int = 1024,
     ) -> DataFrame:
         """This method turns the learned parameters into new
-        recommendations in DataFrame format.
+        recommendations in DataFrame format, without column headers.
 
         Args:
             X (Interactions): The set that will be used to
@@ -104,7 +104,8 @@ class Recommender(nn.Module, ABC):
             batch_size (int): Number of users per batch
 
         Returns:
-            DataFrame: A DataFrame containing the top k recommendations for each user.
+            DataFrame: A DataFrame (without header) containing the top k recommendations
+                    for each user, including predicted ratings.
         """
         sparse_matrix = X.get_sparse()
         num_users = sparse_matrix.shape[0]
@@ -119,32 +120,36 @@ class Recommender(nn.Module, ABC):
                 sparse_matrix[batch_slice], start=batch_start, end=batch_end
             )
 
-            # Get top-k items for current batch
-            top_k_items = torch.topk(batch_scores, k, dim=1).indices
+            # Get top-k items and their scores for current batch
+            top_k_scores, top_k_items = torch.topk(batch_scores, k, dim=1)
+
             batch_users = (
                 torch.arange(batch_start, batch_end).unsqueeze(1).expand(-1, k)
             )
 
-            # Store batch recommendations
-            batch_recs = torch.stack((batch_users, top_k_items), dim=2).reshape(-1, 2)
+            # Store batch recommendations with scores
+            batch_recs = torch.stack(
+                (batch_users, top_k_items, top_k_scores), dim=2
+            ).reshape(-1, 3)
             all_recommendations.append(batch_recs)
 
         # Combine all batches
         recommendations = torch.cat(all_recommendations, dim=0)
 
-        # Extract user and items idxs
+        # Extract user, item indices and predicted scores
         user_idxs = recommendations[:, 0].tolist()
         item_idxs = recommendations[:, 1].tolist()
+        pred_scores = recommendations[:, 2].tolist()
 
         # Map them back to original labels
-        user_label = [umap_i[idx] for idx in user_idxs]
-        item_label = [imap_i[idx] for idx in item_idxs]
+        user_labels = [umap_i[idx] for idx in user_idxs]
+        item_labels = [imap_i[idx] for idx in item_idxs]
 
-        # Zip array and turn it into DataFrame
-        real_recs = np.array(list(zip(user_label, item_label)))
-        recommendations = pd.DataFrame(real_recs)
+        # Zip and turn into DataFrame (no header)
+        real_recs = np.array(list(zip(user_labels, item_labels, pred_scores)))
+        recommendations_df = pd.DataFrame(real_recs)
 
-        return recommendations
+        return recommendations_df
 
     def init_params(self, params: dict):
         """This method sets up the model with the correct parameters.

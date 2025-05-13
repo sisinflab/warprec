@@ -14,12 +14,14 @@ class WritingParams(BaseModel):
         ext (str): The extension of the recommendation files.
         user_label (str): The user label in the header of the file.
         item_label (str): The item label in the header of the file.
+        rating_label (str): The rating label in the header of the file.
     """
 
     sep: str = "\t"
     ext: str = ".tsv"
     user_label: str = "user_id"
     item_label: str = "item_id"
+    rating_label: str = "rating"
 
     @field_validator("sep")
     @classmethod
