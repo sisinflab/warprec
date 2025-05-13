@@ -10,6 +10,7 @@ class EvaluationConfig(BaseModel):
     Attributes:
         top_k (List[int]): List of cutoffs to evaluate.
         metrics (List[str]): List of metrics to compute during evaluation.
+        max_metric_per_row (Optional[int]): Number of metrics to show in each row on console.
         beta (Optional[float]): The beta value used in some metrics like F1 score.
         pop_ratio (Optional[float]): The percentage of item transactions that
             will be considered popular.
@@ -18,6 +19,7 @@ class EvaluationConfig(BaseModel):
 
     top_k: List[int]
     metrics: List[str]
+    max_metric_per_row: Optional[int] = 4
     beta: Optional[float] = 1.0
     pop_ratio: Optional[float] = 0.8
     save_evaluation: Optional[bool] = True

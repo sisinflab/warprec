@@ -129,12 +129,14 @@ def main(args: Namespace):
         if dataset.val_set is not None:
             evaluator.evaluate(best_model, dataset, test_set=False, verbose=True)
             results = evaluator.compute_results()
-            evaluator.print_console(results, "Validation")
+            evaluator.print_console(
+                results, "Validation", config.evaluation.max_metric_per_row
+            )
             result_dict["Validation"] = results
 
         evaluator.evaluate(best_model, dataset, test_set=True, verbose=True)
         results = evaluator.compute_results()
-        evaluator.print_console(results, "Test")
+        evaluator.print_console(results, "Test", config.evaluation.max_metric_per_row)
         result_dict["Test"] = results
 
         writer.write_results(
