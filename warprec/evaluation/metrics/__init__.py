@@ -20,6 +20,7 @@ from .fairness import (
     BiasDisparityBS,
     ItemMADRanking,
     ItemMADRating,
+    REO,
     UserMADRanking,
     UserMADRating,
 )
@@ -54,6 +55,7 @@ __all__ = [
     "BiasDisparityBS",
     "ItemMADRanking",
     "ItemMADRating",
+    "REO",
     "UserMADRanking",
     "UserMADRating",
     "EFD",
