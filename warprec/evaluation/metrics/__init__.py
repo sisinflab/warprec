@@ -21,6 +21,7 @@ from .fairness import (
     ItemMADRanking,
     ItemMADRating,
     REO,
+    RSP,
     UserMADRanking,
     UserMADRating,
 )
@@ -56,6 +57,7 @@ __all__ = [
     "ItemMADRanking",
     "ItemMADRating",
     "REO",
+    "RSP",
     "UserMADRanking",
     "UserMADRating",
     "EFD",

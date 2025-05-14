@@ -4,6 +4,7 @@ from .biasdisparitybs import BiasDisparityBS
 from .itemmadranking import ItemMADRanking
 from .itemmadrating import ItemMADRating
 from .reo import REO
+from .rsp import RSP
 from .usermadranking import UserMADRanking
 from .usermadrating import UserMADRating
 
@@ -14,6 +15,7 @@ __all__ = [
     "ItemMADRanking",
     "ItemMADRating",
     "REO",
+    "RSP",
     "UserMADRanking",
     "UserMADRating",
 ]
