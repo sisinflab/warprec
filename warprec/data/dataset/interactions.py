@@ -51,7 +51,7 @@ class Interactions:
     ) -> None:
         # Setup the variables
         self._inter_df = data
-        self._inter_side = side_data if side_data is not None else None
+        self._inter_side = side_data.copy() if side_data is not None else None
         self._inter_user_cluster = user_cluster if user_cluster is not None else None
         self._inter_item_cluster = item_cluster if item_cluster is not None else None
         self.batch_size = batch_size
@@ -64,6 +64,24 @@ class Interactions:
         self._rating_label = (
             data.columns[2] if rating_type == RatingType.EXPLICIT else None
         )
+
+        # Filter side information (if present)
+        if self._inter_side is not None:
+            self._inter_side = self._inter_side[
+                self._inter_side[self._item_label].isin(
+                    self._inter_df[self._item_label]
+                )
+            ]
+
+            # Order side information to be in the same order of the dataset
+            self._inter_side["order"] = self._inter_side[self._item_label].map(
+                item_mapping
+            )
+            self._inter_side = (
+                self._inter_side.sort_values("order")
+                .drop(columns="order")
+                .reset_index(drop=True)
+            )
 
         # Definition of dimensions
         self._uid = self._inter_df[self._user_label].unique()
