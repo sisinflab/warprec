@@ -1,7 +1,8 @@
-from typing import List, Dict
+from typing import List, Dict, Optional
 
 import torch
 import re
+from pandas import DataFrame
 from scipy.sparse import csr_matrix
 from tabulate import tabulate
 from math import ceil
@@ -24,6 +25,7 @@ class Evaluator:
             be evaluated.
         k_values (List[int]): The cutoffs.
         train_set (csr_matrix): The train set sparse matrix.
+        side_information (Optional[DataFrame]): The side information of the dataset.
         beta (float): The beta value used in some metrics.
         pop_ratio (float): The percentile considered popular.
         user_cluster (Dict[int, int]): The user cluster mapping.
@@ -35,6 +37,7 @@ class Evaluator:
         metric_list: List[str],
         k_values: List[int],
         train_set: csr_matrix,
+        side_information: Optional[DataFrame],
         beta: float = 1.0,
         pop_ratio: float = 0.8,
         user_cluster: Dict[int, int] = None,
@@ -45,6 +48,7 @@ class Evaluator:
 
         common_params = {
             "train_set": train_set,
+            "side_information": side_information,
             "beta": beta,
             "pop_ratio": pop_ratio,
             "user_cluster": user_cluster,

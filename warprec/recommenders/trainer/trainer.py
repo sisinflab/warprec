@@ -160,6 +160,7 @@ class Trainer:
             [metric_name],
             [top_k],
             train_set=dataset.train_set.get_sparse(),
+            side_information=dataset.train_set.get_side_sparse(),
             beta=beta,
             pop_ratio=pop_ratio,
             user_cluster=dataset.user_cluster,

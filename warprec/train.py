@@ -100,6 +100,7 @@ def main(args: Namespace):
         list(config.evaluation.metrics),
         list(config.evaluation.top_k),
         train_set=dataset.train_set.get_sparse(),
+        side_information=dataset.train_set._inter_side,
         beta=config.evaluation.beta,
         pop_ratio=config.evaluation.pop_ratio,
         user_cluster=dataset.user_cluster,
