@@ -174,7 +174,7 @@ class REO(TopKMetric):
         if cluster_probabilities.numel() <= 1:
             return {self.name: torch.tensor(0.0).item()}
 
-        # Calculate REO = std(probs) / mean(probs)
+        # Calculate mean prob for later
         mean_prob = torch.mean(cluster_probabilities)
 
         # Handle case where mean probability is zero
@@ -186,9 +186,15 @@ class REO(TopKMetric):
             cluster_probabilities, unbiased=False
         )  # Use population standard deviation as in original formula
 
-        reo_score = std_prob / mean_prob
+        reo_score = std_prob / cluster_probabilities
 
-        return {self.name: reo_score.item()}
+        results = {}
+        for ic in range(self.n_item_clusters):
+            key = f"{self.name}_IC{ic}"
+            results[key] = reo_score[ic].item()
+
+        results[self.name] = (std_prob / mean_prob).item()
+        return results
 
     def reset(self):
         """Resets the metric state."""

@@ -211,9 +211,15 @@ class RSP(TopKMetric):
             cluster_probabilities, unbiased=False
         )  # Use population standard deviation as in original formula
 
-        rsp_score = std_prob / mean_prob
+        rsp_score = std_prob / cluster_probabilities
 
-        return {self.name: rsp_score.item()}
+        results = {}
+        for ic in range(self.n_item_clusters):
+            key = f"{self.name}_IC{ic}"
+            results[key] = rsp_score[ic].item()
+
+        results[self.name] = (std_prob / mean_prob).item()
+        return results
 
     def reset(self):
         """Resets the metric state."""
