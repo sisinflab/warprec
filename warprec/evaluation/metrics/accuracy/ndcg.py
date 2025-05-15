@@ -113,3 +113,138 @@ class nDCG(TopKMetric):
         """Resets the metric state."""
         self.ndcg.zero_()
         self.users.zero_()
+
+
+@metric_registry.register("nDCGRendle2020")
+class nDCGRendle2020(TopKMetric):
+    r"""Normalized Discounted Cumulative Gain (nDCG) metric for evaluating recommender systems.
+
+    It measures the ranking quality by considering the position of relevant items,
+    giving higher scores to relevant items that appear earlier in the recommendation list.
+    This implementation calculates nDCG@k using *binary relevance* (0 or 1).
+
+    The nDCG@k formula is defined as:
+
+    $$
+        nDCG_k = \frac{DCG_k}{IDCG_k}
+    $$
+
+    where $DCG_k$ is the Discounted Cumulative Gain at cutoff $k$, calculated as:
+
+    $$
+        DCG_k = \sum_{i=1}^k \frac{rel_i}{\log_2(i+1)}
+    $$
+
+    and $IDCG_k$ is the Ideal Discounted Cumulative Gain at cutoff $k$.
+
+    In these formulas:
+        - $k$: The cutoff, i.e., the number of items considered in the top of the ranked list.
+        - $rel_i$: The *binary* relevance (1 if relevant, 0 otherwise) of the item at rank $i$ in the recommendation list.
+        - $IDCG_k$: The maximum possible DCG score for the given list of relevant items, achieved by ranking all relevant items before non-relevant items up to rank $k$.
+
+    The metric computes the nDCG@k for each user and returns the average across all users with at least one relevant item.
+
+    Tensor Calculation Example:
+
+    Consider a batch with 2 users, k=3, and 5 items.
+    `preds` (recommendation scores):
+    +---+---+---+---+---+
+    | 5 | 8 | 3 | 6 | 2 |  (User 1)
+    | 1 | 9 | 4 | 7 | 3 |  (User 2)
+    +---+---+---+---+---+
+
+    `target` (binary relevance, 1 if relevant, 0 otherwise):
+    +---+---+---+---+---+
+    | 0 | 1 | 0 | 1 | 0 |  (User 1: Relevant Item 1, Item 3)
+    | 1 | 0 | 0 | 1 | 0 |  (User 2: Relevant Item 0, Item 3)
+    +---+---+---+---+---+
+
+    Extract the indices of the top-k items (k=3):
+    `top_k_indices`
+    +---+---+---+
+    | 1 | 3 | 0 |  (User 1: Items 1, 3, 0)
+    | 1 | 3 | 4 |  (User 2: Items 1, 3, 4)
+    +---+---+---+
+
+    Get the binary relevance (`rel`) for the items at these top-k indices:
+    `rel`
+    +---+---+---+
+    | 1 | 1 | 0 |  (User 1: Relevance of Items 1, 3, 0 is 1, 1, 0)
+    | 0 | 1 | 0 |  (User 2: Relevance of Items 1, 3, 4 is 0, 1, 0)
+    +---+---+---+
+
+    Get the ideal binary relevance (`ideal_rel`) by sorting the `target` and taking the top-k:
+    User 1 target sorted: [1, 1, 0, 0, 0]. Top-k (k=3): [1, 1, 0].
+    User 2 target sorted: [1, 1, 0, 0, 0]. Top-k (k=3): [1, 1, 0].
+    `ideal_rel`
+    +---+---+---+
+    | 1 | 1 | 0 |  (User 1)
+    | 1 | 1 | 0 |  (User 2)
+    +---+---+---+
+
+    Calculate DCG for `rel` and `ideal_rel` for each user using $\sum_{i=1}^k \frac{rel_i}{\log_2(i+1)}$:
+    User 1 DCG (`rel` [1, 1, 0]): $\frac{1}{\log_2(1+1)} + \frac{1}{\log_2(2+1)} + \frac{0}{\log_2(3+1)} = \frac{1}{1} + \frac{1}{\log_2 3} + 0 \approx 1 + 0.6309 = 1.6309$
+    User 1 IDCG (`ideal_rel` [1, 1, 0]): $\frac{1}{1} + \frac{1}{\log_2 3} + \frac{0}{\log_2 4} \approx 1.6309$
+    User 2 DCG (`rel` [0, 1, 0]): $\frac{0}{\log_2(1+1)} + \frac{1}{\log_2(2+1)} + \frac{0}{\log_2(3+1)} = 0 + \frac{1}{\log_2 3} + 0 \approx 0.6309$
+    User 2 IDCG (`ideal_rel` [1, 1, 0]): $\frac{1}{1} + \frac{1}{\log_2 3} + \frac{0}{\log_2 4} \approx 1.6309$
+
+    Calculate nDCG for each user (DCG / IDCG):
+    User 1 nDCG: $1.6309 / 1.6309 \approx 1.0$
+    User 2 nDCG: $0.6309 / 1.6309 \approx 0.3869$
+
+    Sum nDCG scores (`self.ndcg`): $1.0 + 0.3869 = 1.3869$
+    Count users with relevant items (`self.users`): User 1 has relevant items, User 2 has relevant items. Count: 2.
+
+    Final nDCG = Sum of nDCG / Number of users = $1.3869 / 2 \approx 0.69345$
+
+    This implementation provides a standard calculation of nDCG@k often used in the evaluation
+        of recommender systems, including contexts related to the work of S. Rendle (e.g., in implicit feedback scenarios with binary relevance).
+
+    For further details, please refer to this `link <https://dl.acm.org/doi/10.1145/3394486.3403226>`_.
+
+    Attributes:
+        ndcg (Tensor): The accumulated sum of per-user nDCG scores across all processed batches.
+        users (Tensor): The total number of users processed who have at least one relevant item (i.e., contribute to the denominator in the final average).
+
+    Args:
+        k (int): The cutoff for recommendations.
+        *args (Any): Additional positional arguments list.
+        dist_sync_on_step (bool): Torchmetrics parameter for distributed synchronization. Defaults to `False`.
+        **kwargs (Any): Additional keyword arguments dictionary.
+    """
+
+    ndcg: Tensor
+    users: Tensor
+
+    def __init__(
+        self, k: int, *args: Any, dist_sync_on_step: bool = False, **kwargs: Any
+    ):
+        super().__init__(k, dist_sync_on_step)
+        self.add_state("ndcg", default=torch.tensor(0.0), dist_reduce_fx="sum")
+        self.add_state("users", default=torch.tensor(0.0), dist_reduce_fx="sum")
+
+    def update(self, preds: Tensor, target: Tensor, **kwargs: Any):
+        """Updates the metric state with the new batch of predictions."""
+        # The discounted relevance is computed as 2^(rel + 1) - 1
+        target = self.binary_relevance(target)
+        top_k = torch.topk(preds, self.k, dim=1, largest=True, sorted=True).indices
+        rel = torch.gather(target, 1, top_k).float()
+        ideal_rel = torch.topk(target, self.k, dim=1, largest=True, sorted=True).values
+
+        dcg_score = self.dcg(rel)
+        idcg_score = self.dcg(ideal_rel).clamp(min=1e-10)
+
+        self.ndcg += (dcg_score / idcg_score).nan_to_num(0).sum()
+
+        # Count only users with at least one interaction
+        self.users += (target > 0).any(dim=1).sum().item()
+
+    def compute(self):
+        """Computes the final metric value."""
+        ndcg = self.ndcg / self.users if self.users > 0 else torch.tensor(0.0)
+        return {self.name: ndcg.item()}
+
+    def reset(self):
+        """Resets the metric state."""
+        self.ndcg.zero_()
+        self.users.zero_()

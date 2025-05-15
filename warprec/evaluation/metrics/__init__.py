@@ -8,6 +8,7 @@ from .accuracy import (
     MAR,
     MRR,
     nDCG,
+    nDCGRendle2020,
     Precision,
     Recall,
 )
@@ -38,6 +39,7 @@ __all__ = [
     "MAR",
     "MRR",
     "nDCG",
+    "nDCGRendle2020",
     "Precision",
     "Recall",
     "ACLT",
