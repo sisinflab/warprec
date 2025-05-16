@@ -88,12 +88,16 @@ def check_similarity(value: Any) -> bool:
         bool: True if the value is a correct similarity, False otherwise.
     """
 
-    return (
-        isinstance(value, str)
-        and value.lower() != SearchSpace.CHOICE.value
-        and value.lower() != SearchSpace.GRID.value
-        and value.upper() in similarities_registry.list_registered()
-    )
+    # Check if not string
+    if not isinstance(value, str):
+        return False
+
+    # Check for search space value
+    if value.lower() in {SearchSpace.CHOICE.value, SearchSpace.GRID.value}:
+        return True
+
+    # Check if supported similarity
+    return value.upper() in similarities_registry.list_registered()
 
 
 def check_user_profile(value: Any) -> bool:
