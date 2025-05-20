@@ -1,5 +1,5 @@
 # pylint: disable=arguments-differ, unused-argument, line-too-long
-from typing import Any, Optional, Dict
+from typing import Any
 
 import torch
 from torch import Tensor
@@ -44,12 +44,13 @@ class UserMADRating(TopKMetric):
         user_counts (Tensor): Tensor of counts of batches/updates each user was seen in.
         user_gains (Tensor): Tensor of summed average top-k prediction scores per user across batches.
         n_users (int): Total number of users.
+        n_user_clusters (int): The total number of unique user clusters, including fallback cluster.
 
     Args:
         k (int): Cutoff for top-k recommendations.
         train_set (csr_matrix): Sparse matrix of training interactions (users x items).
         *args (Any): The argument list.
-        user_cluster (Optional[Dict[int, int]]): Mapping from user IDs to user cluster IDs.
+        user_cluster (Tensor): Lookup tensor of user clusters.
         dist_sync_on_step (bool): Whether to synchronize metric state across distributed processes.
         **kwargs (Any): Additional keyword arguments.
     """
@@ -58,30 +59,22 @@ class UserMADRating(TopKMetric):
     user_counts: Tensor
     user_gains: Tensor
     n_users: int
+    n_user_clusters: int
 
     def __init__(
         self,
         k: int,
         train_set: csr_matrix,
         *args: Any,
-        user_cluster: Optional[Dict[int, int]] = None,
+        user_cluster: Tensor = None,
         dist_sync_on_step: bool = False,
         **kwargs: Any,
     ):
         super().__init__(k, dist_sync_on_step)
-
-        # Prepare user-cluster mapping
-        if user_cluster:
-            unique_clusters = sorted(set(user_cluster.values()))
-            self.n_user_clusters = len(unique_clusters)
-            remap = {c: idx for idx, c in enumerate(unique_clusters)}
-            uc = torch.zeros(train_set.shape[0], dtype=torch.long)
-            for u, c in user_cluster.items():
-                uc[u] = remap[c]
-        else:
-            self.n_user_clusters = 1
-            uc = torch.zeros(train_set.shape[0], dtype=torch.long)
-        self.register_buffer("user_clusters", uc)
+        self.register_buffer("user_clusters", user_cluster)
+        self.n_user_clusters = (
+            int(user_cluster.max().item()) + 1
+        )  # Take into account the zero cluster
 
         # Per-user accumulators
         self.add_state(
