@@ -1,4 +1,4 @@
-from typing import Dict, Optional, Any
+from typing import Any
 
 import torch
 from torch import Tensor
@@ -41,8 +41,8 @@ class BiasDisparityBR(TopKMetric):
         k (int): The cutoff.
         train_set (csr_matrix): Sparse matrix of training interactions (users x items).
         *args (Any): The argument list.
-        user_cluster (Optional[Dict[int, int]]): Mapping from user IDs to user cluster IDs.
-        item_cluster (Optional[Dict[int, int]]): Mapping from item IDs to item cluster IDs.
+        user_cluster (Tensor): Lookup tensor of user clusters.
+        item_cluster (Tensor): Lookup tensor of item clusters.
         dist_sync_on_step (bool): Whether to synchronize metric state across distributed processes.
         **kwargs (Any): Additional keyword arguments.
     """
@@ -58,46 +58,28 @@ class BiasDisparityBR(TopKMetric):
         k: int,
         train_set: csr_matrix,
         *args: Any,
-        user_cluster: Optional[Dict[int, int]] = None,
-        item_cluster: Optional[Dict[int, int]] = None,
+        user_cluster: Tensor = None,
+        item_cluster: Tensor = None,
         dist_sync_on_step: bool = False,
         **kwargs: Any,
     ):
         super().__init__(k, dist_sync_on_step)
         self.train_set = train_set
 
-        # Handle user clusters
-        if user_cluster:
-            unique_user_clusters = sorted(set(user_cluster.values()))
-            self.n_user_clusters = len(unique_user_clusters)
-            user_cluster_remap = {
-                cid: idx for idx, cid in enumerate(unique_user_clusters)
-            }  # Use appropriate indexes for clusters
-            uc = torch.zeros(self.train_set.shape[0], dtype=torch.long)
-            for u, g in user_cluster.items():
-                uc[u] = user_cluster_remap[g]
-        else:
-            self.n_user_clusters = 1
-            uc = torch.zeros(self.train_set.shape[0], dtype=torch.long)
-        self.register_buffer("user_clusters", uc)
+        self.register_buffer("user_clusters", user_cluster)
+        self.n_user_effective_clusters = int(user_cluster.max().item())
+        self.n_user_clusters = (
+            self.n_user_effective_clusters + 1
+        )  # Take into account the zero cluster
 
-        # Handle item clusters
-        if item_cluster:
-            unique_item_clusters = sorted(set(item_cluster.values()))
-            self.n_item_clusters = len(unique_item_clusters)
-            item_cluster_remap = {
-                cid: idx for idx, cid in enumerate(unique_item_clusters)
-            }  # Use appropriate indexes for clusters
-            ic = torch.zeros(self.train_set.shape[1], dtype=torch.long)
-            for i, c in item_cluster.items():
-                ic[i] = item_cluster_remap[c]
-        else:
-            self.n_item_clusters = 1
-            ic = torch.zeros(self.train_set.shape[1], dtype=torch.long)
-        self.register_buffer("item_clusters", ic)
+        self.register_buffer("item_clusters", item_cluster)
+        self.n_item_effective_clusters = int(item_cluster.max().item())
+        self.n_item_clusters = (
+            self.n_item_effective_clusters + 1
+        )  # Take into account the zero cluster
 
         # Global distribution of items across item clusters
-        pc = torch.bincount(ic, minlength=self.n_item_clusters).float()
+        pc = torch.bincount(item_cluster, minlength=self.n_item_clusters).float()
         pc = pc / float(self.train_set.shape[1])
         self.register_buffer("PC", pc)
 
@@ -160,10 +142,10 @@ class BiasDisparityBR(TopKMetric):
         bias_disparity = rec_dist / self.PC.unsqueeze(0)  # broadcast over user clusters
 
         results = {}
-        for uc in range(self.n_user_clusters):
-            for ic in range(self.n_item_clusters):
-                key = f"BiasDisparityBR_UC{uc}_IC{ic}"
-                results[key] = bias_disparity[uc, ic].item()
+        for uc in range(self.n_user_effective_clusters):
+            for ic in range(self.n_item_effective_clusters):
+                key = f"BiasDisparityBR_UC{uc + 1}_IC{ic + 1}"
+                results[key] = bias_disparity[uc + 1, ic + 1].item()
         return results
 
     def reset(self):
