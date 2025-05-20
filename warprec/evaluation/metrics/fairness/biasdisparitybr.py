@@ -32,7 +32,11 @@ class BiasDisparityBR(TopKMetric):
 
     Attributes:
         user_clusters (Tensor): Tensor mapping each user to a user cluster.
+        n_user_effective_clusters (int): The total number of unique user clusters.
+        n_user_clusters (int): The total number of unique user clusters, including fallback cluster.
         item_clusters (Tensor): Tensor mapping each item to an item cluster.
+        n_item_effective_clusters (int): The total number of unique item clusters.
+        n_item_clusters (int): The total number of unique item clusters, including fallback cluster.
         PC (Tensor): Global distribution of items across item clusters.
         category_sum (Tensor): Accumulator tensor of shape counting recommended items per user-item cluster pair.
         total_sum (Tensor): Accumulator tensor counting total recommendations per user cluster.
@@ -48,7 +52,11 @@ class BiasDisparityBR(TopKMetric):
     """
 
     user_clusters: Tensor
+    n_user_effective_clusters: int
+    n_user_clusters: int
     item_clusters: Tensor
+    n_item_effective_clusters: int
+    n_item_clusters: int
     PC: Tensor
     category_sum: Tensor
     total_sum: Tensor
