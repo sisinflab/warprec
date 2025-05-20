@@ -92,7 +92,7 @@ class EvaluationConfig(BaseModel):
 
         # Check for duplicates
         len_before = len(v)
-        v = list(set(v))
+        v = cls.check_duplicates_in_list(v)
         len_after = len(v)
 
         if len_after < len_before:
@@ -121,3 +121,23 @@ class EvaluationConfig(BaseModel):
                 f"The pop ratio value should be between 0 and 1. Value provided: {v}"
             )
         return v
+
+    @classmethod
+    def check_duplicates_in_list(cls, values: list) -> list:
+        """Check and remove duplicate elements from list
+        preserving the order.
+
+        Args:
+            values (list): The original list.
+
+        Returns:
+            list: The list without duplicates.
+        """
+        list_without_duplicates = []
+        unique_elements = set()
+
+        for v in values:
+            if v not in unique_elements:
+                list_without_duplicates.append(v)
+                unique_elements.add(v)
+        return list_without_duplicates
