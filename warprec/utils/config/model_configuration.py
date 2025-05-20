@@ -359,14 +359,6 @@ class RecomModel(BaseModel, ABC):
         Raises:
             ValueError: If the range is not in a correct format.
         """
-        # This mapping will be used to check the typing based on
-        # the field typing
-        choice_strat_map = {
-            INT_FIELD: int,
-            STR_FIELD: str,
-            BOOL_FIELD: bool,
-            LIST_INT_FIELD: list,
-        }
         # We check if a search space has been provided
         # if yes, then we validate the strategy the user provided
         if isinstance(value[0], str) and value[0].lower() in [
@@ -375,10 +367,11 @@ class RecomModel(BaseModel, ABC):
             value = self.check_valid_strategy(value[0], typing, value)
         else:
             # If a strategy has not been provided, we use a default one
-            if typing in choice_strat_map.keys():
-                value.insert(0, SearchSpace.CHOICE)
-            else:
-                value.insert(0, SearchSpace.UNIFORM)
+            logger.attention(
+                f"Strategy has not been provided for field {field}. "
+                f"Defaults strategy choice will be used."
+            )
+            value.insert(0, SearchSpace.CHOICE)
 
         # If the typing is simple, then we don't need further checks
         if (
@@ -418,12 +411,13 @@ class RecomModel(BaseModel, ABC):
             SearchSpace.QRANDINT,
             SearchSpace.LOGRANDINT,
             SearchSpace.QLOGRANDINT,
+            SearchSpace.CHOICE,
         ]:
             value.pop(0)
-            value.insert(0, SearchSpace.RANDINT)
+            value.insert(0, SearchSpace.CHOICE)
             logger.attention(
                 f"Strategy {strat} is not valid for field {typing}. "
-                f"Randint strategy will be used instead. "
+                f"Choice strategy will be used instead. "
             )
         if typing == FLOAT_FIELD and strat not in [
             SearchSpace.UNIFORM,
@@ -432,12 +426,13 @@ class RecomModel(BaseModel, ABC):
             SearchSpace.QLOGUNIFORM,
             SearchSpace.RANDN,
             SearchSpace.QRANDN,
+            SearchSpace.CHOICE,
         ]:
             value.pop(0)
-            value.insert(0, SearchSpace.UNIFORM)
+            value.insert(0, SearchSpace.CHOICE)
             logger.attention(
                 f"Strategy {strat} is not valid for field {typing}. "
-                f"Uniform strategy will be used instead. "
+                f"Choice strategy will be used instead. "
             )
         if typing == STR_FIELD and strat not in [
             SearchSpace.CHOICE,
