@@ -367,10 +367,6 @@ class RecomModel(BaseModel, ABC):
             value = self.check_valid_strategy(value[0], typing, value)
         else:
             # If a strategy has not been provided, we use a default one
-            logger.attention(
-                f"Strategy has not been provided for field {field}. "
-                f"Defaults strategy choice will be used."
-            )
             value.insert(0, SearchSpace.CHOICE)
 
         # If the typing is simple, then we don't need further checks
