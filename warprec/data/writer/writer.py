@@ -22,12 +22,12 @@ class Writer(ABC):
     during an experiment multiple writers can be defined.
 
     Attributes:
-        config (Configuration | None): The configuration of the experiment.
+        config (Configuration): The configuration of the experiment.
 
     TODO: Use Factory Pattern for different writer.
     """
 
-    config: Configuration | None
+    config: Configuration = None
 
     @abstractmethod
     def setup_experiment(self):
