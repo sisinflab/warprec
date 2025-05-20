@@ -34,7 +34,7 @@ class UserMADRanking(TopKMetric):
         user_clusters (Tensor): Tensor mapping each user to an user cluster.
         user_counts (Tensor): Tensor of counts of user recommended.
         user_gains (Tensor): Tensor of gains of user recommended.
-        n_item_clusters (int): The total number of unique user clusters, including fallback cluster.
+        n_user_clusters (int): The total number of unique user clusters, including fallback cluster.
 
     Args:
         k (int): Cutoff for top-k recommendations.
@@ -48,7 +48,7 @@ class UserMADRanking(TopKMetric):
     user_clusters: Tensor
     user_counts: Tensor
     user_gains: Tensor
-    n_item_clusters: int
+    n_user_clusters: int
 
     def __init__(
         self,
