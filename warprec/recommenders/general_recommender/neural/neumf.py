@@ -77,6 +77,10 @@ class NeuMF(Recommender):
                 "Items value must be provided to correctly initialize the model."
             )
 
+        # Ray Tune converts lists to tuples
+        # so we need to convert them back to lists
+        self.mlp_hidden_size = list(self.mlp_hidden_size)
+
         # MF embeddings
         self.user_mf_embedding = nn.Embedding(users, self.mf_embedding_size)
         self.item_mf_embedding = nn.Embedding(items, self.mf_embedding_size)
