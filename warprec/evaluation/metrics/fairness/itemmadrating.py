@@ -1,5 +1,5 @@
 # pylint: disable=arguments-differ, unused-argument, line-too-long
-from typing import Any, Optional, Dict
+from typing import Any
 
 import torch
 from torch import Tensor
@@ -45,13 +45,12 @@ class ItemMADRating(TopKMetric):
         item_counts (Tensor): Tensor of counts of item recommended and relevant.
         item_gains (Tensor): Tensor of summed ratings/relevance for item recommended and relevant.
         n_items (int): Total number of items.
-        n_item_clusters (int): Total number of unique item clusters.
 
     Args:
         k (int): Cutoff for top-k recommendations.
         train_set (csr_matrix): Sparse matrix of training interactions (users x items).
         *args (Any): The argument list.
-        item_cluster (Optional[Dict[int, int]]): Mapping from item IDs to item cluster IDs.
+        item_cluster (Tensor): Lookup tensor of item clusters.
         dist_sync_on_step (bool): Whether to synchronize metric state across distributed processes.
         **kwargs (Any): Additional keyword arguments.
     """
@@ -60,14 +59,13 @@ class ItemMADRating(TopKMetric):
     item_counts: Tensor
     item_gains: Tensor
     n_items: int
-    n_item_clusters: int
 
     def __init__(
         self,
         k: int,
         train_set: csr_matrix,
         *args: Any,
-        item_cluster: Optional[Dict[int, int]] = None,
+        item_cluster: Tensor = None,
         dist_sync_on_step: bool = False,
         **kwargs: Any,
     ):
@@ -75,22 +73,7 @@ class ItemMADRating(TopKMetric):
 
         self.n_items = train_set.shape[1]
 
-        # Handle item clusters
-        if item_cluster:
-            unique_item_clusters = sorted(set(item_cluster.values()))
-            self.n_item_clusters = len(unique_item_clusters)
-            item_cluster_remap = {
-                cid: idx for idx, cid in enumerate(unique_item_clusters)
-            }  # Use appropriate indexes for clusters
-            ic = torch.zeros(train_set.shape[1], dtype=torch.long)
-            for i, c in item_cluster.items():
-                # Ensure item ID i is within the bounds [0, n_items)
-                if 0 <= i < self.n_items:
-                    ic[i] = item_cluster_remap[c]
-        else:
-            self.n_item_clusters = 1
-            ic = torch.zeros(train_set.shape[1], dtype=torch.long)
-        self.register_buffer("item_clusters", ic)
+        self.register_buffer("item_clusters", item_cluster)
 
         # Initialize accumulators for counts and gains (relevant items only)
         self.add_state(
