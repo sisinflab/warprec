@@ -1,5 +1,5 @@
 # pylint: disable=arguments-differ, unused-argument, line-too-long
-from typing import Any, Optional, Dict
+from typing import Any
 
 import torch
 from torch import Tensor
@@ -60,13 +60,14 @@ class REO(TopKMetric):
         item_clusters (Tensor): A tensor mapping item index to its cluster ID.
         cluster_recommendations (Tensor): Accumulator for the total count of relevant recommended items per cluster.
         cluster_total_items (Tensor): Accumulator for the total count of relevant items per cluster in the ground truth.
-        n_item_clusters (int): The total number of unique item clusters.
+        n_effective_clusters (int): The total number of unique item clusters.
+        n_item_clusters (int): The total number of unique item clusters, including fallback cluster.
 
     Args:
         k (int): Cutoff for top-k recommendations.
         train_set (csr_matrix): Sparse matrix of training interactions (users x items). (Used for initialization, not directly in update/compute logic in this implementation).
         *args (Any): The argument list.
-        item_cluster (Optional[Dict[int, int]]): Mapping from item IDs (0-indexed) to item cluster IDs. Defaults to None (implies single cluster).
+        item_cluster (Tensor): Lookup tensor of item clusters.
         dist_sync_on_step (bool): Whether to synchronize metric state across distributed processes.
         **kwargs (Any): Additional keyword arguments.
     """
@@ -74,6 +75,7 @@ class REO(TopKMetric):
     item_clusters: Tensor
     cluster_recommendations: Tensor
     cluster_total_items: Tensor
+    n_effective_clusters: int
     n_item_clusters: int
 
     def __init__(
@@ -81,26 +83,16 @@ class REO(TopKMetric):
         k: int,
         train_set: csr_matrix,
         *args: Any,
-        item_cluster: Optional[Dict[int, int]] = None,
+        item_cluster: Tensor = None,
         dist_sync_on_step: bool = False,
         **kwargs: Any,
     ):
         super().__init__(k, dist_sync_on_step)
-
-        # Handle item clusters
-        if item_cluster:
-            unique_item_clusters = sorted(set(item_cluster.values()))
-            self.n_item_clusters = len(unique_item_clusters)
-            item_cluster_remap = {
-                cid: idx for idx, cid in enumerate(unique_item_clusters)
-            }  # Use appropriate indexes for clusters
-            ic = torch.zeros(train_set.shape[1], dtype=torch.long)
-            for i, c in item_cluster.items():
-                ic[i] = item_cluster_remap[c]
-        else:
-            self.n_item_clusters = 1
-            ic = torch.zeros(train_set.shape[1], dtype=torch.long)
-        self.register_buffer("item_clusters", ic)
+        self.register_buffer("item_clusters", item_cluster)
+        self.n_effective_clusters = int(item_cluster.max().item())
+        self.n_item_clusters = (
+            self.n_effective_clusters + 1
+        )  # Take into account the zero cluster
 
         # Per-cluster accumulators
         self.add_state(
@@ -189,8 +181,8 @@ class REO(TopKMetric):
         reo_score = std_prob / cluster_probabilities
 
         results = {}
-        for ic in range(self.n_item_clusters):
-            key = f"{self.name}_IC{ic}"
+        for ic in range(self.n_effective_clusters):
+            key = f"{self.name}_IC{ic + 1}"
             results[key] = reo_score[ic].item()
 
         results[self.name] = (std_prob / mean_prob).item()
