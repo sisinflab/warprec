@@ -2,6 +2,7 @@ from typing import List, Dict, Optional
 
 import torch
 import re
+from torch import Tensor
 from pandas import DataFrame
 from scipy.sparse import csr_matrix
 from tabulate import tabulate
@@ -28,8 +29,8 @@ class Evaluator:
         side_information (Optional[DataFrame]): The side information of the dataset.
         beta (float): The beta value used in some metrics.
         pop_ratio (float): The percentile considered popular.
-        user_cluster (Dict[int, int]): The user cluster mapping.
-        item_cluster (Dict[int, int]): The item cluster mapping.
+        user_cluster (Tensor): The user cluster lookup tensor.
+        item_cluster (Tensor): The item cluster lookup tensor.
     """
 
     def __init__(
@@ -40,8 +41,8 @@ class Evaluator:
         side_information: Optional[DataFrame],
         beta: float = 1.0,
         pop_ratio: float = 0.8,
-        user_cluster: Dict[int, int] = None,
-        item_cluster: Dict[int, int] = None,
+        user_cluster: Tensor = None,
+        item_cluster: Tensor = None,
     ):
         self.k_values = k_values
         self.metrics: Dict[int, List[BaseMetric]] = {}

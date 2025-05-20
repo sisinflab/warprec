@@ -103,8 +103,8 @@ def main(args: Namespace):
         side_information=dataset.train_set._inter_side,
         beta=config.evaluation.beta,
         pop_ratio=config.evaluation.pop_ratio,
-        user_cluster=dataset.user_cluster,
-        item_cluster=dataset.item_cluster,
+        user_cluster=dataset.get_user_cluster(),
+        item_cluster=dataset.get_item_cluster(),
     )
 
     for model_name in models:

@@ -1,7 +1,9 @@
 from typing import Tuple, Any, Optional
 from abc import ABC, abstractmethod
 
+import torch
 import numpy as np
+from torch import Tensor
 from pandas import DataFrame
 from warprec.data.dataset import Interactions
 from warprec.utils.enums import RatingType
@@ -35,6 +37,8 @@ class Dataset(ABC):
         self._nfeat: int = 0
         self._umap: dict[Any, int] = {}
         self._imap: dict[Any, int] = {}
+        self._uc: Tensor = None
+        self._ic: Tensor = None
 
     @abstractmethod
     def get_dims(self) -> Tuple[int, int]:
@@ -65,6 +69,22 @@ class Dataset(ABC):
                 dict: Mapping of user_idx -> user_id.
                 dict: Mapping of item_idxs -> item_id.
         """
+
+    def get_user_cluster(self) -> Tensor:
+        """This method retrieves the lookup tensor for user clusters.
+
+        Returns:
+            Tensor: Lookup tensor for user clusters.
+        """
+        return self._uc
+
+    def get_item_cluster(self) -> Tensor:
+        """This method retrieves the lookup tensor for item clusters.
+
+        Returns:
+            Tensor: Lookup tensor for item clusters.
+        """
+        return self._ic
 
     def info(self) -> dict:
         """This method returns the main information of the
@@ -150,26 +170,6 @@ class TransactionDataset(Dataset):
                 val=val_data,
             )
 
-        # If user cluster data has been provided, we filter the main dataset
-        if user_cluster is not None:
-            train_data, test_data, val_data = self._filter_data(
-                train=train_data,
-                filter_data=user_cluster,
-                label=user_label,
-                test=test_data,
-                val=val_data,
-            )
-
-        # If item cluster data has been provided, we filter the main dataset
-        if item_cluster is not None:
-            train_data, test_data, val_data = self._filter_data(
-                train=train_data,
-                filter_data=item_cluster,
-                label=item_label,
-                test=test_data,
-                val=val_data,
-            )
-
         # Define dimensions that will lead the experiment
         self._nuid = train_data[user_label].nunique()
         self._niid = train_data[item_label].nunique()
@@ -209,6 +209,30 @@ class TransactionDataset(Dataset):
             if item_cluster is not None
             else None
         )
+
+        # Pre compute lookup tensors for user clusters
+        if self.user_cluster is not None:
+            unique_user_clusters = sorted(set(self.user_cluster.values()))
+            user_cluster_remap = {
+                cud: idx + 1 for idx, cud in enumerate(unique_user_clusters)
+            }  # Use appropriate indexes for clusters
+            self._uc = torch.zeros(self._nuid, dtype=torch.long)
+            for u, c in self.user_cluster.items():
+                self._uc[u] = user_cluster_remap[c]
+        else:
+            self._uc = torch.ones(self._nuid, dtype=torch.long)
+
+        # Pre compute lookup tensors for item clusters
+        if self.item_cluster is not None:
+            unique_item_clusters = sorted(set(self.item_cluster.values()))
+            item_cluster_remap = {
+                cid: idx + 1 for idx, cid in enumerate(unique_item_clusters)
+            }  # Use appropriate indexes for clusters
+            self._ic = torch.zeros(self._niid, dtype=torch.long)
+            for i, c in self.item_cluster.items():
+                self._ic[i] = item_cluster_remap[c]
+        else:
+            self._ic = torch.ones(self._niid, dtype=torch.long)
 
         # Create the main data structures
         self.train_set = self._create_inner_set(

@@ -163,8 +163,8 @@ class Trainer:
             side_information=dataset.train_set.get_side_sparse(),
             beta=beta,
             pop_ratio=pop_ratio,
-            user_cluster=dataset.user_cluster,
-            item_cluster=dataset.item_cluster,
+            user_cluster=dataset.get_user_cluster(),
+            item_cluster=dataset.get_item_cluster(),
         )
         self._train_param = self.parse_params(param)
         self._metric_name = metric_name
