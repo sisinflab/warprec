@@ -110,9 +110,8 @@ def check_user_profile(value: Any) -> bool:
         bool: True if the value is a correct user profile, False otherwise.
     """
 
-    return (
-        isinstance(value, str)
-        and value.lower() != SearchSpace.CHOICE.value
-        and value.lower() != SearchSpace.GRID.value
-        and value.upper() in ["binary", "tfidf"]
+    return isinstance(value, str) and (
+        value.lower() == SearchSpace.CHOICE.value
+        or value.lower() == SearchSpace.GRID.value
+        or value.lower() in ["binary", "tfidf"]
     )
