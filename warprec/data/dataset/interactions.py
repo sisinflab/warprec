@@ -157,6 +157,8 @@ class Interactions:
         """
         if isinstance(self._inter_side_sparse, csr_matrix):
             return self._inter_side_sparse
+        if self._inter_side is None:
+            return None
         self._inter_side_sparse = csr_matrix(
             self._inter_side.drop(self._item_label, axis=1), dtype=self.precision
         )
