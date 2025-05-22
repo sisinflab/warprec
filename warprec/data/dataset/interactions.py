@@ -245,47 +245,65 @@ class Interactions:
             DataLoader: Yields triplets of (user, positive_item, negative_item).
         """
         # Define main variables
-        sparse_matrix = self.get_sparse().tocoo()
-        users_pos = sparse_matrix.row
-        items_pos = sparse_matrix.col
+        sparse_matrix = self.get_sparse()
+        num_users = self._nuid
         num_items = self._niid
-        num_positives = len(users_pos)
-
-        # Precompute positive items for each user
-        user_pos_items = {u: items_pos[users_pos == u] for u in np.unique(users_pos)}
-        all_items = np.arange(num_items)
+        num_positives = sparse_matrix.nnz
 
         # Preallocate arrays for triplets
         users_triplet = np.empty(num_positives, dtype=np.int64)
         positives_triplet = np.empty_like(users_triplet)
         negatives_triplet = np.empty_like(users_triplet)
 
-        start_idx = 0
-        for u, pos_items in user_pos_items.items():
-            user_count = len(pos_items)
+        # Single call of module for efficiency
+        rint = np.random.randint  # Storing the module call is ever so slightly faster
+
+        current_idx = 0
+        for u in range(num_users):
+            # Using sparse CSR matrix, get the indices of nnz columns
+            # these will be the positive items
+            start_ptr = sparse_matrix.indptr[u]
+            end_ptr = sparse_matrix.indptr[u + 1]
+
+            # Get indices of items interacted (positive items)
+            user_pos = sparse_matrix.indices[start_ptr:end_ptr]
+            user_count = len(user_pos)
             if user_count == 0:  # Skip the user if it has 0 interactions
                 continue
 
-            neg_candidates = np.setdiff1d(all_items, pos_items)
-            if len(neg_candidates) == 0:  # Extreme edge case. Normally not a problem
-                continue
+            user_pos_set = set(user_pos)  # Efficient control using sets
 
-            # Sample negatives for all positives in this user
-            replace = len(neg_candidates) < user_count
-            sampled = np.random.choice(neg_candidates, size=user_count, replace=replace)
+            # Edge case: the user interacted with all the items
+            if user_count == num_items:
+                continue  # Skip the user if it interacted with all items
 
-            # Create triplet components
-            end_idx = start_idx + user_count
-            users_triplet[start_idx:end_idx] = np.full(user_count, u)
-            positives_triplet[start_idx:end_idx] = pos_items
-            negatives_triplet[start_idx:end_idx] = sampled
-            start_idx = end_idx
+            # Iter through all the positive items
+            for pos_item in user_pos:
+                # Assign user and positive item to arrays
+                users_triplet[current_idx] = u
+                positives_triplet[current_idx] = pos_item
 
-        # Trim to actual size and convert to tensors
-        # Note: PyTorch tensors require long integers for indices
-        users_tensor = torch.LongTensor(users_triplet[:start_idx])
-        positives_tensor = torch.LongTensor(positives_triplet[:start_idx])
-        negatives_tensor = torch.LongTensor(negatives_triplet[:start_idx])
+                # Until we find a valid negative, keep searching
+                while True:
+                    candidate_neg_item = rint(0, num_items)
+
+                    if (
+                        candidate_neg_item not in user_pos_set
+                    ):  # If found save and break loop
+                        negatives_triplet[current_idx] = candidate_neg_item
+                        break
+
+                current_idx += 1
+
+        # Trim length based on possible triplets skipped
+        users_triplet_trimmed = users_triplet[:current_idx]
+        positives_triplet_trimmed = positives_triplet[:current_idx]
+        negatives_triplet_trimmed = negatives_triplet[:current_idx]
+
+        # Create Tensors for efficient data loading
+        users_tensor = torch.LongTensor(users_triplet_trimmed)
+        positives_tensor = torch.LongTensor(positives_triplet_trimmed)
+        negatives_tensor = torch.LongTensor(negatives_triplet_trimmed)
 
         # Create final dataset
         dataset = TensorDataset(users_tensor, positives_tensor, negatives_tensor)
