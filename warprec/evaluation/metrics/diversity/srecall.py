@@ -127,8 +127,10 @@ class SRecall(TopKMetric):
         )
         self.add_state("users", torch.tensor(0.0), dist_reduce_fx="sum")
 
-    def update(self, preds: Tensor, target: Tensor, **kwargs: Any):
+    def update(self, preds: Tensor, **kwargs: Any):
         """Computes the final value of the metric."""
+        target = kwargs.get("ground", torch.zeros_like(preds))
+
         # Get top-k recommended item scores and indices for each user in the batch
         top_k_indices = torch.topk(preds, self.k, dim=1).indices  # [batch_size x k]
 

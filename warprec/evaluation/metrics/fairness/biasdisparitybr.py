@@ -101,8 +101,10 @@ class BiasDisparityBR(TopKMetric):
             "total_sum", default=torch.zeros(self.n_user_clusters), dist_reduce_fx="sum"
         )
 
-    def update(self, preds: Tensor, target: Tensor, start: int, **kwargs: Any):
+    def update(self, preds: Tensor, **kwargs: Any):
         """Updates the metric state with the new batch of predictions."""
+        start = kwargs.get("start", 0)
+
         batch_size = preds.size(0)
         device = preds.device
 

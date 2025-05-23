@@ -51,8 +51,10 @@ class NumRetrieved(TopKMetric):
         )
         self.add_state("users", default=torch.tensor(0.0), dist_reduce_fx="sum")
 
-    def update(self, preds: Tensor, target: Tensor, **kwargs: Any):
+    def update(self, preds: Tensor, **kwargs: Any):
         """Updates the metric state with the new batch of predictions."""
+        target = kwargs.get("ground", torch.zeros_like(preds))
+
         users = (target > 0).any(dim=1).sum().item()
         num_items = preds.size(1)
 

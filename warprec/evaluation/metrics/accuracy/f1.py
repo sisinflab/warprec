@@ -78,13 +78,13 @@ class F1(TopKMetric):
             **kwargs,
         )
 
-    def update(self, preds: Tensor, target: Tensor, **kwargs: Any):
+    def update(self, preds: Tensor, **kwargs: Any):
         """Updates the metric state with the new batch of predictions."""
         # Update first metric
-        self.metric_1.update(preds, target, **kwargs)
+        self.metric_1.update(preds, **kwargs)
 
         # Update second metric
-        self.metric_2.update(preds, target, **kwargs)
+        self.metric_2.update(preds, **kwargs)
 
     def compute(self):
         """Computes the F1 score using precision and recall."""

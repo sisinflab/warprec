@@ -66,9 +66,10 @@ class Recall(TopKMetric):
             "total_relevant", default=torch.tensor(0.0), dist_reduce_fx="sum"
         )
 
-    def update(self, preds: Tensor, target: Tensor, **kwargs: Any):
+    def update(self, preds: Tensor, **kwargs: Any):
         """Updates the metric state with the new batch of predictions."""
-        target = self.binary_relevance(target)
+        target = kwargs.get("binary_relevance", torch.zeros_like(preds))
+
         top_k = torch.topk(preds, self.k, dim=1).indices
         rel = torch.gather(target, 1, top_k)
         self.correct += rel.sum().float()

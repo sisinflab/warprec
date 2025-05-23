@@ -77,10 +77,11 @@ class UserMADRanking(TopKMetric):
             dist_reduce_fx="sum",
         )
 
-    def update(self, preds: Tensor, target: Tensor, start: int, **kwargs: Any):
+    def update(self, preds: Tensor, **kwargs: Any):
         """Updates the metric state with the new batch of predictions."""
         # Apply discounted relevance (2^rel - 1) to target
-        target = self.discounted_relevance(target)
+        target = kwargs.get("discounted_relevance", torch.zeros_like(preds))
+        start = kwargs.get("start", 0)
 
         # Top-k item indices by prediction
         top_k_indices = torch.topk(

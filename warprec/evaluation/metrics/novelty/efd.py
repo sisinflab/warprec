@@ -97,12 +97,12 @@ class EFD(TopKMetric):
         self.add_state("efd", default=torch.tensor(0.0), dist_reduce_fx="sum")
         self.add_state("users", default=torch.tensor(0.0), dist_reduce_fx="sum")
 
-    def update(self, preds: Tensor, target: Tensor, **kwargs: Any):
+    def update(self, preds: Tensor, **kwargs):
         """Updates the metric state with a new batch of predictions."""
         if self.relevance == "discounted":
-            target = self.discounted_relevance(target)
+            target = kwargs.get("discounted_relevance", torch.zeros_like(preds))
         else:
-            target = self.binary_relevance(target)
+            target = kwargs.get("binary_relevance", torch.zeros_like(preds))
 
         top_k = torch.topk(preds, self.k, dim=1, largest=True, sorted=True).indices
         rel = torch.gather(target, 1, top_k).float()

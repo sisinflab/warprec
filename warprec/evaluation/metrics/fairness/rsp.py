@@ -135,7 +135,7 @@ class RSP(TopKMetric):
             dist_reduce_fx="sum",
         )
 
-    def update(self, preds: Tensor, target: Tensor, **kwargs: Any):
+    def update(self, preds: Tensor, **kwargs: Any):
         """Updates the metric state with the new batch of predictions."""
         batch_size = preds.shape[0]
 

@@ -88,8 +88,9 @@ class UserMADRating(TopKMetric):
             dist_reduce_fx="sum",
         )
 
-    def update(self, preds: Tensor, target: Tensor, start: int, **kwargs: Any):
+    def update(self, preds: Tensor, **kwargs: Any):
         """Updates the metric state with the new batch of predictions."""
+        start = kwargs.get("start", 0)
         topk = torch.topk(preds, self.k, dim=1, largest=True, sorted=True).values
         user_avg_scores = topk.mean(dim=1)  # [batch_size]
 

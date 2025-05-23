@@ -80,9 +80,9 @@ class ItemMADRanking(TopKMetric):
             dist_reduce_fx="sum",
         )
 
-    def update(self, preds: Tensor, target: Tensor, **kwargs: Any):
+    def update(self, preds: Tensor, **kwargs: Any):
         """Updates the metric state with the new batch of predictions."""
-        target = self.discounted_relevance(target)
+        target = kwargs.get("discounted_relevance", torch.zeros_like(preds))
 
         # Item counts
         _, top_k_indices = torch.topk(preds, self.k, dim=1)

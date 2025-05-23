@@ -89,9 +89,9 @@ class AUC(BaseMetric):
         self.add_state("auc", default=torch.tensor(0.0), dist_reduce_fx="sum")
         self.add_state("positives", default=torch.tensor(0.0), dist_reduce_fx="sum")
 
-    def update(self, preds: Tensor, target: Tensor, **kwargs: Any):
+    def update(self, preds: Tensor, **kwargs: Any):
         """Updates the metric state with the new batch of predictions."""
-        target = self.binary_relevance(target)
+        target = kwargs.get("binary_relevance", torch.zeros_like(preds))
 
         # Negative samples
         train_set = torch.isinf(preds).logical_and(preds < 0).sum(dim=1)  # [batch_size]

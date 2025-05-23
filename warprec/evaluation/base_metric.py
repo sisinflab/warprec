@@ -15,6 +15,7 @@ class BaseMetric(Metric, ABC):
     def compute(self) -> dict[str, float]:
         pass
 
+    @classmethod
     def binary_relevance(self, target: Tensor) -> Tensor:
         """Compute the binary relevance tensor.
 
@@ -26,6 +27,7 @@ class BaseMetric(Metric, ABC):
         """
         return (target > 0).float()
 
+    @classmethod
     def discounted_relevance(self, target: Tensor) -> Tensor:
         """Compute the discounted relevance tensor.
 

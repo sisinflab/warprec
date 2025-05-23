@@ -99,8 +99,11 @@ class BiasDisparityBS(BaseMetric):
             "total_sum", default=torch.zeros(self.n_user_clusters), dist_reduce_fx="sum"
         )
 
-    def update(self, preds: Tensor, target: Tensor, start: int, **kwargs: Any):
+    def update(self, preds: Tensor, **kwargs: Any):
         """Updates the metric state with the new batch of predictions."""
+        target = kwargs.get("ground", torch.zeros_like(preds))
+        start = kwargs.get("start", 0)
+
         batch_size = preds.size(0)
         user_indices = torch.arange(start, start + batch_size, device=preds.device)
 

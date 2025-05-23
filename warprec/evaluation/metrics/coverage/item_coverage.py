@@ -30,7 +30,7 @@ class ItemCoverage(TopKMetric):
         super().__init__(k, dist_sync_on_step)
         self.add_state("unique_items", default=[], dist_reduce_fx=None)
 
-    def update(self, preds: Tensor, target: Tensor, **kwargs: Any):
+    def update(self, preds: Tensor, **kwargs: Any):
         """Updates the metric state with the new batch of predictions."""
         top_k = torch.topk(preds, self.k, dim=1).indices
         self.unique_items.append(top_k.detach().cpu())

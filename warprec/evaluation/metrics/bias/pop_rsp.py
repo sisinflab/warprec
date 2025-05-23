@@ -94,9 +94,10 @@ class PopRSP(TopKMetric):
         self.add_state("short_gt", default=torch.tensor(0.0), dist_reduce_fx="sum")
         self.add_state("long_gt", default=torch.tensor(0.0), dist_reduce_fx="sum")
 
-    def update(self, preds: Tensor, target: Tensor, **kwargs: Any):
+    def update(self, preds: Tensor, **kwargs: Any):
         """Updates the metric state with the new batch of predictions."""
-        target = self.binary_relevance(target)
+        target = kwargs.get("binary_relevance", torch.zeros_like(preds))
+
         top_k_values, top_k_indices = torch.topk(preds, self.k, dim=1)
         rel = torch.zeros_like(preds)
         rel.scatter_(

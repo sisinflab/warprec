@@ -121,19 +121,28 @@ class Evaluator:
         for train_batch, test_batch, val_batch in dataset:
             _end = _start + train_batch.shape[0]  # Track strat - end of batch iteration
             eval_set = test_batch if test_set else val_batch
-            target = torch.tensor(
+            ground = torch.tensor(
                 (eval_set).toarray(), device=device
-            )  # Target tensor [batch_size x items]
+            )  # Ground tensor [batch_size x items]
 
             predictions = model.predict(train_batch, start=_start, end=_end).to(
                 device
             )  # Get ratings tensor [batch_size x items]
 
+            # Pre-compute binary and discounted relevance
+            binary_relevance = BaseMetric.binary_relevance(ground)
+            discounted_relevance = BaseMetric.discounted_relevance(ground)
+
             # Update all metrics on current batches
             for _, metric_instances in self.metrics.items():
                 for metric in metric_instances:
-                    metric.update(predictions, target, start=_start)
-
+                    metric.update(
+                        predictions,
+                        ground=ground,
+                        binary_relevance=binary_relevance,
+                        discounted_relevance=discounted_relevance,
+                        start=_start,
+                    )
             _start = _end
 
         if verbose:

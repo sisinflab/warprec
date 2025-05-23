@@ -56,8 +56,10 @@ class RMSE(BaseMetric):
         )
         self.add_state("total_count", default=torch.tensor(0.0), dist_reduce_fx="sum")
 
-    def update(self, preds: Tensor, target: Tensor, **kwargs: Any):
+    def update(self, preds: Tensor, **kwargs: Any):
         """Updates the metric state with the new batch of predictions."""
+        target = kwargs.get("ground", torch.zeros_like(preds))
+
         mask = target > 0
         squared_errors = (preds[mask] - target[mask]) ** 2
         self.sum_squared_errors += squared_errors.sum()
