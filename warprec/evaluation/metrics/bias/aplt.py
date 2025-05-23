@@ -94,7 +94,7 @@ class APLT(TopKMetric):
 
         # Retrieve user number (consider only user with at least
         # one interaction)
-        self.users += (target > 0).any(dim=1).sum().item()
+        users = (target > 0).any(dim=1).sum().item()
 
         # Expand long tail
         long_tail_matrix = self.long_tail.expand(
@@ -106,6 +106,7 @@ class APLT(TopKMetric):
 
         # Update
         self.long_hits += long_hits.sum()
+        self.users += users
 
     def compute(self):
         """Computes the final metric value."""
