@@ -172,7 +172,9 @@ class SearchSpace(str, Enum):
 
 
 class MetricBlock(str, Enum):
-    """Represents the types metric blocks that can be precomputed.
+    """Represents the types metric blocks that can be precomputed. A metric block is
+    a series of operation shared between metrics that can be computed one time and used by more
+    than one metric for efficiency.
 
     This enum is used to track the possible metric blocks:
         - BINARY_RELEVANCE: The relevance represented as a binary tensor [0, 1].
