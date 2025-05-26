@@ -157,6 +157,8 @@ class Interactions:
         """
         if isinstance(self._inter_side_sparse, csr_matrix):
             return self._inter_side_sparse
+        if self._inter_side is None:
+            return None
         self._inter_side_sparse = csr_matrix(
             self._inter_side.drop(self._item_label, axis=1), dtype=self.precision
         )
@@ -176,57 +178,95 @@ class Interactions:
             DataLoader: Yields (user, item, rating) with negative samples.
         """
         # Define main variables
-        sparse_matrix = self.get_sparse().tocoo()
-        users_pos = sparse_matrix.row
-        items_pos = sparse_matrix.col
+        sparse_matrix = self.get_sparse()
+        sparse_matrix_coo = sparse_matrix.tocoo()
+        num_users = self._nuid
         num_items = self._niid
-        num_positives = len(users_pos)
+
+        # Single call of module for efficiency
+        rint = np.random.randint  # Storing the module call is ever so slightly faster
 
         # Create positive interactions tensor (implicit feedback)
-        pos_users = torch.LongTensor(users_pos)
-        pos_items = torch.LongTensor(items_pos)
-        pos_ratings = torch.ones_like(pos_users, dtype=torch.float)
+        pos_users = torch.LongTensor(sparse_matrix_coo.row)
+        pos_items = torch.LongTensor(sparse_matrix_coo.col)
+        num_positives = len(pos_users)
 
-        # Precompute positive for each user
-        user_pos_items = {
-            u: set(items_pos[users_pos == u]) for u in np.unique(users_pos)
-        }
-        all_items = np.arange(num_items)
+        # Create tensors of positives
+        pos_users_tensor = torch.LongTensor(pos_users)
+        pos_items_tensor = torch.LongTensor(pos_items)
+        pos_ratings_tensor = torch.ones(num_positives, dtype=torch.float)
 
-        # Preallocate arrays for negatives
-        neg_users = np.empty(num_positives * num_negatives, dtype=np.int64)
-        neg_items = np.empty_like(neg_users)
+        if num_negatives == 0:  # Check if negative samples are required
+            if num_positives == 0:  # Edge case: No interactions
+                dataset = TensorDataset(
+                    torch.LongTensor([]), torch.LongTensor([]), torch.FloatTensor([])
+                )  # Empty dataset
+            else:
+                dataset = TensorDataset(
+                    pos_users_tensor, pos_items_tensor, pos_ratings_tensor
+                )  # Only positive dataset
+            return DataLoader(dataset, batch_size=self.batch_size, shuffle=shuffle)
 
-        start_idx = 0
-        for u, pos_set in user_pos_items.items():
-            # For each user, find the items they have not interacted with
-            # and sample negative items
-            user_mask = users_pos == u
-            user_count = np.sum(user_mask)
-            neg_candidates = np.setdiff1d(all_items, list(pos_set))
-
-            # Sample all negatives for this user at once
-            replace = len(neg_candidates) < num_negatives * user_count
-            sampled = np.random.choice(
-                neg_candidates, size=num_negatives * user_count, replace=replace
+        # Other edge case: No positive interactions
+        elif num_positives == 0:
+            dataset = TensorDataset(
+                torch.LongTensor([]), torch.LongTensor([]), torch.FloatTensor([])
             )
+            return DataLoader(dataset, batch_size=self.batch_size, shuffle=shuffle)
 
-            # Fill preallocated arrays
-            end_idx = start_idx + num_negatives * user_count
-            neg_users[start_idx:end_idx] = u
-            neg_items[start_idx:end_idx] = sampled
-            start_idx = end_idx
+        total_samples = (
+            num_positives * num_negatives
+        )  # At this point this will be a positive number
 
-        # Create negative interactions tensor
-        # Note: PyTorch tensors require long integers for indices
-        neg_users = torch.LongTensor(neg_users)
-        neg_items = torch.LongTensor(neg_items)
-        neg_ratings = torch.zeros_like(neg_users, dtype=torch.float)
+        neg_users = np.empty(total_samples, dtype=np.int64)
+        neg_items = np.empty(total_samples, dtype=np.int64)
 
-        # Combine positive and negative samples
-        all_users = torch.cat([pos_users, neg_users])
-        all_items = torch.cat([pos_items, neg_items])
-        all_ratings = torch.cat([pos_ratings, neg_ratings])
+        current_neg_idx = 0
+        for u in range(num_users):
+            # Using sparse CSR matrix, get the indices of nnz columns
+            # these will be the positive items
+            start_ptr = sparse_matrix.indptr[u]
+            end_ptr = sparse_matrix.indptr[u + 1]
+
+            # Get indices of items interacted (positive items)
+            user_pos = sparse_matrix.indices[start_ptr:end_ptr]
+            user_count = len(user_pos)
+            if user_count == 0:  # Skip the user if it has 0 interactions
+                continue
+
+            # Number of user negative samples
+            user_neg = user_count * num_negatives
+            user_pos_set = set(user_pos)  # Efficient control using sets
+
+            # Edge case: the user interacted with all the items
+            if user_count == num_items:
+                continue  # Skip the user if it interacted with all items
+
+            # Iter for each negative samples for this user
+            for _ in range(user_neg):
+                # Until we find a valid negative, keep searching
+                while True:
+                    candidate_neg_item = rint(0, num_items)
+                    if candidate_neg_item not in user_pos_set:
+                        # If found save and break loop
+                        neg_users[current_neg_idx] = u
+                        neg_items[current_neg_idx] = candidate_neg_item
+                        current_neg_idx += 1
+                        break
+
+        # Trim length based on possible triplets skipped
+        neg_users_trimmed = neg_users[:current_neg_idx]
+        neg_items_trimmed = neg_items[:current_neg_idx]
+
+        # Create Tensors for efficient data loading
+        neg_users_tensor = torch.LongTensor(neg_users_trimmed)
+        neg_items_tensor = torch.LongTensor(neg_items_trimmed)
+        neg_ratings_tensor = torch.zeros(current_neg_idx, dtype=torch.float)
+
+        # Concatenate complete tensors for final dataset
+        all_users = torch.cat([pos_users_tensor, neg_users_tensor])
+        all_items = torch.cat([pos_items_tensor, neg_items_tensor])
+        all_ratings = torch.cat([pos_ratings_tensor, neg_ratings_tensor])
 
         # Create final dataset
         dataset = TensorDataset(all_users, all_items, all_ratings)
@@ -243,47 +283,65 @@ class Interactions:
             DataLoader: Yields triplets of (user, positive_item, negative_item).
         """
         # Define main variables
-        sparse_matrix = self.get_sparse().tocoo()
-        users_pos = sparse_matrix.row
-        items_pos = sparse_matrix.col
+        sparse_matrix = self.get_sparse()
+        num_users = self._nuid
         num_items = self._niid
-        num_positives = len(users_pos)
-
-        # Precompute positive items for each user
-        user_pos_items = {u: items_pos[users_pos == u] for u in np.unique(users_pos)}
-        all_items = np.arange(num_items)
+        num_positives = sparse_matrix.nnz
 
         # Preallocate arrays for triplets
         users_triplet = np.empty(num_positives, dtype=np.int64)
         positives_triplet = np.empty_like(users_triplet)
         negatives_triplet = np.empty_like(users_triplet)
 
-        start_idx = 0
-        for u, pos_items in user_pos_items.items():
-            user_count = len(pos_items)
+        # Single call of module for efficiency
+        rint = np.random.randint  # Storing the module call is ever so slightly faster
+
+        current_idx = 0
+        for u in range(num_users):
+            # Using sparse CSR matrix, get the indices of nnz columns
+            # these will be the positive items
+            start_ptr = sparse_matrix.indptr[u]
+            end_ptr = sparse_matrix.indptr[u + 1]
+
+            # Get indices of items interacted (positive items)
+            user_pos = sparse_matrix.indices[start_ptr:end_ptr]
+            user_count = len(user_pos)
             if user_count == 0:  # Skip the user if it has 0 interactions
                 continue
 
-            neg_candidates = np.setdiff1d(all_items, pos_items)
-            if len(neg_candidates) == 0:  # Extreme edge case. Normally not a problem
-                continue
+            user_pos_set = set(user_pos)  # Efficient control using sets
 
-            # Sample negatives for all positives in this user
-            replace = len(neg_candidates) < user_count
-            sampled = np.random.choice(neg_candidates, size=user_count, replace=replace)
+            # Edge case: the user interacted with all the items
+            if user_count == num_items:
+                continue  # Skip the user if it interacted with all items
 
-            # Create triplet components
-            end_idx = start_idx + user_count
-            users_triplet[start_idx:end_idx] = np.full(user_count, u)
-            positives_triplet[start_idx:end_idx] = pos_items
-            negatives_triplet[start_idx:end_idx] = sampled
-            start_idx = end_idx
+            # Iter through all the positive items
+            for pos_item in user_pos:
+                # Assign user and positive item to arrays
+                users_triplet[current_idx] = u
+                positives_triplet[current_idx] = pos_item
 
-        # Trim to actual size and convert to tensors
-        # Note: PyTorch tensors require long integers for indices
-        users_tensor = torch.LongTensor(users_triplet[:start_idx])
-        positives_tensor = torch.LongTensor(positives_triplet[:start_idx])
-        negatives_tensor = torch.LongTensor(negatives_triplet[:start_idx])
+                # Until we find a valid negative, keep searching
+                while True:
+                    candidate_neg_item = rint(0, num_items)
+
+                    if (
+                        candidate_neg_item not in user_pos_set
+                    ):  # If found save and break loop
+                        negatives_triplet[current_idx] = candidate_neg_item
+                        break
+
+                current_idx += 1
+
+        # Trim length based on possible triplets skipped
+        users_triplet_trimmed = users_triplet[:current_idx]
+        positives_triplet_trimmed = positives_triplet[:current_idx]
+        negatives_triplet_trimmed = negatives_triplet[:current_idx]
+
+        # Create Tensors for efficient data loading
+        users_tensor = torch.LongTensor(users_triplet_trimmed)
+        positives_tensor = torch.LongTensor(positives_triplet_trimmed)
+        negatives_tensor = torch.LongTensor(negatives_triplet_trimmed)
 
         # Create final dataset
         dataset = TensorDataset(users_tensor, positives_tensor, negatives_tensor)
