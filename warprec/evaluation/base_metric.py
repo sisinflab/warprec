@@ -45,6 +45,18 @@ class BaseMetric(Metric, ABC):
         return torch.where(target > 0, 2 ** (target + 1) - 1, target)
 
     @classmethod
+    def valid_users(self, target: Tensor) -> int:
+        """Compute the number of valid users.
+
+        Args:
+            target (Tensor): The target tensor.
+
+        Returns:
+            int: The number of valid users.
+        """
+        return int((target > 0).any(dim=1).sum().item())
+
+    @classmethod
     def top_k_values_indices(self, preds: Tensor, k: int) -> Tuple[Tensor, Tensor]:
         """Compute the top k indices and values.
 

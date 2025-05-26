@@ -104,6 +104,7 @@ class EFD(TopKMetric):
             if relevance == "discounted"
             else {MetricBlock.BINARY_RELEVANCE, MetricBlock.TOP_K_BINARY_RELEVANCE}
         )
+        self._REQUIRED_COMPONENTS.add(MetricBlock.VALID_USERS)
         self._REQUIRED_COMPONENTS.add(MetricBlock.TOP_K_INDICES)
 
     def update(self, preds: Tensor, **kwargs):
@@ -125,6 +126,7 @@ class EFD(TopKMetric):
                 f"top_{self.k}_binary_relevance",
                 self.top_k_relevance(preds, target, self.k),
             )
+        users = kwargs.get("valid_users", self.valid_users(target))
 
         # Extract novelty values
         batch_novelty = self.novelty_profile.repeat(
@@ -136,7 +138,7 @@ class EFD(TopKMetric):
         self.efd += self.dcg(top_k_rel * novelty).sum()
 
         # Count only users with at least one interaction
-        self.users += (target > 0).any(dim=1).sum().item()
+        self.users += users
 
     def compute(self):
         """Computes the final value of the metric."""

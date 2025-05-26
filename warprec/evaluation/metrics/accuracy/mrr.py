@@ -62,6 +62,7 @@ class MRR(TopKMetric):
 
     _REQUIRED_COMPONENTS: Set[MetricBlock] = {
         MetricBlock.BINARY_RELEVANCE,
+        MetricBlock.VALID_USERS,
         MetricBlock.TOP_K_BINARY_RELEVANCE,
     }
 
@@ -80,6 +81,7 @@ class MRR(TopKMetric):
     def update(self, preds: Tensor, **kwargs: Any):
         """Updates the MRR metric state with a batch of predictions."""
         target: Tensor = kwargs.get("binary_relevance", torch.zeros_like(preds))
+        users = kwargs.get("valid_users", self.valid_users(target))
         top_k_rel: Tensor = kwargs.get(
             f"top_{self.k}_binary_relevance",
             self.top_k_relevance(preds, target, self.k),
@@ -92,7 +94,7 @@ class MRR(TopKMetric):
         self.reciprocal_rank_sum += reciprocal_ranks.sum()
 
         # Count only users with at least one interaction
-        self.users += (target > 0).any(dim=1).sum().item()
+        self.users += users
 
     def compute(self):
         """Computes the final MRR@K value."""

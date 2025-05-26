@@ -150,6 +150,13 @@ class Evaluator:
                 else None
             )
 
+            # We also check if the number of valid users is required
+            valid_users = (
+                BaseMetric.valid_users(ground)
+                if MetricBlock.VALID_USERS in self.required_blocks[self.k_values[0]]
+                else None
+            )
+
             # Then we check all the needed blocks that are shared
             # between metrics so we can pre-computed
             for k in self.k_values:
@@ -190,6 +197,7 @@ class Evaluator:
                         "ground": ground,
                         "binary_relevance": binary_relevance,
                         "discounted_relevance": discounted_relevance,
+                        "valid_users": valid_users,
                         "start": _start,
                         **precomputed_blocks[k],
                     }

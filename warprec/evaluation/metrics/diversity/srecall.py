@@ -108,7 +108,10 @@ class SRecall(TopKMetric):
         **kwargs (Any): Additional keyword arguments dictionary.
     """
 
-    _REQUIRED_COMPONENTS: Set[MetricBlock] = {MetricBlock.TOP_K_INDICES}
+    _REQUIRED_COMPONENTS: Set[MetricBlock] = {
+        MetricBlock.VALID_USERS,
+        MetricBlock.TOP_K_INDICES,
+    }
 
     ratio_feature_retrieved: Tensor
     users: Tensor
@@ -133,6 +136,7 @@ class SRecall(TopKMetric):
     def update(self, preds: Tensor, **kwargs: Any):
         """Computes the final value of the metric."""
         target = kwargs.get("ground", torch.zeros_like(preds))
+        users = kwargs.get("valid_users", self.valid_users(target))
         top_k_indices: Tensor = kwargs.get(
             f"top_{self.k}_indices", self.top_k_values_indices(preds, self.k)[1]
         )
@@ -169,7 +173,7 @@ class SRecall(TopKMetric):
         self.ratio_feature_retrieved += (
             unique_feature_counts / unique_relevant_counts
         ).sum()
-        self.users += (target > 0).any(dim=1).sum().item()
+        self.users += users
 
     def compute(self):
         srecall = (

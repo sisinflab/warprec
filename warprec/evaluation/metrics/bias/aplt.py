@@ -66,6 +66,7 @@ class APLT(TopKMetric):
 
     _REQUIRED_COMPONENTS: Set[MetricBlock] = {
         MetricBlock.BINARY_RELEVANCE,
+        MetricBlock.VALID_USERS,
         MetricBlock.TOP_K_INDICES,
         MetricBlock.TOP_K_VALUES,
     }
@@ -91,6 +92,7 @@ class APLT(TopKMetric):
     def update(self, preds: Tensor, **kwargs: Any):
         """Updates the metric state with the new batch of predictions."""
         target: Tensor = kwargs.get("binary_relevance", torch.zeros_like(preds))
+        users = kwargs.get("valid_users", self.valid_users(target))
         top_k_values: Tensor = kwargs.get(
             f"top_{self.k}_values", self.top_k_values_indices(preds, self.k)[0]
         )
@@ -104,10 +106,6 @@ class APLT(TopKMetric):
         )  # [batch_size x items]
         rel = rel * target  # [batch_size x items]
         rel[rel > 0] = 1
-
-        # Retrieve user number (consider only user with at least
-        # one interaction)
-        users = (target > 0).any(dim=1).sum().item()
 
         # Expand long tail
         long_tail_matrix = self.long_tail.expand(

@@ -1,9 +1,10 @@
 # pylint: disable=arguments-differ, unused-argument
-from typing import Any
+from typing import Any, Set
 
 import torch
 from torch import Tensor
 from warprec.evaluation.base_metric import TopKMetric
+from warprec.utils.enums import MetricBlock
 from warprec.utils.registry import metric_registry
 
 
@@ -38,6 +39,8 @@ class NumRetrieved(TopKMetric):
         **kwargs (Any): The keyword argument dictionary.
     """
 
+    _REQUIRED_COMPONENTS: Set[MetricBlock] = {MetricBlock.VALID_USERS}
+
     cumulative_count: Tensor
     users: Tensor
 
@@ -54,8 +57,8 @@ class NumRetrieved(TopKMetric):
     def update(self, preds: Tensor, **kwargs: Any):
         """Updates the metric state with the new batch of predictions."""
         target = kwargs.get("ground", torch.zeros_like(preds))
+        users = kwargs.get("valid_users", self.valid_users(target))
 
-        users = (target > 0).any(dim=1).sum().item()
         num_items = preds.size(1)
 
         self.cumulative_count += users * min(self.k, num_items)

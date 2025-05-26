@@ -177,6 +177,7 @@ class MetricBlock(str, Enum):
     This enum is used to track the possible metric blocks:
         - BINARY_RELEVANCE: The relevance represented as a binary tensor [0, 1].
         - DISCOUNTED_RELEVANCE: The relevance represented as a discounted tensor.
+        - VALID_USERS: The number of users with at least one relevant item.
         - TOP_K_INDICES: The indices of the top k predictions of the model.
         - TOP_K_VALUES: The values of the top k predictions of the model.
         - TOP_K_BINARY_RELEVANCE: The relevance of the top k predictions as a binary tensor [0, 1].
@@ -185,6 +186,7 @@ class MetricBlock(str, Enum):
 
     BINARY_RELEVANCE = "binary_relevance"
     DISCOUNTED_RELEVANCE = "discounted_relevance"
+    VALID_USERS = "valid_users"
     TOP_K_INDICES = "top_k_indices"
     TOP_K_VALUES = "top_k_values"
     TOP_K_BINARY_RELEVANCE = "top_k_binary_relevance"
