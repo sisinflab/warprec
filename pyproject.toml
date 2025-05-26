@@ -2,7 +2,7 @@
 name = "WarpRec"
 version = "0.1.0"
 description = ""
-authors = ["JTOVS <joseph.trotta@ovs.it>"]
+authors = ["JTOVS <joseph.trotta@ovs.it>", "MarcoWV <marco@wideverse.com>"]
 readme = "README.md"
 
 [tool.poetry.dependencies]
