@@ -20,7 +20,7 @@ Whether you're learning how recommender systems work or conducting high-performa
 ### 📋 Prerequisites
 
 - Python 3.12
-- [Poetry](https://python-poetry.org/) for dependency management.
+- [Poetry 2.1.2](https://python-poetry.org/) for dependency management.
 
 ### 🛠️ Installation Guide
 
