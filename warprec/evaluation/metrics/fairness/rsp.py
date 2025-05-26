@@ -1,10 +1,11 @@
 # pylint: disable=arguments-differ, unused-argument, line-too-long
-from typing import Any
+from typing import Any, Set
 
 import torch
 from torch import Tensor
 from scipy.sparse import csr_matrix
 from warprec.evaluation.base_metric import TopKMetric
+from warprec.utils.enums import MetricBlock
 from warprec.utils.registry import metric_registry
 
 
@@ -76,6 +77,8 @@ class RSP(TopKMetric):
         **kwargs (Any): Additional keyword arguments.
     """
 
+    _REQUIRED_COMPONENTS: Set[MetricBlock] = {MetricBlock.TOP_K_INDICES}
+
     item_clusters: Tensor
     cluster_recommendations: Tensor
     denominator_counts: Tensor
@@ -137,10 +140,10 @@ class RSP(TopKMetric):
 
     def update(self, preds: Tensor, **kwargs: Any):
         """Updates the metric state with the new batch of predictions."""
+        top_k_indices: Tensor = kwargs.get(
+            f"top_{self.k}_indices", self.top_k_values_indices(preds, self.k)[1]
+        )
         batch_size = preds.shape[0]
-
-        # Get top-k recommended item indices for each user in the batch
-        top_k_indices = torch.topk(preds, self.k, dim=1).indices  # [batch_size x k]
 
         # Create a mask for items in the top-k recommendations
         top_k_mask = torch.zeros_like(preds, dtype=torch.bool, device=preds.device)

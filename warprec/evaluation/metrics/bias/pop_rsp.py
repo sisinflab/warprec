@@ -1,10 +1,11 @@
 # pylint: disable=arguments-differ, unused-argument, line-too-long
-from typing import Any
+from typing import Any, Set
 
 import torch
 from torch import Tensor
 from scipy.sparse import csr_matrix
 from warprec.evaluation.base_metric import TopKMetric
+from warprec.utils.enums import MetricBlock
 from warprec.utils.registry import metric_registry
 
 
@@ -71,6 +72,12 @@ class PopRSP(TopKMetric):
         **kwargs (Any): The keyword argument dictionary.
     """
 
+    _REQUIRED_COMPONENTS: Set[MetricBlock] = {
+        MetricBlock.BINARY_RELEVANCE,
+        MetricBlock.TOP_K_INDICES,
+        MetricBlock.TOP_K_VALUES,
+    }
+
     short_hits: Tensor
     long_hits: Tensor
     short_gt: Tensor
@@ -96,9 +103,14 @@ class PopRSP(TopKMetric):
 
     def update(self, preds: Tensor, **kwargs: Any):
         """Updates the metric state with the new batch of predictions."""
-        target = kwargs.get("binary_relevance", torch.zeros_like(preds))
+        target: Tensor = kwargs.get("binary_relevance", torch.zeros_like(preds))
+        top_k_values: Tensor = kwargs.get(
+            f"top_{self.k}_values", self.top_k_values_indices(preds, self.k)[0]
+        )
+        top_k_indices: Tensor = kwargs.get(
+            f"top_{self.k}_indices", self.top_k_values_indices(preds, self.k)[1]
+        )
 
-        top_k_values, top_k_indices = torch.topk(preds, self.k, dim=1)
         rel = torch.zeros_like(preds)
         rel.scatter_(
             dim=1, index=top_k_indices, src=top_k_values

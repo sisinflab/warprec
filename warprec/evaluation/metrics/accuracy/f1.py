@@ -78,6 +78,12 @@ class F1(TopKMetric):
             **kwargs,
         )
 
+        # Update needed blocks to be the union of the blocks
+        # of the two metrics
+        self._REQUIRED_COMPONENTS = (
+            self.metric_1._REQUIRED_COMPONENTS | self.metric_2._REQUIRED_COMPONENTS
+        )
+
     def update(self, preds: Tensor, **kwargs: Any):
         """Updates the metric state with the new batch of predictions."""
         # Update first metric

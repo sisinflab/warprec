@@ -1,9 +1,10 @@
 # pylint: disable=arguments-differ, unused-argument, line-too-long
-from typing import Any
+from typing import Any, Set
 
 import torch
 from torch import Tensor
 from warprec.evaluation.base_metric import TopKMetric
+from warprec.utils.enums import MetricBlock
 from warprec.utils.registry import metric_registry
 
 
@@ -71,6 +72,11 @@ class MAP(TopKMetric):
         **kwargs (Any): Additional keyword arguments to pass to the parent class.
     """
 
+    _REQUIRED_COMPONENTS: Set[MetricBlock] = {
+        MetricBlock.BINARY_RELEVANCE,
+        MetricBlock.TOP_K_BINARY_RELEVANCE,
+    }
+
     ap_sum: Tensor
     users: Tensor
 
@@ -84,18 +90,19 @@ class MAP(TopKMetric):
     def update(self, preds: Tensor, **kwargs: Any):
         """Updates the MAP metric state with a batch of predictions."""
         target = kwargs.get("binary_relevance", torch.zeros_like(preds))
+        top_k_rel: Tensor = kwargs.get(
+            f"top_{self.k}_binary_relevance",
+            self.top_k_relevance(preds, target, self.k),
+        )
 
-        top_k = torch.topk(preds, self.k, dim=1).indices
-        rel = torch.gather(target, 1, top_k)
-
-        precision_at_i = rel.cumsum(dim=1) / torch.arange(
-            1, self.k + 1, device=rel.device
+        precision_at_i = top_k_rel.cumsum(dim=1) / torch.arange(
+            1, self.k + 1, device=top_k_rel.device
         )  # [batch_size, k]
         normalization = torch.minimum(
             target.sum(dim=1),
             torch.tensor(self.k, dtype=target.dtype, device=target.device),
         )  # [batch_size]
-        ap = (precision_at_i * rel).sum(dim=1) / normalization  # [batch_size]
+        ap = (precision_at_i * top_k_rel).sum(dim=1) / normalization  # [batch_size]
 
         self.ap_sum += ap.sum()
 

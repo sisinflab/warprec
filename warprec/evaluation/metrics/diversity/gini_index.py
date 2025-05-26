@@ -1,10 +1,11 @@
 # pylint: disable=arguments-differ, unused-argument, line-too-long
-from typing import Any
+from typing import Any, Set
 
 import torch
 from torch import Tensor
 from scipy.sparse import csr_matrix
 from warprec.evaluation.base_metric import TopKMetric
+from warprec.utils.enums import MetricBlock
 from warprec.utils.registry import metric_registry
 
 
@@ -36,6 +37,8 @@ class Gini(TopKMetric):
         **kwargs (Any): The keyword argument dictionary.
     """
 
+    _REQUIRED_COMPONENTS: Set[MetricBlock] = {MetricBlock.TOP_K_INDICES}
+
     recommended_items: list
     free_norm: Tensor
     num_items: int
@@ -57,10 +60,12 @@ class Gini(TopKMetric):
 
     def update(self, preds: Tensor, **kwargs: Any):
         """Updates the metric state with the new batch of predictions."""
-        top_k = torch.topk(preds, self.k, dim=1).indices
-        batch_size = top_k.shape[0]
+        top_k_indices: Tensor = kwargs.get(
+            f"top_{self.k}_indices", self.top_k_values_indices(preds, self.k)[1]
+        )
+        batch_size = top_k_indices.shape[0]
         self.free_norm += torch.tensor(batch_size * self.k, dtype=torch.float)
-        self.recommended_items.append(top_k.detach().cpu())
+        self.recommended_items.append(top_k_indices.detach().cpu())
 
     def compute(self):
         """Computes the final metric value."""

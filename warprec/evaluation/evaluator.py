@@ -1,4 +1,4 @@
-from typing import List, Dict, Optional
+from typing import List, Dict, Optional, Set
 
 import torch
 import re
@@ -10,6 +10,7 @@ from math import ceil
 from warprec.data.dataset import Dataset
 from warprec.evaluation.base_metric import BaseMetric
 from warprec.recommenders.base_recommender import Recommender
+from warprec.utils.enums import MetricBlock
 from warprec.utils.logger import logger
 from warprec.utils.registry import metric_registry
 
@@ -46,6 +47,7 @@ class Evaluator:
     ):
         self.k_values = k_values
         self.metrics: Dict[int, List[BaseMetric]] = {}
+        self.required_blocks: Dict[int, Set[MetricBlock]] = {}
 
         common_params = {
             "train_set": train_set,
@@ -58,6 +60,7 @@ class Evaluator:
 
         for k in self.k_values:
             self.metrics[k] = []
+            self.required_blocks[k] = set()
             for metric_string in metric_list:
                 metric_name = metric_string
                 metric_params = {}
@@ -89,6 +92,7 @@ class Evaluator:
                     **metric_params,  # Add specific params if needed
                 )
                 self.metrics[k].append(metric_instance)
+                self.required_blocks[k].update(metric_instance._REQUIRED_COMPONENTS)
 
     def evaluate(
         self,
@@ -129,19 +133,69 @@ class Evaluator:
                 device
             )  # Get ratings tensor [batch_size x items]
 
-            # Pre-compute binary and discounted relevance
-            binary_relevance = BaseMetric.binary_relevance(ground)
-            discounted_relevance = BaseMetric.discounted_relevance(ground)
+            # Pre-compute metric blocks
+            precomputed_blocks: Dict[int, Dict[str, Tensor]] = {}
+
+            # First we check for relevance
+            binary_relevance = (
+                BaseMetric.binary_relevance(ground)
+                if MetricBlock.BINARY_RELEVANCE
+                in self.required_blocks[self.k_values[0]]
+                else None
+            )
+            discounted_relevance = (
+                BaseMetric.discounted_relevance(ground)
+                if MetricBlock.DISCOUNTED_RELEVANCE
+                in self.required_blocks[self.k_values[0]]
+                else None
+            )
+
+            # Then we check all the needed blocks that are shared
+            # between metrics so we can pre-computed
+            for k in self.k_values:
+                precomputed_blocks[k] = {}
+                required_blocks_for_k = self.required_blocks[k]
+
+                # Check first if we need .top_k() method
+                if (
+                    MetricBlock.TOP_K_VALUES
+                    or MetricBlock.TOP_K_INDICES
+                    or MetricBlock.TOP_K_BINARY_RELEVANCE
+                    or MetricBlock.TOP_K_DISCOUNTED_RELEVANCE
+                ):
+                    top_k_values, top_k_indices = BaseMetric.top_k_values_indices(
+                        predictions, k
+                    )
+                    precomputed_blocks[k][f"top_{k}_values"] = top_k_values
+                    precomputed_blocks[k][f"top_{k}_indices"] = top_k_indices
+
+                    # Then we also check for .gather() method for better optimization
+                    if MetricBlock.TOP_K_BINARY_RELEVANCE in required_blocks_for_k:
+                        precomputed_blocks[k][f"top_{k}_binary_relevance"] = (
+                            BaseMetric.top_k_relevance_from_indices(
+                                binary_relevance, top_k_indices
+                            )
+                        )
+                    if MetricBlock.TOP_K_DISCOUNTED_RELEVANCE in required_blocks_for_k:
+                        precomputed_blocks[k][f"top_{k}_discounted_relevance"] = (
+                            BaseMetric.top_k_relevance_from_indices(
+                                discounted_relevance, top_k_indices
+                            )
+                        )
 
             # Update all metrics on current batches
-            for _, metric_instances in self.metrics.items():
+            for k, metric_instances in self.metrics.items():
                 for metric in metric_instances:
+                    update_kwargs = {
+                        "ground": ground,
+                        "binary_relevance": binary_relevance,
+                        "discounted_relevance": discounted_relevance,
+                        "start": _start,
+                        **precomputed_blocks[k],
+                    }
                     metric.update(
                         predictions,
-                        ground=ground,
-                        binary_relevance=binary_relevance,
-                        discounted_relevance=discounted_relevance,
-                        start=_start,
+                        **update_kwargs,
                     )
             _start = _end
 

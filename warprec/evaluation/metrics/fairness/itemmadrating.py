@@ -1,10 +1,11 @@
 # pylint: disable=arguments-differ, unused-argument, line-too-long
-from typing import Any
+from typing import Any, Set
 
 import torch
 from torch import Tensor
 from scipy.sparse import csr_matrix
 from warprec.evaluation.base_metric import TopKMetric
+from warprec.utils.enums import MetricBlock
 from warprec.utils.registry import metric_registry
 
 
@@ -55,6 +56,12 @@ class ItemMADRating(TopKMetric):
         **kwargs (Any): Additional keyword arguments.
     """
 
+    _REQUIRED_COMPONENTS: Set[MetricBlock] = {
+        MetricBlock.BINARY_RELEVANCE,
+        MetricBlock.TOP_K_VALUES,
+        MetricBlock.TOP_K_INDICES,
+    }
+
     item_clusters: Tensor
     item_counts: Tensor
     item_gains: Tensor
@@ -89,10 +96,15 @@ class ItemMADRating(TopKMetric):
 
     def update(self, preds: Tensor, **kwargs: Any):
         """Updates the metric state with the new batch of predictions."""
-        target = kwargs.get("binary_relevance", torch.zeros_like(preds))
+        target: Tensor = kwargs.get("binary_relevance", torch.zeros_like(preds))
+        top_k_values: Tensor = kwargs.get(
+            f"top_{self.k}_values", self.top_k_values_indices(preds, self.k)[0]
+        )
+        top_k_indices: Tensor = kwargs.get(
+            f"top_{self.k}_indices", self.top_k_values_indices(preds, self.k)[1]
+        )
 
         # Item counts
-        top_k_scores, top_k_indices = torch.topk(preds, self.k, dim=1)
         counts = torch.bincount(
             top_k_indices.flatten(), minlength=self.n_items
         )  # [num_items]
@@ -105,7 +117,7 @@ class ItemMADRating(TopKMetric):
         relevance_mask = target[row_indices, top_k_indices]  # [batch_size x k]
 
         # Multiply scores by relevance mask (0 for non-relevant items)
-        gains = top_k_scores * relevance_mask  # [batch_size x k]
+        gains = top_k_values * relevance_mask  # [batch_size x k]
 
         # Scatter gains to full item dimension and sum
         gain_matrix = torch.zeros_like(preds)

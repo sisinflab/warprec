@@ -101,8 +101,8 @@ class BiasDisparityBS(BaseMetric):
 
     def update(self, preds: Tensor, **kwargs: Any):
         """Updates the metric state with the new batch of predictions."""
-        target = kwargs.get("ground", torch.zeros_like(preds))
         start = kwargs.get("start", 0)
+        target: Tensor = kwargs.get("ground", torch.zeros_like(preds))
 
         batch_size = preds.size(0)
         user_indices = torch.arange(start, start + batch_size, device=preds.device)

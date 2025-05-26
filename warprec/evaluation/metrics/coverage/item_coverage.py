@@ -1,9 +1,10 @@
 # pylint: disable=arguments-differ, unused-argument
-from typing import Any
+from typing import Any, Set
 
 import torch
 from torch import Tensor
 from warprec.evaluation.base_metric import TopKMetric
+from warprec.utils.enums import MetricBlock
 from warprec.utils.registry import metric_registry
 
 
@@ -22,6 +23,8 @@ class ItemCoverage(TopKMetric):
         **kwargs (Any): The keyword argument dictionary.
     """
 
+    _REQUIRED_COMPONENTS: Set[MetricBlock] = {MetricBlock.TOP_K_INDICES}
+
     unique_items: list
 
     def __init__(
@@ -32,8 +35,10 @@ class ItemCoverage(TopKMetric):
 
     def update(self, preds: Tensor, **kwargs: Any):
         """Updates the metric state with the new batch of predictions."""
-        top_k = torch.topk(preds, self.k, dim=1).indices
-        self.unique_items.append(top_k.detach().cpu())
+        top_k_indices: Tensor = kwargs.get(
+            f"top_{self.k}_indices", self.top_k_values_indices(preds, self.k)[1]
+        )
+        self.unique_items.append(top_k_indices.detach().cpu())
 
     def compute(self):
         """Computes the final metric value."""

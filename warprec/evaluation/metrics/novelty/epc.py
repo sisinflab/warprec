@@ -5,6 +5,7 @@ import torch
 from torch import Tensor
 from scipy.sparse import csr_matrix
 from warprec.evaluation.base_metric import TopKMetric
+from warprec.utils.enums import MetricBlock
 from warprec.utils.registry import metric_registry
 
 
@@ -97,24 +98,42 @@ class EPC(TopKMetric):
         self.add_state("epc", default=torch.tensor(0.0), dist_reduce_fx="sum")
         self.add_state("users", default=torch.tensor(0.0), dist_reduce_fx="sum")
 
+        # Check for requirements
+        self._REQUIRED_COMPONENTS = (
+            {MetricBlock.DISCOUNTED_RELEVANCE, MetricBlock.TOP_K_DISCOUNTED_RELEVANCE}
+            if relevance == "discounted"
+            else {MetricBlock.BINARY_RELEVANCE, MetricBlock.TOP_K_BINARY_RELEVANCE}
+        )
+        self._REQUIRED_COMPONENTS.add(MetricBlock.TOP_K_INDICES)
+
     def update(self, preds: Tensor, **kwargs: Any):
         """Updates the metric state with a new batch of predictions."""
+        top_k_indices: Tensor = kwargs.get(
+            f"top_{self.k}_indices", self.top_k_values_indices(preds, self.k)[1]
+        )
+        target: Tensor = None
+        top_k_rel: Tensor = None
         if self.relevance == "discounted":
             target = kwargs.get("discounted_relevance", torch.zeros_like(preds))
+            top_k_rel = kwargs.get(
+                f"top_{self.k}_discounted_relevance",
+                self.top_k_relevance(preds, target, self.k),
+            )
         else:
             target = kwargs.get("binary_relevance", torch.zeros_like(preds))
-
-        top_k = torch.topk(preds, self.k, dim=1, largest=True, sorted=True).indices
-        rel = torch.gather(target, 1, top_k).float()
+            top_k_rel = kwargs.get(
+                f"top_{self.k}_binary_relevance",
+                self.top_k_relevance(preds, target, self.k),
+            )
 
         # Extract novelty values
         batch_novelty = self.novelty_profile.repeat(
             target.shape[0], 1
         )  # [batch_size x items]
-        novelty = torch.gather(batch_novelty, 1, top_k)  # [batch_size x top_k]
+        novelty = torch.gather(batch_novelty, 1, top_k_indices)  # [batch_size x top_k]
 
         # Update
-        self.epc += self.dcg(rel * novelty).sum()
+        self.epc += self.dcg(top_k_rel * novelty).sum()
 
         # Count only users with at least one interaction
         self.users += (target > 0).any(dim=1).sum().item()

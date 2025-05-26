@@ -1,10 +1,11 @@
 # pylint: disable=arguments-differ, unused-argument, line-too-long
-from typing import Any
+from typing import Any, Set
 
 import torch
 from pandas import DataFrame
 from torch import Tensor
 from warprec.evaluation.base_metric import TopKMetric
+from warprec.utils.enums import MetricBlock
 from warprec.utils.registry import metric_registry
 
 
@@ -107,6 +108,8 @@ class SRecall(TopKMetric):
         **kwargs (Any): Additional keyword arguments dictionary.
     """
 
+    _REQUIRED_COMPONENTS: Set[MetricBlock] = {MetricBlock.TOP_K_INDICES}
+
     ratio_feature_retrieved: Tensor
     users: Tensor
 
@@ -130,9 +133,9 @@ class SRecall(TopKMetric):
     def update(self, preds: Tensor, **kwargs: Any):
         """Computes the final value of the metric."""
         target = kwargs.get("ground", torch.zeros_like(preds))
-
-        # Get top-k recommended item scores and indices for each user in the batch
-        top_k_indices = torch.topk(preds, self.k, dim=1).indices  # [batch_size x k]
+        top_k_indices: Tensor = kwargs.get(
+            f"top_{self.k}_indices", self.top_k_values_indices(preds, self.k)[1]
+        )
 
         # Create a mask for items in the top-k recommendations
         top_k_mask = torch.zeros_like(preds, dtype=torch.bool, device=preds.device)

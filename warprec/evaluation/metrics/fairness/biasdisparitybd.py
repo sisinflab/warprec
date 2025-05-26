@@ -93,6 +93,12 @@ class BiasDisparityBD(TopKMetric):
         self.n_item_clusters = self.bs_metric.n_item_clusters  # type: ignore[assignment]
         self.n_item_effective_clusters = self.bs_metric.n_item_effective_clusters  # type: ignore[assignment]
 
+        # Update needed blocks to be the union of the blocks
+        # of the two metrics
+        self._REQUIRED_COMPONENTS = (
+            self.bs_metric._REQUIRED_COMPONENTS | self.br_metric._REQUIRED_COMPONENTS
+        )
+
     def update(self, preds: Tensor, **kwargs: Any):
         """Updates the metric state with the new batch of predictions."""
         # Update BiasDisparityBS (bias from training set)

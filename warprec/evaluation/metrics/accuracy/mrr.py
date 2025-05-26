@@ -1,9 +1,10 @@
 # pylint: disable=arguments-differ, unused-argument, line-too-long
-from typing import Any
+from typing import Any, Set
 
 import torch
 from torch import Tensor
 from warprec.evaluation.base_metric import TopKMetric
+from warprec.utils.enums import MetricBlock
 from warprec.utils.registry import metric_registry
 
 
@@ -59,6 +60,11 @@ class MRR(TopKMetric):
         **kwargs (Any): Additional keyword arguments to pass to the parent class.
     """
 
+    _REQUIRED_COMPONENTS: Set[MetricBlock] = {
+        MetricBlock.BINARY_RELEVANCE,
+        MetricBlock.TOP_K_BINARY_RELEVANCE,
+    }
+
     reciprocal_rank_sum: Tensor
     users: Tensor
 
@@ -73,14 +79,15 @@ class MRR(TopKMetric):
 
     def update(self, preds: Tensor, **kwargs: Any):
         """Updates the MRR metric state with a batch of predictions."""
-        target = kwargs.get("binary_relevance", torch.zeros_like(preds))
-
-        top_k = torch.topk(preds, self.k, dim=1).indices
-        rel = torch.gather(target, 1, top_k)
+        target: Tensor = kwargs.get("binary_relevance", torch.zeros_like(preds))
+        top_k_rel: Tensor = kwargs.get(
+            f"top_{self.k}_binary_relevance",
+            self.top_k_relevance(preds, target, self.k),
+        )
 
         # Find the first relevant item's rank
-        reciprocal_ranks = (rel.argmax(dim=1) + 1).float().reciprocal()
-        reciprocal_ranks[rel.sum(dim=1) == 0] = 0  # Assign 0 if no relevant items
+        reciprocal_ranks = (top_k_rel.argmax(dim=1) + 1).float().reciprocal()
+        reciprocal_ranks[top_k_rel.sum(dim=1) == 0] = 0  # Assign 0 if no relevant items
 
         self.reciprocal_rank_sum += reciprocal_ranks.sum()
 

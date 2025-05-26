@@ -1,15 +1,20 @@
 # pylint: disable=arguments-differ
 from abc import abstractmethod, ABC
-from typing import Any, Tuple
+from typing import Any, Tuple, Set
 
 import torch
 from torch import Tensor
 from torchmetrics import Metric
 from scipy.sparse import csr_matrix
+from warprec.utils.enums import MetricBlock
 
 
 class BaseMetric(Metric, ABC):
     """The base definition of a metric using Torchmetrics."""
+
+    _REQUIRED_COMPONENTS: Set[MetricBlock] = (
+        set()
+    )  # This defines the data that needs to be pre-computed
 
     @abstractmethod
     def compute(self) -> dict[str, float]:
@@ -38,6 +43,51 @@ class BaseMetric(Metric, ABC):
             Tensor: The discounted relevance tensor.
         """
         return torch.where(target > 0, 2 ** (target + 1) - 1, target)
+
+    @classmethod
+    def top_k_values_indices(self, preds: Tensor, k: int) -> Tuple[Tensor, Tensor]:
+        """Compute the top k indices and values.
+
+        Args:
+            preds (Tensor): The prediction tensor
+            k (int): The value of cutoff.
+
+        Returns:
+            Tuple[Tensor, Tensor]:
+                - Tensor: The values tensor.
+                - Tensor: The indices tensor
+        """
+        return torch.topk(preds, k, dim=1)
+
+    @classmethod
+    def top_k_relevance_from_indices(
+        self, target: Tensor, top_k_indices: Tensor
+    ) -> Tensor:
+        """Compute the top k relevance tensor.
+
+        Args:
+            target (Tensor): The target tensor.
+            top_k_indices (Tensor): The top k indices.
+
+        Returns:
+            Tensor: The top k relevance tensor.
+        """
+        return torch.gather(target, dim=1, index=top_k_indices)
+
+    @classmethod
+    def top_k_relevance(self, preds: Tensor, target: Tensor, k: int) -> Tensor:
+        """Compute the top k relevance tensor.
+
+        Args:
+            preds (Tensor): The prediction tensor
+            target (Tensor): The target tensor.
+            k (int): The value of cutoff.
+
+        Returns:
+            Tensor: The top k relevance tensor.
+        """
+        _, top_k_indices = torch.topk(preds, k, dim=1)
+        return torch.gather(target, dim=1, index=top_k_indices)
 
     def compute_head_tail(
         self, train_set: csr_matrix, pop_ratio: float = 0.8

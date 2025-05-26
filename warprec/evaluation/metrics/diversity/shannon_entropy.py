@@ -1,10 +1,11 @@
 # pylint: disable=arguments-differ, unused-argument, line-too-long
-from typing import Any
+from typing import Any, Set
 
 import torch
 from torch import Tensor
 from scipy.sparse import csr_matrix
 from warprec.evaluation.base_metric import TopKMetric
+from warprec.utils.enums import MetricBlock
 from warprec.utils.registry import metric_registry
 
 
@@ -59,6 +60,8 @@ class ShannonEntropy(TopKMetric):
         **kwargs (Any): The keyword argument dictionary.
     """
 
+    _REQUIRED_COMPONENTS: Set[MetricBlock] = {MetricBlock.TOP_K_INDICES}
+
     item_counts: Tensor
     users: Tensor
 
@@ -81,10 +84,12 @@ class ShannonEntropy(TopKMetric):
 
     def update(self, preds: Tensor, **kwargs: Any):
         # Get top-k recommended item indices
-        top_k = torch.topk(preds, self.k, dim=1).indices
+        top_k_indices: Tensor = kwargs.get(
+            f"top_{self.k}_indices", self.top_k_values_indices(preds, self.k)[1]
+        )
 
         # Flatten recommendations and count occurrences
-        flattened = top_k.flatten().long()
+        flattened = top_k_indices.flatten().long()
         batch_counts = torch.bincount(flattened, minlength=self.num_items)
 
         # Update state

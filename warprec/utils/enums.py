@@ -169,3 +169,14 @@ class SearchSpace(str, Enum):
     QLOGRANDINT = "qlograndint"
     CHOICE = "choice"
     GRID = "grid"
+
+
+class MetricBlock(str, Enum):
+    """"""
+
+    BINARY_RELEVANCE = "binary_relevance"
+    DISCOUNTED_RELEVANCE = "discounted_relevance"
+    TOP_K_INDICES = "top_k_indices"
+    TOP_K_VALUES = "top_k_values"
+    TOP_K_BINARY_RELEVANCE = "top_k_binary_relevance"
+    TOP_K_DISCOUNTED_RELEVANCE = "top_k_discounted_relevance"

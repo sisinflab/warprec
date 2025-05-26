@@ -1,9 +1,10 @@
 # pylint: disable=arguments-differ, unused-argument, line-too-long
-from typing import Any
+from typing import Any, Set
 
 import torch
 from torch import Tensor
 from warprec.evaluation.base_metric import TopKMetric
+from warprec.utils.enums import MetricBlock
 from warprec.utils.registry import metric_registry
 
 
@@ -78,6 +79,11 @@ class nDCG(TopKMetric):
         **kwargs (Any): The keyword argument dictionary.
     """
 
+    _REQUIRED_COMPONENTS: Set[MetricBlock] = {
+        MetricBlock.DISCOUNTED_RELEVANCE,
+        MetricBlock.TOP_K_DISCOUNTED_RELEVANCE,
+    }
+
     ndcg: Tensor
     users: Tensor
 
@@ -91,13 +97,14 @@ class nDCG(TopKMetric):
     def update(self, preds: Tensor, **kwargs: Any):
         """Updates the metric state with the new batch of predictions."""
         # The discounted relevance is computed as 2^(rel + 1) - 1
-        target = kwargs.get("discounted_relevance", torch.zeros_like(preds))
+        target: Tensor = kwargs.get("discounted_relevance", torch.zeros_like(preds))
+        top_k_rel: Tensor = kwargs.get(
+            f"top_{self.k}_discounted_relevance",
+            self.top_k_relevance(preds, target, self.k),
+        )
 
-        top_k = torch.topk(preds, self.k, dim=1, largest=True, sorted=True).indices
-        rel = torch.gather(target, 1, top_k).float()
-        ideal_rel = torch.topk(target, self.k, dim=1, largest=True, sorted=True).values
-
-        dcg_score = self.dcg(rel)
+        ideal_rel = torch.topk(target, self.k, dim=1).values
+        dcg_score = self.dcg(top_k_rel)
         idcg_score = self.dcg(ideal_rel).clamp(min=1e-10)
 
         self.ndcg += (dcg_score / idcg_score).nan_to_num(0).sum()

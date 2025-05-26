@@ -1,9 +1,10 @@
 # pylint: disable=arguments-differ, unused-argument, line-too-long
-from typing import Any
+from typing import Any, Set
 
 import torch
 from torch import Tensor
 from warprec.evaluation.base_metric import TopKMetric
+from warprec.utils.enums import MetricBlock
 from warprec.utils.registry import metric_registry
 
 
@@ -54,6 +55,11 @@ class Precision(TopKMetric):
         **kwargs (Any): The keyword argument dictionary.
     """
 
+    _REQUIRED_COMPONENTS: Set[MetricBlock] = {
+        MetricBlock.BINARY_RELEVANCE,
+        MetricBlock.TOP_K_BINARY_RELEVANCE,
+    }
+
     correct: Tensor
     users: Tensor
 
@@ -66,11 +72,13 @@ class Precision(TopKMetric):
 
     def update(self, preds: Tensor, **kwargs: Any):
         """Updates the metric state with the new batch of predictions."""
-        target = kwargs.get("binary_relevance", torch.zeros_like(preds))
+        target: Tensor = kwargs.get("binary_relevance", torch.zeros_like(preds))
+        top_k_rel: Tensor = kwargs.get(
+            f"top_{self.k}_binary_relevance",
+            self.top_k_relevance(preds, target, self.k),
+        )
 
-        top_k = torch.topk(preds, self.k, dim=1).indices
-        rel = torch.gather(target, 1, top_k)
-        self.correct += rel.sum().float()
+        self.correct += top_k_rel.sum().float()
 
         # Count only users with at least one interaction
         self.users += (target > 0).any(dim=1).sum().item()

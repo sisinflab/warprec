@@ -9,6 +9,7 @@ from .enums import (
     SearchAlgorithms,
     Schedulers,
     SearchSpace,
+    MetricBlock,
 )
 from .registry import (
     splitting_registry,
@@ -34,6 +35,7 @@ __all__ = [
     "SearchAlgorithms",
     "Schedulers",
     "SearchSpace",
+    "MetricBlock",
     "splitting_registry",
     "metric_registry",
     "params_registry",

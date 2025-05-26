@@ -1,9 +1,10 @@
-from typing import Any
+from typing import Any, Set
 
 import torch
 from torch import Tensor
 from scipy.sparse import csr_matrix
 from warprec.utils.registry import metric_registry
+from warprec.utils.enums import MetricBlock
 from warprec.evaluation.base_metric import TopKMetric
 
 
@@ -50,6 +51,8 @@ class BiasDisparityBR(TopKMetric):
         dist_sync_on_step (bool): Whether to synchronize metric state across distributed processes.
         **kwargs (Any): Additional keyword arguments.
     """
+
+    _REQUIRED_COMPONENTS: Set[MetricBlock] = {MetricBlock.TOP_K_INDICES}
 
     user_clusters: Tensor
     n_user_effective_clusters: int
@@ -104,15 +107,15 @@ class BiasDisparityBR(TopKMetric):
     def update(self, preds: Tensor, **kwargs: Any):
         """Updates the metric state with the new batch of predictions."""
         start = kwargs.get("start", 0)
+        top_k_indices: Tensor = kwargs.get(
+            f"top_{self.k}_indices", self.top_k_values_indices(preds, self.k)[1]
+        )
 
         batch_size = preds.size(0)
         device = preds.device
 
         # Get user indices in global space
         user_indices = torch.arange(start, start + batch_size, device=device)
-
-        # For each user, get top-k item indices by descending score
-        topk = torch.topk(preds, self.k, dim=1).indices  # [batch_size x cutoff]
 
         # Map user indices to user clusters
         user_clusters = self.user_clusters[user_indices]  # [batch_size]
@@ -121,7 +124,9 @@ class BiasDisparityBR(TopKMetric):
         user_clusters_expanded = (
             user_clusters.unsqueeze(1).expand(-1, self.k).reshape(-1)
         )  # [batch_size * cutoff]
-        item_clusters = self.item_clusters[topk.reshape(-1)]  # [batch_size * cutoff]
+        item_clusters = self.item_clusters[
+            top_k_indices.reshape(-1)
+        ]  # [batch_size * cutoff]
 
         # Count occurrences of each (user_cluster, item_cluster) pair
         # Create a 2D histogram by combining indices into a single index

@@ -1,9 +1,10 @@
-from typing import Any
+from typing import Any, Set
 
 import torch
 from torch import Tensor
 from scipy.sparse import csr_matrix
 from warprec.evaluation.base_metric import TopKMetric
+from warprec.utils.enums import MetricBlock
 from warprec.utils.registry import metric_registry
 
 
@@ -45,6 +46,11 @@ class UserMADRanking(TopKMetric):
         **kwargs (Any): Additional keyword arguments.
     """
 
+    _REQUIRED_COMPONENTS: Set[MetricBlock] = {
+        MetricBlock.DISCOUNTED_RELEVANCE,
+        MetricBlock.TOP_K_INDICES,
+    }
+
     user_clusters: Tensor
     user_counts: Tensor
     user_gains: Tensor
@@ -79,14 +85,11 @@ class UserMADRanking(TopKMetric):
 
     def update(self, preds: Tensor, **kwargs: Any):
         """Updates the metric state with the new batch of predictions."""
-        # Apply discounted relevance (2^rel - 1) to target
-        target = kwargs.get("discounted_relevance", torch.zeros_like(preds))
         start = kwargs.get("start", 0)
-
-        # Top-k item indices by prediction
-        top_k_indices = torch.topk(
-            preds, self.k, dim=1, largest=True, sorted=True
-        ).indices
+        target: Tensor = kwargs.get("discounted_relevance", torch.zeros_like(preds))
+        top_k_indices: Tensor = kwargs.get(
+            f"top_{self.k}_indices", self.top_k_values_indices(preds, self.k)[1]
+        )
 
         # Gather relevance at top-k
         rel = torch.gather(target, 1, top_k_indices)

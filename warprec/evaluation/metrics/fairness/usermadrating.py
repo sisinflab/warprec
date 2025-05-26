@@ -1,10 +1,11 @@
 # pylint: disable=arguments-differ, unused-argument, line-too-long
-from typing import Any
+from typing import Any, Set
 
 import torch
 from torch import Tensor
 from scipy.sparse import csr_matrix
 from warprec.evaluation.base_metric import TopKMetric
+from warprec.utils.enums import MetricBlock
 from warprec.utils.registry import metric_registry
 
 
@@ -55,6 +56,8 @@ class UserMADRating(TopKMetric):
         **kwargs (Any): Additional keyword arguments.
     """
 
+    _REQUIRED_COMPONENTS: Set[MetricBlock] = {MetricBlock.TOP_K_VALUES}
+
     user_clusters: Tensor
     user_counts: Tensor
     user_gains: Tensor
@@ -91,13 +94,15 @@ class UserMADRating(TopKMetric):
     def update(self, preds: Tensor, **kwargs: Any):
         """Updates the metric state with the new batch of predictions."""
         start = kwargs.get("start", 0)
-        topk = torch.topk(preds, self.k, dim=1, largest=True, sorted=True).values
-        user_avg_scores = topk.mean(dim=1)  # [batch_size]
+        top_k_values: Tensor = kwargs.get(
+            f"top_{self.k}_values", self.top_k_values_indices(preds, self.k)[0]
+        )
 
         # Global user indices for the current batch
         batch_size = preds.size(0)
         user_idx = torch.arange(start, start + batch_size, device=preds.device)
 
+        user_avg_scores = top_k_values.mean(dim=1)  # [batch_size]
         self.user_gains.index_add_(0, user_idx, user_avg_scores)
         self.user_counts.index_add_(0, user_idx, torch.ones_like(user_avg_scores))
 
