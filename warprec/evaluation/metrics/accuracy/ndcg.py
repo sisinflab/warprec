@@ -223,6 +223,12 @@ class nDCGRendle2020(TopKMetric):
         **kwargs (Any): Additional keyword arguments dictionary.
     """
 
+    _REQUIRED_COMPONENTS: Set[MetricBlock] = {
+        MetricBlock.BINARY_RELEVANCE,
+        MetricBlock.VALID_USERS,
+        MetricBlock.TOP_K_BINARY_RELEVANCE,
+    }
+
     ndcg: Tensor
     users: Tensor
 
@@ -237,18 +243,21 @@ class nDCGRendle2020(TopKMetric):
         """Updates the metric state with the new batch of predictions."""
         # The discounted relevance is computed as 2^(rel + 1) - 1
         target = kwargs.get("binary_relevance", torch.zeros_like(preds))
+        users = kwargs.get("valid_users", self.valid_users(target))
+        top_k_rel: Tensor = kwargs.get(
+            f"top_{self.k}_binary_relevance",
+            self.top_k_relevance(preds, target, self.k),
+        )
 
-        top_k = torch.topk(preds, self.k, dim=1, largest=True, sorted=True).indices
-        rel = torch.gather(target, 1, top_k).float()
         ideal_rel = torch.topk(target, self.k, dim=1, largest=True, sorted=True).values
 
-        dcg_score = self.dcg(rel)
+        dcg_score = self.dcg(top_k_rel)
         idcg_score = self.dcg(ideal_rel).clamp(min=1e-10)
 
         self.ndcg += (dcg_score / idcg_score).nan_to_num(0).sum()
 
         # Count only users with at least one interaction
-        self.users += (target > 0).any(dim=1).sum().item()
+        self.users += users
 
     def compute(self):
         """Computes the final metric value."""
