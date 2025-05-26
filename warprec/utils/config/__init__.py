@@ -1,4 +1,8 @@
+from . import recommender_model_config
+from .dashboard_configuration import DashboardConfig, Wandb, CodeCarbon, MLflow
+from .evaluation_configuration import EvaluationConfig
 from .general_configuration import GeneralConfig
+from .model_configuration import RecomModel
 from .reader_configuration import (
     ReaderConfig,
     Labels,
@@ -7,62 +11,30 @@ from .reader_configuration import (
     SideInformationReading,
     ClusteringInformationReading,
 )
-from .writer_configuration import WriterConfig, WritingParams
-from .splitter_configuration import SplittingConfig
-from .dashboard_configuration import DashboardConfig, Wandb, CodeCarbon, MLflow
-from .model_configuration import RecomModel
-from .recommender_model_config import (
-    AddEASE,
-    CEASE,
-    EASE,
-    AttributeItemKNN,
-    AttributeUserKNN,
-    ItemKNN,
-    UserKNN,
-    Slim,
-    NeuMF,
-    RP3Beta,
-    MultiDAE,
-    MultiVAE,
-    ADMMSlim,
-    VSM,
-)
-from .evaluation_configuration import EvaluationConfig
 from .search_space_wrapper import SearchSpaceWrapper
+from .splitter_configuration import SplittingConfig
+from .writer_configuration import WriterConfig, WritingParams
 from .config import Configuration, load_yaml
 
 __all__ = [
-    "Configuration",
-    "load_yaml",
+    "recommender_model_config",
+    "DashboardConfig",
+    "Wandb",
+    "CodeCarbon",
+    "MLflow",
+    "EvaluationConfig",
     "GeneralConfig",
+    "RecomModel",
     "ReaderConfig",
     "Labels",
     "CustomDtype",
     "SplitReading",
     "SideInformationReading",
     "ClusteringInformationReading",
+    "SearchSpaceWrapper",
+    "SplittingConfig",
     "WriterConfig",
     "WritingParams",
-    "SplittingConfig",
-    "DashboardConfig",
-    "Wandb",
-    "CodeCarbon",
-    "MLflow",
-    "RecomModel",
-    "AddEASE",
-    "CEASE",
-    "EASE",
-    "AttributeItemKNN",
-    "AttributeUserKNN",
-    "ItemKNN",
-    "UserKNN",
-    "Slim",
-    "NeuMF",
-    "RP3Beta",
-    "MultiDAE",
-    "MultiVAE",
-    "ADMMSlim",
-    "VSM",
-    "EvaluationConfig",
-    "SearchSpaceWrapper",
+    "Configuration",
+    "load_yaml",
 ]

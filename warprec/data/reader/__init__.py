@@ -1,3 +1,3 @@
-from .reader import LocalReader
+from .reader import Reader, LocalReader
 
-__all__ = ["LocalReader"]
+__all__ = ["Reader", "LocalReader"]

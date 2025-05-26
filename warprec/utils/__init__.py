@@ -1,3 +1,5 @@
+from . import config
+from . import logger
 from .enums import (
     RatingType,
     SplittingStrategies,
@@ -21,10 +23,11 @@ from .registry import (
     search_space_registry,
     similarities_registry,
 )
-from .config import Configuration, load_yaml
-from .logger import logger
+
 
 __all__ = [
+    "config",
+    "logger",
     "RatingType",
     "SplittingStrategies",
     "ReadingMethods",
@@ -44,7 +47,4 @@ __all__ = [
     "scheduler_registry",
     "search_space_registry",
     "similarities_registry",
-    "Configuration",
-    "load_yaml",
-    "logger",
 ]

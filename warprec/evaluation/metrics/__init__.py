@@ -1,71 +1,9 @@
-from .accuracy import (
-    AUC,
-    F1,
-    GAUC,
-    HitRate,
-    LAUC,
-    MAP,
-    MAR,
-    MRR,
-    nDCG,
-    nDCGRendle2020,
-    Precision,
-    Recall,
-)
-from .bias import ACLT, APLT, ARP, PopREO, PopRSP
-from .coverage import ItemCoverage, NumRetrieved, UserCoverageAtN, UserCoverage
-from .diversity import Gini, ShannonEntropy, SRecall
-from .fairness import (
-    BiasDisparityBD,
-    BiasDisparityBR,
-    BiasDisparityBS,
-    ItemMADRanking,
-    ItemMADRating,
-    REO,
-    RSP,
-    UserMADRanking,
-    UserMADRating,
-)
-from .novelty import EFD, EPC
-from .rating import MAE, MSE, RMSE
+from . import accuracy
+from . import bias
+from . import coverage
+from . import diversity
+from . import fairness
+from . import novelty
+from . import rating
 
-__all__ = [
-    "AUC",
-    "F1",
-    "GAUC",
-    "HitRate",
-    "LAUC",
-    "MAP",
-    "MAR",
-    "MRR",
-    "nDCG",
-    "nDCGRendle2020",
-    "Precision",
-    "Recall",
-    "ACLT",
-    "APLT",
-    "ARP",
-    "PopREO",
-    "PopRSP",
-    "ItemCoverage",
-    "NumRetrieved",
-    "UserCoverageAtN",
-    "UserCoverage",
-    "Gini",
-    "ShannonEntropy",
-    "SRecall",
-    "BiasDisparityBD",
-    "BiasDisparityBR",
-    "BiasDisparityBS",
-    "ItemMADRanking",
-    "ItemMADRating",
-    "REO",
-    "RSP",
-    "UserMADRanking",
-    "UserMADRating",
-    "EFD",
-    "EPC",
-    "MAE",
-    "MSE",
-    "RMSE",
-]
+__all__ = ["accuracy", "bias", "coverage", "diversity", "fairness", "novelty", "rating"]

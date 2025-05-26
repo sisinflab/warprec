@@ -2,7 +2,10 @@ import argparse
 import os
 from argparse import Namespace
 
-from warprec.data import LocalReader, LocalWriter, Splitter, TransactionDataset
+from warprec.data.reader import LocalReader
+from warprec.data.writer import LocalWriter
+from warprec.data.splitting import Splitter
+from warprec.data.dataset import TransactionDataset
 from warprec.utils.config import load_yaml
 from warprec.utils.logger import logger
 from warprec.recommenders.trainer import Trainer

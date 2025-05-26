@@ -1,54 +1,6 @@
-from .data import (
-    Interactions,
-    Dataset,
-    TransactionDataset,
-    ContextDataset,
-    Splitter,
-    SplittingStrategy,
-    LocalReader,
-    Writer,
-    LocalWriter,
-)
-from .recommenders import EASE, Slim, Trainer, Recommender, generate_model_name
-from .evaluation import Evaluator
-from .utils import (
-    Configuration,
-    load_yaml,
-    logger,
-    splitting_registry,
-    metric_registry,
-    params_registry,
-    model_registry,
-    search_algorithm_registry,
-    scheduler_registry,
-    search_space_registry,
-)
+from . import data
+from . import evaluation
+from . import recommenders
+from . import utils
 
-__all__ = [
-    "LocalReader",
-    "Dataset",
-    "TransactionDataset",
-    "ContextDataset",
-    "Interactions",
-    "Splitter",
-    "SplittingStrategy",
-    "Configuration",
-    "load_yaml",
-    "logger",
-    "splitting_registry",
-    "metric_registry",
-    "params_registry",
-    "model_registry",
-    "search_algorithm_registry",
-    "scheduler_registry",
-    "search_space_registry",
-    "Writer",
-    "LocalWriter",
-    "LocalReader",
-    "EASE",
-    "Slim",
-    "Evaluator",
-    "Trainer",
-    "Recommender",
-    "generate_model_name",
-]
+__all__ = ["data", "evaluation", "recommenders", "utils"]
