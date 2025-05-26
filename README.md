@@ -34,7 +34,7 @@ Whether you're learning how recommender systems work or conducting high-performa
     poetry install
 3. (Optional) Activate the virtual environment:
     ```bash
-    source $(poetry env info --path)/bin/activate
+    eval $(poetry env activate)
 4. Verify the installation:
     ```bash
     poetry run python --version
