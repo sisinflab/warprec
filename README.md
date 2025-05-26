@@ -100,3 +100,4 @@ Citation details will be provided in an upcoming release. Stay tuned!
 For questions, suggestions, or inquiries, feel free to reach out:
 
 **Marco Avolio** - marco@wideverse.com
+**Joseph Trotta** - joseph.trotta@ovs.it
