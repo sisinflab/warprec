@@ -5,7 +5,7 @@ from torch import Tensor
 from scipy.sparse import csr_matrix
 from warprec.utils.registry import metric_registry
 from warprec.utils.enums import MetricBlock
-from warprec.evaluation.base_metric import TopKMetric
+from warprec.evaluation.metrics.base_metric import TopKMetric
 
 
 @metric_registry.register("BiasDisparityBR")

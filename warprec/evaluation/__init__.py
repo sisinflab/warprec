@@ -1,5 +1,5 @@
 from .evaluator import Evaluator
-from .base_metric import BaseMetric
+from .metrics.base_metric import BaseMetric
 from .metrics import (
     AUC,
     F1,

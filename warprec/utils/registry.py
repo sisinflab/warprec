@@ -3,7 +3,7 @@ from typing import TypeVar, Dict, Type, Optional, Callable, List, Generic, TYPE_
 if TYPE_CHECKING:
     from warprec.recommenders.base_recommender import Recommender
     from warprec.utils.config import RecomModel, SearchSpaceWrapper
-    from warprec.evaluation.base_metric import BaseMetric
+    from warprec.evaluation.metrics.base_metric import BaseMetric
     from warprec.data.splitting.strategies import SplittingStrategy
     from warprec.recommenders.trainer.search_algorithm_wrapper import (
         BaseSearchWrapper,

@@ -8,7 +8,7 @@ from scipy.sparse import csr_matrix
 from tabulate import tabulate
 from math import ceil
 from warprec.data.dataset import Dataset
-from warprec.evaluation.base_metric import BaseMetric
+from warprec.evaluation.metrics.base_metric import BaseMetric
 from warprec.recommenders.base_recommender import Recommender
 from warprec.utils.enums import MetricBlock
 from warprec.utils.logger import logger

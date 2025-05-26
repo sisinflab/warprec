@@ -4,7 +4,7 @@ from typing import Any
 import torch
 from torch import Tensor
 from scipy.sparse import csr_matrix
-from warprec.evaluation.base_metric import TopKMetric
+from warprec.evaluation.metrics.base_metric import TopKMetric
 from warprec.utils.registry import metric_registry
 
 

@@ -4,7 +4,7 @@ import torch
 from torch import Tensor
 from scipy.sparse import csr_matrix
 from warprec.utils.registry import metric_registry
-from warprec.evaluation.base_metric import BaseMetric
+from warprec.evaluation.metrics.base_metric import BaseMetric
 
 
 @metric_registry.register("BiasDisparityBS")
