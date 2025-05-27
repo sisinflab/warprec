@@ -16,13 +16,11 @@ class SplitReading(BaseModel):
         local_path (Optional[str]): The directory where the splits are saved.
         ext (Optional[str]): The extension of the split files.
         sep (Optional[str]): The separator of the split files.
-        batch_size (Optional[int]): The batch size values used in the split dataset.
     """
 
     local_path: Optional[str] = None
     ext: Optional[str] = ".tsv"
     sep: Optional[str] = "\t"
-    batch_size: Optional[int] = 1024
 
     @field_validator("sep")
     @classmethod
