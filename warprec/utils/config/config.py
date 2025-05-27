@@ -45,7 +45,7 @@ class Configuration(BaseModel):
     dashboard: DashboardConfig = Field(default_factory=DashboardConfig)
     models: Dict[str, dict]
     evaluation: EvaluationConfig
-    general: GeneralConfig = None
+    general: GeneralConfig = Field(default_factory=GeneralConfig)
 
     # Supported sparse precisions in numpy
     sparse_np_dtype: ClassVar[dict] = {

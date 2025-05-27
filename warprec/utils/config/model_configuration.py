@@ -118,7 +118,7 @@ class Optimization(BaseModel):
     strategy: Optional[SearchAlgorithms] = SearchAlgorithms.GRID
     scheduler: Optional[Schedulers] = Schedulers.FIFO
     properties: Optional[Properties] = Field(default_factory=Properties)
-    validation_metric: Optional[str] = None
+    validation_metric: Optional[str] = "nDCG@5"
     device: Optional[str] = "cpu"
     num_samples: Optional[int] = 1
     cpu_per_trial: Optional[float] = 1.0
