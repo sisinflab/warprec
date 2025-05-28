@@ -1,3 +1,4 @@
+import os
 from typing import List, Optional, Union, ClassVar, Any
 from abc import ABC
 
@@ -121,7 +122,7 @@ class Optimization(BaseModel):
     validation_metric: Optional[str] = "nDCG@5"
     device: Optional[str] = "cpu"
     num_samples: Optional[int] = 1
-    cpu_per_trial: Optional[float] = 1.0
+    cpu_per_trial: Optional[float] = os.cpu_count()
     gpu_per_trial: Optional[float] = 0.0
 
     @field_validator("strategy")
