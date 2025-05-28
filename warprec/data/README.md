@@ -1,4 +1,4 @@
-# 📦 WarpRec Data
+# 📦 [WarpRec](../../README.md) Data
 
 The `data` module of WarpRec offers a wide variety of data structures used by the framework to handle the raw data and transform it into the correct form desired by the different recommendation models.
 

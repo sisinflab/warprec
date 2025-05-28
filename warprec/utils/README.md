@@ -1,4 +1,4 @@
-# 🛠️ WarpRec Utils
+# 🛠️ [WarpRec](../../README.md) Utils
 
 The `utils` module of WarpRec provides a collection of essential utilities designed to simplify the definition and execution of recommendation experiments via configuration files. These tools contribute to making experiments reproducible, maintainable, and extensible.
 

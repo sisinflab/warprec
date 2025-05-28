@@ -79,6 +79,15 @@ To do inference on a model, use the `infer.py` script. Here's an example:
 
 This command will start the inference process using the specified configuration file.
 
+## 📄 Documentation
+
+WarpRec provides a documentation for each module. You can navigate to each section directly from here:
+
+1. 📦 [Data Module](warprec/data/README.md)
+2. 📈 [Evaluation Module](warprec/evaluation/README.md)
+3. 💡 [Recommenders Module](warprec/recommenders/README.md)
+4. 🛠️ [Utils Module](warprec/utils/README.md)
+
 ## 🤝 Contributing
 We welcome contributions from the community! Whether you're fixing bugs, improving documentation, or proposing new features, your input is highly valued.
 
