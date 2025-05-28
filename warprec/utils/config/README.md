@@ -1,6 +1,6 @@
 # WarpRec Configurations
 
-WarpRec offers a wide range of configuration options to help tailor your training process to your data and goals. Here's a quick overview of what you can customize through configuration files:
+WarpRec offers a wide range of configuration options to help tailor your training process to your data and goals. Configurations are a key component of the [utils](../README.md) package of WarpRec. Here's a quick overview of what you can customize through configuration files:
 
 - Data reading
 - Splitting strategies

@@ -1,6 +1,6 @@
 # 🛠️ WarpRec Utils
 
-The `utils` module of WarpRec provides a collection of essential utilities designed to simplify the definition and execution of recommendation experiments via configuration files. These tools contribute to making experiments more reproducible, maintainable, and extensible.
+The `utils` module of WarpRec provides a collection of essential utilities designed to simplify the definition and execution of recommendation experiments via configuration files. These tools contribute to making experiments reproducible, maintainable, and extensible.
 
 ## 📚 Table of Contents
 - ✨ [Main Functionalities](#✨-main-functionalities)
@@ -16,8 +16,8 @@ The `utils` module of WarpRec provides a collection of essential utilities desig
 
 ## ✨ Main Functionalities
 
-- **🧾 Configuration**: Defines the foundation for experiment reproducibility and modularity. Configuration files allow users to control all aspects of the pipeline (e.g., model selection, data splitting, hyperparameters) without changing code.
-- **📣 Logger**: A flexible and extensible logging utility designed to provide consistent output across modules. It supports both console and file-based logging, with customizable formats and verbosity levels.
+- **⚙️ Configuration**: Defines the foundation for experiment reproducibility and modularity. Configuration files allow users to control all aspects of the pipeline (e.g., model selection, data splitting, hyperparameters) without changing code.
+- **🧾 Logger**: A flexible and extensible logging utility designed to provide consistent output across modules. It supports both console and file-based logging, with customizable formats and verbosity levels.
 - **🧩 Enums**: A centralized collection of enumerations used throughout the framework, which ensures readability, type safety, and code consistency.
 - **📦 Registry**: A core component enabling dynamic access and instantiation of key objects—such as models, metrics, splitters, or optimizers—based on configuration references. This design supports decoupling and extensibility across the framework.
 
@@ -25,7 +25,7 @@ The `utils` module of WarpRec provides a collection of essential utilities desig
 
 The module `utils` is structured as follows:
 
-- **[`config`](config/README.md)**: Contains classes and functions to parse, validate, and manage configuration files. It supports default values, nested configurations, and integration with environment variables or CLI overrides.
+- **[`config`](config/README.md)**: Contains classes and functions to parse, validate, and manage configuration files. It supports default values, nested configurations, and integration with environment variables.
 - **[`logger`](logger/logger.py)**: Provides a customizable logging interface used throughout WarpRec. It enables seamless tracking of experiments, debugging information, and system warnings/errors.
 - **[`enums`](enums.py)**: Defines common enumerations used in WarpRec, including model types, dataset formats, splitter strategies, and more. These enums are used to validate user inputs and standardize behavior.
 - **[`registry`](registry.py)**: Implements a lightweight registry pattern to manage dynamically loadable components. It simplifies the addition of custom elements (e.g., new loss functions or metrics) by automatically registering them for discovery at runtime.
