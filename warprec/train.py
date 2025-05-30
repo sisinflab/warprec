@@ -110,6 +110,7 @@ def main(args: Namespace):
         item_cluster=dataset.get_item_cluster(),
     )
 
+    overall_results = {}  # Dictionary to store overall results
     for model_name in models:
         params = config.models[model_name]
         val_metric, val_k = config.validation_metric(
@@ -142,6 +143,9 @@ def main(args: Namespace):
         results = evaluator.compute_results()
         evaluator.print_console(results, "Test", config.evaluation.max_metric_per_row)
         result_dict["Test"] = results
+
+        # Save results in overall
+        overall_results[model_name] = result_dict
 
         writer.write_results(
             result_dict["Test"],
@@ -182,6 +186,9 @@ def main(args: Namespace):
                         source_path = os.path.join(check_path, "checkpoint.pt")
                         checkpoint_name = generate_model_name(model_name, param)
                         writer.checkpoint_from_ray(source_path, checkpoint_name)
+
+    # Save overall results
+    writer.write_overall_results(overall_results)
 
 
 if __name__ == "__main__":

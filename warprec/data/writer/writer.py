@@ -299,6 +299,38 @@ class LocalWriter(Writer):
                 path_val, sep=writing_params.sep, index=None
             )
 
+    def write_overall_results(self, overall_results: dict):
+        """This method writes the overall results of the experiment.
+
+        Args:
+            overall_results (dict): The dictionary containing the overall results.
+                The first index is the model name, the second is the set of results,
+                which can be either "Validation" or "Test", the third is the cutoff
+                and the last is the metric name.
+        """
+        if self.config:
+            writing_params = self.config.writer.writing_params
+        else:
+            writing_params = WritingParams()
+
+        # experiment_path/overall_results.{custom_extension}
+        _path = join(
+            self.experiment_evaluation_dir,
+            f"overall_results_{self._timestamp}" + writing_params.ext,
+        )
+
+        # Convert overall results to DataFrame
+        result_list = []
+        for model_name, result_dict in overall_results.items():
+            for set_name, metrics in result_dict.items():
+                for top_k, metric_values in metrics.items():
+                    row = {"Model": model_name, "Set": set_name, "Top@k": top_k}
+                    row.update(metric_values)
+                    result_list.append(row)
+
+        df = pd.DataFrame(result_list)
+        df.to_csv(_path, sep=writing_params.sep, index=False)
+
     def checkpoint_from_ray(self, source: str, new_name: str):
         destination = join(self.experiment_serialized_models_dir, new_name + ".pth")
         shutil.move(source, destination)
