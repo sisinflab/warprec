@@ -8,6 +8,7 @@ from abc import ABC, abstractmethod
 import pandas as pd
 import numpy as np
 import torch
+import json
 from pandas import DataFrame
 from warprec.utils.config import Configuration
 from warprec.data.dataset import Dataset
@@ -255,6 +256,18 @@ class LocalWriter(Writer):
         # experiment_path/serialized/model_name.pth
         _path = join(self.experiment_serialized_models_dir, model.name_param + ".pth")
         torch.save(model.state_dict(), _path)
+
+    def write_params(self, model_name: str, params: dict):
+        """This method writes the model parameters into a local path.
+
+        Args:
+            model_name (str): The name of the model.
+            params (dict): The parameters of the model.
+        """
+        # experiment_path/serialized/model_name_params.json
+        _path = join(self.experiment_serialized_models_dir, f"{model_name}_params.json")
+        with open(_path, "w") as f:
+            json.dump(params, f, indent=4)
 
     def write_split(self, dataset: Dataset, sep: str = "\t", ext: str = ".tsv") -> None:
         """This method writes the split into a local path.

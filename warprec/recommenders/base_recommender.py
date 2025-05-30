@@ -160,6 +160,17 @@ class Recommender(nn.Module, ABC):
         for ann, _ in self.__class__.__annotations__.items():
             setattr(self, ann, params[ann])
 
+    def get_params(self) -> dict:
+        """Get the model parameters as a dictionary.
+
+        Returns:
+            dict: The dictionary containing the model parameters.
+        """
+        params = {}
+        for ann, _ in self.__class__.__annotations__.items():
+            params[ann] = getattr(self, ann)
+        return params
+
     def set_seed(self, seed: int):
         """Set random seed for reproducibility.
 

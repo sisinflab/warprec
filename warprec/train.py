@@ -168,6 +168,10 @@ def main(args: Namespace):
             )
             writer.write_recs(recs, model_name)
 
+        # Save params
+        model_params = best_model.get_params()
+        writer.write_params(model_name, model_params)
+
         # Model serialization
         if params["meta"]["save_model"]:
             writer.write_model(best_model)
