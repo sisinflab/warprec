@@ -17,6 +17,7 @@ To make everything easier to digest, this documentation includes a Table of Cont
 - 📖 [Reader Configuration](#📖-reader-configuration)
 - ✍️ [Writer Configuration](#️✍️-writer-configuration)
 - 🔀 [Splitter Configuration](#🔀-splitter-configuration)
+- 🖥️ [Dashboard Configuration](#🖥️-dashboard-configuration)
 - 🧠 [Models Configuration](#🧠-models-configuration)
 - 📊 [Evaluation Configuration](#📊-evaluation-configuration)
 - ⚙️ [General Configuration](#️⚙️-general-configuration)
@@ -236,6 +237,70 @@ splitter:
 - Not every field must be provided. Each strategy needs different values.
 - The test set is required, the validation set is optional and can be omitted by simply not passing any value.
 - Temporal strategies require the timestamp to be passed during the reading process.
+
+## 🖥️ Dashboard Configuration
+
+The `Dashboard Configuration` section defines which dashboard to activate during the training process. TensorBoard dashboard is activated by default and cannot be disabled.
+
+### 🔧 Available Keywords
+
+The `Dashboard Configuration` contains different nested sections dedicated to each and every dashboard that can be activated.
+
+- **wandb**: The nested section dedicated to Weights & Biases dashboard.
+- **mlflow**: The nested section dedicated to MLFlow dashboard.
+- **codecarbon**: The nested section dedicated to Codecarbon dashboard.
+
+### 🟡 Wandb
+
+WarpRec through Ray provides the support to the Weights & Biases dashboard.
+
+- **enabled**: Flag value that decides whether or not to activated the dashboard. Defaults to False.
+- **project**: Name of the project.
+- **group**: Name of the group.
+- **api_key_file**: Path to the file with the API key.
+- **api_key**: API key.
+- **excludes**: List of parameters to exclude from logging.
+- **log_config**: Whether or not to log the configuration.
+- **upload_checkpoints**: Whether or not to upload the checkpoints.
+
+### 🔵 MLFlow
+
+WarpRec through Ray provides the support to the MLFlow dashboard.
+
+- **enabled**: Flag value that decides whether or not to activated the dashboard. Defaults to False.
+- **tracking_uri**: URI of the MLflow tracking server.
+- **registry_uri**: URI of the MLflow model registry.
+- **experiment_name**: Name of the MLflow experiment.
+- **tags**: Tags to be added to the MLflow run.
+- **tracking_token**: Token for MLflow tracking.
+- **save_artifacts**: Whether or not to save the artifacts. Defaults to False.
+
+### 🌱 Codecarbon
+
+WarpRec provides the support to the Codecarbon dashboard.
+
+- **enabled**: Flag value that decides whether or not to activated the dashboard. Defaults to False.
+- **save_to_api**: Whether or not to save the results to CodeCarbon API.
+- **save_to_file**: Whether or not to save the results to a file.
+- **output_dir**: Directory where to save the results.
+- **tracking_mode**: Tracking mode for CodeCarbon. Options are "machine" or "process".
+
+### 📌 Example of Dashboard Configuration
+
+Below is a full example of a `dashboard configuration` to track your experiments:
+
+```yaml
+dashboard:
+    mlflow:
+        enabled: true
+        experiment_name: MyExperiment
+...
+```
+
+### ⚠️ Notes and Validation
+
+- If you are using a remote dashboard, like Weights & Biases and you are trying to save artifacts, Ray checkpoints might need to not be deleted.
+- TensorBoard dashboard is always active and can be accessed locally.
 
 ## 🧠 Models Configuration
 
