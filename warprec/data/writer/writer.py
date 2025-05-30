@@ -257,15 +257,15 @@ class LocalWriter(Writer):
         _path = join(self.experiment_serialized_models_dir, model.name_param + ".pth")
         torch.save(model.state_dict(), _path)
 
-    def write_params(self, model_name: str, params: dict):
+    def write_params(self, params: dict, file_name: str):
         """This method writes the model parameters into a local path.
 
         Args:
-            model_name (str): The name of the model.
             params (dict): The parameters of the model.
+            file_name (str): The name used to save the parameters.
         """
         # experiment_path/serialized/model_name_params.json
-        _path = join(self.experiment_serialized_models_dir, f"{model_name}_params.json")
+        _path = join(self.experiment_serialized_models_dir, f"{file_name}.json")
         with open(_path, "w") as f:
             json.dump(params, f, indent=4)
 
@@ -299,7 +299,9 @@ class LocalWriter(Writer):
                 path_val, sep=writing_params.sep, index=None
             )
 
-    def write_overall_results(self, overall_results: dict):
+    def write_overall_results(
+        self, overall_results: dict, sep: str = "\t", ext: str = ".tsv"
+    ):
         """This method writes the overall results of the experiment.
 
         Args:
@@ -307,11 +309,13 @@ class LocalWriter(Writer):
                 The first index is the model name, the second is the set of results,
                 which can be either "Validation" or "Test", the third is the cutoff
                 and the last is the metric name.
+            sep (str): The separator that will be used to write the results.
+            ext (str): The extension that will be used to write the results.
         """
         if self.config:
             writing_params = self.config.writer.writing_params
         else:
-            writing_params = WritingParams()
+            writing_params = WritingParams(sep=sep, ext=ext)
 
         # experiment_path/overall_results.{custom_extension}
         _path = join(
