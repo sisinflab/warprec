@@ -146,7 +146,6 @@ def main(args: Namespace):
         writer.write_results(
             result_dict["Test"],
             model_name,
-            config.evaluation.metrics,
             config.evaluation.top_k,
         )
 
@@ -154,7 +153,6 @@ def main(args: Namespace):
             writer.write_results(
                 result_dict["Validation"],
                 model_name,
-                config.evaluation.metrics,
                 config.evaluation.top_k,
                 validation=True,
             )

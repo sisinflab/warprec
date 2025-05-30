@@ -1,8 +1,8 @@
-import time
 import shutil
 from os.path import join
 from pathlib import Path
 from typing import List
+from datetime import datetime
 from abc import ABC, abstractmethod
 
 import pandas as pd
@@ -40,7 +40,6 @@ class Writer(ABC):
         self,
         result_dict: dict,
         model_name: str,
-        metric_names: List[str],
         top_k: List[int],
     ):
         """This function writes all the results of the experiment."""
@@ -94,12 +93,11 @@ class LocalWriter(Writer):
                 setup_experiment=setup,
             )
 
-        self._timestamp = str(int(time.time() * 1000))
+        self._timestamp = datetime.now().strftime("%d.%m.%Y_%H:%M:%S")
         self.experiment_path = Path(
             join(
                 writer_params.local_experiment_path,
                 writer_params.dataset_name,
-                self._timestamp,
             )
         )
         self.experiment_evaluation_dir = Path(join(self.experiment_path, "evaluation"))
@@ -127,7 +125,9 @@ class LocalWriter(Writer):
         # Write locally the json file of the configuration
         if config:
             json_dump = config.model_dump_json(indent=2)
-            json_path = Path(join(self.experiment_path, "config.json"))
+            json_path = Path(
+                join(self.experiment_path, f"config_{self._timestamp}.json")
+            )
             json_path.write_text(json_dump, encoding="utf-8")
 
         logger.msg("Experiment folder created successfully.")
@@ -136,7 +136,6 @@ class LocalWriter(Writer):
         self,
         result_dict: dict,
         model_name: str,
-        metric_names: List[str],
         top_k: List[int],
         validation: bool = False,
         sep: str = "\t",
@@ -149,7 +148,6 @@ class LocalWriter(Writer):
                 must be in the format index: value, where index
                 is a string formatted as: metric_name@top_k.
             model_name (str): The name of the model which was evaluated.
-            metric_names (List[str]): The names of the metrics to be retrieved from the dictionary.
             top_k (List[int]): The list of top_k, or cutoffs, to retrieve from dictionary.
             validation (bool): Flag value for the validation data.
             sep (str): The separator of the file.
@@ -160,7 +158,7 @@ class LocalWriter(Writer):
         else:
             writing_params = WritingParams(sep=sep, ext=ext)
 
-        _path = join(self.experiment_evaluation_dir, model_name)
+        _path = join(self.experiment_evaluation_dir, f"{model_name}_{self._timestamp}")
         if validation:
             _path = _path + "_Validation" + writing_params.ext
         else:
