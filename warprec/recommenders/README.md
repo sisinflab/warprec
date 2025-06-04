@@ -37,7 +37,7 @@ In this section we will guide you through the process of implementing you own re
 from warprec.recommenders.base_recommender import ItemSimRecommender, Recommender
 ```
 
-The **Recommender** interface is gonna be sufficient for any kind of recommender model, **ItemSimRecommender** is a special interface used by models that learn an item similarity matrix.
+The **Recommender** interface is suitable for any type of recommender model, while **ItemSimRecommender** is a specialized interface used by models that learn an item similarity matrix.
 
 In this guide we will go through the implementation of the EASE model, which is a really simple model to get you started with WarpRec interfaces. As you know, EASE learns an item similarity matrix, but in this case we will use the base interface **Recommender**.
 
@@ -79,9 +79,9 @@ class MyEASE(Recommender):
 
 After the initialization we will need to implement the three main methods of the model:
 
-1. **.fit()**: The main method of training, this is where you will implement the main trining cycle.
-2. **.forward()**: The forward step of the model, used inside neural models.
-3. **.predict()**: The prediction of the model, given the training interactions.
+1. **.fit()**: The main method of training, this is where you will implement the main trining cycle
+2. **.forward()**: The forward step of the model, used inside neural models
+3. **.predict()**: The prediction of the model, given the training interactions
 
 As for our example, the second step is not needed because the is no neural layer inside EASE, therefore no backward step either. As for the fit, we can implement it like this:
 
@@ -148,7 +148,7 @@ This design ensures maximum reproducibility, scalability, and extensibility, mak
 
 ## 🧱 Layers
 
-WarpRec `Layers` module offers a series of building blocks that can be used inside your recommendation models. As of right now, the implemented layers inside the module are as follows:
+WarpRec `Layers` module offers a series of building blocks that can be used inside your recommendation models. As of right now, the implemented layers inside the module are the following:
 
 - `MLP`
 
