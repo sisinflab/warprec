@@ -95,7 +95,8 @@ To get started:
 
 1. Fork the repository and create a new branch for your feature or fix.
 2. Follow the existing coding style and conventions.
-3. Open a pull request with a clear description of your changes.
+3. Make sure using make lint that the code passes all the checks.
+4. Open a pull request with a clear description of your changes.
 
 If you encounter any issues or have questions, feel free to open an issue in the Issues section of the repository.
 
