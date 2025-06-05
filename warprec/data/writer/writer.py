@@ -193,8 +193,16 @@ class LocalWriter(Writer):
             # If there are new metrics, add them to existing_df with NaN.
             # If existing_df has metrics not in new_df, add them to new_df with NaN.
             all_columns = list(set(existing_df.columns) | set(new_df.columns))
-            existing_df = existing_df.reindex(columns=all_columns)
-            new_df = new_df.reindex(columns=all_columns)
+
+            # Ensure the predefined columns are always at the start
+            predefined_columns = ["Model", "Set", "Top@k"]
+            metric_columns = sorted(
+                [col for col in all_columns if col not in predefined_columns]
+            )
+            final_column_order = predefined_columns + metric_columns
+
+            existing_df = existing_df.reindex(columns=final_column_order)
+            new_df = new_df.reindex(columns=final_column_order)
 
             # Define merge keys for deduplication
             merge_keys = ["Model", "Set", "Top@k"]
