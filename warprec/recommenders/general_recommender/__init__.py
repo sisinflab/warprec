@@ -4,6 +4,7 @@ from . import graph_based
 from . import knn
 from . import latent_factor
 from . import neural
+from . import unpersonalized
 
 __all__ = [
     "autoencoder",
@@ -12,4 +13,5 @@ __all__ = [
     "knn",
     "latent_factor",
     "neural",
+    "unpersonalized",
 ]
