@@ -79,9 +79,9 @@ class MyEASE(Recommender):
 
 After the initialization we will need to implement the three main methods of the model:
 
-1. **.fit()**: The main training method. This is where you will implement the core training cycle
-2. **.forward()**: The forward step of the model, used inside neural models
-3. **.predict()**: The prediction of the model, given the training interactions
+1. **fit()**: The main training method. This is where you will implement the core training cycle.
+2. **forward()**: The forward step of the model, used inside neural models.
+3. **predict()**: The prediction of the model, given the training interactions.
 
 As for our example, the second step is not needed because EASE does not contain any neural layers, therefore no backward step either. The **fit** method can be implemented as follows:
 
