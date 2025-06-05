@@ -104,6 +104,7 @@ class LocalWriter(Writer):
         self.experiment_serialized_models_dir = Path(
             join(self.experiment_path, "serialized")
         )
+        self.experiment_params_dir = Path(join(self.experiment_path, "params"))
         self.experiment_split_dir = Path(join(self.experiment_path, "split"))
 
         if writer_params.setup_experiment:
@@ -119,6 +120,7 @@ class LocalWriter(Writer):
         self.experiment_evaluation_dir.mkdir(parents=True, exist_ok=True)
         self.experiment_recommendation_dir.mkdir(parents=True, exist_ok=True)
         self.experiment_serialized_models_dir.mkdir(parents=True, exist_ok=True)
+        self.experiment_params_dir.mkdir(parents=True, exist_ok=True)
         self.experiment_split_dir.mkdir(parents=True, exist_ok=True)
 
         # Write locally the json file of the configuration
@@ -303,10 +305,7 @@ class LocalWriter(Writer):
         }
         """
         # experiment_path/serialized/Overall_Params_{timestamp}.json
-        _path = (
-            self.experiment_serialized_models_dir
-            / f"Overall_Params_{self._timestamp}.json"
-        )
+        _path = self.experiment_params_dir / f"Overall_Params_{self._timestamp}.json"
 
         existing_data = {}
         if _path.exists() and _path.stat().st_size > 0:
