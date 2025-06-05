@@ -33,18 +33,18 @@ user_id,item_id,rating,timestamp
 ...
 ```
 
-WarpRec is a highly customizable framework, here are some of the requirements of the raw data file and also what is customizable:
+WarpRec is a highly customizable framework, and here are some of the requirements for the raw data file and what can be customized:
 
 - A header [user_id,item_id,rating,timestamp] not in a particular order.
     - Column labels can be customized through configuration.
     - The file can contain more columns, only the ones with the correct names will be considered.
-- Values separated by a fixed separator that can be customized.
-- Rating column is required only for the `explicit` rating type.
-- Timestamp column is required only if a temporal strategy is used.
+- Values split by a fixed separator, which can be customized.
+- The rating column is required only for the `explicit` rating type.
+- The timestamp column is required only if a temporal strategy is used. Timestamps should be provided in numeric format for full support — although string formats are accepted, they may result in unexpected errors.
 
 ### 📁 Reading splits from a local source
 
-When reading splits from a local source, WarpRec expects the files to be in the same directory. The structure should be similar to this:
+When reading splits from a local source, WarpRec expects the files to be in the same directory. The structure should be like this:
 
 ```plaintext
 split_dir/
@@ -53,7 +53,7 @@ split_dir/
 └── val.tsv
 ```
 
-The single files are expected to be in the same format as regular data files. In this case, for pre-split data, training set and test set are required, validation split is optional.
+Each individual file is expected to follow the same format as unsplit dataset files. In this setup, both the training and test sets must be provided, while the validation set is optional.
 
 ### 📁 Reading side information from a local source
 
@@ -67,11 +67,11 @@ item_id,feature_1,feature_2,...
 ...
 ```
 
-In this case the ordering of the columns if fundamental: the first column must the the item ID, while the all the other columns will be considered features. WarpRec expects the information inside this file to be all numerical, so the user must provide already processed data. Side information are used to train some models and to evaluate certain metrics. During the process of configuration evaluation, you will be notified if you are trying to use a model that requires side information, but none have been provided. In that case, the experiment will be terminated.
+In this case, the ordering of the columns is crucial: the first column must contain the item ID, while all the other columns will be interpreted as features. WarpRec expects all the data in this file to be numerical, so the user must provide preprocessed input. Side information is used to train certain models and to evaluate specific metrics. During the configuration evaluation process, you will be notified if you attempt to use a model that requires side information but none has been provided. In that case, the experiment will be terminated.
 
 ### 📁 Reading clustering information from a local source
 
-When reading clustering information from a local source, WarpRec expects the file to be formatted as such:
+When reading clustering information from a local source, WarpRec expects the file to be formatted as follows:
 
 ```plaintext
 user_id,cluster
@@ -83,8 +83,8 @@ user_id,cluster
 
 Some general information about the clustering files accepted:
 
-- Labels are important, they need to be consisted with the other files.
-- The cluster must be numerated starting from 1, as the `cluster 0` is used as fallback.
+- The header is important and needs to be consistent with the other files.
+- The clusters must be numbered starting from 1, since `cluster 0` is reserved as a fallback.
     - In case of incorrect numeration, the framework will take care of this step for you.
 
 ## ✍️ Writer
@@ -93,7 +93,7 @@ The `Writer` module of WarpRec is a lightweight solution to track all the experi
 
 ### 🗂️ Writing in a local source
 
-When starting an experiment, WarpRec will setup a directory for you experiment (unless prompted to not do so). This is the general structure of an experimentation folder:
+When starting an experiment, WarpRec will set up a directory for your experiment by default, unless this behavior is disabled via configuration. This is the general structure of an experimentation folder:
 
 ```plaintext
 experiment_dir/
@@ -115,9 +115,9 @@ Results produced with WarpRec will be saved inside this folder with a timestamp.
 
 ## 🔀 Splitter
 
-The `Splitter` module of WarpRec is dedicated to the split of the data into train, test and validation set. The test set is mandatory, while the validation set is optional. The module supports different strategies to split the data, in the following section you can find a description of every strategy and how it splits the data.
+The `Splitter` module in WarpRec is responsible for dividing the data into training and test sets, with an optional validation set. While the test set is mandatory, including a validation set is optional. The module supports various data splitting strategies, each of which is described in the following section along with how it partitions the data.
 
-The WarpRec splitting module is built to be efficient on large datasets and also is robust in edge cases where certain users don't respect splitting criteria: in that case WarpRec handles the user by ensuring that he appears inside the training set at least one time.
+The WarpRec splitting module is built to be efficient on large datasets and robust in edge cases where certain users don't respect splitting criteria: in that case WarpRec handles the user by ensuring that they appear in the training set at least once.
 
 ### 🎲 Random splitting
 
@@ -130,7 +130,7 @@ The `Random splitting` will split the data using a random number generator. In o
 
 The `Temporal splitting` will split the data using the timestamp. If a temporal splitting strategy is chosen inside the configuration, the timestamp column will be mandatory inside the raw data. Temporal strategies available in WarpRec are:
 
-- **temporal holdout**: The temporal holdout will extract from the original data a given ration of the latest transactions.
+- **temporal holdout**: The temporal holdout will extract from the original data a given ratio of the latest transactions.
 - **temporal leave k out**: The temporal leave k out will extract from the original data a given number of the latest transactions for each user.
 
 ### 📅 Timestamp slicing

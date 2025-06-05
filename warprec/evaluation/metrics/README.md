@@ -1,6 +1,6 @@
 # 📈 WarpRec Metrics
 
-The WarpRec `Metrics` modules offers a collection of state-of-the-art metrics for evaluating recommender systems. The subsequent sections will describe the different categories of **out of the box** metrics already implemented inside WarpRec. The final section offers an easy-to-follow tutorial for implementing custom metrics within the WarpRec framework.
+The WarpRec `Metrics` module offers a collection of state-of-the-art metrics for evaluating recommender systems. The subsequent sections will describe the different categories of **built-in** metrics already implemented inside WarpRec. The final section includes an easy-to-follow tutorial on how to implement custom metrics in the WarpRec framework.
 
 ## 📚 Table of Contents
 - 🎯 [Accuracy](#🎯-accuracy)
@@ -39,7 +39,7 @@ evaluation:
     metrics: [F1]
 ...
 ```
-Extended-F1 is also available inside WarpRec, meaning you can compute the harmonic mean of two metrics of your choice, like such:
+Extended-F1 is also available in WarpRec, allowing you to compute the harmonic mean of two metrics of your choice, as follows:
 ```yaml
 evaluation:
     top_k: [10, 20, 50]
@@ -112,7 +112,7 @@ evaluation:
     metrics: [ACLT]
 ...
 ```
-- [**APLT (Average Proportion of Long-Tail items)**](bias/aplt.py): Measures the average proportion of long-tail items in each user's recommendation list, capturing individual-level diversity.
+- [**APLT (Average Proportion of Long-Tail items)**](bias/aplt.py): Measures the average proportion of long-tail items in each user's recommendation list, which captures individual-level diversity.
 ```yaml
 evaluation:
     top_k: [10, 20, 50]
@@ -166,7 +166,7 @@ evaluation:
     metrics: [NumRetrieved]
 ...
 ```
-- [**UserCoverageAtN**](coverage/user_coverage_at_n.py): Measures the number of users for whom the recommender returns at least N items, reflecting system responsiveness.
+- [**UserCoverageAtN**](coverage/user_coverage_at_n.py): Measures the number of users for whom the recommender retrieves at least N items, reflecting system responsiveness.
 ```yaml
 evaluation:
     top_k: [10, 20, 50]
@@ -192,7 +192,7 @@ evaluation:
     metrics: [ShannonEntropy]
 ...
 ```
-- [**SRecall (Subtopic Recall)**](diversity/srecall.py): Measures how many distinct subtopics or categories are covered in the recommendations compared to the relevant ones, reflecting diversity across semantic dimensions. **This metric requires side information to be provided.**
+- [**SRecall (Subtopic Recall)**](diversity/srecall.py): Measures how many distinct subtopics or categories are covered in the recommendations compared to the relevant ones, which reflects diversity across semantic dimensions. **This metric requires the user to provide side information.**
 ```yaml
 evaluation:
     top_k: [10, 20, 50]
@@ -204,63 +204,63 @@ evaluation:
 
 Fairness metrics aim to ensure that recommender systems provide equitable recommendations across different user groups, particularly those defined by sensitive attributes (e.g., gender, age, socioeconomic status). These metrics help detect and mitigate disparate impact or treatment in recommendation outcomes.
 
-- [**BiasDisparityBD**](fairness/biasdisparitybd.py): Measures the difference in recommendation bias between user groups, indicating how much one group is favored over another. **This metric requires clustering information to be provided.**
+- [**BiasDisparityBD**](fairness/biasdisparitybd.py): Measures the difference in recommendation bias between user groups, indicating how much one group is favored over another. **This metric requires the user to provide clustering information.**
 ```yaml
 evaluation:
     top_k: [10, 20, 50]
     metrics: [BiasDisparityBD]
 ...
 ```
-- [**BiasDisparityBR (Bias Disparity – Bias Recommendations)**](fairness/biasdisparitybr.py): Quantifies disparity in the frequency of biased (e.g. popular) items recommended to different user groups in the top-K list. **This metric requires clustering information to be provided.**
+- [**BiasDisparityBR (Bias Disparity – Bias Recommendations)**](fairness/biasdisparitybr.py): Quantifies the disparity in the frequency of biased (e.g., popular) items recommended to different user groups within their top-K recommendations. **This metric requires the user to provide clustering information.**
 ```yaml
 evaluation:
     top_k: [10, 20, 50]
     metrics: [BiasDisparityBR]
 ...
 ```
-- [**BiasDisparityBS (Bias Disparity – Bias Scores)**](fairness/biasdisparitybs.py): Measures the disparity in the average bias scores of recommended items across user groups, assessing score-level bias. **This metric requires clustering information to be provided.**
+- [**BiasDisparityBS (Bias Disparity – Bias Scores)**](fairness/biasdisparitybs.py): Measures the disparity in the average bias scores of recommended items across user groups, assessing score-level bias. **This metric requires the user to provide clustering information.**
 ```yaml
 evaluation:
     top_k: [10, 20, 50]
     metrics: [BiasDisparityBS]
 ...
 ```
-- [**Item MAD Ranking**](fairness/itemmadranking.py): Computes the Mean Absolute Deviation of item ranks across user groups, measuring fairness in item exposure in rankings. **This metric requires clustering information to be provided.**
+- [**Item MAD Ranking**](fairness/itemmadranking.py): Computes the Mean Absolute Deviation of item ranks across user groups, measuring fairness in item exposure in rankings. **This metric requires the user to provide clustering information.**
 ```yaml
 evaluation:
     top_k: [10, 20, 50]
     metrics: [ItemMADRanking]
 ...
 ```
-- [**Item MAD Rating**](fairness/itemmadrating.py): Computes the Mean Absolute Deviation of predicted item ratings across user groups, assessing fairness in predicted preferences. **This metric requires clustering information to be provided.**
+- [**Item MAD Rating**](fairness/itemmadrating.py): Computes the Mean Absolute Deviation of predicted item ratings across user groups, assessing fairness in predicted preferences. **This metric requires the user to provide clustering information.**
 ```yaml
 evaluation:
     top_k: [10, 20, 50]
     metrics: [ItemMADRating]
 ...
 ```
-- [**User MAD Ranking**](fairness/usermadranking.py): Measures the Mean Absolute Deviation of item ranking positions for each user group, focusing on rank consistency across users. **This metric requires clustering information to be provided.**
+- [**User MAD Ranking**](fairness/usermadranking.py): Measures the Mean Absolute Deviation of item ranking positions for each user group, focusing on rank consistency across users. **This metric requires the user to provide clustering information.**
 ```yaml
 evaluation:
     top_k: [10, 20, 50]
     metrics: [UserMADRanking]
 ...
 ```
-- [**User MAD Rating**](fairness/usermadrating.py): Measures the Mean Absolute Deviation of predicted item ratings for each user group, capturing disparities in predicted relevance. **This metric requires clustering information to be provided.**
+- [**User MAD Rating**](fairness/usermadrating.py): Measures the Mean Absolute Deviation of predicted item ratings for each user group, capturing disparities in predicted relevance. **This metric requires the user to provide clustering information.**
 ```yaml
 evaluation:
     top_k: [10, 20, 50]
     metrics: [UserMADRating]
 ...
 ```
-- [**REO (Ranking-based Equal Opportunity)**](fairness/reo.py): Assesses whether relevant items are ranked similarly across user groups, ensuring fair visibility of relevant content. **This metric requires clustering information to be provided.**
+- [**REO (Ranking-based Equal Opportunity)**](fairness/reo.py): Assesses whether relevant items are ranked similarly across user groups, ensuring fair visibility of relevant content. **This metric requires the user to provide clustering information.**
 ```yaml
 evaluation:
     top_k: [10, 20, 50]
     metrics: [REO]
 ...
 ```
-- [**RSP (Ranking-based Statistical Parity)**](fairness/rsp.py): Measures whether the ranking positions of items (regardless of relevance) are equally distributed across user groups, ensuring fairness in exposure. **This metric requires clustering information to be provided.**
+- [**RSP (Ranking-based Statistical Parity)**](fairness/rsp.py): Measures whether the ranking positions of items (regardless of relevance) are equally distributed across user groups, ensuring fairness in exposure. **This metric requires the user to provide clustering information.**
 ```yaml
 evaluation:
     top_k: [10, 20, 50]
@@ -279,7 +279,7 @@ evaluation:
     metrics: [EFD]
 ...
 ```
-Extended-EFD is also available inside WarpRec, meaning you can compute the EFD score using a discounted relevance value, like such:
+Extended-EFD is also available inside WarpRec, meaning you can compute the EFD score using a discounted relevance value, as follows:
 ```yaml
 evaluation:
     top_k: [10, 20, 50]
