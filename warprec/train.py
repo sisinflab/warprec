@@ -111,7 +111,6 @@ def main(args: Namespace):
     )
 
     overall_results = {}  # Dictionary to store overall results
-    overall_params = {}  # Dictionary to store overall parameters
     for model_name in models:
         params = config.models[model_name]
         val_metric, val_k = config.validation_metric(
@@ -174,9 +173,8 @@ def main(args: Namespace):
             writer.write_recs(recs, model_name)
 
         # Save params
-        model_params = best_model.get_params()
-        writer.write_params(model_params, model_name)
-        overall_params[model_name] = model_params
+        model_params = {model_name: best_model.get_params()}
+        writer.write_params(model_params)
 
         # Model serialization
         if params["meta"]["save_model"]:
@@ -191,9 +189,6 @@ def main(args: Namespace):
 
     # Save overall results
     writer.write_overall_results(overall_results)
-
-    # Save overall parameters
-    writer.write_params(overall_params, "Overall")
 
     # Clean writing partial results
     writer.clean_experiment_folders()

@@ -257,20 +257,63 @@ class LocalWriter(Writer):
         _path = join(self.experiment_serialized_models_dir, model.name_param + ".pth")
         torch.save(model.state_dict(), _path)
 
-    def write_params(self, params: dict, file_name: str):
+    def write_params(self, params: dict) -> None:
         """This method writes the model parameters into a local path.
 
         Args:
             params (dict): The parameters of the model.
-            file_name (str): The name used to save the parameters.
+
+        NOTE: Params are expected to be a dictionary formatted as follows:
+        {
+            "model_name": {
+                "param1": value1,
+                "param2": value2,
+                ...
+            },
+            ...
+        }
         """
-        # experiment_path/serialized/model_name_params.json
-        _path = join(
-            self.experiment_serialized_models_dir,
-            f"{file_name}_Params_{self._timestamp}.json",
+        # experiment_path/serialized/Overall_Params_{timestamp}.json
+        _path = (
+            self.experiment_serialized_models_dir
+            / f"Overall_Params_{self._timestamp}.json"
         )
-        with open(_path, "w") as f:
-            json.dump(params, f, indent=4)
+
+        existing_data = {}
+        if _path.exists() and _path.stat().st_size > 0:
+            try:
+                with open(_path, "r", encoding="utf-8") as f:
+                    existing_data = json.load(f)
+                if not isinstance(existing_data, dict):
+                    logger.attention(
+                        f"File {_path} does not contain a valid JSON object (dictionary). "
+                        f"It will be overwritten with new and existing (if any) params."
+                    )
+                    # If it's not a dict, we can't update it.
+                    # We'll effectively overwrite it, but first merge params into an empty dict
+                    # to ensure params are definitely there.
+                    existing_data = {}
+            except json.JSONDecodeError:
+                logger.attention(
+                    f"Could not decode JSON from {_path}. The file will be overwritten "
+                    f"with new and existing (if any) params."
+                )
+                existing_data = {}  # Reset on decode error
+            except Exception as e:
+                logger.negative(
+                    f"Error reading {_path}: {e}. The file will be treated as empty/overwritten."
+                )
+                existing_data = {}
+
+        # Update params with existing ones
+        existing_data.update(params)
+
+        try:
+            with open(_path, "w", encoding="utf-8") as f:
+                json.dump(existing_data, f, indent=4)
+            logger.msg(f"Parameters written to {_path}")
+        except Exception as e:
+            logger.negative(f"Error writing parameters to {_path}: {e}")
 
     def write_split(self, dataset: Dataset, sep: str = "\t", ext: str = ".tsv") -> None:
         """This method writes the split into a local path.
@@ -367,27 +410,6 @@ class LocalWriter(Writer):
         else:
             logger.attention(
                 f"Evaluation directory not found: {self.experiment_evaluation_dir}"
-            )
-
-        # --- Clean Serialized Directory ---
-        logger.msg(
-            f"Cleaning serialized models directory: {self.experiment_serialized_models_dir}"
-        )
-        if self.experiment_serialized_models_dir.exists():
-            for f_path in self.experiment_serialized_models_dir.iterdir():
-                if f_path.is_file():
-                    filename = f_path.name
-                    if filename.endswith(".pth"):
-                        continue
-
-                    if self._timestamp in filename:
-                        try:
-                            f_path.unlink()
-                        except OSError as e:
-                            logger.msg(f"    Error deleting file {filename}: {e}")
-        else:
-            logger.attention(
-                f"Serialized directory not found: {self.experiment_serialized_models_dir}"
             )
 
         logger.msg("Finished cleaning experiment folders.")
