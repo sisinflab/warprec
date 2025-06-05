@@ -265,7 +265,10 @@ class LocalWriter(Writer):
             file_name (str): The name used to save the parameters.
         """
         # experiment_path/serialized/model_name_params.json
-        _path = join(self.experiment_serialized_models_dir, f"{file_name}.json")
+        _path = join(
+            self.experiment_serialized_models_dir,
+            f"{file_name}_params_{self._timestamp}.json",
+        )
         with open(_path, "w") as f:
             json.dump(params, f, indent=4)
 

@@ -175,7 +175,7 @@ def main(args: Namespace):
 
         # Save params
         model_params = best_model.get_params()
-        writer.write_params(model_params, f"{model_name}_params")
+        writer.write_params(model_params, model_name)
         overall_params[model_name] = model_params
 
         # Model serialization
@@ -193,7 +193,7 @@ def main(args: Namespace):
     writer.write_overall_results(overall_results)
 
     # Save overall parameters
-    writer.write_params(overall_params, "overall_params")
+    writer.write_params(overall_params, "overall")
 
 
 if __name__ == "__main__":
