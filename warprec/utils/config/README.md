@@ -1,6 +1,6 @@
 # WarpRec Configurations
 
-WarpRec offers a wide range of configuration options to help tailor your training process to your data and goals. Configurations are a key component of the [utils](../README.md) package of WarpRec. Here's a quick overview of what you can customize through configuration files:
+WarpRec offers a wide range of configuration options to help tailor your training process to your data and goals. Configurations are a key component of WarpRec's [utils](../README.md) package. Here's a quick overview of what you can customize through configuration files:
 
 - Data reading
 - Splitting strategies
@@ -11,7 +11,7 @@ WarpRec offers a wide range of configuration options to help tailor your trainin
 - Output results and recommendations
 - And much more!
 
-To make everything easier to digest, this documentation includes a Table of Contents for easy navigation. Each section includes examples to help you better understand how to configure WarpRec.
+To make everything easier to digest, this documentation includes a Table of Contents for easy navigation. Each section includes examples to help you understand how to configure WarpRec more effectively.
 
 ## 📚 Table of Contents
 - 📖 [Reader Configuration](#📖-reader-configuration)
@@ -24,25 +24,25 @@ To make everything easier to digest, this documentation includes a Table of Cont
 
 ## 📖 Reader Configuration
 
-The `Reader Configuration` section handles data loading and preprocessing. The information read here is transformed into the internal data structures used by WarpRec's recommendation models.
+The `Reader Configuration` section handles data loading and preprocessing. The data loaded here is transformed into the internal structures used by WarpRec’s recommendation models.
 
 ### 🔧 Available Keywords
 
 - **loading_strategy**: The strategy to use to load the data. Can be 'dataset' or 'split'.
 - **data_type**: The type of data accepted by the WarpRec. As of right now, only 'transaction' data is supported.
 - **reading_method**: The source from which the data will be read. As of right now, only 'local' is supported.
-- **local_path**: The path from which read the data locally. This keyword is used along the `reading_method` when is set to local.
-- **sep**: The separator of the file to be read. Default to '\t'.
-- **rating_type**: The type of rating to be used. Can be set to 'implicit' or 'explicit'. If set to explicit, the framework will look for a score column inside the transaction data, this column must contain a score given by the user to the item for that specific transaction. If set to implicit, the column can be omitted and will be treated as a score of 1 for every transaction.
-- **split**: This is a nested section of the reader configuration, it is used in case of data that is already been split.
-- **side**: This is a nested section of the reader configuration, it is used in case the user wants to load side information of the items alongside the transaction data.
-- **clustering**: This is a nested section of the reader configuration, it is used in case the user wants to load clustering information of the users or the items alongside the transaction data.
-- **labels**: This is a nested section of the reader configuration, it is used in case the user wants to read columns with different naming from the standard.
-- **dtypes**: This is a sub category of the reader configuration, it is used in case the user wants to read columns with different typing from the standard.
+- **local_path**: The local path from which the data is read. This keyword is used along with the `reading_method` when is set to `local`.
+- **sep**: The separator of the file to be read. Defaults to `'\t'`.
+- **rating_type**: The type of rating to be used. Can be set to 'implicit' or 'explicit'. If set to explicit, the framework will look for a score column inside the transaction data, this column must contain a score given by the user to the item for that specific transaction. If set to `implicit`, the column can be omitted and each transaction will be assigned a score of 1.
+- **split**: This is a nested section of the reader configuration, it is used in case of data that has already been split.
+- **side**: This is a nested section of the reader configuration, it is used if the user wants to load side information of the items alongside the transaction data.
+- **clustering**: This is a nested section of the reader configuration, it is used if the user wants to load clustering information of the users or the items alongside the transaction data.
+- **labels**: This is a nested section of the reader configuration, it is used if the user wants to read columns with different naming from the standard.
+- **dtypes**: This is a sub category of the reader configuration, it is used if the user wants to read columns with different typing from the standard.
 
 #### 🔀 Split Reading
 
-WarpRec also supports the reading process of already split data. This can be done using the `split` nested section. To use this sub module first of all you need to set the `reading strategy` to **split**, then you provide the following information:
+WarpRec also supports the reading process of already split data. This can be done using the `split` nested section. To use this submodule, you first need to set the `reading strategy` to **split**, then you provide the following information:
 
 - **local_path**: The path to the directory where the split data is stored. All the splits must be in the same directory.
 - **ext**: The extension used by the split files. Defaults to `.tsv`.
@@ -50,14 +50,14 @@ WarpRec also supports the reading process of already split data. This can be don
 
 #### 🧩 Side Information Reading
 
-WarpRec also support the reading process of side information. This can be done using the `side` nested section. To use this sub module you can simply add it you your configuration file, then you can provide the following information:
+WarpRec also supports reading side information. This can be done using the `side` nested section. To use this sub module you can simply add it to your configuration file, then you can provide the following information:
 
 - **local_path**: The path to the side information.
 - **sep**: The separator used for the side information file.
 
 #### 👥 Clustering Information Reading
 
-WarpRec also support the reading process of clustering information. This can be done using the `clustering` nested section. To use this sub module you can simply add it you your configuration file., then you can provide the following information:
+WarpRec also supports reading clustering information. This can be done using the `clustering` nested section. To use this sub module you can simply add it to your configuration file, then you can provide the following information:
 
 - **user_local_path**: The path to the user clustering information.
 - **item_local_path**: The path to the item clustering information.
@@ -66,7 +66,7 @@ WarpRec also support the reading process of clustering information. This can be 
 
 #### 🏷️ Labels
 
-WarpRec expects data to be formatted as per follow:
+WarpRec expects data to be formatted as follows:
 
 ```plaintext
 user_id,item_id,rating,timestamp
@@ -76,7 +76,7 @@ user_id,item_id,rating,timestamp
 ...
 ```
 
-The labels are expected to be exactly the same as provided in this example. This is done in case you have a file with multiple columns but only a few of those are used inside the framework. In case your labels are different, you can use the `label` nested section, then you can provide the following information:
+The labels are expected to be exactly the same as provided in this example. This is done in case you have a file with multiple columns but only a few of those are used inside the framework. If your labels differ, you can use the `label` nested section, then you can provide the following information:
 
 - **user_id_label**: The custom label for the user id.
 - **item_id_label**: The custom label for the item id.
@@ -142,8 +142,8 @@ Here is a complete example that uses all available customization options for the
 
 ### ⚠️ Notes and Validation
 
-- The dataset provided through the `local_path` must contain the labels provided inside `labels`. Invalid dataset will raise an exception.
-- Reading a dataset that was previously split is only possible if the split file are all inside the same directory and they are in the WarpRec format.
+- The dataset provided through the `local_path` must contain the labels provided inside `labels`. An invalid dataset will raise an exception.
+- Reading a dataset that was previously split is only possible if all the split files are in the same directory and they are in the WarpRec format.
 
 ## ✍️ Writer Configuration
 
@@ -244,7 +244,7 @@ The `Dashboard Configuration` section defines which dashboard to activate during
 
 ### 🔧 Available Keywords
 
-The `Dashboard Configuration` contains different nested sections dedicated to each and every dashboard that can be activated.
+The `Dashboard Configuration` contains different nested sections dedicated to each dashboard that can be activated.
 
 - **wandb**: The nested section dedicated to Weights & Biases dashboard.
 - **mlflow**: The nested section dedicated to MLFlow dashboard.
@@ -252,9 +252,9 @@ The `Dashboard Configuration` contains different nested sections dedicated to ea
 
 ### 🟡 Wandb
 
-WarpRec through Ray provides the support to the Weights & Biases dashboard.
+WarpRec, through Ray, supports the Weights & Biases dashboard.
 
-- **enabled**: Flag value that decides whether or not to activated the dashboard. Defaults to False.
+- **enabled**: A flag indicating whether to activate the dashboard. Defaults to False.
 - **project**: Name of the project.
 - **group**: Name of the group.
 - **api_key_file**: Path to the file with the API key.
@@ -265,9 +265,9 @@ WarpRec through Ray provides the support to the Weights & Biases dashboard.
 
 ### 🔵 MLFlow
 
-WarpRec through Ray provides the support to the MLFlow dashboard.
+WarpRec, through Ray, supports the MLFlow dashboard.
 
-- **enabled**: Flag value that decides whether or not to activated the dashboard. Defaults to False.
+- **enabled**: A flag indicating whether to activate the dashboard. Defaults to False.
 - **tracking_uri**: URI of the MLflow tracking server.
 - **registry_uri**: URI of the MLflow model registry.
 - **experiment_name**: Name of the MLflow experiment.
@@ -277,9 +277,9 @@ WarpRec through Ray provides the support to the MLFlow dashboard.
 
 ### 🌱 Codecarbon
 
-WarpRec provides the support to the Codecarbon dashboard.
+WarpRec, through Ray, supports the Codecarbon dashboard.
 
-- **enabled**: Flag value that decides whether or not to activated the dashboard. Defaults to False.
+- **enabled**: A flag indicating whether to activate the dashboard. Defaults to False.
 - **save_to_api**: Whether or not to save the results to CodeCarbon API.
 - **save_to_file**: Whether or not to save the results to a file.
 - **output_dir**: Directory where to save the results.
@@ -304,7 +304,7 @@ dashboard:
 
 ## 🧠 Models Configuration
 
-The `Model Configuration` section defines how each and every model inside you experiment should be trained.
+The `Model Configuration` section defines how each model inside your experiment should be trained.
 
 WarpRec provides several options when it comes to setting up the training of your models that can be configured to match your experimental needs, including:
 
@@ -324,8 +324,8 @@ The `Model Configuration` is different from other configurations as it presents 
 
 The `meta` section let you decide some information about the model that do not interfere with the training.
 
-- **save_model**: Flag that decides wether or not to save the model in the experiment directory. Defaults to false.
-- **keep_all_ray_checkpoints**: Flag that decides wether or not to keep all the checkpoints that Ray Tune will create. On a large scale training this option is advised to be set on false. Defaults to false.
+- **save_model**: Flag that decides whether or not to save the model in the experiment directory. Defaults to false.
+- **keep_all_ray_checkpoints**: Flag that decides whether or not to keep all the checkpoints that Ray Tune will create. On a large scale training this option is advised to be set on false. Defaults to false.
 - **load_from**: Local path to a model weights to be loaded. Defaults to None.
 - **implementation**: The implementation used during the training, if more than one is present. Defaults to latest.
 
@@ -339,7 +339,7 @@ The `optimization` section let you decide how to train your model.
     - *hopt*: Using the HyperOpt algorithm to explore the search space efficiently.
     - *optuna*: Using the Optuna algorithm to explore the search space efficiently.
     - *bohb*: Using the BOHB algorithm to explore the search space efficiently.
-- **scheduler**: The scheduler used fro hyperparameter optimization. Defaults to fifo. Supported strategies are:
+- **scheduler**: The scheduler used for hyperparameter optimization. Defaults to fifo. Supported strategies are:
     - *fifo*: Classic First In First Out.
     - *asha*: The ASHA scheduler for a more optimized scheduling approach.
 - **properties**: A nested section dedicated for strategy and scheduler parameters.
@@ -353,7 +353,7 @@ The `optimization` section let you decide how to train your model.
 
 The `properties` section is used to provide further information to the strategy or the scheduler, if needed.
 
-- **mode**: This values is used to determine wether to maximize the value of the validation metric or to minimize it. Accepted values are min and max. Defaults to max.
+- **mode**: This values is used to determine whether to maximize the value of the validation metric or to minimize it. Accepted values are min and max. Defaults to max.
 - **seed**: The seed of the experimentation, used to set up the model initialization. Defaults to 42.
 - **time_attr**: The measure of time used by the scheduler.
 - **max_t**: Max time unit given to each trial.
@@ -386,7 +386,7 @@ models:
 - Trials of a single model can be computed in parallel. If more than one model is provided, the next training session will wait the pervious one to be over before starting.
 - Parameters of the model, like on the example, depend on the model. Check the model documentation for more information about the parameters.
 
-### 🧪 Experienced Model Configuration
+### 🧪 Advanced Model Configuration
 
 If you are an expert user and want to use WarpRec to its fullest potential, this is the section where we will explain how you can personalize the your model hyperparameter tuning. Let's start with an example, we want to train the ItemKNN model on our data. This is a possible configuration:
 
@@ -423,9 +423,9 @@ models:
 ...
 ```
 
-If your system has for example 12 cores, the this will execute at most 6 trials in parallel. **Be sure to check if you system can handle this many trials in parallel**. This method of approach is perfect if you want a quick and easy hyperparameter exploration. In case you need to do a really extensive search, then it is advised to use a search algorithm like *HyperOpt* or *Optuna*. To do so, in WarpRec, it's really easy; in the optimization section you can add the strategy keyword and select the algorithm.
+If your system has for example 12 cores, then this configuration will execute at most 6 trials in parallel. **Be sure to check if your system can handle this many trials in parallel**. This method of approach is perfect if you want a quick and easy hyperparameter exploration. In case you need to do a really extensive search, then it is advised to use a search algorithm like *HyperOpt* or *Optuna*. To do so, in WarpRec, it's really easy; in the optimization section you can add the strategy keyword and select the algorithm.
 
-Selecting a more refined search algorithm usually it's not sufficient to exhaustively explore the search space. In order to do so you can specify, for each parameter, the *search space* to use. Let's give a quick run down on search spaces:
+Selecting a more refined search algorithm is usually not sufficient to exhaustively explore the search space. In order to do so you can specify, for each parameter, the *search space* to use. Let's give a quick run down on search spaces:
 
 - *uniform*: Uniform search space.
 - *quniform*: Quantized uniform search space.
@@ -479,7 +479,7 @@ The `Evaluation Configuration` can be configured using the following keywords:
 - **max_metric_per_row**: The metric to be logged in each row. Defaults to 4.
 - **beta**: The beta value used by the F1-score metric. Defaults to 1.0.
 - **pop_ratio**: The ratio of transactions that will be considered popular. Defaults to 0.8.
-- **save_evaluation**: Flag that decides wether or not to save the evaluation. Defaults to true.
+- **save_evaluation**: Flag that decides whether or not to save the evaluation. Defaults to true.
 
 ### 📌 Example of Evaluation Configuration
 
@@ -514,7 +514,7 @@ The `General Configuration` can be configured using the following keywords:
 
 The `recommendation` section let you decide some information about the actual recommendation produced by the models.
 
-- **save_recs**: Flag that decides wether or not to save the recommendation for each model. Defaults to false
+- **save_recs**: Flag that decides whether or not to save the recommendation for each model. Defaults to false
 - **sep**: The separator of the recommendation file. Defaults to `\t`.
 - **ext**: The extension of the recommendation file. Defaults to `.tsv`.
 - **k**: The number of recommendation per user. Defaults to 50.
