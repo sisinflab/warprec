@@ -97,18 +97,15 @@ When starting an experiment, WarpRec will setup a directory for you experiment (
 
 ```plaintext
 experiment_dir/
-├── timestamp_1/
-|   ├── evaluation/
-|   ├── recs/
-|   ├── serialized/
-|   ├── split/
-|   └── config.json
-├── timestamp_2/
-|   ├── evaluation/
-...
+├── evaluation/
+├── params/
+├── recs/
+├── serialized/
+├── split/
+└── config.json
 ```
 
-Every timestamp represents an experiment for that specific experimentation folder. Let's describe now each element that you will find inside the experimentation folder:
+Results produced with WarpRec will be saved inside this folder with a timestamp. Let's describe now each element that you will find inside the experimentation folder:
 
 - **evaluation folder**: This folder will contain the results of the evaluation of each model, unless prompted not to do so.
 - **recs folder**: This folder will contain the final recommendation of each model, if the option has been set to true.
