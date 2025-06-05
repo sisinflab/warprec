@@ -176,6 +176,10 @@ def main(args: Namespace):
                         checkpoint_name = generate_model_name(model_name, param)
                         writer.checkpoint_from_ray(source_path, checkpoint_name)
 
+    logger.positive(
+        "All models trained and evaluated successfully. WarpRec is shutting down."
+    )
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
