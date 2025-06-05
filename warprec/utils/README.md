@@ -1,6 +1,6 @@
 # 🛠️ [WarpRec](../../README.md) Utils
 
-The `utils` module of WarpRec provides a collection of essential utilities designed to simplify the definition and execution of recommendation experiments via configuration files. These tools contribute to making experiments reproducible, maintainable, and extensible.
+The `utils` module of WarpRec provides a collection of essential utilities designed to simplify the definition and execution of recommendation experiments via configuration files. These tools help make experiments reproducible, maintainable, and extensible.
 
 ## 📚 Table of Contents
 - ✨ [Main Functionalities](#✨-main-functionalities)
@@ -16,7 +16,7 @@ The `utils` module of WarpRec provides a collection of essential utilities desig
 
 ## ✨ Main Functionalities
 
-- **⚙️ Configuration**: Defines the foundation for experiment reproducibility and modularity. Configuration files allow users to control all aspects of the pipeline (e.g., model selection, data splitting, hyperparameters) without changing code.
+- **⚙️ Configuration**: Defines the foundation for experiment reproducibility and modularity. Configuration files allow users to control all aspects of the pipeline (e.g., model selection, data splitting, hyperparameters) without modifying the underlying code.
 - **🧾 Logger**: A flexible and extensible logging utility designed to provide consistent output across modules. It supports both console and file-based logging, with customizable formats and verbosity levels.
 - **🧩 Enums**: A centralized collection of enumerations used throughout the framework, which ensures readability, type safety, and code consistency.
 - **📦 Registry**: A core component enabling dynamic access and instantiation of key objects—such as models, metrics, splitters, or optimizers—based on configuration references. This design supports decoupling and extensibility across the framework.
@@ -34,11 +34,11 @@ The module `utils` is structured as follows:
 
 ### ⚙️ Config
 
-The module `config` contains all the utilities to define a **configuration file** for your experimentation. In the quick start section we go over the process of running a simple experiment with your data.
+The `config` module provides all the utilities needed to define a **configuration file** for your experiments. In the quick start section, we explain how to run a simple experiment with your data.
 
 #### 🚀 Quick Start
 
-First of all let's create a simple configuration file, here's how you can do it:
+First of all, let's create a simple configuration file. Here's how you can do it:
 
 ```yaml
 reader:
@@ -65,13 +65,13 @@ evaluation:
     metrics: [nDCG, Precision, Recall, HitRate]
 ```
 
-To run an experiment with this configuration just run the following:
+To run an experiment with this configuration, just run the following:
 
 ```bash
 python warprec/train.py --config path/to/the/config.yml
 ```
 
-And you are done! This will get you started with the WarpRec configuration files. For a more in-depth description of all the possible configuration that you can do, use **[`config`](config/README.md)** as reference.
+That's it! You're ready to go. This will get you started with the WarpRec configuration files. For a more in-depth description of all the possible configurations you can make, use **[`config`](config/README.md)** as reference.
 
 ### 🧾 Logger
 
@@ -107,7 +107,7 @@ logger.error("Something is wrong")
 
 ### 🧩 Enums
 
-`Enums` are used throughout the framework to enforce valid values and improve readability. Here’s an example usage:
+`Enums` are used throughout the framework to enforce valid input values and enhance code readability. Here’s an example usage:
 
 ```python
 from warprec.utils.enums import RatingType, Similarities
@@ -118,7 +118,7 @@ similarity = Similarities.COSINE
 print(f"Rating type: {rating_type}, Similarity: {similarity}")
 ```
 
-All enums are subclasses of str and Enum, which means they are both human-readable and type-safe. You can use them in configs like:
+All enums subclass both `str` and `Enum`, making them human-readable and type-safe. You can use them in configs like:
 
 ```yaml
 reader:
@@ -157,4 +157,4 @@ evaluation:
     metrics: [MyCustomMetric]
 ```
 
-Use `.list_registered()` to inspect what's currently available.
+Use `.list_registered()` to see the currently available components.
