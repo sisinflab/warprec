@@ -232,7 +232,7 @@ class LocalWriter(Writer):
         # experiment_path/recs/model_name.{custom_extension}
         _path = join(
             self.experiment_recommendation_dir,
-            model_name + writing_params.ext,
+            f"{model_name}_{self._timestamp}{writing_params.ext}",
         )
 
         # Save in path
