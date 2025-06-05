@@ -110,7 +110,6 @@ def main(args: Namespace):
         item_cluster=dataset.get_item_cluster(),
     )
 
-    overall_results = {}  # Dictionary to store overall results
     for model_name in models:
         params = config.models[model_name]
         val_metric, val_k = config.validation_metric(
@@ -144,22 +143,12 @@ def main(args: Namespace):
         evaluator.print_console(results, "Test", config.evaluation.max_metric_per_row)
         result_dict["Test"] = results
 
-        # Save results in overall
-        overall_results[model_name] = result_dict
-
+        # Write results of current model
         writer.write_results(
-            result_dict["Test"],
+            result_dict,
             model_name,
-            config.evaluation.top_k,
         )
 
-        if "Validation" in result_dict:
-            writer.write_results(
-                result_dict["Validation"],
-                model_name,
-                config.evaluation.top_k,
-                validation=True,
-            )
         # Recommendation
         if config.general.recommendation.save_recs:
             umap_i, imap_i = dataset.get_inverse_mappings()
@@ -186,12 +175,6 @@ def main(args: Namespace):
                         source_path = os.path.join(check_path, "checkpoint.pt")
                         checkpoint_name = generate_model_name(model_name, param)
                         writer.checkpoint_from_ray(source_path, checkpoint_name)
-
-    # Save overall results
-    writer.write_overall_results(overall_results)
-
-    # Clean writing partial results
-    writer.clean_experiment_folders()
 
 
 if __name__ == "__main__":

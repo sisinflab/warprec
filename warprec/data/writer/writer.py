@@ -1,12 +1,11 @@
 import shutil
 from os.path import join
 from pathlib import Path
-from typing import List
+from typing import Dict
 from datetime import datetime
 from abc import ABC, abstractmethod
 
 import pandas as pd
-import numpy as np
 import torch
 import json
 from pandas import DataFrame
@@ -39,9 +38,8 @@ class Writer(ABC):
     @abstractmethod
     def write_results(
         self,
-        result_dict: dict,
+        result_dict: Dict[str, Dict[int, Dict[str, float]]],
         model_name: str,
-        top_k: List[int],
     ):
         """This function writes all the results of the experiment."""
 
@@ -135,22 +133,19 @@ class LocalWriter(Writer):
 
     def write_results(
         self,
-        result_dict: dict,
+        result_data: Dict[str, Dict[int, Dict[str, float]]],
         model_name: str,
-        top_k: List[int],
-        validation: bool = False,
         sep: str = "\t",
         ext: str = ".tsv",
     ) -> None:
-        """This function writes locally all the results of the experiment.
+        """This function writes locally all the results of the experiment into a single
+        "Overall_Results_{timestamp}.tsv" file, merging with existing data if present.
 
         Args:
-            result_dict (dict): The dictionary containing the results,
-                must be in the format index: value, where index
-                is a string formatted as: metric_name@top_k.
+            result_data (Dict[str, Dict[int, Dict[str, float]]]): The dictionary containing the results.
+                Format: { "Set": { "k": { "MetricName": value } } }
+                Example: {"Test": {5: {"Precision": 0.1, "Recall": 0.2}}}
             model_name (str): The name of the model which was evaluated.
-            top_k (List[int]): The list of top_k, or cutoffs, to retrieve from dictionary.
-            validation (bool): Flag value for the validation data.
             sep (str): The separator of the file.
             ext (str): The extension of the file.
         """
@@ -159,43 +154,77 @@ class LocalWriter(Writer):
         else:
             writing_params = WritingParams(sep=sep, ext=ext)
 
-        _path = join(self.experiment_evaluation_dir, f"{model_name}_{self._timestamp}")
-        if validation:
-            _path = _path + "_Validation" + writing_params.ext
+        current_overall_results_path = Path(
+            join(
+                self.experiment_evaluation_dir,
+                f"Overall_Results_{self._timestamp}{writing_params.ext}",
+            )
+        )
+
+        # Load existing data if the file exists
+        existing_df = pd.DataFrame()
+        if current_overall_results_path.exists():
+            try:
+                existing_df = pd.read_csv(
+                    current_overall_results_path, sep=writing_params.sep
+                )
+            except Exception as e:
+                logger.attention(
+                    f"Could not read existing overall results from {current_overall_results_path}: {e}. "
+                    "A new file will be created or existing data will be overwritten."
+                )
+                existing_df = pd.DataFrame()  # Reset to empty if reading fails
+
+        # Convert new results to a DataFrame
+        new_result_list = []
+        for set_name, top_k_data in result_data.items():
+            for k_value, metrics in top_k_data.items():
+                row = {"Model": model_name, "Set": set_name, "Top@k": k_value}
+                row.update(metrics)
+                new_result_list.append(row)
+
+        new_df = pd.DataFrame(new_result_list)
+
+        # Merge new results with existing ones
+        if not existing_df.empty:
+            # We need to ensure columns match before concatenation.
+            # If there are new metrics, add them to existing_df with NaN.
+            # If existing_df has metrics not in new_df, add them to new_df with NaN.
+            all_columns = list(set(existing_df.columns) | set(new_df.columns))
+            existing_df = existing_df.reindex(columns=all_columns)
+            new_df = new_df.reindex(columns=all_columns)
+
+            # Define merge keys for deduplication
+            merge_keys = ["Model", "Set", "Top@k"]
+
+            # Filter out rows from existing_df that are exactly matched by new_df based on merge_keys
+            # This handles updates for existing model/set/k combinations.
+            # First, concatenate to get all data
+            combined_df = pd.concat([existing_df, new_df], ignore_index=True)
+
+            # Drop duplicates, keeping the 'last' (i.e., the one from new_df if it's a duplicate)
+            # This means if a model/set/k combination is present in both, the new one takes precedence.
+            final_df = combined_df.drop_duplicates(subset=merge_keys, keep="last")
         else:
-            _path = _path + "_Test" + writing_params.ext
+            final_df = new_df
 
-        df = self._result_to_dataframe(result_dict, top_k)
-        df.to_csv(_path, sep=writing_params.sep)
+        # Sort for consistent output (optional but good practice)
+        final_df = final_df.sort_values(by=["Model", "Set", "Top@k"]).reset_index(
+            drop=True
+        )
 
-    def _result_to_dataframe(self, result_dict: dict, top_k: List[int]) -> DataFrame:
-        """This is a utility method to transform a dictionary of
-        results in the corresponding DataFrame format.
-
-        Args:
-            result_dict (dict): The dictionary containing the results.
-                The first index is the top_k integer, the second
-                the name of the metric.
-            top_k (List[int]): The list of top_k, or cutoffs, to retrieve from dictionary.
-
-        Returns:
-            DataFrame: The DataFrame format of the results.
-        """
-        # Collect all unique metric keys across all k
-        all_metric_keys = set()
-        for k in top_k:
-            all_metric_keys.update(result_dict[k].keys())
-        sorted_metric_keys = sorted(all_metric_keys)
-
-        result_list = []
-        indexes = ["Top@" + str(k) for k in top_k]
-        for k in top_k:
-            row = []
-            for metric in sorted_metric_keys:
-                row.append(result_dict[k].get(metric, float("nan")))
-            result_list.append(row)
-        result_array = np.array(result_list)
-        return pd.DataFrame(result_array, columns=sorted_metric_keys, index=indexes)
+        # Save the combined DataFrame
+        try:
+            final_df.to_csv(
+                current_overall_results_path, sep=writing_params.sep, index=False
+            )
+            logger.msg(
+                f"Results successfully written in {current_overall_results_path}"
+            )
+        except Exception as e:
+            logger.negative(
+                f"Error writing results to {current_overall_results_path}: {e}"
+            )
 
     def write_recs(
         self,
@@ -311,7 +340,7 @@ class LocalWriter(Writer):
         try:
             with open(_path, "w", encoding="utf-8") as f:
                 json.dump(existing_data, f, indent=4)
-            logger.msg(f"Parameters written to {_path}")
+            logger.msg(f"Parameters successfully written to {_path}")
         except Exception as e:
             logger.negative(f"Error writing parameters to {_path}: {e}")
 
@@ -345,71 +374,6 @@ class LocalWriter(Writer):
                 path_val, sep=writing_params.sep, index=None
             )
 
-    def write_overall_results(
-        self, overall_results: dict, sep: str = "\t", ext: str = ".tsv"
-    ):
-        """This method writes the overall results of the experiment.
-
-        Args:
-            overall_results (dict): The dictionary containing the overall results.
-                The first index is the model name, the second is the set of results,
-                which can be either "Validation" or "Test", the third is the cutoff
-                and the last is the metric name.
-            sep (str): The separator that will be used to write the results.
-            ext (str): The extension that will be used to write the results.
-        """
-        if self.config:
-            writing_params = self.config.writer.writing_params
-        else:
-            writing_params = WritingParams(sep=sep, ext=ext)
-
-        # experiment_path/overall_results.{custom_extension}
-        _path = join(
-            self.experiment_evaluation_dir,
-            f"Overall_Results_{self._timestamp}" + writing_params.ext,
-        )
-
-        # Convert overall results to DataFrame
-        result_list = []
-        for model_name, result_dict in overall_results.items():
-            for set_name, metrics in result_dict.items():
-                for top_k, metric_values in metrics.items():
-                    row = {"Model": model_name, "Set": set_name, "Top@k": top_k}
-                    row.update(metric_values)
-                    result_list.append(row)
-
-        df = pd.DataFrame(result_list)
-        df.to_csv(_path, sep=writing_params.sep, index=False)
-
     def checkpoint_from_ray(self, source: str, new_name: str):
         destination = join(self.experiment_serialized_models_dir, new_name + ".pth")
         shutil.move(source, destination)
-
-    def clean_experiment_folders(self):
-        """Cleans the experiment folders by removing partial results and parameters.
-        - In the evaluation folder, keeps only "Overall_Results_*" files.
-        - In the serialized folder, keeps only "*.pth" model files and removes
-            timestamped parameter files ("*_Params_{timestamp}.json").
-        """
-        logger.msg("Cleaning experiment folders...")
-
-        # --- Clean Evaluation Directory ---
-        logger.msg(f"Cleaning evaluation directory: {self.experiment_evaluation_dir}")
-        if self.experiment_evaluation_dir.exists():
-            for f_path in self.experiment_evaluation_dir.iterdir():
-                if f_path.is_file():
-                    filename = f_path.name
-                    if filename.startswith("Overall_Results_"):
-                        continue
-
-                    if self._timestamp in filename:
-                        try:
-                            f_path.unlink()
-                        except OSError as e:
-                            logger.msg(f"    Error deleting file {filename}: {e}")
-        else:
-            logger.attention(
-                f"Evaluation directory not found: {self.experiment_evaluation_dir}"
-            )
-
-        logger.msg("Finished cleaning experiment folders.")
