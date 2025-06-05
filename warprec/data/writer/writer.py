@@ -341,3 +341,53 @@ class LocalWriter(Writer):
     def checkpoint_from_ray(self, source: str, new_name: str):
         destination = join(self.experiment_serialized_models_dir, new_name + ".pth")
         shutil.move(source, destination)
+
+    def clean_experiment_folders(self):
+        """Cleans the experiment folders by removing partial results and parameters.
+        - In the evaluation folder, keeps only "Overall_Results_*" files.
+        - In the serialized folder, keeps only "*.pth" model files and removes
+            timestamped parameter files ("*_Params_{timestamp}.json").
+        """
+        logger.msg("Cleaning experiment folders...")
+
+        # --- Clean Evaluation Directory ---
+        logger.msg(f"Cleaning evaluation directory: {self.experiment_evaluation_dir}")
+        if self.experiment_evaluation_dir.exists():
+            for f_path in self.experiment_evaluation_dir.iterdir():
+                if f_path.is_file():
+                    filename = f_path.name
+                    if filename.startswith("Overall_Results_"):
+                        continue
+
+                    if self._timestamp in filename:
+                        try:
+                            f_path.unlink()
+                        except OSError as e:
+                            logger.msg(f"    Error deleting file {filename}: {e}")
+        else:
+            logger.attention(
+                f"Evaluation directory not found: {self.experiment_evaluation_dir}"
+            )
+
+        # --- Clean Serialized Directory ---
+        logger.msg(
+            f"Cleaning serialized models directory: {self.experiment_serialized_models_dir}"
+        )
+        if self.experiment_serialized_models_dir.exists():
+            for f_path in self.experiment_serialized_models_dir.iterdir():
+                if f_path.is_file():
+                    filename = f_path.name
+                    if filename.endswith(".pth"):
+                        continue
+
+                    if self._timestamp in filename:
+                        try:
+                            f_path.unlink()
+                        except OSError as e:
+                            logger.msg(f"    Error deleting file {filename}: {e}")
+        else:
+            logger.attention(
+                f"Serialized directory not found: {self.experiment_serialized_models_dir}"
+            )
+
+        logger.msg("Finished cleaning experiment folders.")

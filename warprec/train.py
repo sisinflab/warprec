@@ -195,6 +195,9 @@ def main(args: Namespace):
     # Save overall parameters
     writer.write_params(overall_params, "Overall")
 
+    # Clean writing partial results
+    writer.clean_experiment_folders()
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
