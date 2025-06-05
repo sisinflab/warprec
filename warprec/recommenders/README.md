@@ -2,8 +2,8 @@
 
 The WarpRec `Recommenders` module offers all the tools needed to train and build your recommendation models. This module contains:
 
-- State-of-the-Art models already implemented for an easy access.
-- The trainer compatible with WarpRec models to train your models.
+- State-of-the-Art models already implemented for easy access.
+- A trainer compatible with WarpRec models, allowing you to train your models easily.
 - The building blocks to create your own model.
 
 ## 📚 Table of Contents
@@ -31,7 +31,7 @@ The `General Recommenders` module of WarpRec is a collection of `collaborative` 
 
 ### 👉 How to implement Your recommender
 
-In this section we will guide you through the process of implementing you own recommendation model. First of all, let's import the main metric interface:
+In this section we will guide you through the process of implementing your own recommendation model. First of all, let's import the main metric interface:
 
 ```python
 from warprec.recommenders.base_recommender import ItemSimRecommender, Recommender
@@ -39,9 +39,9 @@ from warprec.recommenders.base_recommender import ItemSimRecommender, Recommende
 
 The **Recommender** interface is suitable for any type of recommender model, while **ItemSimRecommender** is a specialized interface used by models that learn an item similarity matrix.
 
-In this guide we will go through the implementation of the EASE model, which is a really simple model to get you started with WarpRec interfaces. As you know, EASE learns an item similarity matrix, but in this case we will use the base interface **Recommender**.
+In this guide we will go through the implementation of the EASE model, which is a simple model to get you started with WarpRec interfaces. As you know, EASE learns an item similarity matrix, but in this case we will use the base interface **Recommender**.
 
-The first step is the initialization of the model, here we need to setup all the key component needed for the model to execute and all the *learnable objects*. Let's see the key step to a correct initialization:
+The first step is model initialization. Here, we need to set up all the key components required for the model to function, including the *learnable objects*. Let's look at the key steps for proper initialization:
 
 - Write the parameters of your model as in the example, WarpRec handles parameters through annotation and will populate them through configuration.
 - Configure your layers and parameters that will be learned during the fitting of the model.
@@ -71,7 +71,7 @@ class MyEASE(Recommender):
         self._name = "EASE"
 ```
 
-**The info dictionary contains the main information of the dataset**. These are the information contained in it:
+**The info dictionary contains the main information of the dataset**. This is the information it contains:
 
 - **items**: Number of unique items.
 - **users**: Number of unique users.
@@ -79,11 +79,11 @@ class MyEASE(Recommender):
 
 After the initialization we will need to implement the three main methods of the model:
 
-1. **.fit()**: The main method of training, this is where you will implement the main trining cycle
+1. **.fit()**: The main training method. This is where you will implement the core training cycle
 2. **.forward()**: The forward step of the model, used inside neural models
 3. **.predict()**: The prediction of the model, given the training interactions
 
-As for our example, the second step is not needed because the is no neural layer inside EASE, therefore no backward step either. As for the fit, we can implement it like this:
+As for our example, the second step is not needed because EASE does not contain any neural layers, therefore no backward step either. The **fit** method can be implemented as follows:
 
 ```python
 def fit(
@@ -122,7 +122,7 @@ def predict(
     return torch.from_numpy(r).to(self._device)
 ```
 
-When you implement you model, remember to follow the important step of masking the training interactions and also to convert (if not already) to a tensor, and change the device. And you are done!
+When implementing your model, remember to mask the training interactions, convert the result to a tensor (if it isn't one already), and move it to the appropriate device. And you are done!
 
 ## 🏋️‍♂️ Trainer
 
@@ -148,19 +148,19 @@ This design ensures maximum reproducibility, scalability, and extensibility, mak
 
 ## 🧱 Layers
 
-WarpRec `Layers` module offers a series of building blocks that can be used inside your recommendation models. As of right now, the implemented layers inside the module are the following:
+WarpRec `Layers` module offers a series of building blocks that can be used inside your recommendation models. Currently, the module includes the following implemented layers:
 
 - `MLP`
 
 ## 📉 Losses
 
-WarpRec `Losses` module offers a series of loss functions that can be used inside your recommendation models. As of right now, the implemented loss functions inside the module are as follows:
+WarpRec `Losses` module offers a series of loss functions that can be used inside your recommendation models. Currently, the module includes the following implemented loss functions:
 
 - `BPRLoss`
 
 ## 🤝 Similarities
 
-WarpRec `Similarities` module offers a series of similarity functions that can be used inside your recommendation models. As of right now, the implemented similarity functions inside the module are as follows:
+WarpRec `Similarities` module offers a series of similarity functions that can be used inside your recommendation models. Currently, the module includes the following implemented similarity functions:
 
 - `Cosine`
 - `Dot`
