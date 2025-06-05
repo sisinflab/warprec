@@ -193,7 +193,7 @@ def main(args: Namespace):
     writer.write_overall_results(overall_results)
 
     # Save overall parameters
-    writer.write_params(overall_params, "overall")
+    writer.write_params(overall_params, "Overall")
 
 
 if __name__ == "__main__":

@@ -267,7 +267,7 @@ class LocalWriter(Writer):
         # experiment_path/serialized/model_name_params.json
         _path = join(
             self.experiment_serialized_models_dir,
-            f"{file_name}_params_{self._timestamp}.json",
+            f"{file_name}_Params_{self._timestamp}.json",
         )
         with open(_path, "w") as f:
             json.dump(params, f, indent=4)
@@ -323,7 +323,7 @@ class LocalWriter(Writer):
         # experiment_path/overall_results.{custom_extension}
         _path = join(
             self.experiment_evaluation_dir,
-            f"overall_results_{self._timestamp}" + writing_params.ext,
+            f"Overall_Results_{self._timestamp}" + writing_params.ext,
         )
 
         # Convert overall results to DataFrame
