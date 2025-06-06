@@ -187,40 +187,26 @@ class LocalWriter(Writer):
 
         new_df = pd.DataFrame(new_result_list)
 
-        # Merge new results with existing ones
-        if not existing_df.empty:
-            # We need to ensure columns match before concatenation.
-            # If there are new metrics, add them to existing_df with NaN.
-            # If existing_df has metrics not in new_df, add them to new_df with NaN.
-            all_columns = list(set(existing_df.columns) | set(new_df.columns))
+        # Predefined columns used also as merge keys
+        merge_keys = ["Model", "Set", "Top@k"]
 
-            # Ensure the predefined columns are always at the start
-            predefined_columns = ["Model", "Set", "Top@k"]
-            metric_columns = sorted(
-                [col for col in all_columns if col not in predefined_columns]
-            )
-            final_column_order = predefined_columns + metric_columns
+        # If existing_df is empty, concat will just return new_df
+        combined_df = pd.concat([existing_df, new_df], ignore_index=True)
 
-            existing_df = existing_df.reindex(columns=final_column_order)
-            new_df = new_df.reindex(columns=final_column_order)
+        # Drop duplicates based on merge keys, keeping the last occurrence
+        final_df = combined_df.drop_duplicates(subset=merge_keys, keep="last")
 
-            # Define merge keys for deduplication
-            merge_keys = ["Model", "Set", "Top@k"]
+        # Ensure the correct ordering of columns
+        metric_columns = sorted(final_df.columns.difference(merge_keys))
+        final_column_order = merge_keys + metric_columns
 
-            # Filter out rows from existing_df that are exactly matched by new_df based on merge_keys
-            # This handles updates for existing model/set/k combinations.
-            # First, concatenate to get all data
-            combined_df = pd.concat([existing_df, new_df], ignore_index=True)
-
-            # Drop duplicates, keeping the 'last' (i.e., the one from new_df if it's a duplicate)
-            # This means if a model/set/k combination is present in both, the new one takes precedence.
-            final_df = combined_df.drop_duplicates(subset=merge_keys, keep="last")
-        else:
-            final_df = new_df
-
-        # Sort for consistent output (optional but good practice)
-        final_df = final_df.sort_values(by=["Model", "Set", "Top@k"]).reset_index(
-            drop=True
+        # Reindex to ensure the final DataFrame has the correct column order
+        # and sort by merge keys
+        final_df = (
+            combined_df.drop_duplicates(subset=merge_keys, keep="last")
+            .reindex(columns=final_column_order)
+            .sort_values(by=merge_keys)
+            .reset_index(drop=True)
         )
 
         # Save the combined DataFrame
