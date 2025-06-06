@@ -9,6 +9,7 @@ The `General Recommenders` module of WarpRec is a collection of `collaborative` 
 - 👥 [KNN (K Nearest Neighbor)](#👥-knn-k-nearest-neighbor)
 - 🧊 [Latent Factor](#🧊-latent-factor)
 - 🧠 [Neural](#🧠-neural)
+- ➖ [Unpersonalized](#➖-unpersonalized)
 - 📌 [Summary of Available General Models](#📌-summary-of-available-general-models)
 
 ## 🌀 Autoencoders
@@ -192,6 +193,24 @@ models:
 ...
 ```
 
+## ➖ Unpersonalized
+
+Unpersonalized models serve as simple baselines in recommender systems research. They are used to produce reference metric scores against which the performance of actual (personalized) models can be compared.
+
+- [Pop](unpersonalized/pop.py): Recommends the most popular items overall. This model helps assess whether other recommenders are biased towards popularity.
+```yaml
+models:
+    Pop: ~
+...
+```
+
+- [Random](unpersonalized/random.py): Recommends items at random. This model defines a lower bound for performance metrics, serving as a sanity check during evaluation.
+```yaml
+models:
+    Random: ~
+...
+```
+
 ## 📌 Summary of Available General Models
 
 In this section you can find a table summarizing all the models available in WarpRec, along with a brief description.
@@ -213,3 +232,5 @@ In this section you can find a table summarizing all the models available in War
 |                  | **BPR**              | Pairwise ranking model for implicit feedback.                     |
 |                  | **Slim**             | Interpretable item similarity model with L1/L2 regularization.    |
 | 🧠 Neural        | **NeuMF**            | Hybrid neural model combining GMF and MLP layers.                 |
+| ➖ Unpersonalized | **Pop**            | Recommends popular items to all users. Serves as a popularity-based baseline.|
+|                   | **Random**            | Recommends items at random. Serves as a performance lower bound.   |
