@@ -1028,3 +1028,8 @@ class AttributeUserKNN(RecomModel):
 @params_registry.register("Random")
 class Random(RecomModel):
     """Empty definition of the model Random."""
+
+
+@params_registry.register("Pop")
+class Pop(RecomModel):
+    """Empty definition of the model Pop."""
