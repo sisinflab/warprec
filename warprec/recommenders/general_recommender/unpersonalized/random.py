@@ -10,7 +10,9 @@ from warprec.utils.registry import model_registry
 
 @model_registry.register(name="Random")
 class Random(Recommender):
-    """Definition of Random unpersonalized model
+    """Definition of Random unpersonalized model.
+    This model will recommend items based on a random number generator,
+    ensuring that previously seen items are not recommended again.
 
     Args:
         params (dict): The dictionary with the model params.
