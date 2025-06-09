@@ -1023,3 +1023,13 @@ class AttributeUserKNN(RecomModel):
         """Validate normalize."""
         v = convert_to_list(v)
         return v
+
+
+@params_registry.register("Random")
+class Random(RecomModel):
+    """Empty definition of the model Random."""
+
+
+@params_registry.register("Pop")
+class Pop(RecomModel):
+    """Empty definition of the model Pop."""
