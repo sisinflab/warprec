@@ -11,9 +11,22 @@ help:
 
 
 .PHONY: install
-install:
+install-cpu:
+	@echo "🧠 Using Python 3.12 with poetry..."
 	poetry env use python3.12
 	poetry install
+
+	@echo "🧠 Detecting torch version..."
+	@torch_version=$$(poetry run python -c "import torch; print(torch.__version__)") && \
+	echo "✅ Detected torch version: $$torch_version" && \
+	echo "⬇ Installing PyG dependencies for torch==$$torch_version..." && \
+	poetry run pip install \
+		torch-scatter \
+		torch-sparse \
+		torch-cluster \
+		torch-spline-conv \
+		-f https://data.pyg.org/whl/torch-$$torch_version.html && \
+	poetry add torch-geometric
 
 
 # .PHONY: clean
