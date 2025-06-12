@@ -7,7 +7,8 @@ import pandas as pd
 import numpy as np
 from torch import nn, Tensor
 from pandas import DataFrame
-from scipy.sparse import csr_matrix
+from scipy.sparse import csr_matrix, coo_matrix
+from torch_sparse import SparseTensor
 from warprec.data.dataset import Interactions
 
 
@@ -234,6 +235,68 @@ class Recommender(nn.Module, ABC):
             else:
                 name += f"_{ann}={value}"
         return name
+
+
+class GraphRecommenderUtils(ABC):
+    def _get_norm_adj_mat(
+        self,
+        interaction_matrix: coo_matrix,
+        n_users: int,
+        n_items: int,
+        device: str = "cpu",
+    ) -> SparseTensor:
+        """Get the normalized interaction matrix of users and items.
+
+        Args:
+            interaction_matrix (coo_matrix): The full interaction matrix in coo format.
+            n_users (int): The number of users.
+            n_items (int): The number of items.
+            device (str): Device to use for the adjacency matrix.
+
+        Returns:
+            SparseTensor: The sparse adjacency matrix.
+        """
+        # Extract user and items nodes
+        user_nodes = interaction_matrix.row
+        item_nodes = interaction_matrix.col + n_users
+
+        # Unify arcs in both directions
+        row = np.concatenate([user_nodes, item_nodes])
+        col = np.concatenate([item_nodes, user_nodes])
+
+        # Create the edge tensor
+        edge_index_np = np.vstack([row, col])  # Efficient solution
+        # Creating a tensor directly from a numpy array instead of lists
+        edge_index = torch.tensor(edge_index_np, dtype=torch.int64)
+
+        # Create the SparseTensor using the edge indexes.
+        # This is the format expected by LGConv
+        adj = SparseTensor(
+            row=edge_index[0],
+            col=edge_index[1],
+            sparse_sizes=(n_users + n_items, n_users + n_items),
+        ).to(device)
+
+        # LGConv will handle the normalization
+        # so there is no need to do it here
+        return adj
+
+    def _get_ego_embeddings(
+        self, user_embedding: nn.Embedding, item_embedding: nn.Embedding
+    ) -> Tensor:
+        """Get the initial embedding of users and items and combine to an embedding matrix.
+
+        Args:
+            user_embedding (nn.Embedding): The user embeddings.
+            item_embedding (nn.Embedding): The item embeddings.
+
+        Returns:
+            Tensor: Combined user and item embeddings.
+        """
+        user_embeddings = user_embedding.weight
+        item_embeddings = item_embedding.weight
+        ego_embeddings = torch.cat([user_embeddings, item_embeddings], dim=0)
+        return ego_embeddings
 
 
 def generate_model_name(model_name: str, params: dict) -> str:
