@@ -243,7 +243,7 @@ class GraphRecommenderUtils(ABC):
         interaction_matrix: coo_matrix,
         n_users: int,
         n_items: int,
-        device: str = "cpu",
+        device: torch.device | str = "cpu",
     ) -> SparseTensor:
         """Get the normalized interaction matrix of users and items.
 
@@ -251,7 +251,7 @@ class GraphRecommenderUtils(ABC):
             interaction_matrix (coo_matrix): The full interaction matrix in coo format.
             n_users (int): The number of users.
             n_items (int): The number of items.
-            device (str): Device to use for the adjacency matrix.
+            device (torch.device | str): Device to use for the adjacency matrix.
 
         Returns:
             SparseTensor: The sparse adjacency matrix.

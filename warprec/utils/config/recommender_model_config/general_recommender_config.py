@@ -1033,3 +1033,87 @@ class Random(RecomModel):
 @params_registry.register("Pop")
 class Pop(RecomModel):
     """Empty definition of the model Pop."""
+
+
+@params_registry.register("LightGCN")
+class LightGCN(RecomModel):
+    """Definition of the model LightGCN.
+
+    Attributes:
+        embedding_size (INT_FIELD): List of values for embedding_size.
+        n_layers (INT_FIELD): List of values for n_layers.
+        reg_weight (FLOAT_FIELD): List of values for reg_weight.
+        epochs (INT_FIELD): List of values for epochs.
+        learning_rate (FLOAT_FIELD): List of values for learning rate.
+    """
+
+    embedding_size: INT_FIELD
+    n_layers: INT_FIELD
+    reg_weight: FLOAT_FIELD
+    epochs: INT_FIELD
+    learning_rate: FLOAT_FIELD
+
+    @field_validator("embedding_size")
+    @classmethod
+    def check_embedding_size(cls, v: list):
+        """Validate embedding_size."""
+        v = convert_to_list(v)
+        for value in v:
+            if check_less_equal_zero(value):
+                raise ValueError(
+                    "Values of embedding_size for LightGCN model must be > 0. "
+                    f"Values received as input: {v}"
+                )
+        return v
+
+    @field_validator("n_layers")
+    @classmethod
+    def check_k(cls, v: list):
+        """Validate n_layers."""
+        v = convert_to_list(v)
+        for value in v:
+            if check_less_equal_zero(value):
+                raise ValueError(
+                    "Values of n_layers for LightGCN model must be > 0. "
+                    f"Values received as input: {v}"
+                )
+        return v
+
+    @field_validator("reg_weight")
+    @classmethod
+    def check_alpha(cls, v: list):
+        """Validate reg_weight."""
+        v = convert_to_list(v)
+        for value in v:
+            if check_less_than_zero(value):
+                raise ValueError(
+                    f"Values of reg_weight for LightGCN model must be >= 0. "
+                    f"Values received as input: {v}"
+                )
+        return v
+
+    @field_validator("epochs")
+    @classmethod
+    def check_epochs(cls, v: list):
+        """Validate epochs."""
+        v = convert_to_list(v)
+        for value in v:
+            if check_less_equal_zero(value):
+                raise ValueError(
+                    "Values of epochs for LightGCN model must be > 0. "
+                    f"Values received as input: {v}"
+                )
+        return v
+
+    @field_validator("learning_rate")
+    @classmethod
+    def check_learning_rate(cls, v: list):
+        """Validate learning_rate."""
+        v = convert_to_list(v)
+        for value in v:
+            if check_less_equal_zero(value):
+                raise ValueError(
+                    "Values of learning_rate for LightGCN model must be > 0. "
+                    f"Values received as input: {v}"
+                )
+        return v
