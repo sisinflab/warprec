@@ -120,6 +120,9 @@ class Evaluator:
         self.reset_metrics()
         model.eval()
 
+        # Keep a copy of the full training set, if needed
+        train_set = dataset.train_set.get_sparse()
+
         # Iter over batches
         _start = 0
         for train_batch, test_batch, val_batch in dataset:
@@ -129,9 +132,9 @@ class Evaluator:
                 (eval_set).toarray(), device=device
             )  # Ground tensor [batch_size x items]
 
-            predictions = model.predict(train_batch, start=_start, end=_end).to(
-                device
-            )  # Get ratings tensor [batch_size x items]
+            predictions = model.predict(
+                train_batch, start=_start, end=_end, train_set=train_set
+            ).to(device)  # Get ratings tensor [batch_size x items]
 
             # Pre-compute metric blocks
             precomputed_blocks: Dict[int, Dict[str, Tensor]] = {}
