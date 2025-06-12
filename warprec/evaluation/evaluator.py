@@ -249,15 +249,13 @@ class Evaluator:
                 to print in each row.
         """
         # Collect all unique metric keys across all cutoffs
-        all_metric_keys: set[str] = set()
-        for metrics in res_dict.values():
-            all_metric_keys.update(metrics.keys())
-        sorted_metric_keys = sorted(all_metric_keys)
+        first_cutoff_key = next(iter(res_dict))
+        ordered_metric_keys = list(res_dict[first_cutoff_key].keys())
 
         # Split metric keys into chunks of size max_metrics_per_row
-        n_chunks = ceil(len(sorted_metric_keys) / max_metrics_per_row)
+        n_chunks = ceil(len(ordered_metric_keys) / max_metrics_per_row)
         chunks = [
-            sorted_metric_keys[i * max_metrics_per_row : (i + 1) * max_metrics_per_row]
+            ordered_metric_keys[i * max_metrics_per_row : (i + 1) * max_metrics_per_row]
             for i in range(n_chunks)
         ]
 
@@ -280,7 +278,7 @@ class Evaluator:
             if n_chunks > 1:
                 start_idx = chunk_idx * max_metrics_per_row + 1
                 end_idx = min(
-                    (chunk_idx + 1) * max_metrics_per_row, len(all_metric_keys)
+                    (chunk_idx + 1) * max_metrics_per_row, len(ordered_metric_keys)
                 )
                 title += f" (metrics {start_idx} - {end_idx})"
             logger.msg(title.center(_rlen, "-"))
