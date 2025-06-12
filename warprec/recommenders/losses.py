@@ -27,3 +27,43 @@ class BPRLoss(nn.Module):
         """
         loss = -torch.log(self.gamma + torch.sigmoid(pos_score - neg_score)).mean()
         return loss
+
+
+class EmbeddingLoss(nn.Module):
+    """EmbeddingLoss, regularization on embeddings.
+
+    This loss aims to penalize the magnitude of embedding weights,
+    promoting smaller weights and potentially preventing overfitting.
+    It is based on the L1 or L2 norm of the embedding vectors.
+
+    Args:
+        norm (int): The norm to use for loss calculation.
+                    Commonly 1 (L1) or 2 (L2).
+
+    Raises:
+        ValueError: If the norm is not 1 or 2.
+    """
+
+    def __init__(self, norm: int = 2):
+        super(EmbeddingLoss, self).__init__()
+        if norm not in [1, 2]:
+            raise ValueError("Norm must be either 1 (L1) or 2 (L2).")
+        self.norm = norm
+
+    def forward(self, *embeddings: nn.Embedding) -> Tensor:
+        """Compute the EmbeddingLoss loss.
+
+        Args:
+            *embeddings (nn.Embedding): The list of embedding layers.
+
+        Returns:
+            Tensor: The computed Embedding loss.
+        """
+        emb_loss = torch.tensor(0.0, device=embeddings[0].weight.device)
+        num_embeddings = len(embeddings)
+
+        for embedding_layer in embeddings:
+            emb_loss += torch.norm(embedding_layer.weight, p=self.norm)
+
+        emb_loss /= num_embeddings
+        return emb_loss
