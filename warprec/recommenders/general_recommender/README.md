@@ -82,6 +82,18 @@ models:
 
 Graph-based recommenders exploit the structure of the user-item interaction graph to infer relationships and make recommendations. These models capture high-order proximity and implicit associations through walks or neighborhood propagation. They are well-suited for uncovering complex patterns in sparse datasets.
 
+- [LightGCN](graph_based/lightgcn.py):A simplified graph convolutional network designed for collaborative filtering. It eliminates feature transformations and nonlinear activations, focusing solely on neighborhood aggregation over the user-item interaction graph. By stacking multiple propagation layers, LightGCN captures high-order connectivity, leading to more accurate recommendations with reduced computational overhead.
+```yaml
+models:
+    LightGCN:
+        embedding_size: 64
+        n_layers: 2
+        reg_weight: 0.0001
+        epochs: 50
+        learning_rate: 0.001
+...
+```
+
 - [RP3Beta](graph_based/rp3beta.py): A graph-based collaborative filtering model that performs a biased random walk of length 3 on the user-item bipartite graph. It integrates a popularity-based penalization term (beta) to reduce the influence of popular items, resulting in more diverse and personalized recommendations.
 ```yaml
 models:
@@ -200,14 +212,14 @@ Unpersonalized models serve as simple baselines in recommender systems research.
 - [Pop](unpersonalized/pop.py): Recommends the most popular items overall. This model helps assess whether other recommenders are biased towards popularity.
 ```yaml
 models:
-    Pop: ~
+    Pop: {}
 ...
 ```
 
 - [Random](unpersonalized/random.py): Recommends items at random. This model defines a lower bound for performance metrics, serving as a sanity check during evaluation.
 ```yaml
 models:
-    Random: ~
+    Random: {}
 ...
 ```
 
@@ -223,7 +235,8 @@ In this section you can find a table summarizing all the models available in War
 |                  | **MultiDAE**         | Denoising autoencoder optimized for implicit data.                |
 |                  | **MultiVAE**         | Variational autoencoder modeling uncertainty in preferences.      |
 | 📄 Content Based | **VSM**              | Classical content-based model using TF-IDF and cosine similarity. |
-| 🕸️ Graph Based  | **RP3Beta**          | Random walk model with popularity penalization.                   |
+| 🕸️ Graph Based  | **LightGCN**          | Simplified Graph convolutional neural network.                  |
+|                 | **RP3Beta**          | Random walk model with popularity penalization.                   |
 | 👥 KNN           | **ItemKNN**          | Item-based collaborative KNN using similarity metrics.            |
 |                  | **AttributeItemKNN** | Item-based KNN using content features.                            |
 |                  | **UserKNN**          | User-based collaborative KNN using historical interactions.       |
