@@ -82,7 +82,7 @@ models:
 
 Graph-based recommenders exploit the structure of the user-item interaction graph to infer relationships and make recommendations. These models capture high-order proximity and implicit associations through walks or neighborhood propagation. They are well-suited for uncovering complex patterns in sparse datasets.
 
-- [LightGCN](graph_based/lightgcn.py):A simplified graph convolutional network designed for collaborative filtering. It eliminates feature transformations and nonlinear activations, focusing solely on neighborhood aggregation over the user-item interaction graph. By stacking multiple propagation layers, LightGCN captures high-order connectivity, leading to more accurate recommendations with reduced computational overhead.
+- [LightGCN](graph_based/lightgcn.py): A simplified graph convolutional network designed for collaborative filtering. It eliminates feature transformations and nonlinear activations, focusing solely on neighborhood aggregation over the user-item interaction graph. By stacking multiple propagation layers, LightGCN captures high-order connectivity, leading to more accurate recommendations with reduced computational overhead.
 ```yaml
 models:
     LightGCN:
@@ -91,6 +91,20 @@ models:
         reg_weight: 0.0001
         epochs: 50
         learning_rate: 0.001
+...
+```
+
+- [NGCF](graph_based/ngcf.py): A neural graph-based collaborative filtering model that explicitly captures high-order connectivity by propagating embeddings through the user-item interaction graph. NGCF leverages feature transformation and nonlinear activation to model complex user-item interactions, enhancing recommendation accuracy through deep graph representation learning.
+```yaml
+models:
+    NGCF:
+        embedding_size: 64
+        reg_weight: 0.0001
+        epochs: 5
+        learning_rate: 0.001
+        weight_size: [64, 64]
+        node_dropout: 0.01
+        message_dropout: 0.01
 ...
 ```
 
@@ -236,6 +250,7 @@ In this section you can find a table summarizing all the models available in War
 |                  | **MultiVAE**         | Variational autoencoder modeling uncertainty in preferences.      |
 | 📄 Content Based | **VSM**              | Classical content-based model using TF-IDF and cosine similarity. |
 | 🕸️ Graph Based  | **LightGCN**          | Simplified Graph convolutional neural network.                  |
+|                 | **NGCF**             | Complex Graph convolutional neural network.                   |
 |                 | **RP3Beta**          | Random walk model with popularity penalization.                   |
 | 👥 KNN           | **ItemKNN**          | Item-based collaborative KNN using similarity metrics.            |
 |                  | **AttributeItemKNN** | Item-based KNN using content features.                            |
