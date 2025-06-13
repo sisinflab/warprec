@@ -129,7 +129,7 @@ class LightGCN(Recommender, GraphRecommenderUtils):
             **kwargs (Any): The dictionary of keyword arguments.
         """
         if self.adj is None:
-            self.adj = self._get_norm_adj_mat(
+            self.adj = self._get_adj_mat(
                 interactions.get_sparse().tocoo(),
                 self.n_users,
                 self.n_items,
@@ -219,7 +219,7 @@ class LightGCN(Recommender, GraphRecommenderUtils):
                 raise RuntimeError(
                     "The model has not been fit yet. Call fit() before predict()."
                 )
-            self.adj = self._get_norm_adj_mat(
+            self.adj = self._get_adj_mat(
                 train_set.tocoo(), self.n_users, self.n_items, self._device
             )
 
