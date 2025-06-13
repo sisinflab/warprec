@@ -5,6 +5,7 @@ from abc import ABC, abstractmethod
 import torch
 import pandas as pd
 import numpy as np
+import scipy.sparse as sp
 from torch import nn, Tensor
 from pandas import DataFrame
 from scipy.sparse import csr_matrix, coo_matrix
@@ -238,7 +239,7 @@ class Recommender(nn.Module, ABC):
 
 
 class GraphRecommenderUtils(ABC):
-    def _get_norm_adj_mat(
+    def _get_adj_mat(
         self,
         interaction_matrix: coo_matrix,
         n_users: int,
@@ -280,6 +281,60 @@ class GraphRecommenderUtils(ABC):
         # LGConv will handle the normalization
         # so there is no need to do it here
         return adj
+
+    def _get_norm_adj_mat_ngcf(
+        self,
+        interaction_matrix: coo_matrix,
+        n_users: int,
+        n_items: int,
+        device: torch.device | str = "cpu",
+    ) -> SparseTensor:
+        """Get the normalized interaction matrix of users and items specific to NGCF.
+        This includes constructing the full adjacency matrix and applying symmetric normalization.
+
+        Args:
+            interaction_matrix (coo_matrix): The full interaction matrix in coo format.
+            n_users (int): The number of users.
+            n_items (int): The number of items.
+            device (torch.device | str): Device to use for the adjacency matrix.
+
+        Returns:
+            SparseTensor: The sparse normalized adjacency matrix (A_hat).
+        """
+        # Build adjacency matrix (A)
+        # [num_user + num_items x num_user + num_items]
+        A = sp.dok_matrix((n_users + n_items, n_users + n_items), dtype=np.float32)
+        inter_M = interaction_matrix
+        inter_M_t = interaction_matrix.transpose()
+
+        # Add user-item interactions
+        for u, i in zip(inter_M.row, inter_M.col):
+            A[u, i + n_users] = 1.0  # user -> item
+        # Add item-user interactions (transpose)
+        for i, u in zip(inter_M_t.row, inter_M_t.col):
+            A[i + n_users, u] = 1.0  # item -> user
+
+        A = (
+            A.tocsr()
+        )  # Convert to CSR for efficient row-wise sum and diagonal matrix creation
+
+        # Symmetric Normalization: D^{-0.5} A D^{-0.5}
+        sum_rows = np.array(A.sum(axis=1)).flatten()
+        # Add epsilon to avoid division by zero
+        sum_rows[sum_rows == 0] = 1e-7
+        diag_inv_sqrt = np.power(sum_rows, -0.5)
+        D_inv_sqrt = sp.diags(diag_inv_sqrt)
+
+        # L = D^{-0.5} A D^{-0.5}
+        L = D_inv_sqrt.dot(A).dot(D_inv_sqrt)
+
+        # Convert to COO format for SparseTensor
+        L_coo = L.tocoo()
+        indices = torch.LongTensor(np.vstack((L_coo.row, L_coo.col)))
+        values = torch.FloatTensor(L_coo.data)
+        shape = torch.Size(L_coo.shape)
+
+        return torch.sparse_coo_tensor(indices, values, shape).coalesce().to(device)
 
     def _get_ego_embeddings(
         self, user_embedding: nn.Embedding, item_embedding: nn.Embedding
