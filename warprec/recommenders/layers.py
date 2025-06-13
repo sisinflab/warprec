@@ -1,8 +1,11 @@
 from typing import List
 
+import torch
 from torch import nn, Tensor
 from torch.nn import Module
 from torch.nn.init import normal_, xavier_normal_, xavier_uniform_
+from torch_sparse import SparseTensor
+
 from warprec.utils.enums import Activations, Initializations
 
 
@@ -79,3 +82,51 @@ class MLP(nn.Module):
                     raise ValueError("Initialization mode not supported.")
             if module.bias is not None:
                 module.bias.data.fill_(0.0)
+
+
+class SparseDropout(nn.Module):
+    """Dropout layer for sparse tensors.
+
+    Args:
+        p (float): Dropout rate. Values accepted in range [0, 1].
+
+    Raises:
+        ValueError: If p is not in range.
+    """
+
+    def __init__(self, p: float):
+        super().__init__()
+        if not (0 <= p <= 1):
+            raise ValueError(
+                f"Dropout probability has to be between 0 and 1, but got {p}"
+            )
+        self.p = p
+
+    def forward(self, X: SparseTensor) -> SparseTensor:
+        """Apply dropout to SparseTensor.
+
+        Args:
+            X (SparseTensor): The input tensor.
+
+        Returns:
+            SparseTensor: The tensor after the dropout.
+        """
+        if self.p == 0 or not self.training:
+            return X
+
+        # Get indices and values of the sparse tensor
+        indices = X.indices()
+        values = X.values()
+
+        # Calculate number of non-zero elements
+        n_nonzero_elems = values.numel()
+
+        # Create a dropout mask
+        random_tensor = torch.rand(n_nonzero_elems, device=X.device)
+        dropout_mask = (random_tensor > self.p).to(X.dtype)
+
+        # Apply mask and scale
+        out_values = values * dropout_mask / (1 - self.p)
+
+        # Return the tensor as a SparseTensor in coo format
+        return torch.sparse_coo_tensor(indices, out_values, X.size(), device=X.device)

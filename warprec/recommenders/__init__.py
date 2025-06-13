@@ -1,7 +1,7 @@
 from . import general_recommender
 from . import trainer
 from .base_recommender import Recommender, GraphRecommenderUtils, ItemSimRecommender
-from .layers import MLP
+from .layers import MLP, SparseDropout
 from .losses import BPRLoss, EmbeddingLoss
 from .similarities import Similarity
 
@@ -12,6 +12,7 @@ __all__ = [
     "GraphRecommenderUtils",
     "ItemSimRecommender",
     "MLP",
+    "SparseDropout",
     "BPRLoss",
     "EmbeddingLoss",
     "Similarity",
