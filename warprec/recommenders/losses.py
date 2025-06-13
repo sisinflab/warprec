@@ -1,3 +1,5 @@
+from typing import Any, Iterable
+
 import torch
 from torch import nn, Tensor
 
@@ -50,20 +52,56 @@ class EmbeddingLoss(nn.Module):
             raise ValueError("Norm must be either 1 (L1) or 2 (L2).")
         self.norm = norm
 
-    def forward(self, *embeddings: nn.Embedding) -> Tensor:
+    def forward(self, *params: Any) -> Tensor:
         """Compute the EmbeddingLoss loss.
 
         Args:
-            *embeddings (nn.Embedding): The list of embedding layers.
+            *params (Any): A list containing either Tensors, Parameters or Embedding.
+                Any other type of data will be ignored.
 
         Returns:
             Tensor: The computed Embedding loss.
         """
-        emb_loss = torch.tensor(0.0, device=embeddings[0].weight.device)
-        num_embeddings = len(embeddings)
+        # This list will store all the tensors to regularize
+        tensors_to_regularize: list[Tensor] = []
 
-        for embedding_layer in embeddings:
-            emb_loss += torch.norm(embedding_layer.weight, p=self.norm)
+        # Call the support function to handle the list
+        self._collect_tensors(params, tensors_to_regularize)
 
-        emb_loss /= num_embeddings
-        return emb_loss
+        # Edge case: list is empty
+        if not tensors_to_regularize:
+            return torch.tensor(0.0)
+
+        # Initialize the total loss that will be computed on the list
+        total_loss = torch.tensor(0.0, device=tensors_to_regularize[0].device)
+
+        # Compute total loss iterating on all the tensors
+        for tensor in tensors_to_regularize:
+            if self.norm == 2:
+                # L2 regularization, we also square the result
+                total_loss += torch.norm(tensor, p=2).pow(2)
+            else:
+                # L1 regularization
+                total_loss += torch.norm(tensor, p=1)
+
+        return total_loss
+
+    def _collect_tensors(self, items: Iterable[Any], tensor_list: list[Tensor]):
+        """Helper function to handle different type of input data.
+
+        Args:
+            items (Iterable[Any]): Any type of iterable object.
+            tensor_list (list[Tensor]): The list that will be populated.
+        """
+        for item in items:
+            if isinstance(item, nn.Embedding):
+                # In case of an embedding layer, we append it's weights
+                tensor_list.append(item.weight)
+            elif isinstance(item, torch.Tensor):
+                # In case of a tensor, we append the tensor itself
+                tensor_list.append(item)
+            elif isinstance(item, Iterable) and not isinstance(item, str):
+                # In case of another list (or iterable), we
+                # recursively call the helper function
+                self._collect_tensors(item, tensor_list)
+            # Anything else will be ignored
