@@ -115,3 +115,15 @@ def check_user_profile(value: Any) -> bool:
         or value.lower() == SearchSpace.GRID.value
         or value.lower() in ["binary", "tfidf"]
     )
+
+
+def check_between_zero_and_one(value: Any) -> bool:
+    """Check if the field is correct value between 0 and 1.
+
+    Args:
+        value (Any): The value to check.
+
+    Returns:
+        bool: True if the value is between 0 and 1.
+    """
+    return isinstance(value, (float, int)) and (value < 0 or value > 1)
