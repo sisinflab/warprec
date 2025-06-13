@@ -135,8 +135,13 @@ class SparseDropout(nn.Module):
 
 class NGCFLayer(nn.Module):
     """Implementation of a single layer of NGCF propagation.
-    - First term: GCN-like aggregation of neighbors
+    - First term: GCN-like aggregation of neighbors.
     - Second term: Element-wise product capturing interaction between ego-embedding and aggregated neighbors.
+
+    Args:
+        in_features (int): The number of input features.
+        out_features (int): The number of output features.
+        message_dropout (float): The dropout value.
     """
 
     def __init__(
