@@ -16,6 +16,7 @@ from warprec.utils.config.common import (
     check_less_than_zero,
     check_similarity,
     check_user_profile,
+    check_between_zero_and_one,
 )
 from warprec.utils.registry import params_registry, similarities_registry
 
@@ -1114,6 +1115,133 @@ class LightGCN(RecomModel):
             if check_less_equal_zero(value):
                 raise ValueError(
                     "Values of learning_rate for LightGCN model must be > 0. "
+                    f"Values received as input: {v}"
+                )
+        return v
+
+
+@params_registry.register("NGCF")
+class NGCF(RecomModel):
+    """Definition of the model NGCF.
+
+    Attributes:
+        embedding_size (INT_FIELD): List of values for embedding_size.
+        reg_weight (FLOAT_FIELD): List of values for reg_weight.
+        epochs (INT_FIELD): List of values for epochs.
+        learning_rate (FLOAT_FIELD): List of values for learning rate.
+        weight_size (LIST_INT_FIELD): List of values fro weight sizes.
+        node_dropout (FLOAT_FIELD): List of values for node dropout rate.
+        message_dropout (FLOAT_FIELD): List of values for message dropout rate.
+    """
+
+    embedding_size: INT_FIELD
+    reg_weight: FLOAT_FIELD
+    epochs: INT_FIELD
+    learning_rate: FLOAT_FIELD
+    weight_size: LIST_INT_FIELD
+    node_dropout: FLOAT_FIELD
+    message_dropout: FLOAT_FIELD
+
+    @field_validator("embedding_size")
+    @classmethod
+    def check_embedding_size(cls, v: list):
+        """Validate embedding_size."""
+        v = convert_to_list(v)
+        for value in v:
+            if check_less_equal_zero(value):
+                raise ValueError(
+                    "Values of embedding_size for LightGCN model must be > 0. "
+                    f"Values received as input: {v}"
+                )
+        return v
+
+    @field_validator("reg_weight")
+    @classmethod
+    def check_alpha(cls, v: list):
+        """Validate reg_weight."""
+        v = convert_to_list(v)
+        for value in v:
+            if check_less_than_zero(value):
+                raise ValueError(
+                    f"Values of reg_weight for LightGCN model must be >= 0. "
+                    f"Values received as input: {v}"
+                )
+        return v
+
+    @field_validator("epochs")
+    @classmethod
+    def check_epochs(cls, v: list):
+        """Validate epochs."""
+        v = convert_to_list(v)
+        for value in v:
+            if check_less_equal_zero(value):
+                raise ValueError(
+                    "Values of epochs for LightGCN model must be > 0. "
+                    f"Values received as input: {v}"
+                )
+        return v
+
+    @field_validator("learning_rate")
+    @classmethod
+    def check_learning_rate(cls, v: list):
+        """Validate learning_rate."""
+        v = convert_to_list(v)
+        for value in v:
+            if check_less_equal_zero(value):
+                raise ValueError(
+                    "Values of learning_rate for LightGCN model must be > 0. "
+                    f"Values received as input: {v}"
+                )
+        return v
+
+    @field_validator("weight_size")
+    @classmethod
+    def check_weight_size(cls, v: list):
+        """Validate weight_size."""
+        strat = None
+
+        # This should be a list of lists
+        # for a more precise validation we do not
+        # use the common methods
+        if not isinstance(v, list):
+            v = [v]
+        if not isinstance(v[-1], list):
+            v = [v]
+        if isinstance(v[0], str):
+            strat = v.pop(0)
+        for weight_size in v:
+            for value in weight_size:
+                if value <= 0:
+                    raise ValueError(
+                        "Weight size for NGCF must be > 0. "
+                        f"Values received as input: {v}"
+                    )
+        if strat:
+            v.insert(0, strat)
+        return v
+
+    @field_validator("node_dropout")
+    @classmethod
+    def check_node_dropout(cls, v: list):
+        """Validate node_dropout."""
+        v = convert_to_list(v)
+        for value in v:
+            if check_between_zero_and_one(value):
+                raise ValueError(
+                    "Values of node_dropout for NGCF model must be >= 0 and <= 1. "
+                    f"Values received as input: {v}"
+                )
+        return v
+
+    @field_validator("message_dropout")
+    @classmethod
+    def check_message_dropout(cls, v: list):
+        """Validate message_dropout."""
+        v = convert_to_list(v)
+        for value in v:
+            if check_between_zero_and_one(value):
+                raise ValueError(
+                    "Values of message_dropout for NGCF model must be >= 0 and <= 1. "
                     f"Values received as input: {v}"
                 )
         return v
