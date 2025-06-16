@@ -121,7 +121,7 @@ class Evaluator:
         model.eval()
 
         # Keep a copy of the full training set, if needed
-        train_set = dataset.train_set.get_sparse()
+        train_set = dataset.train_set
 
         # Iter over batches
         _start = 0
