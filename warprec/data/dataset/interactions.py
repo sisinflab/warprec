@@ -3,6 +3,7 @@ from typing import Tuple, Any, Optional
 
 import torch
 import numpy as np
+from torch import Tensor
 from pandas import DataFrame
 from torch.utils.data import DataLoader, TensorDataset
 from scipy.sparse import csr_matrix, coo_matrix
@@ -35,6 +36,9 @@ class Interactions:
     _inter_df: DataFrame = None
     _inter_sparse: csr_matrix = None
     _inter_side_sparse: csr_matrix = None
+    _history_matrix: Tensor = None
+    _history_lens: Tensor = None
+    _history_mask: Tensor = None
 
     def __init__(
         self,
@@ -347,6 +351,29 @@ class Interactions:
         dataset = TensorDataset(users_tensor, positives_tensor, negatives_tensor)
         return DataLoader(dataset, batch_size=self.batch_size, shuffle=shuffle)
 
+    def get_history(self) -> Tuple[Tensor, Tensor, Tensor]:
+        """Return the history representation as three Tensors.
+
+        This method also checks if this representation has been already computed,
+        if so then it just returns it without computing it again.
+
+        Returns:
+            Tuple[Tensor, Tensor, Tensor]: A tuple containing:
+                - Tensor: A matrix of dimension [num_user, max_chronology_length],
+                    containing transaction information.
+                - Tensor: An array of dimension [num_user], containing the
+                    length of each chronology (before padding).
+                - Tensor: A binary mask that identifies where the real
+                    transaction information are, ignoring padding.
+        """
+        if (
+            isinstance(self._history_matrix, Tensor)
+            and isinstance(self._history_lens, Tensor)
+            and isinstance(self._history_mask, Tensor)
+        ):
+            return self._history_matrix, self._history_lens, self._history_mask
+        return self._to_history()
+
     def get_dims(self) -> Tuple[int, int]:
         """This method will return the dimensions of the data.
 
@@ -390,6 +417,57 @@ class Interactions:
             dtype=self.precision,
         ).tocsr()
         return self._inter_sparse
+
+    def _to_history(self) -> Tuple[Tensor, Tensor, Tensor]:
+        """Creates three Tensor which contains information of the
+        transaction history for each user.
+
+        Returns:
+            Tuple[Tensor, Tensor, Tensor]: A tuple containing:
+                - Tensor: A matrix of dimension [num_user, max_chronology_length],
+                    containing transaction information.
+                - Tensor: An array of dimension [num_user], containing the
+                    length of each chronology (before padding).
+                - Tensor: A binary mask that identifies where the real
+                    transaction information are, ignoring padding.
+        """
+        # Get sparse interaction matrix
+        sparse_matrix = self.get_sparse()
+
+        # Get user_ids and item_ids from interactions
+        user_ids, item_ids = sparse_matrix.nonzero()
+
+        # Create a dictionary to store history for each user
+        user_history_dict: dict[int, list] = {}
+        for u, i in zip(user_ids, item_ids):
+            if u not in user_history_dict:
+                user_history_dict[u] = []
+            user_history_dict[u].append(
+                i + 1
+            )  # Add 1 to item_id to reserve 0 for padding
+
+        # Determine max history length for padding
+        max_history_len = 0
+        for user_id in range(self._nuid):
+            if user_id in user_history_dict:
+                max_history_len = max(max_history_len, len(user_history_dict[user_id]))
+
+        # Initialize matrices
+        self._history_matrix = torch.zeros(
+            self._nuid, max_history_len, dtype=torch.long
+        )
+        self._history_lens = torch.zeros(self._nuid, dtype=torch.long)
+        self._history_mask = torch.zeros(self._nuid, max_history_len, dtype=torch.float)
+
+        # Populate matrices
+        for user_id in range(self._nuid):
+            if user_id in user_history_dict:
+                items = torch.tensor(user_history_dict[user_id], dtype=torch.long)
+                self._history_matrix[user_id, : len(items)] = items
+                self._history_lens[user_id] = len(items)
+                self._history_mask[user_id, : len(items)] = 1.0
+
+        return self._history_matrix, self._history_lens, self._history_mask
 
     def __iter__(self) -> "Interactions":
         """This method will return the iterator of the interactions.
