@@ -4,10 +4,47 @@ import torch
 import torch.nn.functional as F
 from torch import nn, Tensor
 from torch.nn import Module
-from torch.nn.init import normal_, xavier_normal_, xavier_uniform_
+from torch.nn.init import normal_, xavier_normal_
 from torch_sparse import SparseTensor
 
-from warprec.utils.enums import Activations, Initializations
+from warprec.utils.enums import Activations
+
+
+def get_activation(activation: Activations = Activations.RELU) -> Module:
+    """Get the activation function using enum.
+
+    Args:
+        activation (Activations): The activation layer to retrieve.
+
+    Returns:
+        Module: The activation layer requested.
+
+    Raises:
+        ValueError: If the activation is not known or supported.
+    """
+    match activation:
+        case Activations.SIGMOID:
+            return nn.Sigmoid()
+        case Activations.TANH:
+            return nn.Tanh()
+        case Activations.RELU:
+            return nn.ReLU()
+        case Activations.LEAKYRELU:
+            return nn.LeakyReLU()
+        case _:
+            raise ValueError("Activation function not supported.")
+
+
+def init_weights(module: Module):
+    """Initialize the weights of a module."""
+    if isinstance(module, nn.Linear):
+        normal_(module.weight.data, mean=0, std=0.01)
+        if module.bias is not None:
+            module.bias.data.fill_(0.0)
+    if isinstance(module, nn.Conv2d):
+        normal_(module.weight.data, mean=0, std=0.01)
+        if module.bias is not None:
+            module.bias.data.fill_(0.0)
 
 
 class MLP(nn.Module):
@@ -18,7 +55,7 @@ class MLP(nn.Module):
         dropout (float): The dropout probability.
         activation (Activations): The activation function to apply.
         batch_normalization (bool): Wether or not to apply batch normalization.
-        initialization_method (Initializations): The method of initialization to use.
+        initialize (bool): Wether or not to initialize the weights.
         last_activation (bool): Wether or not to keep last non-linearity function.
     """
 
@@ -28,11 +65,10 @@ class MLP(nn.Module):
         dropout: float = 0.0,
         activation: Activations = Activations.RELU,
         batch_normalization: bool = False,
-        initialization_method: Initializations = None,
+        initialize: bool = False,
         last_activation: bool = True,
     ):
         super().__init__()
-        self.init = initialization_method
         mlp_modules: List[Module] = []
         for input_size, output_size in zip(layers[:-1], layers[1:]):
             mlp_modules.append(nn.Dropout(p=dropout))
@@ -40,12 +76,12 @@ class MLP(nn.Module):
             if batch_normalization:
                 mlp_modules.append(nn.BatchNorm1d(num_features=output_size))
             if activation:
-                mlp_modules.append(self._get_activation(activation))
+                mlp_modules.append(get_activation(activation))
         if activation is not None and not last_activation:
             mlp_modules.pop()
         self.mlp_layers = nn.Sequential(*mlp_modules)
-        if initialization_method:
-            self.apply(self._init_weights)
+        if initialize:
+            self.apply(init_weights)
 
     def forward(self, input_feature: Tensor):
         """Simple forwarding, input tensor will pass
@@ -53,36 +89,65 @@ class MLP(nn.Module):
         """
         return self.mlp_layers(input_feature)
 
-    def _get_activation(self, activation: Activations = Activations.RELU):
-        """Retrieve the activation to use at the end
-        of a MLP layer using structural pattern matching.
-        """
-        match activation:
-            case Activations.SIGMOID:
-                return nn.Sigmoid()
-            case Activations.TANH:
-                return nn.Tanh()
-            case Activations.RELU:
-                return nn.ReLU()
-            case Activations.LEAKYRELU:
-                return nn.LeakyReLU()
-            case _:
-                raise ValueError("Activation function not supported.")
 
-    def _init_weights(self, module: Module):
-        """Initialize the weights of a module."""
-        if isinstance(module, nn.Linear):
-            match self.init:
-                case Initializations.NORM:
-                    normal_(module.weight.data, mean=0, std=0.01)
-                case Initializations.XAVIER_NORM:
-                    xavier_normal_(module.weight.data)
-                case Initializations.XAVIER_UNI:
-                    xavier_uniform_(module.weight.data)
-                case _:
-                    raise ValueError("Initialization mode not supported.")
-            if module.bias is not None:
-                module.bias.data.fill_(0.0)
+class CNN(nn.Module):
+    """Simple implementation of Convolutional Neural Network.
+
+    Args:
+        cnn_channels (List[int]): The output channels of each layer of the CNN.
+        cnn_kernels (List[int]): The kernels of each layer.
+        cnn_strides (List[int]): The strides of each layer.
+        activation (Activations): The activation function to apply.
+        initialize (bool): Wether or not to initialize the weights.
+
+    Raises:
+        ValueError: If the cnn_channels, cnn_kernels and cnn_strides lists
+            do not have the same length.
+    """
+
+    def __init__(
+        self,
+        cnn_channels: List[int],
+        cnn_kernels: List[int],
+        cnn_strides: List[int],
+        activation: Activations = Activations.RELU,
+        initialize: bool = False,
+    ):
+        super().__init__()
+        if not (len(cnn_channels) == len(cnn_kernels) == len(cnn_strides)):
+            raise ValueError(
+                "cnn_channels, cnn_kernels, and cnn_strides must have the same length."
+            )
+
+        cnn_modules: List[Module] = []
+        in_channel = 1  # The first input channel will always be 1
+        for i in range(len(cnn_channels)):
+            out_channel = cnn_channels[i]
+            kernel_size = cnn_kernels[i]
+            stride = cnn_strides[i]
+
+            # Append conv layer
+            cnn_modules.append(
+                nn.Conv2d(
+                    in_channels=in_channel,
+                    out_channels=out_channel,
+                    kernel_size=kernel_size,
+                    stride=stride,
+                )
+            )
+            cnn_modules.append(get_activation(activation))
+            in_channel = out_channel
+
+        self.cnn_layers = nn.Sequential(*cnn_modules)
+
+        if initialize:
+            self.apply(init_weights)
+
+    def forward(self, input_feature: Tensor):
+        """Simple forwarding, input tensor will pass
+        through all the CNN layers.
+        """
+        return self.cnn_layers(input_feature)
 
 
 class SparseDropout(nn.Module):
