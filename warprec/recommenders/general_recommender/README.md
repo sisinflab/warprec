@@ -190,6 +190,21 @@ models:
 ...
 ```
 
+- [FISM (Factored Item Similarity Models)](latent_factor/fism.py): A recommendation algorithm that models item-to-item similarity by learning latent representations of items. Instead of explicitly learning user embeddings, FISM represents each user as the weighted average of the items they have interacted with, enabling efficient and accurate personalized recommendations
+```yaml
+models:
+    FISM:
+        embedding_size: 16
+        reg_1: 0.001
+        reg_2: 0.001
+        alpha: 0.1
+        split_to: 5
+        epochs: 5
+        learning_rate: 0.001
+        neg_ratio: 0.002
+...
+```
+
 - [Slim (Sparse Linear Methods)](latent_factor/slim.py): A collaborative filtering model that learns a sparse item similarity matrix using L1 and L2 regularization. SLIM directly models the relationship between items, making it highly interpretable and effective for top-N recommendation.
 ```yaml
 models:
@@ -258,6 +273,7 @@ In this section you can find a table summarizing all the models available in War
 |                  | **AttributeUserKNN** | User-based KNN using content-derived user profiles.               |
 | 🧊 Latent Factor | **ADMMSlim**         | Sparse item similarity model optimized via ADMM.                  |
 |                  | **BPR**              | Pairwise ranking model for implicit feedback.                     |
+|                  | **FISM**              | Efficient item similarity model using weighted average as user embeddings. |
 |                  | **Slim**             | Interpretable item similarity model with L1/L2 regularization.    |
 | 🧠 Neural        | **NeuMF**            | Hybrid neural model combining GMF and MLP layers.                 |
 | ➖ Unpersonalized | **Pop**            | Recommends popular items to all users. Serves as a popularity-based baseline.|
