@@ -1157,7 +1157,7 @@ class NGCF(RecomModel):
 
     @field_validator("reg_weight")
     @classmethod
-    def check_alpha(cls, v: list):
+    def check_reg_weight(cls, v: list):
         """Validate reg_weight."""
         v = convert_to_list(v)
         for value in v:
@@ -1242,6 +1242,120 @@ class NGCF(RecomModel):
             if check_between_zero_and_one(value):
                 raise ValueError(
                     "Values of message_dropout for NGCF model must be >= 0 and <= 1. "
+                    f"Values received as input: {v}"
+                )
+        return v
+
+
+@params_registry.register("FISM")
+class FISM(RecomModel):
+    """Definition of the model FISM.
+
+    Attributes:
+        embedding_size (INT_FIELD): List of values for embedding_size.
+        reg_1 (FLOAT_FIELD): List of values for reg_1.
+        reg_2 (FLOAT_FIELD): List of values for reg_2.
+        alpha (FLOAT_FIELD): List of values for alpha.
+        split_to (INT_FIELD): List of values for split_to.
+        epochs (INT_FIELD): List of values for epochs.
+        learning_rate (FLOAT_FIELD): List of values for learning rate.
+    """
+
+    embedding_size: INT_FIELD
+    reg_1: FLOAT_FIELD
+    reg_2: FLOAT_FIELD
+    alpha: FLOAT_FIELD
+    split_to: INT_FIELD
+    epochs: INT_FIELD
+    learning_rate: FLOAT_FIELD
+
+    @field_validator("embedding_size")
+    @classmethod
+    def check_embedding_size(cls, v: list):
+        """Validate embedding_size."""
+        v = convert_to_list(v)
+        for value in v:
+            if check_less_equal_zero(value):
+                raise ValueError(
+                    "Values of embedding_size for FISM model must be > 0. "
+                    f"Values received as input: {v}"
+                )
+        return v
+
+    @field_validator("reg_1")
+    @classmethod
+    def check_reg_1(cls, v: list):
+        """Validate reg_1."""
+        v = convert_to_list(v)
+        for value in v:
+            if check_less_than_zero(value):
+                raise ValueError(
+                    f"Values of reg_1 for FISM model must be >= 0. "
+                    f"Values received as input: {v}"
+                )
+        return v
+
+    @field_validator("reg_2")
+    @classmethod
+    def check_reg_2(cls, v: list):
+        """Validate reg_2."""
+        v = convert_to_list(v)
+        for value in v:
+            if check_less_than_zero(value):
+                raise ValueError(
+                    f"Values of reg_2 for FISM model must be >= 0. "
+                    f"Values received as input: {v}"
+                )
+        return v
+
+    @field_validator("alpha")
+    @classmethod
+    def check_alpha(cls, v: list):
+        """Validate alpha."""
+        v = convert_to_list(v)
+        for value in v:
+            if check_less_than_zero(value):
+                raise ValueError(
+                    f"Values of alpha for FISM model must be >= 0. "
+                    f"Values received as input: {v}"
+                )
+        return v
+
+    @field_validator("split_to")
+    @classmethod
+    def check_split_to(cls, v: list):
+        """Validate split_to."""
+        v = convert_to_list(v)
+        for value in v:
+            if check_less_equal_zero(value):
+                raise ValueError(
+                    "Values of split_to for FISM model must be > 0. "
+                    f"Values received as input: {v}"
+                )
+        return v
+
+    @field_validator("epochs")
+    @classmethod
+    def check_epochs(cls, v: list):
+        """Validate epochs."""
+        v = convert_to_list(v)
+        for value in v:
+            if check_less_equal_zero(value):
+                raise ValueError(
+                    "Values of epochs for FISM model must be > 0. "
+                    f"Values received as input: {v}"
+                )
+        return v
+
+    @field_validator("learning_rate")
+    @classmethod
+    def check_learning_rate(cls, v: list):
+        """Validate learning_rate."""
+        v = convert_to_list(v)
+        for value in v:
+            if check_less_equal_zero(value):
+                raise ValueError(
+                    "Values of learning_rate for LightGCN model must be > 0. "
                     f"Values received as input: {v}"
                 )
         return v
