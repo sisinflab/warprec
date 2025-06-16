@@ -151,12 +151,14 @@ This design ensures maximum reproducibility, scalability, and extensibility, mak
 WarpRec `Layers` module offers a series of building blocks that can be used inside your recommendation models. Currently, the module includes the following implemented layers:
 
 - `MLP`
+- `NGCFLayer`
 
 ## 📉 Losses
 
 WarpRec `Losses` module offers a series of loss functions that can be used inside your recommendation models. Currently, the module includes the following implemented loss functions:
 
 - `BPRLoss`
+- `EmbeddingLoss`
 
 ## 🤝 Similarities
 
