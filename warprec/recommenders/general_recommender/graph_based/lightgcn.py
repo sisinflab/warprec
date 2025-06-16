@@ -217,7 +217,8 @@ class LightGCN(Recommender, GraphRecommenderUtils):
             train_set: Interactions = kwargs.get("train_set", None)
             if train_set is None:
                 raise RuntimeError(
-                    "The model has not been fit yet. Call fit() before predict()."
+                    "The model has not been fit yet. Call fit() before predict() "
+                    "or pass the training set as kwargs."
                 )
             self.adj = self._get_adj_mat(
                 train_set.get_sparse().tocoo(), self.n_users, self.n_items, self._device
