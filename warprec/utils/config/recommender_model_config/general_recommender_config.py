@@ -1,4 +1,5 @@
 from typing import ClassVar
+from itertools import product
 
 from pydantic import field_validator
 from warprec.utils.config.model_configuration import (
@@ -1129,7 +1130,7 @@ class NGCF(RecomModel):
         reg_weight (FLOAT_FIELD): List of values for reg_weight.
         epochs (INT_FIELD): List of values for epochs.
         learning_rate (FLOAT_FIELD): List of values for learning rate.
-        weight_size (LIST_INT_FIELD): List of values fro weight sizes.
+        weight_size (LIST_INT_FIELD): List of values for weight sizes.
         node_dropout (FLOAT_FIELD): List of values for node dropout rate.
         message_dropout (FLOAT_FIELD): List of values for message dropout rate.
     """
@@ -1355,7 +1356,301 @@ class FISM(RecomModel):
         for value in v:
             if check_less_equal_zero(value):
                 raise ValueError(
-                    "Values of learning_rate for LightGCN model must be > 0. "
+                    "Values of learning_rate for FISM model must be > 0. "
                     f"Values received as input: {v}"
                 )
         return v
+
+
+@params_registry.register("ConvNCF")
+class ConvNCF(RecomModel):
+    """Definition of the model ConvNCF.
+
+    Attributes:
+        embedding_size (INT_FIELD): List of values for embedding_size.
+        cnn_channels (LIST_INT_FIELD): List of values for CNN channels.
+        cnn_kernels (LIST_INT_FIELD): List of values for CNN kernels.
+        cnn_strides (LIST_INT_FIELD): List of values for CNN strides.
+        dropout_prob (FLOAT_FIELD): List of values for dropout_prob.
+        reg_embedding (FLOAT_FIELD): List of values for embedding regularization.
+        reg_cnn_mlp (FLOAT_FIELD): List of values for CNN and MLP regularization.
+        epochs (INT_FIELD): List of values for epochs.
+        learning_rate (FLOAT_FIELD): List of values for learning rate.
+        need_single_trial_validation (ClassVar[bool]): Whether or not to check if a Ray Tune
+            trial parameter are valid.
+    """
+
+    embedding_size: INT_FIELD
+    cnn_channels: LIST_INT_FIELD
+    cnn_kernels: LIST_INT_FIELD
+    cnn_strides: LIST_INT_FIELD
+    dropout_prob: FLOAT_FIELD
+    reg_embedding: FLOAT_FIELD
+    reg_cnn_mlp: FLOAT_FIELD
+    epochs: INT_FIELD
+    learning_rate: FLOAT_FIELD
+    need_single_trial_validation: ClassVar[bool] = True
+
+    @field_validator("embedding_size")
+    @classmethod
+    def check_embedding_size(cls, v: list):
+        """Validate embedding_size."""
+        v = convert_to_list(v)
+        for value in v:
+            if check_less_equal_zero(value):
+                raise ValueError(
+                    "Values of embedding_size for ConvNCF model must be > 0. "
+                    f"Values received as input: {v}"
+                )
+        return v
+
+    @field_validator("cnn_channels")
+    @classmethod
+    def check_cnn_channels(cls, v: list):
+        """Validate cnn_channels."""
+        strat = None
+
+        # This should be a list of lists
+        # for a more precise validation we do not
+        # use the common methods
+        if not isinstance(v, list):
+            v = [v]
+        if not isinstance(v[-1], list):
+            v = [v]
+        if isinstance(v[0], str):
+            strat = v.pop(0)
+        for weight_size in v:
+            for value in weight_size:
+                if value <= 0:
+                    raise ValueError(
+                        "cnn_channels for ConvNCF must be > 0. "
+                        f"Values received as input: {v}"
+                    )
+        if strat:
+            v.insert(0, strat)
+        return v
+
+    @field_validator("cnn_kernels")
+    @classmethod
+    def check_cnn_kernels(cls, v: list):
+        """Validate cnn_kernels."""
+        strat = None
+
+        # This should be a list of lists
+        # for a more precise validation we do not
+        # use the common methods
+        if not isinstance(v, list):
+            v = [v]
+        if not isinstance(v[-1], list):
+            v = [v]
+        if isinstance(v[0], str):
+            strat = v.pop(0)
+        for weight_size in v:
+            for value in weight_size:
+                if value <= 0:
+                    raise ValueError(
+                        "cnn_kernels for ConvNCF must be > 0. "
+                        f"Values received as input: {v}"
+                    )
+        if strat:
+            v.insert(0, strat)
+        return v
+
+    @field_validator("cnn_strides")
+    @classmethod
+    def check_cnn_strides(cls, v: list):
+        """Validate cnn_strides."""
+        strat = None
+
+        # This should be a list of lists
+        # for a more precise validation we do not
+        # use the common methods
+        if not isinstance(v, list):
+            v = [v]
+        if not isinstance(v[-1], list):
+            v = [v]
+        if isinstance(v[0], str):
+            strat = v.pop(0)
+        for weight_size in v:
+            for value in weight_size:
+                if value <= 0:
+                    raise ValueError(
+                        "cnn_strides for ConvNCF must be > 0. "
+                        f"Values received as input: {v}"
+                    )
+        if strat:
+            v.insert(0, strat)
+        return v
+
+    @field_validator("dropout_prob")
+    @classmethod
+    def check_dropout_prob(cls, v: list):
+        """Validate dropout_prob."""
+        v = convert_to_list(v)
+        for value in v:
+            if check_less_than_zero(value):
+                raise ValueError(
+                    f"Values of dropout_prob for ConvNCF model must be >= 0. "
+                    f"Values received as input: {v}"
+                )
+        return v
+
+    @field_validator("reg_embedding")
+    @classmethod
+    def check_reg_embedding(cls, v: list):
+        """Validate reg_embedding."""
+        v = convert_to_list(v)
+        for value in v:
+            if check_less_than_zero(value):
+                raise ValueError(
+                    f"Values of reg_embedding for ConvNCF model must be >= 0. "
+                    f"Values received as input: {v}"
+                )
+        return v
+
+    @field_validator("reg_cnn_mlp")
+    @classmethod
+    def check_reg_cnn_mlp(cls, v: list):
+        """Validate reg_cnn_mlp."""
+        v = convert_to_list(v)
+        for value in v:
+            if check_less_than_zero(value):
+                raise ValueError(
+                    f"Values of reg_cnn_mlp for ConvNCF model must be >= 0. "
+                    f"Values received as input: {v}"
+                )
+        return v
+
+    @field_validator("epochs")
+    @classmethod
+    def check_epochs(cls, v: list):
+        """Validate epochs."""
+        v = convert_to_list(v)
+        for value in v:
+            if check_less_equal_zero(value):
+                raise ValueError(
+                    "Values of epochs for ConvNCF model must be > 0. "
+                    f"Values received as input: {v}"
+                )
+        return v
+
+    @field_validator("learning_rate")
+    @classmethod
+    def check_learning_rate(cls, v: list):
+        """Validate learning_rate."""
+        v = convert_to_list(v)
+        for value in v:
+            if check_less_equal_zero(value):
+                raise ValueError(
+                    "Values of learning_rate for ConvNCF model must be > 0. "
+                    f"Values received as input: {v}"
+                )
+        return v
+
+    def validate_all_combinations(self):
+        """Validates if at least one valid combination of hyperparameters exists.
+        This method should be called after all individual fields have been validated.
+
+        Raises:
+            ValueError: If no valid combination of hyperparameters can be formed.
+        """
+        # Extract parameters to check, removing searching strategy
+        embedding_sizes = self._clean_param_list(self.embedding_size)
+        cnn_channels_list = self._clean_param_list(self.cnn_channels)
+        cnn_kernels_list = self._clean_param_list(self.cnn_kernels)
+        cnn_strides_list = self._clean_param_list(self.cnn_strides)
+
+        # Check if parameters are lists of lists
+        cnn_channels_processed = [
+            item if isinstance(item, list) else [item] for item in cnn_channels_list
+        ]
+        cnn_kernels_processed = [
+            item if isinstance(item, list) else [item] for item in cnn_kernels_list
+        ]
+        cnn_strides_processed = [
+            item if isinstance(item, list) else [item] for item in cnn_strides_list
+        ]
+
+        # Iter over all possible combinations and check if
+        # any of them is valid.
+        has_valid_combination = False
+        for emb_size, channels_config, kernels_config, strides_config in product(
+            embedding_sizes,
+            cnn_channels_processed,
+            cnn_kernels_processed,
+            cnn_strides_processed,
+        ):
+            # Check for lengths
+            if not (len(channels_config) == len(kernels_config) == len(strides_config)):
+                continue
+            # Check for embedding size
+            if emb_size != channels_config[0]:
+                continue
+
+            # Found a valid combination
+            has_valid_combination = True
+            break
+
+        if not has_valid_combination:
+            raise ValueError(
+                "No valid hyperparameter combination found for ConvNCF. "
+                "Ensure there's at least one combination of 'embedding_size', "
+                "'cnn_channels', 'cnn_kernels', and 'cnn_strides' that meets the criteria: "
+                "1. The lengths of 'cnn_channels', 'cnn_kernels', and 'cnn_strides' must be equal. "
+                "2. The dimension of the first CNN channel must be equal to 'embedding_size'."
+            )
+
+    def validate_single_trial_params(self):
+        """Validates the coherence of cnn_channels, cnn_kernels, and cnn_strides
+        for a single trial's parameter set.
+
+        Raises:
+            ValueError: If the parameter values are not consistent for the model.
+        """
+        # Clean parameters from search space information
+        embedding_size_clean = (
+            self.embedding_size[1:]
+            if self.embedding_size and isinstance(self.embedding_size[0], str)
+            else self.embedding_size
+        )
+        cnn_channels_clean = (
+            self.cnn_channels[1:]
+            if self.cnn_channels and isinstance(self.cnn_channels[0], str)
+            else self.cnn_channels
+        )
+        cnn_kernels_clean = (
+            self.cnn_kernels[1:]
+            if self.cnn_kernels and isinstance(self.cnn_kernels[0], str)
+            else self.cnn_kernels
+        )
+        cnn_strides_clean = (
+            self.cnn_strides[1:]
+            if self.cnn_strides and isinstance(self.cnn_strides[0], str)
+            else self.cnn_strides
+        )
+
+        # Track the lengths of layers
+        len_channels = len(cnn_channels_clean[0])
+        len_kernels = len(cnn_kernels_clean[0])
+        len_strides = len(cnn_strides_clean[0])
+
+        # Check if this is a possible combination of parameters
+        # if not, just raise an error.
+        # RayTune will skip this trial
+        if not (len_channels == len_kernels == len_strides):
+            raise ValueError(
+                f"Inconsistent CNN layer configuration: "
+                f"cnn_channels length ({len_channels}), cnn_kernels length ({len_kernels}), "
+                f"and cnn_strides length ({len_strides}) must be equal. "
+            )
+
+        emb_size = embedding_size_clean[0]
+        first_layer_cnn = cnn_channels_clean[0][0]
+
+        # Check if the first cnn_channel output layer
+        # is the same as the embedding size
+        if emb_size != first_layer_cnn:
+            raise ValueError(
+                f"Embedding size must be the same as the first layer of CNN. "
+                f"embedding_size value ({emb_size}), first cnn layer ({first_layer_cnn}). "
+            )
