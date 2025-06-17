@@ -40,6 +40,7 @@ class LightGCN(Recommender, GraphRecommenderUtils):
         reg_weight (float): The weight decay for L2 regularization.
         epochs (int): The number of epochs.
         learning_rate (float): The learning rate value.
+        block_size (int): The block_size vale. Defaults to 10.
     """
 
     # Model hyperparameters
@@ -48,6 +49,7 @@ class LightGCN(Recommender, GraphRecommenderUtils):
     reg_weight: float
     epochs: int
     learning_rate: float
+    block_size: int = 10
 
     def __init__(
         self,
@@ -229,12 +231,11 @@ class LightGCN(Recommender, GraphRecommenderUtils):
 
         start_idx = kwargs.get("start", 0)
         end_idx = kwargs.get("end", interaction_matrix.shape[0])
-        block_size = 200  # Better memory management
 
         preds = []
         # Process users in batches to manage memory
-        for current_batch_start in range(start_idx, end_idx, block_size):
-            current_batch_end = min(current_batch_start + block_size, end_idx)
+        for current_batch_start in range(start_idx, end_idx, self.block_size):
+            current_batch_end = min(current_batch_start + self.block_size, end_idx)
             users_in_batch = torch.arange(
                 current_batch_start, current_batch_end, device=self._device
             )

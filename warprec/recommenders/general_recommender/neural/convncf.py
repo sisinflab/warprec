@@ -41,6 +41,7 @@ class ConvNCF(Recommender):
         reg_cnn_mlp (float): The regularization for embedding cnn and mlp layers.
         epochs (int): The number of epochs.
         learning_rate (float): The learning rate value.
+        block_size (int): The block_size vale. Defaults to 10.
     """
 
     # Model hyperparameters
@@ -53,6 +54,7 @@ class ConvNCF(Recommender):
     reg_cnn_mlp: float
     epochs: int
     learning_rate: float
+    block_size: int = 10
 
     def __init__(
         self,
@@ -267,15 +269,14 @@ class ConvNCF(Recommender):
 
         num_users_in_batch = len(user_indices)
         num_items = interaction_matrix.shape[1]
-        block_size = 20  # Better memory management
 
         # Extract embedding of specific users in batch
         user_e_batch = self.user_embedding(user_indices)
 
         # Process in blocks for memory efficiency
         all_scores = []
-        for item_start_idx in range(0, num_items, block_size):
-            item_end_idx = min(item_start_idx + block_size, num_items)
+        for item_start_idx in range(0, num_items, self.block_size):
+            item_end_idx = min(item_start_idx + self.block_size, num_items)
 
             # Process embeddings of items in block
             item_indices_block = torch.arange(

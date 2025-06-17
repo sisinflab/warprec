@@ -160,7 +160,8 @@ class Recommender(nn.Module, ABC):
             params (dict): The dictionary with the model params.
         """
         for ann, _ in self.__class__.__annotations__.items():
-            setattr(self, ann, params[ann])
+            if ann in params.keys():
+                setattr(self, ann, params[ann])
 
     def get_params(self) -> dict:
         """Get the model parameters as a dictionary.

@@ -40,6 +40,7 @@ class NeuMF(Recommender):
         epochs (int): The number of epochs.
         learning_rate (float): The learning rate value.
         neg_samples (int): The number of negative samples per positive interaction.
+        block_size (int): The block_size vale. Defaults to 10.
     """
 
     # Model hyperparameters
@@ -52,6 +53,7 @@ class NeuMF(Recommender):
     epochs: int
     learning_rate: float
     neg_samples: int
+    block_size: int = 10
 
     def __init__(
         self,
@@ -221,13 +223,12 @@ class NeuMF(Recommender):
         batch_size, num_items = interaction_matrix.shape
         start_idx = kwargs.get("start", 0)
         end_idx = kwargs.get("end", interaction_matrix.shape[0])
-        block_size = 200  # Better memory management
 
         preds = []
         for start in range(
-            0, num_items, block_size
+            0, num_items, self.block_size
         ):  # We proceed with the evaluation in blocks
-            end = min(start + block_size, num_items)
+            end = min(start + self.block_size, num_items)
             items_block = torch.arange(start, end, device=self._device).unsqueeze(0)
             items_block = items_block.expand(batch_size, -1).reshape(
                 -1
