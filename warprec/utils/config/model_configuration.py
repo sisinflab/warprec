@@ -262,11 +262,14 @@ class RecomModel(BaseModel, ABC):
         meta (Meta): The meta-information about the model. Defaults to Meta default values.
         optimization (Optimization): The optimization information that will be used by Ray Tune.
         need_side_information (ClassVar[bool]): Wether or not the model needs side information.
+        need_single_trial_validation (ClassVar[bool]): Wether or not the model needs to be
+            validated during training.
     """
 
     meta: Meta = Field(default_factory=Meta)
     optimization: Optimization = Field(default_factory=Optimization)
     need_side_information: ClassVar[bool] = False
+    need_single_trial_validation: ClassVar[bool] = False
 
     @model_validator(mode="after")
     def model_validation(self):
@@ -582,3 +585,12 @@ class RecomModel(BaseModel, ABC):
                     )
 
         return value
+
+    def validate_single_trial_params(self):
+        """This method must be implemented by models that present possible
+        inconsistencies in their params.
+
+        Ray Tune will call this method to validate a possible configuration
+        of parameters.
+        """
+        pass

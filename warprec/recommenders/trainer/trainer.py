@@ -317,17 +317,21 @@ class Trainer:
         mode: str,
         evaluator: Evaluator,
         device: str,
-    ):
+    ) -> None:
         """Objective function to optimize the hyperparameters.
 
         Args:
             params (dict): The parameter to train the model.
             model_name (str): The name of the model to train.
             dataset (Dataset): The dataset to train the model on.
-            mode (str): Wether or not to maximize or minimize the metric.
+            mode (str): Whether or not to maximize or minimize the metric.
             evaluator (Evaluator): The evaluator that will calculate the
                 validation metric.
             device (str): The device used for tensor operations.
+
+        Returns:
+            None: This function reports metrics and checkpoints to Ray Tune
+                via `tune.report()` and does not explicitly return a value.
         """
 
         def _report(model: Recommender, **kwargs: Any):
@@ -355,6 +359,25 @@ class Trainer:
                     checkpoint=Checkpoint.from_directory(tmpdir),
                 )
 
+        # Trial parameter configuration check for consistency
+        model_params: RecomModel = params_registry.get(model_name, **params)
+        if model_params.need_single_trial_validation:
+            try:
+                model_params.validate_single_trial_params()
+            except ValueError as e:
+                logger.negative(
+                    str(e)
+                )  # Log the custom message from Pydantic validation
+
+                # Report to Ray Tune the trial failed
+                if mode == "max":
+                    tune.report(metrics={"score": -float("inf")})
+                else:
+                    tune.report(metrics={"score": float("inf")})
+
+                return  # Stop Ray Tune trial
+
+        # Proceed with normal model training behavior
         model = model_registry.get(
             name=model_name,
             implementation=self._model_params.meta.implementation,
@@ -374,9 +397,10 @@ class Trainer:
                 tune.report(
                     metrics={"score": -torch.inf},
                 )
-            tune.report(
-                metrics={"score": torch.inf},
-            )
+            else:
+                tune.report(
+                    metrics={"score": torch.inf},
+                )
 
     def parse_params(self, params: dict) -> dict:
         """This method parses the parameters of a model.
