@@ -218,6 +218,22 @@ models:
 
 Neural recommenders leverage deep learning architectures to model complex, non-linear interactions between users and items. These models can integrate collaborative signals with side information and are especially powerful when trained on large-scale datasets.
 
+- [ConvNCF (Convolutional Neural Collaborative Filtering)](neural/convncf.py): Utilizes the outer product of user and item embeddings to construct a 2D interaction map, which is processed by Convolutional Neural Networks (CNNs) to capture complex and localized patterns in user-item interactions. ConvNCF enhances the expressive power of neural collaborative filtering by modeling structured relationships, making it well-suited for scenarios where fine-grained interaction modeling is critical.
+```yaml
+models:
+    ConvNCF:
+        embedding_size: 16
+        cnn_channels: [[16, 32]]
+        cnn_kernels: [[2, 2]]
+        cnn_strides: [[1, 1]]
+        dropout_prob: 0.01
+        reg_embedding: 0.1
+        reg_cnn_mlp: 0.1
+        epochs: 1
+        learning_rate: 0.001
+...
+```
+
 - [NeuMF (Neural Matrix Factorization)](neural/neumf.py): Combines Generalized Matrix Factorization (GMF) with a Multi-Layer Perceptron (MLP) to capture both linear and non-linear user-item interactions. NeuMF is a highly expressive model that can adapt to various patterns in user behavior, making it suitable for both implicit and explicit feedback scenarios.
 ```yaml
 models:
@@ -275,6 +291,7 @@ In this section you can find a table summarizing all the models available in War
 |                  | **BPR**              | Pairwise ranking model for implicit feedback.                     |
 |                  | **FISM**              | Efficient item similarity model using weighted average as user embeddings. |
 |                  | **Slim**             | Interpretable item similarity model with L1/L2 regularization.    |
-| 🧠 Neural        | **NeuMF**            | Hybrid neural model combining GMF and MLP layers.                 |
+| 🧠 Neural        | **ConvNCF**            | Applies CNNs to the outer product of user and item embeddings to capture rich interaction patterns.|
+|                   | **NeuMF**            | Hybrid neural model combining GMF and MLP layers.                 |
 | ➖ Unpersonalized | **Pop**            | Recommends popular items to all users. Serves as a popularity-based baseline.|
 |                   | **Random**            | Recommends items at random. Serves as a performance lower bound.   |
