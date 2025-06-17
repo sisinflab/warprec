@@ -175,6 +175,9 @@ class Configuration(BaseModel):
                     "but none have been provided. Check the configuration file."
                 )
 
+            # Check if there is at least one valid combination
+            model_class.validate_all_combinations()
+
             # Extract model train parameters, removing the meta infos
             model_data = {
                 k: (

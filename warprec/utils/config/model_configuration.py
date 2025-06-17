@@ -594,3 +594,18 @@ class RecomModel(BaseModel, ABC):
         of parameters.
         """
         pass
+
+    def validate_all_combinations(self):
+        """This method validates all possible combinations and ensures that
+        at least one is valid.
+        """
+        pass
+
+    def _clean_param_list(
+        self,
+        param_list: list,
+    ):
+        """Helper method to clean parameter lists from search space information."""
+        if param_list and isinstance(param_list[0], str):
+            return param_list[1:]
+        return param_list
