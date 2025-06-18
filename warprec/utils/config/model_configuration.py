@@ -108,6 +108,8 @@ class Optimization(BaseModel):
         validation_metric (Optional[str]): The metric/loss that will
             validate each trial in Ray Tune.
         device (Optional[str]): The device that will be used for tensor operations.
+        block_size (Optional[int]): The number of items to process during prediction.
+            Used by some neural models, increasing this value will affect memory usage.
         num_samples (Optional[int]): The number of trials that Ray Tune will try.
             In case of a grid search, this parameter should be set to 1.
         cpu_per_trial (Optional[float]): The number of cpu cores dedicated to
@@ -121,6 +123,7 @@ class Optimization(BaseModel):
     properties: Optional[Properties] = Field(default_factory=Properties)
     validation_metric: Optional[str] = "nDCG@5"
     device: Optional[str] = "cpu"
+    block_size: Optional[int] = 50
     num_samples: Optional[int] = 1
     cpu_per_trial: Optional[float] = os.cpu_count()
     gpu_per_trial: Optional[float] = 0.0
