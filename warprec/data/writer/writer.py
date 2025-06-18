@@ -255,22 +255,30 @@ class LocalWriter(Writer):
             )
 
         # experiment_path/recs/model_name.{custom_extension}
-        _path = join(
+        recommendation_folder_path = join(
             self.experiment_recommendation_dir,
             f"{model_name}_{self._timestamp}{writing_params.ext}",
         )
 
-        # Save in path
-        recs.to_csv(
-            _path,
-            sep=writing_params.sep,
-            header=[
-                writing_params.user_label,
-                writing_params.item_label,
-                writing_params.rating_label,
-            ],
-            index=None,
-        )
+        try:
+            # Save in path
+            recs.to_csv(
+                recommendation_folder_path,
+                sep=writing_params.sep,
+                header=[
+                    writing_params.user_label,
+                    writing_params.item_label,
+                    writing_params.rating_label,
+                ],
+                index=None,
+            )
+            logger.msg(
+                f"Recommendations successfully written in {recommendation_folder_path}"
+            )
+        except Exception as e:
+            logger.negative(
+                f"Error writing recommendations to {recommendation_folder_path}: {e}"
+            )
 
     def write_model(self, model: Recommender):
         """This method writes the model state into a local path.
