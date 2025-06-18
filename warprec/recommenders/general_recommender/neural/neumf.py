@@ -40,7 +40,6 @@ class NeuMF(Recommender):
         epochs (int): The number of epochs.
         learning_rate (float): The learning rate value.
         neg_samples (int): The number of negative samples per positive interaction.
-        block_size (int): The block_size vale. Defaults to 50.
     """
 
     # Model hyperparameters
@@ -53,7 +52,6 @@ class NeuMF(Recommender):
     epochs: int
     learning_rate: float
     neg_samples: int
-    block_size: int = 50
 
     def __init__(
         self,
@@ -78,6 +76,9 @@ class NeuMF(Recommender):
             raise ValueError(
                 "Items value must be provided to correctly initialize the model."
             )
+
+        # Set block size
+        self.block_size = kwargs.get("block_size", 50)
 
         # Ray Tune converts lists to tuples
         # so we need to convert them back to lists

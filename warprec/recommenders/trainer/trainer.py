@@ -385,6 +385,7 @@ class Trainer:
             device=device,
             seed=self._model_params.optimization.properties.seed,
             info=self.infos,
+            block_size=self._model_params.optimization.block_size,
         )
         try:
             model.fit(dataset.train_set, report_fn=_report)

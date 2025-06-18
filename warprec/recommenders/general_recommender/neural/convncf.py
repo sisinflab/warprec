@@ -41,7 +41,6 @@ class ConvNCF(Recommender):
         reg_cnn_mlp (float): The regularization for embedding cnn and mlp layers.
         epochs (int): The number of epochs.
         learning_rate (float): The learning rate value.
-        block_size (int): The block_size vale. Defaults to 50.
     """
 
     # Model hyperparameters
@@ -54,7 +53,6 @@ class ConvNCF(Recommender):
     reg_cnn_mlp: float
     epochs: int
     learning_rate: float
-    block_size: int = 50
 
     def __init__(
         self,
@@ -79,6 +77,9 @@ class ConvNCF(Recommender):
             raise ValueError(
                 "Items value must be provided to correctly initialize the model."
             )
+
+        # Set block size
+        self.block_size = kwargs.get("block_size", 50)
 
         # Ray Tune converts lists to tuples
         self.cnn_channels = list(self.cnn_channels)
@@ -112,6 +113,8 @@ class ConvNCF(Recommender):
 
         # Move to device
         self.to(self._device)
+
+        print(f"aaaaa: {self.block_size}")
 
     def _init_weights(self, module: Module):
         """Internal method to initialize weights.

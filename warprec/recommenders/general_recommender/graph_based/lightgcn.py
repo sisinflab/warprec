@@ -40,7 +40,6 @@ class LightGCN(Recommender, GraphRecommenderUtils):
         reg_weight (float): The weight decay for L2 regularization.
         epochs (int): The number of epochs.
         learning_rate (float): The learning rate value.
-        block_size (int): The block_size vale. Defaults to 50.
     """
 
     # Model hyperparameters
@@ -49,7 +48,6 @@ class LightGCN(Recommender, GraphRecommenderUtils):
     reg_weight: float
     epochs: int
     learning_rate: float
-    block_size: int = 50
 
     def __init__(
         self,
@@ -74,6 +72,9 @@ class LightGCN(Recommender, GraphRecommenderUtils):
             raise ValueError(
                 "Items value must be provided to correctly initialize the model."
             )
+
+        # Set block size
+        self.block_size = kwargs.get("block_size", 50)
 
         # Embeddings
         self.user_embedding = nn.Embedding(self.n_users, self.embedding_size)
