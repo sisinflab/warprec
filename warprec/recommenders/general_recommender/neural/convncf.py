@@ -114,8 +114,6 @@ class ConvNCF(Recommender):
         # Move to device
         self.to(self._device)
 
-        print(f"aaaaa: {self.block_size}")
-
     def _init_weights(self, module: Module):
         """Internal method to initialize weights.
 
