@@ -40,7 +40,7 @@ class NeuMF(Recommender):
         epochs (int): The number of epochs.
         learning_rate (float): The learning rate value.
         neg_samples (int): The number of negative samples per positive interaction.
-        block_size (int): The block_size vale. Defaults to 10.
+        block_size (int): The block_size vale. Defaults to 50.
     """
 
     # Model hyperparameters
@@ -53,7 +53,7 @@ class NeuMF(Recommender):
     epochs: int
     learning_rate: float
     neg_samples: int
-    block_size: int = 10
+    block_size: int = 50
 
     def __init__(
         self,

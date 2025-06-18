@@ -41,7 +41,7 @@ class ConvNCF(Recommender):
         reg_cnn_mlp (float): The regularization for embedding cnn and mlp layers.
         epochs (int): The number of epochs.
         learning_rate (float): The learning rate value.
-        block_size (int): The block_size vale. Defaults to 10.
+        block_size (int): The block_size vale. Defaults to 50.
     """
 
     # Model hyperparameters
@@ -54,7 +54,7 @@ class ConvNCF(Recommender):
     reg_cnn_mlp: float
     epochs: int
     learning_rate: float
-    block_size: int = 10
+    block_size: int = 50
 
     def __init__(
         self,
