@@ -34,7 +34,7 @@ class Recommender(nn.Module, ABC):
         info: dict = None,
         **kwargs: Any,
     ):
-        super().__init__(*args, **kwargs)
+        super().__init__()
         self.init_params(params)
         self.set_seed(seed)
         self._device = torch.device(device)
@@ -160,8 +160,7 @@ class Recommender(nn.Module, ABC):
             params (dict): The dictionary with the model params.
         """
         for ann, _ in self.__class__.__annotations__.items():
-            if ann in params.keys():
-                setattr(self, ann, params[ann])
+            setattr(self, ann, params[ann])
 
     def get_params(self) -> dict:
         """Get the model parameters as a dictionary.
