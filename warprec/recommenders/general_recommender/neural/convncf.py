@@ -135,9 +135,9 @@ class ConvNCF(Recommender):
             Tensor: The computed ConvNCFBPR loss.
         """
         distance = pos_score - neg_score
-        loss = -torch.sum(
-            torch.log(torch.sigmoid(distance))
-        )  # Log-sigmoid loss for BPR
+        loss = torch.sum(
+            torch.nn.functional.softplus(-distance)
+        )  # Log-sigmoid loss for BPR (using softplus)
         return loss
 
     def _reg_loss(self) -> Tensor:
@@ -147,19 +147,19 @@ class ConvNCF(Recommender):
         Returns;
             Tensor: The computed regularization loss.
         """
-        loss_1 = self.reg_embedding * self.user_embedding.weight.norm(2)
-        loss_2 = self.reg_embedding * self.item_embedding.weight.norm(2)
-        loss_3 = 0.0
+        loss_1 = self.reg_embedding * self.user_embedding.weight.pow(2).sum()
+        loss_2 = self.reg_embedding * self.item_embedding.weight.pow(2).sum()
+        loss_3 = torch.tensor(0.0, device=self._device)
 
         # Regularization for CNN layers
         for name, parm in self.cnn_layers.named_parameters():
             if name.endswith("weight"):
-                loss_3 += self.reg_cnn_mlp * parm.norm(2)
+                loss_3 += self.reg_cnn_mlp * parm.pow(2).sum()
 
         # Regularization for prediction layers (MLP)
         for name, parm in self.predict_layers.named_parameters():
             if name.endswith("weight"):
-                loss_3 += self.reg_cnn_mlp * parm.norm(2)
+                loss_3 += self.reg_cnn_mlp * parm.pow(2).sum()
 
         return loss_1 + loss_2 + loss_3
 
