@@ -103,7 +103,7 @@ def _check_similarity(value: Any) -> bool:
     return value.upper() in similarities_registry.list_registered()
 
 
-def _check_user_profile(value: Any) -> bool:
+def _check_profile(value: Any) -> bool:
     """Check if the field is correct string.
 
     Args:
@@ -180,5 +180,58 @@ def validate_greater_equal_than_zero(cls: Type[T], value: Any, field: str) -> li
             raise ValueError(
                 f"Values of {field} for {cls.__name__} model must be >= 0. "
                 f"Values received as input: {value}"
+            )
+    return value
+
+
+def validate_similarity(cls: Type[T], value: Any, field: str) -> list:
+    """Validate a hyperparameter.
+
+    Valid values must be supported similarity.
+
+    Args:
+        cls (Type[T]): Class type of original Pydantic BaseModel.
+        value (Any): A value or a list of values to be validated.
+        field (str): The name of the field to be validated.
+
+    Returns:
+        list: A list of validated values in the correct format.
+
+    Raises:
+        ValueError: If any of the values are not a supported similarity.
+    """
+    value = _convert_to_list(value)
+    for v in value:
+        if not _check_similarity(v):
+            raise ValueError(
+                f"Values of {field} for {cls.__name__} model must be supported similarities. "
+                f"Values received as input: {value}. "
+                f"Supported similarities: {similarities_registry.list_registered()}"
+            )
+    return value
+
+
+def validate_profile(cls: Type[T], value: Any, field: str) -> list:
+    """Validate a hyperparameter.
+
+    Valid values must be supported profile.
+
+    Args:
+        cls (Type[T]): Class type of original Pydantic BaseModel.
+        value (Any): A value or a list of values to be validated.
+        field (str): The name of the field to be validated.
+
+    Returns:
+        list: A list of validated values in the correct format.
+
+    Raises:
+        ValueError: If any of the values are not a supported profile.
+    """
+    value = _convert_to_list(value)
+    for v in value:
+        if not _check_profile(v):
+            raise ValueError(
+                f"Values of {field} for {cls.__name__} model must be 'binary' or 'tfidf'. "
+                f"Values received as input: {value}. "
             )
     return value
