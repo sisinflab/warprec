@@ -3,11 +3,56 @@ from typing import Tuple, Any, Optional
 
 import torch
 import numpy as np
+import pandas as pd
 from torch import Tensor
 from pandas import DataFrame
-from torch.utils.data import DataLoader, TensorDataset
+from torch.utils.data import DataLoader, TensorDataset, Dataset
 from scipy.sparse import csr_matrix, coo_matrix
 from warprec.utils.enums import RatingType
+from warprec.utils.logger import logger
+
+
+class SequentialInteractions(Dataset):
+    """Personalized dataset for sequential data.
+
+    Used by sequential models to capture temporal information from
+    user interaction history.
+
+    Args:
+        sequences (Tensor): The sequence of interactions.
+        sequence_lengths (Tensor): The length of the sequence (before padding).
+        positive_items (Tensor): The positive items.
+        negative_items (Optional[Tensor]): The negative items.
+    """
+
+    def __init__(
+        self,
+        sequences: Tensor,
+        sequence_lengths: Tensor,
+        positive_items: Tensor,
+        negative_items: Optional[Tensor] = None,
+    ):
+        self.sequences = sequences
+        self.sequence_lengths = sequence_lengths
+        self.positive_items = positive_items
+        self.negative_items = negative_items
+
+    def __len__(self):
+        return len(self.sequences)
+
+    def __getitem__(self, idx):
+        if self.negative_items is not None:
+            return (
+                self.sequences[idx],
+                self.sequence_lengths[idx],
+                self.positive_items[idx],
+                self.negative_items[idx],
+            )
+        return (
+            self.sequences[idx],
+            self.sequence_lengths[idx],
+            self.positive_items[idx],
+        )
 
 
 class Interactions:
@@ -39,6 +84,7 @@ class Interactions:
     _history_matrix: Tensor = None
     _history_lens: Tensor = None
     _history_mask: Tensor = None
+    _cached_sequential_data: dict = {}
 
     def __init__(
         self,
@@ -374,6 +420,57 @@ class Interactions:
             return self._history_matrix, self._history_lens, self._history_mask
         return self._to_history()
 
+    # Your original method, now calling the optimized helper function
+    def get_sequential_dataloader(
+        self, num_negatives: int = 0, shuffle: bool = True
+    ) -> DataLoader:
+        """Create a dataloader for sequential data.
+
+        Args:
+            num_negatives (int): Number of negative samples per user.
+            shuffle (bool): Whether to shuffle the data.
+
+        Returns:
+            DataLoader: Yields (item_seq, item_seq_len, pos_item_id) if num_negatives = 0.
+                Yields (item_seq, item_seq_len, pos_item_id, neg_item_id) if num_negatives > 0.
+        """
+        # Check if sequential that has been cached
+        cache_key = num_negatives
+        if cache_key in self._cached_sequential_data:
+            tensors = self._cached_sequential_data[cache_key]
+            dataset = SequentialInteractions(*[t for t in tensors if t is not None])
+            return DataLoader(dataset, batch_size=self.batch_size, shuffle=shuffle)
+
+        # Call the optimized processing function
+        padded_item_seq, tensor_item_seq_len, tensor_pos_item_id, tensor_neg_item_id = (
+            self._create_sequences_and_targets(
+                num_negatives=num_negatives,
+            )
+        )
+
+        # Check for empty results
+        if padded_item_seq.shape[0] == 0:
+            logger.attention(
+                "No valid sequential samples generated for DataLoader. "
+                "Check your data or session definition (min length 2)."
+            )
+
+        # Cache the results
+        self._cached_sequential_data[cache_key] = (
+            padded_item_seq,
+            tensor_item_seq_len,
+            tensor_pos_item_id,
+            tensor_neg_item_id,
+        )
+
+        # Create final dataset and dataloader
+        tensors_for_dataset = [padded_item_seq, tensor_item_seq_len, tensor_pos_item_id]
+        if num_negatives > 0 and tensor_neg_item_id is not None:
+            tensors_for_dataset.append(tensor_neg_item_id)
+
+        dataset = SequentialInteractions(*tensors_for_dataset)
+        return DataLoader(dataset, batch_size=self.batch_size, shuffle=shuffle)
+
     def get_dims(self) -> Tuple[int, int]:
         """This method will return the dimensions of the data.
 
@@ -468,6 +565,148 @@ class Interactions:
                 self._history_mask[user_id, : len(items)] = 1.0
 
         return self._history_matrix, self._history_lens, self._history_mask
+
+    def _create_sequences_and_targets(
+        self,
+        num_negatives: int,
+    ) -> Tuple[Tensor, Tensor, Tensor, Optional[Tensor]]:
+        """Core logic for transforming interaction data into sequential training samples.
+
+        This function uses pandas and numpy for efficient processing.
+
+        Args:
+            num_negatives (int): Number of negative samples per user.
+
+        Returns:
+            Tuple[Tensor, Tensor, Tensor, Optional[Tensor]]: A tuple containing:
+                - Tensor: Padded item sequence.
+                - Tensor: Item sequence length.
+                - Tensor: Positive item tensor.
+                - Optional[Tensor]: Negative item tensor.
+        """
+        mapped_df = pd.DataFrame(
+            {
+                self._user_label: self._inter_df[self._user_label].map(self._umap),
+                self._item_label: self._inter_df[self._item_label].map(self._imap),
+                "timestamp": self._inter_df["timestamp"],
+            }
+        ).dropna()  # Drop any interactions if user/item not in map
+
+        # Convert to integer types
+        mapped_df[[self._user_label, self._item_label]] = mapped_df[
+            [self._user_label, self._item_label]
+        ].astype(int)
+
+        # Group interactions based on timestamp
+        user_sessions = (
+            mapped_df.sort_values(by=[self._user_label, "timestamp"])
+            .groupby(self._user_label)[self._item_label]
+            .agg(list)
+        )
+
+        # Filter out sessions with less than 2 interactions
+        user_sessions = user_sessions[user_sessions.str.len() >= 2]
+
+        # Edge case: No user has at least 2 interactions in sequence
+        if user_sessions.empty:
+            return (
+                torch.empty((0, 0), dtype=torch.long),
+                torch.empty(0, dtype=torch.long),
+                torch.empty(0, dtype=torch.long),
+                None if num_negatives == 0 else torch.empty(0, dtype=torch.long),
+            )
+
+        # Create sequence-target pairs using explode
+        # For a session [i1, i2, i3, i4], this generates:
+        #   - seq: [i1], target: i2
+        #   - seq: [i1, i2], target: i3
+        #   - seq: [i1, i2, i3], target: i4
+        session_df = pd.DataFrame(
+            {
+                "sequences": user_sessions.apply(
+                    lambda s: [s[: i + 1] for i in range(len(s) - 1)]
+                ),
+                "targets": user_sessions.apply(lambda s: s[1:]),
+            }
+        )
+
+        # Explode the lists into separate rows
+        training_data = session_df.explode(["sequences", "targets"]).reset_index()
+
+        # Handle Negative Sampling if requested
+        neg_tensor = None
+        if num_negatives > 0:
+            num_samples = len(training_data)
+
+            # Create a set of interacted items for each sequence for fast lookups
+            # Note: items are 0-indexed here
+            interacted_sets = training_data["sequences"].apply(set)
+
+            # Generate all negative candidates at once
+            neg_candidates = np.random.randint(
+                0, self._niid, size=(num_samples, num_negatives), dtype=np.int64
+            )
+
+            # Check for collisions: a negative sample is invalid if it's the target or in the history
+            is_target = neg_candidates == training_data["targets"].values[:, None]
+
+            # We iterate through rows and columns to build a boolean mask
+            in_history = np.zeros_like(neg_candidates, dtype=bool)
+            for i, interacted_set in enumerate(interacted_sets):
+                for j in range(num_negatives):
+                    if neg_candidates[i, j] in interacted_set:
+                        in_history[i, j] = True
+
+            invalid_mask = is_target | in_history
+
+            # Iteratively replace invalid samples until all are valid
+            while np.any(invalid_mask):
+                num_invalid = np.sum(invalid_mask)
+                new_candidates = np.random.randint(
+                    0, self._niid, size=num_invalid, dtype=np.int64
+                )
+                neg_candidates[invalid_mask] = new_candidates
+
+                # Re-evaluate the mask only for the newly generated candidates
+                is_target_new = (
+                    neg_candidates == training_data["targets"].values[:, None]
+                )
+                in_history_new = np.zeros_like(neg_candidates, dtype=bool)
+                rows, cols = np.where(
+                    invalid_mask
+                )  # Get indices of what needs checking
+                for i, j in zip(rows, cols):  # type: ignore[assignment]
+                    if neg_candidates[i, j] in interacted_sets.iloc[i]:
+                        in_history_new[i, j] = True
+
+                invalid_mask = is_target_new | in_history_new
+
+            # Convert to 1-indexed for the model
+            neg_tensor = torch.tensor(neg_candidates + 1, dtype=torch.long)
+
+        # Convert DataFrame to list
+        sequences_list_0_indexed = training_data["sequences"].tolist()
+
+        # Convert list to be 1-indexed, this is faster
+        # than working with DataFrames
+        sequences_tensors_1_indexed = [
+            torch.tensor(s, dtype=torch.long) + 1 for s in sequences_list_0_indexed
+        ]
+
+        # Use torch.nn.utils to pad the sequence
+        padded_item_seq = torch.nn.utils.rnn.pad_sequence(
+            sequences_tensors_1_indexed, batch_first=True, padding_value=0
+        )
+
+        # Convert to 1-index and to Tensors
+        tensor_item_seq_len = torch.tensor(
+            training_data["sequences"].str.len().tolist(), dtype=torch.long
+        )
+        tensor_pos_item_id = torch.tensor(
+            training_data["targets"].values.astype(np.int64) + 1, dtype=torch.long
+        )
+
+        return padded_item_seq, tensor_item_seq_len, tensor_pos_item_id, neg_tensor
 
     def __iter__(self) -> "Interactions":
         """This method will return the iterator of the interactions.
