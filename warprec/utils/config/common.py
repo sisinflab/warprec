@@ -235,3 +235,78 @@ def validate_profile(cls: Type[T], value: Any, field: str) -> list:
                 f"Values received as input: {value}. "
             )
     return value
+
+
+def validate_between_zero_and_one(cls: Type[T], value: Any, field: str) -> list:
+    """Validate a hyperparameter.
+
+    Valid values must be between zero and one.
+
+    Args:
+        cls (Type[T]): Class type of original Pydantic BaseModel.
+        value (Any): A value or a list of values to be validated.
+        field (str): The name of the field to be validated.
+
+    Returns:
+        list: A list of validated values in the correct format.
+
+    Raises:
+        ValueError: If any of the values are not between zero and one.
+    """
+    value = _convert_to_list(value)
+    for v in value:
+        if _check_between_zero_and_one(v):
+            raise ValueError(
+                f"Values of {field} for {cls.__name__} model must be >= 0 and <= 1. "
+                f"Values received as input: {value}"
+            )
+    return value
+
+
+def validate_layer_list(cls: Type[T], value: Any, field: str) -> list:
+    """Validate a hyperparameter.
+
+    Valid values must be lists of layers.
+
+    Args:
+        cls (Type[T]): Class type of original Pydantic BaseModel.
+        value (Any): A value or a list of values to be validated.
+        field (str): The name of the field to be validated.
+
+    Returns:
+        list: A list of validated values in the correct format.
+
+    Raises:
+        ValueError: If any of the values are not lists of layers.
+    """
+    strat = None  # Init strategy
+    if not isinstance(value, list):
+        value = [value]
+    if not isinstance(value[-1], list):
+        value = [value]
+    if isinstance(value[0], str):
+        strat = value.pop(0)
+    for layer in value:
+        for v in layer:
+            if v <= 0:
+                raise ValueError(
+                    f"Values of {field} for {cls.__name__} model must be positive layer values. "
+                    f"Values received as input: {value}"
+                )
+    if strat:
+        value.insert(0, strat)
+    return value
+
+
+def validate_bool_values(value: Any) -> list:
+    """Validate a hyperparameter.
+
+    Valid values must be boolean.
+
+    Args:
+        value (Any): A value or a list of values to be validated.
+
+    Returns:
+        list: A list of validated values in the correct format.
+    """
+    return _convert_to_list(value)
