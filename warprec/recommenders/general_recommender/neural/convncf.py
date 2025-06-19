@@ -7,6 +7,7 @@ from torch.nn import Module
 from torch.nn.init import normal_
 from scipy.sparse import csr_matrix
 from warprec.recommenders.layers import MLP, CNN
+from warprec.recommenders.losses import BPRLoss
 from warprec.data.dataset import Interactions
 from warprec.recommenders.base_recommender import Recommender
 from warprec.utils.enums import Activations
@@ -108,8 +109,9 @@ class ConvNCF(Recommender):
         # Init embedding weights
         self.apply(self._init_weights)
 
-        # Optimizer
+        # Optimizer and losses
         self.optimizer = torch.optim.Adam(self.parameters(), lr=self.learning_rate)
+        self.bpr_loss = BPRLoss()
 
         # Move to device
         self.to(self._device)
@@ -122,24 +124,6 @@ class ConvNCF(Recommender):
         """
         if isinstance(module, nn.Embedding):
             normal_(module.weight.data, mean=0.0, std=0.01)
-
-    def _bpr_loss(self, pos_score: Tensor, neg_score: Tensor) -> Tensor:
-        """ConvNCFBPRLoss, based on Bayesian Personalized Ranking.
-
-        This is a variation of the normal BPR loss, used in the original paper.
-
-        Args:
-            pos_score (Tensor): Positive item scores.
-            neg_score (Tensor): Negative item scores.
-
-        Returns:
-            Tensor: The computed ConvNCFBPR loss.
-        """
-        distance = pos_score - neg_score
-        loss = torch.sum(
-            torch.nn.functional.softplus(-distance)
-        )  # Log-sigmoid loss for BPR (using softplus)
-        return loss
 
     def _reg_loss(self) -> Tensor:
         """Calculate the L2 normalization loss of model parameters.
@@ -197,7 +181,7 @@ class ConvNCF(Recommender):
                 neg_item_score = self.forward(user, neg_item)
 
                 # Loss computation (BPR + Regularization)
-                bpr_loss = self._bpr_loss(pos_item_score, neg_item_score)
+                bpr_loss: Tensor = self.bpr_loss(pos_item_score, neg_item_score)
                 reg_loss = self._reg_loss()
                 total_loss = bpr_loss + reg_loss
 
@@ -226,7 +210,8 @@ class ConvNCF(Recommender):
         # Outer product to create interaction map
         # user_e.unsqueeze(2) -> [batch_size, embedding_size, 1]
         # item_e.unsqueeze(1) -> [batch_size, 1, embedding_size]
-        # torch.bmm(user_e.unsqueeze(2), item_e.unsqueeze(1)) -> [batch_size, embedding_size, embedding_size]
+        # torch.bmm(user_e.unsqueeze(2), item_e.unsqueeze(1))
+        # -> [batch_size, embedding_size, embedding_size]
         interaction_map = torch.bmm(user_e.unsqueeze(2), item_e.unsqueeze(1))
 
         # Add a channel dimension for CNN input: [batch_size, 1, embedding_size, embedding_size]

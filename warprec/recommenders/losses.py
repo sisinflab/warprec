@@ -1,6 +1,7 @@
 from typing import Any, Iterable
 
 import torch
+import torch.nn.functional as F
 from torch import nn, Tensor
 
 
@@ -8,14 +9,10 @@ class BPRLoss(nn.Module):
     """BPRLoss, based on Bayesian Personalized Ranking.
 
     For further details, check the `paper <https://arxiv.org/abs/1205.2618>`_.
-
-    Args:
-        gamma (float): Small value to avoid division by zero
     """
 
-    def __init__(self, gamma: float = 1e-10):
-        super(BPRLoss, self).__init__()
-        self.gamma = gamma
+    def __init__(self):
+        super().__init__()
 
     def forward(self, pos_score: Tensor, neg_score: Tensor) -> Tensor:
         """Compute the BPR loss.
@@ -27,8 +24,15 @@ class BPRLoss(nn.Module):
         Returns:
             Tensor: The computed BPR loss.
         """
-        loss = -torch.log(self.gamma + torch.sigmoid(pos_score - neg_score)).mean()
-        return loss
+        # Compute the distance of positive
+        # and negative scores
+        distance = pos_score - neg_score
+
+        # Compute the softplus function of the negative distance
+        loss = F.softplus(-distance)  # pylint: disable=not-callable
+
+        # Return the mean of the bpr losses computed
+        return loss.mean()
 
 
 class EmbeddingLoss(nn.Module):
@@ -47,7 +51,7 @@ class EmbeddingLoss(nn.Module):
     """
 
     def __init__(self, norm: int = 2):
-        super(EmbeddingLoss, self).__init__()
+        super().__init__()
         if norm not in [1, 2]:
             raise ValueError("Norm must be either 1 (L1) or 2 (L2).")
         self.norm = norm
