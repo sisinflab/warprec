@@ -68,19 +68,6 @@ def _check_less_than_zero(value: Any) -> bool:
     return isinstance(value, (float, int)) and value < 0
 
 
-def _check_zero_to_one(value: Any) -> bool:
-    """Check if the field is numerical and between 0 and 1.
-
-    Args:
-        value (Any): The value to check.
-
-    Returns:
-        bool: True if the value is between 0 and 1, False otherwise.
-    """
-
-    return isinstance(value, (float, int)) and 0 <= value <= 1
-
-
 def _check_similarity(value: Any) -> bool:
     """Check if the field is correct string.
 
