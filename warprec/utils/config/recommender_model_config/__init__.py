@@ -1,33 +1,3 @@
-from .general_recommender_config import (
-    AddEASE,
-    CEASE,
-    EASE,
-    AttributeItemKNN,
-    AttributeUserKNN,
-    ItemKNN,
-    UserKNN,
-    Slim,
-    NeuMF,
-    RP3Beta,
-    MultiDAE,
-    MultiVAE,
-    ADMMSlim,
-    VSM,
-)
+from . import general_model_config
 
-__all__ = [
-    "AddEASE",
-    "CEASE",
-    "EASE",
-    "AttributeItemKNN",
-    "AttributeUserKNN",
-    "ItemKNN",
-    "UserKNN",
-    "Slim",
-    "NeuMF",
-    "RP3Beta",
-    "MultiDAE",
-    "MultiVAE",
-    "ADMMSlim",
-    "VSM",
-]
+__all__ = ["general_model_config"]
