@@ -3,6 +3,7 @@ from .content_based_config import VSM
 from .graph_based_config import LightGCN, NGCF, RP3Beta
 from .knn_config import AttributeItemKNN, AttributeUserKNN, ItemKNN, UserKNN
 from .latent_factor_config import ADMMSlim, BPR, FISM, Slim
+from .neural_config import ConvNCF, NeuMF
 
 __all__ = [
     "AddEASE",
@@ -21,4 +22,6 @@ __all__ = [
     "BPR",
     "FISM",
     "Slim",
+    "ConvNCF",
+    "NeuMF",
 ]
