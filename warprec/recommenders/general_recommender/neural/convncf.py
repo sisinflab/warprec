@@ -11,7 +11,6 @@ from warprec.recommenders.layers import MLP, CNN
 from warprec.recommenders.losses import BPRLoss
 from warprec.data.dataset import Interactions
 from warprec.recommenders.base_recommender import Recommender
-from warprec.utils.enums import Activations
 from warprec.utils.registry import model_registry
 
 
@@ -92,7 +91,7 @@ class ConvNCF(Recommender):
             self.cnn_channels,
             self.cnn_kernels,
             self.cnn_strides,
-            activation=Activations.RELU,
+            activation="relu",
         )
 
         # Prediction layer (MLP)
