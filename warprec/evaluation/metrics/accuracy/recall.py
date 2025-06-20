@@ -10,14 +10,17 @@ from warprec.utils.registry import metric_registry
 
 @metric_registry.register("Recall")
 class Recall(TopKMetric):
-    """The Recall@k counts the number of item retrieve correctly,
+    r"""The Recall@k counts the number of item retrieve correctly,
         over the total number of relevant item in the ground truth.
 
     The metric formula is defined as:
-        Recall@k = sum_{u=1}^{n_users} sum_{i=1}^{k} rel_{u,i} / (n_items * n_users)
+        Recall@k = (1 / |U_valid|) * sum_{u \in U_valid} (|Rel_u \cap Rec_{u,k}| / |Rel_u|)
 
     where:
-        - rel_{u,i} is the relevance of the i-th item for user u.
+        - $U_{valid}$ is the set of users with at least one relevant item in the ground truth.
+        - $Rel_u$ is the set of items relevant to user $u$.
+        - $Rec_{u,k}$ is the set of top-k recommended items for user $u$.
+        - $| \cdot |$ denotes the cardinality of a set.
 
     Matrix computation of the metric:
         PREDS                   TARGETS
@@ -40,13 +43,13 @@ class Recall(TopKMetric):
     | 1 | 0 |
     +---+---+
 
-    Recall@2 = (1 + 1) / (2 * 4) = 0.25
+    Recall@2 = [(1 / 2) + (1 / 2)] / 2 = 0.5
 
     For further details, please refer to this `link <https://en.wikipedia.org/wiki/Precision_and_recall>`_.
 
     Attributes:
-        correct (Tensor): The number of hits in the top-k recommendations.
-        total_relevant (Tensor): The number of real hits in user transactions.
+        retrieved (Tensor): The number of relevant items retrieved.
+        users (Tensor): The number of users evaluated.
 
     Args:
         k (int): The cutoff.
@@ -57,42 +60,44 @@ class Recall(TopKMetric):
 
     _REQUIRED_COMPONENTS: Set[MetricBlock] = {
         MetricBlock.BINARY_RELEVANCE,
+        MetricBlock.VALID_USERS,
         MetricBlock.TOP_K_BINARY_RELEVANCE,
     }
 
-    correct: Tensor
-    total_relevant: Tensor
+    retrieved: Tensor
+    users: Tensor
 
     def __init__(
         self, k: int, *args: Any, dist_sync_on_step: bool = False, **kwargs: Any
     ):
         super().__init__(k, dist_sync_on_step)
-        self.add_state("correct", default=torch.tensor(0.0), dist_reduce_fx="sum")
-        self.add_state(
-            "total_relevant", default=torch.tensor(0.0), dist_reduce_fx="sum"
-        )
+        self.add_state("hits", default=torch.tensor(0.0), dist_reduce_fx="sum")
+        self.add_state("users", default=torch.tensor(0.0), dist_reduce_fx="sum")
 
     def update(self, preds: Tensor, **kwargs: Any):
         """Updates the metric state with the new batch of predictions."""
         target: Tensor = kwargs.get("binary_relevance", torch.zeros_like(preds))
+        users = kwargs.get("valid_users", self.valid_users(target))
         top_k_rel: Tensor = kwargs.get(
             f"top_{self.k}_binary_relevance",
             self.top_k_relevance(preds, target, self.k),
         )
 
-        self.correct += top_k_rel.sum().float()
-        self.total_relevant += target.sum().float()
+        hits = top_k_rel.sum(dim=1).float()
+        relevant = target.sum(dim=1).float()
+        self.retrieved += (
+            torch.where(relevant > 0, hits / relevant, torch.tensor(0.0)).sum().float()
+        )
+
+        # Count only users with at least one interaction
+        self.users += users
 
     def compute(self):
         """Computes the final metric value."""
-        recall = (
-            self.correct / self.total_relevant
-            if self.total_relevant > 0
-            else torch.tensor(0.0)
-        )
+        recall = self.retrieved / self.users if self.users > 0 else torch.tensor(0.0)
         return {self.name: recall.item()}
 
     def reset(self):
         """Resets the metric state."""
-        self.correct.zero_()
-        self.total_relevant.zero_()
+        self.retrieved.zero_()
+        self.users.zero_()
