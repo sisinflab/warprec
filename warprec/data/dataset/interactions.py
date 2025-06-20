@@ -1,5 +1,5 @@
 import typing
-from typing import Tuple, Any, Optional
+from typing import Dict, List, Tuple, Any, Optional
 
 import torch
 import numpy as np
@@ -84,7 +84,9 @@ class Interactions:
     _history_matrix: Tensor = None
     _history_lens: Tensor = None
     _history_mask: Tensor = None
+    # Cached sequential data
     _cached_sequential_data: dict = {}
+    _cached_user_histories: Dict[int, List[int]] = {}
 
     def __init__(
         self,
@@ -471,6 +473,69 @@ class Interactions:
         dataset = SequentialInteractions(*tensors_for_dataset)
         return DataLoader(dataset, batch_size=self.batch_size, shuffle=shuffle)
 
+    def get_user_history_sequences(self, user_ids: List[int]) -> Tuple[Tensor, Tensor]:
+        """Retrieves padded historical sequences and their lengths for a given list of user IDs.
+        Sequences are 1-indexed.
+
+        Args:
+            user_ids (List[int]): A list of global user indices.
+
+        Returns:
+            Tuple[Tensor, Tensor]: A tuple containing:
+                - Padded item sequences [num_users, max_seq_len]
+                - Sequence lengths [num_users]
+        """
+        if not self._cached_user_histories:
+            self._compute_cache_user_history()
+
+        sequences_to_process = []
+        lengths_to_process = []
+
+        for uid in user_ids:
+            history = self._cached_user_histories.get(
+                uid, []
+            )  # Get history, empty if no interactions
+            # For prediction, we use the entire history available in the training set
+            # The length check can be 0 here as padding handles empty sequences.
+            sequences_to_process.append(torch.tensor(history, dtype=torch.long))
+            lengths_to_process.append(len(history))
+
+        # Handle cases where some users in the batch might not have history (empty lists)
+        # Pad sequences (0-indexed padding value)
+        padded_sequences = torch.nn.utils.rnn.pad_sequence(
+            sequences_to_process, batch_first=True, padding_value=0
+        )
+        sequence_lengths = torch.tensor(lengths_to_process, dtype=torch.long)
+
+        return padded_sequences, sequence_lengths
+
+    def _compute_cache_user_history(self):
+        # First call or cache cleared: pre-process all user histories
+        mapped_df_for_history = pd.DataFrame(
+            {
+                self._user_label: self._inter_df[self._user_label].map(self._umap),
+                self._item_label: self._inter_df[self._item_label].map(self._imap),
+                "timestamp": self._inter_df["timestamp"],
+            }
+        ).dropna()  # Ensure user/item are mapped
+
+        mapped_df_for_history[[self._user_label, self._item_label]] = (
+            mapped_df_for_history[[self._user_label, self._item_label]].astype(int)
+        )
+
+        mapped_df_for_history = mapped_df_for_history.sort_values(
+            by=[self._user_label, "timestamp"]
+        )
+
+        # Store 1-indexed sequences
+        self._cached_user_histories = (
+            mapped_df_for_history.groupby(self._user_label)[self._item_label]
+            .apply(
+                lambda x: (x.values + 1).tolist()
+            )  # Convert to list and 1-index items
+            .to_dict()
+        )
+
     def get_dims(self) -> Tuple[int, int]:
         """This method will return the dimensions of the data.
 
@@ -488,6 +553,13 @@ class Interactions:
             int: Number of transactions.
         """
         return self._transactions
+
+    def clear_history_cache(self):
+        """This method will can be used to clear the
+        cached sequential data if not used anymore.
+        """
+        self._cached_sequential_data = {}
+        self._cached_user_histories = {}
 
     def _to_sparse(self) -> csr_matrix:
         """This method will create the sparse representation of the data contained.
