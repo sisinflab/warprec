@@ -2,7 +2,6 @@
 from typing import Optional, Callable, Tuple, Any
 
 import torch
-
 import numpy as np
 import scipy.sparse as sp
 from torch import nn, Tensor
@@ -78,26 +77,25 @@ class NGCF(Recommender, GraphRecommenderUtils):
             raise ValueError(
                 "Items value must be provided to correctly initialize the model."
             )
+        self.block_size = kwargs.get("block_size", 50)
 
         # Initialize the hidden dimensions
         self.hidden_size_list = [
             self.embedding_size
         ] + self.weight_size  # [embed_k, layer1_dim, layer2_dim, ...]
 
-        # Embeddings
         self.user_embedding = nn.Embedding(self.n_users, self.embedding_size)
         self.item_embedding = nn.Embedding(self.n_items, self.embedding_size)
 
         # Init embedding weights
         self.apply(self._init_weights)
 
-        # Loss and optimizer
         self.optimizer = torch.optim.Adam(self.parameters(), lr=self.learning_rate)
         self.mf_loss = BPRLoss()
         self.reg_loss = EmbeddingLoss(norm=2)
-
-        # Adjacency tensor initialization
         self.adj_matrix: Optional[SparseTensor] = None
+
+        # Optionally define a dropout layer (optimized for sparse data)
         self.sparse_dropout = (
             SparseDropout(self.node_dropout) if self.node_dropout > 0 else None
         )
@@ -111,7 +109,6 @@ class NGCF(Recommender, GraphRecommenderUtils):
                 NGCFLayer(in_f, out_f, self.message_dropout)
             )
 
-        # Move to device
         self.to(self._device)
 
     def _init_weights(self, module: Module):
@@ -150,7 +147,6 @@ class NGCF(Recommender, GraphRecommenderUtils):
         # Get the dataloader from interactions for pairwise training
         dataloader = interactions.get_pos_neg_dataloader()
 
-        # Training loop
         self.train()
         for _ in range(self.epochs):
             epoch_loss = 0.0
@@ -180,10 +176,8 @@ class NGCF(Recommender, GraphRecommenderUtils):
                     self.user_embedding, self.item_embedding, propagation_params
                 )
 
-                # Loss of the batch
-                loss: Tensor = mf_loss + self.reg_weight * reg_loss
-
-                # Backward pass and optimization
+                # Loss computation and backpropagation
+                loss = mf_loss + self.reg_weight * reg_loss
                 loss.backward()
                 self.optimizer.step()
 
@@ -246,12 +240,11 @@ class NGCF(Recommender, GraphRecommenderUtils):
 
         start_idx = kwargs.get("start", 0)
         end_idx = kwargs.get("end", interaction_matrix.shape[0])
-        block_size = 200  # Better memory management
 
         preds = []
         # Process users in batches to manage memory
-        for current_batch_start in range(start_idx, end_idx, block_size):
-            current_batch_end = min(current_batch_start + block_size, end_idx)
+        for current_batch_start in range(start_idx, end_idx, self.block_size):
+            current_batch_end = min(current_batch_start + self.block_size, end_idx)
             users_in_batch = torch.arange(
                 current_batch_start, current_batch_end, device=self._device
             )

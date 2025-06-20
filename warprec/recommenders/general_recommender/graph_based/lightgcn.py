@@ -72,23 +72,17 @@ class LightGCN(Recommender, GraphRecommenderUtils):
             raise ValueError(
                 "Items value must be provided to correctly initialize the model."
             )
-
-        # Set block size
         self.block_size = kwargs.get("block_size", 50)
 
-        # Embeddings
         self.user_embedding = nn.Embedding(self.n_users, self.embedding_size)
         self.item_embedding = nn.Embedding(self.n_items, self.embedding_size)
 
         # Init embedding weights
         self.apply(self._init_weights)
 
-        # Loss and optimizer
         self.optimizer = torch.optim.Adam(self.parameters(), lr=self.learning_rate)
         self.mf_loss = BPRLoss()
         self.reg_loss = EmbeddingLoss(norm=2)  # L2-norm for embeddings
-
-        # Adjacency tensor initialization
         self.adj: Optional[SparseTensor] = None
 
         # Initialization of the propagation network
@@ -99,12 +93,11 @@ class LightGCN(Recommender, GraphRecommenderUtils):
             "x, edge_index", propagation_network_list
         )
 
-        # Normalization for embedding normalization
+        # Vectorized normalization for embedding
         self.alpha = torch.tensor(
             [1 / (k + 1) for k in range(self.n_layers + 1)], device=self._device
         )
 
-        # Move to device
         self.to(self._device)
 
     def _init_weights(self, module: Module):
@@ -142,7 +135,6 @@ class LightGCN(Recommender, GraphRecommenderUtils):
         # Get the dataloader from interactions for pairwise training
         dataloader = interactions.get_pos_neg_dataloader()
 
-        # Training loop
         self.train()
         for _ in range(self.epochs):
             epoch_loss = 0.0
@@ -170,9 +162,8 @@ class LightGCN(Recommender, GraphRecommenderUtils):
                     self.item_embedding,
                 )
 
-                loss: Tensor = mf_loss + self.reg_weight * reg_loss
-
-                # Backward pass and optimization
+                # Loss computation and backpropagation
+                loss = mf_loss + self.reg_weight * reg_loss
                 loss.backward()
                 self.optimizer.step()
 
