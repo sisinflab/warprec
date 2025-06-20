@@ -6,10 +6,11 @@ from torch import nn, Tensor
 from torch.nn import Module
 from torch.nn.init import normal_
 from scipy.sparse import csr_matrix
+
 from warprec.recommenders.layers import MLP, CNN
+from warprec.recommenders.losses import BPRLoss
 from warprec.data.dataset import Interactions
 from warprec.recommenders.base_recommender import Recommender
-from warprec.utils.enums import Activations
 from warprec.utils.registry import model_registry
 
 
@@ -77,8 +78,6 @@ class ConvNCF(Recommender):
             raise ValueError(
                 "Items value must be provided to correctly initialize the model."
             )
-
-        # Set block size
         self.block_size = kwargs.get("block_size", 50)
 
         # Ray Tune converts lists to tuples
@@ -86,16 +85,13 @@ class ConvNCF(Recommender):
         self.cnn_kernels = list(self.cnn_kernels)
         self.cnn_strides = list(self.cnn_strides)
 
-        # Embedding layers
         self.user_embedding = nn.Embedding(users, self.embedding_size)
         self.item_embedding = nn.Embedding(items, self.embedding_size)
-
-        # CNN layers
         self.cnn_layers = CNN(
             self.cnn_channels,
             self.cnn_kernels,
             self.cnn_strides,
-            activation=Activations.RELU,
+            activation="relu",
         )
 
         # Prediction layer (MLP)
@@ -108,10 +104,9 @@ class ConvNCF(Recommender):
         # Init embedding weights
         self.apply(self._init_weights)
 
-        # Optimizer
         self.optimizer = torch.optim.Adam(self.parameters(), lr=self.learning_rate)
+        self.bprloss = BPRLoss()
 
-        # Move to device
         self.to(self._device)
 
     def _init_weights(self, module: Module):
@@ -122,24 +117,6 @@ class ConvNCF(Recommender):
         """
         if isinstance(module, nn.Embedding):
             normal_(module.weight.data, mean=0.0, std=0.01)
-
-    def _bpr_loss(self, pos_score: Tensor, neg_score: Tensor) -> Tensor:
-        """ConvNCFBPRLoss, based on Bayesian Personalized Ranking.
-
-        This is a variation of the normal BPR loss, used in the original paper.
-
-        Args:
-            pos_score (Tensor): Positive item scores.
-            neg_score (Tensor): Negative item scores.
-
-        Returns:
-            Tensor: The computed ConvNCFBPR loss.
-        """
-        distance = pos_score - neg_score
-        loss = torch.sum(
-            torch.nn.functional.softplus(-distance)
-        )  # Log-sigmoid loss for BPR (using softplus)
-        return loss
 
     def _reg_loss(self) -> Tensor:
         """Calculate the L2 normalization loss of model parameters.
@@ -184,7 +161,6 @@ class ConvNCF(Recommender):
         # ConvNCF uses pairwise training, so we need positive and negative items.
         dataloader = interactions.get_pos_neg_dataloader()
 
-        # Training loop
         self.train()
         for _ in range(self.epochs):
             epoch_loss = 0.0
@@ -197,7 +173,7 @@ class ConvNCF(Recommender):
                 neg_item_score = self.forward(user, neg_item)
 
                 # Loss computation (BPR + Regularization)
-                bpr_loss = self._bpr_loss(pos_item_score, neg_item_score)
+                bpr_loss = self.bprloss(pos_item_score, neg_item_score)
                 reg_loss = self._reg_loss()
                 total_loss = bpr_loss + reg_loss
 

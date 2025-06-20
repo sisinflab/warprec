@@ -76,36 +76,6 @@ class Similarities(str, Enum):
     HAVERSINE = "haversine"
 
 
-class Activations(str, Enum):
-    """Represents the types of activation supported.
-
-    This enum is used to track the possible activation:
-        - SIGMOID: Sigmoid activation function.
-        - TANH: Tanh activation function.
-        - RELU: ReLU activation function.
-        - LEAKYRELU: LeakyReLU activation function.
-    """
-
-    SIGMOID = "sigmoid"
-    TANH = "tanh"
-    RELU = "relu"
-    LEAKYRELU = "leakyrelu"
-
-
-class Initializations(str, Enum):
-    """Represents the types of initialization supported.
-
-    This enum is used to track the possible initialization:
-        - NORM: Normal distribution initialization.
-        - XAVIER_NORM: Xavier normal distribution.
-        - XAVIER_UNI: Xavier uniform distribution.
-    """
-
-    NORM = "norm"
-    XAVIER_NORM = "xavier_norm"
-    XAVIER_UNI = "xavier_uni"
-
-
 class SearchAlgorithms(str, Enum):
     """Represents the types of search algorithms supported.
 
