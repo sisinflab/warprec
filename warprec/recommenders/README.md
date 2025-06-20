@@ -9,6 +9,7 @@ The WarpRec `Recommenders` module offers all the tools needed to train and build
 ## 📚 Table of Contents
 - 🤖 [Recommendation models](#🤖-recommendation-models)
     - 🌐 [General Recommenders](#🌐-general-recommenders)
+    - 🔄 [Sequential Recommenders](#🔄-sequential-recommenders)
     - 👉 [How to implement your recommender](#👉-how-to-implement-your-recommender)
 - 🏋️‍♂️ [Trainer](#️🏋️‍♂️️-trainer)
 - 🧱 [Layers](#🧱-layers)
@@ -28,6 +29,10 @@ Model-specific attributes are handled dynamically using Python annotations and p
 ### 🌐 General Recommenders
 
 The `General Recommenders` module of WarpRec is a collection of `collaborative` and `content-based` models. For further information check the [General Recommenders](general_recommender/README.md) documentation.
+
+### 🔄 Sequential Recommenders
+
+The `Sequential Recommenders` module of WarpRec is a collection of models that leverage the temporal order of user interactions to predict future behaviors. For further information check the [Sequential Recommenders](sequential_recommender/README.md) documentation.
 
 ### 👉 How to implement Your recommender
 
