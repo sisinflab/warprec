@@ -11,6 +11,7 @@ from pandas import DataFrame
 from scipy.sparse import csr_matrix, coo_matrix
 from torch_sparse import SparseTensor
 from warprec.data.dataset import Interactions
+from warprec.utils.enums import RecommenderModelType
 
 
 class Recommender(nn.Module, ABC):
@@ -37,6 +38,7 @@ class Recommender(nn.Module, ABC):
         super().__init__()
         self.init_params(params)
         self.set_seed(seed)
+        self.model_type = RecommenderModelType.GENERAL
         self._device = torch.device(device)
         self._name = ""
 
