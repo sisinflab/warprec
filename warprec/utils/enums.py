@@ -193,3 +193,18 @@ class MetricBlock(str, Enum):
     TOP_K_VALUES = "top_k_values"
     TOP_K_BINARY_RELEVANCE = "top_k_binary_relevance"
     TOP_K_DISCOUNTED_RELEVANCE = "top_k_discounted_relevance"
+
+
+class RecommenderModelType(str, Enum):
+    """Represents the types of model supported by WarpRec. Each model type might
+    require different information or data type to train/evaluate.
+
+    This enum is used to track the possible recommender model types:
+        - GENERAL: The general models comprehend collaborative and content-based models.
+            Inside WarpRec also some hybrid version are supported. These models only require
+            the URM matrix to compute.
+        - SEQUENTIAL: The sequential models require sequential information to compute.
+    """
+
+    GENERAL = "general"
+    SEQUENTIAL = "sequential"
