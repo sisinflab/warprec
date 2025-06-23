@@ -71,6 +71,8 @@ class Interactions:
         batch_size (int): The batch size that will be used to
             iterate over the interactions.
         rating_type (RatingType): The type of rating to be used.
+        rating_label (str): The label of the rating column.
+        timestamp_label (str): The label of the timestamp column.
         precision (Any): The precision of the internal representation of the data.
 
     Raises:
@@ -99,6 +101,8 @@ class Interactions:
         item_cluster: Optional[dict] = None,
         batch_size: int = 1024,
         rating_type: RatingType = RatingType.IMPLICIT,
+        rating_label: str = None,
+        timestamp_label: str = None,
         precision: Any = np.float32,
     ) -> None:
         # Setup the variables
@@ -110,12 +114,13 @@ class Interactions:
         self.rating_type = rating_type
         self.precision = precision
 
-        # Set user and item label
+        # Set DataFrame labels
         self._user_label = data.columns[0]
         self._item_label = data.columns[1]
         self._rating_label = (
-            data.columns[2] if rating_type == RatingType.EXPLICIT else None
+            rating_label if rating_type == RatingType.EXPLICIT else None
         )
+        self._timestamp_label = timestamp_label
 
         # Filter side information (if present)
         if self._inter_side is not None:
@@ -515,7 +520,7 @@ class Interactions:
             {
                 self._user_label: self._inter_df[self._user_label].map(self._umap),
                 self._item_label: self._inter_df[self._item_label].map(self._imap),
-                "timestamp": self._inter_df["timestamp"],
+                self._timestamp_label: self._inter_df[self._timestamp_label],
             }
         ).dropna()  # Ensure user/item are mapped
 
@@ -524,7 +529,7 @@ class Interactions:
         )
 
         mapped_df_for_history = mapped_df_for_history.sort_values(
-            by=[self._user_label, "timestamp"]
+            by=[self._user_label, self._timestamp_label]
         )
 
         # Store 1-indexed sequences
@@ -660,7 +665,7 @@ class Interactions:
             {
                 self._user_label: self._inter_df[self._user_label].map(self._umap),
                 self._item_label: self._inter_df[self._item_label].map(self._imap),
-                "timestamp": self._inter_df["timestamp"],
+                self._timestamp_label: self._inter_df[self._timestamp_label],
             }
         ).dropna()  # Drop any interactions if user/item not in map
 
@@ -671,7 +676,7 @@ class Interactions:
 
         # Group interactions based on timestamp
         user_sessions = (
-            mapped_df.sort_values(by=[self._user_label, "timestamp"])
+            mapped_df.sort_values(by=[self._user_label, self._timestamp_label])
             .groupby(self._user_label)[self._item_label]
             .agg(list)
         )

@@ -60,6 +60,9 @@ def main(args: Namespace):
                     item_cluster=item_cluster,
                     batch_size=config.general.batch_size,
                     rating_type=config.reader.rating_type,
+                    rating_label=config.reader.labels.rating_label,
+                    timestamp_label=config.reader.labels.timestamp_label,
+                    cluster_label=config.reader.labels.cluster_label,
                     precision=config.general.precision,
                 )
             else:

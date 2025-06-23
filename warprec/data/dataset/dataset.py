@@ -139,7 +139,10 @@ class TransactionDataset(Dataset):
         user_cluster (Optional[DataFrame]): The user cluster data.
         item_cluster (Optional[DataFrame]): The item cluster data.
         batch_size (int): The batch size that will be used in training and evaluation.
-        rating_type (RatingType): The type of rating used in the dataset.
+        rating_type (RatingType): The type of rating used.
+        rating_label (str): The label of the rating column.
+        timestamp_label (str): The label of the timestamp column.
+        cluster_label (str): The label of the cluster column.
         precision (Any): The precision of the internal representation of the data.
     """
 
@@ -153,6 +156,9 @@ class TransactionDataset(Dataset):
         item_cluster: Optional[DataFrame] = None,
         batch_size: int = 1024,
         rating_type: RatingType = RatingType.IMPLICIT,
+        rating_label: str = None,
+        timestamp_label: str = None,
+        cluster_label: str = None,
         precision: Any = np.float32,
     ):
         super().__init__()
@@ -191,8 +197,8 @@ class TransactionDataset(Dataset):
             {
                 self._umap[user_id]: cluster
                 for user_id, cluster in zip(
-                    user_cluster[user_label], user_cluster["cluster"]
-                )  # TODO: use config
+                    user_cluster[user_label], user_cluster[cluster_label]
+                )
                 if user_id in self._umap
             }
             if user_cluster is not None
@@ -202,8 +208,8 @@ class TransactionDataset(Dataset):
             {
                 self._imap[item_id]: cluster
                 for item_id, cluster in zip(
-                    item_cluster[item_label], item_cluster["cluster"]
-                )  # TODO: use config
+                    item_cluster[item_label], item_cluster[cluster_label]
+                )
                 if item_id in self._imap
             }
             if item_cluster is not None
@@ -243,6 +249,8 @@ class TransactionDataset(Dataset):
             header_msg="Train",
             batch_size=batch_size,
             rating_type=rating_type,
+            rating_label=rating_label,
+            timestamp_label=timestamp_label,
             precision=precision,
         )
 
@@ -255,6 +263,8 @@ class TransactionDataset(Dataset):
                 header_msg="Test",
                 batch_size=batch_size,
                 rating_type=rating_type,
+                rating_label=rating_label,
+                timestamp_label=timestamp_label,
                 precision=precision,
             )
         if val_data is not None:
@@ -266,6 +276,8 @@ class TransactionDataset(Dataset):
                 header_msg="Validation",
                 batch_size=batch_size,
                 rating_type=rating_type,
+                rating_label=rating_label,
+                timestamp_label=timestamp_label,
                 precision=precision,
             )
 
@@ -329,6 +341,8 @@ class TransactionDataset(Dataset):
         header_msg: str = "Train",
         batch_size: int = 1024,
         rating_type: RatingType = RatingType.IMPLICIT,
+        rating_label: str = None,
+        timestamp_label: str = None,
         precision: Any = np.float32,
     ) -> Interactions:
         """Functionality to create Interaction data from DataFrame.
@@ -341,6 +355,8 @@ class TransactionDataset(Dataset):
             header_msg (str): The header of the logger output.
             batch_size (int): The batch size of the interaction.
             rating_type (RatingType): The type of rating used.
+            rating_label (str): The label of the rating column.
+            timestamp_label (str): The label of the timestamp column.
             precision (Any): The precision that will be used to store interactions.
 
         Returns:
@@ -356,6 +372,8 @@ class TransactionDataset(Dataset):
             item_cluster=item_cluster,
             batch_size=batch_size,
             rating_type=rating_type,
+            rating_label=rating_label,
+            timestamp_label=timestamp_label,
             precision=precision,
         )
         nuid, niid = inter_set.get_dims()
