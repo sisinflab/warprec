@@ -35,6 +35,7 @@ class Dataset(ABC):
         self._nuid: int = 0
         self._niid: int = 0
         self._nfeat: int = 0
+        self._max_seq_len: int = 0
         self._umap: dict[Any, int] = {}
         self._imap: dict[Any, int] = {}
         self._uc: Tensor = None
@@ -98,6 +99,7 @@ class Dataset(ABC):
             "items": self._niid,
             "users": self._nuid,
             "features": self._nfeat,
+            "max_seq_len": self._max_seq_len,
         }
 
     def update_mappings(self, user_mapping: dict, item_mapping: dict):
@@ -239,6 +241,11 @@ class TransactionDataset(Dataset):
                 self._ic[i] = item_cluster_remap[c]
         else:
             self._ic = torch.ones(self._niid, dtype=torch.long)
+
+        # Compute sequence length used for sequential data
+        user_interaction_counts = train_data.groupby(user_label).size()
+        capped_max_len = int(user_interaction_counts.quantile(0.95))
+        self._max_seq_len = capped_max_len
 
         # Create the main data structures
         self.train_set = self._create_inner_set(
