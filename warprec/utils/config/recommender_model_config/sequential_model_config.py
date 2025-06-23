@@ -1,3 +1,5 @@
+from typing import ClassVar
+
 from pydantic import field_validator
 from warprec.utils.config.model_configuration import (
     RecomModel,
@@ -24,6 +26,7 @@ class GRU4Rec(RecomModel):
         epochs (INT_FIELD): List of values for epochs.
         learning_rate (FLOAT_FIELD): List of values for learning rate.
         neg_samples (INT_FIELD): List of values for neg_samples.
+        need_timestamp (ClassVar[bool]): Wether or not the model needs the timestamp.
     """
 
     embedding_size: INT_FIELD
@@ -34,6 +37,7 @@ class GRU4Rec(RecomModel):
     epochs: INT_FIELD
     learning_rate: FLOAT_FIELD
     neg_samples: INT_FIELD
+    need_timestamp: ClassVar[bool] = True
 
     @field_validator("embedding_size")
     @classmethod
