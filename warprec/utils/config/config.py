@@ -151,12 +151,15 @@ class Configuration(BaseModel):
 
         # Final checks and parsing
         self.check_precision()
-        self.models = self.parse_models()
+        self.models = self.parse_models(_header)
 
         return self
 
-    def parse_models(self) -> dict:
+    def parse_models(self, header: list) -> dict:
         """This method parses the models and creates the correct data structures.
+
+        Args:
+            header (list): The header of the file, used to check timestamp.
 
         Returns:
             dict: The dictionary containing all the models and their parameters.
@@ -177,6 +180,16 @@ class Configuration(BaseModel):
 
             # Check if there is at least one valid combination
             model_class.validate_all_combinations()
+
+            # Check if the model requires timestamp
+            if (
+                model_class.need_timestamp
+                and self.reader.labels.timestamp_label not in header
+            ):
+                raise ValueError(
+                    f"The model {model_name} requires timestamps to work properly, "
+                    "but none have been provided. Check the configuration file."
+                )
 
             # Extract model train parameters, removing the meta infos
             model_data = {
