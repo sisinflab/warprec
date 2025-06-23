@@ -71,15 +71,12 @@ class GRU4Rec(Recommender):
                 "Items value must be provided to correctly initialize the model."
             )
 
-        # Embedding layer for items
         self.item_embedding = nn.Embedding(
             self.n_items + 1,
             self.embedding_size,
             padding_idx=0,  # Taking into account the extra "item" for padding
         )
         self.emb_dropout = nn.Dropout(self.dropout_prob)
-
-        # GRU layers
         self.gru_layers = nn.GRU(
             input_size=self.embedding_size,
             hidden_size=self.hidden_size,
@@ -89,8 +86,15 @@ class GRU4Rec(Recommender):
         )
 
         # Dense layer to project GRU output back to embedding_size
-        # This is for prediction
+        # Used for prediction
         self.dense = nn.Linear(self.hidden_size, self.embedding_size)
+
+        # Initialize weights
+        self.apply(self._init_weights)
+
+        self.optimizer = torch.optim.Adam(
+            self.parameters(), lr=self.learning_rate, weight_decay=self.weight_decay
+        )
 
         # Loss function will be based on number of
         # negative samples
@@ -100,15 +104,6 @@ class GRU4Rec(Recommender):
         else:
             self.loss = nn.CrossEntropyLoss()
 
-        # Initialize weights
-        self.apply(self._init_weights)
-
-        # Optimizer
-        self.optimizer = torch.optim.Adam(
-            self.parameters(), lr=self.learning_rate, weight_decay=self.weight_decay
-        )
-
-        # Move to device
         self.to(self._device)
 
     def _init_weights(self, module: Module):
@@ -163,17 +158,14 @@ class GRU4Rec(Recommender):
             Tensor: The embedding of the predicted item (last session state)
                     [batch_size, embedding_size].
         """
-        # Pass through embedding layer
         item_seq_emb = self.item_embedding(
             item_seq
         )  # [batch_size, max_seq_len, embedding_size]
-        item_seq_emb_dropout = self.emb_dropout(item_seq_emb)  # Apply dropout
+        item_seq_emb_dropout = self.emb_dropout(item_seq_emb)
 
         # GRU layers
         # NOTE: Only the output sequence is used in the forward pass
         gru_output, _ = self.gru_layers(item_seq_emb_dropout)
-
-        # Pass through the dense layer to obtain predictions
         gru_output = self.dense(gru_output)  # [batch_size, max_seq_len, embedding_size]
 
         # Use the utility method to gather the last index of
@@ -285,7 +277,6 @@ class GRU4Rec(Recommender):
         Returns:
             Tensor: The score matrix {user x item}.
         """
-        # Move input sequences to device
         user_seq = user_seq.to(self._device)
         seq_len = seq_len.to(self._device)
 
