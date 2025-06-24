@@ -35,6 +35,7 @@ class GeneralConfig(BaseModel):
         precision (Optional[str]): The precision to use during computation.
         batch_size (Optional[int]): The batch_size used during the experiment.
         ray_verbose (Optional[int]): The Ray level of verbosity.
+        sequence_quantile (Optional[float]): The quantile percentage to use to truncate sequence data.
         recommendation (Optional[GeneralRecommendation]): The general information
             about the recommendation.
     """
@@ -42,6 +43,17 @@ class GeneralConfig(BaseModel):
     precision: Optional[str] = "float32"
     batch_size: Optional[int] = 1024
     ray_verbose: Optional[int] = 1
+    sequence_quantile: Optional[float] = 0.95
     recommendation: Optional[GeneralRecommendation] = Field(
         default_factory=GeneralRecommendation
     )
+
+    @field_validator("sequence_quantile")
+    @classmethod
+    def check_sequence_quantile(cls, v: float):
+        """Validates the sequence_quantile."""
+        if v <= 0 or v > 1:
+            raise ValueError(
+                f"The quantile percentage must be 0 < x <= 1. Value received: {v}"
+            )
+        return v

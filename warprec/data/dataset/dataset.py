@@ -145,6 +145,7 @@ class TransactionDataset(Dataset):
         rating_label (str): The label of the rating column.
         timestamp_label (str): The label of the timestamp column.
         cluster_label (str): The label of the cluster column.
+        sequence_quantile (float): The quantile percentage to use to truncate sequence data.
         precision (Any): The precision of the internal representation of the data.
     """
 
@@ -161,6 +162,7 @@ class TransactionDataset(Dataset):
         rating_label: str = None,
         timestamp_label: str = None,
         cluster_label: str = None,
+        sequence_quantile: float = 0.95,
         precision: Any = np.float32,
     ):
         super().__init__()
@@ -244,7 +246,7 @@ class TransactionDataset(Dataset):
 
         # Compute sequence length used for sequential data
         user_interaction_counts = train_data.groupby(user_label).size()
-        capped_max_len = int(user_interaction_counts.quantile(0.95))
+        capped_max_len = int(user_interaction_counts.quantile(sequence_quantile))
         self._max_seq_len = capped_max_len
 
         # Create the main data structures
