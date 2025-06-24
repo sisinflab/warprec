@@ -133,7 +133,8 @@ class Evaluator:
             user_seq, seq_len = None, None
             if model.model_type == RecommenderModelType.SEQUENTIAL:
                 user_seq, seq_len = train_set.get_user_history_sequences(
-                    current_users_idx_list
+                    current_users_idx_list,
+                    dataset.info()["max_seq_len"],  # Sequence length truncated
                 )
 
             eval_set = test_batch if test_set else val_batch
