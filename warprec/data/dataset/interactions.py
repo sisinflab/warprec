@@ -427,13 +427,13 @@ class Interactions:
             return self._history_matrix, self._history_lens, self._history_mask
         return self._to_history()
 
-    # Your original method, now calling the optimized helper function
     def get_sequential_dataloader(
-        self, num_negatives: int = 0, shuffle: bool = True
+        self, max_seq_len: int, num_negatives: int = 0, shuffle: bool = True
     ) -> DataLoader:
         """Create a dataloader for sequential data.
 
         Args:
+            max_seq_len (int): Maximum length of sequences produced.
             num_negatives (int): Number of negative samples per user.
             shuffle (bool): Whether to shuffle the data.
 
@@ -452,6 +452,7 @@ class Interactions:
         padded_item_seq, tensor_item_seq_len, tensor_pos_item_id, tensor_neg_item_id = (
             self._create_sequences_and_targets(
                 num_negatives=num_negatives,
+                max_seq_len=max_seq_len,
             )
         )
 
@@ -478,12 +479,15 @@ class Interactions:
         dataset = SequentialInteractions(*tensors_for_dataset)
         return DataLoader(dataset, batch_size=self.batch_size, shuffle=shuffle)
 
-    def get_user_history_sequences(self, user_ids: List[int]) -> Tuple[Tensor, Tensor]:
+    def get_user_history_sequences(
+        self, user_ids: List[int], max_seq_len: int
+    ) -> Tuple[Tensor, Tensor]:
         """Retrieves padded historical sequences and their lengths for a given list of user IDs.
         Sequences are 1-indexed.
 
         Args:
             user_ids (List[int]): A list of global user indices.
+            max_seq_len (int): Maximum length of sequences produced.
 
         Returns:
             Tuple[Tensor, Tensor]: A tuple containing:
@@ -500,10 +504,12 @@ class Interactions:
             history = self._cached_user_histories.get(
                 uid, []
             )  # Get history, empty if no interactions
+            recent_history = history[-max_seq_len:]  # Take only the most recent
+
             # For prediction, we use the entire history available in the training set
             # The length check can be 0 here as padding handles empty sequences.
-            sequences_to_process.append(torch.tensor(history, dtype=torch.long))
-            lengths_to_process.append(len(history))
+            sequences_to_process.append(torch.tensor(recent_history, dtype=torch.long))
+            lengths_to_process.append(len(recent_history))
 
         # Handle cases where some users in the batch might not have history (empty lists)
         # Pad sequences (0-indexed padding value)
@@ -646,6 +652,7 @@ class Interactions:
     def _create_sequences_and_targets(
         self,
         num_negatives: int,
+        max_seq_len: int,
     ) -> Tuple[Tensor, Tensor, Tensor, Optional[Tensor]]:
         """Core logic for transforming interaction data into sequential training samples.
 
@@ -653,6 +660,7 @@ class Interactions:
 
         Args:
             num_negatives (int): Number of negative samples per user.
+            max_seq_len (int): Maximum length of sequences produced.
 
         Returns:
             Tuple[Tensor, Tensor, Tensor, Optional[Tensor]]: A tuple containing:
@@ -706,6 +714,30 @@ class Interactions:
                 "targets": user_sessions.apply(lambda s: s[1:]),
             }
         )
+
+        def truncate_user_sequences(sequences_for_user, targets_for_user, max_len):
+            """Helper function to truncate sequences to max_len."""
+            truncated_sequences = []
+            truncated_targets = []
+            for seq, target in zip(sequences_for_user, targets_for_user):
+                # Truncate sequences taking only the last max_len elements
+                current_truncated_seq = seq[-max_len:] if max_len > 0 else []
+                if current_truncated_seq:
+                    truncated_sequences.append(current_truncated_seq)
+                    truncated_targets.append(target)
+            return truncated_sequences, truncated_targets
+
+        # Truncate each row
+        session_df[["sequences", "targets"]] = session_df.apply(
+            lambda row: truncate_user_sequences(
+                row["sequences"], row["targets"], max_seq_len
+            ),
+            axis=1,
+            result_type="expand",
+        )
+
+        # Remove empty rows
+        session_df = session_df[session_df["sequences"].apply(lambda x: len(x) > 0)]
 
         # Explode the lists into separate rows
         training_data = session_df.explode(["sequences", "targets"]).reset_index()

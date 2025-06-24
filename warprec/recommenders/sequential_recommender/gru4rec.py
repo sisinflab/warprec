@@ -66,9 +66,10 @@ class GRU4Rec(Recommender):
 
         # Get information from dataset info
         self.n_items = info.get("items", None)
-        if not self.n_items:
+        self.max_seq_len = info.get("max_seq_len", None)
+        if not self.n_items or not self.max_seq_len:
             raise ValueError(
-                "Items value must be provided to correctly initialize the model."
+                "Both 'items' and 'max_seq_len' must be provided to correctly initialize the model."
             )
 
         self.item_embedding = nn.Embedding(
@@ -194,6 +195,7 @@ class GRU4Rec(Recommender):
             **kwargs (Any): The dictionary of keyword arguments.
         """
         dataloader = interactions.get_sequential_dataloader(
+            max_seq_len=self.max_seq_len,
             num_negatives=self.neg_samples,
         )
 
