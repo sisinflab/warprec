@@ -17,3 +17,21 @@ models:
         neg_samples: 2
 ...
 ```
+
+- [SASRec (Self-Attentive Sequential Recommendation)](sasrec.py): A sequential recommendation model based on self-attention mechanisms, inspired by the Transformer architecture. It uses stacked self-attention blocks to capture dependencies between previously interacted items, effectively modeling users' dynamic preferences. SASRec is capable of learning both short- and long-term patterns without relying on RNNs or CNNs, making it well-suited for sparse recommendation scenarios.
+
+```yaml
+models:
+    SASRec:
+        embedding_size: 128
+        n_layers: 2
+        n_heads: 4
+        inner_size: 512
+        dropout_prob: 0.3
+        attn_dropout_prob: 0.3
+        learning_rate: 0.001
+        weight_decay: 0.0
+        epochs: 1
+        neg_samples: 1
+...
+```
