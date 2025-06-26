@@ -23,6 +23,7 @@ class SequentialInteractions(Dataset):
         sequence_lengths (Tensor): The length of the sequence (before padding).
         positive_items (Tensor): The positive items.
         negative_items (Optional[Tensor]): The negative items.
+        users (Optional[Tensor]): The user IDs associated with the sequences.
     """
 
     def __init__(
@@ -31,16 +32,33 @@ class SequentialInteractions(Dataset):
         sequence_lengths: Tensor,
         positive_items: Tensor,
         negative_items: Optional[Tensor] = None,
+        users: Optional[Tensor] = None,
     ):
         self.sequences = sequences
         self.sequence_lengths = sequence_lengths
         self.positive_items = positive_items
         self.negative_items = negative_items
+        self.users = users
 
     def __len__(self):
         return len(self.sequences)
 
     def __getitem__(self, idx):
+        if self.users is not None:
+            if self.negative_items is not None:
+                return (
+                    self.users[idx],
+                    self.sequences[idx],
+                    self.sequence_lengths[idx],
+                    self.positive_items[idx],
+                    self.negative_items[idx],
+                )
+            return (
+                self.users[idx],
+                self.sequences[idx],
+                self.sequence_lengths[idx],
+                self.positive_items[idx],
+            )
         if self.negative_items is not None:
             return (
                 self.sequences[idx],
@@ -428,13 +446,18 @@ class Interactions:
         return self._to_history()
 
     def get_sequential_dataloader(
-        self, max_seq_len: int, num_negatives: int = 0, shuffle: bool = True
+        self,
+        max_seq_len: int,
+        num_negatives: int = 0,
+        user_id: bool = False,
+        shuffle: bool = True,
     ) -> DataLoader:
         """Create a dataloader for sequential data.
 
         Args:
             max_seq_len (int): Maximum length of sequences produced.
             num_negatives (int): Number of negative samples per user.
+            user_id (bool): Wether or not to return also the user_id.
             shuffle (bool): Whether to shuffle the data.
 
         Returns:
@@ -442,18 +465,23 @@ class Interactions:
                 Yields (item_seq, item_seq_len, pos_item_id, neg_item_id) if num_negatives > 0.
         """
         # Check if sequential that has been cached
-        cache_key = num_negatives
+        cache_key = (num_negatives, user_id)
         if cache_key in self._cached_sequential_data:
-            tensors = self._cached_sequential_data[cache_key]
-            dataset = SequentialInteractions(*[t for t in tensors if t is not None])
+            cached_tensors = self._cached_sequential_data[cache_key]
+            dataset = SequentialInteractions(**cached_tensors)
             return DataLoader(dataset, batch_size=self.batch_size, shuffle=shuffle)
 
         # Call the optimized processing function
-        padded_item_seq, tensor_item_seq_len, tensor_pos_item_id, tensor_neg_item_id = (
-            self._create_sequences_and_targets(
-                num_negatives=num_negatives,
-                max_seq_len=max_seq_len,
-            )
+        (
+            tensor_user_id,
+            padded_item_seq,
+            tensor_item_seq_len,
+            tensor_pos_item_id,
+            tensor_neg_item_id,
+        ) = self._create_sequences_and_targets(
+            num_negatives=num_negatives,
+            max_seq_len=max_seq_len,
+            user_id=user_id,
         )
 
         # Check for empty results
@@ -463,20 +491,21 @@ class Interactions:
                 "Check your data or session definition (min length 2)."
             )
 
-        # Cache the results
-        self._cached_sequential_data[cache_key] = (
-            padded_item_seq,
-            tensor_item_seq_len,
-            tensor_pos_item_id,
-            tensor_neg_item_id,
-        )
+        # Cache the results inside a dictionary
+        dataset_args = {
+            "sequences": padded_item_seq,
+            "sequence_lengths": tensor_item_seq_len,
+            "positive_items": tensor_pos_item_id,
+        }
+        if tensor_user_id is not None:
+            dataset_args["users"] = tensor_user_id
 
-        # Create final dataset and dataloader
-        tensors_for_dataset = [padded_item_seq, tensor_item_seq_len, tensor_pos_item_id]
-        if num_negatives > 0 and tensor_neg_item_id is not None:
-            tensors_for_dataset.append(tensor_neg_item_id)
+        if tensor_neg_item_id is not None:
+            dataset_args["negative_items"] = tensor_neg_item_id
+        self._cached_sequential_data[cache_key] = dataset_args
 
-        dataset = SequentialInteractions(*tensors_for_dataset)
+        # Create instance of the dataset
+        dataset = SequentialInteractions(**dataset_args)
         return DataLoader(dataset, batch_size=self.batch_size, shuffle=shuffle)
 
     def get_user_history_sequences(
@@ -653,7 +682,8 @@ class Interactions:
         self,
         num_negatives: int,
         max_seq_len: int,
-    ) -> Tuple[Tensor, Tensor, Tensor, Optional[Tensor]]:
+        user_id: bool = False,
+    ) -> Tuple[Optional[Tensor], Tensor, Tensor, Tensor, Optional[Tensor]]:
         """Core logic for transforming interaction data into sequential training samples.
 
         This function uses pandas and numpy for efficient processing.
@@ -661,9 +691,11 @@ class Interactions:
         Args:
             num_negatives (int): Number of negative samples per user.
             max_seq_len (int): Maximum length of sequences produced.
+            user_id (bool): Wether or not to return also the user_id.
 
         Returns:
-            Tuple[Tensor, Tensor, Tensor, Optional[Tensor]]: A tuple containing:
+            Tuple[Optional[Tensor], Tensor, Tensor, Tensor, Optional[Tensor]]: A tuple containing:
+                - Optional[Tensor]: User ID.
                 - Tensor: Padded item sequence.
                 - Tensor: Item sequence length.
                 - Tensor: Positive item tensor.
@@ -695,6 +727,7 @@ class Interactions:
         # Edge case: No user has at least 2 interactions in sequence
         if user_sessions.empty:
             return (
+                None if not user_id else torch.empty(0, dtype=torch.long),
                 torch.empty((0, 0), dtype=torch.long),
                 torch.empty(0, dtype=torch.long),
                 torch.empty(0, dtype=torch.long),
@@ -741,6 +774,14 @@ class Interactions:
 
         # Explode the lists into separate rows
         training_data = session_df.explode(["sequences", "targets"]).reset_index()
+
+        # Optionally associate every sequence to a user_id
+        tensor_user_id = None
+        if user_id:
+            # The user_id is inside the correct column thanks to the reset_index
+            tensor_user_id = torch.tensor(
+                training_data[self._user_label].values, dtype=torch.long
+            )
 
         # Handle Negative Sampling if requested
         neg_tensor = None
@@ -815,7 +856,13 @@ class Interactions:
             training_data["targets"].values.astype(np.int64) + 1, dtype=torch.long
         )
 
-        return padded_item_seq, tensor_item_seq_len, tensor_pos_item_id, neg_tensor
+        return (
+            tensor_user_id,
+            padded_item_seq,
+            tensor_item_seq_len,
+            tensor_pos_item_id,
+            neg_tensor,
+        )
 
     def __iter__(self) -> "Interactions":
         """This method will return the iterator of the interactions.
