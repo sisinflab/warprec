@@ -356,6 +356,22 @@ class GraphRecommenderUtils(ABC):
         return ego_embeddings
 
 
+class SequentialRecommenderUtils(ABC):
+    def _gather_indexes(self, output: Tensor, gather_index: Tensor) -> Tensor:
+        """Gathers the output from specific indexes for each batch.
+
+        Args:
+            output (Tensor): The tensor to gather the indices from.
+            gather_index (Tensor): The indices to gather.
+
+        Returns:
+            Tensor: The gathered values flattened.
+        """
+        gather_index = gather_index.view(-1, 1, 1).expand(-1, 1, output.shape[-1])
+        output_flatten = output.gather(dim=1, index=gather_index)
+        return output_flatten.squeeze(1)
+
+
 def generate_model_name(model_name: str, params: dict) -> str:
     """
     Generate a model name string based on the model name and its parameters.

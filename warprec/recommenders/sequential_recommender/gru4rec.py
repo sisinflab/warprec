@@ -7,7 +7,10 @@ from torch.nn import Module
 from torch.nn.init import xavier_uniform_, xavier_normal_
 from scipy.sparse import csr_matrix
 
-from warprec.recommenders.base_recommender import Recommender
+from warprec.recommenders.base_recommender import (
+    Recommender,
+    SequentialRecommenderUtils,
+)
 from warprec.recommenders.losses import BPRLoss
 from warprec.data.dataset import Interactions
 from warprec.utils.enums import RecommenderModelType
@@ -15,7 +18,7 @@ from warprec.utils.registry import model_registry
 
 
 @model_registry.register(name="GRU4Rec")
-class GRU4Rec(Recommender):
+class GRU4Rec(Recommender, SequentialRecommenderUtils):
     """Implementation of GRU4Rec algorithm from
     "Improved Recurrent Neural Networks for Session-based Recommendations." in DLRS 2016.
 
@@ -129,24 +132,6 @@ class GRU4Rec(Recommender):
             xavier_uniform_(module.weight.data)
             if module.bias is not None:
                 module.bias.data.zero_()
-
-    @staticmethod
-    def _gather_indexes(output: Tensor, gather_index: Tensor) -> Tensor:
-        """Gathers the output from specific indexes for each batch.
-
-        Args:
-            output (Tensor): The output tensor from GRU (batch_size, seq_len, hidden_size).
-            gather_index (Tensor): The index to gather for each sequence (batch_size,).
-
-        Returns:
-            Tensor: The gathered output (batch_size, hidden_size).
-        """
-        # Reshape gather_index to be (batch_size, 1, 1) and expand to (batch_size, 1, hidden_size)
-        # to correctly select across the hidden_size dimension.
-        gather_index = gather_index.view(-1, 1, 1).expand(-1, 1, output.shape[-1])
-        # Use gather to select the element at gather_index along dimension 1 (seq_len)
-        output_flatten = output.gather(dim=1, index=gather_index)
-        return output_flatten.squeeze(1)  # Remove the sequence length dimension (1)
 
     def forward(self, item_seq: Tensor, item_seq_len: Tensor) -> Tensor:
         """Forward pass of the GRU4Rec model.

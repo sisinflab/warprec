@@ -7,7 +7,10 @@ from torch.nn import Module
 from torch.nn.init import xavier_normal_
 from scipy.sparse import csr_matrix
 
-from warprec.recommenders.base_recommender import Recommender
+from warprec.recommenders.base_recommender import (
+    Recommender,
+    SequentialRecommenderUtils,
+)
 from warprec.recommenders.losses import BPRLoss
 from warprec.data.dataset import Interactions
 from warprec.utils.enums import RecommenderModelType
@@ -15,7 +18,7 @@ from warprec.utils.registry import model_registry
 
 
 @model_registry.register(name="SASRec")
-class SASRec(Recommender):
+class SASRec(Recommender, SequentialRecommenderUtils):
     """Implementation of SASRec algorithm from
     "Self-Attentive Sequential Recommendation." in ICDM 2018.
 
@@ -138,13 +141,6 @@ class SASRec(Recommender):
         """Generates a causal mask for the transformer."""
         mask = torch.triu(torch.ones(seq_len, seq_len, device=self._device), diagonal=1)
         return mask.bool()  # True values will be masked
-
-    @staticmethod
-    def _gather_indexes(output: Tensor, gather_index: Tensor) -> Tensor:
-        """Gathers the output from specific indexes for each batch."""
-        gather_index = gather_index.view(-1, 1, 1).expand(-1, 1, output.shape[-1])
-        output_flatten = output.gather(dim=1, index=gather_index)
-        return output_flatten.squeeze(1)
 
     def forward(self, item_seq: Tensor, item_seq_len: Tensor) -> Tensor:
         """Forward pass of the SASRec model.
