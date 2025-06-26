@@ -14,6 +14,81 @@ from warprec.utils.config.common import (
 from warprec.utils.registry import params_registry
 
 
+@params_registry.register("Caser")
+class Caser(RecomModel):
+    """Definition of the model Caser.
+
+    Attributes:
+        embedding_size (INT_FIELD): List of values for embedding_size.
+        n_h (INT_FIELD):  List of values for n_h.
+        n_v (INT_FIELD): List of values for n_h.
+        dropout_prob (FLOAT_FIELD): List of values for dropout_prob.
+        weight_decay (FLOAT_FIELD): List of values for weight_decay.
+        epochs (INT_FIELD): List of values for epochs.
+        learning_rate (FLOAT_FIELD): List of values for learning rate.
+        neg_samples (INT_FIELD): List of values for neg_samples.
+        need_timestamp (ClassVar[bool]): Wether or not the model needs the timestamp.
+    """
+
+    embedding_size: INT_FIELD
+    n_h: INT_FIELD
+    n_v: INT_FIELD
+    dropout_prob: FLOAT_FIELD
+    weight_decay: FLOAT_FIELD
+    epochs: INT_FIELD
+    learning_rate: FLOAT_FIELD
+    neg_samples: INT_FIELD
+    need_timestamp: ClassVar[bool] = True
+
+    @field_validator("embedding_size")
+    @classmethod
+    def check_embedding_size(cls, v: list):
+        """Validate embedding_size."""
+        return validate_greater_than_zero(cls, v, "embedding_size")
+
+    @field_validator("n_h")
+    @classmethod
+    def check_n_h(cls, v: list):
+        """Validate n_h."""
+        return validate_greater_than_zero(cls, v, "n_h")
+
+    @field_validator("n_v")
+    @classmethod
+    def check_n_v(cls, v: list):
+        """Validate n_v."""
+        return validate_greater_than_zero(cls, v, "n_v")
+
+    @field_validator("dropout_prob")
+    @classmethod
+    def check_dropout_prob(cls, v: list):
+        """Validate dropout_prob."""
+        return validate_greater_equal_than_zero(cls, v, "dropout_prob")
+
+    @field_validator("weight_decay")
+    @classmethod
+    def check_weight_decay(cls, v: list):
+        """Validate weight_decay."""
+        return validate_greater_equal_than_zero(cls, v, "weight_decay")
+
+    @field_validator("epochs")
+    @classmethod
+    def check_epochs(cls, v: list):
+        """Validate epochs."""
+        return validate_greater_than_zero(cls, v, "epochs")
+
+    @field_validator("learning_rate")
+    @classmethod
+    def check_learning_rate(cls, v: list):
+        """Validate learning_rate."""
+        return validate_greater_than_zero(cls, v, "learning_rate")
+
+    @field_validator("neg_samples")
+    @classmethod
+    def check_neg_samples(cls, v: list):
+        """Validate neg_samples."""
+        return validate_greater_equal_than_zero(cls, v, "neg_samples")
+
+
 @params_registry.register("GRU4Rec")
 class GRU4Rec(RecomModel):
     """Definition of the model GRU4Rec.
