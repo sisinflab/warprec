@@ -44,7 +44,7 @@ class Caser(Recommender):
         epochs (int): The number of training epochs.
         learning_rate (float): The learning rate value.
         neg_samples (int): The number of negative samples.
-        max_seq_len(int): The maximum length of sequences.
+        max_seq_len (int): The maximum length of sequences.
     """
 
     # Model hyperparameters
