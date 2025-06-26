@@ -197,9 +197,7 @@ class Caser(Recommender):
         x = torch.cat([z, user_emb], 1)
 
         # Second FC layer
-        seq_output = self.fc2(x)  # In original paper, there is no activation here.
-        # But RecBole implementation adds one.
-        # Let's add it for consistency.
+        seq_output = self.fc2(x)
         seq_output = self.ac_fc(seq_output)
 
         return seq_output
