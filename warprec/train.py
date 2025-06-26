@@ -63,7 +63,6 @@ def main(args: Namespace):
                     rating_label=config.reader.labels.rating_label,
                     timestamp_label=config.reader.labels.timestamp_label,
                     cluster_label=config.reader.labels.cluster_label,
-                    sequence_quantile=config.general.sequence_quantile,
                     precision=config.general.precision,
                 )
             else:
@@ -95,7 +94,6 @@ def main(args: Namespace):
                 rating_label=config.reader.labels.rating_label,
                 timestamp_label=config.reader.labels.timestamp_label,
                 cluster_label=config.reader.labels.cluster_label,
-                sequence_quantile=config.general.sequence_quantile,
                 precision=config.general.precision,
             )
         else:

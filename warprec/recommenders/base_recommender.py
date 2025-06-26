@@ -11,7 +11,6 @@ from pandas import DataFrame
 from scipy.sparse import csr_matrix, coo_matrix
 from torch_sparse import SparseTensor
 from warprec.data.dataset import Interactions
-from warprec.utils.enums import RecommenderModelType
 
 
 class Recommender(nn.Module, ABC):
@@ -38,7 +37,6 @@ class Recommender(nn.Module, ABC):
         super().__init__()
         self.init_params(params)
         self.set_seed(seed)
-        self.model_type = RecommenderModelType.GENERAL
         self._device = torch.device(device)
         self._name = ""
 
@@ -241,6 +239,11 @@ class Recommender(nn.Module, ABC):
 
 
 class GraphRecommenderUtils(ABC):
+    """Common definition for graph recommenders.
+
+    Collection of common method used by all graph recommenders.
+    """
+
     def _get_adj_mat(
         self,
         interaction_matrix: coo_matrix,
@@ -357,6 +360,19 @@ class GraphRecommenderUtils(ABC):
 
 
 class SequentialRecommenderUtils(ABC):
+    """Common definition for sequential recommenders.
+
+    Collection of common method used by all sequential recommenders.
+
+    Attributes:
+        max_seq_len (int): This value will be used to truncate user sequences.
+            More recent transaction will have priority over older ones in case
+            a sequence needs to be truncated. If a sequence is smaller than the
+            max_seq_len, it will be padded.
+    """
+
+    max_seq_len: int = 0
+
     def _gather_indexes(self, output: Tensor, gather_index: Tensor) -> Tensor:
         """Gathers the output from specific indexes for each batch.
 

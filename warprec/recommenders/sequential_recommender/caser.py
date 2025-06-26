@@ -11,7 +11,6 @@ import torch.nn.functional as F
 from warprec.recommenders.base_recommender import Recommender
 from warprec.recommenders.losses import BPRLoss
 from warprec.data.dataset import Interactions
-from warprec.utils.enums import RecommenderModelType
 from warprec.utils.registry import model_registry
 
 
@@ -45,6 +44,7 @@ class Caser(Recommender):
         epochs (int): The number of training epochs.
         learning_rate (float): The learning rate value.
         neg_samples (int): The number of negative samples.
+        max_seq_len(int): The maximum length of sequences.
     """
 
     # Model hyperparameters
@@ -56,6 +56,7 @@ class Caser(Recommender):
     epochs: int
     learning_rate: float
     neg_samples: int
+    max_seq_len: int
 
     def __init__(
         self,
@@ -68,15 +69,13 @@ class Caser(Recommender):
     ):
         super().__init__(params, device=device, seed=seed, *args, **kwargs)
         self._name = "Caser"
-        self.model_type = RecommenderModelType.SEQUENTIAL
 
         # Get information from dataset info
         self.n_items = info.get("items", None)
         self.n_users = info.get("users", None)
-        self.max_seq_len = info.get("max_seq_len", None)
-        if not self.n_items or not self.n_users or not self.max_seq_len:
+        if not self.n_items or not self.n_users:
             raise ValueError(
-                "All 'items', 'users', and 'max_seq_len' must be provided to correctly initialize the model."
+                "All 'items' and 'users' must be provided to correctly initialize the model."
             )
 
         # Layers

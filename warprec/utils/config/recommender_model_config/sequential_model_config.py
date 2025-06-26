@@ -27,6 +27,7 @@ class Caser(RecomModel):
         epochs (INT_FIELD): List of values for epochs.
         learning_rate (FLOAT_FIELD): List of values for learning rate.
         neg_samples (INT_FIELD): List of values for neg_samples.
+        max_seq_len (INT_FIELD): List of values for max_seq_len.
         need_timestamp (ClassVar[bool]): Wether or not the model needs the timestamp.
     """
 
@@ -38,6 +39,7 @@ class Caser(RecomModel):
     epochs: INT_FIELD
     learning_rate: FLOAT_FIELD
     neg_samples: INT_FIELD
+    max_seq_len: INT_FIELD
     need_timestamp: ClassVar[bool] = True
 
     @field_validator("embedding_size")
@@ -88,6 +90,12 @@ class Caser(RecomModel):
         """Validate neg_samples."""
         return validate_greater_equal_than_zero(cls, v, "neg_samples")
 
+    @field_validator("max_seq_len")
+    @classmethod
+    def check_max_seq_len(cls, v: list):
+        """Validate max_seq_len."""
+        return validate_greater_than_zero(cls, v, "max_seq_len")
+
 
 @params_registry.register("GRU4Rec")
 class GRU4Rec(RecomModel):
@@ -102,6 +110,7 @@ class GRU4Rec(RecomModel):
         epochs (INT_FIELD): List of values for epochs.
         learning_rate (FLOAT_FIELD): List of values for learning rate.
         neg_samples (INT_FIELD): List of values for neg_samples.
+        max_seq_len (INT_FIELD): List of values for max_seq_len.
         need_timestamp (ClassVar[bool]): Wether or not the model needs the timestamp.
     """
 
@@ -113,6 +122,7 @@ class GRU4Rec(RecomModel):
     epochs: INT_FIELD
     learning_rate: FLOAT_FIELD
     neg_samples: INT_FIELD
+    max_seq_len: INT_FIELD
     need_timestamp: ClassVar[bool] = True
 
     @field_validator("embedding_size")
@@ -163,6 +173,12 @@ class GRU4Rec(RecomModel):
         """Validate neg_samples."""
         return validate_greater_equal_than_zero(cls, v, "neg_samples")
 
+    @field_validator("max_seq_len")
+    @classmethod
+    def check_max_seq_len(cls, v: list):
+        """Validate max_seq_len."""
+        return validate_greater_than_zero(cls, v, "max_seq_len")
+
 
 @params_registry.register("SASRec")
 class SASRec(RecomModel):
@@ -179,6 +195,7 @@ class SASRec(RecomModel):
         epochs (INT_FIELD): List of values for epochs.
         learning_rate (FLOAT_FIELD): List of values for learning rate.
         neg_samples (INT_FIELD): List of values for neg_samples.
+        max_seq_len (INT_FIELD): List of values for max_seq_len.
         need_timestamp (ClassVar[bool]): Wether or not the model needs the timestamp.
         need_single_trial_validation (ClassVar[bool]): Whether or not to check if a Ray Tune
             trial parameter are valid.
@@ -194,6 +211,7 @@ class SASRec(RecomModel):
     epochs: INT_FIELD
     learning_rate: FLOAT_FIELD
     neg_samples: INT_FIELD
+    max_seq_len: INT_FIELD
     need_timestamp: ClassVar[bool] = True
     need_single_trial_validation: ClassVar[bool] = True
 
@@ -256,6 +274,12 @@ class SASRec(RecomModel):
     def check_neg_samples(cls, v: list):
         """Validate neg_samples."""
         return validate_greater_equal_than_zero(cls, v, "neg_samples")
+
+    @field_validator("max_seq_len")
+    @classmethod
+    def check_max_seq_len(cls, v: list):
+        """Validate max_seq_len."""
+        return validate_greater_than_zero(cls, v, "max_seq_len")
 
     def validate_all_combinations(self):
         """Validates if at least one valid combination of hyperparameters exists.

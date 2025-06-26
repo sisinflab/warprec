@@ -9,8 +9,11 @@ from tabulate import tabulate
 from math import ceil
 from warprec.data.dataset import Dataset
 from warprec.evaluation.metrics.base_metric import BaseMetric
-from warprec.recommenders.base_recommender import Recommender
-from warprec.utils.enums import MetricBlock, RecommenderModelType
+from warprec.recommenders.base_recommender import (
+    Recommender,
+    SequentialRecommenderUtils,
+)
+from warprec.utils.enums import MetricBlock
 from warprec.utils.logger import logger
 from warprec.utils.registry import metric_registry
 
@@ -131,10 +134,10 @@ class Evaluator:
 
             # If we are evaluating a sequential model, compute user history
             user_seq, seq_len = None, None
-            if model.model_type == RecommenderModelType.SEQUENTIAL:
+            if isinstance(model, SequentialRecommenderUtils):
                 user_seq, seq_len = train_set.get_user_history_sequences(
                     current_users_idx_list,
-                    dataset.info()["max_seq_len"],  # Sequence length truncated
+                    model.max_seq_len,  # Sequence length truncated
                 )
 
             eval_set = test_batch if test_set else val_batch

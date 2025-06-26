@@ -99,7 +99,6 @@ class Dataset(ABC):
             "items": self._niid,
             "users": self._nuid,
             "features": self._nfeat,
-            "max_seq_len": self._max_seq_len,
         }
 
     def update_mappings(self, user_mapping: dict, item_mapping: dict):
@@ -145,7 +144,6 @@ class TransactionDataset(Dataset):
         rating_label (str): The label of the rating column.
         timestamp_label (str): The label of the timestamp column.
         cluster_label (str): The label of the cluster column.
-        sequence_quantile (float): The quantile percentage to use to truncate sequence data.
         precision (Any): The precision of the internal representation of the data.
     """
 
@@ -162,7 +160,6 @@ class TransactionDataset(Dataset):
         rating_label: str = None,
         timestamp_label: str = None,
         cluster_label: str = None,
-        sequence_quantile: float = 0.95,
         precision: Any = np.float32,
     ):
         super().__init__()
@@ -243,11 +240,6 @@ class TransactionDataset(Dataset):
                 self._ic[i] = item_cluster_remap[c]
         else:
             self._ic = torch.ones(self._niid, dtype=torch.long)
-
-        # Compute sequence length used for sequential data
-        user_interaction_counts = train_data.groupby(user_label).size()
-        capped_max_len = int(user_interaction_counts.quantile(sequence_quantile))
-        self._max_seq_len = capped_max_len
 
         # Create the main data structures
         self.train_set = self._create_inner_set(

@@ -12,7 +12,6 @@ from .enums import (
     Schedulers,
     SearchSpace,
     MetricBlock,
-    RecommenderModelType,
 )
 from .registry import (
     splitting_registry,
@@ -40,7 +39,6 @@ __all__ = [
     "Schedulers",
     "SearchSpace",
     "MetricBlock",
-    "RecommenderModelType",
     "splitting_registry",
     "metric_registry",
     "params_registry",

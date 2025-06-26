@@ -15,6 +15,7 @@ models:
         epochs: 3
         learning_rate: 0.001
         neg_samples: 1
+        max_seq_len: 20
 ...
 ```
 
@@ -31,6 +32,7 @@ models:
         epochs: 20
         learning_rate: 0.001
         neg_samples: 2
+        max_seq_len: 200
 ...
 ```
 
@@ -49,5 +51,6 @@ models:
         weight_decay: 0.0
         epochs: 1
         neg_samples: 1
+        max_seq_len: 200
 ...
 ```

@@ -13,7 +13,6 @@ from warprec.recommenders.base_recommender import (
 )
 from warprec.recommenders.losses import BPRLoss
 from warprec.data.dataset import Interactions
-from warprec.utils.enums import RecommenderModelType
 from warprec.utils.registry import model_registry
 
 
@@ -48,6 +47,7 @@ class SASRec(Recommender, SequentialRecommenderUtils):
         epochs (int): The number of training epochs.
         learning_rate (float): The learning rate value.
         neg_samples (int): The number of negative samples.
+        max_seq_len(int): The maximum length of sequences.
     """
 
     # Model hyperparameters
@@ -61,6 +61,7 @@ class SASRec(Recommender, SequentialRecommenderUtils):
     epochs: int
     learning_rate: float
     neg_samples: int
+    max_seq_len: int
 
     def __init__(
         self,
@@ -73,14 +74,12 @@ class SASRec(Recommender, SequentialRecommenderUtils):
     ):
         super().__init__(params, device=device, seed=seed, *args, **kwargs)
         self._name = "SASRec"
-        self.model_type = RecommenderModelType.SEQUENTIAL
 
         # Get information from dataset info
         self.n_items = info.get("items", None)
-        self.max_seq_len = info.get("max_seq_len", None)
         if not self.n_items or not self.max_seq_len:
             raise ValueError(
-                "Both 'items' and 'max_seq_len' must be provided to correctly initialize the model."
+                "Both 'items' must be provided to correctly initialize the model."
             )
 
         self.item_embedding = nn.Embedding(
