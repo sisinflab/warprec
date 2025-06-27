@@ -5,7 +5,7 @@ import torch
 import numpy as np
 from torch import Tensor
 from pandas import DataFrame
-from warprec.data.dataset import Interactions
+from warprec.data.dataset import Interactions, Sessions
 from warprec.utils.enums import RatingType
 from warprec.utils.logger import logger
 
@@ -17,16 +17,22 @@ class Dataset(ABC):
 
     Attributes:
         train_set (Interactions): Training set on that will be used with recommendation models.
+        test_set (Interactions): Test set, not mandatory, used in evaluation to calculate metrics.
         val_set (Interactions): Validation set, not mandatory,
             used during training to validate the process.
-        test_set (Interactions): Test set, not mandatory, used in evaluation to calculate metrics.
+        train_session (Sessions): Training session used by sequential models.
+        test_session (Sessions): Test session, not mandatory used by sequential models.
+        val_session (Sessions): Training session, not mandatory used by sequential models.
         user_cluster (Optional[dict]): User cluster information.
         item_cluster (Optional[dict]): Item cluster information.
     """
 
     train_set: Interactions = None
-    val_set: Interactions = None
     test_set: Interactions = None
+    val_set: Interactions = None
+    train_session: Sessions = None
+    test_session: Sessions = None
+    val_session: Sessions = None
     user_cluster: Optional[dict] = None
     item_cluster: Optional[dict] = None
 
@@ -280,6 +286,31 @@ class TransactionDataset(Dataset):
                 rating_label=rating_label,
                 timestamp_label=timestamp_label,
                 precision=precision,
+            )
+
+        # Sequential recommendation sessions
+        self.train_session = Sessions(
+            train_data,
+            self._umap,
+            self._imap,
+            batch_size=batch_size,
+            timestamp_label=timestamp_label,
+        )
+        if test_data is not None:
+            self.test_session = Sessions(
+                test_data,
+                self._umap,
+                self._imap,
+                batch_size=batch_size,
+                timestamp_label=timestamp_label,
+            )
+        if val_data is not None:
+            self.val_session = Sessions(
+                val_data,
+                self._umap,
+                self._imap,
+                batch_size=batch_size,
+                timestamp_label=timestamp_label,
             )
 
     def _filter_data(

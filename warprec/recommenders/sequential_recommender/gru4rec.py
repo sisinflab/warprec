@@ -12,7 +12,7 @@ from warprec.recommenders.base_recommender import (
     SequentialRecommenderUtils,
 )
 from warprec.recommenders.losses import BPRLoss
-from warprec.data.dataset import Interactions
+from warprec.data.dataset import Interactions, Sessions
 from warprec.utils.registry import model_registry
 
 
@@ -177,8 +177,15 @@ class GRU4Rec(Recommender, SequentialRecommenderUtils):
             *args (Any): List of arguments.
             report_fn (Optional[Callable]): The Ray Tune function to report the iteration.
             **kwargs (Any): The dictionary of keyword arguments.
+
+        Raises:
+            ValueError: If the Sessions object is not provided.
         """
-        dataloader = interactions.get_sequential_dataloader(
+        sessions = kwargs.get("sessions")
+        if not isinstance(sessions, Sessions):
+            raise ValueError("Sessions must be provided correctly to train the model.")
+
+        dataloader = sessions.get_sequential_dataloader(
             max_seq_len=self.max_seq_len,
             num_negatives=self.neg_samples,
         )

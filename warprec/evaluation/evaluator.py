@@ -123,8 +123,9 @@ class Evaluator:
         self.reset_metrics()
         model.eval()
 
-        # Keep a copy of the full training set, if needed
+        # Extract main data structures from dataset
         train_set = dataset.train_set
+        train_session = dataset.train_session
 
         # Iter over batches
         _start = 0
@@ -135,7 +136,7 @@ class Evaluator:
             # If we are evaluating a sequential model, compute user history
             user_seq, seq_len = None, None
             if isinstance(model, SequentialRecommenderUtils):
-                user_seq, seq_len = train_set.get_user_history_sequences(
+                user_seq, seq_len = train_session.get_user_history_sequences(
                     current_users_idx_list,
                     model.max_seq_len,  # Sequence length truncated
                 )
