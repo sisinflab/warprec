@@ -37,6 +37,8 @@ class Configuration(BaseModel):
             and their numpy sparse counterpart.
         sparse_torch_dtype (ClassVar[dict]): The mapping between the string dtype
             and their torch sparse counterpart.
+        need_session_based_information (ClassVar[bool]): Wether or not the experiments
+            will be conducted on session data.
     """
 
     reader: ReaderConfig
@@ -58,6 +60,9 @@ class Configuration(BaseModel):
         "float32": torch.float32,
         "float64": torch.float64,
     }
+
+    # Track if session-based information is needed
+    need_session_based_information: ClassVar[bool] = False
 
     @field_validator("splitter", mode="before")
     @classmethod
@@ -190,6 +195,11 @@ class Configuration(BaseModel):
                     f"The model {model_name} requires timestamps to work properly, "
                     "but none have been provided. Check the configuration file."
                 )
+
+            # If at least one model is a sequential model, then
+            # we set the flag for session-based information
+            if model_class.need_timestamp:
+                Configuration.need_session_based_information = True
 
             # Extract model train parameters, removing the meta infos
             model_data = {
