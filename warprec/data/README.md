@@ -16,6 +16,7 @@ The `data` module of WarpRec offers a wide variety of data structures used by th
     - 📅 [Timestamp slicing](#📅-timestamp-slicing)
 -  📊 [Dataset](#📊-dataset)
     - 🤝 [Interactions](#🤝-interactions)
+    - 🧠 [Sessions](#🧠-sessions)
 
 ## 🔍 Reader
 
@@ -157,3 +158,16 @@ Its main functionalities include:
 - **DataFrame**: Maintains a copy of the raw data in tabular format for easy manipulation.
 - **CSR Sparse Matrix**: The primary representation for interaction data, optimized for efficient sparse matrix operations, common in recommendation models.
 - **CSR Sparse Matrix for Side Information**: If side information is present, it's converted into a sparse matrix for efficient access.
+
+### 🧠 Sessions
+The `Sessions` class is part of the `Dataset` module and is designed to **generate session-aware training data for sequential recommendation models**.
+
+This component processes raw interaction data (user, item, timestamp) to produce user-item sequences and corresponding targets, optionally with negative sampling, enabling models to learn temporal user behavior.
+
+Key responsibilities:
+
+- Convert timestamped interaction logs into user-item sequences.
+- Automatically truncate sequences to a fixed length (`max_seq_len`).
+- Support user-specific batching with optional user IDs.
+- Efficient negative sampling avoiding items in the history or current target.
+- Internal caching mechanism to speed up repeated dataloader creation.
