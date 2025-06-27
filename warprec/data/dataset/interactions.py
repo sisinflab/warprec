@@ -1,5 +1,5 @@
 import typing
-from typing import Tuple, Any, Optional
+from typing import Tuple, Any, Optional, Dict
 
 import torch
 import numpy as np
@@ -41,6 +41,9 @@ class Interactions:
     _history_matrix: Tensor = None
     _history_lens: Tensor = None
     _history_mask: Tensor = None
+
+    # Cached loader for easier access
+    _cached_dataloaders: Dict[Tuple, DataLoader] = {}
 
     def __init__(
         self,
@@ -125,6 +128,10 @@ class Interactions:
         else:
             raise ValueError(f"Rating type {rating_type} not supported.")
 
+    def clear_dataloader_cache(self):
+        """This method will clear the cached DataLoader objects."""
+        self._cached_dataloaders = {}
+
     def get_dict(self) -> dict:
         """This method will return the transaction information in dict format.
 
@@ -186,6 +193,11 @@ class Interactions:
         Returns:
             DataLoader: Yields (user, item, rating) with negative samples.
         """
+        # Check if dataloader has been cached
+        cache_key = (num_negatives, "item_rating")
+        if cache_key in self._cached_dataloaders:
+            return self._cached_dataloaders[cache_key]
+
         # Define main variables
         sparse_matrix = self.get_sparse()
         sparse_matrix_coo = sparse_matrix.tocoo()
@@ -279,7 +291,9 @@ class Interactions:
 
         # Create final dataset
         dataset = TensorDataset(all_users, all_items, all_ratings)
-        return DataLoader(dataset, batch_size=self.batch_size, shuffle=shuffle)
+        dataloader = DataLoader(dataset, batch_size=self.batch_size, shuffle=shuffle)
+        self._cached_dataloaders[cache_key] = dataloader
+        return dataloader
 
     @typing.no_type_check
     def get_pos_neg_dataloader(self, shuffle: bool = True) -> DataLoader:
@@ -291,6 +305,11 @@ class Interactions:
         Returns:
             DataLoader: Yields triplets of (user, positive_item, negative_item).
         """
+        # Check if dataloader has been cached
+        cache_key = "pos_neg"
+        if cache_key in self._cached_dataloaders:
+            return self._cached_dataloaders[cache_key]
+
         # Define main variables
         sparse_matrix = self.get_sparse()
         num_users = self._nuid
@@ -354,7 +373,9 @@ class Interactions:
 
         # Create final dataset
         dataset = TensorDataset(users_tensor, positives_tensor, negatives_tensor)
-        return DataLoader(dataset, batch_size=self.batch_size, shuffle=shuffle)
+        dataloader = DataLoader(dataset, batch_size=self.batch_size, shuffle=shuffle)
+        self._cached_dataloaders[cache_key] = dataloader
+        return dataloader
 
     def get_history(self) -> Tuple[Tensor, Tensor, Tensor]:
         """Return the history representation as three Tensors.
