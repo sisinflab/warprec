@@ -144,6 +144,7 @@ class Evaluator:
             ground = torch.tensor(
                 (eval_set).toarray(), device=device
             )  # Ground tensor [batch_size x items]
+            user_id_tensor = torch.tensor(current_users_idx_list, dtype=torch.long)
 
             predictions = model.predict(
                 train_batch,
@@ -151,6 +152,7 @@ class Evaluator:
                 end=_end,
                 train_set=train_set,
                 user_seq=user_seq,
+                user_id=user_id_tensor,
                 seq_len=seq_len,
             ).to(device)  # Get ratings tensor [batch_size x items]
 

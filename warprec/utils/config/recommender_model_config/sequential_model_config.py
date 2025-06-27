@@ -97,6 +97,142 @@ class Caser(RecomModel):
         return validate_greater_than_zero(cls, v, "max_seq_len")
 
 
+@params_registry.register("FOSSIL")
+class FOSSIL(RecomModel):
+    """Definition of the model FOSSIL.
+
+    Attributes:
+        embedding_size (INT_FIELD): List of values for embedding_size.
+        order_len (INT_FIELD):  List of values for order_len.
+        reg_weight (FLOAT_FIELD): List of values for reg_weight.
+        alpha (FLOAT_FIELD): List of values for alpha.
+        weight_decay (FLOAT_FIELD): List of values for weight_decay.
+        epochs (INT_FIELD): List of values for epochs.
+        learning_rate (FLOAT_FIELD): List of values for learning rate.
+        neg_samples (INT_FIELD): List of values for neg_samples.
+        max_seq_len (INT_FIELD): List of values for max_seq_len.
+        need_timestamp (ClassVar[bool]): Wether or not the model needs the timestamp.
+    """
+
+    embedding_size: INT_FIELD
+    order_len: INT_FIELD
+    reg_weight: FLOAT_FIELD
+    alpha: FLOAT_FIELD
+    weight_decay: FLOAT_FIELD
+    epochs: INT_FIELD
+    learning_rate: FLOAT_FIELD
+    neg_samples: INT_FIELD
+    max_seq_len: INT_FIELD
+    need_timestamp: ClassVar[bool] = True
+
+    @field_validator("embedding_size")
+    @classmethod
+    def check_embedding_size(cls, v: list):
+        """Validate embedding_size."""
+        return validate_greater_than_zero(cls, v, "embedding_size")
+
+    @field_validator("order_len")
+    @classmethod
+    def check_order_len(cls, v: list):
+        """Validate order_len."""
+        return validate_greater_than_zero(cls, v, "order_len")
+
+    @field_validator("reg_weight")
+    @classmethod
+    def check_reg_weight(cls, v: list):
+        """Validate reg_weight."""
+        return validate_greater_equal_than_zero(cls, v, "reg_weight")
+
+    @field_validator("alpha")
+    @classmethod
+    def check_alpha(cls, v: list):
+        """Validate alpha."""
+        return validate_greater_equal_than_zero(cls, v, "alpha")
+
+    @field_validator("weight_decay")
+    @classmethod
+    def check_weight_decay(cls, v: list):
+        """Validate weight_decay."""
+        return validate_greater_equal_than_zero(cls, v, "weight_decay")
+
+    @field_validator("epochs")
+    @classmethod
+    def check_epochs(cls, v: list):
+        """Validate epochs."""
+        return validate_greater_than_zero(cls, v, "epochs")
+
+    @field_validator("learning_rate")
+    @classmethod
+    def check_learning_rate(cls, v: list):
+        """Validate learning_rate."""
+        return validate_greater_than_zero(cls, v, "learning_rate")
+
+    @field_validator("neg_samples")
+    @classmethod
+    def check_neg_samples(cls, v: list):
+        """Validate neg_samples."""
+        return validate_greater_equal_than_zero(cls, v, "neg_samples")
+
+    @field_validator("max_seq_len")
+    @classmethod
+    def check_max_seq_len(cls, v: list):
+        """Validate max_seq_len."""
+        return validate_greater_than_zero(cls, v, "max_seq_len")
+
+    def validate_all_combinations(self):
+        """Validates if at least one valid combination of hyperparameters exists.
+        This method should be called after all individual fields have been validated.
+
+        Raises:
+            ValueError: If no valid combination of hyperparameters can be formed.
+        """
+        # Extract parameters to check, removing searching strategy
+        order_lengths = self._clean_param_list(self.order_len)
+        max_lengths = self._clean_param_list(self.max_seq_len)
+
+        # Check if any combination of parameters is a valid combination
+        has_valid_combination = False
+        for order_len, max_seq_len in product(order_lengths, max_lengths):
+            if order_len <= max_seq_len:
+                has_valid_combination = True
+                break
+
+        if not has_valid_combination:
+            raise ValueError(
+                "No valid hyperparameter combination found for FOSSIL. "
+                "Ensure there's at least one combination of 'order_len' and "
+                "'max_seq_len' that meets the criteria: "
+                "1. Order_len must be <= max_seq_len. "
+            )
+
+    def validate_single_trial_params(self):
+        """Validates the coherence of order_len and max_seq_len
+        for a single trial's parameter set.
+
+        Raises:
+            ValueError: If the parameter values are not consistent for the model.
+        """
+        # Clean parameters from search space information
+        order_len_clean = (
+            self.order_len[1:]
+            if self.order_len and isinstance(self.order_len[0], str)
+            else self.order_len
+        )
+        max_seq_len_clean = (
+            self.max_seq_len[1:]
+            if self.max_seq_len and isinstance(self.max_seq_len[0], str)
+            else self.max_seq_len
+        )
+
+        # Check is parameters are coherent
+        if order_len_clean <= max_seq_len_clean:
+            raise ValueError(
+                f"Inconsistent order_len and max_seq_len configuration: "
+                f"order_len_clean ({order_len_clean}) must be lesser or equal "
+                f"of max_seq_len ({max_seq_len_clean})."
+            )
+
+
 @params_registry.register("GRU4Rec")
 class GRU4Rec(RecomModel):
     """Definition of the model GRU4Rec.
