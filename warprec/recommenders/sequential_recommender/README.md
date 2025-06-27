@@ -19,6 +19,23 @@ models:
 ...
 ```
 
+- [FOSSIL](fossil.py): A recommendation model that combines sequential modeling with item similarity. It leverages a first-order Markov Chain to capture short-term user behavior and integrates a factored item similarity model (inspired by SLIM) to better handle data sparsity and model long-term preferences.
+
+```yaml
+models:
+    FOSSIL:
+        embedding_size: 64
+        order_len: 8
+        reg_weight: 0.001
+        alpha: 0.001
+        weight_decay: 0.0
+        epochs: 100
+        learning_rate: 0.001
+        neg_samples: 1
+        max_seq_len: 100
+...
+```
+
 - [GRU4Rec](gru4rec.py): An early and influential recurrent neural network-based model for session-based recommendation. It utilizes Gated Recurrent Units (GRUs) to capture sequential patterns within user sessions, predicting the next item a user is likely to interact with. GRU4Rec is known for its ability to model short-term user interests effectively.
 
 ```yaml
@@ -29,7 +46,7 @@ models:
         num_layers: 1
         dropout_prob: 0.2
         weight_decay: 0.0001
-        epochs: 20
+        epochs: 100
         learning_rate: 0.001
         neg_samples: 2
         max_seq_len: 200
@@ -49,7 +66,7 @@ models:
         attn_dropout_prob: 0.3
         learning_rate: 0.001
         weight_decay: 0.0
-        epochs: 1
+        epochs: 100
         neg_samples: 1
         max_seq_len: 200
 ...
