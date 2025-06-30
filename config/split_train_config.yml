@@ -1,0 +1,39 @@
+data:
+  dataset_name: MovieLens
+  loading_strategy: split
+  data_type: transaction
+  split_dir: tests/movielens/
+  sep: '\t'
+  experiment_path: experiment/test/
+  rating_type: explicit
+models:
+  EASE:
+    meta:
+      #save_model: True
+      #keep_all_ray_checkpoints: True
+      implementation: elliot
+    optimization:
+      strategy: grid
+      scheduler: fifo
+      properties:
+        mode: max
+        seed: 42
+      validation_metric: nDCG@10
+      cpu_per_trial: 12
+    l2: 91.52633625468275
+evaluation:
+  top_k: [10, 20, 50]
+  metrics: [AUC, HitRate, nDCG, Precision, PopREO, ItemCoverage, Gini, EPC, MAE]
+  beta: 1
+  pop_ratio: 0.8
+general:
+  seed: 42
+  float_digits: 8
+  device: cpu
+  precision: float64
+  max_eval: 10
+  recommendation:
+    save_recs: True
+    sep: \t
+    ext: .tsv
+    k: 50

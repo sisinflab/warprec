@@ -1,0 +1,160 @@
+from typing import ClassVar
+
+from pydantic import field_validator
+from warprec.utils.config.model_configuration import (
+    RecomModel,
+    INT_FIELD,
+    STR_FIELD,
+    BOOL_FIELD,
+)
+from warprec.utils.config.common import (
+    validate_greater_than_zero,
+    validate_similarity,
+    validate_profile,
+    validate_bool_values,
+)
+from warprec.utils.registry import params_registry
+
+
+@params_registry.register("AttributeItemKNN")
+class AttributeItemKNN(RecomModel):
+    """Definition of the model AttributeItemKNN.
+
+    Attributes:
+        k (INT_FIELD): List of values for neighbor.
+        similarity (STR_FIELD): List of names of similarity functions.
+        normalize (BOOL_FIELD): List of values for normalization flag.
+        need_side_information (ClassVar[bool]): Wether or not the model needs side information.
+    """
+
+    k: INT_FIELD
+    similarity: STR_FIELD
+    normalize: BOOL_FIELD
+    need_side_information: ClassVar[bool] = True
+
+    @field_validator("k")
+    @classmethod
+    def check_k(cls, v: list):
+        """Validate k."""
+        return validate_greater_than_zero(cls, v, "k")
+
+    @field_validator("similarity")
+    @classmethod
+    def check_similarity(cls, v: list):
+        """Validate similarity."""
+        return validate_similarity(cls, v, "similarity")
+
+    @field_validator("normalize")
+    @classmethod
+    def check_normalize(cls, v: list):
+        """Validate normalize."""
+        return validate_bool_values(v)
+
+
+@params_registry.register("AttributeUserKNN")
+class AttributeUserKNN(RecomModel):
+    """Definition of the model AttributeUserKNN.
+
+    Attributes:
+        k (INT_FIELD): List of values for neighbor.
+        similarity (STR_FIELD): List of names of similarity functions.
+        user_profile (STR_FIELD): List of user profile computations.
+        normalize (BOOL_FIELD): List of values for normalization flag.
+        need_side_information (ClassVar[bool]): Wether or not the model needs side information.
+    """
+
+    k: INT_FIELD
+    similarity: STR_FIELD
+    user_profile: STR_FIELD
+    normalize: BOOL_FIELD
+    need_side_information: ClassVar[bool] = True
+
+    @field_validator("k")
+    @classmethod
+    def check_k(cls, v: list):
+        """Validate k."""
+        return validate_greater_than_zero(cls, v, "k")
+
+    @field_validator("similarity")
+    @classmethod
+    def check_similarity(cls, v: list):
+        """Validate similarity."""
+        return validate_similarity(cls, v, "similarity")
+
+    @field_validator("user_profile")
+    @classmethod
+    def check_user_profile(cls, v: list):
+        """Validate user_profile."""
+        return validate_profile(cls, v, "user_profile")
+
+    @field_validator("normalize")
+    @classmethod
+    def check_normalize(cls, v: list):
+        """Validate normalize."""
+        return validate_bool_values(v)
+
+
+@params_registry.register("ItemKNN")
+class ItemKNN(RecomModel):
+    """Definition of the model ItemKNN.
+
+    Attributes:
+        k (INT_FIELD): List of values for neighbor.
+        similarity (STR_FIELD): List of names of similarity functions.
+        normalize (BOOL_FIELD): List of values for normalization flag.
+    """
+
+    k: INT_FIELD
+    similarity: STR_FIELD
+    normalize: BOOL_FIELD
+
+    @field_validator("k")
+    @classmethod
+    def check_k(cls, v: list):
+        """Validate k."""
+        return validate_greater_than_zero(cls, v, "k")
+
+    @field_validator("similarity")
+    @classmethod
+    def check_similarity(cls, v: list):
+        """Validate similarity."""
+        return validate_similarity(cls, v, "similarity")
+
+    @field_validator("normalize")
+    @classmethod
+    def check_normalize(cls, v: list):
+        """Validate normalize."""
+        return validate_bool_values(v)
+
+
+@params_registry.register("UserKNN")
+class UserKNN(RecomModel):
+    """Definition of the model UserKNN.
+
+    Attributes:
+        k (INT_FIELD): List of values for neighbor.
+        similarity (STR_FIELD): List of names of similarity functions.
+        normalize (BOOL_FIELD): List of values for normalization flag.
+    """
+
+    k: INT_FIELD
+    similarity: STR_FIELD
+    normalize: BOOL_FIELD
+
+    @field_validator("k")
+    @classmethod
+    def check_k(cls, v: list):
+        """Validate k."""
+        return validate_greater_than_zero(cls, v, "k")
+
+    @field_validator("similarity")
+    @classmethod
+    def check_similarity(cls, v: list):
+        """Validate similarity."""
+        return validate_similarity(cls, v, "similarity")
+
+    @field_validator("normalize")
+    @classmethod
+    def check_normalize(cls, v: list):
+        """Validate normalize."""
+        return validate_bool_values(v)
