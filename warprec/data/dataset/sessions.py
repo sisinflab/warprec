@@ -71,6 +71,28 @@ class SessionDataset(Dataset):
         )
 
 
+class GroupSessionDataset(Dataset):
+    """Personalized dataset for grouped session based data.
+
+    Used by sequential models to capture temporal information from
+    entire user interaction history.
+
+    Args:
+        positive_sequences (Tensor): The sequences of positive interactions.
+        negative_samples (Tensor): The sequences of negative interactions.
+    """
+
+    def __init__(self, positive_sequences: Tensor, negative_samples: Tensor):
+        self.positive_sequences = positive_sequences
+        self.negative_samples = negative_samples
+
+    def __len__(self) -> int:
+        return len(self.positive_sequences)
+
+    def __getitem__(self, idx: int) -> Tuple[Tensor, Tensor]:
+        return self.positive_sequences[idx], self.negative_samples[idx]
+
+
 class Sessions:
     """Sessions class will handle the data of the sessions for
     session-based recommendations.
@@ -434,3 +456,120 @@ class Sessions:
             )  # Convert to list and 1-index items
             .to_dict()
         )
+
+    def get_group_sequential_dataloader(
+        self,
+        max_seq_len: int,
+        num_negatives: int,
+        shuffle: bool = True,
+    ) -> DataLoader:
+        """Creates a sequential DataLoader grouped by user.
+
+        Args:
+            max_seq_len (int): Maximum length of sequences produced.
+            num_negatives (int): Number of negative samples per user.
+            shuffle (bool): Whether to shuffle the data.
+
+        Returns:
+            DataLoader: Yields (pos_item_id, neg_item_id).
+        """
+        pos_seqs, neg_samples = self._create_grouped_sequences(
+            max_seq_len=max_seq_len,
+            num_negatives=num_negatives,
+        )
+
+        if pos_seqs.shape[0] == 0:
+            logger.attention(
+                "No valid sequential samples generated for DataLoader. "
+                "Check your data or session definition (min length 2)."
+            )
+
+        dataset = GroupSessionDataset(pos_seqs, neg_samples)
+        return DataLoader(dataset, batch_size=self.batch_size, shuffle=shuffle)
+
+    def _create_grouped_sequences(
+        self, max_seq_len: int, num_negatives: int
+    ) -> Tuple[Tensor, Tensor]:
+        """Core logic to transform interaction data into
+        grouped sequences.
+
+        Args:
+            max_seq_len (int): Maximum length of sequences produced.
+            num_negatives (int): Number of negative samples per user.
+
+        Returns:
+            Tuple[Tensor, Tensor]:
+                - Tensor: Positive sample.
+                - Tensor: Negative sample.
+        """
+        # Retrieve mapped and ordered DataFrame
+        mapped_df = pd.DataFrame(
+            {
+                self._user_label: self._inter_df[self._user_label].map(self._umap),
+                self._item_label: self._inter_df[self._item_label].map(self._imap),
+                self._timestamp_label: self._inter_df[self._timestamp_label],
+            }
+        ).dropna()
+        mapped_df[[self._user_label, self._item_label]] = mapped_df[
+            [self._user_label, self._item_label]
+        ].astype(int)
+
+        # Group-by user session
+        user_sessions = (
+            mapped_df.sort_values(by=[self._user_label, self._timestamp_label])
+            .groupby(self._user_label)[self._item_label]
+            .apply(list)
+        )
+
+        # Filter out user with less than 2 interactions (only one interaction
+        # can't be considered a sequence). Truncate sequences to max_seq_len
+        processed_sessions = (
+            user_sessions[user_sessions.str.len() >= 2]
+            .apply(lambda s: s[-max_seq_len:])
+            .tolist()
+        )
+
+        if not processed_sessions:
+            return torch.empty(0), torch.empty(0)
+
+        # Compute negative sampling
+        all_negative_samples = []
+        for session in processed_sessions:
+            seq_len = len(session)
+            session_negatives = np.zeros(
+                (seq_len - 1, num_negatives), dtype=np.int64
+            )  # [L-1, num_negatives]
+
+            for i in range(1, seq_len):
+                history = set(
+                    session[: i + 1]
+                )  # Other items in history cannot be a negative_sample
+
+                # Randomly sample until found
+                step_negatives: list = []
+                while len(step_negatives) < num_negatives:
+                    candidates = np.random.randint(
+                        0, self._niid, size=num_negatives * 2
+                    )
+                    valid_candidates = [c for c in candidates if c not in history]
+                    step_negatives.extend(valid_candidates)
+
+                session_negatives[i - 1] = step_negatives[:num_negatives]
+
+            all_negative_samples.append(torch.from_numpy(session_negatives))
+
+        # Shift sequences by 1 (0 is for padding) and add padding
+        pos_sequences_1_indexed = [
+            torch.tensor(s, dtype=torch.long) + 1 for s in processed_sessions
+        ]
+        padded_pos_sequences = torch.nn.utils.rnn.pad_sequence(
+            pos_sequences_1_indexed, batch_first=True, padding_value=0
+        )
+
+        # The same applies to the negatives
+        neg_samples_1_indexed = [neg + 1 for neg in all_negative_samples]
+        padded_neg_samples = torch.nn.utils.rnn.pad_sequence(
+            neg_samples_1_indexed, batch_first=True, padding_value=0
+        )
+
+        return padded_pos_sequences, padded_neg_samples
