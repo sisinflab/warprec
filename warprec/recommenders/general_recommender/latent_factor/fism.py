@@ -72,26 +72,23 @@ class FISM(Recommender):
             raise ValueError(
                 "Items value must be provided to correctly initialize the model."
             )
+        self.block_size = kwargs.get("block_size", 50)
 
         # Embeddings and biases
         self.item_src_embedding = nn.Embedding(
             self.n_items + 1, self.embedding_size, padding_idx=0
-        ).to(self._device)  # +1 for padding
+        )  # +1 for padding
         self.item_dst_embedding = nn.Embedding(
             self.n_items + 1, self.embedding_size, padding_idx=0
-        ).to(self._device)  # +1 for padding
-        self.user_bias = nn.Parameter(torch.zeros(self.n_users, device=self._device))
-        self.item_bias = nn.Parameter(
-            torch.zeros(self.n_items + 1, device=self._device)
         )  # +1 for padding
+        self.user_bias = nn.Parameter(torch.zeros(self.n_users))
+        self.item_bias = nn.Parameter(torch.zeros(self.n_items + 1))  # +1 for padding
+
+        # Parameters initialization
+        self.apply(self._init_weights)
 
         # Define the loss
         self.bceloss = nn.BCEWithLogitsLoss()
-
-        # parameters initialization
-        self.apply(self._init_weights)
-
-        # Optimization
         self.optimizer = torch.optim.Adam(self.parameters(), lr=self.learning_rate)
 
         # These will be set in the fit method
@@ -100,9 +97,9 @@ class FISM(Recommender):
         self.history_mask: Tensor | None = None
 
         # Handle groups
-        self.group = torch.chunk(
-            torch.arange(1, self.n_items + 1).to(self._device), self.split_to
-        )
+        self.group = torch.chunk(torch.arange(1, self.n_items + 1), self.split_to)
+
+        self.to(self._device)
 
     def _init_weights(self, module: Module):
         """Internal method to initialize weights.
@@ -169,7 +166,7 @@ class FISM(Recommender):
             report_fn (Optional[Callable]): The Ray Tune function to report the iteration.
             **kwargs (Any): The dictionary of keyword arguments.
         """
-        self.train()  # Set model to training mode
+        self.train()
 
         # Prepare history information
         self.history_matrix, self.history_lens, self.history_mask = (
@@ -208,11 +205,8 @@ class FISM(Recommender):
 
                 output = self.forward(batch_user, batch_item)
 
-                loss: Tensor = (
-                    self.bceloss(output, batch_label.float()) + self._reg_loss()
-                )
-
-                # Backward pass and optimization
+                # Loss computation and backpropagation
+                loss = self.bceloss(output, batch_label.float()) + self._reg_loss()
                 loss.backward()
                 self.optimizer.step()
 
@@ -229,7 +223,6 @@ class FISM(Recommender):
         # Get user batching parameters from kwargs
         start_user = kwargs.get("start", 0)
         end_user = kwargs.get("end", self.n_users)
-        block_size = 200  # Better memory management
 
         # Retrieve training set to get history data
         if (
@@ -264,8 +257,8 @@ class FISM(Recommender):
 
         # Iter in blocks for efficiency
         block_predictions = []
-        for start_item in range(0, self.n_items, block_size):
-            end_item = min(start_item + block_size, self.n_items)
+        for start_item in range(0, self.n_items, self.block_size):
+            end_item = min(start_item + self.block_size, self.n_items)
 
             # Item indices for this block
             item_indices_block = torch.arange(start_item, end_item, device=self._device)
@@ -303,6 +296,6 @@ class FISM(Recommender):
         Returns:
             Tensor: The sum of the two regularization losses.
         """
-        loss_1 = self.reg_1 * self.item_src_embedding.weight.norm(2)
-        loss_2 = self.reg_2 * self.item_dst_embedding.weight.norm(2)
+        loss_1 = self.reg_1 * self.item_src_embedding.weight.pow(2).sum()
+        loss_2 = self.reg_2 * self.item_dst_embedding.weight.pow(2).sum()
         return loss_1 + loss_2

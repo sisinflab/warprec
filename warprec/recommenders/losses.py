@@ -93,6 +93,11 @@ class EmbeddingLoss(nn.Module):
     def _collect_tensors(self, items: Iterable[Any], tensor_list: list[Tensor]):
         """Helper function to handle different type of input data.
 
+        Given a list of nn.Modules, this function will populate the tensor_list
+        with the correct tensor that will be regularized:
+            - In case of an Embedding, we will regularize it's weights.
+            - In case of a Tensor, we will regularize the tensor itself.
+
         Args:
             items (Iterable[Any]): Any type of iterable object.
             tensor_list (list[Tensor]): The list that will be populated.

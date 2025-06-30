@@ -7,14 +7,12 @@ from torch.nn import Module
 from torch.nn.init import normal_, xavier_normal_
 from torch_sparse import SparseTensor
 
-from warprec.utils.enums import Activations
 
-
-def get_activation(activation: Activations = Activations.RELU) -> Module:
+def get_activation(activation: str = "relu") -> Module:
     """Get the activation function using enum.
 
     Args:
-        activation (Activations): The activation layer to retrieve.
+        activation (str): The activation layer to retrieve.
 
     Returns:
         Module: The activation layer requested.
@@ -23,13 +21,13 @@ def get_activation(activation: Activations = Activations.RELU) -> Module:
         ValueError: If the activation is not known or supported.
     """
     match activation:
-        case Activations.SIGMOID:
+        case "sigmoid":
             return nn.Sigmoid()
-        case Activations.TANH:
+        case "tanh":
             return nn.Tanh()
-        case Activations.RELU:
+        case "relu":
             return nn.ReLU()
-        case Activations.LEAKYRELU:
+        case "leakyrelu":
             return nn.LeakyReLU()
         case _:
             raise ValueError("Activation function not supported.")
@@ -53,7 +51,7 @@ class MLP(nn.Module):
     Args:
         layers (List[int]): The hidden layers size list.
         dropout (float): The dropout probability.
-        activation (Activations): The activation function to apply.
+        activation (str): The activation function to apply.
         batch_normalization (bool): Wether or not to apply batch normalization.
         initialize (bool): Wether or not to initialize the weights.
         last_activation (bool): Wether or not to keep last non-linearity function.
@@ -63,7 +61,7 @@ class MLP(nn.Module):
         self,
         layers: List[int],
         dropout: float = 0.0,
-        activation: Activations = Activations.RELU,
+        activation: str = "relu",
         batch_normalization: bool = False,
         initialize: bool = False,
         last_activation: bool = True,
@@ -97,7 +95,7 @@ class CNN(nn.Module):
         cnn_channels (List[int]): The output channels of each layer of the CNN.
         cnn_kernels (List[int]): The kernels of each layer.
         cnn_strides (List[int]): The strides of each layer.
-        activation (Activations): The activation function to apply.
+        activation (str): The activation function to apply.
         initialize (bool): Wether or not to initialize the weights.
 
     Raises:
@@ -110,7 +108,7 @@ class CNN(nn.Module):
         cnn_channels: List[int],
         cnn_kernels: List[int],
         cnn_strides: List[int],
-        activation: Activations = Activations.RELU,
+        activation: str = "relu",
         initialize: bool = False,
     ):
         super().__init__()

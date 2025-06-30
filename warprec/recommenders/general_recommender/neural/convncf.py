@@ -6,11 +6,11 @@ from torch import nn, Tensor
 from torch.nn import Module
 from torch.nn.init import normal_
 from scipy.sparse import csr_matrix
+
 from warprec.recommenders.layers import MLP, CNN
 from warprec.recommenders.losses import BPRLoss
 from warprec.data.dataset import Interactions
 from warprec.recommenders.base_recommender import Recommender
-from warprec.utils.enums import Activations
 from warprec.utils.registry import model_registry
 
 
@@ -78,8 +78,6 @@ class ConvNCF(Recommender):
             raise ValueError(
                 "Items value must be provided to correctly initialize the model."
             )
-
-        # Set block size
         self.block_size = kwargs.get("block_size", 50)
 
         # Ray Tune converts lists to tuples
@@ -87,16 +85,13 @@ class ConvNCF(Recommender):
         self.cnn_kernels = list(self.cnn_kernels)
         self.cnn_strides = list(self.cnn_strides)
 
-        # Embedding layers
         self.user_embedding = nn.Embedding(users, self.embedding_size)
         self.item_embedding = nn.Embedding(items, self.embedding_size)
-
-        # CNN layers
         self.cnn_layers = CNN(
             self.cnn_channels,
             self.cnn_kernels,
             self.cnn_strides,
-            activation=Activations.RELU,
+            activation="relu",
         )
 
         # Prediction layer (MLP)
@@ -113,7 +108,6 @@ class ConvNCF(Recommender):
         self.optimizer = torch.optim.Adam(self.parameters(), lr=self.learning_rate)
         self.bpr_loss = BPRLoss()
 
-        # Move to device
         self.to(self._device)
 
     def _init_weights(self, module: Module):
@@ -168,7 +162,6 @@ class ConvNCF(Recommender):
         # ConvNCF uses pairwise training, so we need positive and negative items.
         dataloader = interactions.get_pos_neg_dataloader()
 
-        # Training loop
         self.train()
         for _ in range(self.epochs):
             epoch_loss = 0.0
