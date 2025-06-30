@@ -84,7 +84,7 @@ class FOSSIL(Recommender, SequentialRecommenderUtils):
             self.n_items + 1, self.embedding_size, padding_idx=0
         )
         self.user_lambda = nn.Embedding(
-            self.n_users + 1, self.order_len
+            self.n_users, self.order_len
         )  # User specific weights for Markov chains
         self.lambda_ = nn.Parameter(
             torch.zeros(self.order_len)
@@ -337,7 +337,9 @@ class FOSSIL(Recommender, SequentialRecommenderUtils):
                 if self.neg_samples > 0:
                     neg_items_emb = self.item_embedding(neg_item)
                     pos_score = torch.sum(seq_output * pos_items_emb, dim=-1)
-                    neg_score = torch.sum(seq_output * neg_items_emb, dim=-1)
+                    neg_score = torch.sum(
+                        seq_output.unsqueeze(1) * neg_items_emb, dim=-1
+                    )
                     total_loss = self.loss(pos_score, neg_score)
                     total_loss += self._reg_loss(
                         user_lambda_emb, pos_items_emb, seq_output
@@ -364,7 +366,7 @@ class FOSSIL(Recommender, SequentialRecommenderUtils):
         interaction_matrix: csr_matrix,
         user_seq: Tensor,
         seq_len: Tensor,
-        user_id_batch: Tensor,
+        user_id: Tensor,
         *args: Any,
         **kwargs: Any,
     ) -> Tensor:
@@ -376,7 +378,7 @@ class FOSSIL(Recommender, SequentialRecommenderUtils):
                 pairs of interactions to evaluate.
             user_seq (Tensor): Padded sequences of item IDs for users to predict for.
             seq_len (Tensor): Actual lengths of these sequences, before padding.
-            user_id_batch (Tensor): The user IDs corresponding to user_seq.
+            user_id (Tensor): The user IDs corresponding to user_seq.
             *args (Any): List of arguments.
             **kwargs (Any): The dictionary of keyword arguments.
 
@@ -385,15 +387,18 @@ class FOSSIL(Recommender, SequentialRecommenderUtils):
         """
         user_seq = user_seq.to(self._device)
         seq_len = seq_len.to(self._device)
-        user_id_batch = user_id_batch.to(self._device)
+        user_id = user_id.to(self._device)
+        print(user_id.min(), user_id.max())
 
         # Get the combined output embedding for each user
         seq_output = self.forward(
-            user_seq, seq_len, user_id_batch
+            user_seq, seq_len, user_id
         )  # [num_users, embedding_size]
 
         # Get embeddings for all items
-        all_item_embeddings = self.item_embedding.weight  # [n_items, embedding_size]
+        all_item_embeddings = self.item_embedding.weight[
+            1:
+        ]  # [n_items, embedding_size]
 
         # Calculate scores for all items
         # Scores = dot product of session embedding with all item embeddings

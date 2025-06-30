@@ -219,7 +219,7 @@ class SASRec(Recommender, SequentialRecommenderUtils):
         self.train()
         for _ in range(self.epochs):
             epoch_loss = 0.0
-            for batch in dataloader:
+            for i, batch in enumerate(dataloader):
                 if self.neg_samples > 0:
                     item_seq, item_seq_len, pos_item, neg_item = [
                         x.to(self._device) for x in batch
@@ -250,7 +250,7 @@ class SASRec(Recommender, SequentialRecommenderUtils):
                         seq_output * pos_items_emb, dim=-1
                     )  # [batch_size]
                     neg_score = torch.sum(
-                        seq_output * neg_items_emb, dim=-1
+                        seq_output.unsqueeze(1) * neg_items_emb, dim=-1
                     )  # [batch_size]
                     total_loss = self.loss(pos_score, neg_score)
                 else:
@@ -303,7 +303,9 @@ class SASRec(Recommender, SequentialRecommenderUtils):
         seq_output = self.forward(user_seq, seq_len)  # [num_users, embedding_size]
 
         # Get embeddings for all items
-        all_item_embeddings = self.item_embedding.weight  # [n_items, embedding_size]
+        all_item_embeddings = self.item_embedding.weight[
+            1:
+        ]  # [n_items, embedding_size]
 
         # Calculate scores for all items
         # Scores = dot product of session embedding with all item embeddings

@@ -32,7 +32,7 @@ class Caser(Recommender):
         **kwargs (Any): Arbitrary keyword arguments.
 
     Raises:
-        ValueError: If essential values like 'items', 'users' or 'max_seq_len'
+        ValueError: If essential values like 'items' or 'users'
                     are not passed through the info dict.
 
     Attributes:
@@ -251,7 +251,9 @@ class Caser(Recommender):
                     neg_items_emb = self.item_embedding(neg_item)
 
                     pos_score = torch.sum(seq_output * pos_items_emb, dim=-1)
-                    neg_score = torch.sum(seq_output * neg_items_emb, dim=-1)
+                    neg_score = torch.sum(
+                        seq_output.unsqueeze(1) * neg_items_emb, dim=-1
+                    )
                     total_loss = self.loss(pos_score, neg_score)
                 else:  # Cross-Entropy Loss
                     test_item_emb = self.item_embedding.weight
@@ -295,7 +297,7 @@ class Caser(Recommender):
         seq_output = self.forward(user_ids, user_seq)
 
         # Get embeddings for all items
-        all_item_embeddings = self.item_embedding.weight
+        all_item_embeddings = self.item_embedding.weight[1:]
 
         # Calculate scores for all items via dot product
         predictions = torch.matmul(seq_output, all_item_embeddings.transpose(0, 1))
