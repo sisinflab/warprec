@@ -53,6 +53,27 @@ models:
 ...
 ```
 
+- [gSASRec (Group-wise Self-Attentive Sequential Recommendation)](gsasred.py): A variant of SASRec designed to better model user behavior by capturing diverse user intents. Instead of relying on a single attention representation like SASRec, gSASRec introduces a group-wise self-attention mechanism that generates multiple latent interest groups from a user’s interaction history. Each group focuses on a different aspect of the user's preferences, allowing the model to better capture complex and multifaceted user behavior. This group-wise modeling leads to improved recommendation accuracy, particularly in scenarios where user interests are diverse or evolve over time.
+
+```yaml
+models:
+    gSASRec:
+        embedding_size: 128
+        n_layers: 2
+        n_heads: 4
+        inner_size: 512
+        dropout_prob: 0.3
+        attn_dropout_prob: 0.3
+        learning_rate: 0.001
+        gbce_t: 0.5
+        weight_decay: 0.0
+        epochs: 100
+        neg_samples: 1
+        max_seq_len: 200
+        reuse_item_embeddings: True
+...
+```
+
 - [SASRec (Self-Attentive Sequential Recommendation)](sasrec.py): A sequential recommendation model based on self-attention mechanisms, inspired by the Transformer architecture. It uses stacked self-attention blocks to capture dependencies between previously interacted items, effectively modeling users' dynamic preferences. SASRec is capable of learning both short- and long-term patterns without relying on RNNs or CNNs, making it well-suited for sparse recommendation scenarios.
 
 ```yaml
