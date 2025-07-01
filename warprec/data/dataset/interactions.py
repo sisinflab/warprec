@@ -411,6 +411,15 @@ class Interactions:
                 self._transactions
             )  # With implicit rating we create an array directly (faster)
         )
+
+        # Compute invalid values mask for faster filtering
+        mask = ~np.isnan(users) & ~np.isnan(items) & ~np.isnan(ratings)
+
+        # Filter out invalid values
+        users = users[mask]
+        items = items[mask]
+        ratings = ratings[mask]
+
         self._inter_sparse = coo_matrix(
             (ratings, (users, items)),
             shape=(self._og_nuid, self._og_niid),
