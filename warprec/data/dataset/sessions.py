@@ -159,7 +159,8 @@ class Sessions:
             DataLoader: Yields (item_seq, item_seq_len, pos_item_id) if num_negatives = 0.
                 Yields (item_seq, item_seq_len, pos_item_id, neg_item_id) if num_negatives > 0.
         """
-        # Check if sequential that has been cached
+        # Check if sequential data has already been computed
+        # and is stored in cache
         cache_key = (num_negatives, user_id)
         if cache_key in self._cached_sequential_data:
             cached_tensors = self._cached_sequential_data[cache_key]
