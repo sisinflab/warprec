@@ -71,7 +71,7 @@ class Recall(TopKMetric):
         self, k: int, *args: Any, dist_sync_on_step: bool = False, **kwargs: Any
     ):
         super().__init__(k, dist_sync_on_step)
-        self.add_state("hits", default=torch.tensor(0.0), dist_reduce_fx="sum")
+        self.add_state("retrieved", default=torch.tensor(0.0), dist_reduce_fx="sum")
         self.add_state("users", default=torch.tensor(0.0), dist_reduce_fx="sum")
 
     def update(self, preds: Tensor, **kwargs: Any):

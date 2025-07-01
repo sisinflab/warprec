@@ -105,6 +105,8 @@ class Dataset(ABC):
             "items": self._niid,
             "users": self._nuid,
             "features": self._nfeat,
+            "item_mapping": self._imap,
+            "user_mapping": self._umap,
         }
 
     def update_mappings(self, user_mapping: dict, item_mapping: dict):

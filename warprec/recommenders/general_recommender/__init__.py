@@ -5,6 +5,7 @@ from . import knn
 from . import latent_factor
 from . import neural
 from . import unpersonalized
+from .proxy import ProxyRecommender
 
 __all__ = [
     "autoencoder",
@@ -14,4 +15,5 @@ __all__ = [
     "latent_factor",
     "neural",
     "unpersonalized",
+    "ProxyRecommender",
 ]
