@@ -1,4 +1,6 @@
-from typing import Any, Type, TypeVar
+import importlib
+import os
+from typing import Any, Type, TypeVar, Optional, Dict, Callable
 
 from pydantic import BaseModel
 from warprec.utils.enums import SearchSpace
@@ -26,6 +28,50 @@ def check_separator(sep: str) -> str:
         )
         sep = "\t"
     return sep
+
+
+def _load_user_callback(
+    script_path: str, function_name: str
+) -> Optional[Callable[[Any, Dict[str, Any], Any], None]]:
+    """Helper function to load a function from a python script.
+
+    Args:
+        script_path (str): Path to the python script.
+        function_name (str): Name of the function to load.
+
+    Returns:
+        Optional[Callable[[Any, Dict[str, Any], Any], None]]: The callback function if found.
+    """
+
+    try:
+        spec = importlib.util.spec_from_file_location(
+            "user_callback_module", script_path
+        )
+        if spec is None:
+            logger.negative(f"Failed to load callback from: {script_path}.")
+            return None
+
+        user_module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(user_module)
+
+        if hasattr(user_module, function_name):
+            callback_function = getattr(user_module, function_name)
+            if callable(callback_function):
+                logger.msg(
+                    f"User callback '{function_name}' loaded successfully from: {script_path}."
+                )
+                return callback_function
+            else:
+                logger.attention(
+                    f"'{function_name}' in '{script_path}' is not a callable function."
+                )
+                return None
+        else:
+            logger.attention(f"'{function_name}' not found in: {script_path}.")
+            return None
+    except Exception as e:
+        logger.negative(f"Error during callback loading: {e}")
+        return None
 
 
 def _convert_to_list(value: Any) -> list:
@@ -117,6 +163,27 @@ def _check_between_zero_and_one(value: Any) -> bool:
         bool: True if the value is between 0 and 1.
     """
     return isinstance(value, (float, int)) and (value < 0 or value > 1)
+
+
+def validate_callback(v: Any, field: str) -> Callable[[Any, dict[str, Any], Any], None]:
+    # Script file path validation
+    if not isinstance(v, str):
+        raise ValueError(
+            f"Callback script path must be a string, got {type(v).__name__}"
+        )
+
+    if not v.endswith(".py"):
+        raise ValueError(
+            f"Callback script path must be a Python file ('.py' extension), got '{v}'"
+        )
+
+    if not os.path.exists(v):
+        raise ValueError(f"Callback script file not found at path: '{v}'")
+
+    # Load the callback from the script using the helper function
+    loaded_func = _load_user_callback(v, function_name=field)
+
+    return loaded_func
 
 
 def validate_greater_than_zero(cls: Type[T], value: Any, field: str) -> list:

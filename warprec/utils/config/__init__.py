@@ -1,4 +1,5 @@
 from . import recommender_model_config
+from .custom_callbacks_configuration import CustomCallbacksConfig
 from .dashboard_configuration import DashboardConfig, Wandb, CodeCarbon, MLflow
 from .evaluation_configuration import EvaluationConfig
 from .general_configuration import GeneralConfig
@@ -18,6 +19,7 @@ from .config import Configuration, load_yaml
 
 __all__ = [
     "recommender_model_config",
+    "CustomCallbacksConfig",
     "DashboardConfig",
     "Wandb",
     "CodeCarbon",

@@ -11,6 +11,7 @@ from warprec.utils.config import (
     WriterConfig,
     SplittingConfig,
     DashboardConfig,
+    CustomCallbacksConfig,
     RecomModel,
     EvaluationConfig,
 )
@@ -29,6 +30,7 @@ class Configuration(BaseModel):
         writer (WriterConfig): Configuration of the writing process.
         splitter (SplittingConfig): Configuration of the splitting process.
         dashboard (DashboardConfig): Configuration of the dashboard process.
+        callbacks (CustomCallbacksConfig): Configuration of the callback process.
         models (Dict[str, dict]): The dictionary containing model information
             in the format {model_name: dict{param_1: value, param_2: value, ...}, ...}
         evaluation (EvaluationConfig): Configuration of the evaluation process.
@@ -43,6 +45,7 @@ class Configuration(BaseModel):
     writer: WriterConfig
     splitter: SplittingConfig = None
     dashboard: DashboardConfig = Field(default_factory=DashboardConfig)
+    callbacks: CustomCallbacksConfig = Field(default_factory=CustomCallbacksConfig)
     models: Dict[str, dict]
     evaluation: EvaluationConfig
     general: GeneralConfig = Field(default_factory=GeneralConfig)
