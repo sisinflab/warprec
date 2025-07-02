@@ -165,7 +165,7 @@ def _check_between_zero_and_one(value: Any) -> bool:
     return isinstance(value, (float, int)) and (value < 0 or value > 1)
 
 
-def validate_callback(v: Any, field: str) -> Callable[[Any, dict[str, Any], Any], None]:
+def validate_callback(v: Any, field: str) -> Callable[..., None]:
     # Script file path validation
     if not isinstance(v, str):
         raise ValueError(

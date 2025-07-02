@@ -1,4 +1,4 @@
-from typing import Optional, ClassVar, Dict, Callable, Any
+from typing import Optional, ClassVar, Dict, Callable
 
 from pydantic import BaseModel, field_validator
 
@@ -24,9 +24,7 @@ class CustomCallbacksConfig(BaseModel):
     on_dataset_creation: Optional[str] = None
 
     # Callback loaded will be stored directly inside the Pydantic model
-    _loaded_callbacks: ClassVar[
-        Dict[str, Callable[[Any, Dict[str, Any], Any], None]]
-    ] = {}
+    _loaded_callbacks: ClassVar[Dict[str, Callable[..., None]]] = {}
 
     @field_validator("on_model_evaluation", mode="before")
     @classmethod
