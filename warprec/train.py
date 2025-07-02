@@ -23,6 +23,9 @@ def main(args: Namespace):
     # Config parser testing
     config = load_yaml(args.config)
 
+    # Load custom callbacks from config
+    callbacks = config.callbacks._loaded_callbacks
+
     # Writer module testing
     writer = LocalWriter(config=config)
 
@@ -93,6 +96,21 @@ def main(args: Namespace):
         else:
             raise ValueError("Data type not yet supported.")
 
+    # Callback on dataset creation
+    if "on_dataset_creation" in callbacks:
+        try:
+            callbacks["on_dataset_creation"](
+                dataset=dataset,
+                train_set=train,
+                test_set=test,
+                val_set=val,
+            )
+        except Exception as e:
+            logger.attention(
+                f"Error during user callback execution: {e}. "
+                "Please check the callback script."
+            )
+
     if config.splitter and config.writer.save_split:
         writer.write_split(dataset)
 
@@ -148,6 +166,23 @@ def main(args: Namespace):
             result_dict,
             model_name,
         )
+
+        # Callback on evaluation
+        # NOTE: If the call fails, we do not stop the main process
+        # but instead we log it as a warning
+        if "on_model_evaluation" in callbacks:
+            try:
+                callbacks["on_model_evaluation"](
+                    model=best_model,
+                    params=params,
+                    dataset=dataset,
+                    results=result_dict,
+                )
+            except Exception as e:
+                logger.attention(
+                    f"Error during user callback execution: {e}. "
+                    "Please check the callback script."
+                )
 
         # Recommendation
         if config.general.recommendation.save_recs:
