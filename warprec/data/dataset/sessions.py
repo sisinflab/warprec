@@ -396,9 +396,9 @@ class Sessions:
         """Retrieves padded historical sequences and their lengths for a given list of user IDs.
         Sequences are 1-indexed.
 
-        This method is intended for evaluation purposes and should be used with either the validation or
-        test set, not the training set. For each user, it returns their complete interaction history as
-        recorded in the dataset, truncated or padded to the specified maximum sequence length.
+        This method is intended for evaluation purposes. For each user, it returns their complete interaction history as
+        recorded in the dataset, truncated or padded to the specified maximum sequence length. It's main
+        usage is to provide the full history of interactions for each user during prediction.
 
         Args:
             user_ids (List[int]): A list of global user indices.
