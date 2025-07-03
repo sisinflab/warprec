@@ -6,7 +6,7 @@ from warprec.data.reader import LocalReader
 from warprec.data.writer import LocalWriter
 from warprec.data.splitting import Splitter
 from warprec.data.dataset import TransactionDataset
-from warprec.utils.config import load_yaml
+from warprec.utils.config import load_yaml, load_callback
 from warprec.utils.logger import logger
 from warprec.recommenders.trainer import Trainer
 from warprec.recommenders.base_recommender import generate_model_name
@@ -23,8 +23,8 @@ def main(args: Namespace):
     # Config parser testing
     config = load_yaml(args.config)
 
-    # Load custom callbacks from config
-    callbacks = config.callbacks._loaded_callbacks
+    # Load custom callback if specified
+    callback = load_callback(config.general.callback)
 
     # Writer module testing
     writer = LocalWriter(config=config)
@@ -97,19 +97,12 @@ def main(args: Namespace):
             raise ValueError("Data type not yet supported.")
 
     # Callback on dataset creation
-    if "on_dataset_creation" in callbacks:
-        try:
-            callbacks["on_dataset_creation"](
-                dataset=dataset,
-                train_set=train,
-                test_set=test,
-                val_set=val,
-            )
-        except Exception as e:
-            logger.attention(
-                f"Error during user callback execution: {e}. "
-                "Please check the callback script."
-            )
+    callback.on_dataset_creation(
+        dataset=dataset,
+        train_set=train,
+        test_set=test,
+        val_set=val,
+    )
 
     if config.splitter and config.writer.save_split:
         writer.write_split(dataset)
@@ -142,9 +135,13 @@ def main(args: Namespace):
             beta=config.evaluation.beta,
             pop_ratio=config.evaluation.pop_ratio,
             ray_verbose=config.general.ray_verbose,
+            custom_callback=callback,
             config=config,
         )
         best_model, checkpoint_param = trainer.train_and_evaluate()
+
+        # Callback on training complete
+        callback.on_training_complete(model=best_model)
 
         # Evaluation testing
         result_dict = {}
@@ -161,28 +158,18 @@ def main(args: Namespace):
         evaluator.print_console(results, "Test", config.evaluation.max_metric_per_row)
         result_dict["Test"] = results
 
+        # Callback after complete evaluation
+        callback.on_evaluation_complete(
+            model=best_model,
+            params=params,
+            results=result_dict,
+        )
+
         # Write results of current model
         writer.write_results(
             result_dict,
             model_name,
         )
-
-        # Callback on evaluation
-        # NOTE: If the call fails, we do not stop the main process
-        # but instead we log it as a warning
-        if "on_model_evaluation" in callbacks:
-            try:
-                callbacks["on_model_evaluation"](
-                    model=best_model,
-                    params=params,
-                    dataset=dataset,
-                    results=result_dict,
-                )
-            except Exception as e:
-                logger.attention(
-                    f"Error during user callback execution: {e}. "
-                    "Please check the callback script."
-                )
 
         # Recommendation
         if config.general.recommendation.save_recs:
