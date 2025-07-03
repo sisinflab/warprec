@@ -509,6 +509,7 @@ The `General Configuration` can be configured using the following keywords:
 - **batch_size**: The batch size to be used inside the experiment. Defaults to 1024.
 - **ray_verbose**: . The Ray Tune verbosity value. Ray Tune accepts verbosity levels in a range from 0 to 3. Defaults to 1.
 - **recommendation**: A nested section dedicated to the recommendation produced by the models.
+- **callback**: A nested section dedicated to the optional callback.
 
 #### 📝 Recommendation
 
@@ -518,6 +519,15 @@ The `recommendation` section let you decide some information about the actual re
 - **sep**: The separator of the recommendation file. Defaults to `\t`.
 - **ext**: The extension of the recommendation file. Defaults to `.tsv`.
 - **k**: The number of recommendation per user. Defaults to 50.
+
+#### 📞 Callback
+
+The `callback` section let point at some custom callback implementation and optionally pass it some information directly from configuration.
+
+- **callback_path**: The path to the python script containing the callback implementation.
+- **callback_name**: The name of the implementation of the callback. The class must inherit from [WarpRecCallback](../callback.py)
+- **args**: A list of arguments to pass the callback constructor.
+- **kwargs**: A dictionary of arguments to pass the callback constructor.
 
 ### 📌 Example of Recommendation Configuration
 
@@ -530,6 +540,14 @@ general:
     ray_verbose: 0
     recommendation:
         save_recs: true
+    callback:
+        callback_path: path/to/the/script.py
+        callback_name: class_name
+        args: [arg_1, arg_2, ...]
+        kwargs:
+            kwargs_1: kwargs_value_1
+            kwargs_2: kwargs_value_2
+            ...
 ...
 ```
 
