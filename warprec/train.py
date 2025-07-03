@@ -24,7 +24,11 @@ def main(args: Namespace):
     config = load_yaml(args.config)
 
     # Load custom callback if specified
-    callback = load_callback(config.general.callback)
+    callback = load_callback(
+        config.general.callback,
+        *config.general.callback.args,
+        **config.general.callback.kwargs,
+    )
 
     # Writer module testing
     writer = LocalWriter(config=config)

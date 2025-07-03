@@ -2,7 +2,7 @@ import os
 import sys
 import importlib
 from pathlib import Path
-from typing import Tuple, ClassVar, Dict
+from typing import Tuple, ClassVar, Dict, Any
 
 import yaml
 import numpy as np
@@ -255,7 +255,7 @@ def load_yaml(path: str) -> Configuration:
 
 
 def load_callback(
-    callback_config: WarpRecCallbackConfig,
+    callback_config: WarpRecCallbackConfig, *args: Any, **kwargs: Any
 ) -> WarpRecCallback:
     """Dynamically loads and initializes a custom WarpRecCallback class
     based on the provided configuration.
@@ -267,6 +267,8 @@ def load_callback(
     Args:
         callback_config (WarpRecCallbackConfig): The Pydantic configuration object
             for the custom callback.
+        *args (Any): Additional positional arguments to pass to the callback's constructor.
+        **kwargs (Any): Additional keyword arguments to pass to the callback's constructor.
 
     Returns:
         WarpRecCallback: An instance of the custom callback, or None if no
@@ -308,7 +310,7 @@ def load_callback(
         callback_class = getattr(module, class_name)
 
         # Initialize and return the callback instance
-        return callback_class()
+        return callback_class(*args, **kwargs)
 
     except Exception as e:
         # Catch any residual errors, though validation should prevent most

@@ -2,7 +2,7 @@ import os
 import sys
 import importlib
 from pathlib import Path
-from typing import Optional, Type
+from typing import Optional, Type, List, Dict, Any
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 from warprec.utils.config.common import check_separator
@@ -39,6 +39,13 @@ class WarpRecCallbackConfig(BaseModel):
     Attributes:
         callback_path (Optional[str]): Path to the script containing the callback.
         callback_name (Optional[str]): Name of the callback to load from the script.
+        args (Optional[List[Any]]): Positional arguments to pass to the callback.
+        kwargs (Optional[Dict[str, Any]]): Additional keyword arguments to pass to the callback.
+
+    Note:
+        The args dictionary can be used to pass additional parameters but
+        it is not validated. It is the user's responsibility to ensure that
+        the parameters passed in args are correct.
 
     Raises:
         ValueError: If the callback script cannot be found or is incorrect.
@@ -46,6 +53,8 @@ class WarpRecCallbackConfig(BaseModel):
 
     callback_path: Optional[str] = None
     callback_name: Optional[str] = None
+    args: Optional[List[Any]] = []
+    kwargs: Optional[Dict[str, Any]] = {}
 
     @field_validator("callback_path")
     @classmethod

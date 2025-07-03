@@ -13,7 +13,14 @@ class WarpRecCallback(Callback):
 
     This class extends the Ray Tune Callback class to provide a base for custom WarpRec callbacks.
     Custom callbacks should inherit from this class and implement the necessary methods.
+
+    Args:
+        *args (Any): Additional positional arguments.
+        **kwargs (Any): Additional keyword arguments.
     """
+
+    def __init__(self, *args: Any, **kwargs: Any):
+        pass
 
     def on_dataset_creation(
         self,
