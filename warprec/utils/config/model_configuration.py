@@ -265,6 +265,7 @@ class RecomModel(BaseModel, ABC):
         meta (Meta): The meta-information about the model. Defaults to Meta default values.
         optimization (Optimization): The optimization information that will be used by Ray Tune.
         need_side_information (ClassVar[bool]): Wether or not the model needs side information.
+        need_timestamp (ClassVar[bool]): Wether or not the model needs the timestamp.
         need_single_trial_validation (ClassVar[bool]): Wether or not the model needs to be
             validated during training.
     """
@@ -272,6 +273,7 @@ class RecomModel(BaseModel, ABC):
     meta: Meta = Field(default_factory=Meta)
     optimization: Optimization = Field(default_factory=Optimization)
     need_side_information: ClassVar[bool] = False
+    need_timestamp: ClassVar[bool] = False
     need_single_trial_validation: ClassVar[bool] = False
 
     @model_validator(mode="after")
