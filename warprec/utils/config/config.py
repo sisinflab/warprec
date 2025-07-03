@@ -42,6 +42,8 @@ class Configuration(BaseModel):
             and their numpy sparse counterpart.
         sparse_torch_dtype (ClassVar[dict]): The mapping between the string dtype
             and their torch sparse counterpart.
+        need_session_based_information (ClassVar[bool]): Wether or not the experiments
+            will be conducted on session data.
     """
 
     reader: ReaderConfig
@@ -63,6 +65,9 @@ class Configuration(BaseModel):
         "float32": torch.float32,
         "float64": torch.float64,
     }
+
+    # Track if session-based information is needed
+    need_session_based_information: ClassVar[bool] = False
 
     @field_validator("splitter", mode="before")
     @classmethod
@@ -156,12 +161,15 @@ class Configuration(BaseModel):
 
         # Final checks and parsing
         self.check_precision()
-        self.models = self.parse_models()
+        self.models = self.parse_models(_header)
 
         return self
 
-    def parse_models(self) -> dict:
+    def parse_models(self, header: list) -> dict:
         """This method parses the models and creates the correct data structures.
+
+        Args:
+            header (list): The header of the file, used to check timestamp.
 
         Returns:
             dict: The dictionary containing all the models and their parameters.
@@ -182,6 +190,21 @@ class Configuration(BaseModel):
 
             # Check if there is at least one valid combination
             model_class.validate_all_combinations()
+
+            # Check if the model requires timestamp
+            if (
+                model_class.need_timestamp
+                and self.reader.labels.timestamp_label not in header
+            ):
+                raise ValueError(
+                    f"The model {model_name} requires timestamps to work properly, "
+                    "but none have been provided. Check the configuration file."
+                )
+
+            # If at least one model is a sequential model, then
+            # we set the flag for session-based information
+            if model_class.need_timestamp:
+                Configuration.need_session_based_information = True
 
             # Extract model train parameters, removing the meta infos
             model_data = {
