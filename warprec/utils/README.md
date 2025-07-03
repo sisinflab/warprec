@@ -199,6 +199,21 @@ general:
 
 You can pass custom `args` and `kwargs` to the callback via the configuration file. Note that WarpRec does **not** perform validation on these parameters—it is the user's responsibility to handle them correctly.
 
+For this example, we used this configuration for the NeuMF model:
+
+```yaml
+NeuMF:
+    mf_embedding_size: 64
+    mlp_embedding_size: 64
+    mlp_hidden_size: [32, 16, 8]
+    mf_train: True
+    mlp_train: True
+    dropout: 0
+    epochs: 20
+    learning_rate: 0.0001
+    neg_samples: 4
+```
+
 Here is the resulting plot from this example:
 
 ![Missing image](../../plots/nDCG_over_iterations.png "nDCG@5_over_iterations")
