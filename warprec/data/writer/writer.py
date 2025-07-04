@@ -13,7 +13,12 @@ from warprec.utils.config import Configuration
 from warprec.data.dataset import Dataset
 from warprec.recommenders.base_recommender import Recommender
 from warprec.utils.enums import WritingMethods
-from warprec.utils.config import WriterConfig, WritingParams
+from warprec.utils.config import (
+    WriterConfig,
+    ResultsWriting,
+    SplitWriting,
+    RecommendationWriting,
+)
 from warprec.utils.logger import logger
 
 
@@ -152,9 +157,9 @@ class LocalWriter(Writer):
             ext (str): The extension of the file.
         """
         if self.config:
-            writing_params = self.config.writer.writing_params
+            writing_params = self.config.writer.results
         else:
-            writing_params = WritingParams(sep=sep, ext=ext)
+            writing_params = ResultsWriting(sep=sep, ext=ext)
 
         current_overall_results_path = Path(
             join(
@@ -228,6 +233,7 @@ class LocalWriter(Writer):
         model_name: str,
         sep: str = "\t",
         ext: str = ".tsv",
+        header: bool = False,
         user_label: str = "user_id",
         item_label: str = "item_id",
         rating_label: str = "rating",
@@ -239,16 +245,18 @@ class LocalWriter(Writer):
             model_name (str): The name of the model which produced the recommendations.
             sep (str): The separator of the file.
             ext (str): The extension of the file.
+            header (bool): Whether to write the header in the file.
             user_label (str): The label of the user data.
             item_label (str): The label of the item data.
             rating_label (str): The label of the rating data.
         """
         if self.config:
-            writing_params = self.config.writer.writing_params
+            writing_params = self.config.writer.recommendation
         else:
-            writing_params = WritingParams(
+            writing_params = RecommendationWriting(
                 sep=sep,
                 ext=ext,
+                header=header,
                 user_label=user_label,
                 item_label=item_label,
                 rating_label=rating_label,
@@ -265,11 +273,7 @@ class LocalWriter(Writer):
             recs.to_csv(
                 recommendation_folder_path,
                 sep=writing_params.sep,
-                header=[
-                    writing_params.user_label,
-                    writing_params.item_label,
-                    writing_params.rating_label,
-                ],
+                header=writing_params.get_header(),
                 index=None,
             )
             logger.msg(
@@ -345,18 +349,21 @@ class LocalWriter(Writer):
         except Exception as e:
             logger.negative(f"Error writing parameters to {_path}: {e}")
 
-    def write_split(self, dataset: Dataset, sep: str = "\t", ext: str = ".tsv") -> None:
+    def write_split(
+        self, dataset: Dataset, sep: str = "\t", ext: str = ".tsv", header: bool = True
+    ) -> None:
         """This method writes the split into a local path.
 
         Args:
             dataset (Dataset): The dataset splitted.
             sep (str): The separator that will be used to write the results.
             ext (str): The extension that will be used to write the results.
+            header (bool): Whether to write the header in the file.
         """
         if self.config:
-            writing_params = self.config.writer.writing_params
+            writing_params = self.config.writer.split
         else:
-            writing_params = WritingParams(sep=sep, ext=ext)
+            writing_params = SplitWriting(sep=sep, ext=ext, header=header)
 
         path_train = join(self.experiment_split_dir, "train" + writing_params.ext)
         path_test = join(self.experiment_split_dir, "test" + writing_params.ext)
@@ -364,15 +371,24 @@ class LocalWriter(Writer):
 
         if dataset.train_set is not None:
             dataset.train_set.get_df().to_csv(
-                path_train, sep=writing_params.sep, index=None
+                path_train,
+                sep=writing_params.sep,
+                header=writing_params.header,
+                index=None,
             )
         if dataset.test_set is not None:
             dataset.test_set.get_df().to_csv(
-                path_test, sep=writing_params.sep, index=None
+                path_test,
+                sep=writing_params.sep,
+                header=writing_params.header,
+                index=None,
             )
         if dataset.val_set is not None:
             dataset.val_set.get_df().to_csv(
-                path_val, sep=writing_params.sep, index=None
+                path_val,
+                sep=writing_params.sep,
+                header=writing_params.header,
+                index=None,
             )
 
     def checkpoint_from_ray(self, source: str, new_name: str):
