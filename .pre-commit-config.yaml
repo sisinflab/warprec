@@ -59,6 +59,15 @@ repos:
         types: [python]
         exclude: ^tests/|^src/pipelines/
 
+  - repo: local
+    hooks:
+      - id: export-poetry-requirements
+        name: Export Poetry Requirements
+        entry: poetry export -f requirements.txt --output requirements.txt --without-hashes
+        language: system
+        pass_filenames: false
+        always_run: true
+
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v5.0.0
     hooks:
