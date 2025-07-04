@@ -1,5 +1,8 @@
 import os
-from typing import Tuple, ClassVar, Dict
+import sys
+import importlib
+from pathlib import Path
+from typing import Tuple, ClassVar, Dict, Any
 
 import yaml
 import numpy as np
@@ -7,6 +10,7 @@ import torch
 from pydantic import BaseModel, field_validator, model_validator, Field
 from warprec.utils.config import (
     GeneralConfig,
+    WarpRecCallbackConfig,
     ReaderConfig,
     WriterConfig,
     SplittingConfig,
@@ -14,6 +18,7 @@ from warprec.utils.config import (
     RecomModel,
     EvaluationConfig,
 )
+from warprec.utils.callback import WarpRecCallback
 from warprec.utils.enums import RatingType, SplittingStrategies, ReadingMethods
 from warprec.utils.registry import params_registry
 from warprec.utils.logger import logger
@@ -289,3 +294,72 @@ def load_yaml(path: str) -> Configuration:
         data = yaml.safe_load(file)
     logger.msg("Reading process completed correctly.")
     return Configuration(**data)
+
+
+def load_callback(
+    callback_config: WarpRecCallbackConfig, *args: Any, **kwargs: Any
+) -> WarpRecCallback:
+    """Dynamically loads and initializes a custom WarpRecCallback class
+    based on the provided configuration.
+
+    This function assumes that `callback_config` has already been validated
+    via Pydantic, ensuring that the module path and class name are correct,
+    and that the class exists and is a subclass of `WarpRecCallback`.
+
+    Args:
+        callback_config (WarpRecCallbackConfig): The Pydantic configuration object
+            for the custom callback.
+        *args (Any): Additional positional arguments to pass to the callback's constructor.
+        **kwargs (Any): Additional keyword arguments to pass to the callback's constructor.
+
+    Returns:
+        WarpRecCallback: An instance of the custom callback, or None if no
+            custom callback is specified in the configuration.
+
+    Raises:
+        RuntimeError: If an unexpected error occurs during loading or initialization,
+            given that prior validation should have prevented most errors.
+    """
+    if (
+        callback_config is None
+        or callback_config.callback_path is None
+        or callback_config.callback_name is None
+    ):
+        return WarpRecCallback()  # Empty callback used for consistency
+
+    module_path = Path(callback_config.callback_path)
+    class_name = callback_config.callback_name
+
+    # Save the original sys.path to restore it afterwards
+    original_sys_path = sys.path[:]
+
+    try:
+        # Add the module's directory to sys.path to allow for internal imports
+        module_dir = module_path.parent
+        if str(module_dir) not in sys.path:
+            sys.path.insert(0, str(module_dir))
+
+        spec = importlib.util.spec_from_file_location(module_path.stem, module_path)
+        if spec is None:
+            raise RuntimeError(
+                f"Could not load spec for module: {module_path}. "
+                f"This should not happen after validation."
+            )
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+
+        # Get the class from the module
+        callback_class = getattr(module, class_name)
+
+        # Initialize and return the callback instance
+        return callback_class(*args, **kwargs)
+
+    except Exception as e:
+        # Catch any residual errors, though validation should prevent most
+        raise RuntimeError(
+            f"Unexpected error during initialization of callback '{class_name}' "
+            f"from '{module_path}': {e}"
+        ) from e
+    finally:
+        # Restore sys.path to avoid side-effects
+        sys.path = original_sys_path

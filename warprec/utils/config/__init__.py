@@ -1,7 +1,7 @@
 from . import recommender_model_config
 from .dashboard_configuration import DashboardConfig, Wandb, CodeCarbon, MLflow
 from .evaluation_configuration import EvaluationConfig
-from .general_configuration import GeneralConfig
+from .general_configuration import GeneralConfig, WarpRecCallbackConfig
 from .model_configuration import RecomModel
 from .reader_configuration import (
     ReaderConfig,
@@ -19,7 +19,7 @@ from .writer_configuration import (
     SplitWriting,
     RecommendationWriting,
 )
-from .config import Configuration, load_yaml
+from .config import Configuration, load_yaml, load_callback
 
 __all__ = [
     "recommender_model_config",
@@ -29,6 +29,7 @@ __all__ = [
     "MLflow",
     "EvaluationConfig",
     "GeneralConfig",
+    "WarpRecCallbackConfig",
     "RecomModel",
     "ReaderConfig",
     "Labels",
@@ -44,4 +45,5 @@ __all__ = [
     "RecommendationWriting",
     "Configuration",
     "load_yaml",
+    "load_callback",
 ]
