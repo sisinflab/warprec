@@ -2,7 +2,7 @@ from typing import Optional, List, ClassVar, Dict
 
 import numpy as np
 from pydantic import BaseModel, Field, field_validator, model_validator
-from warprec.utils.enums import RatingType, ReadingMethods, DataFormat
+from warprec.utils.enums import RatingType, ReadingMethods
 from warprec.utils.config.common import check_separator
 from warprec.utils.logger import logger
 
@@ -150,7 +150,6 @@ class ReaderConfig(BaseModel):
     Attributes:
         loading_strategy (str): The strategy to use to load the data. Can be 'dataset' or 'split'.
         data_type (str): The type of data to be loaded. Can be 'transaction'.
-        data_format (DataFormat): The format of the data to be loaded. Defaults to DataFormat.CUSTOM.
         reading_method (ReadingMethods): The strategy used to read the data.
         local_path (Optional[str | None]): The path to the local dataset.
         sep (Optional[str]): The separator of the file to read.
@@ -169,7 +168,6 @@ class ReaderConfig(BaseModel):
 
     loading_strategy: str
     data_type: str
-    data_format: DataFormat = DataFormat.CUSTOM
     reading_method: ReadingMethods
     local_path: Optional[str | None] = None
     sep: Optional[str] = "\t"
