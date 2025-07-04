@@ -1,5 +1,5 @@
 import typing
-from typing import Tuple, Any, Optional
+from typing import Tuple, Any, Optional, Dict
 
 import torch
 import numpy as np
@@ -26,6 +26,8 @@ class Interactions:
         batch_size (int): The batch size that will be used to
             iterate over the interactions.
         rating_type (RatingType): The type of rating to be used.
+        rating_label (str): The label of the rating column.
+        timestamp_label (str): The label of the timestamp column.
         precision (Any): The precision of the internal representation of the data.
 
     Raises:
@@ -40,6 +42,9 @@ class Interactions:
     _history_lens: Tensor = None
     _history_mask: Tensor = None
 
+    # Cached loader for easier access
+    _cached_dataloaders: Dict[Tuple, DataLoader] = {}
+
     def __init__(
         self,
         data: DataFrame,
@@ -51,6 +56,8 @@ class Interactions:
         item_cluster: Optional[dict] = None,
         batch_size: int = 1024,
         rating_type: RatingType = RatingType.IMPLICIT,
+        rating_label: str = None,
+        timestamp_label: str = None,
         precision: Any = np.float32,
     ) -> None:
         # Setup the variables
@@ -62,12 +69,13 @@ class Interactions:
         self.rating_type = rating_type
         self.precision = precision
 
-        # Set user and item label
+        # Set DataFrame labels
         self._user_label = data.columns[0]
         self._item_label = data.columns[1]
         self._rating_label = (
-            data.columns[2] if rating_type == RatingType.EXPLICIT else None
+            rating_label if rating_type == RatingType.EXPLICIT else None
         )
+        self._timestamp_label = timestamp_label
 
         # Filter side information (if present)
         if self._inter_side is not None:
@@ -119,6 +127,10 @@ class Interactions:
             }
         else:
             raise ValueError(f"Rating type {rating_type} not supported.")
+
+    def clear_dataloader_cache(self):
+        """This method will clear the cached DataLoader objects."""
+        self._cached_dataloaders = {}
 
     def get_dict(self) -> dict:
         """This method will return the transaction information in dict format.
@@ -181,6 +193,11 @@ class Interactions:
         Returns:
             DataLoader: Yields (user, item, rating) with negative samples.
         """
+        # Check if dataloader has been cached
+        cache_key = (num_negatives, "item_rating")
+        if cache_key in self._cached_dataloaders:
+            return self._cached_dataloaders[cache_key]
+
         # Define main variables
         sparse_matrix = self.get_sparse()
         sparse_matrix_coo = sparse_matrix.tocoo()
@@ -274,7 +291,9 @@ class Interactions:
 
         # Create final dataset
         dataset = TensorDataset(all_users, all_items, all_ratings)
-        return DataLoader(dataset, batch_size=self.batch_size, shuffle=shuffle)
+        dataloader = DataLoader(dataset, batch_size=self.batch_size, shuffle=shuffle)
+        self._cached_dataloaders[cache_key] = dataloader
+        return dataloader
 
     @typing.no_type_check
     def get_pos_neg_dataloader(self, shuffle: bool = True) -> DataLoader:
@@ -286,6 +305,11 @@ class Interactions:
         Returns:
             DataLoader: Yields triplets of (user, positive_item, negative_item).
         """
+        # Check if dataloader has been cached
+        cache_key = "pos_neg"
+        if cache_key in self._cached_dataloaders:
+            return self._cached_dataloaders[cache_key]
+
         # Define main variables
         sparse_matrix = self.get_sparse()
         num_users = self._nuid
@@ -349,7 +373,9 @@ class Interactions:
 
         # Create final dataset
         dataset = TensorDataset(users_tensor, positives_tensor, negatives_tensor)
-        return DataLoader(dataset, batch_size=self.batch_size, shuffle=shuffle)
+        dataloader = DataLoader(dataset, batch_size=self.batch_size, shuffle=shuffle)
+        self._cached_dataloaders[cache_key] = dataloader
+        return dataloader
 
     def get_history(self) -> Tuple[Tensor, Tensor, Tensor]:
         """Return the history representation as three Tensors.

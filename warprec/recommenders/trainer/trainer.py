@@ -388,7 +388,9 @@ class Trainer:
             block_size=self._model_params.optimization.block_size,
         )
         try:
-            model.fit(dataset.train_set, report_fn=_report)
+            model.fit(
+                dataset.train_set, sessions=dataset.train_session, report_fn=_report
+            )
         except Exception as e:
             logger.negative(
                 f"The fitting of the model {model.name}, failed "

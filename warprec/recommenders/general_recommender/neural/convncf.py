@@ -104,8 +104,9 @@ class ConvNCF(Recommender):
         # Init embedding weights
         self.apply(self._init_weights)
 
+        # Optimizer and losses
         self.optimizer = torch.optim.Adam(self.parameters(), lr=self.learning_rate)
-        self.bprloss = BPRLoss()
+        self.bpr_loss = BPRLoss()
 
         self.to(self._device)
 
@@ -173,7 +174,7 @@ class ConvNCF(Recommender):
                 neg_item_score = self.forward(user, neg_item)
 
                 # Loss computation (BPR + Regularization)
-                bpr_loss = self.bprloss(pos_item_score, neg_item_score)
+                bpr_loss: Tensor = self.bpr_loss(pos_item_score, neg_item_score)
                 reg_loss = self._reg_loss()
                 total_loss = bpr_loss + reg_loss
 
@@ -202,7 +203,8 @@ class ConvNCF(Recommender):
         # Outer product to create interaction map
         # user_e.unsqueeze(2) -> [batch_size, embedding_size, 1]
         # item_e.unsqueeze(1) -> [batch_size, 1, embedding_size]
-        # torch.bmm(user_e.unsqueeze(2), item_e.unsqueeze(1)) -> [batch_size, embedding_size, embedding_size]
+        # torch.bmm(user_e.unsqueeze(2), item_e.unsqueeze(1))
+        # -> [batch_size, embedding_size, embedding_size]
         interaction_map = torch.bmm(user_e.unsqueeze(2), item_e.unsqueeze(1))
 
         # Add a channel dimension for CNN input: [batch_size, 1, embedding_size, embedding_size]
