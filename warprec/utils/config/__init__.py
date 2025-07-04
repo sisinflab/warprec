@@ -13,7 +13,12 @@ from .reader_configuration import (
 )
 from .search_space_wrapper import SearchSpaceWrapper
 from .splitter_configuration import SplittingConfig
-from .writer_configuration import WriterConfig, WritingParams
+from .writer_configuration import (
+    WriterConfig,
+    ResultsWriting,
+    SplitWriting,
+    RecommendationWriting,
+)
 from .config import Configuration, load_yaml
 
 __all__ = [
@@ -34,7 +39,9 @@ __all__ = [
     "SearchSpaceWrapper",
     "SplittingConfig",
     "WriterConfig",
-    "WritingParams",
+    "ResultsWriting",
+    "SplitWriting",
+    "RecommendationWriting",
     "Configuration",
     "load_yaml",
 ]
