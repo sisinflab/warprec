@@ -58,6 +58,20 @@ class WritingMethods(str, Enum):
     LOCAL = "local"
 
 
+class DataFormat(str, Enum):
+    """Represents the types of data formats supported.
+
+    This enum is used to track the possible data formats:
+        - CUSTOM: Custom data structure.
+        - ELLIOT: Elliot data structure.
+        - RECBOLE: RecBole data structure.
+    """
+
+    CUSTOM = "custom"
+    ELLIOT = "elliot"
+    RECBOLE = "recbole"
+
+
 class Similarities(str, Enum):
     """Represents the types of similarities supported.
 

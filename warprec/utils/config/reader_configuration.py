@@ -2,7 +2,7 @@ from typing import Optional, List, ClassVar, Dict
 
 import numpy as np
 from pydantic import BaseModel, Field, field_validator, model_validator
-from warprec.utils.enums import RatingType, ReadingMethods
+from warprec.utils.enums import RatingType, ReadingMethods, DataFormat
 from warprec.utils.config.common import check_separator
 from warprec.utils.logger import logger
 
@@ -16,11 +16,13 @@ class SplitReading(BaseModel):
         local_path (Optional[str]): The directory where the splits are saved.
         ext (Optional[str]): The extension of the split files.
         sep (Optional[str]): The separator of the split files.
+        header (Optional[bool]): Whether the file has a header or not. Defaults to True.
     """
 
     local_path: Optional[str] = None
     ext: Optional[str] = ".tsv"
     sep: Optional[str] = "\t"
+    header: Optional[bool] = True
 
     @field_validator("sep")
     @classmethod
@@ -37,10 +39,12 @@ class SideInformationReading(BaseModel):
     Attributes:
         local_path (Optional[str]): The directory where the side information are saved.
         sep (Optional[str]): The separator of the split files.
+        header (Optional[bool]): Whether the file has a header or not. Defaults to True.
     """
 
     local_path: Optional[str] = None
     sep: Optional[str] = "\t"
+    header: Optional[bool] = True
 
     @field_validator("sep")
     @classmethod
@@ -59,12 +63,16 @@ class ClusteringInformationReading(BaseModel):
         item_local_path (Optional[str]): The path to the item clustering information.
         user_sep (Optional[str]): The separator of the user clustering file.
         item_sep (Optional[str]): The separator of the item clustering file.
+        user_header (Optional[bool]): Whether the user clustering file has a header. Defaults to True.
+        item_header (Optional[bool]): Whether the item clustering file has a header. Defaults to True.
     """
 
     user_local_path: Optional[str] = None
     item_local_path: Optional[str] = None
     user_sep: Optional[str] = "\t"
     item_sep: Optional[str] = "\t"
+    user_header: Optional[bool] = True
+    item_header: Optional[bool] = True
 
     @field_validator("user_sep", "item_sep")
     @classmethod
@@ -142,9 +150,11 @@ class ReaderConfig(BaseModel):
     Attributes:
         loading_strategy (str): The strategy to use to load the data. Can be 'dataset' or 'split'.
         data_type (str): The type of data to be loaded. Can be 'transaction'.
+        data_format (DataFormat): The format of the data to be loaded. Defaults to DataFormat.CUSTOM.
         reading_method (ReadingMethods): The strategy used to read the data.
         local_path (Optional[str | None]): The path to the local dataset.
         sep (Optional[str]): The separator of the file to read.
+        header (Optional[bool]): Whether the file has a header or not. Defaults to True.
         rating_type (RatingType): The type of rating to be used. If 'implicit' is chosen,
             the reader will not look for a score.
         split (Optional[SplitReading]): The information of the split reading process.
@@ -159,9 +169,11 @@ class ReaderConfig(BaseModel):
 
     loading_strategy: str
     data_type: str
+    data_format: DataFormat = DataFormat.CUSTOM
     reading_method: ReadingMethods
     local_path: Optional[str | None] = None
     sep: Optional[str] = "\t"
+    header: Optional[bool] = True
     rating_type: RatingType
     split: Optional[SplitReading] = Field(default_factory=SplitReading)
     side: Optional[SideInformationReading] = None

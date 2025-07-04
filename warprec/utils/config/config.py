@@ -105,30 +105,49 @@ class Configuration(BaseModel):
                 first_line = f.readline()
             _header = first_line.strip().split(_sep)
 
-            # Define column names to read after, if the input file
-            # contains more columns this is more efficient.
-            _column_names = [
-                self.reader.labels.user_id_label,
-                self.reader.labels.item_id_label,
-            ]
-            if self.reader.rating_type == RatingType.EXPLICIT:
-                # In case the RatingType is explicit, we add the
-                # score label and read scores from the source.
-                _column_names.append(self.reader.labels.rating_label)
-            if self.splitter.strategy in [
-                SplittingStrategies.TEMPORAL_HOLDOUT,
-                SplittingStrategies.TEMPORAL_LEAVE_K_OUT,
-            ]:
-                # In case the SplittingStrategy is temporal, we add the
-                # timestamp label and read timestamps from the source.
-                _column_names.append(self.reader.labels.timestamp_label)
+            # If the source file should have header, we check
+            # if the column names are present.
+            if self.reader.header:
+                # Define column names to read after, if the input file
+                # contains more columns this is more efficient.
+                _column_names = [
+                    self.reader.labels.user_id_label,
+                    self.reader.labels.item_id_label,
+                ]
+                if self.reader.rating_type == RatingType.EXPLICIT:
+                    # In case the RatingType is explicit, we add the
+                    # score label and read scores from the source.
+                    _column_names.append(self.reader.labels.rating_label)
+                if self.splitter.strategy in [
+                    SplittingStrategies.TEMPORAL_HOLDOUT,
+                    SplittingStrategies.TEMPORAL_LEAVE_K_OUT,
+                ]:
+                    # In case the SplittingStrategy is temporal, we add the
+                    # timestamp label and read timestamps from the source.
+                    _column_names.append(self.reader.labels.timestamp_label)
 
-            # Check if column name defined in config are present in the header of the local file
-            if not set(_column_names).issubset(set(_header)):
-                raise ValueError(
-                    "Column labels required do not match with the "
-                    "column names found in the local file."
-                )
+                # Check if column name defined in config are present in the header of the local file
+                if not set(_column_names).issubset(set(_header)):
+                    raise ValueError(
+                        "Column labels required do not match with the "
+                        "column names found in the local file."
+                    )
+            else:
+                # If the header is not present, we check if the number of columns
+                # in the file matches the number of columns expected.
+                _expected_columns = 2  # user_id and item_id
+                if self.reader.rating_type == RatingType.EXPLICIT:
+                    _expected_columns += 1
+                if self.splitter.strategy in [
+                    SplittingStrategies.TEMPORAL_HOLDOUT,
+                    SplittingStrategies.TEMPORAL_LEAVE_K_OUT,
+                ]:
+                    _expected_columns += 1
+                if len(_header) != _expected_columns:
+                    raise ValueError(
+                        "The number of columns in the local file does not match "
+                        "the number of columns expected. Check the configuration."
+                    )
 
         # Check if experiment has been set up correctly
         if not self.writer.setup_experiment:
