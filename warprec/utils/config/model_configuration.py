@@ -29,6 +29,7 @@ class Meta(BaseModel):
 
     Attributes:
         save_model (Optional[bool]): Whether save or not the model state after training.
+        save_recs (Optional[bool]): Whether save or not the recommendations after training.
         keep_all_ray_checkpoints (Optional[bool]): Wether or not to save all the
             checkpoints for the model optimization.
         load_from (Optional[str]): The path where a previous model state has been saved.
@@ -36,6 +37,7 @@ class Meta(BaseModel):
     """
 
     save_model: Optional[bool] = False
+    save_recs: Optional[bool] = False
     keep_all_ray_checkpoints: Optional[bool] = False
     load_from: Optional[str] = None
     implementation: Optional[str] = "latest"
