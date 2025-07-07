@@ -1,7 +1,7 @@
 import shutil
 from os.path import join
 from pathlib import Path
-from typing import Dict
+from typing import Dict, List
 from datetime import datetime
 from abc import ABC, abstractmethod
 
@@ -19,6 +19,7 @@ from warprec.utils.config import (
     SplitWriting,
     RecommendationWriting,
 )
+from warprec.utils.config.common import Labels
 from warprec.utils.logger import logger
 
 
@@ -350,7 +351,12 @@ class LocalWriter(Writer):
             logger.negative(f"Error writing parameters to {_path}: {e}")
 
     def write_split(
-        self, dataset: Dataset, sep: str = "\t", ext: str = ".tsv", header: bool = True
+        self,
+        dataset: Dataset,
+        sep: str = "\t",
+        ext: str = ".tsv",
+        header: bool = True,
+        column_names: List[str] | None = None,
     ) -> None:
         """This method writes the split into a local path.
 
@@ -359,32 +365,58 @@ class LocalWriter(Writer):
             sep (str): The separator that will be used to write the results.
             ext (str): The extension that will be used to write the results.
             header (bool): Whether to write the header in the file.
+            column_names (List[str] | None): Optional list of column names to use for the DataFrame.
+                If None, the DataFrame's existing columns will be used.
         """
         if self.config:
             writing_params = self.config.writer.split
         else:
-            writing_params = SplitWriting(sep=sep, ext=ext, header=header)
+            if not column_names:
+                column_names = dataset.train_set._inter_df.columns
+            writing_params = SplitWriting(
+                sep=sep, ext=ext, header=header, labels=Labels.from_list(column_names)
+            )
 
         path_train = join(self.experiment_split_dir, "train" + writing_params.ext)
         path_test = join(self.experiment_split_dir, "test" + writing_params.ext)
         path_val = join(self.experiment_split_dir, "val" + writing_params.ext)
 
+        # Check the column to use
+        infos = dataset.info()
+        validated_column_names = [
+            writing_params.labels.user_id_label,
+            writing_params.labels.item_id_label,
+        ]
+        if infos["has_explicit_ratings"]:
+            validated_column_names.append(writing_params.labels.rating_label)
+        if infos["has_timestamp"]:
+            validated_column_names.append(writing_params.labels.timestamp_label)
+
+        print(self.config.writer.model_dump())
+        print(validated_column_names)
+
         if dataset.train_set is not None:
-            dataset.train_set.get_df().to_csv(
+            df = dataset.train_set.get_df()
+            df.columns = validated_column_names
+            df.to_csv(
                 path_train,
                 sep=writing_params.sep,
                 header=writing_params.header,
                 index=None,
             )
         if dataset.test_set is not None:
-            dataset.test_set.get_df().to_csv(
+            df = dataset.test_set.get_df()
+            df.columns = validated_column_names
+            df.to_csv(
                 path_test,
                 sep=writing_params.sep,
                 header=writing_params.header,
                 index=None,
             )
         if dataset.val_set is not None:
-            dataset.val_set.get_df().to_csv(
+            df = dataset.val_set.get_df()
+            df.columns = validated_column_names
+            df.to_csv(
                 path_val,
                 sep=writing_params.sep,
                 header=writing_params.header,

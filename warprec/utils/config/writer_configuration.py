@@ -2,7 +2,7 @@ import os
 from typing import Optional, List
 
 from pydantic import BaseModel, Field, field_validator, model_validator
-from warprec.utils.config.common import check_separator
+from warprec.utils.config.common import check_separator, Labels
 from warprec.utils.enums import WritingMethods
 
 
@@ -65,11 +65,13 @@ class SplitWriting(BaseModel):
         sep (str): The separator to use for the split files.
         ext (str): The extension of the split files.
         header (bool): Whether or not to write the header in the split files.
+        labels (Labels): The labels to use for the split files.
     """
 
     sep: str = "\t"
     ext: str = ".tsv"
     header: bool = True
+    labels: Labels = Field(default_factory=Labels)
 
     @field_validator("sep")
     @classmethod
