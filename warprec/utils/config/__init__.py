@@ -1,11 +1,11 @@
 from . import recommender_model_config
+from .common import Labels
 from .dashboard_configuration import DashboardConfig, Wandb, CodeCarbon, MLflow
 from .evaluation_configuration import EvaluationConfig
 from .general_configuration import GeneralConfig, WarpRecCallbackConfig
 from .model_configuration import RecomModel
 from .reader_configuration import (
     ReaderConfig,
-    Labels,
     CustomDtype,
     SplitReading,
     SideInformationReading,
@@ -23,6 +23,7 @@ from .config import Configuration, load_yaml, load_callback
 
 __all__ = [
     "recommender_model_config",
+    "Labels",
     "DashboardConfig",
     "Wandb",
     "CodeCarbon",
@@ -32,7 +33,6 @@ __all__ = [
     "WarpRecCallbackConfig",
     "RecomModel",
     "ReaderConfig",
-    "Labels",
     "CustomDtype",
     "SplitReading",
     "SideInformationReading",

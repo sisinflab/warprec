@@ -3,7 +3,7 @@ from typing import Optional, List, ClassVar, Dict
 import numpy as np
 from pydantic import BaseModel, Field, field_validator, model_validator
 from warprec.utils.enums import RatingType, ReadingMethods
-from warprec.utils.config.common import check_separator
+from warprec.utils.config.common import check_separator, Labels
 from warprec.utils.logger import logger
 
 
@@ -79,49 +79,6 @@ class ClusteringInformationReading(BaseModel):
     def check_sep(cls, v: str):
         """Validates the separator."""
         return check_separator(v)
-
-
-class Labels(BaseModel):
-    """Definition of the label sub-configuration.
-
-    This class reads and optionally overrides the default labels of important data.
-
-    Attributes:
-        user_id_label (Optional[str]): Name of the user ID label. Defaults to 'user_id'.
-        item_id_label (Optional[str]): Name of the item ID label. Defaults to 'item_id'.
-        rating_label (Optional[str]): Name of the rating label. Defaults to 'rating'.
-        timestamp_label (Optional[str]): Name of the timestamp label. Defaults to 'timestamp'.
-        cluster_label (Optional[str]): Name of the cluster label. Defaults to 'cluster'.
-    """
-
-    user_id_label: Optional[str] = "user_id"
-    item_id_label: Optional[str] = "item_id"
-    rating_label: Optional[str] = "rating"
-    timestamp_label: Optional[str] = "timestamp"
-    cluster_label: Optional[str] = "cluster"
-
-    @classmethod
-    def from_list(cls, labels: List[str]) -> "Labels":
-        """Creates a Labels instance from a list of labels.
-
-        Args:
-            labels (List[str]): A list of labels in the order of:
-                user_id, item_id, rating, timestamp.
-
-        Returns:
-            Labels: An instance of the Labels class with the provided labels.
-
-        Raises:
-            ValueError: If the input is not a list of length 4.
-        """
-        if not isinstance(labels, list) | len(labels) != 4:
-            raise ValueError("Input must be a list of length 4.")
-        return cls(
-            user_id_label=labels[0],
-            item_id_label=labels[1],
-            rating_label=labels[2],
-            timestamp_label=labels[3],
-        )
 
 
 class CustomDtype(BaseModel):
