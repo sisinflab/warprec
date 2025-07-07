@@ -392,9 +392,6 @@ class LocalWriter(Writer):
         if infos["has_timestamp"]:
             validated_column_names.append(writing_params.labels.timestamp_label)
 
-        print(self.config.writer.model_dump())
-        print(validated_column_names)
-
         if dataset.train_set is not None:
             df = dataset.train_set.get_df()
             df.columns = validated_column_names
