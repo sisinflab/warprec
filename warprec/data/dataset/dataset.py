@@ -38,6 +38,8 @@ class Dataset(ABC):
 
     def __init__(self):
         # Set mappings
+        self._has_explicit_ratings: bool = False
+        self._has_timestamp: bool = False
         self._nuid: int = 0
         self._niid: int = 0
         self._nfeat: int = 0
@@ -102,6 +104,8 @@ class Dataset(ABC):
                 the dataset.
         """
         return {
+            "has_explicit_ratings": self._has_explicit_ratings,
+            "has_timestamp": self._has_timestamp,
             "items": self._niid,
             "users": self._nuid,
             "features": self._nfeat,
@@ -199,6 +203,19 @@ class TransactionDataset(Dataset):
         # Calculate mapping for users and items
         self._umap = {user: i for i, user in enumerate(_uid)}
         self._imap = {item: i for i, item in enumerate(_iid)}
+
+        # Save other information about the data
+        self._has_explicit_ratings = (
+            True if rating_type == RatingType.EXPLICIT else False
+        )
+        self._has_timestamp = (
+            True
+            if self._has_explicit_ratings
+            and len(train_data.columns) == 4
+            or not self._has_explicit_ratings
+            and len(train_data.columns) == 3
+            else False
+        )
 
         # Save side information inside the dataset
         self.side = side_data if side_data is not None else None
