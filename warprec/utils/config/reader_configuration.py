@@ -119,6 +119,7 @@ class ReaderConfig(BaseModel):
             of the dataset.
         labels (Labels): The labels sub-configuration. Defaults to Labels default values.
         dtypes (CustomDtype): The list of column dtype.
+        column_names (ClassVar[List[str]]): The names of the columns in the dataset.
         column_map_dtype (ClassVar[dict]): The mapping between the string dtype
             and their numpy counterpart.
     """
@@ -135,6 +136,12 @@ class ReaderConfig(BaseModel):
     clustering: Optional[ClusteringInformationReading] = None
     labels: Labels = Field(default_factory=Labels)
     dtypes: CustomDtype = Field(default_factory=CustomDtype)
+    column_names: ClassVar[List[str]] = [
+        "user_id",
+        "item_id",
+        "rating",
+        "timestamp",
+    ]
 
     # Supported dtype
     column_map_dtype: ClassVar[dict] = {
@@ -207,26 +214,13 @@ class ReaderConfig(BaseModel):
 
         return self
 
-    def column_names(self) -> List[str]:
-        """This method returns the names of the column passed through configuration.
-
-        Returns:
-            List[str]: The list of column names.
-        """
-        return [
-            self.labels.user_id_label,
-            self.labels.item_id_label,
-            self.labels.rating_label,
-            self.labels.timestamp_label,
-        ]
-
     def column_dtype(self) -> Dict[str, np.dtype]:
         """This method will parse the dtype from the string forma to their numpy counterpart.
 
         Returns:
             Dict[str, np.dtype]: A list containing the dtype to use for data loading.
         """
-        column_names = self.column_names()
+        column_names = self.column_names
         column_dtypes = [
             self.dtypes.user_id_type,
             self.dtypes.item_id_type,

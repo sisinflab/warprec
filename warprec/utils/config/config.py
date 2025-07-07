@@ -138,26 +138,42 @@ class Configuration(BaseModel):
 
                 # Check if column name defined in config are present in the header of the local file
                 if not set(_column_names).issubset(set(_header)):
-                    raise ValueError(
+                    error_msg = (
                         "Column labels required do not match with the "
-                        "column names found in the local file."
+                        "column names found in the local file. "
+                        f"Expected: {', '.join(_column_names)}. "
+                        f"Found: {', '.join(_header)}. "
                     )
+
+                    raise ValueError(error_msg)
+
+                # Updating reader config with the column names
+                ReaderConfig.column_names = _column_names
             else:
                 # If the header is not present, we check if the number of columns
                 # in the file matches the number of columns expected.
                 _expected_columns = 2  # user_id and item_id
+                _column_names = [
+                    self.reader.labels.user_id_label,
+                    self.reader.labels.item_id_label,
+                ]
                 if self.reader.rating_type == RatingType.EXPLICIT:
                     _expected_columns += 1
+                    _column_names.append(self.reader.labels.rating_label)
                 if self.splitter.strategy in [
                     SplittingStrategies.TEMPORAL_HOLDOUT,
                     SplittingStrategies.TEMPORAL_LEAVE_K_OUT,
                 ]:
                     _expected_columns += 1
+                    _column_names.append(self.reader.labels.timestamp_label)
                 if len(_header) != _expected_columns:
                     raise ValueError(
                         "The number of columns in the local file does not match "
                         "the number of columns expected. Check the configuration."
                     )
+
+                # Updating reader config with the column names
+                ReaderConfig.column_names = _column_names
 
         # Check if experiment has been set up correctly
         if not self.writer.setup_experiment:

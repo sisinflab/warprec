@@ -110,12 +110,12 @@ class LocalReader(Reader):
             data = pd.read_csv(
                 read_config.local_path,
                 sep=read_config.sep,
-                usecols=read_config.column_names(),
+                usecols=read_config.column_names,
                 dtype=read_config.column_dtype(),
             )
         else:
             data = pd.read_csv(read_config.local_path, sep=read_config.sep, header=None)
-            data.columns = read_config.column_names()
+            data.columns = read_config.column_names
         logger.msg("Data loaded correctly from local source.")
 
         return data
@@ -213,7 +213,7 @@ class LocalReader(Reader):
                 train_data = pd.read_csv(
                     path_train,
                     sep=read_config.split.sep,
-                    usecols=read_config.column_names(),
+                    usecols=read_config.column_names,
                     dtype=read_config.column_dtype(),
                 )
             else:
@@ -222,14 +222,14 @@ class LocalReader(Reader):
                     sep=read_config.split.sep,
                     header=None,
                 )
-                train_data.columns = read_config.column_names()
+                train_data.columns = read_config.column_names
 
             if isfile(path_test):
                 if read_config.split.header:
                     test_data = pd.read_csv(
                         path_test,
                         sep=read_config.split.sep,
-                        usecols=read_config.column_names(),
+                        usecols=read_config.column_names,
                         dtype=read_config.column_dtype(),
                     )
                 else:
@@ -238,14 +238,14 @@ class LocalReader(Reader):
                         sep=read_config.split.sep,
                         header=None,
                     )
-                    test_data.columns = read_config.column_names()
+                    test_data.columns = read_config.column_names
 
             if isfile(path_val):
                 if read_config.split.header:
                     val_data = pd.read_csv(
                         path_val,
                         sep=read_config.split.sep,
-                        usecols=read_config.column_names(),
+                        usecols=read_config.column_names,
                         dtype=read_config.column_dtype(),
                     )
                 else:
@@ -254,7 +254,7 @@ class LocalReader(Reader):
                         sep=read_config.split.sep,
                         header=None,
                     )
-                    val_data.columns = read_config.column_names()
+                    val_data.columns = read_config.column_names
 
             return (train_data, test_data, val_data)
         raise FileNotFoundError(f"Train split not found in {path_train}")
