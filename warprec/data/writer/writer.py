@@ -393,7 +393,7 @@ class LocalWriter(Writer):
             validated_column_names.append(writing_params.labels.timestamp_label)
 
         if dataset.train_set is not None:
-            df = dataset.train_set.get_df()
+            df = dataset.train_set.get_df().copy()
             df.columns = validated_column_names
             df.to_csv(
                 path_train,
@@ -402,7 +402,7 @@ class LocalWriter(Writer):
                 index=None,
             )
         if dataset.test_set is not None:
-            df = dataset.test_set.get_df()
+            df = dataset.test_set.get_df().copy()
             df.columns = validated_column_names
             df.to_csv(
                 path_test,
@@ -411,7 +411,7 @@ class LocalWriter(Writer):
                 index=None,
             )
         if dataset.val_set is not None:
-            df = dataset.val_set.get_df()
+            df = dataset.val_set.get_df().copy()
             df.columns = validated_column_names
             df.to_csv(
                 path_val,
