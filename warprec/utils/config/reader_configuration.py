@@ -3,7 +3,7 @@ from typing import Optional, List, ClassVar, Dict
 import numpy as np
 from pydantic import BaseModel, Field, field_validator, model_validator
 from warprec.utils.enums import RatingType, ReadingMethods
-from warprec.utils.config.common import check_separator
+from warprec.utils.config.common import check_separator, Labels
 from warprec.utils.logger import logger
 
 
@@ -16,11 +16,13 @@ class SplitReading(BaseModel):
         local_path (Optional[str]): The directory where the splits are saved.
         ext (Optional[str]): The extension of the split files.
         sep (Optional[str]): The separator of the split files.
+        header (Optional[bool]): Whether the file has a header or not. Defaults to True.
     """
 
     local_path: Optional[str] = None
     ext: Optional[str] = ".tsv"
     sep: Optional[str] = "\t"
+    header: Optional[bool] = True
 
     @field_validator("sep")
     @classmethod
@@ -37,10 +39,12 @@ class SideInformationReading(BaseModel):
     Attributes:
         local_path (Optional[str]): The directory where the side information are saved.
         sep (Optional[str]): The separator of the split files.
+        header (Optional[bool]): Whether the file has a header or not. Defaults to True.
     """
 
     local_path: Optional[str] = None
     sep: Optional[str] = "\t"
+    header: Optional[bool] = True
 
     @field_validator("sep")
     @classmethod
@@ -59,61 +63,22 @@ class ClusteringInformationReading(BaseModel):
         item_local_path (Optional[str]): The path to the item clustering information.
         user_sep (Optional[str]): The separator of the user clustering file.
         item_sep (Optional[str]): The separator of the item clustering file.
+        user_header (Optional[bool]): Whether the user clustering file has a header. Defaults to True.
+        item_header (Optional[bool]): Whether the item clustering file has a header. Defaults to True.
     """
 
     user_local_path: Optional[str] = None
     item_local_path: Optional[str] = None
     user_sep: Optional[str] = "\t"
     item_sep: Optional[str] = "\t"
+    user_header: Optional[bool] = True
+    item_header: Optional[bool] = True
 
     @field_validator("user_sep", "item_sep")
     @classmethod
     def check_sep(cls, v: str):
         """Validates the separator."""
         return check_separator(v)
-
-
-class Labels(BaseModel):
-    """Definition of the label sub-configuration.
-
-    This class reads and optionally overrides the default labels of important data.
-
-    Attributes:
-        user_id_label (Optional[str]): Name of the user ID label. Defaults to 'user_id'.
-        item_id_label (Optional[str]): Name of the item ID label. Defaults to 'item_id'.
-        rating_label (Optional[str]): Name of the rating label. Defaults to 'rating'.
-        timestamp_label (Optional[str]): Name of the timestamp label. Defaults to 'timestamp'.
-        cluster_label (Optional[str]): Name of the cluster label. Defaults to 'cluster'.
-    """
-
-    user_id_label: Optional[str] = "user_id"
-    item_id_label: Optional[str] = "item_id"
-    rating_label: Optional[str] = "rating"
-    timestamp_label: Optional[str] = "timestamp"
-    cluster_label: Optional[str] = "cluster"
-
-    @classmethod
-    def from_list(cls, labels: List[str]) -> "Labels":
-        """Creates a Labels instance from a list of labels.
-
-        Args:
-            labels (List[str]): A list of labels in the order of:
-                user_id, item_id, rating, timestamp.
-
-        Returns:
-            Labels: An instance of the Labels class with the provided labels.
-
-        Raises:
-            ValueError: If the input is not a list of length 4.
-        """
-        if not isinstance(labels, list) | len(labels) != 4:
-            raise ValueError("Input must be a list of length 4.")
-        return cls(
-            user_id_label=labels[0],
-            item_id_label=labels[1],
-            rating_label=labels[2],
-            timestamp_label=labels[3],
-        )
 
 
 class CustomDtype(BaseModel):
@@ -145,6 +110,7 @@ class ReaderConfig(BaseModel):
         reading_method (ReadingMethods): The strategy used to read the data.
         local_path (Optional[str | None]): The path to the local dataset.
         sep (Optional[str]): The separator of the file to read.
+        header (Optional[bool]): Whether the file has a header or not. Defaults to True.
         rating_type (RatingType): The type of rating to be used. If 'implicit' is chosen,
             the reader will not look for a score.
         split (Optional[SplitReading]): The information of the split reading process.
@@ -153,6 +119,7 @@ class ReaderConfig(BaseModel):
             of the dataset.
         labels (Labels): The labels sub-configuration. Defaults to Labels default values.
         dtypes (CustomDtype): The list of column dtype.
+        column_names (ClassVar[List[str]]): The names of the columns in the dataset.
         column_map_dtype (ClassVar[dict]): The mapping between the string dtype
             and their numpy counterpart.
     """
@@ -162,12 +129,19 @@ class ReaderConfig(BaseModel):
     reading_method: ReadingMethods
     local_path: Optional[str | None] = None
     sep: Optional[str] = "\t"
+    header: Optional[bool] = True
     rating_type: RatingType
     split: Optional[SplitReading] = Field(default_factory=SplitReading)
     side: Optional[SideInformationReading] = None
     clustering: Optional[ClusteringInformationReading] = None
     labels: Labels = Field(default_factory=Labels)
     dtypes: CustomDtype = Field(default_factory=CustomDtype)
+    column_names: ClassVar[List[str]] = [
+        "user_id",
+        "item_id",
+        "rating",
+        "timestamp",
+    ]
 
     # Supported dtype
     column_map_dtype: ClassVar[dict] = {
@@ -240,26 +214,13 @@ class ReaderConfig(BaseModel):
 
         return self
 
-    def column_names(self) -> List[str]:
-        """This method returns the names of the column passed through configuration.
-
-        Returns:
-            List[str]: The list of column names.
-        """
-        return [
-            self.labels.user_id_label,
-            self.labels.item_id_label,
-            self.labels.rating_label,
-            self.labels.timestamp_label,
-        ]
-
     def column_dtype(self) -> Dict[str, np.dtype]:
         """This method will parse the dtype from the string forma to their numpy counterpart.
 
         Returns:
             Dict[str, np.dtype]: A list containing the dtype to use for data loading.
         """
-        column_names = self.column_names()
+        column_names = self.column_names
         column_dtypes = [
             self.dtypes.user_id_type,
             self.dtypes.item_id_type,

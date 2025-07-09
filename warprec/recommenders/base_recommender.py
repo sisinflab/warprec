@@ -238,6 +238,11 @@ class Recommender(nn.Module, ABC):
 
 
 class GraphRecommenderUtils(ABC):
+    """Common definition for graph recommenders.
+
+    Collection of common method used by all graph recommenders.
+    """
+
     def _get_adj_mat(
         self,
         interaction_matrix: coo_matrix,
@@ -297,6 +302,35 @@ class GraphRecommenderUtils(ABC):
         item_embeddings = item_embedding.weight
         ego_embeddings = torch.cat([user_embeddings, item_embeddings], dim=0)
         return ego_embeddings
+
+
+class SequentialRecommenderUtils(ABC):
+    """Common definition for sequential recommenders.
+
+    Collection of common method used by all sequential recommenders.
+
+    Attributes:
+        max_seq_len (int): This value will be used to truncate user sequences.
+            More recent transaction will have priority over older ones in case
+            a sequence needs to be truncated. If a sequence is smaller than the
+            max_seq_len, it will be padded.
+    """
+
+    max_seq_len: int = 0
+
+    def _gather_indexes(self, output: Tensor, gather_index: Tensor) -> Tensor:
+        """Gathers the output from specific indexes for each batch.
+
+        Args:
+            output (Tensor): The tensor to gather the indices from.
+            gather_index (Tensor): The indices to gather.
+
+        Returns:
+            Tensor: The gathered values flattened.
+        """
+        gather_index = gather_index.view(-1, 1, 1).expand(-1, 1, output.shape[-1])
+        output_flatten = output.gather(dim=1, index=gather_index)
+        return output_flatten.squeeze(1)
 
 
 def generate_model_name(model_name: str, params: dict) -> str:
