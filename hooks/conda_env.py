@@ -15,7 +15,6 @@ CONDA_PACKAGES = {
     "scikit-learn",
     "mlflow",
     "pydantic",
-    "torch",
     "tensorboard",
     "hyperopt",
     "tabulate",
@@ -100,7 +99,6 @@ dependencies:
             env_yml += f"    - {dep}\n"
 
     OUTPUT_PATH.write_text(env_yml)
-    print(f"✅ Created {OUTPUT_PATH}")
 
 
 if __name__ == "__main__":
