@@ -68,6 +68,12 @@ repos:
         pass_filenames: false
         always_run: true
 
+      - id: export-environment
+        name: Generate Conda environment from requirements.txt
+        entry: poetry run python hooks/conda_env.py
+        language: system
+        always_run: true
+
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v5.0.0
     hooks:
