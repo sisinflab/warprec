@@ -53,6 +53,40 @@ The project includes a Makefile to simplify common operations:
     ```bash
     make test
 
+### 🐍 Installing the environment with `requirements.txt`
+
+1. (Optional) Create and activate virtual environment:
+```bash
+    python -m venv .venv
+    source .venv/bin/activate  # or .venv\Scripts\activate on Windows
+```
+
+2. Install dependencies with pip:
+```bash
+    pip install -r requirements.txt
+```
+
+### 🧪 Installing the environment with `environment.yml` (with Conda or Mamba)
+
+1. Create the environment:
+```bash
+    conda env create -f environment.yml
+```
+
+or, using Mamba:
+```bash
+    mamba env create -f environment.yml
+```
+
+2. Activate the environment:
+```bash
+    conda activate warprec
+```
+
+#### ⚠️ Notes
+
+While these environments are made available for convenience and broader compatibility, **Poetry remains the preferred tool for development**, ensuring consistency with the project's setup.
+
 ## 🚂 Usage
 
 ### 🏋️‍♂️ Training a model
