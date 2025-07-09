@@ -43,45 +43,21 @@ Whether you're learning how recommender systems work or conducting high-performa
 
 The project includes a Makefile to simplify common operations:
 
-- Install dependencies:
+- 🎼 Install dependencies with Poetry:
     ```bash
     make install
-- Run linting:
+- 🧪 Install dependencies with venv:
+    ```bash
+    make install-venv
+- 🐍 Install dependencies with Conda/Mamba:
+    ```bash
+    make install-conda
+- 🧹 Run linting:
     ```bash
     make lint
-- Run tests:
+- 🧑‍🔬 Run tests:
     ```bash
     make test
-
-### 🐍 Installing the environment with `requirements.txt`
-
-1. (Optional) Create and activate virtual environment:
-```bash
-    python -m venv .venv
-    source .venv/bin/activate  # or .venv\Scripts\activate on Windows
-```
-
-2. Install dependencies with pip:
-```bash
-    pip install -r requirements.txt
-```
-
-### 🧪 Installing the environment with `environment.yml` (with Conda or Mamba)
-
-1. Create the environment:
-```bash
-    conda env create -f environment.yml
-```
-
-or, using Mamba:
-```bash
-    mamba env create -f environment.yml
-```
-
-2. Activate the environment:
-```bash
-    conda activate warprec
-```
 
 #### ⚠️ Notes
 
