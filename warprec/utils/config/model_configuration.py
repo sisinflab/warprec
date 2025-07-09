@@ -29,6 +29,7 @@ class Meta(BaseModel):
 
     Attributes:
         save_model (Optional[bool]): Whether save or not the model state after training.
+        save_recs (Optional[bool]): Whether save or not the recommendations after training.
         keep_all_ray_checkpoints (Optional[bool]): Wether or not to save all the
             checkpoints for the model optimization.
         load_from (Optional[str]): The path where a previous model state has been saved.
@@ -36,6 +37,7 @@ class Meta(BaseModel):
     """
 
     save_model: Optional[bool] = False
+    save_recs: Optional[bool] = False
     keep_all_ray_checkpoints: Optional[bool] = False
     load_from: Optional[str] = None
     implementation: Optional[str] = "latest"
@@ -265,6 +267,7 @@ class RecomModel(BaseModel, ABC):
         meta (Meta): The meta-information about the model. Defaults to Meta default values.
         optimization (Optimization): The optimization information that will be used by Ray Tune.
         need_side_information (ClassVar[bool]): Wether or not the model needs side information.
+        need_timestamp (ClassVar[bool]): Wether or not the model needs the timestamp.
         need_single_trial_validation (ClassVar[bool]): Wether or not the model needs to be
             validated during training.
     """
@@ -272,6 +275,7 @@ class RecomModel(BaseModel, ABC):
     meta: Meta = Field(default_factory=Meta)
     optimization: Optimization = Field(default_factory=Optimization)
     need_side_information: ClassVar[bool] = False
+    need_timestamp: ClassVar[bool] = False
     need_single_trial_validation: ClassVar[bool] = False
 
     @model_validator(mode="after")

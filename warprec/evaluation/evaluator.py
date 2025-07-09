@@ -9,7 +9,10 @@ from tabulate import tabulate
 from math import ceil
 from warprec.data.dataset import Dataset
 from warprec.evaluation.metrics.base_metric import BaseMetric
-from warprec.recommenders.base_recommender import Recommender
+from warprec.recommenders.base_recommender import (
+    Recommender,
+    SequentialRecommenderUtils,
+)
 from warprec.utils.enums import MetricBlock
 from warprec.utils.logger import logger
 from warprec.utils.registry import metric_registry
@@ -120,20 +123,38 @@ class Evaluator:
         self.reset_metrics()
         model.eval()
 
-        # Keep a copy of the full training set, if needed
+        # Extract main data structures from dataset
         train_set = dataset.train_set
+        train_session = dataset.train_session
 
         # Iter over batches
         _start = 0
         for train_batch, test_batch, val_batch in dataset:
             _end = _start + train_batch.shape[0]  # Track strat - end of batch iteration
+            current_users_idx_list = list(range(_start, _end))  # List of user idxs
+
+            # If we are evaluating a sequential model, compute user history
+            user_seq, seq_len = None, None
+            if isinstance(model, SequentialRecommenderUtils):
+                user_seq, seq_len = train_session.get_user_history_sequences(
+                    current_users_idx_list,
+                    model.max_seq_len,  # Sequence length truncated
+                )
+
             eval_set = test_batch if test_set else val_batch
             ground = torch.tensor(
                 (eval_set).toarray(), device=device
             )  # Ground tensor [batch_size x items]
+            user_id_tensor = torch.tensor(current_users_idx_list, dtype=torch.long)
 
             predictions = model.predict(
-                train_batch, start=_start, end=_end, train_set=train_set
+                train_batch,
+                start=_start,
+                end=_end,
+                train_set=train_set,
+                user_seq=user_seq,
+                user_id=user_id_tensor,
+                seq_len=seq_len,
             ).to(device)  # Get ratings tensor [batch_size x items]
 
             # Pre-compute metric blocks

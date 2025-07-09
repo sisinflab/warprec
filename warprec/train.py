@@ -6,7 +6,7 @@ from warprec.data.reader import LocalReader
 from warprec.data.writer import LocalWriter
 from warprec.data.splitting import Splitter
 from warprec.data.dataset import TransactionDataset
-from warprec.utils.config import load_yaml
+from warprec.utils.config import load_yaml, load_callback
 from warprec.utils.logger import logger
 from warprec.recommenders.trainer import Trainer
 from warprec.recommenders.base_recommender import generate_model_name
@@ -22,6 +22,13 @@ def main(args: Namespace):
 
     # Config parser testing
     config = load_yaml(args.config)
+
+    # Load custom callback if specified
+    callback = load_callback(
+        config.general.callback,
+        *config.general.callback.args,
+        **config.general.callback.kwargs,
+    )
 
     # Writer module testing
     writer = LocalWriter(config=config)
@@ -60,6 +67,10 @@ def main(args: Namespace):
                     item_cluster=item_cluster,
                     batch_size=config.general.batch_size,
                     rating_type=config.reader.rating_type,
+                    rating_label=config.reader.labels.rating_label,
+                    timestamp_label=config.reader.labels.timestamp_label,
+                    cluster_label=config.reader.labels.cluster_label,
+                    need_session_based_information=config.need_session_based_information,
                     precision=config.general.precision,
                 )
             else:
@@ -88,10 +99,22 @@ def main(args: Namespace):
                 item_cluster=item_cluster,
                 batch_size=config.general.batch_size,
                 rating_type=config.reader.rating_type,
+                rating_label=config.reader.labels.rating_label,
+                timestamp_label=config.reader.labels.timestamp_label,
+                cluster_label=config.reader.labels.cluster_label,
+                need_session_based_information=config.need_session_based_information,
                 precision=config.general.precision,
             )
         else:
             raise ValueError("Data type not yet supported.")
+
+    # Callback on dataset creation
+    callback.on_dataset_creation(
+        dataset=dataset,
+        train_set=train,
+        test_set=test,
+        val_set=val,
+    )
 
     if config.splitter and config.writer.save_split:
         writer.write_split(dataset)
@@ -124,9 +147,13 @@ def main(args: Namespace):
             beta=config.evaluation.beta,
             pop_ratio=config.evaluation.pop_ratio,
             ray_verbose=config.general.ray_verbose,
+            custom_callback=callback,
             config=config,
         )
         best_model, checkpoint_param = trainer.train_and_evaluate()
+
+        # Callback on training complete
+        callback.on_training_complete(model=best_model)
 
         # Evaluation testing
         result_dict = {}
@@ -143,6 +170,13 @@ def main(args: Namespace):
         evaluator.print_console(results, "Test", config.evaluation.max_metric_per_row)
         result_dict["Test"] = results
 
+        # Callback after complete evaluation
+        callback.on_evaluation_complete(
+            model=best_model,
+            params=params,
+            results=result_dict,
+        )
+
         # Write results of current model
         writer.write_results(
             result_dict,
@@ -150,13 +184,13 @@ def main(args: Namespace):
         )
 
         # Recommendation
-        if config.general.recommendation.save_recs:
+        if params["meta"]["save_recs"]:
             umap_i, imap_i = dataset.get_inverse_mappings()
             recs = best_model.get_recs(
                 dataset.train_set,
                 umap_i,
                 imap_i,
-                k=config.general.recommendation.k,
+                k=config.writer.recommendation.k,
                 batch_size=config.general.batch_size,
             )
             writer.write_recs(recs, model_name)
