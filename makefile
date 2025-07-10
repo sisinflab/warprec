@@ -5,9 +5,6 @@ PYTHON := python3.12
 ENV_NAME := warprec
 INSTALL_STAMP := .install.stamp
 
-# This is the fixed version of torch for WarpRec
-TORCH_VERSION := 2.6.0
-
 .PHONY: help
 help:
 	@echo "Available commands:"
@@ -17,7 +14,6 @@ help:
 	@echo "  lint       	- Run code linters"
 	@echo "  test       	- Run tests"
 
-
 ################################################################################
 ## Poetry install
 .PHONY: install-poetry
@@ -26,7 +22,6 @@ install-poetry:
 	poetry env use ${PYTHON}
 	poetry install
 
-	@echo "🔍 Detecting CUDA version..."
 	@CUDA_SUFFIX="cpu"; \
 	if command -v nvcc &> /dev/null; then \
 		CUDA_VERSION=$$(nvcc --version | grep "release" | sed 's/.*release \([0-9]\+\.[0-9]\+\).*/\1/'); \
@@ -37,29 +32,37 @@ install-poetry:
 			"12.4") CUDA_SUFFIX="cu124";; \
 			"12.6") CUDA_SUFFIX="cu126";; \
 			*) \
-				echo "❌ ERROR: Unsupported CUDA version '$$CUDA_VERSION'. Supported versions are 11.8, 12.1, 12.4, 12.6."; \
+				echo "❌ ERROR: Unsupported CUDA version '$$CUDA_VERSION'. Supported: 11.8, 12.1, 12.4, 12.6."; \
 				exit 1;; \
 		esac; \
 	else \
 		echo "⚠️ WARNING: 'nvcc' not found. Installing CPU version of PyTorch."; \
 	fi; \
 	\
-	TORCH_INSTALL_VERSION="$(TORCH_VERSION)+$$CUDA_SUFFIX"; \
-	PYG_URL="https://data.pyg.org/whl/torch-$$TORCH_INSTALL_VERSION.html"; \
+	# Define the version map inline \
+	case "$$CUDA_SUFFIX" in \
+		cu118) TORCH_FULL="2.7.0+cu118";; \
+		cu121) TORCH_FULL="2.5.1+cu121";; \
+		cu124) TORCH_FULL="2.6.0+cu124";; \
+		cu126) TORCH_FULL="2.7.0+cu126";; \
+		cpu)   TORCH_FULL="2.7.0+cpu";; \
+		*) echo "❌ ERROR: No mapping for $$CUDA_SUFFIX"; exit 1;; \
+	esac; \
+	TORCH_BASE=$$(echo $$TORCH_FULL | sed 's/+.*//'); \
 	\
-	echo "⬇️ Installing torch==$(TORCH_VERSION) for $$CUDA_SUFFIX..."; \
-	poetry run pip install torch==$(TORCH_VERSION) --index-url https://download.pytorch.org/whl/$$CUDA_SUFFIX; \
+	echo "⬇️ Installing torch==$$TORCH_BASE for $$CUDA_SUFFIX..."; \
+	poetry run pip install torch==$$TORCH_BASE --index-url https://download.pytorch.org/whl/$$CUDA_SUFFIX; \
 	\
-	echo "⬇️ Installing PyG dependencies from $$PYG_URL..."; \
+	echo "⬇️ Installing PyG deps for torch $$TORCH_FULL..."; \
 	poetry run pip install \
 		torch-scatter \
 		torch-sparse \
 		torch-cluster \
 		torch-spline-conv \
-	-f $$PYG_URL; \
+		-f https://data.pyg.org/whl/torch-$$TORCH_FULL.html; \
 	\
 	poetry run pip install torch-geometric torchmetrics; \
-	echo "✅ PyTorch and PyG dependencies installed successfully."
+	echo "✅ All dependencies installed successfully."
 
 
 ################################################################################
@@ -72,7 +75,6 @@ install-venv:
 	pip install --upgrade pip && \
 	pip install -r requirements.txt && \
 	\
-	echo "🔍 Detecting CUDA version for venv environment..." && \
 	CUDA_SUFFIX="cpu"; \
 	if command -v nvcc &> /dev/null; then \
 		CUDA_VERSION=$$(nvcc --version | grep "release" | sed 's/.*release \([0-9]\+\.[0-9]\+\).*/\1/'); \
@@ -82,33 +84,37 @@ install-venv:
 			"12.1") CUDA_SUFFIX="cu121";; \
 			"12.4") CUDA_SUFFIX="cu124";; \
 			"12.6") CUDA_SUFFIX="cu126";; \
-			*) \
-				echo "❌ ERROR: Unsupported CUDA version '$$CUDA_VERSION'. Supported versions are 11.8, 12.1, 12.4, 12.6."; \
-				exit 1;; \
+			*) echo "❌ ERROR: Unsupported CUDA version '$$CUDA_VERSION'. Supported: 11.8, 12.1, 12.4, 12.6."; exit 1;; \
 		esac; \
 	else \
 		echo "⚠️ WARNING: 'nvcc' not found. Installing CPU version of PyTorch."; \
 	fi; \
 	\
-	TORCH_INSTALL_VERSION="$(TORCH_VERSION)+$$CUDA_SUFFIX"; \
-	PYG_URL="https://data.pyg.org/whl/torch-$$TORCH_INSTALL_VERSION.html"; \
+	case "$$CUDA_SUFFIX" in \
+		cu118) TORCH_FULL="2.7.0+cu118";; \
+		cu121) TORCH_FULL="2.5.1+cu121";; \
+		cu124) TORCH_FULL="2.6.0+cu124";; \
+		cu126) TORCH_FULL="2.7.0+cu126";; \
+		cpu)   TORCH_FULL="2.7.0+cpu";; \
+		*) echo "❌ ERROR: No mapping for $$CUDA_SUFFIX"; exit 1;; \
+	esac; \
+	TORCH_BASE=$$(echo $$TORCH_FULL | sed 's/+.*//'); \
+	PYG_URL="https://data.pyg.org/whl/torch-$$TORCH_FULL.html"; \
 	\
-	echo "⬇️ Installing torch==$(TORCH_VERSION) for $$CUDA_SUFFIX..."; \
-	pip install --no-cache-dir torch==$(TORCH_VERSION) --index-url https://download.pytorch.org/whl/$$CUDA_SUFFIX; \
+	echo "⬇️ Installing torch==$$TORCH_BASE for $$CUDA_SUFFIX..."; \
+	pip install torch==$$TORCH_BASE --index-url https://download.pytorch.org/whl/$$CUDA_SUFFIX; \
 	\
 	echo "⬇️ Installing PyG dependencies from $$PYG_URL..."; \
-	pip install --no-cache-dir \
+	pip install \
 		torch-scatter \
 		torch-sparse \
 		torch-cluster \
 		torch-spline-conv \
-	-f $$PYG_URL; \
+		-f $$PYG_URL; \
 	\
 	echo "⬇️ Installing torch-geometric and torchmetrics..."; \
-	pip install --no-cache-dir torch-geometric torchmetrics; \
-	\
-	echo "✅ PyTorch ecosystem installed successfully for venv."
-
+	pip install torch-geometric torchmetrics; \
+	echo "✅ All dependencies installed for venv."
 
 ################################################################################
 ## Conda install
@@ -130,32 +136,37 @@ endif
 			"12.1") CUDA_SUFFIX="cu121";; \
 			"12.4") CUDA_SUFFIX="cu124";; \
 			"12.6") CUDA_SUFFIX="cu126";; \
-			*) \
-				echo "❌ ERROR: Unsupported CUDA version '$$CUDA_VERSION'. Supported versions are 11.8, 12.1, 12.4, 12.6."; \
-				exit 1;; \
+			*) echo "❌ ERROR: Unsupported CUDA version '$$CUDA_VERSION'. Supported: 11.8, 12.1, 12.4, 12.6."; exit 1;; \
 		esac; \
 	else \
 		echo "⚠️ WARNING: 'nvcc' not found. Installing CPU version of PyTorch."; \
 	fi; \
 	\
-	TORCH_INSTALL_VERSION="$(TORCH_VERSION)+$$CUDA_SUFFIX"; \
-	PYG_URL="https://data.pyg.org/whl/torch-$$TORCH_INSTALL_VERSION.html"; \
+	case "$$CUDA_SUFFIX" in \
+		cu118) TORCH_FULL="2.7.0+cu118";; \
+		cu121) TORCH_FULL="2.5.1+cu121";; \
+		cu124) TORCH_FULL="2.6.0+cu124";; \
+		cu126) TORCH_FULL="2.7.0+cu126";; \
+		cpu)   TORCH_FULL="2.7.0+cpu";; \
+		*) echo "❌ ERROR: No mapping for $$CUDA_SUFFIX"; exit 1;; \
+	esac; \
+	TORCH_BASE=$$(echo $$TORCH_FULL | sed 's/+.*//'); \
+	PYG_URL="https://data.pyg.org/whl/torch-$$TORCH_FULL.html"; \
 	\
-	echo "⬇️ Installing torch==$(TORCH_VERSION) for $$CUDA_SUFFIX..."; \
-	$(CONDA_EXE) run -n $(ENV_NAME) pip install --no-cache-dir torch==$(TORCH_VERSION) --index-url https://download.pytorch.org/whl/$$CUDA_SUFFIX; \
+	echo "⬇️ Installing torch==$$TORCH_BASE for $$CUDA_SUFFIX..."; \
+	$(CONDA_EXE) run -n $(ENV_NAME) pip install torch==$$TORCH_BASE --index-url https://download.pytorch.org/whl/$$CUDA_SUFFIX; \
 	\
 	echo "⬇️ Installing PyG dependencies from $$PYG_URL..."; \
-	$(CONDA_EXE) run -n $(ENV_NAME) pip install --no-cache-dir \
+	$(CONDA_EXE) run -n $(ENV_NAME) pip install \
 		torch-scatter \
 		torch-sparse \
 		torch-cluster \
 		torch-spline-conv \
-	-f $$PYG_URL; \
+		-f $$PYG_URL; \
 	\
 	echo "⬇️ Installing torch-geometric and torchmetrics..."; \
-	$(CONDA_EXE) run -n $(ENV_NAME) pip install --no-cache-dir torch-geometric torchmetrics; \
-	\
-	echo "✅ PyTorch ecosystem installed successfully for Conda. Activate with: $(CONDA_EXE) activate $(ENV_NAME)"
+	$(CONDA_EXE) run -n $(ENV_NAME) pip install torch-geometric torchmetrics; \
+	echo "✅ All dependencies installed for conda. Activate with: $(CONDA_EXE) activate $(ENV_NAME)"
 
 .PHONY: lint
 lint:
