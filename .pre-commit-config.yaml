@@ -61,16 +61,9 @@ repos:
 
   - repo: local
     hooks:
-      - id: export-poetry-requirements
-        name: Export Poetry Requirements
-        entry: poetry export -f requirements.txt --output requirements.txt --without-hashes
-        language: system
-        pass_filenames: false
-        always_run: true
-
       - id: export-environment
-        name: Generate Conda environment from requirements.txt
-        entry: poetry run python hooks/conda_env.py
+        name: Generate environment files
+        entry: poetry run python hooks/update_env_files.py
         language: system
         always_run: true
 
