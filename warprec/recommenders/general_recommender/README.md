@@ -44,9 +44,9 @@ models:
         intermediate_dim: 600
         latent_dim: 200
         dropout: 1.0
+        weight_decay: 0.02
         epochs: 10
         learning_rate: 0.001
-        l2_lambda: 0.02
 ...
 ```
 - [MultiVAE (Multinomial Variational Autoencoder)](autoencoder/multivae.py): A probabilistic variant of MultiDAE that models uncertainty in user preferences via variational inference. Useful for capturing diverse user behaviors and providing more personalized recommendations.

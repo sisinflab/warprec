@@ -92,17 +92,17 @@ class MultiDAE(RecomModel):
         intermediate_dim (INT_FIELD): List of intermediate_dim values.
         latent_dim (INT_FIELD): List of values for latent_dim values.
         dropout (FLOAT_FIELD): List of values for dropout.
+        weight_decay (FLOAT_FIELD): List of values for weight_decay.
         epochs (INT_FIELD): List of values for epochs.
         learning_rate (FLOAT_FIELD): List of values for learning rate.
-        l2_lambda (FLOAT_FIELD): List of values for l2_lambda.
     """
 
     intermediate_dim: INT_FIELD
     latent_dim: INT_FIELD
     dropout: FLOAT_FIELD
+    weight_decay: FLOAT_FIELD
     epochs: INT_FIELD
     learning_rate: FLOAT_FIELD
-    l2_lambda: FLOAT_FIELD
 
     @field_validator("intermediate_dim")
     @classmethod
@@ -122,6 +122,12 @@ class MultiDAE(RecomModel):
         """Validate dropout."""
         return validate_greater_equal_than_zero(cls, v, "dropout")
 
+    @field_validator("weight_decay")
+    @classmethod
+    def check_weight_decay(cls, v: list):
+        """Validate weight_decay."""
+        return validate_greater_equal_than_zero(cls, v, "weight_decay")
+
     @field_validator("epochs")
     @classmethod
     def check_epochs(cls, v: list):
@@ -133,12 +139,6 @@ class MultiDAE(RecomModel):
     def check_learning_rate(cls, v: list):
         """Validate learning_rate."""
         return validate_greater_than_zero(cls, v, "learning_rate")
-
-    @field_validator("l2_lambda")
-    @classmethod
-    def check_l2_lambda(cls, v: list):
-        """Validate l2_lambda."""
-        return validate_greater_equal_than_zero(cls, v, "l2_lambda")
 
 
 @params_registry.register("MultiVAE")
