@@ -126,19 +126,17 @@ class FISM(RecomModel):
 
     Attributes:
         embedding_size (INT_FIELD): List of values for embedding_size.
-        reg_1 (FLOAT_FIELD): List of values for reg_1.
-        reg_2 (FLOAT_FIELD): List of values for reg_2.
         alpha (FLOAT_FIELD): List of values for alpha.
         split_to (INT_FIELD): List of values for split_to.
+        weight_decay (FLOAT_FIELD): List of values for weight_decay.
         epochs (INT_FIELD): List of values for epochs.
         learning_rate (FLOAT_FIELD): List of values for learning rate.
     """
 
     embedding_size: INT_FIELD
-    reg_1: FLOAT_FIELD
-    reg_2: FLOAT_FIELD
     alpha: FLOAT_FIELD
     split_to: INT_FIELD
+    weight_decay: FLOAT_FIELD
     epochs: INT_FIELD
     learning_rate: FLOAT_FIELD
 
@@ -147,18 +145,6 @@ class FISM(RecomModel):
     def check_embedding_size(cls, v: list):
         """Validate embedding_size."""
         return validate_greater_than_zero(cls, v, "embedding_size")
-
-    @field_validator("reg_1")
-    @classmethod
-    def check_reg_1(cls, v: list):
-        """Validate reg_1."""
-        return validate_greater_equal_than_zero(cls, v, "reg_1")
-
-    @field_validator("reg_2")
-    @classmethod
-    def check_reg_2(cls, v: list):
-        """Validate reg_2."""
-        return validate_greater_equal_than_zero(cls, v, "reg_2")
 
     @field_validator("alpha")
     @classmethod
@@ -171,6 +157,12 @@ class FISM(RecomModel):
     def check_split_to(cls, v: list):
         """Validate split_to."""
         return validate_greater_than_zero(cls, v, "split_to")
+
+    @field_validator("weight_decay")
+    @classmethod
+    def check_weight_decay(cls, v: list):
+        """Validate weight_decay."""
+        return validate_greater_equal_than_zero(cls, v, "weight_decay")
 
     @field_validator("epochs")
     @classmethod

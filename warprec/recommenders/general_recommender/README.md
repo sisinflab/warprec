@@ -196,13 +196,11 @@ models:
 models:
     FISM:
         embedding_size: 16
-        reg_1: 0.001
-        reg_2: 0.001
         alpha: 0.1
         split_to: 5
+        weight_decay: 0.0001
         epochs: 5
         learning_rate: 0.001
-        neg_ratio: 0.002
 ...
 ```
 
