@@ -88,7 +88,7 @@ models:
     LightGCN:
         embedding_size: 64
         n_layers: 2
-        reg_weight: 0.0001
+        weight_decay: 0.0001
         epochs: 50
         learning_rate: 0.001
 ...
