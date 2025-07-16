@@ -185,6 +185,7 @@ models:
 models:
     BPR:
         embedding_size: 16
+        weight_decay: 0.001
         epochs: 20
         learning_rate: 0.001
 ...
