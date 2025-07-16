@@ -56,9 +56,9 @@ models:
         intermediate_dim: 600
         latent_dim: 200
         dropout: 1.0
+        weight_decay: 0.02
         epochs: 10
         learning_rate: 0.001
-        l2_lambda: 0.02
         anneal_cap: 0.2
         anneal_step: 200
 ...
