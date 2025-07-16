@@ -266,7 +266,7 @@ class EarlyStopping(BaseModel):
     Attributes:
         monitor (Optional[str]): The value to monitor. Can be either 'score'
             or 'loss'.
-        patience (Optional[int]): The number of epochs the trainer will wait for
+        patience (int): The number of epochs the trainer will wait for
             an improvement.
         grace_period (Optional[int]): The number of epochs to wait before
             activating the early stopping.
@@ -274,7 +274,7 @@ class EarlyStopping(BaseModel):
     """
 
     monitor: Optional[str] = "score"
-    patience: Optional[int]
+    patience: int
     grace_period: Optional[int] = 0
     min_delta: Optional[float] = 0.0
 
