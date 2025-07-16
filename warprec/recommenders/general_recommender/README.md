@@ -99,7 +99,7 @@ models:
 models:
     NGCF:
         embedding_size: 64
-        reg_weight: 0.0001
+        weight_decay: 0.0001
         epochs: 5
         learning_rate: 0.001
         weight_size: [64, 64]

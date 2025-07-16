@@ -71,7 +71,7 @@ class NGCF(RecomModel):
 
     Attributes:
         embedding_size (INT_FIELD): List of values for embedding_size.
-        reg_weight (FLOAT_FIELD): List of values for reg_weight.
+        weight_decay (FLOAT_FIELD): List of values for weight_decay.
         epochs (INT_FIELD): List of values for epochs.
         learning_rate (FLOAT_FIELD): List of values for learning rate.
         weight_size (LIST_INT_FIELD): List of values for weight sizes.
@@ -80,7 +80,7 @@ class NGCF(RecomModel):
     """
 
     embedding_size: INT_FIELD
-    reg_weight: FLOAT_FIELD
+    weight_decay: FLOAT_FIELD
     epochs: INT_FIELD
     learning_rate: FLOAT_FIELD
     weight_size: LIST_INT_FIELD
@@ -93,11 +93,11 @@ class NGCF(RecomModel):
         """Validate embedding_size."""
         return validate_greater_than_zero(cls, v, "embedding_size")
 
-    @field_validator("reg_weight")
+    @field_validator("weight_decay")
     @classmethod
-    def check_reg_weight(cls, v: list):
-        """Validate reg_weight."""
-        return validate_greater_equal_than_zero(cls, v, "reg_weight")
+    def check_weight_decay(cls, v: list):
+        """Validate weight_decay."""
+        return validate_greater_equal_than_zero(cls, v, "weight_decay")
 
     @field_validator("epochs")
     @classmethod
