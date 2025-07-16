@@ -99,25 +99,32 @@ class Configuration(BaseModel):
             ValueError: If any information between parts of the configuration file is inconsistent.
         """
 
-        # Check if file exists
-        if (
-            self.reader.reading_method == ReadingMethods.LOCAL
-            and self.reader.local_path
-        ):
-            _local_path = self.reader.local_path
-            if not os.path.exists(_local_path):
-                raise FileNotFoundError(
-                    f"Configuration file not found at {_local_path}."
-                )
-            _sep = self.reader.sep
+        # Check if the local file exists and is correctly
+        # formatted
+        if self.reader.reading_method == ReadingMethods.LOCAL:
+            _local_path: str = None
+            _sep: str = None
+            _has_header: bool = None
+            if self.reader.local_path is not None:
+                _local_path = self.reader.local_path
+                _sep = self.reader.sep
+                _has_header = self.reader.header
+            elif self.reader.split.local_path is not None:
+                _ext = self.reader.split.ext
+                _local_path = os.path.join(self.reader.split.local_path, "train" + _ext)
+                _sep = self.reader.split.sep
+                _has_header = self.reader.split.header
+            else:
+                raise ValueError("Unsupported local source or missing local path.")
+            
             # Read the header of file to later check
             with open(_local_path, "r", encoding="utf-8") as f:
                 first_line = f.readline()
-            _header = first_line.strip().split(_sep)
+            _header = first_line.strip().split(_sep)      
 
             # If the source file should have header, we check
             # if the column names are present.
-            if self.reader.header:
+            if _has_header:
                 # Define column names to read after, if the input file
                 # contains more columns this is more efficient.
                 _column_names = [
@@ -128,7 +135,7 @@ class Configuration(BaseModel):
                     # In case the RatingType is explicit, we add the
                     # score label and read scores from the source.
                     _column_names.append(self.reader.labels.rating_label)
-                if self.splitter.strategy in [
+                if self.splitter is not None and self.splitter.strategy in [
                     SplittingStrategies.TEMPORAL_HOLDOUT,
                     SplittingStrategies.TEMPORAL_LEAVE_K_OUT,
                 ]:
@@ -196,15 +203,12 @@ class Configuration(BaseModel):
 
         # Final checks and parsing
         self.check_precision()
-        self.models = self.parse_models(_header)
+        self.models = self.parse_models()
 
         return self
 
-    def parse_models(self, header: list) -> dict:
+    def parse_models(self) -> dict:
         """This method parses the models and creates the correct data structures.
-
-        Args:
-            header (list): The header of the file, used to check timestamp.
 
         Returns:
             dict: The dictionary containing all the models and their parameters.
@@ -229,11 +233,10 @@ class Configuration(BaseModel):
             # Check if the model requires timestamp
             if (
                 model_class.need_timestamp
-                and self.reader.labels.timestamp_label not in header
             ):
-                raise ValueError(
+                logger.attention(
                     f"The model {model_name} requires timestamps to work properly, "
-                    "but none have been provided. Check the configuration file."
+                    "be sure that your dataset contains them."
                 )
 
             # If at least one model is a sequential model, then
