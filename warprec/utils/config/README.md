@@ -33,6 +33,7 @@ The `Reader Configuration` section handles data loading and preprocessing. The d
 - **reading_method**: The source from which the data will be read. As of right now, only 'local' is supported.
 - **local_path**: The local path from which the data is read. This keyword is used along with the `reading_method` when is set to `local`.
 - **sep**: The separator of the file to be read. Defaults to `'\t'`.
+- **header**: Whether to treat the first row of the file as a header or not. Defaults to True.
 - **rating_type**: The type of rating to be used. Can be set to 'implicit' or 'explicit'. If set to explicit, the framework will look for a score column inside the transaction data, this column must contain a score given by the user to the item for that specific transaction. If set to `implicit`, the column can be omitted and each transaction will be assigned a score of 1.
 - **split**: This is a nested section of the reader configuration, it is used in case of data that has already been split.
 - **side**: This is a nested section of the reader configuration, it is used if the user wants to load side information of the items alongside the transaction data.
@@ -47,6 +48,7 @@ WarpRec also supports the reading process of already split data. This can be don
 - **local_path**: The path to the directory where the split data is stored. All the splits must be in the same directory.
 - **ext**: The extension used by the split files. Defaults to `.tsv`.
 - **sep**: The separator used by the split files. Defaults to `\t`.
+- **header**: Whether to treat the first row of the file as a header or not. Defaults to True.
 
 #### 🧩 Side Information Reading
 
@@ -54,6 +56,7 @@ WarpRec also supports reading side information. This can be done using the `side
 
 - **local_path**: The path to the side information.
 - **sep**: The separator used for the side information file.
+- **header**: Whether to treat the first row of the file as a header or not. Defaults to True.
 
 #### 👥 Clustering Information Reading
 
@@ -63,6 +66,8 @@ WarpRec also supports reading clustering information. This can be done using the
 - **item_local_path**: The path to the item clustering information.
 - **user_sep**: The separator used for the user clustering file.
 - **item_sep**: The separator used for the item clustering file.
+- **user_header**: Whether to treat the first row of the user file as a header or not. Defaults to True.
+- **item_header**: Whether to treat the first row of the item file as a header or not. Defaults to True.
 
 #### 🏷️ Labels
 
@@ -88,6 +93,7 @@ Some information to keep in mind regarding labels:
 - Only `user_id` and `item_id` are strictly required.
 - If you're using implicit feedback, `rating_label` is optional.
 - `timestamp_label` is only needed for time-based split strategies.
+- In case `header=False`, columns are expected to be ordered correctly.
 
 #### 🧬 Dtypes
 
@@ -103,6 +109,8 @@ If your data uses different types (e.g. string-based IDs), you can override them
 - **item_id_type**: The custom dtype for the item id.
 - **rating_type**: The custom dtype for the rating.
 - **timestamp_type**: The custom dtype for the timestamp.
+
+As a side note, when `header=False` dtypes will be ignored.
 
 Supported dtypes:
 
@@ -158,16 +166,33 @@ WarpRec allows customization of file format, paths, naming conventions, and more
 - **local_experiment_path**: The path where all files related to the experiment (e.g., recommendations, metrics, splits) will be stored. Required when using local as the writing method.
 - **setup_experiment**: Whether to set up a new experiment folder with proper structure. Default is true.
 - **save_split**: Whether to save the train/validation/test splits created during preprocessing. Default is false.
-- **writing_params**: A nested section to control file-specific options like separator, file extension, and custom header labels.
+- **results**: A nested section to control result file customization.
+- **split**: A nested section to control split file customization.
+- **recommendation**: A nested section to control recommendation file customization.
 
-#### 📝 Writing Parameters
-The `writing_params` section lets you control the structure of the output files.
+#### 📝 Results
+The `results` section lets you control the structure of the result files.
 
 - **sep**: The separator used for the output files. Default is `\t`.
 - **ext**: The extension of the output files. Default is `.tsv`.
-- **user_label**: The column name used for the user ID in the output file. Default is `user_id`.
-- **item_label**: The column name used for the item ID in the output file. Default is `item_id`.
-- **rating_label**: The column name used for the predicted rating/score in the output file. Default is `rating`.
+
+#### ✂️ Split
+The `split` section lets you control the structure of the split files.
+
+- **sep**: The separator used for the output files. Default is `\t`.
+- **ext**: The extension of the output files. Default is `.tsv`.
+- **header**: Whether to treat the first row of the file as a header or not. Defaults to True.
+
+#### 🛍️ Recommendation
+The `recommendation` section lets you control the structure of the recommendation files.
+
+- **sep**: The separator used for the output files. Default is `\t`.
+- **ext**: The extension of the output files. Default is `.tsv`.
+- **header**: Whether to treat the first row of the file as a header or not. Defaults to `True`.
+- **k**: The number of recommendation per user to produce. Defaults to `50`.
+- **user_label**: The user label used in the file. Defaults to `user_id`.
+- **item_label**: The item label used in the file. Defaults to `item_id`.
+- **rating_label**: The rating label used in the file. Defaults to `rating`.
 
 ### 📌 Example of Writer Configuration
 
@@ -180,12 +205,16 @@ writer:
     local_experiment_path: results/movielens_experiment
     setup_experiment: true
     save_split: true
-    writing_params:
+    results:
         sep: ','
-        ext: '.csv'
-        user_label: uid
-        item_label: iid
-        rating_label: score
+    split:
+        sep: ','
+        ext: .csv
+    recommendation:
+        sep: ','
+        ext: .csv
+        header: false
+        k: 100
 ...
 ```
 
@@ -325,6 +354,7 @@ The `Model Configuration` is different from other configurations as it presents 
 The `meta` section let you decide some information about the model that do not interfere with the training.
 
 - **save_model**: Flag that decides whether or not to save the model in the experiment directory. Defaults to false.
+- **save_recs**: Flag that decides whether or not to save the recommendations. Defaults to false.
 - **keep_all_ray_checkpoints**: Flag that decides whether or not to keep all the checkpoints that Ray Tune will create. On a large scale training this option is advised to be set on false. Defaults to false.
 - **load_from**: Local path to a model weights to be loaded. Defaults to None.
 - **implementation**: The implementation used during the training, if more than one is present. Defaults to latest.
@@ -385,6 +415,7 @@ models:
 - Each model trained with WarpRec requires it's own configuration.
 - Trials of a single model can be computed in parallel. If more than one model is provided, the next training session will wait the pervious one to be over before starting.
 - Parameters of the model, like on the example, depend on the model. Check the model documentation for more information about the parameters.
+- Saving recommendation will lead to disk space occupation. Save recommendations only if you need them.
 
 ### 🧪 Advanced Model Configuration
 
@@ -499,7 +530,7 @@ evaluation:
 
 ## ⚙️ General Configuration
 
-The `General Configuration` section defines some parameters that will affect the overall behaviour of WarpRec.
+The `General Configuration` section defines some parameters that will affect the overall behavior of WarpRec.
 
 ### 🔧 Available Keywords
 
@@ -508,16 +539,16 @@ The `General Configuration` can be configured using the following keywords:
 - **precision**: The precision to be used inside the experiment. Defaults to float32.
 - **batch_size**: The batch size to be used inside the experiment. Defaults to 1024.
 - **ray_verbose**: . The Ray Tune verbosity value. Ray Tune accepts verbosity levels in a range from 0 to 3. Defaults to 1.
-- **recommendation**: A nested section dedicated to the recommendation produced by the models.
+- **callback**: A nested section dedicated to the optional callback.
 
-#### 📝 Recommendation
+#### 📞 Callback
 
-The `recommendation` section let you decide some information about the actual recommendation produced by the models.
+The `callback` section let point at some custom callback implementation and optionally pass it some information directly from configuration.
 
-- **save_recs**: Flag that decides whether or not to save the recommendation for each model. Defaults to false
-- **sep**: The separator of the recommendation file. Defaults to `\t`.
-- **ext**: The extension of the recommendation file. Defaults to `.tsv`.
-- **k**: The number of recommendation per user. Defaults to 50.
+- **callback_path**: The path to the python script containing the callback implementation.
+- **callback_name**: The name of the implementation of the callback. The class must inherit from [WarpRecCallback](../callback.py)
+- **args**: A list of arguments to pass the callback constructor.
+- **kwargs**: A dictionary of arguments to pass the callback constructor.
 
 ### 📌 Example of Recommendation Configuration
 
@@ -528,12 +559,17 @@ general:
     precision: float64
     batch_size: 2048
     ray_verbose: 0
-    recommendation:
-        save_recs: true
+    callback:
+        callback_path: path/to/the/script.py
+        callback_name: class_name
+        args: [arg_1, arg_2, ...]
+        kwargs:
+            kwargs_1: kwargs_value_1
+            kwargs_2: kwargs_value_2
+            ...
 ...
 ```
 
 ### ⚠️ Notes and Validation
 
 - Increasing the precision of the experiment will also require more memory to execute most models. Usually float32 is more than sufficient.
-- Saving recommendation will lead to disk space occupation. Save recommendations only if you need them.

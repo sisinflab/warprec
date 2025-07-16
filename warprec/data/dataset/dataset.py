@@ -5,7 +5,7 @@ import torch
 import numpy as np
 from torch import Tensor
 from pandas import DataFrame
-from warprec.data.dataset import Interactions
+from warprec.data.dataset import Interactions, Sessions
 from warprec.utils.enums import RatingType
 from warprec.utils.logger import logger
 
@@ -17,24 +17,33 @@ class Dataset(ABC):
 
     Attributes:
         train_set (Interactions): Training set on that will be used with recommendation models.
+        test_set (Interactions): Test set, not mandatory, used in evaluation to calculate metrics.
         val_set (Interactions): Validation set, not mandatory,
             used during training to validate the process.
-        test_set (Interactions): Test set, not mandatory, used in evaluation to calculate metrics.
+        train_session (Sessions): Training session used by sequential models.
+        test_session (Sessions): Test session, not mandatory used by sequential models.
+        val_session (Sessions): Training session, not mandatory used by sequential models.
         user_cluster (Optional[dict]): User cluster information.
         item_cluster (Optional[dict]): Item cluster information.
     """
 
     train_set: Interactions = None
-    val_set: Interactions = None
     test_set: Interactions = None
+    val_set: Interactions = None
+    train_session: Sessions = None
+    test_session: Sessions = None
+    val_session: Sessions = None
     user_cluster: Optional[dict] = None
     item_cluster: Optional[dict] = None
 
     def __init__(self):
         # Set mappings
+        self._has_explicit_ratings: bool = False
+        self._has_timestamp: bool = False
         self._nuid: int = 0
         self._niid: int = 0
         self._nfeat: int = 0
+        self._max_seq_len: int = 0
         self._umap: dict[Any, int] = {}
         self._imap: dict[Any, int] = {}
         self._uc: Tensor = None
@@ -95,9 +104,13 @@ class Dataset(ABC):
                 the dataset.
         """
         return {
+            "has_explicit_ratings": self._has_explicit_ratings,
+            "has_timestamp": self._has_timestamp,
             "items": self._niid,
             "users": self._nuid,
             "features": self._nfeat,
+            "item_mapping": self._imap,
+            "user_mapping": self._umap,
         }
 
     def update_mappings(self, user_mapping: dict, item_mapping: dict):
@@ -139,7 +152,11 @@ class TransactionDataset(Dataset):
         user_cluster (Optional[DataFrame]): The user cluster data.
         item_cluster (Optional[DataFrame]): The item cluster data.
         batch_size (int): The batch size that will be used in training and evaluation.
-        rating_type (RatingType): The type of rating used in the dataset.
+        rating_type (RatingType): The type of rating used.
+        rating_label (str): The label of the rating column.
+        timestamp_label (str): The label of the timestamp column.
+        cluster_label (str): The label of the cluster column.
+        need_session_based_information (bool): Wether or not to initialize session data.
         precision (Any): The precision of the internal representation of the data.
     """
 
@@ -153,6 +170,10 @@ class TransactionDataset(Dataset):
         item_cluster: Optional[DataFrame] = None,
         batch_size: int = 1024,
         rating_type: RatingType = RatingType.IMPLICIT,
+        rating_label: str = None,
+        timestamp_label: str = None,
+        cluster_label: str = None,
+        need_session_based_information: bool = False,
         precision: Any = np.float32,
     ):
         super().__init__()
@@ -183,6 +204,19 @@ class TransactionDataset(Dataset):
         self._umap = {user: i for i, user in enumerate(_uid)}
         self._imap = {item: i for i, item in enumerate(_iid)}
 
+        # Save other information about the data
+        self._has_explicit_ratings = (
+            True if rating_type == RatingType.EXPLICIT else False
+        )
+        self._has_timestamp = (
+            True
+            if self._has_explicit_ratings
+            and len(train_data.columns) == 4
+            or not self._has_explicit_ratings
+            and len(train_data.columns) == 3
+            else False
+        )
+
         # Save side information inside the dataset
         self.side = side_data if side_data is not None else None
 
@@ -191,8 +225,8 @@ class TransactionDataset(Dataset):
             {
                 self._umap[user_id]: cluster
                 for user_id, cluster in zip(
-                    user_cluster[user_label], user_cluster["cluster"]
-                )  # TODO: use config
+                    user_cluster[user_label], user_cluster[cluster_label]
+                )
                 if user_id in self._umap
             }
             if user_cluster is not None
@@ -202,8 +236,8 @@ class TransactionDataset(Dataset):
             {
                 self._imap[item_id]: cluster
                 for item_id, cluster in zip(
-                    item_cluster[item_label], item_cluster["cluster"]
-                )  # TODO: use config
+                    item_cluster[item_label], item_cluster[cluster_label]
+                )
                 if item_id in self._imap
             }
             if item_cluster is not None
@@ -243,6 +277,8 @@ class TransactionDataset(Dataset):
             header_msg="Train",
             batch_size=batch_size,
             rating_type=rating_type,
+            rating_label=rating_label,
+            timestamp_label=timestamp_label,
             precision=precision,
         )
 
@@ -255,6 +291,8 @@ class TransactionDataset(Dataset):
                 header_msg="Test",
                 batch_size=batch_size,
                 rating_type=rating_type,
+                rating_label=rating_label,
+                timestamp_label=timestamp_label,
                 precision=precision,
             )
         if val_data is not None:
@@ -266,8 +304,36 @@ class TransactionDataset(Dataset):
                 header_msg="Validation",
                 batch_size=batch_size,
                 rating_type=rating_type,
+                rating_label=rating_label,
+                timestamp_label=timestamp_label,
                 precision=precision,
             )
+
+        # Sequential recommendation sessions
+        if need_session_based_information:
+            self.train_session = Sessions(
+                train_data,
+                self._umap,
+                self._imap,
+                batch_size=batch_size,
+                timestamp_label=timestamp_label,
+            )
+            if test_data is not None:
+                self.test_session = Sessions(
+                    test_data,
+                    self._umap,
+                    self._imap,
+                    batch_size=batch_size,
+                    timestamp_label=timestamp_label,
+                )
+            if val_data is not None:
+                self.val_session = Sessions(
+                    val_data,
+                    self._umap,
+                    self._imap,
+                    batch_size=batch_size,
+                    timestamp_label=timestamp_label,
+                )
 
     def _filter_data(
         self,
@@ -329,6 +395,8 @@ class TransactionDataset(Dataset):
         header_msg: str = "Train",
         batch_size: int = 1024,
         rating_type: RatingType = RatingType.IMPLICIT,
+        rating_label: str = None,
+        timestamp_label: str = None,
         precision: Any = np.float32,
     ) -> Interactions:
         """Functionality to create Interaction data from DataFrame.
@@ -341,6 +409,8 @@ class TransactionDataset(Dataset):
             header_msg (str): The header of the logger output.
             batch_size (int): The batch size of the interaction.
             rating_type (RatingType): The type of rating used.
+            rating_label (str): The label of the rating column.
+            timestamp_label (str): The label of the timestamp column.
             precision (Any): The precision that will be used to store interactions.
 
         Returns:
@@ -356,6 +426,8 @@ class TransactionDataset(Dataset):
             item_cluster=item_cluster,
             batch_size=batch_size,
             rating_type=rating_type,
+            rating_label=rating_label,
+            timestamp_label=timestamp_label,
             precision=precision,
         )
         nuid, niid = inter_set.get_dims()

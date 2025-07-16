@@ -29,6 +29,7 @@ from warprec.utils.config import (
     CodeCarbon,
     MLflow,
 )
+from warprec.utils.callback import WarpRecCallback
 from warprec.utils.enums import SearchSpace
 from warprec.utils.logger import logger
 from warprec.utils.registry import (
@@ -54,6 +55,9 @@ class Trainer:
         beta (float): The beta value for the evaluation.
         pop_ratio (float): The pop ratio value for the evaluation.
         ray_verbose (int): The Ray level of verbosity.
+        custom_callback (WarpRecCallback): The custom callback to use
+            during training and evaluation. Default is an empty
+            WarpRecCallback instance.
         enable_wandb (bool): Wether or not to enable Wandb.
         project_wandb (str): The name of the Wandb project.
         group_wandb (Optional[str]): The name of the Wandb group.
@@ -96,6 +100,7 @@ class Trainer:
         beta: float = 1.0,
         pop_ratio: float = 0.8,
         ray_verbose: int = 1,
+        custom_callback: WarpRecCallback = WarpRecCallback(),
         enable_wandb: bool = False,
         project_wandb: str = "WarpRec",
         group_wandb: Optional[str] = None,
@@ -155,6 +160,7 @@ class Trainer:
         self.infos = dataset.info()
         self._model_params: RecomModel = params_registry.get(model_name, **model_params)
         self._dashboard = dashboard
+        self._custom_callback = custom_callback
         self.model_name = model_name
         self._evaluator = Evaluator(
             [metric_name],
@@ -219,7 +225,10 @@ class Trainer:
         )
 
         # Setup callbacks
-        callbacks: List[tune.Callback] = [best_checkpoint_callback]
+        callbacks: List[tune.Callback] = [
+            best_checkpoint_callback,
+            self._custom_callback,
+        ]
 
         if self._dashboard.wandb.enabled:
             callbacks.append(
@@ -388,7 +397,9 @@ class Trainer:
             block_size=self._model_params.optimization.block_size,
         )
         try:
-            model.fit(dataset.train_set, report_fn=_report)
+            model.fit(
+                dataset.train_set, sessions=dataset.train_session, report_fn=_report
+            )
         except Exception as e:
             logger.negative(
                 f"The fitting of the model {model.name}, failed "

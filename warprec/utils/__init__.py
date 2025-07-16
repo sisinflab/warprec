@@ -1,5 +1,6 @@
 from . import config
 from . import logger
+from .callback import WarpRecCallback
 from .enums import (
     RatingType,
     SplittingStrategies,
@@ -26,6 +27,7 @@ from .registry import (
 __all__ = [
     "config",
     "logger",
+    "WarpRecCallback",
     "RatingType",
     "SplittingStrategies",
     "ReadingMethods",
