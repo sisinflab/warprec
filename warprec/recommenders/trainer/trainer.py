@@ -1,13 +1,14 @@
 import os
 import tempfile
+import shutil
 from typing import List, Tuple, Optional, Dict, Any
 from copy import deepcopy
 
 import ray
 import torch
-import shutil
 from ray import tune
 from ray.tune import Checkpoint
+from ray.tune.stopper import Stopper
 from ray.air.integrations.wandb import WandbLoggerCallback
 from ray.air.integrations.mlflow import MLflowLoggerCallback
 from ray.tune.experiment.trial import Trial
@@ -224,6 +225,16 @@ class Trainer:
             "score", mode, keep_all_ray_checkpoints
         )
 
+        early_stopping: Stopper = None
+        if self._model_params.early_stopping is not None:
+            early_stopping = EarlyStopping(
+                metric=self._model_params.early_stopping.monitor,
+                mode=mode,
+                patience=self._model_params.early_stopping.patience,
+                grace_period=self._model_params.early_stopping.grace_period,
+                min_delta=self._model_params.early_stopping.min_delta,
+            )
+
         # Setup callbacks
         callbacks: List[tune.Callback] = [
             best_checkpoint_callback,
@@ -277,6 +288,7 @@ class Trainer:
             num_samples=self._model_params.optimization.num_samples,
             verbose=self._verbose,
             callbacks=callbacks,
+            stop=early_stopping,
         )
 
         # Retrieve results from callback
@@ -434,6 +446,8 @@ class Trainer:
             params_copy.pop("meta")
         if "optimization" in params_copy:
             params_copy.pop("optimization")
+        if "early_stopping" in params_copy:
+            params_copy.pop("early_stopping")
         for k, v in params_copy.items():
             if v[0] is not SearchSpace.CHOICE:
                 tune_params[k] = search_space_registry.get(v[0])(*v[1:])
@@ -557,3 +571,98 @@ class CodeCarbonCallback(tune.Callback):
         tracker = self.trackers.pop(trial.trial_id, None)
         if tracker:
             tracker.stop()
+
+
+class EarlyStopping(Stopper):
+    """Ray Tune Stopper for early stopping based on a validation metric.
+
+    Args:
+        metric (str): The name of the metric to monitor for early stopping.
+        mode (str): One of {"min", "max"}. In "min" mode, training will stop
+            when the quantity monitored has stopped decreasing; in "max" mode
+            it will stop when the quantity monitored has stopped increasing.
+        patience (int): Number of epochs with no improvement after which
+            training will be stopped.
+        grace_period (int): Number of epochs to wait before activating
+            the stopper.
+        min_delta (float): Minimum change in the monitored quantity to qualify
+            as an improvement, i.e. an absolute change of less than min_delta,
+            will count as no improvement.
+
+    Raises:
+        ValueError: If the mode is not 'min' or 'max'.
+    """
+
+    def __init__(
+        self,
+        metric: str,
+        mode: str,
+        patience: int,
+        grace_period: int = 0,
+        min_delta: float = 0.0,
+    ):
+        if mode not in ["min", "max"]:
+            raise ValueError("Mode must be 'min' or 'max'.")
+
+        self.metric = metric
+        self.mode = mode
+        self.patience = patience
+        self.grace_period = grace_period
+        self.min_delta = min_delta
+        self.best_score: Optional[float] = None
+        self.wait = 0
+        self.stopped_training = False
+
+    def __call__(self, trial_id: str, result: Dict) -> bool:
+        """Callback when a trial reports a result.
+
+        Args:
+            trial_id (str): The id of the trial.
+            result (Dict): The result dictionary.
+
+        Returns:
+            bool: Wether or not to suppress the trial.
+        """
+        if self.stopped_training:
+            return True
+
+        current_score = result.get(self.metric, None)
+        iteration = result.get("training_iteration", None)
+
+        if current_score is None:
+            logger.attention(
+                f"Metric '{self.metric}' not found in trial results for trial {trial_id}. "
+                "Early stopping will not be applied to this trial in this iteration."
+            )
+            return False
+
+        if self.best_score is None:
+            self.best_score = current_score
+            self.wait = 0
+        elif iteration <= self.grace_period:
+            return False
+        else:
+            if self.mode == "min":
+                if current_score < self.best_score - self.min_delta:
+                    self.best_score = current_score
+                    self.wait = 0
+                else:
+                    self.wait += 1
+            elif self.mode == "max":
+                if current_score > self.best_score + self.min_delta:
+                    self.best_score = current_score
+                    self.wait = 0
+                else:
+                    self.wait += 1
+
+        if self.wait >= self.patience:
+            self.stopped_training = True
+            logger.attention(
+                f"Early stopping triggered for trial {trial_id}: "
+                f"No improvement in '{self.metric}' for {self.patience} iterations. "
+            )
+            return True
+        return False
+
+    def stop_all(self):
+        return False
