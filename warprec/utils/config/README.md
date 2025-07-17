@@ -347,6 +347,7 @@ The `Model Configuration` is different from other configurations as it presents 
 
 - **meta**: The meta parameters of the model. Meta parameters affect initialization of the model, implementation and checkpoints.
 - **optimization**: A nested section containing all the information about the hyperparameter optimization done through Ray Tune.
+- **early_stopping**: An optional strategy which will stop the trial if the model has reached a plateau.
 - **parameters**: The parameters of the model.
 
 #### 📝 Meta
@@ -390,6 +391,15 @@ The `properties` section is used to provide further information to the strategy 
 - **grace_period**: Min time unit given to each trial.
 - **reduction_factor**: Reduction rate of trials. Used inside ASHA scheduler to reduce the number of trials.
 
+#### 🛑 Early Stopping
+
+The `early_stopping` section is used to optionally add a stopping criteria to each trial.
+
+- **monitor**: The value to monitor during training. Can either be "score", to monitor the validation metric, or "loss".
+- **patience**: Number of consecutive evaluations without improvement after which training will be stopped. This value is *required* if the early stopping is included in the training.
+- **grace_period**: Minimum number of evaluations to run before applying early stopping, regardless of performance.
+- **min_delta**: Minimum change in the monitored value to qualify as an improvement. Changes smaller than this threshold are considered as no improvement.
+
 ### 📌 Example of Model Configuration
 
 Below is a full example of a `model configuration` that trains a model on given data:
@@ -407,6 +417,30 @@ models:
             validation_metric: nDCG@10
             cpu_per_trial: 12
         l2: 10
+...
+```
+
+Also this is an example configuration including a more complex parameter exploration, with early stopping:
+
+```yaml
+models:
+    NeuMF:
+        optimization:
+          strategy: hopt
+          num_samples: 50
+        early_stopping:
+          patience: 5
+          grace_period: 5
+        mf_embedding_size: [16, 32, 64]
+        mlp_embedding_size: [16, 32, 64]
+        mlp_hidden_size: [[32, 16], [64, 32], [64, 32, 16]]
+        mf_train: [True, False]
+        mlp_train: [True, False]
+        dropout: [0, 0.01]
+        weight_decay: 1e-5
+        epochs: 100
+        learning_rate: [1e-3, 1e-4, 1e-5]
+        neg_samples: [0, 1, 2]
 ...
 ```
 
