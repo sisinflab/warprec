@@ -2,6 +2,7 @@ from typing import List, Dict, Optional, Set, Any
 
 import torch
 import re
+import time
 from torch import Tensor
 from pandas import DataFrame
 from scipy.sparse import csr_matrix
@@ -137,8 +138,10 @@ class Evaluator:
         Raises:
             ValueError: If evaluation is required on a set not provided.
         """
+        eval_start_time: float
         if verbose:
             logger.msg(f"Starting evaluation process for model {model.name}.")
+            eval_start_time = time.time()
 
         # Reset all metrics in evaluator
         self.reset_metrics()
@@ -286,7 +289,13 @@ class Evaluator:
             _start = _end
 
         if verbose:
-            logger.positive(f"Evaluation completed for model {model.name}.")
+            eval_total_time = time.time() - eval_start_time
+            frmt_eval_total_time = time.strftime(
+                "%H:%M:%S", time.gmtime(eval_total_time)
+            )
+            logger.positive(
+                f"Evaluation completed for model {model.name}. Evaluation process took: {frmt_eval_total_time}"
+            )
 
     def reset_metrics(self):
         """Reset all metrics accumulated values."""
