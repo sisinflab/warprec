@@ -28,8 +28,7 @@ class ConvNCF(RecomModel):
         cnn_kernels (LIST_INT_FIELD): List of values for CNN kernels.
         cnn_strides (LIST_INT_FIELD): List of values for CNN strides.
         dropout_prob (FLOAT_FIELD): List of values for dropout_prob.
-        reg_embedding (FLOAT_FIELD): List of values for embedding regularization.
-        reg_cnn_mlp (FLOAT_FIELD): List of values for CNN and MLP regularization.
+        weight_decay (FLOAT_FIELD): List of values for weight_decay.
         epochs (INT_FIELD): List of values for epochs.
         learning_rate (FLOAT_FIELD): List of values for learning rate.
         need_single_trial_validation (ClassVar[bool]): Whether or not to check if a Ray Tune
@@ -41,8 +40,7 @@ class ConvNCF(RecomModel):
     cnn_kernels: LIST_INT_FIELD
     cnn_strides: LIST_INT_FIELD
     dropout_prob: FLOAT_FIELD
-    reg_embedding: FLOAT_FIELD
-    reg_cnn_mlp: FLOAT_FIELD
+    weight_decay: FLOAT_FIELD
     epochs: INT_FIELD
     learning_rate: FLOAT_FIELD
     need_single_trial_validation: ClassVar[bool] = True
@@ -77,17 +75,11 @@ class ConvNCF(RecomModel):
         """Validate dropout_prob."""
         return validate_greater_equal_than_zero(cls, v, "dropout_prob")
 
-    @field_validator("reg_embedding")
+    @field_validator("weight_decay")
     @classmethod
-    def check_reg_embedding(cls, v: list):
-        """Validate reg_embedding."""
-        return validate_greater_equal_than_zero(cls, v, "reg_embedding")
-
-    @field_validator("reg_cnn_mlp")
-    @classmethod
-    def check_reg_cnn_mlp(cls, v: list):
-        """Validate reg_cnn_mlp."""
-        return validate_greater_equal_than_zero(cls, v, "reg_cnn_mlp")
+    def check_weight_decay(cls, v: list):
+        """Validate weight_decay."""
+        return validate_greater_equal_than_zero(cls, v, "weight_decay")
 
     @field_validator("epochs")
     @classmethod

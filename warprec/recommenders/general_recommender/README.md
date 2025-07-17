@@ -226,9 +226,8 @@ models:
         cnn_kernels: [[2, 2]]
         cnn_strides: [[1, 1]]
         dropout_prob: 0.01
-        reg_embedding: 0.1
-        reg_cnn_mlp: 0.1
-        epochs: 1
+        weight_decay: 0.0001
+        epochs: 20
         learning_rate: 0.001
 ...
 ```

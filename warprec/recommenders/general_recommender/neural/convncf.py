@@ -38,8 +38,7 @@ class ConvNCF(Recommender):
         cnn_kernels (List[int]): The list of kernel sizes for each CNN layer.
         cnn_strides (List[int]): The list of stride sizes for each CNN layer.
         dropout_prob (float): The dropout probability for the prediction layer.
-        reg_embedding (float): The regularization for embedding weights.
-        reg_cnn_mlp (float): The regularization for embedding cnn and mlp layers.
+        weight_decay (float): The value of weight decay used in the optimizer.
         epochs (int): The number of epochs.
         learning_rate (float): The learning rate value.
     """
@@ -50,8 +49,7 @@ class ConvNCF(Recommender):
     cnn_kernels: List[int]
     cnn_strides: List[int]
     dropout_prob: float
-    reg_embedding: float
-    reg_cnn_mlp: float
+    weight_decay: float
     epochs: int
     learning_rate: float
 
@@ -105,8 +103,10 @@ class ConvNCF(Recommender):
         self.apply(self._init_weights)
 
         # Optimizer and losses
-        self.optimizer = torch.optim.Adam(self.parameters(), lr=self.learning_rate)
-        self.bpr_loss = BPRLoss()
+        self.optimizer = torch.optim.Adam(
+            self.parameters(), lr=self.learning_rate, weight_decay=self.weight_decay
+        )
+        self.loss = BPRLoss()
 
         self.to(self._device)
 
@@ -118,29 +118,6 @@ class ConvNCF(Recommender):
         """
         if isinstance(module, nn.Embedding):
             normal_(module.weight.data, mean=0.0, std=0.01)
-
-    def _reg_loss(self) -> Tensor:
-        """Calculate the L2 normalization loss of model parameters.
-        Including embedding matrices and weight matrices of model.
-
-        Returns;
-            Tensor: The computed regularization loss.
-        """
-        loss_1 = self.reg_embedding * self.user_embedding.weight.pow(2).sum()
-        loss_2 = self.reg_embedding * self.item_embedding.weight.pow(2).sum()
-        loss_3 = torch.tensor(0.0, device=self._device)
-
-        # Regularization for CNN layers
-        for name, parm in self.cnn_layers.named_parameters():
-            if name.endswith("weight"):
-                loss_3 += self.reg_cnn_mlp * parm.pow(2).sum()
-
-        # Regularization for prediction layers (MLP)
-        for name, parm in self.predict_layers.named_parameters():
-            if name.endswith("weight"):
-                loss_3 += self.reg_cnn_mlp * parm.pow(2).sum()
-
-        return loss_1 + loss_2 + loss_3
 
     def fit(
         self,
@@ -172,17 +149,13 @@ class ConvNCF(Recommender):
                 self.optimizer.zero_grad()
                 pos_item_score = self.forward(user, pos_item)
                 neg_item_score = self.forward(user, neg_item)
-
-                # Loss computation (BPR + Regularization)
-                bpr_loss: Tensor = self.bpr_loss(pos_item_score, neg_item_score)
-                reg_loss = self._reg_loss()
-                total_loss = bpr_loss + reg_loss
+                loss: Tensor = self.loss(pos_item_score, neg_item_score)
 
                 # Backward pass and optimization
-                total_loss.backward()
+                loss.backward()
                 self.optimizer.step()
 
-                epoch_loss += total_loss.item()
+                epoch_loss += loss.item()
 
             if report_fn is not None:
                 report_fn(self, loss=epoch_loss)
