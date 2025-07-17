@@ -156,30 +156,28 @@ def main(args: Namespace):
         callback.on_training_complete(model=best_model)
 
         # Evaluation testing
-        result_dict = {}
-        if dataset.val_set is not None:
-            evaluator.evaluate(best_model, dataset, test_set=False, verbose=True)
-            results = evaluator.compute_results()
-            evaluator.print_console(
-                results, "Validation", config.evaluation.max_metric_per_row
-            )
-            result_dict["Validation"] = results
-
-        evaluator.evaluate(best_model, dataset, test_set=True, verbose=True)
+        eval_validation = dataset.val_set is not None
+        eval_test = dataset.test_set is not None
+        evaluator.evaluate(
+            best_model,
+            dataset,
+            evaluate_on_validation=eval_validation,
+            evaluate_on_test=eval_test,
+            verbose=True,
+        )
         results = evaluator.compute_results()
-        evaluator.print_console(results, "Test", config.evaluation.max_metric_per_row)
-        result_dict["Test"] = results
+        evaluator.print_console(results, config.evaluation.max_metric_per_row)
 
         # Callback after complete evaluation
         callback.on_evaluation_complete(
             model=best_model,
             params=params,
-            results=result_dict,
+            results=results,
         )
 
         # Write results of current model
         writer.write_results(
-            result_dict,
+            results,
             model_name,
         )
 

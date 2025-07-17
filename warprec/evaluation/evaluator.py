@@ -1,4 +1,4 @@
-from typing import List, Dict, Optional, Set
+from typing import List, Dict, Optional, Set, Any
 
 import torch
 import re
@@ -49,10 +49,10 @@ class Evaluator:
         item_cluster: Tensor = None,
     ):
         self.k_values = k_values
-        self.metrics: Dict[int, List[BaseMetric]] = {}
+        self.metric_list = metric_list
+        self.metrics: Dict[str, Dict[int, List[BaseMetric]]] = {}
         self.required_blocks: Dict[int, Set[MetricBlock]] = {}
-
-        common_params = {
+        self.common_params: Dict[str, Any] = {
             "train_set": train_set,
             "side_information": side_information,
             "beta": beta,
@@ -61,8 +61,24 @@ class Evaluator:
             "item_cluster": item_cluster,
         }
 
+    def _init_metrics(self, set_type: str, metric_list: List[str]):
+        """Utility method to initialize metrics.
+
+        Args:
+            set_type (str): The type of set which requires the metrics to be set.
+                Can be either 'test' or 'validation'.
+            metric_list (List[str]): The list of metric names used to initialize
+                metric classes from registry.
+
+        Raises:
+            ValueError: If the set_type is not 'test' or 'validation'.
+        """
+        if set_type not in ["test", "validation"]:
+            raise ValueError("Unexpected set type during metrics initialization")
+
+        self.metrics[set_type] = {}
         for k in self.k_values:
-            self.metrics[k] = []
+            self.metrics[set_type][k] = []
             self.required_blocks[k] = set()
             for metric_string in metric_list:
                 metric_name = metric_string
@@ -91,10 +107,10 @@ class Evaluator:
                 metric_instance = metric_registry.get(
                     metric_name,
                     k=k,
-                    **common_params,
+                    **self.common_params,
                     **metric_params,  # Add specific params if needed
                 )
-                self.metrics[k].append(metric_instance)
+                self.metrics[set_type][k].append(metric_instance)
                 self.required_blocks[k].update(metric_instance._REQUIRED_COMPONENTS)
 
     def evaluate(
@@ -102,7 +118,8 @@ class Evaluator:
         model: Recommender,
         dataset: Dataset,
         device: str = "cpu",
-        test_set: bool = True,
+        evaluate_on_test: bool = False,
+        evaluate_on_validation: bool = False,
         verbose: bool = False,
     ):
         """The main method to evaluate a list of metrics on the prediction of a model.
@@ -111,13 +128,17 @@ class Evaluator:
             model (Recommender): The trained model.
             dataset (Dataset): The dataset from which retrieve train/val/test data.
             device (str): The device on which the metrics will be calculated.
-            test_set (bool): Wether or not to compute metrics on test set.
+            evaluate_on_test (bool): Wether or not to evaluate
+                the model on test set.
+            evaluate_on_validation (bool): Wether or not to evaluate
+                the model on validation set.
             verbose (bool): Wether of not the method should write with logger.
+
+        Raises:
+            ValueError: If evaluation is required on a set not provided.
         """
         if verbose:
-            partition = "test set" if test_set else "validation set"
-            logger.separator()
-            logger.msg(f"Starting evaluation for model {model.name} on {partition}.")
+            logger.msg(f"Starting evaluation process for model {model.name}.")
 
         # Reset all metrics in evaluator
         self.reset_metrics()
@@ -126,6 +147,27 @@ class Evaluator:
         # Extract main data structures from dataset
         train_set = dataset.train_set
         train_session = dataset.train_session
+
+        # Initialize evaluation sets and inner data structures
+        set_type_to_evaluate = []
+        if evaluate_on_validation:
+            if dataset.val_set is not None:
+                self._init_metrics("validation", self.metric_list)
+                set_type_to_evaluate.append("validation")
+            else:
+                raise ValueError(
+                    "Evaluator is trying to evaluate on validation set, "
+                    "but None have been provided."
+                )
+        if evaluate_on_test:
+            if dataset.test_set is not None:
+                self._init_metrics("test", self.metric_list)
+                set_type_to_evaluate.append("test")
+            else:
+                raise ValueError(
+                    "Evaluator is trying to evaluate on test set, "
+                    "but None have been provided."
+                )
 
         # Iter over batches
         _start = 0
@@ -141,94 +183,106 @@ class Evaluator:
                     model.max_seq_len,  # Sequence length truncated
                 )
 
-            eval_set = test_batch if test_set else val_batch
-            ground = torch.tensor(
-                (eval_set).toarray(), device=device
-            )  # Ground tensor [batch_size x items]
-            user_id_tensor = torch.tensor(current_users_idx_list, dtype=torch.long)
-
             predictions = model.predict(
                 train_batch,
                 start=_start,
                 end=_end,
                 train_set=train_set,
                 user_seq=user_seq,
-                user_id=user_id_tensor,
+                user_id=torch.tensor(current_users_idx_list, dtype=torch.long),
                 seq_len=seq_len,
             ).to(device)  # Get ratings tensor [batch_size x items]
 
-            # Pre-compute metric blocks
-            precomputed_blocks: Dict[int, Dict[str, Tensor]] = {}
-
-            # First we check for relevance
-            binary_relevance = (
-                BaseMetric.binary_relevance(ground)
-                if MetricBlock.BINARY_RELEVANCE
-                in self.required_blocks[self.k_values[0]]
-                else None
-            )
-            discounted_relevance = (
-                BaseMetric.discounted_relevance(ground)
-                if MetricBlock.DISCOUNTED_RELEVANCE
-                in self.required_blocks[self.k_values[0]]
-                else None
-            )
-
-            # We also check if the number of valid users is required
-            valid_users = (
-                BaseMetric.valid_users(ground)
-                if MetricBlock.VALID_USERS in self.required_blocks[self.k_values[0]]
-                else None
-            )
-
-            # Then we check all the needed blocks that are shared
-            # between metrics so we can pre-computed
-            for k in self.k_values:
-                precomputed_blocks[k] = {}
-                required_blocks_for_k = self.required_blocks[k]
-
-                # Check first if we need .top_k() method
-                if (
-                    MetricBlock.TOP_K_VALUES
-                    or MetricBlock.TOP_K_INDICES
-                    or MetricBlock.TOP_K_BINARY_RELEVANCE
-                    or MetricBlock.TOP_K_DISCOUNTED_RELEVANCE
-                ):
-                    top_k_values, top_k_indices = BaseMetric.top_k_values_indices(
-                        predictions, k
+            for set_type in set_type_to_evaluate:
+                ground: Tensor
+                if set_type == "test":
+                    ground = torch.tensor(
+                        (test_batch).toarray(), device=device
+                    )  # Ground tensor [batch_size x items]
+                elif set_type == "validation":
+                    ground = torch.tensor(
+                        (val_batch).toarray(), device=device
+                    )  # Ground tensor [batch_size x items]
+                else:
+                    raise ValueError(
+                        f"Set type error in evaluator. Set type received: {set_type}"
                     )
-                    precomputed_blocks[k][f"top_{k}_values"] = top_k_values
-                    precomputed_blocks[k][f"top_{k}_indices"] = top_k_indices
 
-                    # Then we also check for .gather() method for better optimization
-                    if MetricBlock.TOP_K_BINARY_RELEVANCE in required_blocks_for_k:
-                        precomputed_blocks[k][f"top_{k}_binary_relevance"] = (
-                            BaseMetric.top_k_relevance_from_indices(
-                                binary_relevance, top_k_indices
-                            )
-                        )
-                    if MetricBlock.TOP_K_DISCOUNTED_RELEVANCE in required_blocks_for_k:
-                        precomputed_blocks[k][f"top_{k}_discounted_relevance"] = (
-                            BaseMetric.top_k_relevance_from_indices(
-                                discounted_relevance, top_k_indices
-                            )
-                        )
+                # Pre-compute metric blocks
+                precomputed_blocks: Dict[int, Dict[str, Tensor]] = {}
 
-            # Update all metrics on current batches
-            for k, metric_instances in self.metrics.items():
-                for metric in metric_instances:
-                    update_kwargs = {
-                        "ground": ground,
-                        "binary_relevance": binary_relevance,
-                        "discounted_relevance": discounted_relevance,
-                        "valid_users": valid_users,
-                        "start": _start,
-                        **precomputed_blocks[k],
-                    }
-                    metric.update(
-                        predictions,
-                        **update_kwargs,
-                    )
+                # First we check for relevance
+                binary_relevance = (
+                    BaseMetric.binary_relevance(ground)
+                    if MetricBlock.BINARY_RELEVANCE
+                    in self.required_blocks[self.k_values[0]]
+                    else None
+                )
+                discounted_relevance = (
+                    BaseMetric.discounted_relevance(ground)
+                    if MetricBlock.DISCOUNTED_RELEVANCE
+                    in self.required_blocks[self.k_values[0]]
+                    else None
+                )
+
+                # We also check if the number of valid users is required
+                valid_users = (
+                    BaseMetric.valid_users(ground)
+                    if MetricBlock.VALID_USERS in self.required_blocks[self.k_values[0]]
+                    else None
+                )
+
+                # Then we check all the needed blocks that are shared
+                # between metrics so we can pre-computed
+                for k in self.k_values:
+                    precomputed_blocks[k] = {}
+                    required_blocks_for_k = self.required_blocks[k]
+
+                    # Check first if we need .top_k() method
+                    if (
+                        MetricBlock.TOP_K_VALUES
+                        or MetricBlock.TOP_K_INDICES
+                        or MetricBlock.TOP_K_BINARY_RELEVANCE
+                        or MetricBlock.TOP_K_DISCOUNTED_RELEVANCE
+                    ):
+                        top_k_values, top_k_indices = BaseMetric.top_k_values_indices(
+                            predictions, k
+                        )
+                        precomputed_blocks[k][f"top_{k}_values"] = top_k_values
+                        precomputed_blocks[k][f"top_{k}_indices"] = top_k_indices
+
+                        # Then we also check for .gather() method for better optimization
+                        if MetricBlock.TOP_K_BINARY_RELEVANCE in required_blocks_for_k:
+                            precomputed_blocks[k][f"top_{k}_binary_relevance"] = (
+                                BaseMetric.top_k_relevance_from_indices(
+                                    binary_relevance, top_k_indices
+                                )
+                            )
+                        if (
+                            MetricBlock.TOP_K_DISCOUNTED_RELEVANCE
+                            in required_blocks_for_k
+                        ):
+                            precomputed_blocks[k][f"top_{k}_discounted_relevance"] = (
+                                BaseMetric.top_k_relevance_from_indices(
+                                    discounted_relevance, top_k_indices
+                                )
+                            )
+
+                # Update all metrics on current batches
+                for k, metric_instances in self.metrics[set_type].items():
+                    for metric in metric_instances:
+                        update_kwargs = {
+                            "ground": ground,
+                            "binary_relevance": binary_relevance,
+                            "discounted_relevance": discounted_relevance,
+                            "valid_users": valid_users,
+                            "start": _start,
+                            **precomputed_blocks[k],
+                        }
+                        metric.update(
+                            predictions,
+                            **update_kwargs,
+                        )
             _start = _end
 
         if verbose:
@@ -240,68 +294,70 @@ class Evaluator:
             for metric in metric_list:
                 metric.reset()
 
-    def compute_results(self) -> Dict[int, Dict[str, float]]:
+    def compute_results(self) -> Dict[str, Dict[int, Dict[str, float]]]:
         """The method to retrieve computed results in dictionary format.
 
         Returns:
-            Dict[int, Dict[str, float]]: The dictionary containing the results.
+            Dict[str, Dict[int, Dict[str, float]]]: The dictionary containing the results.
         """
-        results: Dict[int, Dict[str, float]] = {}
-        for k, metric_instances in self.metrics.items():
-            results[k] = {}
-            for metric in metric_instances:
-                metric_result = metric.compute()
-                results[k].update(metric_result)
+        results: Dict[str, Dict[int, Dict[str, float]]] = {}
+        for set_type, metric_dict in self.metrics.items():
+            results[set_type] = {}
+            for k, metric_instances in metric_dict.items():
+                results[set_type][k] = {}
+                for metric in metric_instances:
+                    metric_result = metric.compute()
+                    results[set_type][k].update(metric_result)
         return results
 
     def print_console(
         self,
-        res_dict: Dict[int, Dict[str, float]],
-        header: str,
-        max_metrics_per_row: int = 4,  # TODO: Add to config
+        results: Dict[str, Dict[int, Dict[str, float]]],
+        max_metrics_per_row: int = 4,
     ):
         """Utility function to print results using tabulate.
 
         Args:
-            res_dict (Dict[int, Dict[str, float]]): The dictionary containing all the results.
-            header (str): The header of the evaluation grid,
-                usually set with the name of evaluation.
+            results (Dict[str, Dict[int, Dict[str, float]]]): The dictionary containing all the results.
             max_metrics_per_row (int): The number of metrics
                 to print in each row.
         """
-        # Collect all unique metric keys across all cutoffs
-        first_cutoff_key = next(iter(res_dict))
-        ordered_metric_keys = list(res_dict[first_cutoff_key].keys())
+        for header, res_dict in results.items():
+            # Collect all unique metric keys across all cutoffs
+            first_cutoff_key = next(iter(res_dict))
+            ordered_metric_keys = list(res_dict[first_cutoff_key].keys())
 
-        # Split metric keys into chunks of size max_metrics_per_row
-        n_chunks = ceil(len(ordered_metric_keys) / max_metrics_per_row)
-        chunks = [
-            ordered_metric_keys[i * max_metrics_per_row : (i + 1) * max_metrics_per_row]
-            for i in range(n_chunks)
-        ]
+            # Split metric keys into chunks of size max_metrics_per_row
+            n_chunks = ceil(len(ordered_metric_keys) / max_metrics_per_row)
+            chunks = [
+                ordered_metric_keys[
+                    i * max_metrics_per_row : (i + 1) * max_metrics_per_row
+                ]
+                for i in range(n_chunks)
+            ]
 
-        # For each chunk, print a table with subset of metric columns
-        for chunk_idx, chunk_keys in enumerate(chunks):
-            _tab = []
-            for k, metrics in res_dict.items():
-                _metric_tab = [f"Top@{k}"]
-                for key in chunk_keys:
-                    _metric_tab.append(str(metrics.get(key, float("nan"))))
-                _tab.append(_metric_tab)
+            # For each chunk, print a table with subset of metric columns
+            for chunk_idx, chunk_keys in enumerate(chunks):
+                _tab = []
+                for k, metrics in res_dict.items():
+                    _metric_tab = [f"Top@{k}"]
+                    for key in chunk_keys:
+                        _metric_tab.append(str(metrics.get(key, float("nan"))))
+                    _tab.append(_metric_tab)
 
-            table = tabulate(
-                _tab,
-                headers=["Cutoff"] + chunk_keys,
-                tablefmt="grid",
-            )
-            _rlen = len(table.split("\n", maxsplit=1)[0])
-            title = header
-            if n_chunks > 1:
-                start_idx = chunk_idx * max_metrics_per_row + 1
-                end_idx = min(
-                    (chunk_idx + 1) * max_metrics_per_row, len(ordered_metric_keys)
+                table = tabulate(
+                    _tab,
+                    headers=["Cutoff"] + chunk_keys,
+                    tablefmt="grid",
                 )
-                title += f" (metrics {start_idx} - {end_idx})"
-            logger.msg(title.center(_rlen, "-"))
-            for row in table.split("\n"):
-                logger.msg(row)
+                _rlen = len(table.split("\n", maxsplit=1)[0])
+                title = header
+                if n_chunks > 1:
+                    start_idx = chunk_idx * max_metrics_per_row + 1
+                    end_idx = min(
+                        (chunk_idx + 1) * max_metrics_per_row, len(ordered_metric_keys)
+                    )
+                    title += f" (metrics {start_idx} - {end_idx})"
+                logger.msg(title.center(_rlen, "-"))
+                for row in table.split("\n"):
+                    logger.msg(row)
