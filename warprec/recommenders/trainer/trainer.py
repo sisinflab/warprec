@@ -609,9 +609,8 @@ class EarlyStopping(Stopper):
         self.patience = patience
         self.grace_period = grace_period
         self.min_delta = min_delta
-        self.best_score: Optional[float] = None
-        self.wait = 0
-        self.stopped_training = False
+        self.trial_best_score: Dict[str, Optional[float]] = {}
+        self.trial_wait: Dict[str, int] = {}
 
     def __call__(self, trial_id: str, result: Dict) -> bool:
         """Callback when a trial reports a result.
@@ -623,8 +622,6 @@ class EarlyStopping(Stopper):
         Returns:
             bool: Wether or not to suppress the trial.
         """
-        if self.stopped_training:
-            return True
 
         current_score = result.get(self.metric, None)
         iteration = result.get("training_iteration", None)
@@ -636,27 +633,26 @@ class EarlyStopping(Stopper):
             )
             return False
 
-        if self.best_score is None:
-            self.best_score = current_score
-            self.wait = 0
+        if trial_id not in self.trial_best_score:
+            self.trial_best_score[trial_id] = current_score
+            self.trial_wait[trial_id] = 0
         elif iteration <= self.grace_period:
             return False
         else:
             if self.mode == "min":
-                if current_score < self.best_score - self.min_delta:
-                    self.best_score = current_score
-                    self.wait = 0
+                if current_score < self.trial_best_score[trial_id] - self.min_delta:
+                    self.trial_best_score[trial_id] = current_score
+                    self.trial_wait[trial_id] = 0
                 else:
-                    self.wait += 1
+                    self.trial_wait[trial_id] += 1
             elif self.mode == "max":
-                if current_score > self.best_score + self.min_delta:
-                    self.best_score = current_score
-                    self.wait = 0
+                if current_score > self.trial_best_score[trial_id] + self.min_delta:
+                    self.trial_best_score[trial_id] = current_score
+                    self.trial_wait[trial_id] = 0
                 else:
-                    self.wait += 1
+                    self.trial_wait[trial_id] += 1
 
-        if self.wait >= self.patience:
-            self.stopped_training = True
+        if self.trial_wait[trial_id] >= self.patience:
             logger.attention(
                 f"Early stopping triggered for trial {trial_id}: "
                 f"No improvement in '{self.metric}' for {self.patience} iterations. "
