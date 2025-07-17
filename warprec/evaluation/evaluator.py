@@ -351,7 +351,7 @@ class Evaluator:
                     tablefmt="grid",
                 )
                 _rlen = len(table.split("\n", maxsplit=1)[0])
-                title = header
+                title = header.capitalize()
                 if n_chunks > 1:
                     start_idx = chunk_idx * max_metrics_per_row + 1
                     end_idx = min(
