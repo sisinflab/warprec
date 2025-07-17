@@ -260,12 +260,60 @@ class Optimization(BaseModel):
         return self
 
 
+class EarlyStopping(BaseModel):
+    """Definition of the Early stopping sub-configuration of a RecommenderModel.
+
+    Attributes:
+        monitor (Optional[str]): The value to monitor. Can be either 'score'
+            or 'loss'.
+        patience (int): The number of epochs the trainer will wait for
+            an improvement.
+        grace_period (Optional[int]): The number of epochs to wait before
+            activating the early stopping.
+        min_delta (Optional[float]): The delta value used to offset the improvement.
+    """
+
+    monitor: Optional[str] = "score"
+    patience: int
+    grace_period: Optional[int] = 0
+    min_delta: Optional[float] = 0.0
+
+    @field_validator("monitor")
+    @classmethod
+    def check_monitor(cls, v: str):
+        """Validate monitor."""
+        if v not in ["score", "loss"]:
+            raise ValueError(
+                "Value for monitor must be either 'score' or 'loss'. "
+                f"Value received: {v}"
+            )
+        return v
+
+    @field_validator("patience")
+    @classmethod
+    def check_patience(cls, v: int):
+        """Validate patience."""
+        if v <= 0:
+            raise ValueError("Value for patience must be >0.")
+        return v
+
+    @field_validator("grace_period")
+    @classmethod
+    def check_grace_period(cls, v: int):
+        """Validate grace_period."""
+        if v < 0:
+            raise ValueError("Value for grace_period must be >=0.")
+        return v
+
+
 class RecomModel(BaseModel, ABC):
     """Definition of a RecommendationModel configuration. All models must extend this class.
 
     Attributes:
         meta (Meta): The meta-information about the model. Defaults to Meta default values.
         optimization (Optimization): The optimization information that will be used by Ray Tune.
+        early_stopping (Optional[EarlyStopping]): The early stopping information that
+            will be used during training.
         need_side_information (ClassVar[bool]): Wether or not the model needs side information.
         need_timestamp (ClassVar[bool]): Wether or not the model needs the timestamp.
         need_single_trial_validation (ClassVar[bool]): Wether or not the model needs to be
@@ -274,6 +322,7 @@ class RecomModel(BaseModel, ABC):
 
     meta: Meta = Field(default_factory=Meta)
     optimization: Optimization = Field(default_factory=Optimization)
+    early_stopping: Optional[EarlyStopping] = None
     need_side_information: ClassVar[bool] = False
     need_timestamp: ClassVar[bool] = False
     need_single_trial_validation: ClassVar[bool] = False
@@ -293,7 +342,9 @@ class RecomModel(BaseModel, ABC):
         self.validate_model_and_implementation(_name, _imp)
 
         # General parameters control
-        updated_values = self.model_dump(exclude=["meta", "optimization"])
+        updated_values = self.model_dump(
+            exclude=["meta", "optimization", "early_stopping"]
+        )
 
         for field, value in updated_values.items():
             typing = field_to_type[field]
