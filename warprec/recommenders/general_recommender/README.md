@@ -44,9 +44,9 @@ models:
         intermediate_dim: 600
         latent_dim: 200
         dropout: 1.0
+        weight_decay: 0.02
         epochs: 10
         learning_rate: 0.001
-        l2_lambda: 0.02
 ...
 ```
 - [MultiVAE (Multinomial Variational Autoencoder)](autoencoder/multivae.py): A probabilistic variant of MultiDAE that models uncertainty in user preferences via variational inference. Useful for capturing diverse user behaviors and providing more personalized recommendations.
@@ -56,9 +56,9 @@ models:
         intermediate_dim: 600
         latent_dim: 200
         dropout: 1.0
+        weight_decay: 0.02
         epochs: 10
         learning_rate: 0.001
-        l2_lambda: 0.02
         anneal_cap: 0.2
         anneal_step: 200
 ...
@@ -88,7 +88,7 @@ models:
     LightGCN:
         embedding_size: 64
         n_layers: 2
-        reg_weight: 0.0001
+        weight_decay: 0.0001
         epochs: 50
         learning_rate: 0.001
 ...
@@ -99,7 +99,7 @@ models:
 models:
     NGCF:
         embedding_size: 64
-        reg_weight: 0.0001
+        weight_decay: 0.0001
         epochs: 5
         learning_rate: 0.001
         weight_size: [64, 64]
@@ -185,6 +185,7 @@ models:
 models:
     BPR:
         embedding_size: 16
+        weight_decay: 0.001
         epochs: 20
         learning_rate: 0.001
 ...
@@ -195,13 +196,11 @@ models:
 models:
     FISM:
         embedding_size: 16
-        reg_1: 0.001
-        reg_2: 0.001
         alpha: 0.1
         split_to: 5
+        weight_decay: 0.0001
         epochs: 5
         learning_rate: 0.001
-        neg_ratio: 0.002
 ...
 ```
 
@@ -227,9 +226,8 @@ models:
         cnn_kernels: [[2, 2]]
         cnn_strides: [[1, 1]]
         dropout_prob: 0.01
-        reg_embedding: 0.1
-        reg_cnn_mlp: 0.1
-        epochs: 1
+        weight_decay: 0.0001
+        epochs: 20
         learning_rate: 0.001
 ...
 ```
@@ -244,6 +242,7 @@ models:
         mf_train: True
         mlp_train: True
         dropout: 0.01
+        weight_decay: 0.0001
         epochs: 20
         learning_rate: 0.001
         neg_samples: 1

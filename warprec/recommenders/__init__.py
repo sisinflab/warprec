@@ -8,7 +8,7 @@ from .base_recommender import (
     ItemSimRecommender,
 )
 from .layers import MLP, CNN, SparseDropout, NGCFLayer
-from .losses import BPRLoss, EmbeddingLoss
+from .losses import BPRLoss
 from .similarities import Similarity
 
 __all__ = [
@@ -24,6 +24,5 @@ __all__ = [
     "SparseDropout",
     "NGCFLayer",
     "BPRLoss",
-    "EmbeddingLoss",
     "Similarity",
 ]

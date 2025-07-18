@@ -32,20 +32,18 @@ class FISM(Recommender):
 
     Attributes:
         embedding_size (int): The number of factors for item feature embeddings.
-        reg_1 (float): Regularization coefficient for the item source embeddings (beta).
-        reg_2 (float): Regularization coefficient for the item destination embeddings (lambda).
         alpha (float): The alpha parameter, a value between 0 and 1, used in the similarity calculation.
         split_to (int): Parameter for splitting items into chunks during prediction (for memory management).
+        weight_decay (float): The value of weight decay used in the optimizer.
         epochs (int): The number of training epochs.
         learning_rate (float): The learning rate for the optimizer.
     """
 
     # Model specific parameters
     embedding_size: int
-    reg_1: float
-    reg_2: float
     alpha: float
     split_to: int
+    weight_decay: float
     epochs: int
     learning_rate: float
 
@@ -89,7 +87,9 @@ class FISM(Recommender):
 
         # Define the loss
         self.bceloss = nn.BCEWithLogitsLoss()
-        self.optimizer = torch.optim.Adam(self.parameters(), lr=self.learning_rate)
+        self.optimizer = torch.optim.Adam(
+            self.parameters(), lr=self.learning_rate, weight_decay=self.weight_decay
+        )
 
         # These will be set in the fit method
         self.history_matrix: Tensor | None = None
@@ -204,16 +204,16 @@ class FISM(Recommender):
                 batch_label = shuffled_label_tensor[start_idx:end_idx]
 
                 output = self.forward(batch_user, batch_item)
+                loss: Tensor = self.bceloss(output, batch_label.float())
 
                 # Loss computation and backpropagation
-                loss = self.bceloss(output, batch_label.float()) + self._reg_loss()
                 loss.backward()
                 self.optimizer.step()
 
                 epoch_loss += loss.item()
 
             if report_fn:
-                report_fn(self, loss=epoch_loss, epoch=epoch)
+                report_fn(self, loss=epoch_loss)
 
     @torch.no_grad()
     def predict(
@@ -289,13 +289,3 @@ class FISM(Recommender):
 
         # We return raw scores without sigmoid
         return predictions
-
-    def _reg_loss(self) -> Tensor:
-        """Compute the regularization loss for embedding layers.
-
-        Returns:
-            Tensor: The sum of the two regularization losses.
-        """
-        loss_1 = self.reg_1 * self.item_src_embedding.weight.pow(2).sum()
-        loss_2 = self.reg_2 * self.item_dst_embedding.weight.pow(2).sum()
-        return loss_1 + loss_2

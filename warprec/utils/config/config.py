@@ -116,11 +116,14 @@ class Configuration(BaseModel):
                 _has_header = self.reader.split.header
             else:
                 raise ValueError("Unsupported local source or missing local path.")
-            
+
+            if not os.path.exists(_local_path):
+                raise FileNotFoundError(f"Training file not at {_local_path}")
+
             # Read the header of file to later check
             with open(_local_path, "r", encoding="utf-8") as f:
                 first_line = f.readline()
-            _header = first_line.strip().split(_sep)      
+            _header = first_line.strip().split(_sep)
 
             # If the source file should have header, we check
             # if the column names are present.
@@ -231,9 +234,7 @@ class Configuration(BaseModel):
             model_class.validate_all_combinations()
 
             # Check if the model requires timestamp
-            if (
-                model_class.need_timestamp
-            ):
+            if model_class.need_timestamp:
                 logger.attention(
                     f"The model {model_name} requires timestamps to work properly, "
                     "be sure that your dataset contains them."

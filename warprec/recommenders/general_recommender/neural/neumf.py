@@ -37,6 +37,7 @@ class NeuMF(Recommender):
         mf_train (bool): Wether or not to train MF embedding.
         mlp_train (bool): Wether or not to train MLP embedding.
         dropout (float): The dropout probability.
+        weight_decay (float): The value of weight decay used in the optimizer.
         epochs (int): The number of epochs.
         learning_rate (float): The learning rate value.
         neg_samples (int): The number of negative samples per positive interaction.
@@ -49,6 +50,7 @@ class NeuMF(Recommender):
     mf_train: bool
     mlp_train: bool
     dropout: float
+    weight_decay: float
     epochs: int
     learning_rate: float
     neg_samples: int
@@ -111,7 +113,9 @@ class NeuMF(Recommender):
         self.apply(self._init_weights)
 
         # Loss and optimizer
-        self.optimizer = torch.optim.Adam(self.parameters(), lr=self.learning_rate)
+        self.optimizer = torch.optim.Adam(
+            self.parameters(), lr=self.learning_rate, weight_decay=self.weight_decay
+        )
         self.loss = nn.BCEWithLogitsLoss()
         self.sigmoid = nn.Sigmoid()
 
