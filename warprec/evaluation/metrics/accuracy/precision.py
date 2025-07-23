@@ -115,13 +115,11 @@ class Precision(TopKMetric):
     def compute(self):
         """Computes the final metric value."""
         if self.compute_per_user:
-            return {
-                self.name: self.correct / self.k
-            }  # Return the tensor with per_user metric
+            precision = self.correct / self.k  # Return the tensor with per_user metric
         else:
             precision = (
                 self.correct / (self.users * self.k)
                 if self.users > 0
                 else torch.tensor(0.0)
-            )
-            return {self.name: precision.item()}  # Return the metric value
+            ).item()  # Return the metric value
+        return {self.name: precision}

@@ -127,9 +127,9 @@ class Recall(TopKMetric):
     def compute(self):
         """Computes the final metric value."""
         if self.compute_per_user:
-            return {self.name: self.retrieved}  # Return the tensor with per_user metric
+            recall = self.retrieved  # Return the tensor with per_user metric
         else:
             recall = (
                 self.retrieved / self.users if self.users > 0 else torch.tensor(0.0)
-            )
-            return {self.name: recall.item()}  # Return the metric value
+            ).item()  # Return the metric value
+        return {self.name: recall}
