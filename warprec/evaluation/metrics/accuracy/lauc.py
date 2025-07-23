@@ -1,10 +1,10 @@
 # pylint: disable=arguments-differ, unused-argument
-from typing import Any
+from typing import Any, Set
 
 import torch
 from torch import Tensor
-from scipy.sparse import csr_matrix
 from warprec.evaluation.metrics.base_metric import TopKMetric
+from warprec.utils.enums import MetricBlock
 from warprec.utils.registry import metric_registry
 
 
@@ -75,34 +75,58 @@ class LAUC(TopKMetric):
     Attributes:
         lauc (Tensor): The lauc value across all users.
         users (Tensor): The number of users.
+        compute_per_user (bool): Wether or not to compute the metric
+            per user or globally.
 
     Args:
         k (int): The cutoff.
-        train_set (csr_matrix): The training interaction data.
+        num_users (int): Number of users in the training set.
+        num_items (int): Number of items in the training set.
         *args (Any): The argument list.
+        compute_per_user (bool): Wether or not to compute the metric
+            per user or globally.
         dist_sync_on_step (bool): Torchmetrics parameter.
         **kwargs (Any): The keyword argument dictionary.
     """
 
+    _REQUIRED_COMPONENTS: Set[MetricBlock] = {
+        MetricBlock.BINARY_RELEVANCE,
+        MetricBlock.VALID_USERS,
+    }
+    _CAN_COMPUTE_PER_USER: bool = True
+
     lauc: Tensor
     users: Tensor
+    compute_per_user: bool
 
     def __init__(
         self,
         k: int,
-        train_set: csr_matrix,
+        num_users: int,
+        num_items: int,
         *args: Any,
+        compute_per_user: bool = False,
         dist_sync_on_step: bool = False,
         **kwargs: Any,
     ):
         super().__init__(k, dist_sync_on_step)
-        self.num_items = train_set.shape[1]
-        self.add_state("lauc", default=torch.tensor(0.0), dist_reduce_fx="sum")
+        self.num_items = num_items
+        self.compute_per_user = compute_per_user
+
+        if self.compute_per_user:
+            self.add_state(
+                "lauc", default=torch.zeros(num_users), dist_reduce_fx="sum"
+            )  # Initialize a tensor to store metric value for each user
+        else:
+            self.add_state(
+                "lauc", default=torch.tensor(0.0), dist_reduce_fx="sum"
+            )  # Initialize a scalar to store global value
         self.add_state("users", default=torch.tensor(0.0), dist_reduce_fx="sum")
 
-    def update(self, preds: Tensor, **kwargs: Any):
+    def update(self, preds: Tensor, user_indices: Tensor, **kwargs: Any):
         """Updates the metric state with the new batch of predictions."""
         target = kwargs.get("binary_relevance", torch.zeros_like(preds))
+        users = kwargs.get("valid_users", self.valid_users(target))
 
         # Negative samples
         train_set = torch.isinf(preds).logical_and(preds < 0).sum(dim=1)  # [batch_size]
@@ -141,20 +165,25 @@ class LAUC(TopKMetric):
             target.sum(dim=1), torch.tensor(self.k)
         )  # [batch_size]
         auc_tensor = auc_matrix.sum(dim=1)  # [batch_size]
-        lauc_values = auc_tensor / normalization
 
-        # Update
-        self.lauc += lauc_values.sum()
+        if self.compute_per_user:
+            self.lauc.index_add_(
+                0, user_indices, auc_tensor / normalization
+            )  # Index metric values per user
+        else:
+            self.lauc += (
+                auc_tensor / normalization
+            ).sum()  # Sum the global lauc metric
 
         # Count only users with at least one interaction
-        self.users += (target > 0).any(dim=1).sum().item()
+        self.users += users
 
     def compute(self):
         """Computes the final metric value."""
-        score = self.lauc / self.users if self.users > 0 else torch.tensor(0.0)
-        return {self.name: score.item()}
-
-    def reset(self):
-        """Resets the metric state."""
-        self.lauc.zero_()
-        self.users.zero_()
+        if self.compute_per_user:
+            lauc = self.lauc
+        else:
+            lauc = (
+                self.lauc / self.users if self.users > 0 else torch.tensor(0.0)
+            ).item()
+        return {self.name: lauc}
