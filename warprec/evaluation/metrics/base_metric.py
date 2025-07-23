@@ -15,13 +15,16 @@ class BaseMetric(Metric, ABC):
     _REQUIRED_COMPONENTS: Set[MetricBlock] = (
         set()
     )  # This defines the data that needs to be pre-computed
+    _CAN_COMPUTE_PER_USER: bool = (
+        False  # Flag value for user-wise computation of metric
+    )
 
     @abstractmethod
     def compute(self) -> dict[str, float]:
         pass
 
     @classmethod
-    def binary_relevance(self, target: Tensor) -> Tensor:
+    def binary_relevance(cls, target: Tensor) -> Tensor:
         """Compute the binary relevance tensor.
 
         Args:
@@ -33,7 +36,7 @@ class BaseMetric(Metric, ABC):
         return (target > 0).float()
 
     @classmethod
-    def discounted_relevance(self, target: Tensor) -> Tensor:
+    def discounted_relevance(cls, target: Tensor) -> Tensor:
         """Compute the discounted relevance tensor.
 
         Args:
@@ -45,7 +48,7 @@ class BaseMetric(Metric, ABC):
         return torch.where(target > 0, 2 ** (target + 1) - 1, target)
 
     @classmethod
-    def valid_users(self, target: Tensor) -> int:
+    def valid_users(cls, target: Tensor) -> int:
         """Compute the number of valid users.
 
         Args:
@@ -57,7 +60,7 @@ class BaseMetric(Metric, ABC):
         return int((target > 0).any(dim=1).sum().item())
 
     @classmethod
-    def top_k_values_indices(self, preds: Tensor, k: int) -> Tuple[Tensor, Tensor]:
+    def top_k_values_indices(cls, preds: Tensor, k: int) -> Tuple[Tensor, Tensor]:
         """Compute the top k indices and values.
 
         Args:
@@ -73,7 +76,7 @@ class BaseMetric(Metric, ABC):
 
     @classmethod
     def top_k_relevance_from_indices(
-        self, target: Tensor, top_k_indices: Tensor
+        cls, target: Tensor, top_k_indices: Tensor
     ) -> Tensor:
         """Compute the top k relevance tensor.
 
@@ -87,7 +90,7 @@ class BaseMetric(Metric, ABC):
         return torch.gather(target, dim=1, index=top_k_indices)
 
     @classmethod
-    def top_k_relevance(self, preds: Tensor, target: Tensor, k: int) -> Tensor:
+    def top_k_relevance(cls, preds: Tensor, target: Tensor, k: int) -> Tensor:
         """Compute the top k relevance tensor.
 
         Args:
@@ -196,7 +199,7 @@ class BaseMetric(Metric, ABC):
 class TopKMetric(BaseMetric):
     """The definition of a Top-K metric."""
 
-    def __init__(self, k: int, *args: Any, dist_sync_on_step=False, **kwargs: Any):
+    def __init__(self, k: int, dist_sync_on_step=False, **kwargs: Any):
         super().__init__(dist_sync_on_step=dist_sync_on_step)
         self.k = k
 
