@@ -1,13 +1,13 @@
+import re
+import time
+from math import ceil
 from typing import List, Dict, Optional, Set, Any
 
 import torch
-import re
-import time
 from torch import Tensor
 from pandas import DataFrame
 from scipy.sparse import csr_matrix
 from tabulate import tabulate
-from math import ceil
 from warprec.data.dataset import Dataset
 from warprec.evaluation.metrics.base_metric import BaseMetric
 from warprec.recommenders.base_recommender import (
@@ -67,7 +67,7 @@ class Evaluator:
             "item_cluster": item_cluster,
         }
 
-    def _init_metrics(self, set_type: str, metric_list: List[str]):
+    def _init_metrics(self, set_type: str, metric_list: List[str], device: str):
         """Utility method to initialize metrics.
 
         Args:
@@ -75,6 +75,7 @@ class Evaluator:
                 Can be either 'test' or 'validation'.
             metric_list (List[str]): The list of metric names used to initialize
                 metric classes from registry.
+            device (str): The device where to compute the metric.
 
         Raises:
             ValueError: If the set_type is not 'test' or 'validation'.
@@ -115,7 +116,7 @@ class Evaluator:
                     k=k,
                     **self.common_params,
                     **metric_params,  # Add specific params if needed
-                )
+                ).to(device)
                 self.metrics[set_type][k].append(metric_instance)
                 self.required_blocks[k].update(metric_instance._REQUIRED_COMPONENTS)
 
@@ -160,7 +161,7 @@ class Evaluator:
         set_type_to_evaluate = []
         if evaluate_on_validation:
             if dataset.val_set is not None:
-                self._init_metrics("validation", self.metric_list)
+                self._init_metrics("validation", self.metric_list, device)
                 set_type_to_evaluate.append("validation")
             else:
                 raise ValueError(
@@ -169,7 +170,7 @@ class Evaluator:
                 )
         if evaluate_on_test:
             if dataset.test_set is not None:
-                self._init_metrics("test", self.metric_list)
+                self._init_metrics("test", self.metric_list, device)
                 set_type_to_evaluate.append("test")
             else:
                 raise ValueError(
