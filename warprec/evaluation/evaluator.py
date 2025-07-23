@@ -59,6 +59,7 @@ class Evaluator:
         self.common_params: Dict[str, Any] = {
             "compute_per_user": compute_per_user,
             "num_users": train_set.shape[0],
+            "num_items": train_set.shape[1],
             "train_set": train_set,
             "side_information": side_information,
             "beta": beta,
