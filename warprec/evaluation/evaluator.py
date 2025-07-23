@@ -32,6 +32,8 @@ class Evaluator:
         k_values (List[int]): The cutoffs.
         train_set (csr_matrix): The train set sparse matrix.
         side_information (Optional[DataFrame]): The side information of the dataset.
+        compute_per_user (bool): Wether or not to compute the metric
+            per user or globally.
         beta (float): The beta value used in some metrics.
         pop_ratio (float): The percentile considered popular.
         user_cluster (Tensor): The user cluster lookup tensor.
@@ -44,6 +46,7 @@ class Evaluator:
         k_values: List[int],
         train_set: csr_matrix,
         side_information: Optional[DataFrame],
+        compute_per_user: bool = False,
         beta: float = 1.0,
         pop_ratio: float = 0.8,
         user_cluster: Tensor = None,
@@ -54,6 +57,8 @@ class Evaluator:
         self.metrics: Dict[str, Dict[int, List[BaseMetric]]] = {}
         self.required_blocks: Dict[int, Set[MetricBlock]] = {}
         self.common_params: Dict[str, Any] = {
+            "compute_per_user": compute_per_user,
+            "num_users": train_set.shape[0],
             "train_set": train_set,
             "side_information": side_information,
             "beta": beta,
@@ -177,6 +182,7 @@ class Evaluator:
         for train_batch, test_batch, val_batch in dataset:
             _end = _start + train_batch.shape[0]  # Track strat - end of batch iteration
             current_users_idx_list = list(range(_start, _end))  # List of user idxs
+            user_indices = torch.tensor(current_users_idx_list, device=device)
 
             # If we are evaluating a sequential model, compute user history
             user_seq, seq_len = None, None
@@ -190,6 +196,7 @@ class Evaluator:
                 train_batch,
                 start=_start,
                 end=_end,
+                user_indices=user_indices,
                 train_set=train_set,
                 user_seq=user_seq,
                 user_id=torch.tensor(current_users_idx_list, dtype=torch.long),
@@ -279,6 +286,7 @@ class Evaluator:
                             "binary_relevance": binary_relevance,
                             "discounted_relevance": discounted_relevance,
                             "valid_users": valid_users,
+                            "user_indices": user_indices,
                             "start": _start,
                             **precomputed_blocks[k],
                         }
