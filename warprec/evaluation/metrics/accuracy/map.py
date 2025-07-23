@@ -62,12 +62,17 @@ class MAP(TopKMetric):
     For further details, please refer to this `link <https://sdsawtelle.github.io/blog/output/mean-average-precision-MAP-for-recommender-systems.html#MAP-for-Recommender-Algorithms>`_.
 
     Attributes:
-        ap_sum (Tensor): The average precision tensor.
+        ap (Tensor): The average precision tensor.
         users (Tensor): The number of users evaluated.
+        compute_per_user (bool): Wether or not to compute the metric
+            per user or globally.
 
     Args:
         k (int): The recommendation cutoff.
+        num_users (int): Number of users in the training set.
         *args (Any): Additional arguments to pass to the parent class.
+        compute_per_user (bool): Wether or not to compute the metric
+            per user or globally.
         dist_sync_on_step (bool): Torchmetrics parameter.
         **kwargs (Any): Additional keyword arguments to pass to the parent class.
     """
@@ -77,18 +82,35 @@ class MAP(TopKMetric):
         MetricBlock.VALID_USERS,
         MetricBlock.TOP_K_BINARY_RELEVANCE,
     }
+    _CAN_COMPUTE_PER_USER: bool = True
 
-    ap_sum: Tensor
+    ap: Tensor
     users: Tensor
+    compute_per_user: bool
 
     def __init__(
-        self, k: int, *args: Any, dist_sync_on_step: bool = False, **kwargs: Any
+        self,
+        k: int,
+        num_users: int,
+        *args: Any,
+        compute_per_user: bool = False,
+        dist_sync_on_step: bool = False,
+        **kwargs: Any,
     ):
         super().__init__(k, dist_sync_on_step)
-        self.add_state("ap_sum", default=torch.tensor(0.0), dist_reduce_fx="sum")
+        self.compute_per_user = compute_per_user
+
+        if self.compute_per_user:
+            self.add_state(
+                "ap", default=torch.zeros(num_users), dist_reduce_fx="sum"
+            )  # Initialize a tensor to store metric value for each user
+        else:
+            self.add_state(
+                "ap", default=torch.tensor(0.0), dist_reduce_fx="sum"
+            )  # Initialize a scalar to store global value
         self.add_state("users", default=torch.tensor(0.0), dist_reduce_fx="sum")
 
-    def update(self, preds: Tensor, **kwargs: Any):
+    def update(self, preds: Tensor, user_indices: Tensor, **kwargs: Any):
         """Updates the MAP metric state with a batch of predictions."""
         target = kwargs.get("binary_relevance", torch.zeros_like(preds))
         users = kwargs.get("valid_users", self.valid_users(target))
@@ -104,14 +126,25 @@ class MAP(TopKMetric):
             target.sum(dim=1),
             torch.tensor(self.k, dtype=target.dtype, device=target.device),
         )  # [batch_size]
-        ap = (precision_at_i * top_k_rel).sum(dim=1) / normalization  # [batch_size]
 
-        self.ap_sum += ap.sum()
+        if self.compute_per_user:
+            self.ap.index_add_(
+                0, user_indices, (precision_at_i * top_k_rel).sum(dim=1) / normalization
+            )  # Index metric values per user
+        else:
+            self.ap += (
+                (precision_at_i * top_k_rel).sum(dim=1) / normalization
+            ).sum()  # Compute total average precision
 
         # Count only users with at least one interaction
         self.users += users
 
     def compute(self):
         """Computes the final MAP@K value."""
-        map = self.ap_sum / self.users if self.users > 0 else torch.tensor(0.0)
-        return {self.name: map.item()}
+        if self.compute_per_user:
+            map = self.ap  # Return the tensor with per_user metric
+        else:
+            map = (
+                self.ap / self.users if self.users > 0 else torch.tensor(0.0)
+            ).item()  # Return the metric value
+        return {self.name: map}
