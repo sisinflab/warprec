@@ -309,9 +309,10 @@ class Evaluator:
 
     def reset_metrics(self):
         """Reset all metrics accumulated values."""
-        for metric_list in self.metrics.values():
-            for metric in metric_list:
-                metric.reset()
+        for k_metrics in self.metrics.values():
+            for metric_list in k_metrics.values():
+                for metric in metric_list:
+                    metric.reset()
 
     def compute_results(self) -> Dict[str, Dict[int, Dict[str, float]]]:
         """The method to retrieve computed results in dictionary format.
