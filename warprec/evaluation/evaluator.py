@@ -150,8 +150,9 @@ class Evaluator:
             logger.msg(f"Starting evaluation process for model {model.name}.")
             eval_start_time = time.time()
 
-        # Reset all metrics in evaluator
+        # Initialize evaluation process
         self.reset_metrics()
+        self.metrics_to(device)
         model.eval()
 
         # Extract main data structures from dataset
@@ -313,6 +314,17 @@ class Evaluator:
             for metric_list in k_metrics.values():
                 for metric in metric_list:
                     metric.reset()
+
+    def metrics_to(self, device: str):
+        """Move all metrics to the same device.
+
+        Args:
+            device (str): The device where to move the metrics.
+        """
+        for k_metrics in self.metrics.values():
+            for metric_list in k_metrics.values():
+                for metric in metric_list:
+                    metric.to(device)
 
     def compute_results(self) -> Dict[str, Dict[int, Dict[str, float]]]:
         """The method to retrieve computed results in dictionary format.
