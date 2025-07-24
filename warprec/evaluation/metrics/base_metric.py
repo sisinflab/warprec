@@ -5,7 +5,6 @@ from typing import Any, Tuple, Set
 import torch
 from torch import Tensor
 from torchmetrics import Metric
-from scipy.sparse import csr_matrix
 from warprec.utils.enums import MetricBlock
 
 
@@ -153,23 +152,19 @@ class BaseMetric(Metric, ABC):
         return item_interactions.unsqueeze(0)
 
     def compute_novelty_profile(
-        self, train_set: csr_matrix, log_discount: bool = False
+        self, item_interactions: Tensor, num_users: int, log_discount: bool = False
     ) -> Tensor:
         """Compute the novelty profile based on the count of interactions.
 
         Args:
-            train_set (csr_matrix): The training interaction data.
+            item_interactions (Tensor): The counts for item interactions in training set.
+            num_users (int): Number of users in the training set.
             log_discount (bool): Whether or not to compute the discounted novelty.
 
         Returns:
             Tensor: A tensor that contains the novelty score for each item.
         """
-        # Compute item frequencies
-        item_interactions = torch.tensor(
-            train_set.getnnz(axis=0)
-        ).float()  # Get number of non-zero elements in each column
         total_interactions = item_interactions.sum()
-        users = train_set.shape[0]
 
         # Avoid division by zero: set minimum interaction
         # count to 1 if any item has zero interactions
@@ -177,8 +172,8 @@ class BaseMetric(Metric, ABC):
 
         # Compute novelty scores
         if log_discount:
-            return -torch.log2(item_interactions / total_interactions)
-        return 1 - (item_interactions / users)
+            return -torch.log2(item_interactions / total_interactions).unsqueeze(0)
+        return (1 - (item_interactions / num_users)).unsqueeze(0)
 
     @property
     def name(self):
