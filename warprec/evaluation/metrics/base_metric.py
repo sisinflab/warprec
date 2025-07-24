@@ -105,12 +105,12 @@ class BaseMetric(Metric, ABC):
         return torch.gather(target, dim=1, index=top_k_indices)
 
     def compute_head_tail(
-        self, train_set: csr_matrix, pop_ratio: float = 0.8
+        self, item_interactions: Tensor, pop_ratio: float = 0.8
     ) -> Tuple[Tensor, Tensor]:
         """Compute popularity as tensors of the short head and long tail.
 
         Args:
-            train_set (csr_matrix): The training interaction data.
+            item_interactions (Tensor): The counts for item interactions in training set.
             pop_ratio (float): The percentile considered popular.
 
         Returns:
@@ -118,11 +118,6 @@ class BaseMetric(Metric, ABC):
                 - Tensor: The tensor containing indices of short head items.
                 - Tensor: The tensor containing indices of long tail items.
         """
-        # Compute item frequencies
-        item_interactions = torch.tensor(
-            train_set.getnnz(axis=0)
-        ).float()  # Get number of non-zero elements in each column
-
         # Order item popularity
         sorted_interactions, sorted_indices = torch.sort(
             item_interactions, descending=True
