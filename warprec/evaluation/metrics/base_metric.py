@@ -138,24 +138,19 @@ class BaseMetric(Metric, ABC):
 
         return short_head_indices, long_tail_indices
 
-    def compute_popularity(self, train_set: csr_matrix) -> Tensor:
+    def compute_popularity(self, item_interactions: Tensor) -> Tensor:
         """Compute popularity tensor based on the interactions.
 
         Args:
-            train_set (csr_matrix): The training interaction data.
+            item_interactions (Tensor): The counts for item interactions in training set.
 
         Returns:
             Tensor: The interaction count for each item.
         """
-        # Compute item frequencies
-        item_interactions = torch.tensor(
-            train_set.getnnz(axis=0)
-        ).float()  # Get number of non-zero elements in each column
-
         # Avoid division by zero: set minimum interaction
         # count to 1 if any item has zero interactions
         item_interactions = torch.clamp(item_interactions, min=1)
-        return item_interactions
+        return item_interactions.unsqueeze(0)
 
     def compute_novelty_profile(
         self, train_set: csr_matrix, log_discount: bool = False
