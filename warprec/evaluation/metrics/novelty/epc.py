@@ -82,6 +82,8 @@ class EPC(TopKMetric):
         **kwargs (Any): Additional keyword arguments.
     """
 
+    _CAN_COMPUTE_PER_USER: bool = True
+
     epc: Tensor
     users: Tensor
     compute_per_user: bool

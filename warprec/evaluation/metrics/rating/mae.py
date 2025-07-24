@@ -51,6 +51,8 @@ class MAE(BaseMetric):
         **kwargs (Any): The keyword argument dictionary.
     """
 
+    _CAN_COMPUTE_PER_USER: bool = True
+
     sum_absolute_errors: Tensor
     total_count: Tensor
     compute_per_user: bool

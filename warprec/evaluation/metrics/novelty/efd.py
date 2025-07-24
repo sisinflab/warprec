@@ -82,6 +82,8 @@ class EFD(TopKMetric):
         **kwargs (Any): Additional keyword arguments.
     """
 
+    _CAN_COMPUTE_PER_USER: bool = True
+
     efd: Tensor
     users: Tensor
     compute_per_user: bool

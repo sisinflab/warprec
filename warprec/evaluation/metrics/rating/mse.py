@@ -51,6 +51,8 @@ class MSE(BaseMetric):
         **kwargs (Any): The keyword argument dictionary.
     """
 
+    _CAN_COMPUTE_PER_USER: bool = True
+
     sum_squared_errors: Tensor
     total_count: Tensor
     compute_per_user: bool
