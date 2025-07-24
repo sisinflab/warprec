@@ -3,7 +3,6 @@ from typing import Any, Set
 
 import torch
 from torch import Tensor
-from scipy.sparse import csr_matrix
 from warprec.evaluation.metrics.base_metric import TopKMetric
 from warprec.utils.enums import MetricBlock
 from warprec.utils.registry import metric_registry
@@ -66,7 +65,7 @@ class PopREO(TopKMetric):
 
     Args:
         k (int): The cutoff for recommendations.
-        train_set (csr_matrix): The training interaction data.
+        item_interactions (Tensor): The counts for item interactions in training set.
         pop_ratio (float): The percentile considered popular.
         *args (Any): The argument list.
         dist_sync_on_step (bool): Torchmetrics parameter.
@@ -87,14 +86,14 @@ class PopREO(TopKMetric):
     def __init__(
         self,
         k: int,
-        train_set: csr_matrix,
+        item_interactions: Tensor,
         pop_ratio: float,
         *args: Any,
         dist_sync_on_step: bool = False,
         **kwargs: Any,
     ):
         super().__init__(k, dist_sync_on_step)
-        sh, lt = self.compute_head_tail(train_set, pop_ratio)
+        sh, lt = self.compute_head_tail(item_interactions, pop_ratio)
         self.short_head = sh
         self.long_tail = lt
         self.add_state("short_hits", default=torch.tensor(0.0), dist_reduce_fx="sum")
@@ -161,12 +160,5 @@ class PopREO(TopKMetric):
             return torch.tensor(0.0)
 
         pr = torch.stack([pr_short, pr_long])
-        pop_reo = torch.std(pr, unbiased=False) / torch.mean(pr)
-        return {self.name: pop_reo.item()}
-
-    def reset(self):
-        """Resets the metric state."""
-        self.short_hits.zero_()
-        self.long_hits.zero_()
-        self.short_gt.zero_()
-        self.long_gt.zero_()
+        pop_reo = (torch.std(pr, unbiased=False) / torch.mean(pr)).item()
+        return {self.name: pop_reo}
