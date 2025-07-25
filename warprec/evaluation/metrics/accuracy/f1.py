@@ -3,7 +3,6 @@ from typing import Any
 
 import torch
 from torch import Tensor
-from scipy.sparse import csr_matrix
 from warprec.evaluation.metrics.base_metric import TopKMetric, BaseMetric
 from warprec.utils.registry import metric_registry
 
@@ -38,7 +37,6 @@ class F1(TopKMetric):
         k (int): The number of top recommendations to consider (cutoff).
         num_users (int): Number of users in the training set.
         num_items (int): Number of items in the training set.
-        train_set (csr_matrix): Sparse matrix of training interactions (users x items).
         *args (Any): Additional arguments to pass to the parent class.
         beta (float): The weight of recall in the harmonic mean. Default is 1.0.
         compute_per_user (bool): Wether or not to compute the metric
@@ -60,7 +58,6 @@ class F1(TopKMetric):
         k: int,
         num_users: int,
         num_items: int,
-        train_set: csr_matrix,
         *args: Any,
         beta: float = 1.0,
         compute_per_user: bool = False,
@@ -82,7 +79,6 @@ class F1(TopKMetric):
             k=k,
             num_users=num_users,
             num_items=num_items,
-            train_set=train_set,
             compute_per_user=True,
             dist_sync_on_step=dist_sync_on_step,
             **kwargs,
@@ -92,7 +88,6 @@ class F1(TopKMetric):
             k=k,
             num_users=num_users,
             num_items=num_items,
-            train_set=train_set,
             compute_per_user=True,
             dist_sync_on_step=dist_sync_on_step,
             **kwargs,
