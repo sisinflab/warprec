@@ -5,7 +5,6 @@ from typing import List, Dict, Optional, Set, Any
 
 import torch
 from torch import Tensor
-from pandas import DataFrame
 from scipy.sparse import csr_matrix
 from tabulate import tabulate
 from warprec.data.dataset import Dataset
@@ -31,13 +30,13 @@ class Evaluator:
             be evaluated.
         k_values (List[int]): The cutoffs.
         train_set (csr_matrix): The train set sparse matrix.
-        side_information (Optional[DataFrame]): The side information of the dataset.
         compute_per_user (bool): Wether or not to compute the metric
             per user or globally.
         beta (float): The beta value used in some metrics.
         pop_ratio (float): The percentile considered popular.
-        user_cluster (Tensor): The user cluster lookup tensor.
-        item_cluster (Tensor): The item cluster lookup tensor.
+        feature_lookup (Optional[Tensor]): The feature lookup tensor.
+        user_cluster (Optional[Tensor]): The user cluster lookup tensor.
+        item_cluster (Optional[Tensor]): The item cluster lookup tensor.
     """
 
     def __init__(
@@ -45,12 +44,12 @@ class Evaluator:
         metric_list: List[str],
         k_values: List[int],
         train_set: csr_matrix,
-        side_information: Optional[DataFrame],
         compute_per_user: bool = False,
         beta: float = 1.0,
         pop_ratio: float = 0.8,
-        user_cluster: Tensor = None,
-        item_cluster: Tensor = None,
+        feature_lookup: Optional[Tensor] = None,
+        user_cluster: Optional[Tensor] = None,
+        item_cluster: Optional[Tensor] = None,
     ):
         self.k_values = k_values
         self.metric_list = metric_list
@@ -62,7 +61,7 @@ class Evaluator:
             "num_items": train_set.shape[1],
             "item_interactions": torch.tensor(train_set.getnnz(axis=0)).float(),
             "train_set": train_set,
-            "side_information": side_information,
+            "feature_lookup": feature_lookup,
             "beta": beta,
             "pop_ratio": pop_ratio,
             "user_cluster": user_cluster,

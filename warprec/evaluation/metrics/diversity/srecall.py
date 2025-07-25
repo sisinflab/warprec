@@ -2,7 +2,6 @@
 from typing import Any, Set
 
 import torch
-from pandas import DataFrame
 from torch import Tensor
 from warprec.evaluation.metrics.base_metric import TopKMetric
 from warprec.utils.enums import MetricBlock
@@ -100,9 +99,8 @@ class SRecall(TopKMetric):
 
     Args:
         k (int): The cutoff for recommendations.
-        side_information (DataFrame): A pandas DataFrame where the first column represents the item ID
-            (or an identifying index) and subsequent columns represent the item features (subtopics).
-            Features are read starting from the second column.
+        feature_lookup (Tensor): A tensor containing the features associated with each item.
+            Tensor shape is expected to be [num_items, num_features].
         *args (Any): Additional positional arguments list.
         dist_sync_on_step (bool): Torchmetrics parameter for distributed synchronization. Defaults to `False`.
         **kwargs (Any): Additional keyword arguments dictionary.
@@ -119,15 +117,13 @@ class SRecall(TopKMetric):
     def __init__(
         self,
         k: int,
-        side_information: DataFrame,
+        feature_lookup: Tensor,
         *args: Any,
         dist_sync_on_step: bool = False,
         **kwargs: Any,
     ):
         super().__init__(k, dist_sync_on_step=dist_sync_on_step)
-        self.feature_lookup = torch.tensor(
-            side_information.iloc[:, 1:].values, dtype=torch.float
-        )
+        self.feature_lookup = feature_lookup
         self.add_state(
             "ratio_feature_retrieved", torch.tensor(0.0), dist_reduce_fx="sum"
         )
