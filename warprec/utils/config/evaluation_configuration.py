@@ -1,9 +1,35 @@
 from typing import List, Optional
 
 import re
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel, field_validator, Field
 from warprec.utils.registry import metric_registry
 from warprec.utils.logger import logger
+
+
+class StatSignificance(BaseModel):
+    """Definition of statistical significance configuration.
+
+    Attributes:
+        paired_t_test (Optional[bool]): Whether to perform paired t-test.
+        wilcoxon_test (Optional[bool]): Whether to perform Wilcoxon test.
+        kruskal_test (Optional[bool]): Whether to perform Kruskal-Wallis test.
+        friedman_test (Optional[bool]): Whether to perform Friedman test.
+        whitney_u_test (Optional[bool]): Whether to perform Mann-Whitney U test.
+    """
+
+    paired_t_test: Optional[bool] = False
+    wilcoxon_test: Optional[bool] = False
+    kruskal_test: Optional[bool] = False
+    friedman_test: Optional[bool] = False
+    whitney_u_test: Optional[bool] = False
+
+    def requires_stat_significance(self) -> bool:
+        """Check if any statistical significance test is enabled.
+
+        Returns:
+            bool: True if any test is enabled, False otherwise.
+        """
+        return any(self.model_dump().values())
 
 
 class EvaluationConfig(BaseModel):
@@ -12,6 +38,7 @@ class EvaluationConfig(BaseModel):
     Attributes:
         top_k (List[int]): List of cutoffs to evaluate.
         metrics (List[str]): List of metrics to compute during evaluation.
+        stat_significance (Optional[StatSignificance]): Statistical significance configuration.
         max_metric_per_row (Optional[int]): Number of metrics to show in each row on console.
         beta (Optional[float]): The beta value used in some metrics like F1 score.
         pop_ratio (Optional[float]): The percentage of item transactions that
@@ -21,6 +48,9 @@ class EvaluationConfig(BaseModel):
 
     top_k: List[int]
     metrics: List[str]
+    stat_significance: Optional[StatSignificance] = Field(
+        default_factory=StatSignificance
+    )
     max_metric_per_row: Optional[int] = 4
     beta: Optional[float] = 1.0
     pop_ratio: Optional[float] = 0.8
