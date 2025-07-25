@@ -13,14 +13,12 @@ class StatSignificance(BaseModel):
         paired_t_test (Optional[bool]): Whether to perform paired t-test.
         wilcoxon_test (Optional[bool]): Whether to perform Wilcoxon test.
         kruskal_test (Optional[bool]): Whether to perform Kruskal-Wallis test.
-        friedman_test (Optional[bool]): Whether to perform Friedman test.
         whitney_u_test (Optional[bool]): Whether to perform Mann-Whitney U test.
     """
 
     paired_t_test: Optional[bool] = False
     wilcoxon_test: Optional[bool] = False
     kruskal_test: Optional[bool] = False
-    friedman_test: Optional[bool] = False
     whitney_u_test: Optional[bool] = False
 
     def requires_stat_significance(self) -> bool:
