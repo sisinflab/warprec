@@ -111,9 +111,9 @@ class MultiVAE(Recommender):
         intermediate_dim (int): Intermediate dimension size.
         latent_dim (int): Latent dimension size.
         dropout (float): Dropout probability.
+        weight_decay (float): The value of weight decay used in the optimizer.
         epochs (int): The number of epochs.
         learning_rate (float): The learning rate value.
-        l2_lambda (float): L2 regularization parameter.
         anneal_cap (float): Annealing cap for KL divergence.
         anneal_step (int): Annealing step for KL divergence.
     """
@@ -121,9 +121,9 @@ class MultiVAE(Recommender):
     intermediate_dim: int
     latent_dim: int
     dropout: float
+    weight_decay: float
     epochs: int
     learning_rate: float
-    l2_lambda: float
     anneal_cap: float
     anneal_step: int
 
@@ -162,7 +162,7 @@ class MultiVAE(Recommender):
         # Initialize weights
         self.apply(self._init_weights)
         self.optimizer = torch.optim.Adam(
-            self.parameters(), lr=self.learning_rate, weight_decay=self.l2_lambda
+            self.parameters(), lr=self.learning_rate, weight_decay=self.weight_decay
         )
 
         # Move to device

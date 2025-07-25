@@ -12,7 +12,7 @@ from scipy.sparse import csr_matrix
 
 from warprec.data.dataset import Interactions
 from warprec.recommenders.base_recommender import Recommender, GraphRecommenderUtils
-from warprec.recommenders.losses import BPRLoss, EmbeddingLoss
+from warprec.recommenders.losses import BPRLoss
 from warprec.utils.registry import model_registry
 
 
@@ -37,7 +37,7 @@ class LightGCN(Recommender, GraphRecommenderUtils):
     Attributes:
         embedding_size (int): The embedding size of user and item.
         n_layers (int): The number of graph convolution layers.
-        reg_weight (float): The weight decay for L2 regularization.
+        weight_decay (float): The value of weight decay used in the optimizer.
         epochs (int): The number of epochs.
         learning_rate (float): The learning rate value.
     """
@@ -45,7 +45,7 @@ class LightGCN(Recommender, GraphRecommenderUtils):
     # Model hyperparameters
     embedding_size: int
     n_layers: int
-    reg_weight: float
+    weight_decay: float
     epochs: int
     learning_rate: float
 
@@ -80,9 +80,10 @@ class LightGCN(Recommender, GraphRecommenderUtils):
         # Init embedding weights
         self.apply(self._init_weights)
 
-        self.optimizer = torch.optim.Adam(self.parameters(), lr=self.learning_rate)
-        self.mf_loss = BPRLoss()
-        self.reg_loss = EmbeddingLoss(norm=2)  # L2-norm for embeddings
+        self.optimizer = torch.optim.Adam(
+            self.parameters(), lr=self.learning_rate, weight_decay=self.weight_decay
+        )
+        self.loss = BPRLoss()
         self.adj: Optional[SparseTensor] = None
 
         # Initialization of the propagation network
@@ -154,16 +155,9 @@ class LightGCN(Recommender, GraphRecommenderUtils):
                 # Calculate BPR Loss
                 pos_scores = torch.mul(u_embeddings, pos_embeddings).sum(dim=1)
                 neg_scores = torch.mul(u_embeddings, neg_embeddings).sum(dim=1)
-                mf_loss: Tensor = self.mf_loss(pos_scores, neg_scores)
-
-                # Calculate embedding regularization loss
-                reg_loss = self.reg_loss(
-                    self.user_embedding,
-                    self.item_embedding,
-                )
+                loss: Tensor = self.loss(pos_scores, neg_scores)
 
                 # Loss computation and backpropagation
-                loss = mf_loss + self.reg_weight * reg_loss
                 loss.backward()
                 self.optimizer.step()
 

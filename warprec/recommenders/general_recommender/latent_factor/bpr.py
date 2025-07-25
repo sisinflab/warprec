@@ -33,12 +33,14 @@ class BPR(Recommender):
 
     Attributes:
         embedding_size (int): The embedding size of user and item.
+        weight_decay (float): The value of weight decay used in the optimizer.
         epochs (int): The number of epochs.
         learning_rate (float): The learning rate value.
     """
 
     # Model hyperparameters
     embedding_size: int
+    weight_decay: float
     epochs: int
     learning_rate: float
 
@@ -74,7 +76,9 @@ class BPR(Recommender):
         self.apply(self._init_weights)
 
         # Loss and optimizer
-        self.optimizer = torch.optim.Adam(self.parameters(), lr=self.learning_rate)
+        self.optimizer = torch.optim.Adam(
+            self.parameters(), lr=self.learning_rate, weight_decay=self.weight_decay
+        )
         self.loss = BPRLoss()
 
         # Move to device
