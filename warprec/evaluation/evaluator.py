@@ -60,6 +60,7 @@ class Evaluator:
             "num_users": train_set.shape[0],
             "num_items": train_set.shape[1],
             "item_interactions": torch.tensor(train_set.getnnz(axis=0)).float(),
+            "item_indices": torch.tensor(train_set.indices, dtype=torch.long),
             "train_set": train_set,
             "feature_lookup": feature_lookup,
             "beta": beta,
