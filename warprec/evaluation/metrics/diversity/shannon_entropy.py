@@ -3,7 +3,6 @@ from typing import Any, Set
 
 import torch
 from torch import Tensor
-from scipy.sparse import csr_matrix
 from warprec.evaluation.metrics.base_metric import TopKMetric
 from warprec.utils.enums import MetricBlock
 from warprec.utils.registry import metric_registry
@@ -54,13 +53,17 @@ class ShannonEntropy(TopKMetric):
 
     Args:
         k (int): Recommendation list cutoff
-        train_set (csr_matrix): The training interaction data.
+        num_items (int): Number of items in the training set.
         *args (Any): The argument list.
         dist_sync_on_step (bool): Torchmetrics parameter.
         **kwargs (Any): The keyword argument dictionary.
     """
 
-    _REQUIRED_COMPONENTS: Set[MetricBlock] = {MetricBlock.TOP_K_INDICES}
+    _REQUIRED_COMPONENTS: Set[MetricBlock] = {
+        MetricBlock.BINARY_RELEVANCE,
+        MetricBlock.VALID_USERS,
+        MetricBlock.TOP_K_INDICES,
+    }
 
     item_counts: Tensor
     users: Tensor
@@ -68,13 +71,13 @@ class ShannonEntropy(TopKMetric):
     def __init__(
         self,
         k: int,
-        train_set: csr_matrix,
+        num_items: int,
         *args: Any,
         dist_sync_on_step: bool = False,
         **kwargs: Any,
     ):
         super().__init__(k, dist_sync_on_step)
-        self.num_items = train_set.shape[1]
+        self.num_items = num_items
 
         self.add_state(
             "item_counts", default=torch.zeros(self.num_items), dist_reduce_fx="sum"
@@ -83,18 +86,18 @@ class ShannonEntropy(TopKMetric):
         self.add_state("users", default=torch.tensor(0.0), dist_reduce_fx="sum")
 
     def update(self, preds: Tensor, **kwargs: Any):
-        # Get top-k recommended item indices
+        target: Tensor = kwargs.get("binary_relevance", torch.zeros_like(preds))
+        users = kwargs.get("valid_users", self.valid_users(target))
         top_k_indices: Tensor = kwargs.get(
             f"top_{self.k}_indices", self.top_k_values_indices(preds, self.k)[1]
         )
 
         # Flatten recommendations and count occurrences
         flattened = top_k_indices.flatten().long()
-        batch_counts = torch.bincount(flattened, minlength=self.num_items)
 
         # Update state
-        self.item_counts += batch_counts
-        self.users += preds.shape[0]  # Track total users
+        self.item_counts += torch.bincount(flattened, minlength=self.num_items)
+        self.users += users
 
     def compute(self):
         """Calculate final entropy value."""
@@ -106,10 +109,7 @@ class ShannonEntropy(TopKMetric):
         probs = self.item_counts / total_recs
 
         # Compute entropy with numerical stability
-        shannon_entropy = -torch.sum(probs * torch.log(probs + 1e-12))  # Avoid log(0)
-        return {self.name: shannon_entropy.item()}
-
-    def reset(self):
-        """Reset metric state."""
-        self.item_counts.zero_()
-        self.users.zero_()
+        shannon_entropy = -torch.sum(
+            probs * torch.log(probs + 1e-12)
+        ).item()  # Avoid log(0)
+        return {self.name: shannon_entropy}
