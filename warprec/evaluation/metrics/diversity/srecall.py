@@ -96,12 +96,17 @@ class SRecall(TopKMetric):
         ratio_feature_retrieved (Tensor): Sum, across all processed users, of the ratio between
             the number of unique relevant features retrieved in the top-k and the total number of unique relevant features.
         users (Tensor): The total number of processed users who have at least one relevant item.
+        compute_per_user (bool): Wether or not to compute the metric
+            per user or globally.
 
     Args:
         k (int): The cutoff for recommendations.
+        num_users (int): Number of users in the training set.
         feature_lookup (Tensor): A tensor containing the features associated with each item.
             Tensor shape is expected to be [num_items, num_features].
         *args (Any): Additional positional arguments list.
+        compute_per_user (bool): Wether or not to compute the metric
+            per user or globally.
         dist_sync_on_step (bool): Torchmetrics parameter for distributed synchronization. Defaults to `False`.
         **kwargs (Any): Additional keyword arguments dictionary.
     """
@@ -110,26 +115,41 @@ class SRecall(TopKMetric):
         MetricBlock.VALID_USERS,
         MetricBlock.TOP_K_INDICES,
     }
+    _CAN_COMPUTE_PER_USER: bool = True
 
     ratio_feature_retrieved: Tensor
     users: Tensor
+    compute_per_user: bool
 
     def __init__(
         self,
         k: int,
+        num_users: int,
         feature_lookup: Tensor,
         *args: Any,
+        compute_per_user: bool = False,
         dist_sync_on_step: bool = False,
         **kwargs: Any,
     ):
         super().__init__(k, dist_sync_on_step=dist_sync_on_step)
         self.feature_lookup = feature_lookup
-        self.add_state(
-            "ratio_feature_retrieved", torch.tensor(0.0), dist_reduce_fx="sum"
-        )
+        self.compute_per_user = compute_per_user
+
+        if self.compute_per_user:
+            self.add_state(
+                "ratio_feature_retrieved",
+                default=torch.zeros(num_users),
+                dist_reduce_fx="sum",
+            )  # Initialize a tensor to store metric value for each user
+        else:
+            self.add_state(
+                "ratio_feature_retrieved",
+                default=torch.tensor(0.0),
+                dist_reduce_fx="sum",
+            )  # Initialize a scalar to store global value
         self.add_state("users", torch.tensor(0.0), dist_reduce_fx="sum")
 
-    def update(self, preds: Tensor, **kwargs: Any):
+    def update(self, preds: Tensor, user_indices: Tensor, **kwargs: Any):
         """Computes the final value of the metric."""
         target = kwargs.get("ground", torch.zeros_like(preds))
         users = kwargs.get("valid_users", self.valid_users(target))
@@ -166,20 +186,25 @@ class SRecall(TopKMetric):
         unique_relevant_mask = user_relevant_counts > 0  # [batch_size x num_features]
         unique_relevant_counts = unique_relevant_mask.sum(dim=1)  # [batch_size]
 
-        self.ratio_feature_retrieved += (
-            unique_feature_counts / unique_relevant_counts
-        ).sum()
+        if self.compute_per_user:
+            self.ratio_feature_retrieved.index_add_(
+                0, user_indices, unique_feature_counts / unique_relevant_counts
+            )
+        else:
+            self.ratio_feature_retrieved += (
+                unique_feature_counts / unique_relevant_counts
+            ).sum()
+
+        # Count only users with at least one interaction
         self.users += users
 
     def compute(self):
-        srecall = (
-            self.ratio_feature_retrieved / self.users
-            if self.users > 0
-            else torch.tensor(0.0)
-        )
-        return {self.name: srecall.item()}
-
-    def reset(self):
-        """Resets the metric state."""
-        self.ratio_feature_retrieved.zero_()
-        self.users.zero_()
+        if self.compute_per_user:
+            srecall = self.ratio_feature_retrieved
+        else:
+            srecall = (
+                self.ratio_feature_retrieved / self.users
+                if self.users > 0
+                else torch.tensor(0.0)
+            ).item()
+        return {self.name: srecall}
