@@ -326,13 +326,13 @@ class Evaluator:
                 for metric in metric_list:
                     metric.to(device)
 
-    def compute_results(self) -> Dict[str, Dict[int, Dict[str, float]]]:
+    def compute_results(self) -> Dict[str, Dict[int, Dict[str, float | Tensor]]]:
         """The method to retrieve computed results in dictionary format.
 
         Returns:
-            Dict[str, Dict[int, Dict[str, float]]]: The dictionary containing the results.
+            Dict[str, Dict[int, Dict[str, float | Tensor]]]: The dictionary containing the results.
         """
-        results: Dict[str, Dict[int, Dict[str, float]]] = {}
+        results: Dict[str, Dict[int, Dict[str, float | Tensor]]] = {}
         for set_type, metric_dict in self.metrics.items():
             results[set_type] = {}
             for k, metric_instances in metric_dict.items():
