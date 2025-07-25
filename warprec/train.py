@@ -231,11 +231,16 @@ def main(args: Namespace):
             f"Computing statistical significance tests for {len(models)} models."
         )
 
-        stat_significance = config.evaluation.stat_significance.model_dump()
+        stat_significance = config.evaluation.stat_significance.model_dump(
+            exclude=["corrections"]  # type: ignore[arg-type]
+        )
+        corrections = config.evaluation.stat_significance.corrections.model_dump()
 
         for stat_name, enabled in stat_significance.items():
             if enabled:
-                test_results = compute_paired_statistical_test(model_results, stat_name)
+                test_results = compute_paired_statistical_test(
+                    model_results, stat_name, **corrections
+                )
                 writer.write_statistical_significance_test(test_results, stat_name)
 
         logger.positive("Statistical significance tests completed successfully.")

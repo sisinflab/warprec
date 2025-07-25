@@ -121,7 +121,12 @@ class WhitneyUTest(StatisticalTest):
 
 
 def compute_paired_statistical_test(
-    results: Dict[str, Dict[str, Dict[int, Dict[str, float | Tensor]]]], test_name: str
+    results: Dict[str, Dict[str, Dict[int, Dict[str, float | Tensor]]]],
+    test_name: str,
+    alpha: float = 0.05,
+    bonferroni: bool = False,
+    holm_bonferroni: bool = False,
+    fdr: bool = False,
 ) -> DataFrame:
     """Compute pairwise statistical significance tests on evaluation results.
 
@@ -138,6 +143,10 @@ def compute_paired_statistical_test(
                 }
             }
         test_name (str): Name of the statistical test to use, e.g., "wilcoxon_test".
+        alpha (float): Significance level for the statistical tests.
+        bonferroni (bool): Whether to apply Bonferroni correction.
+        holm_bonferroni (bool): Whether to apply Holm-Bonferroni correction.
+        fdr (bool): Whether to apply False Discovery Rate correction.
 
     Returns:
         DataFrame: A DataFrame containing the results of the pairwise statistical tests.
@@ -183,6 +192,7 @@ def compute_paired_statistical_test(
                             array_b = values_b.cpu().numpy()
 
                             stat, p = stat_test.compute(array_a, array_b)
+                            accepted = "Accepted" if p < alpha else "Rejected"
 
                             rows.append(
                                 {
@@ -193,6 +203,7 @@ def compute_paired_statistical_test(
                                     "Metric": metric,
                                     "Statistic": stat,
                                     "p-value": p,
+                                    "Significance (α={})".format(alpha): accepted,
                                 }
                             )
                     except Exception as e:
@@ -200,4 +211,29 @@ def compute_paired_statistical_test(
                             f"Error on {model_a} vs {model_b} | {set_name} @ {cutoff} - {metric}: {e}"
                         )
 
-    return DataFrame(rows)
+    stat_test_df = DataFrame(rows)
+    if bonferroni:
+        # Apply Bonferroni correction
+        bonferroni_alpha = alpha / len(stat_test_df)
+        stat_test_df["Significance (Bonferroni α={})".format(bonferroni_alpha)] = (
+            stat_test_df["p-value"] < (alpha / len(stat_test_df))
+        ).map({True: "Accepted", False: "Rejected"})
+    if holm_bonferroni:
+        # Apply Holm-Bonferroni correction
+        stat_test_df.sort_values("p-value", inplace=True)
+        stat_test_df["Holm-Bonferroni Rank"] = range(1, len(stat_test_df) + 1)
+        stat_test_df["Significance (Holm-Bonferroni)"] = (
+            stat_test_df["p-value"] < (alpha / stat_test_df["Holm-Bonferroni Rank"])
+        ).map({True: "Accepted", False: "Rejected"})
+        stat_test_df.drop(columns=["Holm-Bonferroni Rank"], inplace=True)
+    if fdr:
+        # Apply False Discovery Rate (FDR) correction
+        stat_test_df["FDR Rank"] = stat_test_df["p-value"].rank(method="first")
+        stat_test_df["FDR Threshold"] = (
+            alpha * stat_test_df["FDR Rank"] / len(stat_test_df)
+        )
+        stat_test_df["Significance (FDR)"] = (
+            stat_test_df["p-value"] < stat_test_df["FDR Threshold"]
+        ).map({True: "Accepted", False: "Rejected"})
+        stat_test_df.drop(columns=["FDR Rank", "FDR Threshold"], inplace=True)
+    return stat_test_df
