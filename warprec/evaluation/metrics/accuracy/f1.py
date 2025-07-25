@@ -37,6 +37,7 @@ class F1(TopKMetric):
     Args:
         k (int): The number of top recommendations to consider (cutoff).
         num_users (int): Number of users in the training set.
+        num_items (int): Number of items in the training set.
         train_set (csr_matrix): Sparse matrix of training interactions (users x items).
         *args (Any): Additional arguments to pass to the parent class.
         beta (float): The weight of recall in the harmonic mean. Default is 1.0.
@@ -58,6 +59,7 @@ class F1(TopKMetric):
         self,
         k: int,
         num_users: int,
+        num_items: int,
         train_set: csr_matrix,
         *args: Any,
         beta: float = 1.0,
@@ -79,6 +81,7 @@ class F1(TopKMetric):
             metric_name_1,
             k=k,
             num_users=num_users,
+            num_items=num_items,
             train_set=train_set,
             compute_per_user=True,
             dist_sync_on_step=dist_sync_on_step,
@@ -88,6 +91,7 @@ class F1(TopKMetric):
             metric_name_2,
             k=k,
             num_users=num_users,
+            num_items=num_items,
             train_set=train_set,
             compute_per_user=True,
             dist_sync_on_step=dist_sync_on_step,
