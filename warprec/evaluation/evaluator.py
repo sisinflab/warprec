@@ -344,13 +344,13 @@ class Evaluator:
 
     def print_console(
         self,
-        results: Dict[str, Dict[int, Dict[str, float]]],
+        results: Dict[str, Dict[int, Dict[str, float | Tensor]]],
         max_metrics_per_row: int = 4,
     ):
         """Utility function to print results using tabulate.
 
         Args:
-            results (Dict[str, Dict[int, Dict[str, float]]]): The dictionary containing all the results.
+            results (Dict[str, Dict[int, Dict[str, float | Tensor]]]): The dictionary containing all the results.
             max_metrics_per_row (int): The number of metrics
                 to print in each row.
         """
