@@ -374,7 +374,12 @@ class Evaluator:
                 for k, metrics in res_dict.items():
                     _metric_tab = [f"Top@{k}"]
                     for key in chunk_keys:
-                        _metric_tab.append(str(metrics.get(key, float("nan"))))
+                        metric = metrics.get(key, float("nan"))
+                        if isinstance(
+                            metric, Tensor
+                        ):  # In case of user_wise computation, we compute the mean
+                            metric = metric.mean().item()
+                        _metric_tab.append(str(metric))
                     _tab.append(_metric_tab)
 
                 table = tabulate(
