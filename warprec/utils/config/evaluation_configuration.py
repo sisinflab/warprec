@@ -6,6 +6,30 @@ from warprec.utils.registry import metric_registry
 from warprec.utils.logger import logger
 
 
+class Corrections(BaseModel):
+    """Definition of corrections configuration.
+
+    Attributes:
+        bonferroni (Optional[bool]): Whether to apply Bonferroni correction.
+        holm_bonferroni (Optional[bool]): Whether to apply Holm-Bonferroni correction.
+        fdr (Optional[bool]): Whether to apply False Discovery Rate correction.
+        alpha (Optional[float]): Significance level for statistical tests.
+    """
+
+    bonferroni: Optional[bool] = False
+    holm_bonferroni: Optional[bool] = False
+    fdr: Optional[bool] = False
+    alpha: Optional[float] = 0.05
+
+    def requires_correction(self) -> bool:
+        """Check if any correction is enabled.
+
+        Returns:
+            bool: True if any correction is enabled, False otherwise.
+        """
+        return any(self.model_dump(exclude=["alpha"]).values())  # type: ignore[arg-type]
+
+
 class StatSignificance(BaseModel):
     """Definition of statistical significance configuration.
 
@@ -14,12 +38,14 @@ class StatSignificance(BaseModel):
         wilcoxon_test (Optional[bool]): Whether to perform Wilcoxon test.
         kruskal_test (Optional[bool]): Whether to perform Kruskal-Wallis test.
         whitney_u_test (Optional[bool]): Whether to perform Mann-Whitney U test.
+        corrections (Optional[Corrections]): Corrections configuration for statistical tests.
     """
 
     paired_t_test: Optional[bool] = False
     wilcoxon_test: Optional[bool] = False
     kruskal_test: Optional[bool] = False
     whitney_u_test: Optional[bool] = False
+    corrections: Optional[Corrections] = Field(default_factory=Corrections)
 
     def requires_stat_significance(self) -> bool:
         """Check if any statistical significance test is enabled.
@@ -27,7 +53,7 @@ class StatSignificance(BaseModel):
         Returns:
             bool: True if any test is enabled, False otherwise.
         """
-        return any(self.model_dump().values())
+        return any(self.model_dump(exclude=["corrections"]).values())  # type: ignore[arg-type]
 
 
 class EvaluationConfig(BaseModel):
