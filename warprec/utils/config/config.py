@@ -2,12 +2,13 @@ import os
 import sys
 import importlib
 from pathlib import Path
-from typing import Tuple, ClassVar, Dict, Any
+from typing import Tuple, ClassVar, Dict, Any, List
 
 import yaml
 import numpy as np
 import torch
 from pydantic import BaseModel, field_validator, model_validator, Field
+from warprec.data.filtering import Filter
 from warprec.utils.config import (
     GeneralConfig,
     WarpRecCallbackConfig,
@@ -20,7 +21,7 @@ from warprec.utils.config import (
 )
 from warprec.utils.callback import WarpRecCallback
 from warprec.utils.enums import RatingType, SplittingStrategies, ReadingMethods
-from warprec.utils.registry import params_registry
+from warprec.utils.registry import params_registry, filter_registry
 from warprec.utils.logger import logger
 
 
@@ -32,6 +33,8 @@ class Configuration(BaseModel):
     Attributes:
         reader (ReaderConfig): Configuration of the reading process.
         writer (WriterConfig): Configuration of the writing process.
+        filtering (Dict[str, dict]): The dictionary containing filtering
+            information in the format {filter_name: dict{param_1: value, param_2: value, ...}, ...}
         splitter (SplittingConfig): Configuration of the splitting process.
         dashboard (DashboardConfig): Configuration of the dashboard process.
         models (Dict[str, dict]): The dictionary containing model information
@@ -48,6 +51,7 @@ class Configuration(BaseModel):
 
     reader: ReaderConfig
     writer: WriterConfig
+    filtering: Dict[str, dict] = None
     splitter: SplittingConfig = None
     dashboard: DashboardConfig = Field(default_factory=DashboardConfig)
     models: Dict[str, dict]
@@ -204,6 +208,19 @@ class Configuration(BaseModel):
                     "setup first. Set setup_experiment to True."
                 )
 
+        # Check if the filters have been set correctly
+        for filter_name, filter_params in self.filtering.items():
+            if filter_name.upper() not in filter_registry.list_registered():
+                raise ValueError(
+                    f"Filter '{filter_name}' is not registered. These are the filters registered: {filter_registry.list_registered()}"
+                )
+            try:
+                filter_registry.get(filter_name, **filter_params)
+            except Exception as e:
+                raise ValueError(
+                    f"Error initializing filter '{filter_name}' with these params {filter_params}: {e}"
+                )
+
         # Final checks and parsing
         self.check_precision()
         self.models = self.parse_models()
@@ -298,6 +315,19 @@ class Configuration(BaseModel):
         """
         metric_name, top_k = val_metric.split("@")
         return metric_name, int(top_k)
+
+    def get_filters(self) -> List[Filter]:
+        """Returns the initialized filters based on the configuration.
+
+        Returns:
+            List[Filter]: A list of initialized filter instances.
+        """
+        if not self.filtering:
+            return []
+        return [
+            filter_registry.get(filter_name, **filter_params)
+            for filter_name, filter_params in self.filtering.items()
+        ]
 
 
 def load_yaml(path: str) -> Configuration:
