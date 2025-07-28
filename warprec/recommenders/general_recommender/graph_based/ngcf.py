@@ -220,13 +220,13 @@ class NGCF(Recommender, GraphRecommenderUtils):
     ) -> Tensor:
         """Prediction using the learned embeddings."""
         if self.adj_matrix is None:
-            train_set: csr_matrix = kwargs.get("train_set", None).get_sparse()
+            train_set: Interactions = kwargs.get("train_set", None)
             if train_set is None:
                 raise RuntimeError(
                     "The model has not been fit yet. Call fit() before predict()."
                 )
             self.adj_matrix = self._get_norm_adj_mat_ngcf(
-                train_set.tocoo(), self.n_users, self.n_items, self._device
+                train_set.get_sparse().tocoo(), self.n_users, self.n_items, self._device
             )
 
         # Perform forward pass to get the final embeddings
