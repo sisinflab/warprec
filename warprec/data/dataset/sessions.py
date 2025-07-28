@@ -145,6 +145,7 @@ class Sessions:
         max_seq_len: int,
         num_negatives: int = 0,
         user_id: bool = False,
+        batch_size: int = 1024,
         shuffle: bool = True,
     ) -> DataLoader:
         """Create a dataloader for sequential data.
@@ -153,6 +154,8 @@ class Sessions:
             max_seq_len (int): Maximum length of sequences produced.
             num_negatives (int): Number of negative samples per user.
             user_id (bool): Wether or not to return also the user_id.
+            batch_size (int): The batch size that will be used to
+                iterate over the sessions.
             shuffle (bool): Whether to shuffle the data.
 
         Returns:
@@ -202,7 +205,7 @@ class Sessions:
 
         # Create instance of the dataset
         dataset = SessionDataset(**dataset_args)
-        return DataLoader(dataset, batch_size=self.batch_size, shuffle=shuffle)
+        return DataLoader(dataset, batch_size=batch_size, shuffle=shuffle)
 
     def _create_sequences_and_targets(
         self,
