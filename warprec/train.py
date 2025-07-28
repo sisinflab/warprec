@@ -6,6 +6,7 @@ from warprec.data.reader import LocalReader
 from warprec.data.writer import LocalWriter
 from warprec.data.splitting import Splitter
 from warprec.data.dataset import TransactionDataset
+from warprec.data.filtering import apply_filtering
 from warprec.utils.config import load_yaml, load_callback
 from warprec.utils.logger import logger
 from warprec.recommenders.trainer import Trainer
@@ -43,6 +44,11 @@ def main(args: Namespace):
     item_cluster = None
     if config.reader.loading_strategy == "dataset":
         data = reader.read()
+
+        # Check for optional filtering
+        if config.filtering is not None:
+            filters = config.get_filters()
+            data = apply_filtering(data, filters)
 
         # Side information reading
         if config.reader.side:
