@@ -65,7 +65,7 @@ def main(args: Namespace):
                     side_data=side_data,
                     user_cluster=user_cluster,
                     item_cluster=item_cluster,
-                    batch_size=config.general.batch_size,
+                    batch_size=config.evaluation.batch_size,
                     rating_type=config.reader.rating_type,
                     rating_label=config.reader.labels.rating_label,
                     timestamp_label=config.reader.labels.timestamp_label,
@@ -97,7 +97,7 @@ def main(args: Namespace):
                 side_data=side_data,
                 user_cluster=user_cluster,
                 item_cluster=item_cluster,
-                batch_size=config.general.batch_size,
+                batch_size=config.evaluation.batch_size,
                 rating_type=config.reader.rating_type,
                 rating_label=config.reader.labels.rating_label,
                 timestamp_label=config.reader.labels.timestamp_label,
@@ -191,7 +191,7 @@ def main(args: Namespace):
                 umap_i,
                 imap_i,
                 k=config.writer.recommendation.k,
-                batch_size=config.general.batch_size,
+                batch_size=config.evaluation.batch_size,
             )
             writer.write_recs(recs, model_name)
 
