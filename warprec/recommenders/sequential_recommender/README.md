@@ -48,6 +48,7 @@ models:
         num_layers: 1
         dropout_prob: 0.2
         weight_decay: 0.0001
+        batch_size: 512
         epochs: 100
         learning_rate: 0.001
         neg_samples: 2

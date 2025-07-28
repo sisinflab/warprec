@@ -38,6 +38,7 @@ class GRU4Rec(Recommender, SequentialRecommenderUtils):
         num_layers (int): The number of recurrent layers.
         dropout_prob (float): The probability of dropout for the embeddings.
         weight_decay (float): The value of weight decay used in optimizer.
+        batch_size (int): The batch size used for training.
         epochs (int): The number of training epochs.
         learning_rate (float): The learning rate value.
         neg_samples (int): The number of negative samples.
@@ -50,6 +51,7 @@ class GRU4Rec(Recommender, SequentialRecommenderUtils):
     num_layers: int
     dropout_prob: float
     weight_decay: float
+    batch_size: int
     epochs: int
     learning_rate: float
     neg_samples: int
@@ -188,6 +190,7 @@ class GRU4Rec(Recommender, SequentialRecommenderUtils):
         dataloader = sessions.get_sequential_dataloader(
             max_seq_len=self.max_seq_len,
             num_negatives=self.neg_samples,
+            batch_size=self.batch_size,
         )
 
         self.train()
