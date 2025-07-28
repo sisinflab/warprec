@@ -42,6 +42,7 @@ class FOSSIL(Recommender, SequentialRecommenderUtils):
         reg_weight (float): The L2 regularization weight.
         alpha (float): The parameter for calculating similarity.
         weight_decay (float): The value of weight decay used in the optimizer.
+        batch_size (int): The batch size used for training.
         epochs (int): The number of training epochs.
         learning_rate (float): The learning rate value.
         neg_samples (int): The number of negative samples.
@@ -54,6 +55,7 @@ class FOSSIL(Recommender, SequentialRecommenderUtils):
     reg_weight: float
     alpha: float
     weight_decay: float
+    batch_size: int
     epochs: int
     learning_rate: float
     neg_samples: int
@@ -307,6 +309,7 @@ class FOSSIL(Recommender, SequentialRecommenderUtils):
         dataloader = sessions.get_sequential_dataloader(
             max_seq_len=self.max_seq_len,
             num_negatives=self.neg_samples,
+            batch_size=self.batch_size,
             user_id=True,  # We need user ids for FOSSIL
         )
 
@@ -388,7 +391,6 @@ class FOSSIL(Recommender, SequentialRecommenderUtils):
         user_seq = user_seq.to(self._device)
         seq_len = seq_len.to(self._device)
         user_id = user_id.to(self._device)
-        print(user_id.min(), user_id.max())
 
         # Get the combined output embedding for each user
         seq_output = self.forward(

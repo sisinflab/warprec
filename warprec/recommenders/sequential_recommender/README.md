@@ -30,6 +30,7 @@ models:
         reg_weight: 0.001
         alpha: 0.001
         weight_decay: 0.0
+        batch_size: 512
         epochs: 100
         learning_rate: 0.001
         neg_samples: 1
