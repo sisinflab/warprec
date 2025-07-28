@@ -234,6 +234,9 @@ def apply_filtering(dataset: DataFrame, filters: List[Filter]) -> DataFrame:
 
     Returns:
         DataFrame: The filtered dataset after applying all filters.
+
+    Raises:
+        ValueError: If the dataset becomes empty after applying any filter.
     """
     if len(filters) == 0:
         logger.attention("No filters provided. Returning the original dataset.")
@@ -244,8 +247,16 @@ def apply_filtering(dataset: DataFrame, filters: List[Filter]) -> DataFrame:
 
     for i, single_filter in enumerate(filters):
         dataset = single_filter(dataset).reset_index(drop=True)
+
+        # Check if the dataset post filtering is empty
+        if dataset.empty:
+            raise ValueError(
+                f"Dataset is empty after applying filter {i + 1}/{len(filters)}: "
+                f"{single_filter.__class__.__name__}. Please check the filtering criteria."
+            )
+
         logger.stats(
-            f"After filter {i + 1}/{len(filters)} ({filter.__class__.__name__}): "
+            f"After filter {i + 1}/{len(filters)} ({single_filter.__class__.__name__}): "
             f"{len(dataset)} rows"
         )
 
