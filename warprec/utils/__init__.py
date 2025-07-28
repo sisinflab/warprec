@@ -21,6 +21,7 @@ from .registry import (
     scheduler_registry,
     search_space_registry,
     similarities_registry,
+    filter_registry,
 )
 
 
@@ -45,4 +46,5 @@ __all__ = [
     "scheduler_registry",
     "search_space_registry",
     "similarities_registry",
+    "filter_registry",
 ]
