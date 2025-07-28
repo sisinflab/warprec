@@ -250,6 +250,7 @@ models:
         mlp_train: True
         dropout: 0.01
         weight_decay: 0.0001
+        batch_size: 512
         epochs: 20
         learning_rate: 0.001
         neg_samples: 1
