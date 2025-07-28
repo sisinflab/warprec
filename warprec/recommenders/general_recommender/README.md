@@ -233,6 +233,7 @@ models:
         cnn_strides: [[1, 1]]
         dropout_prob: 0.01
         weight_decay: 0.0001
+        batch_size: 512
         epochs: 20
         learning_rate: 0.001
 ...
