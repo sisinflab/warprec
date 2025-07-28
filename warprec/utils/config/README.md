@@ -16,6 +16,7 @@ To make everything easier to digest, this documentation includes a Table of Cont
 ## 📚 Table of Contents
 - 📖 [Reader Configuration](#📖-reader-configuration)
 - ✍️ [Writer Configuration](#️✍️-writer-configuration)
+- 🧹 [Filtering Configuration](#🧹-filtering-configuration)
 - 🔀 [Splitter Configuration](#🔀-splitter-configuration)
 - 🖥️ [Dashboard Configuration](#🖥️-dashboard-configuration)
 - 🧠 [Models Configuration](#🧠-models-configuration)
@@ -223,6 +224,112 @@ writer:
 - The `local_experiment_path` must exist if you choose `local` as the `writing_method`. Otherwise, WarpRec will raise an error.
 - Custom separators (e.g., `|`, `,`, etc.) must be valid characters. Invalid separators will raise an exception.
 - Only local writing is currently supported, but this structure allows easy extension for remote/cloud options in future versions.
+
+## 🧹 Filtering Configuration
+
+The `Filtering Configuration` section defines how your dataset is filtered before the splitting process. Filtering is crucial in scenarios where you dataset contains redundant information or it's dimensions are too much to handle with the resources at hand. Filtering strategies will be executed in order, so be careful how information is provided in the configuration. Filtering strategies are expected to be in this format:
+
+```yaml
+filtering:
+    strategy_name_1:
+        arg_name_1: value_1
+    strategy_name_2:
+        arg_name_1: value_1
+        arg_name_2: value_2
+...
+```
+
+and the strategies will be executed from top to bottom. These are all the strategies available:
+
+`MinRating`: All the transactions with a rating value lower then the min_rating will be discarded. Cannot be used in implicit rating scenarios.
+
+```yaml
+filtering:
+    MinRating:
+        min_rating: 3.0
+...
+```
+
+`UserAverage`: All the transactions below the average of each user will be discarded. Cannot be used in implicit rating scenarios.
+
+```yaml
+filtering:
+    UserAverage: {} # No parameters needed
+...
+```
+
+`UserMin`: All the transactions containing an user with less then the specified number of interactions, will be discarded.
+
+```yaml
+filtering:
+    UserMin:
+        min_interactions: 5
+...
+```
+
+`UserMax`: All the transactions containing an user with more then the specified number of interactions, will be discarded. Useful to analyze cold scenarios.
+
+```yaml
+filtering:
+    UserMax:
+        max_interactions: 2
+...
+```
+
+`ItemMin`: All the transactions containing an item with less then the specified number of interactions, will be discarded.
+
+```yaml
+filtering:
+    ItemMin:
+        min_interactions: 5
+...
+```
+
+`ItemMax`: All the transactions containing an item with more then the specified number of interactions, will be discarded. Useful to analyze cold scenarios.
+
+```yaml
+filtering:
+    ItemMax:
+        max_interactions: 2
+...
+```
+
+`IterativeKCore`: Iteratively apply UserMin and ItemMin until convergence is reached.
+
+```yaml
+filtering:
+    IterativeKCore:
+        min_interactions: 5
+...
+```
+
+`NRoundsKCore`: Apply UserMin and ItemMin a fixed number of times. This is a simpler version of `IterativeKCore`, can be used in cases where convergence is not needed.
+
+```yaml
+filtering:
+    NRoundsKCore:
+        rounds: 3
+        min_interactions: 5
+...
+```
+
+### 📌 Example of Filtering Configuration
+
+Below is a full example of a `filtering configuration` that first removes all the ratings below 3.0, then keeps only the users with at least 10 interactions:
+
+```yaml
+filtering:
+    MinRating:
+        min_rating: 3.0
+    UserMin:
+        min_interactions: 10
+...
+```
+
+### ⚠️ Notes and Validation
+
+- The naming of the strategy and the parameters must be correct for them to properly work.
+- Changing the order of the filtering will most likely change the end results of the filtering process.
 
 ## 🔀 Splitter Configuration
 
