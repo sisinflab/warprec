@@ -182,12 +182,13 @@ class Interactions:
 
     @typing.no_type_check
     def get_item_rating_dataloader(
-        self, num_negatives: int = 0, shuffle: bool = True
+        self, num_negatives: int = 0, batch_size: int = 1024, shuffle: bool = True
     ) -> DataLoader:
         """Create a PyTorch DataLoader with implicit feedback and negative sampling.
 
         Args:
             num_negatives (int): Number of negative samples per user.
+            batch_size (int): The batch size that will be used to
             shuffle (bool): Whether to shuffle the data.
 
         Returns:
@@ -226,14 +227,14 @@ class Interactions:
                 dataset = TensorDataset(
                     pos_users_tensor, pos_items_tensor, pos_ratings_tensor
                 )  # Only positive dataset
-            return DataLoader(dataset, batch_size=self.batch_size, shuffle=shuffle)
+            return DataLoader(dataset, batch_size=batch_size, shuffle=shuffle)
 
         # Other edge case: No positive interactions
         elif num_positives == 0:
             dataset = TensorDataset(
                 torch.LongTensor([]), torch.LongTensor([]), torch.FloatTensor([])
             )
-            return DataLoader(dataset, batch_size=self.batch_size, shuffle=shuffle)
+            return DataLoader(dataset, batch_size=batch_size, shuffle=shuffle)
 
         total_samples = (
             num_positives * num_negatives
@@ -291,7 +292,7 @@ class Interactions:
 
         # Create final dataset
         dataset = TensorDataset(all_users, all_items, all_ratings)
-        dataloader = DataLoader(dataset, batch_size=self.batch_size, shuffle=shuffle)
+        dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=shuffle)
         self._cached_dataloaders[cache_key] = dataloader
         return dataloader
 
