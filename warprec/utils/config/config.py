@@ -209,17 +209,18 @@ class Configuration(BaseModel):
                 )
 
         # Check if the filters have been set correctly
-        for filter_name, filter_params in self.filtering.items():
-            if filter_name.upper() not in filter_registry.list_registered():
-                raise ValueError(
-                    f"Filter '{filter_name}' is not registered. These are the filters registered: {filter_registry.list_registered()}"
-                )
-            try:
-                filter_registry.get(filter_name, **filter_params)
-            except Exception as e:
-                raise ValueError(
-                    f"Error initializing filter '{filter_name}' with these params {filter_params}: {e}"
-                )
+        if self.filtering is not None:
+            for filter_name, filter_params in self.filtering.items():
+                if filter_name.upper() not in filter_registry.list_registered():
+                    raise ValueError(
+                        f"Filter '{filter_name}' is not registered. These are the filters registered: {filter_registry.list_registered()}"
+                    )
+                try:
+                    filter_registry.get(filter_name, **filter_params)
+                except Exception as e:
+                    raise ValueError(
+                        f"Error initializing filter '{filter_name}' with these params {filter_params}: {e}"
+                    )
 
         # Final checks and parsing
         self.check_precision()
