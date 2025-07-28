@@ -164,11 +164,11 @@ class Sessions:
         """
         # Check if sequential data has already been computed
         # and is stored in cache
-        cache_key = (num_negatives, user_id)
+        cache_key = (max_seq_len, num_negatives, user_id)
         if cache_key in self._cached_sequential_data:
             cached_tensors = self._cached_sequential_data[cache_key]
             dataset = SessionDataset(**cached_tensors)
-            return DataLoader(dataset, batch_size=self.batch_size, shuffle=shuffle)
+            return DataLoader(dataset, batch_size=batch_size, shuffle=shuffle)
 
         # Call the optimized processing function
         (
