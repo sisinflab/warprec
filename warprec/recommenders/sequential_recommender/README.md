@@ -12,7 +12,8 @@ models:
         n_v: 4
         dropout_prob: 0.5
         weight_decay: 0.0
-        epochs: 3
+        batch_size: 512
+        epochs: 30
         learning_rate: 0.001
         neg_samples: 1
         max_seq_len: 20

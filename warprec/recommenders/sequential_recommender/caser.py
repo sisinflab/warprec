@@ -41,6 +41,7 @@ class Caser(Recommender):
         n_v (int): The number of vertical filters.
         dropout_prob (float): The probability of dropout for the fully connected layer.
         weight_decay (float): The value of weight decay used in the optimizer.
+        batch_size (int): The batch size used during training.
         epochs (int): The number of training epochs.
         learning_rate (float): The learning rate value.
         neg_samples (int): The number of negative samples.
@@ -53,6 +54,7 @@ class Caser(Recommender):
     n_v: int
     dropout_prob: float
     weight_decay: float
+    batch_size: int
     epochs: int
     learning_rate: float
     neg_samples: int
@@ -226,6 +228,7 @@ class Caser(Recommender):
         dataloader = sessions.get_sequential_dataloader(
             max_seq_len=self.max_seq_len,
             num_negatives=self.neg_samples,
+            batch_size=self.batch_size,
             user_id=True,  # We need user ids for Caser
         )
 
