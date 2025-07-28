@@ -70,6 +70,7 @@ models:
         learning_rate: 0.001
         gbce_t: 0.5
         weight_decay: 0.0
+        batch_size: 512
         epochs: 100
         neg_samples: 1
         max_seq_len: 200
