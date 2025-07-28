@@ -296,10 +296,14 @@ class Interactions:
         return dataloader
 
     @typing.no_type_check
-    def get_pos_neg_dataloader(self, shuffle: bool = True) -> DataLoader:
+    def get_pos_neg_dataloader(
+        self, batch_size: int = 1024, shuffle: bool = True
+    ) -> DataLoader:
         """Create a PyTorch DataLoader with triplets for implicit feedback.
 
         Args:
+            batch_size (int): The batch size that will be used to
+                iterate over the interactions.
             shuffle (bool): Whether to shuffle the data.
 
         Returns:
@@ -373,7 +377,7 @@ class Interactions:
 
         # Create final dataset
         dataset = TensorDataset(users_tensor, positives_tensor, negatives_tensor)
-        dataloader = DataLoader(dataset, batch_size=self.batch_size, shuffle=shuffle)
+        dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=shuffle)
         self._cached_dataloaders[cache_key] = dataloader
         return dataloader
 
