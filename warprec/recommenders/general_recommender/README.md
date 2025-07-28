@@ -102,8 +102,9 @@ models:
 models:
     NGCF:
         embedding_size: 64
-        weight_decay: 0.0001
-        epochs: 5
+        weight_decay: 0.
+        batch_size: 512
+        epochs: 50
         learning_rate: 0.001
         weight_size: [64, 64]
         node_dropout: 0.01
