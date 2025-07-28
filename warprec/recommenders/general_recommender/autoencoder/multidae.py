@@ -93,6 +93,7 @@ class MultiDAE(Recommender):
         latent_dim (int): Latent dimension size.
         dropout (float): Dropout probability.
         weight_decay (float): The value of weight decay used in the optimizer.
+        batch_size (int): The batch size used for training.
         epochs (int): The number of epochs.
         learning_rate (float): The learning rate value.
     """
@@ -101,6 +102,7 @@ class MultiDAE(Recommender):
     latent_dim: int
     dropout: float
     weight_decay: float
+    batch_size: int
     epochs: int
     learning_rate: float
 
@@ -192,8 +194,8 @@ class MultiDAE(Recommender):
 
         for _ in range(self.epochs):
             epoch_loss = 0.0
-            for start in range(0, interactions.batch_size, interactions.batch_size):
-                end = min(start + interactions.batch_size, X.shape[0])
+            for start in range(0, self.batch_size, self.batch_size):
+                end = min(start + self.batch_size, X.shape[0])
 
                 # Create rating matrix
                 rating_matrix = torch.tensor(
