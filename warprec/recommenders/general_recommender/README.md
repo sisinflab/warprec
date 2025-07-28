@@ -91,6 +91,7 @@ models:
         embedding_size: 64
         n_layers: 2
         weight_decay: 0.0001
+        batch_size: 512
         epochs: 50
         learning_rate: 0.001
 ...
