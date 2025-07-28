@@ -58,6 +58,7 @@ models:
         latent_dim: 200
         dropout: 1.0
         weight_decay: 0.02
+        batch_size: 512
         epochs: 10
         learning_rate: 0.001
         anneal_cap: 0.2
