@@ -44,6 +44,7 @@ class SASRec(Recommender, SequentialRecommenderUtils):
         dropout_prob (float): The probability of dropout for embeddings and other layers.
         attn_dropout_prob (float): The probability of dropout for the attention weights.
         weight_decay (float): The value of weight decay used in the optimizer.
+        batch_size (int): The batch size used during training.
         epochs (int): The number of training epochs.
         learning_rate (float): The learning rate value.
         neg_samples (int): The number of negative samples.
@@ -58,6 +59,7 @@ class SASRec(Recommender, SequentialRecommenderUtils):
     dropout_prob: float
     attn_dropout_prob: float
     weight_decay: float
+    batch_size: int
     epochs: int
     learning_rate: float
     neg_samples: int
@@ -214,6 +216,7 @@ class SASRec(Recommender, SequentialRecommenderUtils):
         dataloader = sessions.get_sequential_dataloader(
             max_seq_len=self.max_seq_len,
             num_negatives=self.neg_samples,
+            batch_size=self.batch_size,
         )
 
         self.train()

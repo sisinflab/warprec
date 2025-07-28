@@ -90,6 +90,7 @@ models:
         attn_dropout_prob: 0.3
         learning_rate: 0.001
         weight_decay: 0.0
+        batch_size: 512
         epochs: 100
         neg_samples: 1
         max_seq_len: 200
