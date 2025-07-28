@@ -469,6 +469,7 @@ class Sessions:
         self,
         max_seq_len: int,
         num_negatives: int,
+        batch_size: int = 1024,
         shuffle: bool = True,
     ) -> DataLoader:
         """Creates a sequential DataLoader grouped by user.
@@ -476,6 +477,8 @@ class Sessions:
         Args:
             max_seq_len (int): Maximum length of sequences produced.
             num_negatives (int): Number of negative samples per user.
+            batch_size (int): The batch size that will be used to
+                iterate over the sessions.
             shuffle (bool): Whether to shuffle the data.
 
         Returns:
@@ -493,7 +496,7 @@ class Sessions:
             )
 
         dataset = GroupSessionDataset(pos_seqs, neg_samples)
-        return DataLoader(dataset, batch_size=self.batch_size, shuffle=shuffle)
+        return DataLoader(dataset, batch_size=batch_size, shuffle=shuffle)
 
     def _create_grouped_sequences(
         self, max_seq_len: int, num_negatives: int
