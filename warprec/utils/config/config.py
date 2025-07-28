@@ -210,13 +210,14 @@ class Configuration(BaseModel):
 
         # Check if the filters have been set correctly
         if self.filtering is not None:
+            labels = self.reader.labels.model_dump()
             for filter_name, filter_params in self.filtering.items():
                 if filter_name.upper() not in filter_registry.list_registered():
                     raise ValueError(
                         f"Filter '{filter_name}' is not registered. These are the filters registered: {filter_registry.list_registered()}"
                     )
                 try:
-                    filter_registry.get(filter_name, **filter_params)
+                    filter_registry.get(filter_name, **filter_params, **labels)
                 except Exception as e:
                     raise ValueError(
                         f"Error initializing filter '{filter_name}' with these params {filter_params}: {e}"
@@ -325,8 +326,9 @@ class Configuration(BaseModel):
         """
         if not self.filtering:
             return []
+        labels = self.reader.labels.model_dump()
         return [
-            filter_registry.get(filter_name, **filter_params)
+            filter_registry.get(filter_name, **filter_params, **labels)
             for filter_name, filter_params in self.filtering.items()
         ]
 
