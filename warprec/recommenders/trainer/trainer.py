@@ -167,9 +167,9 @@ class Trainer:
             [metric_name],
             [top_k],
             train_set=dataset.train_set.get_sparse(),
-            side_information=dataset.train_set.get_side_sparse(),
             beta=beta,
             pop_ratio=pop_ratio,
+            feature_lookup=dataset.get_features_lookup(),
             user_cluster=dataset.get_user_cluster(),
             item_cluster=dataset.get_item_cluster(),
         )
@@ -362,10 +362,16 @@ class Trainer:
                 model (Recommender): The trained model to report.
                 **kwargs (Any): The parameters of the model.
             """
-            test_set = True if dataset.val_set is None else False
-            evaluator.evaluate(model, dataset, test_set=test_set)
+            key: str
+            if dataset.val_set is not None:
+                key = "validation"
+                evaluator.evaluate(model, dataset, evaluate_on_validation=True)
+            else:
+                key = "test"
+                evaluator.evaluate(model, dataset, evaluate_on_test=True)
+
             results = evaluator.compute_results()
-            score = results[self._top_k][self._metric_name]
+            score = results[key][self._top_k][self._metric_name]
 
             with tempfile.TemporaryDirectory() as tmpdir:
                 torch.save(

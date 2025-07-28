@@ -14,7 +14,7 @@ class UserCoverage(TopKMetric):
        that received at least one recommendation.
 
     Attributes:
-        user_coverage (Tensor): The number of users with at least one recommendation.
+        users (Tensor): The number of users evaluated.
 
     Args:
         k (int): The cutoff.
@@ -23,27 +23,28 @@ class UserCoverage(TopKMetric):
         **kwargs (Any): The keyword argument dictionary.
     """
 
-    _REQUIRED_COMPONENTS: Set[MetricBlock] = {MetricBlock.TOP_K_INDICES}
+    _REQUIRED_COMPONENTS: Set[MetricBlock] = {
+        MetricBlock.BINARY_RELEVANCE,
+        MetricBlock.VALID_USERS,
+    }
 
-    user_coverage: Tensor
+    users: Tensor
 
     def __init__(
         self, k: int, *args: Any, dist_sync_on_step: bool = False, **kwargs: Any
     ):
         super().__init__(k, dist_sync_on_step)
-        self.add_state("user_coverage", default=torch.tensor(0.0), dist_reduce_fx="sum")
+        self.add_state("users", default=torch.tensor(0.0), dist_reduce_fx="sum")
 
     def update(self, preds: Tensor, **kwargs: Any):
         """Updates the metric state with the new batch of predictions."""
-        top_k_indices: Tensor = kwargs.get(
-            f"top_{self.k}_indices", self.top_k_values_indices(preds, self.k)[1]
-        )
-        self.user_coverage += top_k_indices.shape[0]
+        target: Tensor = kwargs.get("binary_relevance", torch.zeros_like(preds))
+        users = kwargs.get("valid_users", self.valid_users(target))
+
+        # Count only users with at least one interaction
+        self.users += users
 
     def compute(self):
         """Computes the final metric value."""
-        return {self.name: self.user_coverage.item()}
-
-    def reset(self):
-        """Resets the metric state."""
-        self.user_coverage.zero_()
+        user_coverage = int(self.users.item())
+        return {self.name: user_coverage}

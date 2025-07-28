@@ -29,50 +29,78 @@ class NumRetrieved(TopKMetric):
     For further details, please refer to the `link <https://github.com/RankSys/RankSys/blob/master/RankSys-metrics/src/main/java/es/uam/eps/ir/ranksys/metrics/basic/NumRetrieved.java>`_
 
     Attributes:
-        cumulative_count (Tensor): Sum of retrieved items per user.
+        num_retrieved (Tensor): Counts of retrieved items per user.
         users (Tensor): Number of user with at least 1 relevant item.
+        compute_per_user (bool): Wether or not to compute the metric
+            per user or globally.
 
     Args:
         k (int): The cutoff.
+        num_users (int): Number of users in the training set.
         *args (Any): The argument list.
+        compute_per_user (bool): Wether or not to compute the metric
+            per user or globally.
         dist_sync_on_step (bool): Torchmetrics parameter.
         **kwargs (Any): The keyword argument dictionary.
     """
 
-    _REQUIRED_COMPONENTS: Set[MetricBlock] = {MetricBlock.VALID_USERS}
+    _REQUIRED_COMPONENTS: Set[MetricBlock] = {
+        MetricBlock.BINARY_RELEVANCE,
+        MetricBlock.VALID_USERS,
+        MetricBlock.TOP_K_VALUES,
+    }
+    _CAN_COMPUTE_PER_USER: bool = True
 
-    cumulative_count: Tensor
+    num_retrieved: Tensor
     users: Tensor
+    compute_per_user: bool
 
     def __init__(
-        self, k: int, *args: Any, dist_sync_on_step: bool = False, **kwargs: Any
+        self,
+        k: int,
+        num_users: int,
+        *args: Any,
+        compute_per_user: bool = False,
+        dist_sync_on_step: bool = False,
+        **kwargs: Any,
     ):
-        super().__init__(k, *args, dist_sync_on_step=dist_sync_on_step, **kwargs)
+        super().__init__(k, dist_sync_on_step)
+        self.compute_per_user = compute_per_user
 
-        self.add_state(
-            "cumulative_count", default=torch.tensor(0.0), dist_reduce_fx="sum"
-        )
+        if self.compute_per_user:
+            self.add_state(
+                "num_retrieved", default=torch.zeros(num_users), dist_reduce_fx="sum"
+            )  # Initialize a tensor to store metric value for each user
+        else:
+            self.add_state(
+                "num_retrieved", default=torch.tensor(0.0), dist_reduce_fx="sum"
+            )  # Initialize a scalar to store global value
         self.add_state("users", default=torch.tensor(0.0), dist_reduce_fx="sum")
 
-    def update(self, preds: Tensor, **kwargs: Any):
+    def update(self, preds: Tensor, user_indices: Tensor, **kwargs: Any):
         """Updates the metric state with the new batch of predictions."""
-        target = kwargs.get("ground", torch.zeros_like(preds))
+        target: Tensor = kwargs.get("binary_relevance", torch.zeros_like(preds))
         users = kwargs.get("valid_users", self.valid_users(target))
+        top_k_values: Tensor = kwargs.get(
+            f"top_{self.k}_values", self.top_k_values_indices(preds, self.k)[0]
+        )
 
-        num_items = preds.size(1)
+        if self.compute_per_user:
+            self.num_retrieved.index_add_(
+                0, user_indices, (~torch.isinf(top_k_values)).sum(dim=1).float()
+            )
+        else:
+            self.num_retrieved += (~torch.isinf(top_k_values)).sum().float()
 
-        self.cumulative_count += users * min(self.k, num_items)
+        # Count only users with at least one interaction
         self.users += users
 
     def compute(self):
         """Computes the final metric value."""
-        num_retrieved = (
-            self.cumulative_count / self.users if self.users > 0 else torch.tensor(0.0)
-        )
-
-        return {self.name: num_retrieved.item()}
-
-    def reset(self):
-        """Resets the metric state."""
-        self.cumulative_count.zero_()
-        self.users.zero_()
+        if self.compute_per_user:
+            num_retrieved = self.num_retrieved
+        else:
+            num_retrieved = (
+                self.num_retrieved / self.users if self.users > 0 else torch.tensor(0.0)
+            ).item()
+        return {self.name: num_retrieved}

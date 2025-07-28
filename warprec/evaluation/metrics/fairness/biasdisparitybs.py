@@ -2,7 +2,6 @@ from typing import Any
 
 import torch
 from torch import Tensor
-from scipy.sparse import csr_matrix
 from warprec.utils.registry import metric_registry
 from warprec.evaluation.metrics.base_metric import BaseMetric
 
@@ -43,7 +42,7 @@ class BiasDisparityBS(BaseMetric):
         total_sum (Tensor): Accumulated counts of positive interactions per user cluster.
 
     Args:
-        train_set (csr_matrix): Sparse matrix of training interactions (users x items).
+        num_items (int): Number of items in the training set.
         *args (Any): The argument list.
         user_cluster (Tensor): Lookup tensor of user clusters.
         item_cluster (Tensor): Lookup tensor of item clusters.
@@ -63,7 +62,7 @@ class BiasDisparityBS(BaseMetric):
 
     def __init__(
         self,
-        train_set: csr_matrix,
+        num_items: int,
         *args: Any,
         user_cluster: Tensor = None,
         item_cluster: Tensor = None,
@@ -71,8 +70,6 @@ class BiasDisparityBS(BaseMetric):
         **kwargs: Any,
     ):
         super().__init__(dist_sync_on_step=dist_sync_on_step)
-        self.train_set = train_set
-
         self.register_buffer("user_clusters", user_cluster)
         self.n_user_effective_clusters = int(user_cluster.max().item())
         self.n_user_clusters = (
@@ -87,7 +84,7 @@ class BiasDisparityBS(BaseMetric):
 
         # Global distribution of items
         pc = torch.bincount(item_cluster, minlength=self.n_item_clusters).float()
-        pc = pc / float(self.train_set.shape[1])
+        pc = pc / float(num_items)  # Normalize to get proportions
         self.register_buffer("PC", pc)
 
         self.add_state(
@@ -99,13 +96,9 @@ class BiasDisparityBS(BaseMetric):
             "total_sum", default=torch.zeros(self.n_user_clusters), dist_reduce_fx="sum"
         )
 
-    def update(self, preds: Tensor, **kwargs: Any):
+    def update(self, preds: Tensor, user_indices: Tensor, **kwargs: Any):
         """Updates the metric state with the new batch of predictions."""
-        start = kwargs.get("start", 0)
         target: Tensor = kwargs.get("ground", torch.zeros_like(preds))
-
-        batch_size = preds.size(0)
-        user_indices = torch.arange(start, start + batch_size, device=preds.device)
 
         # Find positive interactions in target
         user_batch_idx, item_idx = target.nonzero(as_tuple=True)
@@ -136,8 +129,3 @@ class BiasDisparityBS(BaseMetric):
                 key = f"{self.name}_UC{uc + 1}_IC{ic + 1}"
                 results[key] = bias_src[uc + 1, ic + 1].item()
         return results
-
-    def reset(self):
-        """Resets the metric state."""
-        self.category_sum.zero_()
-        self.total_sum.zero_()

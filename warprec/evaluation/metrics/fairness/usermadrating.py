@@ -3,7 +3,6 @@ from typing import Any, Set
 
 import torch
 from torch import Tensor
-from scipy.sparse import csr_matrix
 from warprec.evaluation.metrics.base_metric import TopKMetric
 from warprec.utils.enums import MetricBlock
 from warprec.utils.registry import metric_registry
@@ -44,12 +43,11 @@ class UserMADRating(TopKMetric):
         user_clusters (Tensor): Tensor mapping each user to an user cluster.
         user_counts (Tensor): Tensor of counts of batches/updates each user was seen in.
         user_gains (Tensor): Tensor of summed average top-k prediction scores per user across batches.
-        n_users (int): Total number of users.
         n_user_clusters (int): The total number of unique user clusters, including fallback cluster.
 
     Args:
         k (int): Cutoff for top-k recommendations.
-        train_set (csr_matrix): Sparse matrix of training interactions (users x items).
+        num_users (int): Number of users in the training set.
         *args (Any): The argument list.
         user_cluster (Tensor): Lookup tensor of user clusters.
         dist_sync_on_step (bool): Whether to synchronize metric state across distributed processes.
@@ -61,13 +59,12 @@ class UserMADRating(TopKMetric):
     user_clusters: Tensor
     user_counts: Tensor
     user_gains: Tensor
-    n_users: int
     n_user_clusters: int
 
     def __init__(
         self,
         k: int,
-        train_set: csr_matrix,
+        num_users: int,
         *args: Any,
         user_cluster: Tensor = None,
         dist_sync_on_step: bool = False,
@@ -82,12 +79,12 @@ class UserMADRating(TopKMetric):
         # Per-user accumulators
         self.add_state(
             "user_counts",
-            torch.zeros(train_set.shape[0], dtype=torch.float),
+            torch.zeros(num_users),
             dist_reduce_fx="sum",
         )
         self.add_state(
             "user_gains",
-            torch.zeros(train_set.shape[0], dtype=torch.float),
+            torch.zeros(num_users),
             dist_reduce_fx="sum",
         )
 
@@ -130,7 +127,7 @@ class UserMADRating(TopKMetric):
         values = mean_cluster[nz]
         m = values.numel()
         if m < 2:
-            mad = torch.tensor(0.0, device=values.device)
+            mad = torch.tensor(0.0, device=values.device).item()
         else:
             # vectorized pairwise diffs
             i = values.unsqueeze(0)
@@ -139,11 +136,6 @@ class UserMADRating(TopKMetric):
             # take upper triangle without diagonal
             pairwise = diffs.triu(diagonal=1)
             # mean of non-zero entries
-            mad = pairwise.sum() / (m * (m - 1) / 2)
+            mad = (pairwise.sum() / (m * (m - 1) / 2)).item()
 
-        return {self.name: mad.item()}
-
-    def reset(self):
-        """Resets the metric state."""
-        self.user_counts.zero_()
-        self.user_gains.zero_()
+        return {self.name: mad}

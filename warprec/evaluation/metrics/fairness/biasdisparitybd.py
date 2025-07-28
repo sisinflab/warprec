@@ -1,7 +1,6 @@
 from typing import Any
 import torch
 from torch import Tensor
-from scipy.sparse import csr_matrix
 from warprec.utils.registry import metric_registry
 from warprec.evaluation.metrics.base_metric import TopKMetric, BaseMetric
 
@@ -41,7 +40,7 @@ class BiasDisparityBD(TopKMetric):
 
     Args:
         k (int): Cutoff for top-k recommendations (used by BiasDisparityBR).
-        train_set (csr_matrix): Sparse matrix of training interactions (users x items).
+        num_items (int): Number of items in the training set.
         *args (Any): The argument list.
         user_cluster (Tensor): Lookup tensor of user clusters.
         item_cluster (Tensor): Lookup tensor of item clusters.
@@ -59,7 +58,7 @@ class BiasDisparityBD(TopKMetric):
     def __init__(
         self,
         k: int,
-        train_set: csr_matrix,
+        num_items: int,
         *args: Any,
         user_cluster: Tensor = None,
         item_cluster: Tensor = None,
@@ -71,7 +70,7 @@ class BiasDisparityBD(TopKMetric):
         # Initialize BiasDisparityBS and BiasDisparityBR
         self.bs_metric = metric_registry.get(
             "BiasDisparityBS",
-            train_set=train_set,
+            num_items=num_items,
             user_cluster=user_cluster,
             item_cluster=item_cluster,
             dist_sync_on_step=dist_sync_on_step,
@@ -80,7 +79,7 @@ class BiasDisparityBD(TopKMetric):
         self.br_metric = metric_registry.get(
             "BiasDisparityBR",
             k=k,
-            train_set=train_set,
+            num_items=num_items,
             user_cluster=user_cluster,
             item_cluster=item_cluster,
             dist_sync_on_step=dist_sync_on_step,
@@ -139,10 +138,3 @@ class BiasDisparityBD(TopKMetric):
                 results[key] = bd_tensor[uc + 1, ic + 1].item()
 
         return results
-
-    def reset(self):
-        """
-        Reset the internal states of both BS and BR metrics.
-        """
-        self.bs_metric.reset()
-        self.br_metric.reset()

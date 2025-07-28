@@ -46,6 +46,7 @@ class Dataset(ABC):
         self._max_seq_len: int = 0
         self._umap: dict[Any, int] = {}
         self._imap: dict[Any, int] = {}
+        self._feat_lookup: Tensor = None
         self._uc: Tensor = None
         self._ic: Tensor = None
 
@@ -78,6 +79,14 @@ class Dataset(ABC):
                 dict: Mapping of user_idx -> user_id.
                 dict: Mapping of item_idxs -> item_id.
         """
+
+    def get_features_lookup(self) -> Optional[Tensor]:
+        """This method retrieves the lookup tensor for side information features.
+
+        Returns:
+            Optional[Tensor]: Lookup tensor for side information features.
+        """
+        return self._feat_lookup
 
     def get_user_cluster(self) -> Tensor:
         """This method retrieves the lookup tensor for user clusters.
@@ -217,9 +226,6 @@ class TransactionDataset(Dataset):
             else False
         )
 
-        # Save side information inside the dataset
-        self.side = side_data if side_data is not None else None
-
         # Save user and item cluster information inside the dataset
         self.user_cluster = (
             {
@@ -308,6 +314,16 @@ class TransactionDataset(Dataset):
                 timestamp_label=timestamp_label,
                 precision=precision,
             )
+
+        # Save side information inside the dataset
+        self.side = side_data if side_data is not None else None
+        if side_data is not None:
+            self.side = side_data
+
+            # Create the lookup tensor for side information features
+            self._feat_lookup = torch.tensor(
+                self.train_set._inter_side.iloc[:, 1:].values
+            ).float()
 
         # Sequential recommendation sessions
         if need_session_based_information:

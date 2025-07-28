@@ -61,12 +61,17 @@ class MAR(TopKMetric):
     For further details, please refer to this `link <https://sdsawtelle.github.io/blog/output/mean-average-precision-MAP-for-recommender-systems.html#So-Why-Did-I-Bother-Defining-Recall?>`_.
 
     Attributes:
-        ar_sum (Tensor): The average recall tensor.
+        ar (Tensor): The average recall tensor.
         users (Tensor): The number of users evaluated.
+        compute_per_user (bool): Wether or not to compute the metric
+            per user or globally.
 
     Args:
         k (int): The recommendation cutoff.
+        num_users (int): Number of users in the training set.
         *args (Any): Additional arguments to pass to the parent class.
+        compute_per_user (bool): Wether or not to compute the metric
+            per user or globally.
         dist_sync_on_step (bool): Torchmetrics parameter.
         **kwargs (Any): Additional keyword arguments to pass to the parent class.
     """
@@ -76,18 +81,35 @@ class MAR(TopKMetric):
         MetricBlock.VALID_USERS,
         MetricBlock.TOP_K_BINARY_RELEVANCE,
     }
+    _CAN_COMPUTE_PER_USER: bool = True
 
-    ar_sum: Tensor
+    ar: Tensor
     users: Tensor
+    compute_per_user: bool
 
     def __init__(
-        self, k: int, *args: Any, dist_sync_on_step: bool = False, **kwargs: Any
+        self,
+        k: int,
+        num_users: int,
+        *args: Any,
+        compute_per_user: bool = False,
+        dist_sync_on_step: bool = False,
+        **kwargs: Any,
     ):
         super().__init__(k, dist_sync_on_step)
-        self.add_state("ar_sum", default=torch.tensor(0.0), dist_reduce_fx="sum")
+        self.compute_per_user = compute_per_user
+
+        if self.compute_per_user:
+            self.add_state(
+                "ar", default=torch.zeros(num_users), dist_reduce_fx="sum"
+            )  # Initialize a tensor to store metric value for each user
+        else:
+            self.add_state(
+                "ar", default=torch.tensor(0.0), dist_reduce_fx="sum"
+            )  # Initialize a scalar to store global value
         self.add_state("users", default=torch.tensor(0.0), dist_reduce_fx="sum")
 
-    def update(self, preds: Tensor, **kwargs: Any):
+    def update(self, preds: Tensor, user_indices: Tensor, **kwargs: Any):
         """Updates the MAR metric state with a batch of predictions."""
         target: Tensor = kwargs.get("binary_relevance", torch.zeros_like(preds))
         users = kwargs.get("valid_users", self.valid_users(target))
@@ -103,14 +125,25 @@ class MAR(TopKMetric):
             target.sum(dim=1),
             torch.tensor(self.k, dtype=target.dtype, device=target.device),
         )  # [batch_size]
-        ar = (recall_at_i * top_k_rel).sum(dim=1) / normalization  # [batch_size]
 
-        self.ar_sum += ar.sum()
+        if self.compute_per_user:
+            self.ar.index_add_(
+                0, user_indices, (recall_at_i * top_k_rel).sum(dim=1) / normalization
+            )  # Index metric values per user
+        else:
+            self.ar += (
+                (recall_at_i * top_k_rel).sum(dim=1) / normalization
+            ).sum()  # Compute total average recall
 
         # Count only users with at least one interaction
         self.users += users
 
     def compute(self):
         """Computes the final MAR@K value."""
-        mar = self.ar_sum / self.users if self.users > 0 else torch.tensor(0.0)
-        return {self.name: mar.item()}
+        if self.compute_per_user:
+            mar = self.ar  # Return the tensor with per_user metric
+        else:
+            mar = (
+                self.ar / self.users if self.users > 0 else torch.tensor(0.0)
+            ).item()  # Return the metric value
+        return {self.name: mar}

@@ -3,7 +3,6 @@ from typing import Any, Set
 
 import torch
 from torch import Tensor
-from scipy.sparse import csr_matrix
 from warprec.evaluation.metrics.base_metric import TopKMetric
 from warprec.utils.enums import MetricBlock
 from warprec.utils.registry import metric_registry
@@ -70,7 +69,8 @@ class RSP(TopKMetric):
 
     Args:
         k (int): Cutoff for top-k recommendations.
-        train_set (csr_matrix): Sparse matrix of training interactions (users x items). Used to determine the denominator pool.
+        num_users (int): Number of users in the training set.
+        item_indices (Tensor): Indices of items in the training set used to calculate the denominator counts.
         *args (Any): The argument list.
         item_cluster (Tensor): Lookup tensor of item clusters.
         dist_sync_on_step (bool): Whether to synchronize metric state across distributed processes.
@@ -88,15 +88,14 @@ class RSP(TopKMetric):
     def __init__(
         self,
         k: int,
-        train_set: csr_matrix,
+        num_users: int,
+        item_indices: Tensor,
         *args: Any,
         item_cluster: Tensor = None,
         dist_sync_on_step: bool = False,
         **kwargs: Any,
     ):
         super().__init__(k, dist_sync_on_step)
-        num_users = train_set.shape[0]
-
         self.register_buffer("item_clusters", item_cluster)
         self.n_effective_clusters = int(item_cluster.max().item())
         self.n_item_clusters = (
@@ -104,14 +103,12 @@ class RSP(TopKMetric):
         )  # Take into account the zero cluster
 
         # Calculate |g_a| for each cluster g_a
-        item_clusters_cpu = self.item_clusters.cpu()  # Work on CPU for CSR interaction
         cluster_item_counts = torch.bincount(
-            item_clusters_cpu, minlength=self.n_item_clusters
+            self.item_clusters, minlength=self.n_item_clusters
         ).float()  # [num_clusters]
 
         # Calculate total count of training interactions whose item is in group g_a
-        train_item_indices_cpu = torch.tensor(train_set.indices, dtype=torch.long)
-        train_item_clusters_cpu = item_clusters_cpu[train_item_indices_cpu]
+        train_item_clusters = self.item_clusters[item_indices]
 
         # Count occurrences of each cluster ID among training items
         cluster_train_interaction_counts = torch.zeros(
@@ -119,19 +116,17 @@ class RSP(TopKMetric):
         )
         cluster_train_interaction_counts.scatter_add_(
             0,
-            train_item_clusters_cpu,
-            torch.ones_like(train_item_clusters_cpu, dtype=torch.float),
+            train_item_clusters,
+            torch.ones_like(train_item_clusters, dtype=torch.float),
         )  # Sum counts per cluster
 
         # Calculate the denominator for each cluster
         total_potential_items_per_cluster = num_users * cluster_item_counts
-        denominator_counts_cpu = (
+        denominator_counts = (
             total_potential_items_per_cluster - cluster_train_interaction_counts
         )  # [n_item_clusters]
 
-        self.register_buffer(
-            "denominator_counts", denominator_counts_cpu.to(self.item_clusters.device)
-        )
+        self.register_buffer("denominator_counts", denominator_counts)
         self.add_state(
             "cluster_recommendations",
             torch.zeros(self.n_item_clusters, dtype=torch.float),
@@ -209,7 +204,3 @@ class RSP(TopKMetric):
 
         results[self.name] = (std_prob / mean_prob).item()
         return results
-
-    def reset(self):
-        """Resets the metric state."""
-        self.cluster_recommendations.zero_()

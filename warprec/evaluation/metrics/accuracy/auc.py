@@ -1,10 +1,10 @@
 # pylint: disable=arguments-differ, unused-argument, line-too-long
-from typing import Any
+from typing import Any, Set
 
 import torch
 from torch import Tensor
-from scipy.sparse import csr_matrix
 from warprec.evaluation.metrics.base_metric import BaseMetric
+from warprec.utils.enums import MetricBlock
 from warprec.utils.registry import metric_registry
 
 
@@ -68,30 +68,34 @@ class AUC(BaseMetric):
         positives (Tensor): The number of positive examples.
 
     Args:
-        train_set (csr_matrix): The training interaction data.
+        num_items (int): Number of items in the training set.
         *args (Any): The argument list.
         dist_sync_on_step (bool): Torchmetrics parameter.
         **kwargs (Any): The keyword argument dictionary.
     """
+
+    _REQUIRED_COMPONENTS: Set[MetricBlock] = {
+        MetricBlock.BINARY_RELEVANCE,
+    }
 
     auc: Tensor
     positives: Tensor
 
     def __init__(
         self,
-        train_set: csr_matrix,
+        num_items: int,
         *args: Any,
         dist_sync_on_step: bool = False,
         **kwargs: Any,
     ):
         super().__init__(dist_sync_on_step=dist_sync_on_step)
-        self.num_items = train_set.shape[1]
+        self.num_items = num_items
         self.add_state("auc", default=torch.tensor(0.0), dist_reduce_fx="sum")
         self.add_state("positives", default=torch.tensor(0.0), dist_reduce_fx="sum")
 
     def update(self, preds: Tensor, **kwargs: Any):
         """Updates the metric state with the new batch of predictions."""
-        target = kwargs.get("binary_relevance", torch.zeros_like(preds))
+        target: Tensor = kwargs.get("binary_relevance", torch.zeros_like(preds))
 
         # Negative samples
         train_set = torch.isinf(preds).logical_and(preds < 0).sum(dim=1)  # [batch_size]
@@ -134,8 +138,3 @@ class AUC(BaseMetric):
         """Computes the final metric value."""
         score = self.auc / self.positives if self.positives > 0 else torch.tensor(0.0)
         return {self.name: score.item()}
-
-    def reset(self):
-        """Resets the metric state."""
-        self.auc.zero_()
-        self.positives.zero_()

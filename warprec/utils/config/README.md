@@ -542,10 +542,30 @@ The `Evaluation Configuration` can be configured using the following keywords:
 - **top_k**: The cutoff used to compute ranking metrics.
 - **metrics**: The metrics to be evaluated.
 - **batch_size**: The batch size used during evaluation. Defaults to 1024.
+- **stat_significance**: This is a nested section containing the information about the stat test to execute.
 - **max_metric_per_row**: The metric to be logged in each row. Defaults to 4.
 - **beta**: The beta value used by the F1-score metric. Defaults to 1.0.
 - **pop_ratio**: The ratio of transactions that will be considered popular. Defaults to 0.8.
 - **save_evaluation**: Flag that decides whether or not to save the evaluation. Defaults to true.
+
+#### ⚖️ Stat significance
+
+This nested section specifies which statistical significance tests should be applied:
+
+- **paired_t_test**: A flag indicating whether to activate the Paired t-test. Defaults to False.
+- **wilcoxon_test**: A flag indicating whether to activate the Wilcoxon signed-rank test. Defaults to False.
+- **kruskal_test**: A flag indicating whether to activate the Kruskal-Wallis H-test. Defaults to False.
+- **whitney_u_test**: A flag indicating whether to activate the Mann–Whitney U test. Defaults to False.
+- **corrections**: A nested section containing information about extra corrections to apply to stat tests.
+
+#### ✏️ Corrections
+
+This section defines which correction methods to apply for controlling the family-wise error rate or the false discovery rate:
+
+- **bonferroni**: A flag indicating whether to apply Bonferroni correction. Defaults to False.
+- **holm_bonferroni**: A flag indicating whether to apply Holm-Bonferroni correction. Defaults to False.
+- **fdr**: A flag indicating whether to apply False Discovery Rate (FDR) correction. Defaults to False.
+- **alpha**: Significance level (α) used for hypothesis testing. Defaults to 0,05.
 
 ### 📌 Example of Evaluation Configuration
 
@@ -555,6 +575,11 @@ Below is a full example of a `evaluation configuration` that evaluates the best 
 evaluation:
     top_k: [10, 20, 50]
     metrics: [nDCG, Precision, Recall, HitRate]
+    stat_significance:
+        wilcoxon_test: True
+        paired_t_test: True
+        corrections:
+            bonferroni: True
 ...
 ```
 

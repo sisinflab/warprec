@@ -11,6 +11,7 @@ from warprec.utils.logger import logger
 from warprec.recommenders.trainer import Trainer
 from warprec.recommenders.base_recommender import generate_model_name
 from warprec.evaluation.evaluator import Evaluator
+from warprec.evaluation.statistical_significance import compute_paired_statistical_test
 
 
 def main(args: Namespace):
@@ -122,13 +123,25 @@ def main(args: Namespace):
     # Trainer testing
     models = list(config.models.keys())
 
+    # If statistical significance is required, metrics will
+    # be computed user_wise
+    requires_stat_significance = (
+        config.evaluation.stat_significance.requires_stat_significance()
+    )
+    if requires_stat_significance:
+        logger.attention(
+            "Statistical significance is required, metrics will be computed user-wise."
+        )
+        model_results = {}
+
     evaluator = Evaluator(
         list(config.evaluation.metrics),
         list(config.evaluation.top_k),
         train_set=dataset.train_set.get_sparse(),
-        side_information=dataset.train_set._inter_side,
         beta=config.evaluation.beta,
         pop_ratio=config.evaluation.pop_ratio,
+        compute_per_user=requires_stat_significance,
+        feature_lookup=dataset.get_features_lookup(),
         user_cluster=dataset.get_user_cluster(),
         item_cluster=dataset.get_item_cluster(),
     )
@@ -156,30 +169,33 @@ def main(args: Namespace):
         callback.on_training_complete(model=best_model)
 
         # Evaluation testing
-        result_dict = {}
-        if dataset.val_set is not None:
-            evaluator.evaluate(best_model, dataset, test_set=False, verbose=True)
-            results = evaluator.compute_results()
-            evaluator.print_console(
-                results, "Validation", config.evaluation.max_metric_per_row
-            )
-            result_dict["Validation"] = results
-
-        evaluator.evaluate(best_model, dataset, test_set=True, verbose=True)
+        eval_validation = dataset.val_set is not None
+        eval_test = dataset.test_set is not None
+        evaluator.evaluate(
+            best_model,
+            dataset,
+            evaluate_on_validation=eval_validation,
+            evaluate_on_test=eval_test,
+            verbose=True,
+        )
         results = evaluator.compute_results()
-        evaluator.print_console(results, "Test", config.evaluation.max_metric_per_row)
-        result_dict["Test"] = results
+        evaluator.print_console(results, config.evaluation.max_metric_per_row)
+
+        if requires_stat_significance:
+            model_results[model_name] = (
+                results  # Populate model_results for statistical significance
+            )
 
         # Callback after complete evaluation
         callback.on_evaluation_complete(
             model=best_model,
             params=params,
-            results=result_dict,
+            results=results,
         )
 
         # Write results of current model
         writer.write_results(
-            result_dict,
+            results,
             model_name,
         )
 
@@ -210,6 +226,24 @@ def main(args: Namespace):
                         checkpoint_name = generate_model_name(model_name, param)
                         writer.checkpoint_from_ray(source_path, checkpoint_name)
 
+    if requires_stat_significance:
+        logger.msg(
+            f"Computing statistical significance tests for {len(models)} models."
+        )
+
+        stat_significance = config.evaluation.stat_significance.model_dump(
+            exclude=["corrections"]  # type: ignore[arg-type]
+        )
+        corrections = config.evaluation.stat_significance.corrections.model_dump()
+
+        for stat_name, enabled in stat_significance.items():
+            if enabled:
+                test_results = compute_paired_statistical_test(
+                    model_results, stat_name, **corrections
+                )
+                writer.write_statistical_significance_test(test_results, stat_name)
+
+        logger.positive("Statistical significance tests completed successfully.")
     logger.positive(
         "All models trained and evaluated successfully. WarpRec is shutting down."
     )

@@ -1,9 +1,59 @@
 from typing import List, Optional
 
 import re
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel, field_validator, Field
 from warprec.utils.registry import metric_registry
 from warprec.utils.logger import logger
+
+
+class Corrections(BaseModel):
+    """Definition of corrections configuration.
+
+    Attributes:
+        bonferroni (Optional[bool]): Whether to apply Bonferroni correction.
+        holm_bonferroni (Optional[bool]): Whether to apply Holm-Bonferroni correction.
+        fdr (Optional[bool]): Whether to apply False Discovery Rate correction.
+        alpha (Optional[float]): Significance level for statistical tests.
+    """
+
+    bonferroni: Optional[bool] = False
+    holm_bonferroni: Optional[bool] = False
+    fdr: Optional[bool] = False
+    alpha: Optional[float] = 0.05
+
+    def requires_correction(self) -> bool:
+        """Check if any correction is enabled.
+
+        Returns:
+            bool: True if any correction is enabled, False otherwise.
+        """
+        return any(self.model_dump(exclude=["alpha"]).values())  # type: ignore[arg-type]
+
+
+class StatSignificance(BaseModel):
+    """Definition of statistical significance configuration.
+
+    Attributes:
+        paired_t_test (Optional[bool]): Whether to perform paired t-test.
+        wilcoxon_test (Optional[bool]): Whether to perform Wilcoxon test.
+        kruskal_test (Optional[bool]): Whether to perform Kruskal-Wallis test.
+        whitney_u_test (Optional[bool]): Whether to perform Mann-Whitney U test.
+        corrections (Optional[Corrections]): Corrections configuration for statistical tests.
+    """
+
+    paired_t_test: Optional[bool] = False
+    wilcoxon_test: Optional[bool] = False
+    kruskal_test: Optional[bool] = False
+    whitney_u_test: Optional[bool] = False
+    corrections: Optional[Corrections] = Field(default_factory=Corrections)
+
+    def requires_stat_significance(self) -> bool:
+        """Check if any statistical significance test is enabled.
+
+        Returns:
+            bool: True if any test is enabled, False otherwise.
+        """
+        return any(self.model_dump(exclude=["corrections"]).values())  # type: ignore[arg-type]
 
 
 class EvaluationConfig(BaseModel):
@@ -13,6 +63,7 @@ class EvaluationConfig(BaseModel):
         top_k (List[int]): List of cutoffs to evaluate.
         metrics (List[str]): List of metrics to compute during evaluation.
         batch_size (Optional[int]): Batch size used during evaluation.
+        stat_significance (Optional[StatSignificance]): Statistical significance configuration.
         max_metric_per_row (Optional[int]): Number of metrics to show in each row on console.
         beta (Optional[float]): The beta value used in some metrics like F1 score.
         pop_ratio (Optional[float]): The percentage of item transactions that
@@ -23,6 +74,9 @@ class EvaluationConfig(BaseModel):
     top_k: List[int]
     metrics: List[str]
     batch_size: Optional[int] = 1024
+    stat_significance: Optional[StatSignificance] = Field(
+        default_factory=StatSignificance
+    )
     max_metric_per_row: Optional[int] = 4
     beta: Optional[float] = 1.0
     pop_ratio: Optional[float] = 0.8
