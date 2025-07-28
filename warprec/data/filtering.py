@@ -1,3 +1,4 @@
+# pylint: disable = too-few-public-methods
 from typing import List
 from abc import ABC
 
@@ -29,8 +30,6 @@ class MinRating(Filter):
 
     def __init__(self, min_rating: float):
         self.min_rating = min_rating
-
-    """Filter to select rows based on a rating condition."""
 
     def __call__(self, dataset: DataFrame) -> DataFrame:
         """Select rows where the 'rating' column is greater than or equal to min_rating.
@@ -193,13 +192,15 @@ def apply_filtering(dataset: DataFrame, filters: List[Filter]) -> DataFrame:
     logger.msg(f"Applying filters to the dataset. Initial dataset size: {len(dataset)}")
     start = time.time()
 
-    for i, filter in enumerate(filters):
-        dataset = filter(dataset)
+    for i, single_filter in enumerate(filters):
+        dataset = single_filter(dataset).reset_index(drop=True)
         logger.stats(
-            f"After filter {i + 1}/{len(filters)} ({filter.__class__.__name__}): {len(dataset)} rows"
+            f"After filter {i + 1}/{len(filters)} ({filter.__class__.__name__}): "
+            f"{len(dataset)} rows"
         )
 
     logger.positive(
-        f"Filtering process completed. Final dataset size after filtering: {len(dataset)}. Total filtering time: {time.time() - start:.2f} seconds."
+        f"Filtering process completed. Final dataset size after filtering: {len(dataset)}. "
+        f"Total filtering time: {time.time() - start:.2f} seconds."
     )
     return dataset
