@@ -35,6 +35,7 @@ class FISM(Recommender):
         alpha (float): The alpha parameter, a value between 0 and 1, used in the similarity calculation.
         split_to (int): Parameter for splitting items into chunks during prediction (for memory management).
         weight_decay (float): The value of weight decay used in the optimizer.
+        batch_size (int): The size of the batches used during training.
         epochs (int): The number of training epochs.
         learning_rate (float): The learning rate for the optimizer.
     """
@@ -44,6 +45,7 @@ class FISM(Recommender):
     alpha: float
     split_to: int
     weight_decay: float
+    batch_size: int
     epochs: int
     learning_rate: float
 
@@ -182,10 +184,9 @@ class FISM(Recommender):
         )  # Assuming ratings are 1.0 for positive interactions
 
         dataset_size = user_tensor.size(0)
-        batch_size = interactions.batch_size
-        num_batches = (dataset_size + batch_size - 1) // batch_size
+        num_batches = (dataset_size + self.batch_size - 1) // self.batch_size
 
-        for epoch in range(self.epochs):
+        for _ in range(self.epochs):
             epoch_loss = 0.0
             # Shuffle data for each epoch
             indices = torch.randperm(dataset_size, device=self._device)
@@ -194,8 +195,8 @@ class FISM(Recommender):
             shuffled_label_tensor = label_tensor[indices]
 
             for i in range(num_batches):
-                start_idx = i * batch_size
-                end_idx = min((i + 1) * batch_size, dataset_size)
+                start_idx = i * self.batch_size
+                end_idx = min((i + 1) * self.batch_size, dataset_size)
 
                 self.optimizer.zero_grad()
 

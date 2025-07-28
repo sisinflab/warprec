@@ -204,7 +204,8 @@ models:
         alpha: 0.1
         split_to: 5
         weight_decay: 0.0001
-        epochs: 5
+        batch_size: 512
+        epochs: 50
         learning_rate: 0.001
 ...
 ```
