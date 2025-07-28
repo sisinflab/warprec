@@ -86,12 +86,14 @@ class BPR(RecomModel):
     Attributes:
         embedding_size (INT_FIELD): List of embedding size.
         weight_decay (FLOAT_FIELD): List of values for weight_decay.
+        batch_size (INT_FIELD): List of values for batch_size.
         epochs (INT_FIELD): List of values for epochs.
         learning_rate (FLOAT_FIELD): List of values for learning rate.
     """
 
     embedding_size: INT_FIELD
     weight_decay: FLOAT_FIELD
+    batch_size: INT_FIELD
     epochs: INT_FIELD
     learning_rate: FLOAT_FIELD
 
@@ -106,6 +108,12 @@ class BPR(RecomModel):
     def check_weight_decay(cls, v: list):
         """Validate weight_decay"""
         return validate_greater_equal_than_zero(cls, v, "weight_decay")
+
+    @field_validator("batch_size")
+    @classmethod
+    def check_batch_size(cls, v: list):
+        """Validate batch_size."""
+        return validate_greater_than_zero(cls, v, "batch_size")
 
     @field_validator("epochs")
     @classmethod
