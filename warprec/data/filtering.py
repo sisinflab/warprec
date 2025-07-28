@@ -85,6 +85,31 @@ class UserMin(Filter):
         return dataset[dataset["user_id"].isin(valid_users)]
 
 
+@filter_registry.register("UserMax")
+class UserMax(Filter):
+    """Filter to select users based on a maximum number of interactions.
+
+    Args:
+        max_interactions (int): Maximum number of interactions per user.
+    """
+
+    def __init__(self, max_interactions: int):
+        self.max_interactions = max_interactions
+
+    def __call__(self, dataset: DataFrame) -> DataFrame:
+        """Select users with at most max_interactions.
+
+        Args:
+            dataset (DataFrame): The dataset to filter.
+
+        Returns:
+            DataFrame: Filtered dataset containing only users with interactions <= max_interactions.
+        """
+        user_counts = dataset["user_id"].value_counts()
+        valid_users = user_counts[user_counts <= self.max_interactions].index
+        return dataset[dataset["user_id"].isin(valid_users)]
+
+
 @filter_registry.register("ItemMin")
 class ItemMin(Filter):
     """Filter to select items based on a minimum number of interactions.
@@ -107,6 +132,31 @@ class ItemMin(Filter):
         """
         item_counts = dataset["item_id"].value_counts()
         valid_items = item_counts[item_counts >= self.min_interactions].index
+        return dataset[dataset["item_id"].isin(valid_items)]
+
+
+@filter_registry.register("ItemMax")
+class ItemMax(Filter):
+    """Filter to select items based on a maximum number of interactions.
+
+    Args:
+        max_interactions (int): Maximum number of interactions per item.
+    """
+
+    def __init__(self, max_interactions: int):
+        self.max_interactions = max_interactions
+
+    def __call__(self, dataset: DataFrame) -> DataFrame:
+        """Select items with at most max_interactions.
+
+        Args:
+            dataset (DataFrame): The dataset to filter.
+
+        Returns:
+            DataFrame: Filtered dataset containing only items with interactions <= max_interactions.
+        """
+        item_counts = dataset["item_id"].value_counts()
+        valid_items = item_counts[item_counts <= self.max_interactions].index
         return dataset[dataset["item_id"].isin(valid_items)]
 
 
