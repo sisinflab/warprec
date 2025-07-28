@@ -541,6 +541,7 @@ The `Evaluation Configuration` can be configured using the following keywords:
 
 - **top_k**: The cutoff used to compute ranking metrics.
 - **metrics**: The metrics to be evaluated.
+- **batch_size**: The batch size used during evaluation. Defaults to 1024.
 - **max_metric_per_row**: The metric to be logged in each row. Defaults to 4.
 - **beta**: The beta value used by the F1-score metric. Defaults to 1.0.
 - **pop_ratio**: The ratio of transactions that will be considered popular. Defaults to 0.8.
@@ -571,7 +572,6 @@ The `General Configuration` section defines some parameters that will affect the
 The `General Configuration` can be configured using the following keywords:
 
 - **precision**: The precision to be used inside the experiment. Defaults to float32.
-- **batch_size**: The batch size to be used inside the experiment. Defaults to 1024.
 - **ray_verbose**: . The Ray Tune verbosity value. Ray Tune accepts verbosity levels in a range from 0 to 3. Defaults to 1.
 - **callback**: A nested section dedicated to the optional callback.
 
@@ -591,7 +591,6 @@ Below is a full example of a `recommendation configuration`:
 ```yaml
 general:
     precision: float64
-    batch_size: 2048
     ray_verbose: 0
     callback:
         callback_path: path/to/the/script.py
