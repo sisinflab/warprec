@@ -107,6 +107,7 @@ class Sessions:
     """
 
     _cached_sequential_data: dict = {}
+    _cached_grouped_sequential_data: dict = {}
     _cached_user_histories: Dict[int, List[int]] = {}
 
     def __init__(
@@ -138,6 +139,7 @@ class Sessions:
         cached sequential data if not used anymore.
         """
         self._cached_sequential_data = {}
+        self._cached_grouped_sequential_data = {}
         self._cached_user_histories = {}
 
     def get_sequential_dataloader(
@@ -484,6 +486,14 @@ class Sessions:
         Returns:
             DataLoader: Yields (pos_item_id, neg_item_id).
         """
+        # Check if grouped sequential data has already been computed
+        # and is stored in cache
+        cache_key = (max_seq_len, num_negatives)
+        if cache_key in self._cached_grouped_sequential_data:
+            cached_tensors = self._cached_grouped_sequential_data[cache_key]
+            dataset = GroupSessionDataset(**cached_tensors)
+            return DataLoader(dataset, batch_size=batch_size, shuffle=shuffle)
+
         pos_seqs, neg_samples = self._create_grouped_sequences(
             max_seq_len=max_seq_len,
             num_negatives=num_negatives,
@@ -495,7 +505,14 @@ class Sessions:
                 "Check your data or session definition (min length 2)."
             )
 
-        dataset = GroupSessionDataset(pos_seqs, neg_samples)
+        # Cache the results inside a dictionary
+        dataset_args = {
+            "positive_sequences": pos_seqs,
+            "negative_samples": neg_samples,
+        }
+        self._cached_grouped_sequential_data[cache_key] = dataset_args
+
+        dataset = GroupSessionDataset(**dataset_args)
         return DataLoader(dataset, batch_size=batch_size, shuffle=shuffle)
 
     def _create_grouped_sequences(
