@@ -227,7 +227,8 @@ writer:
 
 ## 🧹 Filtering Configuration
 
-The `Filtering Configuration` section defines how your dataset is filtered before the splitting process. Filtering is crucial in scenarios where you dataset contains redundant information or it's dimensions are too much to handle with the resources at hand. Filtering strategies will be executed in order, so be careful how information is provided in the configuration. Filtering strategies are expected to be in this format:
+The `Filtering Configuration` section specifies the preprocessing strategies applied to the dataset prior to the splitting phase. Filtering is essential in scenarios where the dataset contains redundant information or its size exceeds the available computational resources.
+Filtering strategies are executed sequentially, in the order they are defined, which may affect the final outcome. Each strategy must be specified using the following format:
 
 ```yaml
 filtering:
@@ -239,9 +240,9 @@ filtering:
 ...
 ```
 
-and the strategies will be executed from top to bottom. These are all the strategies available:
+The filtering strategies will be applied from top to bottom as listed. The following strategies are currently supported:
 
-`MinRating`: All the transactions with a rating value lower then the min_rating will be discarded. Cannot be used in implicit rating scenarios.
+`MinRating`: Removes all interactions with a rating value strictly lower than the specified `min_rating` threshold. This strategy is not compatible with implicit feedback datasets.
 
 ```yaml
 filtering:
@@ -250,7 +251,7 @@ filtering:
 ...
 ```
 
-`UserAverage`: All the transactions below the average of each user will be discarded. Cannot be used in implicit rating scenarios.
+`UserAverage`: Removes all interactions for which the rating is below the corresponding user’s average rating. Not applicable in implicit feedback scenarios.
 
 ```yaml
 filtering:
@@ -258,7 +259,7 @@ filtering:
 ...
 ```
 
-`UserMin`: All the transactions containing an user with less then the specified number of interactions, will be discarded.
+`UserMin`: Removes all interactions involving users with fewer interactions than the specified `min_interactions` threshold.
 
 ```yaml
 filtering:
@@ -267,7 +268,7 @@ filtering:
 ...
 ```
 
-`UserMax`: All the transactions containing an user with more then the specified number of interactions, will be discarded. Useful to analyze cold scenarios.
+`UserMax`: Removes all interactions involving users with more interactions than the specified `max_interactions` threshold. This strategy is useful for analyzing cold-start user scenarios.
 
 ```yaml
 filtering:
@@ -276,7 +277,7 @@ filtering:
 ...
 ```
 
-`ItemMin`: All the transactions containing an item with less then the specified number of interactions, will be discarded.
+`ItemMin`: Removes all interactions involving items with fewer interactions than the specified `min_interactions` threshold.
 
 ```yaml
 filtering:
@@ -285,7 +286,7 @@ filtering:
 ...
 ```
 
-`ItemMax`: All the transactions containing an item with more then the specified number of interactions, will be discarded. Useful to analyze cold scenarios.
+`ItemMax`: Removes all interactions involving items with more interactions than the specified `max_interactions` threshold. This strategy is useful for analyzing cold-start item scenarios.
 
 ```yaml
 filtering:
@@ -294,7 +295,7 @@ filtering:
 ...
 ```
 
-`IterativeKCore`: Iteratively apply UserMin and ItemMin until convergence is reached.
+`IterativeKCore`: Applies `UserMin` and `ItemMin` iteratively until no further interactions can be removed (i.e., until convergence is reached).
 
 ```yaml
 filtering:
@@ -303,7 +304,7 @@ filtering:
 ...
 ```
 
-`NRoundsKCore`: Apply UserMin and ItemMin a fixed number of times. This is a simpler version of `IterativeKCore`, can be used in cases where convergence is not needed.
+`NRoundsKCore`: Applies `UserMin` and `ItemMin` for a fixed number of iterations. This is a simplified variant of `IterativeKCore`, appropriate when convergence is not required.
 
 ```yaml
 filtering:
@@ -315,7 +316,7 @@ filtering:
 
 ### 📌 Example of Filtering Configuration
 
-Below is a full example of a `filtering configuration` that first removes all the ratings below 3.0, then keeps only the users with at least 10 interactions:
+The following example demonstrates a configuration where all ratings below 3.0 are first removed, followed by the removal of users with fewer than 10 interactions:
 
 ```yaml
 filtering:
@@ -328,8 +329,8 @@ filtering:
 
 ### ⚠️ Notes and Validation
 
-- The naming of the strategy and the parameters must be correct for them to properly work.
-- Changing the order of the filtering will most likely change the end results of the filtering process.
+- Strategy names and their respective parameter names must match exactly as defined; otherwise, the configuration will not be processed correctly.
+- The execution order of the filtering strategies affects the final dataset. Changing the sequence may lead to different results.
 
 ## 🔀 Splitter Configuration
 
