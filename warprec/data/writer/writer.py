@@ -1,7 +1,7 @@
 import shutil
 from os.path import join
 from pathlib import Path
-from typing import Dict, List
+from typing import Dict, List, Any
 from datetime import datetime
 from abc import ABC, abstractmethod
 
@@ -10,6 +10,8 @@ import torch
 import json
 from pandas import DataFrame
 from torch import Tensor
+from datetime import timedelta
+
 from warprec.utils.config import Configuration
 from warprec.data.dataset import Dataset
 from warprec.recommenders.base_recommender import Recommender
@@ -426,6 +428,46 @@ class LocalWriter(Writer):
                 header=writing_params.header,
                 index=None,
             )
+
+    def write_time_report(self, time_report: List[Dict[str, Any]]):
+        """This method writes the time report into a local path.
+
+        Args:
+            time_report (List[Dict[str, Any]]): The time report to write.
+        """
+
+        def format_secs(secs):
+            return str(timedelta(seconds=round(secs)))
+
+        if self.config:
+            writing_params = self.config.writer.results
+        else:
+            writing_params = ResultsWriting(sep="\t", ext=".tsv")
+
+        # experiment_path/evaluation/Time_Report_{timestamp}.{ext}
+        time_report_path = join(
+            self.experiment_evaluation_dir,
+            f"Time_Report_{self._timestamp}{writing_params.ext}",
+        )
+        try:
+            report = pd.DataFrame(time_report)
+            report["Data_Preparation_Time"] = report["Data_Preparation_Time"].apply(
+                format_secs
+            )
+            report["Hyperparameter_Exploration_Time"] = report[
+                "Hyperparameter_Exploration_Time"
+            ].apply(format_secs)
+            report["Evaluation_Time"] = report["Evaluation_Time"].apply(format_secs)
+            report["Total_Time"] = report["Total_Time"].apply(format_secs)
+
+            report.to_csv(
+                time_report_path,
+                sep=writing_params.sep,
+                index=False,
+            )
+            logger.msg(f"Time report written to {time_report_path}")
+        except Exception as e:
+            logger.negative(f"Error writing time report: {e}")
 
     def write_statistical_significance_test(
         self, test_results: DataFrame, test_name: str

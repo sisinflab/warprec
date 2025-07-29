@@ -248,14 +248,17 @@ def main(args: Namespace):
         # Timing report for the current model
         model_timing_report.append(
             {
-                "model_name": model_name,
-                "data_preparation_time": data_preparation_time,
-                "exploration_time": model_exploration_total_time,
-                "evaluation_time": model_evaluation_total_time,
-                "total_time": model_exploration_total_time
+                "Model_Name": model_name,
+                "Data_Preparation_Time": data_preparation_time,
+                "Hyperparameter_Exploration_Time": model_exploration_total_time,
+                "Evaluation_Time": model_evaluation_total_time,
+                "Total_Time": model_exploration_total_time
                 + model_evaluation_total_time,
             }
         )
+
+    if config.general.time_report:
+        writer.write_time_report(model_timing_report)
 
     if requires_stat_significance:
         logger.msg(
