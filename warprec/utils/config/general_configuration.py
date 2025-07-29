@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import Optional, Type, List, Dict, Any
 
 from pydantic import BaseModel, field_validator, model_validator, Field
+from warprec.utils.helpers import is_python_module
 from warprec.utils.callback import WarpRecCallback
 
 
@@ -126,11 +127,38 @@ class GeneralConfig(BaseModel):
     Attributes:
         precision (Optional[str]): The precision to use during computation.
         ray_verbose (Optional[int]): The Ray level of verbosity.
+        custom_models (Optional[str | List[str]]): List of custom model paths to load.
+            This is useful for loading custom models that are not part of the
+            standard Warprec framework.
         callback (Optional[WarpRecCallbackConfig]): The custom callback configuration.
     """
 
     precision: Optional[str] = "float32"
     ray_verbose: Optional[int] = 1
+    custom_models: Optional[str | List[str]] = None
     callback: Optional[WarpRecCallbackConfig] = Field(
         default_factory=WarpRecCallbackConfig
     )
+
+    @field_validator("custom_models")
+    @classmethod
+    def check_custom_models(cls, v: None | str | List[str]) -> List[str]:
+        """Validates the custom models list."""
+        if v is None:
+            return []
+
+        if isinstance(v, str):
+            if is_python_module(v):
+                return [v]
+            raise ValueError(f"Custom model path '{v}' is not a valid Python module.")
+
+        for path in v:
+            if not isinstance(path, str):
+                raise ValueError(
+                    f"Each custom model path must be a string, got: {path}."
+                )
+            if not is_python_module(path):
+                raise ValueError(
+                    f"Custom model path '{path}' is not a valid Python module."
+                )
+        return v
