@@ -1,6 +1,6 @@
 import os
 import tempfile
-from typing import Any
+from typing import Any, List
 
 import torch
 from ray import tune
@@ -10,6 +10,7 @@ from warprec.data.dataset import Dataset
 from warprec.evaluation.evaluator import Evaluator
 from warprec.recommenders.base_recommender import Recommender
 from warprec.utils.config import RecomModel
+from warprec.utils.helpers import load_custom_modules
 from warprec.utils.registry import model_registry, params_registry
 from warprec.utils.logger import logger
 
@@ -27,6 +28,7 @@ def objective_function(
     implementation: str = "latest",
     seed: int = 42,
     block_size: int = 50,
+    custom_models: List[str] = [],
 ) -> None:
     """Objective function to optimize the hyperparameters.
 
@@ -46,6 +48,8 @@ def objective_function(
         seed (int): The seed for reproducibility. Defaults to 42.
         block_size (int): The block size for the model optimization.
             Defaults to 50.
+        custom_models (List[str]): List of custom models to import.
+            Defaults to an empty list.
 
     Returns:
         None: This function reports metrics and checkpoints to Ray Tune
@@ -82,6 +86,9 @@ def objective_function(
                 },
                 checkpoint=Checkpoint.from_directory(tmpdir),
             )
+
+    # Load custom modules if provided
+    load_custom_modules(custom_models)
 
     # Trial parameter configuration check for consistency
     model_params: RecomModel = params_registry.get(model_name, **params)

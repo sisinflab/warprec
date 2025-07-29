@@ -12,6 +12,7 @@ from .enums import (
     SearchSpace,
     MetricBlock,
 )
+from .helpers import load_custom_modules
 from .registry import (
     splitting_registry,
     metric_registry,
@@ -38,6 +39,7 @@ __all__ = [
     "Schedulers",
     "SearchSpace",
     "MetricBlock",
+    "load_custom_modules",
     "splitting_registry",
     "metric_registry",
     "params_registry",
