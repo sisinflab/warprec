@@ -58,6 +58,7 @@ class Trainer:
         custom_callback (WarpRecCallback): The custom callback to use
             during training and evaluation. Default is an empty
             WarpRecCallback instance.
+        custom_models (str | List[str]): The list of custom models to load.
         enable_wandb (bool): Wether or not to enable Wandb.
         project_wandb (str): The name of the Wandb project.
         group_wandb (Optional[str]): The name of the Wandb group.
@@ -101,6 +102,7 @@ class Trainer:
         pop_ratio: float = 0.8,
         ray_verbose: int = 1,
         custom_callback: WarpRecCallback = WarpRecCallback(),
+        custom_models: str | List[str] = [],
         enable_wandb: bool = False,
         project_wandb: str = "WarpRec",
         group_wandb: Optional[str] = None,
@@ -161,6 +163,7 @@ class Trainer:
         self._model_params: RecomModel = params_registry.get(model_name, **model_params)
         self._dashboard = dashboard
         self._custom_callback = custom_callback
+        self._custom_models = custom_models
         self.model_name = model_name
         self._evaluator = Evaluator(
             [metric_name],
@@ -217,6 +220,7 @@ class Trainer:
             implementation=self._model_params.meta.implementation,
             seed=self._model_params.optimization.properties.seed,
             block_size=self._model_params.optimization.block_size,
+            custom_models=self._custom_models,
         )
 
         search_alg: BaseSearchWrapper = search_algorithm_registry.get(
