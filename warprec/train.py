@@ -1,5 +1,6 @@
 import argparse
 import os
+import time
 from argparse import Namespace
 
 from warprec.data.reader import LocalReader
@@ -21,6 +22,7 @@ def main(args: Namespace):
     This method will start the train pipeline.
     """
     logger.msg("Starting experiment.")
+    experiment_start_time = time.time()
 
     # Config parser testing
     config = load_yaml(args.config)
@@ -151,6 +153,9 @@ def main(args: Namespace):
         user_cluster=dataset.get_user_cluster(),
         item_cluster=dataset.get_item_cluster(),
     )
+
+    data_preparation_time = time.time() - experiment_start_time
+    logger.msg(f"Data preparation completed in {data_preparation_time:.2f} seconds.")
 
     for model_name in models:
         params = config.models[model_name]
