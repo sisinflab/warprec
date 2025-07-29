@@ -706,6 +706,7 @@ The `General Configuration` can be configured using the following keywords:
 
 - **precision**: The precision to be used inside the experiment. Defaults to float32.
 - **ray_verbose**: . The Ray Tune verbosity value. Ray Tune accepts verbosity levels in a range from 0 to 3. Defaults to 1.
+- **time_report**: Whether to report the time taken by each step. Defaults to True.
 - **callback**: A nested section dedicated to the optional callback.
 
 #### 📞 Callback

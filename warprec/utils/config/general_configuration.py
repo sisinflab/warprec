@@ -126,11 +126,13 @@ class GeneralConfig(BaseModel):
     Attributes:
         precision (Optional[str]): The precision to use during computation.
         ray_verbose (Optional[int]): The Ray level of verbosity.
+        time_report (Optional[bool]): Whether to report the time taken by each step.
         callback (Optional[WarpRecCallbackConfig]): The custom callback configuration.
     """
 
     precision: Optional[str] = "float32"
     ray_verbose: Optional[int] = 1
+    time_report: Optional[bool] = True
     callback: Optional[WarpRecCallbackConfig] = Field(
         default_factory=WarpRecCallbackConfig
     )
