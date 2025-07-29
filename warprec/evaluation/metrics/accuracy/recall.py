@@ -50,10 +50,15 @@ class Recall(TopKMetric):
     Attributes:
         retrieved (Tensor): The number of relevant items retrieved.
         users (Tensor): The number of users evaluated.
+        compute_per_user (bool): Wether or not to compute the metric
+            per user or globally.
 
     Args:
         k (int): The cutoff.
+        num_users (int): Number of users in the training set.
         *args (Any): The argument list.
+        compute_per_user (bool): Wether or not to compute the metric
+            per user or globally.
         dist_sync_on_step (bool): Torchmetrics parameter.
         **kwargs (Any): The keyword argument dictionary.
     """
@@ -63,18 +68,35 @@ class Recall(TopKMetric):
         MetricBlock.VALID_USERS,
         MetricBlock.TOP_K_BINARY_RELEVANCE,
     }
+    _CAN_COMPUTE_PER_USER: bool = True
 
     retrieved: Tensor
     users: Tensor
+    compute_per_user: bool
 
     def __init__(
-        self, k: int, *args: Any, dist_sync_on_step: bool = False, **kwargs: Any
+        self,
+        k: int,
+        num_users: int,
+        *args: Any,
+        compute_per_user: bool = False,
+        dist_sync_on_step: bool = False,
+        **kwargs: Any,
     ):
         super().__init__(k, dist_sync_on_step)
-        self.add_state("retrieved", default=torch.tensor(0.0), dist_reduce_fx="sum")
+        self.compute_per_user = compute_per_user
+
+        if self.compute_per_user:
+            self.add_state(
+                "retrieved", default=torch.zeros(num_users), dist_reduce_fx="sum"
+            )  # Initialize a tensor to store metric value for each user
+        else:
+            self.add_state(
+                "retrieved", default=torch.tensor(0.0), dist_reduce_fx="sum"
+            )  # Initialize a scalar to store global value
         self.add_state("users", default=torch.tensor(0.0), dist_reduce_fx="sum")
 
-    def update(self, preds: Tensor, **kwargs: Any):
+    def update(self, preds: Tensor, user_indices: Tensor, **kwargs: Any):
         """Updates the metric state with the new batch of predictions."""
         target: Tensor = kwargs.get("binary_relevance", torch.zeros_like(preds))
         users = kwargs.get("valid_users", self.valid_users(target))
@@ -85,19 +107,29 @@ class Recall(TopKMetric):
 
         hits = top_k_rel.sum(dim=1).float()
         relevant = target.sum(dim=1).float()
-        self.retrieved += (
-            torch.where(relevant > 0, hits / relevant, torch.tensor(0.0)).sum().float()
-        )
+
+        if self.compute_per_user:
+            self.retrieved.index_add_(
+                0,
+                user_indices,
+                torch.where(relevant > 0, hits / relevant, torch.tensor(0.0)),
+            )  # Index metric values per user
+        else:
+            self.retrieved += (
+                torch.where(relevant > 0, hits / relevant, torch.tensor(0.0))
+                .sum()
+                .float()
+            )  # Count global 'retrieved' items
 
         # Count only users with at least one interaction
         self.users += users
 
     def compute(self):
         """Computes the final metric value."""
-        recall = self.retrieved / self.users if self.users > 0 else torch.tensor(0.0)
-        return {self.name: recall.item()}
-
-    def reset(self):
-        """Resets the metric state."""
-        self.retrieved.zero_()
-        self.users.zero_()
+        if self.compute_per_user:
+            recall = self.retrieved  # Return the tensor with per_user metric
+        else:
+            recall = (
+                self.retrieved / self.users if self.users > 0 else torch.tensor(0.0)
+            ).item()  # Return the metric value
+        return {self.name: recall}

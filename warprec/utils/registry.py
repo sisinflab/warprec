@@ -13,6 +13,7 @@ if TYPE_CHECKING:
     )
     from warprec.recommenders.similarities import Similarity
     from warprec.data.filtering import Filter
+    from warprec.evaluation.statistical_significance import StatisticalTest
 
 T = TypeVar("T")
 
@@ -99,6 +100,9 @@ search_space_registry: BasicRegistry["SearchSpaceWrapper"] = BasicRegistry(
 )
 similarities_registry: BasicRegistry["Similarity"] = BasicRegistry("Similarity")
 filter_registry: BasicRegistry["Filter"] = BasicRegistry("Filter")
+stat_significance_registry: BasicRegistry["StatisticalTest"] = BasicRegistry(
+    "StatisticalSignificance"
+)
 
 
 class ModelRegistry:

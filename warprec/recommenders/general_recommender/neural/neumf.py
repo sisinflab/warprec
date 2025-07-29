@@ -38,6 +38,7 @@ class NeuMF(Recommender):
         mlp_train (bool): Wether or not to train MLP embedding.
         dropout (float): The dropout probability.
         weight_decay (float): The value of weight decay used in the optimizer.
+        batch_size (int): The batch size used for training.
         epochs (int): The number of epochs.
         learning_rate (float): The learning rate value.
         neg_samples (int): The number of negative samples per positive interaction.
@@ -51,6 +52,7 @@ class NeuMF(Recommender):
     mlp_train: bool
     dropout: float
     weight_decay: float
+    batch_size: int
     epochs: int
     learning_rate: float
     neg_samples: int
@@ -152,7 +154,8 @@ class NeuMF(Recommender):
         """
         # Get the dataloader from interactions
         dataloader = interactions.get_item_rating_dataloader(
-            num_negatives=self.neg_samples
+            num_negatives=self.neg_samples,
+            batch_size=self.batch_size,
         )
 
         # Training loop

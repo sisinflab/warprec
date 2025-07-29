@@ -3,7 +3,6 @@ from typing import Any, Set
 
 import torch
 from torch import Tensor
-from scipy.sparse import csr_matrix
 from warprec.evaluation.metrics.base_metric import TopKMetric
 from warprec.utils.enums import MetricBlock
 from warprec.utils.registry import metric_registry
@@ -66,7 +65,6 @@ class REO(TopKMetric):
 
     Args:
         k (int): Cutoff for top-k recommendations.
-        train_set (csr_matrix): Sparse matrix of training interactions (users x items). (Used for initialization, not directly in update/compute logic in this implementation).
         *args (Any): The argument list.
         item_cluster (Tensor): Lookup tensor of item clusters.
         dist_sync_on_step (bool): Whether to synchronize metric state across distributed processes.
@@ -87,7 +85,6 @@ class REO(TopKMetric):
     def __init__(
         self,
         k: int,
-        train_set: csr_matrix,
         *args: Any,
         item_cluster: Tensor = None,
         dist_sync_on_step: bool = False,
@@ -103,12 +100,12 @@ class REO(TopKMetric):
         # Per-cluster accumulators
         self.add_state(
             "cluster_recommendations",
-            torch.zeros(self.n_item_clusters, dtype=torch.float),
+            torch.zeros(self.n_item_clusters),
             dist_reduce_fx="sum",
         )
         self.add_state(
             "cluster_total_items",
-            torch.zeros(self.n_item_clusters, dtype=torch.float),
+            torch.zeros(self.n_item_clusters),
             dist_reduce_fx="sum",
         )
 
@@ -195,8 +192,3 @@ class REO(TopKMetric):
 
         results[self.name] = (std_prob / mean_prob).item()
         return results
-
-    def reset(self):
-        """Resets the metric state."""
-        self.cluster_recommendations.zero_()
-        self.cluster_total_items.zero_()

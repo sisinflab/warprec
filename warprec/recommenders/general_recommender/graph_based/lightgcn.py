@@ -38,6 +38,7 @@ class LightGCN(Recommender, GraphRecommenderUtils):
         embedding_size (int): The embedding size of user and item.
         n_layers (int): The number of graph convolution layers.
         weight_decay (float): The value of weight decay used in the optimizer.
+        batch_size (int): The batch size used for training.
         epochs (int): The number of epochs.
         learning_rate (float): The learning rate value.
     """
@@ -46,6 +47,7 @@ class LightGCN(Recommender, GraphRecommenderUtils):
     embedding_size: int
     n_layers: int
     weight_decay: float
+    batch_size: int
     epochs: int
     learning_rate: float
 
@@ -134,7 +136,7 @@ class LightGCN(Recommender, GraphRecommenderUtils):
             )
 
         # Get the dataloader from interactions for pairwise training
-        dataloader = interactions.get_pos_neg_dataloader()
+        dataloader = interactions.get_pos_neg_dataloader(self.batch_size)
 
         self.train()
         for _ in range(self.epochs):

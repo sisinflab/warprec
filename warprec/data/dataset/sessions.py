@@ -107,6 +107,7 @@ class Sessions:
     """
 
     _cached_sequential_data: dict = {}
+    _cached_grouped_sequential_data: dict = {}
     _cached_user_histories: Dict[int, List[int]] = {}
 
     def __init__(
@@ -138,6 +139,7 @@ class Sessions:
         cached sequential data if not used anymore.
         """
         self._cached_sequential_data = {}
+        self._cached_grouped_sequential_data = {}
         self._cached_user_histories = {}
 
     def get_sequential_dataloader(
@@ -145,6 +147,7 @@ class Sessions:
         max_seq_len: int,
         num_negatives: int = 0,
         user_id: bool = False,
+        batch_size: int = 1024,
         shuffle: bool = True,
     ) -> DataLoader:
         """Create a dataloader for sequential data.
@@ -153,6 +156,8 @@ class Sessions:
             max_seq_len (int): Maximum length of sequences produced.
             num_negatives (int): Number of negative samples per user.
             user_id (bool): Wether or not to return also the user_id.
+            batch_size (int): The batch size that will be used to
+                iterate over the sessions.
             shuffle (bool): Whether to shuffle the data.
 
         Returns:
@@ -161,11 +166,11 @@ class Sessions:
         """
         # Check if sequential data has already been computed
         # and is stored in cache
-        cache_key = (num_negatives, user_id)
+        cache_key = (max_seq_len, num_negatives, user_id)
         if cache_key in self._cached_sequential_data:
             cached_tensors = self._cached_sequential_data[cache_key]
             dataset = SessionDataset(**cached_tensors)
-            return DataLoader(dataset, batch_size=self.batch_size, shuffle=shuffle)
+            return DataLoader(dataset, batch_size=batch_size, shuffle=shuffle)
 
         # Call the optimized processing function
         (
@@ -202,7 +207,7 @@ class Sessions:
 
         # Create instance of the dataset
         dataset = SessionDataset(**dataset_args)
-        return DataLoader(dataset, batch_size=self.batch_size, shuffle=shuffle)
+        return DataLoader(dataset, batch_size=batch_size, shuffle=shuffle)
 
     def _create_sequences_and_targets(
         self,
@@ -466,6 +471,7 @@ class Sessions:
         self,
         max_seq_len: int,
         num_negatives: int,
+        batch_size: int = 1024,
         shuffle: bool = True,
     ) -> DataLoader:
         """Creates a sequential DataLoader grouped by user.
@@ -473,11 +479,21 @@ class Sessions:
         Args:
             max_seq_len (int): Maximum length of sequences produced.
             num_negatives (int): Number of negative samples per user.
+            batch_size (int): The batch size that will be used to
+                iterate over the sessions.
             shuffle (bool): Whether to shuffle the data.
 
         Returns:
             DataLoader: Yields (pos_item_id, neg_item_id).
         """
+        # Check if grouped sequential data has already been computed
+        # and is stored in cache
+        cache_key = (max_seq_len, num_negatives)
+        if cache_key in self._cached_grouped_sequential_data:
+            cached_tensors = self._cached_grouped_sequential_data[cache_key]
+            dataset = GroupSessionDataset(**cached_tensors)
+            return DataLoader(dataset, batch_size=batch_size, shuffle=shuffle)
+
         pos_seqs, neg_samples = self._create_grouped_sequences(
             max_seq_len=max_seq_len,
             num_negatives=num_negatives,
@@ -489,8 +505,15 @@ class Sessions:
                 "Check your data or session definition (min length 2)."
             )
 
-        dataset = GroupSessionDataset(pos_seqs, neg_samples)
-        return DataLoader(dataset, batch_size=self.batch_size, shuffle=shuffle)
+        # Cache the results inside a dictionary
+        dataset_args = {
+            "positive_sequences": pos_seqs,
+            "negative_samples": neg_samples,
+        }
+        self._cached_grouped_sequential_data[cache_key] = dataset_args
+
+        dataset = GroupSessionDataset(**dataset_args)
+        return DataLoader(dataset, batch_size=batch_size, shuffle=shuffle)
 
     def _create_grouped_sequences(
         self, max_seq_len: int, num_negatives: int

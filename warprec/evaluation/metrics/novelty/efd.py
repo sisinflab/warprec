@@ -3,7 +3,6 @@ from typing import Any
 
 import torch
 from torch import Tensor
-from scipy.sparse import csr_matrix
 from warprec.evaluation.metrics.base_metric import TopKMetric
 from warprec.utils.enums import MetricBlock
 from warprec.utils.registry import metric_registry
@@ -68,34 +67,53 @@ class EFD(TopKMetric):
     Attributes:
         efd (Tensor): The EFD value for every user.
         users (Tensor): Number of users evaluated.
+        compute_per_user (bool): Wether or not to compute the metric
+            per user or globally.
 
     Args:
         k (int): The cutoff for recommendations.
-        train_set (csr_matrix): The training interaction data.
+        num_users (int): Number of users in the training set.
+        item_interactions (Tensor): The counts for item interactions in training set.
         *args (Any): Additional arguments.
+        compute_per_user (bool): Wether or not to compute the metric
+            per user or globally.
         dist_sync_on_step (bool): Torchmetrics parameter.
         relevance (str): The type of relevance to use for computation.
         **kwargs (Any): Additional keyword arguments.
     """
 
+    _CAN_COMPUTE_PER_USER: bool = True
+
     efd: Tensor
     users: Tensor
+    compute_per_user: bool
 
     def __init__(
         self,
         k: int,
-        train_set: csr_matrix,
+        num_users: int,
+        item_interactions: Tensor,
         *args: Any,
+        compute_per_user: bool = False,
         dist_sync_on_step: bool = False,
         relevance: str = "binary",
         **kwargs: Any,
     ):
         super().__init__(k, dist_sync_on_step)
         self.novelty_profile = self.compute_novelty_profile(
-            train_set, log_discount=True
-        ).unsqueeze(0)
+            item_interactions, num_users, log_discount=True
+        )
         self.relevance = relevance
-        self.add_state("efd", default=torch.tensor(0.0), dist_reduce_fx="sum")
+        self.compute_per_user = compute_per_user
+
+        if self.compute_per_user:
+            self.add_state(
+                "efd", default=torch.zeros(num_users), dist_reduce_fx="sum"
+            )  # Initialize a tensor to store metric value for each user
+        else:
+            self.add_state(
+                "efd", default=torch.tensor(0.0), dist_reduce_fx="sum"
+            )  # Initialize a scalar to store global value
         self.add_state("users", default=torch.tensor(0.0), dist_reduce_fx="sum")
 
         # Check for requirements
@@ -107,7 +125,7 @@ class EFD(TopKMetric):
         self._REQUIRED_COMPONENTS.add(MetricBlock.VALID_USERS)
         self._REQUIRED_COMPONENTS.add(MetricBlock.TOP_K_INDICES)
 
-    def update(self, preds: Tensor, **kwargs):
+    def update(self, preds: Tensor, user_indices: Tensor, **kwargs):
         """Updates the metric state with a new batch of predictions."""
         top_k_indices: Tensor = kwargs.get(
             f"top_{self.k}_indices", self.top_k_values_indices(preds, self.k)[1]
@@ -134,20 +152,25 @@ class EFD(TopKMetric):
         )  # [batch_size x items]
         novelty = torch.gather(batch_novelty, 1, top_k_indices)  # [batch_size x top_k]
 
-        # Update
-        self.efd += self.dcg(top_k_rel * novelty).sum()
+        if self.compute_per_user:
+            self.efd.index_add_(0, user_indices, self.dcg(top_k_rel * novelty))
+        else:
+            self.efd += self.dcg(top_k_rel * novelty).sum()
 
         # Count only users with at least one interaction
         self.users += users
 
     def compute(self):
         """Computes the final value of the metric."""
-        score = (
-            self.efd / (self.users * self.discounted_sum(self.k))
-            if self.users > 0
-            else torch.tensor(0.0)
-        )
-        return {self.name: score.item()}
+        if self.compute_per_user:
+            efd = self.efd / self.discounted_sum(self.k)
+        else:
+            efd = (
+                self.efd / (self.users * self.discounted_sum(self.k))
+                if self.users > 0
+                else torch.tensor(0.0)
+            ).item()
+        return {self.name: efd}
 
     @property
     def name(self):

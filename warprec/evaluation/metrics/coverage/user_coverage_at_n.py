@@ -39,7 +39,7 @@ class UserCoverageAtN(TopKMetric):
     def __init__(
         self, k: int, *args: Any, dist_sync_on_step: bool = False, **kwargs: Any
     ):
-        super().__init__(k, *args, dist_sync_on_step=dist_sync_on_step, **kwargs)
+        super().__init__(k, dist_sync_on_step)
 
         self.add_state("users", default=torch.tensor(0.0), dist_reduce_fx="sum")
 
@@ -49,8 +49,5 @@ class UserCoverageAtN(TopKMetric):
 
     def compute(self):
         """Computes the final metric value."""
-        return {self.name: self.users.item()}
-
-    def reset(self):
-        """Resets the metric state."""
-        self.users.zero_()
+        user_coverage_at_n = int(self.users.item())
+        return {self.name: user_coverage_at_n}

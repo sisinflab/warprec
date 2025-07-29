@@ -12,7 +12,8 @@ models:
         n_v: 4
         dropout_prob: 0.5
         weight_decay: 0.0
-        epochs: 3
+        batch_size: 512
+        epochs: 30
         learning_rate: 0.001
         neg_samples: 1
         max_seq_len: 20
@@ -29,6 +30,7 @@ models:
         reg_weight: 0.001
         alpha: 0.001
         weight_decay: 0.0
+        batch_size: 512
         epochs: 100
         learning_rate: 0.001
         neg_samples: 1
@@ -46,6 +48,7 @@ models:
         num_layers: 1
         dropout_prob: 0.2
         weight_decay: 0.0001
+        batch_size: 512
         epochs: 100
         learning_rate: 0.001
         neg_samples: 2
@@ -67,6 +70,7 @@ models:
         learning_rate: 0.001
         gbce_t: 0.5
         weight_decay: 0.0
+        batch_size: 512
         epochs: 100
         neg_samples: 1
         max_seq_len: 200
@@ -87,6 +91,7 @@ models:
         attn_dropout_prob: 0.3
         learning_rate: 0.001
         weight_decay: 0.0
+        batch_size: 512
         epochs: 100
         neg_samples: 1
         max_seq_len: 200

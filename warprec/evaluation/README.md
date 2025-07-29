@@ -7,6 +7,7 @@ The `Evaluation` module within the WarpRec framework provides a comprehensive se
 - 🧮 [Evaluator](#🧮-evaluator)
     - 🧺 [Batch Evaluation](#🧺-batch-evaluation)
     - 🧱 [Metric Blocks](#🧱-metric-blocks)
+- ⚖️ [Statistical significance](#⚖️-statistical-significance)
 
 ## 📈 Metrics
 
@@ -52,3 +53,7 @@ Some examples of **Metric Blocks** are:
 - **Binary/Discounted Relevance**: Determining item relevance, either as a binary (0/1) or discounted (e.g., using a logarithmic scale) value.
 - **Valid Users**: Identifying users who possess at least one relevant item, which is crucial for accurate per-user metric calculations.
 - Other foundational computations required by various metrics.
+
+## ⚖️ Statistical significance
+
+The evaluation module provides utilities for conducting statistical significance testing on computed evaluation metrics. These tests are performed on pairs of models, thus requiring the inclusion of at least two models within the experiment. For each model pair, significance tests are executed across all combinations of evaluation set, cutoff, and metric. Detailed configuration options and further information on supported statistical tests can be found in the [configuration documentation](../utils/config/README.md).
