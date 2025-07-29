@@ -155,9 +155,14 @@ def main(args: Namespace):
     )
 
     data_preparation_time = time.time() - experiment_start_time
-    logger.msg(f"Data preparation completed in {data_preparation_time:.2f} seconds.")
+    logger.positive(
+        f"Data preparation completed in {data_preparation_time:.2f} seconds."
+    )
+    model_timing_report = []
 
     for model_name in models:
+        model_exploration_start_time = time.time()
+
         params = config.models[model_name]
         val_metric, val_k = config.validation_metric(
             params["optimization"]["validation_metric"]
@@ -175,11 +180,13 @@ def main(args: Namespace):
             config=config,
         )
         best_model, checkpoint_param = trainer.train_and_evaluate()
+        model_exploration_total_time = time.time() - model_exploration_start_time
 
         # Callback on training complete
         callback.on_training_complete(model=best_model)
 
         # Evaluation testing
+        model_evaluation_start_time = time.time()
         eval_validation = dataset.val_set is not None
         eval_test = dataset.test_set is not None
         evaluator.evaluate(
@@ -190,6 +197,7 @@ def main(args: Namespace):
             verbose=True,
         )
         results = evaluator.compute_results()
+        model_evaluation_total_time = time.time() - model_evaluation_start_time
         evaluator.print_console(results, config.evaluation.max_metric_per_row)
 
         if requires_stat_significance:
@@ -236,6 +244,18 @@ def main(args: Namespace):
                         source_path = os.path.join(check_path, "checkpoint.pt")
                         checkpoint_name = generate_model_name(model_name, param)
                         writer.checkpoint_from_ray(source_path, checkpoint_name)
+
+        # Timing report for the current model
+        model_timing_report.append(
+            {
+                "model_name": model_name,
+                "data_preparation_time": data_preparation_time,
+                "exploration_time": model_exploration_total_time,
+                "evaluation_time": model_evaluation_total_time,
+                "total_time": model_exploration_total_time
+                + model_evaluation_total_time,
+            }
+        )
 
     if requires_stat_significance:
         logger.msg(
