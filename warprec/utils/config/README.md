@@ -707,7 +707,92 @@ The `General Configuration` can be configured using the following keywords:
 - **precision**: The precision to be used inside the experiment. Defaults to float32.
 - **ray_verbose**: . The Ray Tune verbosity value. Ray Tune accepts verbosity levels in a range from 0 to 3. Defaults to 1.
 - **time_report**: Whether to report the time taken by each step. Defaults to True.
+- **ray_verbose**: The Ray Tune verbosity value. Ray Tune accepts verbosity levels in a range from 0 to 3. Defaults to 1.
+- **custom_models**: Modules to import into WarpRec for loading custom models within the main pipeline. Accepted values are a string or a list of strings.
 - **callback**: A nested section dedicated to the optional callback.
+
+### 🛠️ Custom models
+
+WarpRec supports the integration of user-defined models, allowing practitioners to benchmark personalized algorithms against established baselines or to leverage the framework’s training and evaluation capabilities for custom implementations.
+
+To load a custom model into WarpRec, two components are required:
+
+- A model implementation that inherits from the `Recommender` interface.
+- A corresponding parameter validation class.
+
+To implement a custom model, refer to the guide provided [here](../../recommenders/README.md). Once implemented, make sure to register the model using the `model_registry`. A minimal example is shown below:
+
+```python
+@model_registry.register("CustomModel")
+class CustomModel(Recommender):
+    param_1: float
+    param_2: bool
+    param_3: int
+    parma_4: str
+
+    def __init__(
+        self,
+        params: dict,
+        *args: Any,
+        device: str = "cpu",
+        seed: int = 42,
+        info: dict = None,
+        **kwargs: Any,
+    ):
+        super().__init__(params, device=device, seed=seed, *args, **kwargs)
+        self._name = "CustomModel"
+        # Initialization logic here
+
+    def fit(self):
+        # Training logic here
+
+    def forward(self):
+        # Forward pass logic here
+
+    def predict(self):
+        # Prediction logic here
+```
+
+Once the model is defined, WarpRec expects a corresponding parameter validation class to be registered using the `params_registry`. This class defines the expected hyperparameters and their validation logic, ensuring standardized input processing.
+
+Below is a sample parameter validation class matching the model above:
+
+```python
+@params_registry.register("CustomModel")
+class CustomModel(RecomModel):
+    param_1: FLOAT_FIELD
+    param_2: BOOL_FILED
+    param_3: INT_FIELD
+    param_4: STR_FIELD
+
+    @field_validator("param_1")
+    @classmethod
+    def check_param_1(cls, v: list):
+        """Validate param_1."""
+        return validate_greater_than_zero(cls, v, "param_1")
+
+    @field_validator("param_2")
+    @classmethod
+    def check_param_2(cls, v: list):
+        """Validate param_2."""
+        return validate_bool_values(cls, v, "param_2")
+
+    @field_validator("param_3")
+    @classmethod
+    def check_param_3(cls, v: list):
+        """Validate param_3."""
+        return validate_greater_equal_than_zero(cls, v, "param_3")
+
+    @field_validator("param_4")
+    @classmethod
+    def check_param_4(cls, v: list):
+        """Validate param_4."""
+        return validate_similarity(cls, v, "param_4")
+```
+
+Parameter validation consists of associating each declared field with a validation function. A collection of predefined validation utilities is available [here](common.py).
+
+**Important**: both the model class and its corresponding parameter class must share the same registration name to ensure consistency across the pipeline.
 
 #### 📞 Callback
 

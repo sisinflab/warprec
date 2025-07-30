@@ -8,6 +8,7 @@ import yaml
 import numpy as np
 import torch
 from pydantic import BaseModel, field_validator, model_validator, Field
+from warprec.utils.helpers import load_custom_modules
 from warprec.data.filtering import Filter
 from warprec.utils.config import (
     GeneralConfig,
@@ -21,7 +22,7 @@ from warprec.utils.config import (
 )
 from warprec.utils.callback import WarpRecCallback
 from warprec.utils.enums import RatingType, SplittingStrategies, ReadingMethods
-from warprec.utils.registry import params_registry, filter_registry
+from warprec.utils.registry import model_registry, params_registry, filter_registry
 from warprec.utils.logger import logger
 
 
@@ -208,6 +209,9 @@ class Configuration(BaseModel):
                     "setup first. Set setup_experiment to True."
                 )
 
+        # Load custom modules if specified
+        load_custom_modules(self.general.custom_models)
+
         # Check if the filters have been set correctly
         if self.filtering is not None:
             labels = self.reader.labels.model_dump()
@@ -241,40 +245,58 @@ class Configuration(BaseModel):
         parsed_models = {}
 
         for model_name, model_data in self.models.items():
-            model_class: RecomModel = params_registry.get(model_name, **model_data)
-
-            if model_class.need_side_information and self.reader.side is None:
-                raise ValueError(
-                    f"The model {model_name} requires side information to be provided, "
-                    "but none have been provided. Check the configuration file."
+            if model_name.upper() not in model_registry.list_registered():
+                logger.negative(
+                    f"The model {model_name} is not registered in the model registry. "
+                    "The model will not be loaded and will not be available for training. "
+                    "Check the configuration file."
                 )
-
-            # Check if there is at least one valid combination
-            model_class.validate_all_combinations()
-
-            # Check if the model requires timestamp
-            if model_class.need_timestamp:
-                logger.attention(
-                    f"The model {model_name} requires timestamps to work properly, "
-                    "be sure that your dataset contains them."
+                continue
+            elif (
+                model_name.upper() in model_registry.list_registered()
+                and model_name.upper() not in params_registry.list_registered()
+            ):
+                logger.negative(
+                    f"The model {model_name} is registered in the model registry, but not in parameter registry. "
+                    "The model will not be loaded and will not be available for training. "
+                    "Check the configuration file."
                 )
+                continue
+            else:
+                model_class: RecomModel = params_registry.get(model_name, **model_data)
 
-            # If at least one model is a sequential model, then
-            # we set the flag for session-based information
-            if model_class.need_timestamp:
-                Configuration.need_session_based_information = True
+                if model_class.need_side_information and self.reader.side is None:
+                    raise ValueError(
+                        f"The model {model_name} requires side information to be provided, "
+                        "but none have been provided. Check the configuration file."
+                    )
 
-            # Extract model train parameters, removing the meta infos
-            model_data = {
-                k: (
-                    [v]
-                    if not isinstance(v, list) and v is not None and k != "meta"
-                    else v
-                )
-                for k, v in model_data.items()
-            }
+                # Check if there is at least one valid combination
+                model_class.validate_all_combinations()
 
-            parsed_models[model_name] = model_class.model_dump()
+                # Check if the model requires timestamp
+                if model_class.need_timestamp:
+                    logger.attention(
+                        f"The model {model_name} requires timestamps to work properly, "
+                        "be sure that your dataset contains them."
+                    )
+
+                # If at least one model is a sequential model, then
+                # we set the flag for session-based information
+                if model_class.need_timestamp:
+                    Configuration.need_session_based_information = True
+
+                # Extract model train parameters, removing the meta infos
+                model_data = {
+                    k: (
+                        [v]
+                        if not isinstance(v, list) and v is not None and k != "meta"
+                        else v
+                    )
+                    for k, v in model_data.items()
+                }
+
+                parsed_models[model_name] = model_class.model_dump()
         return parsed_models
 
     def check_precision(self) -> None:

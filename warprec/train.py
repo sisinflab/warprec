@@ -3,6 +3,8 @@ import os
 import time
 from argparse import Namespace
 
+import ray
+
 from warprec.data.reader import LocalReader
 from warprec.data.writer import LocalWriter
 from warprec.data.splitting import Splitter
@@ -159,6 +161,8 @@ def main(args: Namespace):
         f"Data preparation completed in {data_preparation_time:.2f} seconds."
     )
     model_timing_report = []
+    # Before starting training process, initialize Ray
+    ray.init(runtime_env={"py_modules": config.general.custom_models})
 
     for model_name in models:
         model_exploration_start_time = time.time()
@@ -177,6 +181,7 @@ def main(args: Namespace):
             pop_ratio=config.evaluation.pop_ratio,
             ray_verbose=config.general.ray_verbose,
             custom_callback=callback,
+            custom_models=config.general.custom_models,
             config=config,
         )
         best_model, checkpoint_param, avg_train_time = trainer.train_and_evaluate()
