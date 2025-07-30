@@ -45,6 +45,7 @@ models:
         latent_dim: 200
         dropout: 1.0
         weight_decay: 0.02
+        batch_size: 512
         epochs: 10
         learning_rate: 0.001
 ...
@@ -57,6 +58,7 @@ models:
         latent_dim: 200
         dropout: 1.0
         weight_decay: 0.02
+        batch_size: 512
         epochs: 10
         learning_rate: 0.001
         anneal_cap: 0.2
@@ -89,6 +91,7 @@ models:
         embedding_size: 64
         n_layers: 2
         weight_decay: 0.0001
+        batch_size: 512
         epochs: 50
         learning_rate: 0.001
 ...
@@ -99,8 +102,9 @@ models:
 models:
     NGCF:
         embedding_size: 64
-        weight_decay: 0.0001
-        epochs: 5
+        weight_decay: 0.
+        batch_size: 512
+        epochs: 50
         learning_rate: 0.001
         weight_size: [64, 64]
         node_dropout: 0.01
@@ -186,6 +190,7 @@ models:
     BPR:
         embedding_size: 16
         weight_decay: 0.001
+        batch_size: 512
         epochs: 20
         learning_rate: 0.001
 ...
@@ -199,7 +204,8 @@ models:
         alpha: 0.1
         split_to: 5
         weight_decay: 0.0001
-        epochs: 5
+        batch_size: 512
+        epochs: 50
         learning_rate: 0.001
 ...
 ```
@@ -227,6 +233,7 @@ models:
         cnn_strides: [[1, 1]]
         dropout_prob: 0.01
         weight_decay: 0.0001
+        batch_size: 512
         epochs: 20
         learning_rate: 0.001
 ...
@@ -243,6 +250,7 @@ models:
         mlp_train: True
         dropout: 0.01
         weight_decay: 0.0001
+        batch_size: 512
         epochs: 20
         learning_rate: 0.001
         neg_samples: 1

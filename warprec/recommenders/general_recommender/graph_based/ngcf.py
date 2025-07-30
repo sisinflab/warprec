@@ -38,6 +38,7 @@ class NGCF(Recommender, GraphRecommenderUtils):
     Attributes:
         embedding_size (int): The embedding size of user and item.
         weight_decay (float): The value of weight decay used in the optimizer.
+        batch_size (int): The batch size used for training.
         epochs (int): The number of epochs.
         learning_rate (float): The learning rate value.
         weight_size (list[int]): List of hidden sizes for each layer.
@@ -48,6 +49,7 @@ class NGCF(Recommender, GraphRecommenderUtils):
     # Model hyperparameters
     embedding_size: int
     weight_decay: float
+    batch_size: int
     epochs: int
     learning_rate: float
     weight_size: list[int]
@@ -146,7 +148,7 @@ class NGCF(Recommender, GraphRecommenderUtils):
             )
 
         # Get the dataloader from interactions for pairwise training
-        dataloader = interactions.get_pos_neg_dataloader()
+        dataloader = interactions.get_pos_neg_dataloader(self.batch_size)
 
         self.train()
         for _ in range(self.epochs):
@@ -218,13 +220,13 @@ class NGCF(Recommender, GraphRecommenderUtils):
     ) -> Tensor:
         """Prediction using the learned embeddings."""
         if self.adj_matrix is None:
-            train_set: csr_matrix = kwargs.get("train_set", None)
+            train_set: Interactions = kwargs.get("train_set", None)
             if train_set is None:
                 raise RuntimeError(
                     "The model has not been fit yet. Call fit() before predict()."
                 )
             self.adj_matrix = self._get_norm_adj_mat_ngcf(
-                train_set.tocoo(), self.n_users, self.n_items, self._device
+                train_set.get_sparse().tocoo(), self.n_users, self.n_items, self._device
             )
 
         # Perform forward pass to get the final embeddings

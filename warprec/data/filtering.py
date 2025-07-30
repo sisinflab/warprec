@@ -1,0 +1,306 @@
+# pylint: disable = too-few-public-methods
+from typing import List, Any
+from abc import ABC
+
+import time
+from pandas import DataFrame
+
+from warprec.utils.logger import logger
+from warprec.utils.registry import filter_registry
+
+
+class Filter(ABC):
+    """Abstract definition of a filter.
+    Filters are used to process datasets by applying specific conditions
+    or transformations to the data.
+
+    Args:
+        user_id_label (str): Column name for user IDs.
+        item_id_label (str): Column name for item IDs.
+        rating_label (str): Column name for ratings.
+        timestamp_label (str): Column name for timestamps.
+        **kwargs (Any): Additional keyword arguments.
+    """
+
+    def __init__(
+        self,
+        user_id_label: str = "user_id",
+        item_id_label: str = "item_id",
+        rating_label: str = "rating",
+        timestamp_label: str = "timestamp",
+        **kwargs: Any,
+    ):
+        self.user_label = user_id_label
+        self.item_label = item_id_label
+        self.rating_label = rating_label
+        self.timestamp_label = timestamp_label
+
+    def __call__(self, dataset: DataFrame) -> DataFrame:
+        """Apply the filter to the dataset."""
+        raise NotImplementedError("Subclasses should implement this method.")
+
+
+@filter_registry.register("MinRating")
+class MinRating(Filter):
+    """Filter to select rows based on a minimum rating.
+
+    Args:
+        min_rating (float): The minimum rating threshold.
+        **kwargs (Any): Additional keyword arguments.
+    """
+
+    def __init__(self, min_rating: float, **kwargs: Any):
+        super().__init__(**kwargs)
+        self.min_rating = min_rating
+
+    def __call__(self, dataset: DataFrame) -> DataFrame:
+        """Select rows where the 'rating' column is greater than or equal to min_rating.
+
+        Args:
+            dataset (DataFrame): The dataset to filter.
+
+        Returns:
+            DataFrame: Filtered dataset containing only rows with 'rating' >= min_rating.
+        """
+        return dataset[dataset[self.rating_label] >= self.min_rating]
+
+
+@filter_registry.register("UserAverage")
+class UserAverage(Filter):
+    """Filter to select users based on their average rating.
+
+    Args:
+        **kwargs (Any): Additional keyword arguments.
+    """
+
+    def __init__(self, **kwargs: Any):
+        super().__init__(**kwargs)
+
+    def __call__(self, dataset: DataFrame) -> DataFrame:
+        """Select rows where the 'rating' column is greater than the user average.
+
+        Args:
+            dataset (DataFrame): The dataset to filter.
+
+        Returns:
+            DataFrame: Filtered dataset containing only rows with 'rating' > user average.
+        """
+        user_avg = dataset.groupby(self.user_label)[self.rating_label].transform("mean")
+        return dataset[dataset[self.rating_label] > user_avg]
+
+
+@filter_registry.register("UserMin")
+class UserMin(Filter):
+    """Filter to select users based on a minimum number of interactions.
+
+    Args:
+        min_interactions (int): Minimum number of interactions per user.
+        **kwargs (Any): Additional keyword arguments.
+    """
+
+    def __init__(self, min_interactions: int, **kwargs: Any):
+        super().__init__(**kwargs)
+        self.min_interactions = min_interactions
+
+    def __call__(self, dataset: DataFrame) -> DataFrame:
+        """Select users with at least min_interactions.
+
+        Args:
+            dataset (DataFrame): The dataset to filter.
+
+        Returns:
+            DataFrame: Filtered dataset containing only users with interactions >= min_interactions.
+        """
+        user_counts = dataset[self.user_label].value_counts()
+        valid_users = user_counts[user_counts >= self.min_interactions].index
+        return dataset[dataset[self.user_label].isin(valid_users)]
+
+
+@filter_registry.register("UserMax")
+class UserMax(Filter):
+    """Filter to select users based on a maximum number of interactions.
+
+    Args:
+        max_interactions (int): Maximum number of interactions per user.
+        **kwargs (Any): Additional keyword arguments.
+    """
+
+    def __init__(self, max_interactions: int, **kwargs: Any):
+        super().__init__(**kwargs)
+        self.max_interactions = max_interactions
+
+    def __call__(self, dataset: DataFrame) -> DataFrame:
+        """Select users with at most max_interactions.
+
+        Args:
+            dataset (DataFrame): The dataset to filter.
+
+        Returns:
+            DataFrame: Filtered dataset containing only users with interactions <= max_interactions.
+        """
+        user_counts = dataset[self.user_label].value_counts()
+        valid_users = user_counts[user_counts <= self.max_interactions].index
+        return dataset[dataset[self.user_label].isin(valid_users)]
+
+
+@filter_registry.register("ItemMin")
+class ItemMin(Filter):
+    """Filter to select items based on a minimum number of interactions.
+
+    Args:
+        min_interactions (int): Minimum number of interactions per item.
+        **kwargs (Any): Additional keyword arguments.
+    """
+
+    def __init__(self, min_interactions: int, **kwargs: Any):
+        super().__init__(**kwargs)
+        self.min_interactions = min_interactions
+
+    def __call__(self, dataset: DataFrame) -> DataFrame:
+        """Select items with at least min_interactions.
+
+        Args:
+            dataset (DataFrame): The dataset to filter.
+
+        Returns:
+            DataFrame: Filtered dataset containing only items with interactions >= min_interactions.
+        """
+        item_counts = dataset[self.item_label].value_counts()
+        valid_items = item_counts[item_counts >= self.min_interactions].index
+        return dataset[dataset[self.item_label].isin(valid_items)]
+
+
+@filter_registry.register("ItemMax")
+class ItemMax(Filter):
+    """Filter to select items based on a maximum number of interactions.
+
+    Args:
+        max_interactions (int): Maximum number of interactions per item.
+        **kwargs (Any): Additional keyword arguments.
+    """
+
+    def __init__(self, max_interactions: int, **kwargs: Any):
+        super().__init__(**kwargs)
+        self.max_interactions = max_interactions
+
+    def __call__(self, dataset: DataFrame) -> DataFrame:
+        """Select items with at most max_interactions.
+
+        Args:
+            dataset (DataFrame): The dataset to filter.
+
+        Returns:
+            DataFrame: Filtered dataset containing only items with interactions <= max_interactions.
+        """
+        item_counts = dataset[self.item_label].value_counts()
+        valid_items = item_counts[item_counts <= self.max_interactions].index
+        return dataset[dataset[self.item_label].isin(valid_items)]
+
+
+@filter_registry.register("IterativeKCore")
+class IterativeKCore(Filter):
+    """Iteratively apply k-core filtering to the dataset.
+
+    Args:
+        min_interactions (int): Minimum number of interactions for users/items.
+        **kwargs (Any): Additional keyword arguments.
+    """
+
+    def __init__(self, min_interactions: int, **kwargs: Any):
+        self.user_core = UserMin(min_interactions, **kwargs)
+        self.item_core = ItemMin(min_interactions, **kwargs)
+
+    def __call__(self, dataset: DataFrame) -> DataFrame:
+        """Apply k-core filtering iteratively until no more users or items can be removed.
+
+        Args:
+            dataset (DataFrame): The dataset to filter.
+
+        Returns:
+            DataFrame: Filtered dataset after applying k-core filtering.
+        """
+        while True:
+            filtered_dataset = self.user_core(dataset)
+            filtered_dataset = self.item_core(filtered_dataset)
+
+            if len(filtered_dataset) == len(dataset):
+                break
+            dataset = filtered_dataset
+
+        return dataset
+
+
+@filter_registry.register("NRoundsKCore")
+class NRoundsKCore(Filter):
+    """Apply k-core filtering for a specified number of rounds.
+
+    Args:
+        rounds (int): Number of rounds to apply k-core filtering.
+        min_interactions (int): Minimum number of interactions for users/items.
+        **kwargs (Any): Additional keyword arguments.
+    """
+
+    def __init__(self, rounds: int, min_interactions: int, **kwargs: Any):
+        self.user_core = UserMin(min_interactions, **kwargs)
+        self.item_core = ItemMin(min_interactions, **kwargs)
+        self.rounds = rounds
+
+    def __call__(self, dataset: DataFrame) -> DataFrame:
+        """Apply k-core filtering for the specified number of rounds.
+
+        Args:
+            dataset (DataFrame): The dataset to filter.
+
+        Returns:
+            DataFrame: Filtered dataset after applying k-core filtering for the specified rounds.
+        """
+        for _ in range(self.rounds):
+            filtered_dataset = self.user_core(dataset)
+            filtered_dataset = self.item_core(filtered_dataset)
+
+            if len(filtered_dataset) == len(dataset):
+                break
+            dataset = filtered_dataset
+        return dataset
+
+
+def apply_filtering(dataset: DataFrame, filters: List[Filter]) -> DataFrame:
+    """Apply a list of filters to the dataset.
+
+    Args:
+        dataset (DataFrame): The dataset to filter.
+        filters (List[Filter]): List of filters to apply.
+
+    Returns:
+        DataFrame: The filtered dataset after applying all filters.
+
+    Raises:
+        ValueError: If the dataset becomes empty after applying any filter.
+    """
+    if len(filters) == 0:
+        logger.attention("No filters provided. Returning the original dataset.")
+        return dataset
+
+    logger.msg(f"Applying filters to the dataset. Initial dataset size: {len(dataset)}")
+    start = time.time()
+
+    for i, single_filter in enumerate(filters):
+        dataset = single_filter(dataset).reset_index(drop=True)
+
+        # Check if the dataset post filtering is empty
+        if dataset.empty:
+            raise ValueError(
+                f"Dataset is empty after applying filter {i + 1}/{len(filters)}: "
+                f"{single_filter.__class__.__name__}. Please check the filtering criteria."
+            )
+
+        logger.stats(
+            f"After filter {i + 1}/{len(filters)} ({single_filter.__class__.__name__}): "
+            f"{len(dataset)} rows"
+        )
+
+    logger.positive(
+        f"Filtering process completed. Final dataset size after filtering: {len(dataset)}. "
+        f"Total filtering time: {time.time() - start:.2f} seconds."
+    )
+    return dataset

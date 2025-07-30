@@ -5,7 +5,6 @@ from typing import Any, Tuple, Set
 import torch
 from torch import Tensor
 from torchmetrics import Metric
-from scipy.sparse import csr_matrix
 from warprec.utils.enums import MetricBlock
 
 
@@ -15,13 +14,16 @@ class BaseMetric(Metric, ABC):
     _REQUIRED_COMPONENTS: Set[MetricBlock] = (
         set()
     )  # This defines the data that needs to be pre-computed
+    _CAN_COMPUTE_PER_USER: bool = (
+        False  # Flag value for user-wise computation of metric
+    )
 
     @abstractmethod
     def compute(self) -> dict[str, float]:
         pass
 
     @classmethod
-    def binary_relevance(self, target: Tensor) -> Tensor:
+    def binary_relevance(cls, target: Tensor) -> Tensor:
         """Compute the binary relevance tensor.
 
         Args:
@@ -33,7 +35,7 @@ class BaseMetric(Metric, ABC):
         return (target > 0).float()
 
     @classmethod
-    def discounted_relevance(self, target: Tensor) -> Tensor:
+    def discounted_relevance(cls, target: Tensor) -> Tensor:
         """Compute the discounted relevance tensor.
 
         Args:
@@ -45,7 +47,7 @@ class BaseMetric(Metric, ABC):
         return torch.where(target > 0, 2 ** (target + 1) - 1, target)
 
     @classmethod
-    def valid_users(self, target: Tensor) -> int:
+    def valid_users(cls, target: Tensor) -> int:
         """Compute the number of valid users.
 
         Args:
@@ -57,7 +59,7 @@ class BaseMetric(Metric, ABC):
         return int((target > 0).any(dim=1).sum().item())
 
     @classmethod
-    def top_k_values_indices(self, preds: Tensor, k: int) -> Tuple[Tensor, Tensor]:
+    def top_k_values_indices(cls, preds: Tensor, k: int) -> Tuple[Tensor, Tensor]:
         """Compute the top k indices and values.
 
         Args:
@@ -73,7 +75,7 @@ class BaseMetric(Metric, ABC):
 
     @classmethod
     def top_k_relevance_from_indices(
-        self, target: Tensor, top_k_indices: Tensor
+        cls, target: Tensor, top_k_indices: Tensor
     ) -> Tensor:
         """Compute the top k relevance tensor.
 
@@ -87,7 +89,7 @@ class BaseMetric(Metric, ABC):
         return torch.gather(target, dim=1, index=top_k_indices)
 
     @classmethod
-    def top_k_relevance(self, preds: Tensor, target: Tensor, k: int) -> Tensor:
+    def top_k_relevance(cls, preds: Tensor, target: Tensor, k: int) -> Tensor:
         """Compute the top k relevance tensor.
 
         Args:
@@ -102,12 +104,12 @@ class BaseMetric(Metric, ABC):
         return torch.gather(target, dim=1, index=top_k_indices)
 
     def compute_head_tail(
-        self, train_set: csr_matrix, pop_ratio: float = 0.8
+        self, item_interactions: Tensor, pop_ratio: float = 0.8
     ) -> Tuple[Tensor, Tensor]:
         """Compute popularity as tensors of the short head and long tail.
 
         Args:
-            train_set (csr_matrix): The training interaction data.
+            item_interactions (Tensor): The counts for item interactions in training set.
             pop_ratio (float): The percentile considered popular.
 
         Returns:
@@ -115,11 +117,6 @@ class BaseMetric(Metric, ABC):
                 - Tensor: The tensor containing indices of short head items.
                 - Tensor: The tensor containing indices of long tail items.
         """
-        # Compute item frequencies
-        item_interactions = torch.tensor(
-            train_set.getnnz(axis=0)
-        ).float()  # Get number of non-zero elements in each column
-
         # Order item popularity
         sorted_interactions, sorted_indices = torch.sort(
             item_interactions, descending=True
@@ -140,43 +137,34 @@ class BaseMetric(Metric, ABC):
 
         return short_head_indices, long_tail_indices
 
-    def compute_popularity(self, train_set: csr_matrix) -> Tensor:
+    def compute_popularity(self, item_interactions: Tensor) -> Tensor:
         """Compute popularity tensor based on the interactions.
 
         Args:
-            train_set (csr_matrix): The training interaction data.
+            item_interactions (Tensor): The counts for item interactions in training set.
 
         Returns:
             Tensor: The interaction count for each item.
         """
-        # Compute item frequencies
-        item_interactions = torch.tensor(
-            train_set.getnnz(axis=0)
-        ).float()  # Get number of non-zero elements in each column
-
         # Avoid division by zero: set minimum interaction
         # count to 1 if any item has zero interactions
         item_interactions = torch.clamp(item_interactions, min=1)
-        return item_interactions
+        return item_interactions.unsqueeze(0)
 
     def compute_novelty_profile(
-        self, train_set: csr_matrix, log_discount: bool = False
+        self, item_interactions: Tensor, num_users: int, log_discount: bool = False
     ) -> Tensor:
         """Compute the novelty profile based on the count of interactions.
 
         Args:
-            train_set (csr_matrix): The training interaction data.
+            item_interactions (Tensor): The counts for item interactions in training set.
+            num_users (int): Number of users in the training set.
             log_discount (bool): Whether or not to compute the discounted novelty.
 
         Returns:
             Tensor: A tensor that contains the novelty score for each item.
         """
-        # Compute item frequencies
-        item_interactions = torch.tensor(
-            train_set.getnnz(axis=0)
-        ).float()  # Get number of non-zero elements in each column
         total_interactions = item_interactions.sum()
-        users = train_set.shape[0]
 
         # Avoid division by zero: set minimum interaction
         # count to 1 if any item has zero interactions
@@ -184,8 +172,8 @@ class BaseMetric(Metric, ABC):
 
         # Compute novelty scores
         if log_discount:
-            return -torch.log2(item_interactions / total_interactions)
-        return 1 - (item_interactions / users)
+            return -torch.log2(item_interactions / total_interactions).unsqueeze(0)
+        return (1 - (item_interactions / num_users)).unsqueeze(0)
 
     @property
     def name(self):
@@ -196,7 +184,7 @@ class BaseMetric(Metric, ABC):
 class TopKMetric(BaseMetric):
     """The definition of a Top-K metric."""
 
-    def __init__(self, k: int, *args: Any, dist_sync_on_step=False, **kwargs: Any):
+    def __init__(self, k: int, dist_sync_on_step=False, **kwargs: Any):
         super().__init__(dist_sync_on_step=dist_sync_on_step)
         self.k = k
 

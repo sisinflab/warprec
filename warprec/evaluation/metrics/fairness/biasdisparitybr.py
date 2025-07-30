@@ -2,7 +2,6 @@ from typing import Any, Set
 
 import torch
 from torch import Tensor
-from scipy.sparse import csr_matrix
 from warprec.utils.registry import metric_registry
 from warprec.utils.enums import MetricBlock
 from warprec.evaluation.metrics.base_metric import TopKMetric
@@ -44,7 +43,7 @@ class BiasDisparityBR(TopKMetric):
 
     Args:
         k (int): The cutoff.
-        train_set (csr_matrix): Sparse matrix of training interactions (users x items).
+        num_items (int): Number of items in the training set.
         *args (Any): The argument list.
         user_cluster (Tensor): Lookup tensor of user clusters.
         item_cluster (Tensor): Lookup tensor of item clusters.
@@ -67,7 +66,7 @@ class BiasDisparityBR(TopKMetric):
     def __init__(
         self,
         k: int,
-        train_set: csr_matrix,
+        num_items: int,
         *args: Any,
         user_cluster: Tensor = None,
         item_cluster: Tensor = None,
@@ -75,8 +74,6 @@ class BiasDisparityBR(TopKMetric):
         **kwargs: Any,
     ):
         super().__init__(k, dist_sync_on_step)
-        self.train_set = train_set
-
         self.register_buffer("user_clusters", user_cluster)
         self.n_user_effective_clusters = int(user_cluster.max().item())
         self.n_user_clusters = (
@@ -91,7 +88,7 @@ class BiasDisparityBR(TopKMetric):
 
         # Global distribution of items across item clusters
         pc = torch.bincount(item_cluster, minlength=self.n_item_clusters).float()
-        pc = pc / float(self.train_set.shape[1])
+        pc = pc / float(num_items)  # Normalize to get proportions
         self.register_buffer("PC", pc)
 
         # Initialize accumulators for counts per user cluster and item cluster
@@ -104,18 +101,11 @@ class BiasDisparityBR(TopKMetric):
             "total_sum", default=torch.zeros(self.n_user_clusters), dist_reduce_fx="sum"
         )
 
-    def update(self, preds: Tensor, **kwargs: Any):
+    def update(self, preds: Tensor, user_indices: Tensor, **kwargs: Any):
         """Updates the metric state with the new batch of predictions."""
-        start = kwargs.get("start", 0)
         top_k_indices: Tensor = kwargs.get(
             f"top_{self.k}_indices", self.top_k_values_indices(preds, self.k)[1]
         )
-
-        batch_size = preds.size(0)
-        device = preds.device
-
-        # Get user indices in global space
-        user_indices = torch.arange(start, start + batch_size, device=device)
 
         # Map user indices to user clusters
         user_clusters = self.user_clusters[user_indices]  # [batch_size]
@@ -162,8 +152,3 @@ class BiasDisparityBR(TopKMetric):
                 key = f"BiasDisparityBR_UC{uc + 1}_IC{ic + 1}"
                 results[key] = bias_disparity[uc + 1, ic + 1].item()
         return results
-
-    def reset(self):
-        """Resets the metric state."""
-        self.category_sum.zero_()
-        self.total_sum.zero_()

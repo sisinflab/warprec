@@ -29,6 +29,7 @@ class ConvNCF(RecomModel):
         cnn_strides (LIST_INT_FIELD): List of values for CNN strides.
         dropout_prob (FLOAT_FIELD): List of values for dropout_prob.
         weight_decay (FLOAT_FIELD): List of values for weight_decay.
+        batch_size (INT_FIELD): List of values for batch_size.
         epochs (INT_FIELD): List of values for epochs.
         learning_rate (FLOAT_FIELD): List of values for learning rate.
         need_single_trial_validation (ClassVar[bool]): Whether or not to check if a Ray Tune
@@ -41,6 +42,7 @@ class ConvNCF(RecomModel):
     cnn_strides: LIST_INT_FIELD
     dropout_prob: FLOAT_FIELD
     weight_decay: FLOAT_FIELD
+    batch_size: INT_FIELD
     epochs: INT_FIELD
     learning_rate: FLOAT_FIELD
     need_single_trial_validation: ClassVar[bool] = True
@@ -80,6 +82,12 @@ class ConvNCF(RecomModel):
     def check_weight_decay(cls, v: list):
         """Validate weight_decay."""
         return validate_greater_equal_than_zero(cls, v, "weight_decay")
+
+    @field_validator("batch_size")
+    @classmethod
+    def check_batch_size(cls, v: list):
+        """Validate batch_size."""
+        return validate_greater_than_zero(cls, v, "batch_size")
 
     @field_validator("epochs")
     @classmethod
@@ -214,6 +222,7 @@ class NeuMF(RecomModel):
         mlp_train (BOOL_FIELD): List of values for mlp_train flag.
         dropout (FLOAT_FIELD): List of values for dropout.
         weight_decay (FLOAT_FIELD): List of values for weight_decay.
+        batch_size (INT_FIELD): List of values for batch size.
         epochs (INT_FIELD): List of values for epochs.
         learning_rate (FLOAT_FIELD): List of values for learning rate.
         neg_samples (INT_FIELD): List of values for negative sampling.
@@ -226,6 +235,7 @@ class NeuMF(RecomModel):
     mlp_train: BOOL_FIELD
     dropout: FLOAT_FIELD
     weight_decay: FLOAT_FIELD
+    batch_size: INT_FIELD
     epochs: INT_FIELD
     learning_rate: FLOAT_FIELD
     neg_samples: INT_FIELD
@@ -271,6 +281,12 @@ class NeuMF(RecomModel):
     def check_weight_decay(cls, v: list):
         """Validate weight_decay."""
         return validate_greater_equal_than_zero(cls, v, "weight_decay")
+
+    @field_validator("batch_size")
+    @classmethod
+    def check_batch_size(cls, v: list):
+        """Validate batch_size."""
+        return validate_greater_than_zero(cls, v, "batch_size")
 
     @field_validator("epochs")
     @classmethod

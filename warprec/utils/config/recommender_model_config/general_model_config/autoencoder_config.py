@@ -93,6 +93,7 @@ class MultiDAE(RecomModel):
         latent_dim (INT_FIELD): List of values for latent_dim values.
         dropout (FLOAT_FIELD): List of values for dropout.
         weight_decay (FLOAT_FIELD): List of values for weight_decay.
+        batch_size (INT_FIELD): List of values for batch_size.
         epochs (INT_FIELD): List of values for epochs.
         learning_rate (FLOAT_FIELD): List of values for learning rate.
     """
@@ -101,6 +102,7 @@ class MultiDAE(RecomModel):
     latent_dim: INT_FIELD
     dropout: FLOAT_FIELD
     weight_decay: FLOAT_FIELD
+    batch_size: INT_FIELD
     epochs: INT_FIELD
     learning_rate: FLOAT_FIELD
 
@@ -128,6 +130,12 @@ class MultiDAE(RecomModel):
         """Validate weight_decay."""
         return validate_greater_equal_than_zero(cls, v, "weight_decay")
 
+    @field_validator("batch_size")
+    @classmethod
+    def check_batch_size(cls, v: list):
+        """Validate batch_size."""
+        return validate_greater_than_zero(cls, v, "batch_size")
+
     @field_validator("epochs")
     @classmethod
     def check_epochs(cls, v: list):
@@ -150,6 +158,7 @@ class MultiVAE(RecomModel):
         latent_dim (INT_FIELD): List of values for latent_dim values.
         dropout (FLOAT_FIELD): List of values for dropout.
         weight_decay (FLOAT_FIELD): List of values for weight_decay.
+        batch_size (INT_FIELD): List of values for batch_size.
         epochs (INT_FIELD): List of values for epochs.
         learning_rate (FLOAT_FIELD): List of values for learning rate.
         anneal_cap (FLOAT_FIELD): List of values for anneal_cap.
@@ -160,6 +169,7 @@ class MultiVAE(RecomModel):
     latent_dim: INT_FIELD
     dropout: FLOAT_FIELD
     weight_decay: FLOAT_FIELD
+    batch_size: INT_FIELD
     epochs: INT_FIELD
     learning_rate: FLOAT_FIELD
     anneal_cap: FLOAT_FIELD
@@ -188,6 +198,12 @@ class MultiVAE(RecomModel):
     def check_weight_decay(cls, v: list):
         """Validate weight_decay."""
         return validate_greater_equal_than_zero(cls, v, "weight_decay")
+
+    @field_validator("batch_size")
+    @classmethod
+    def check_batch_size(cls, v: list):
+        """Validate batch_size."""
+        return validate_greater_than_zero(cls, v, "batch_size")
 
     @field_validator("epochs")
     @classmethod

@@ -3,7 +3,6 @@ from typing import Any, Set
 
 import torch
 from torch import Tensor
-from scipy.sparse import csr_matrix
 from warprec.evaluation.metrics.base_metric import TopKMetric
 from warprec.utils.enums import MetricBlock
 from warprec.utils.registry import metric_registry
@@ -42,14 +41,14 @@ class ItemMADRating(TopKMetric):
     For further details on the concept, please refer to this `link <https://dl.acm.org/doi/abs/10.1145/3269206.3271795>`_.
 
     Attributes:
+        num_items (int): Number of items in the training set.
         item_clusters (Tensor): Tensor mapping each item to an item cluster.
         item_counts (Tensor): Tensor of counts of item recommended and relevant.
         item_gains (Tensor): Tensor of summed ratings/relevance for item recommended and relevant.
-        n_items (int): Total number of items.
 
     Args:
         k (int): Cutoff for top-k recommendations.
-        train_set (csr_matrix): Sparse matrix of training interactions (users x items).
+        num_items (int): Number of items in the training set.
         *args (Any): The argument list.
         item_cluster (Tensor): Lookup tensor of item clusters.
         dist_sync_on_step (bool): Whether to synchronize metric state across distributed processes.
@@ -62,15 +61,15 @@ class ItemMADRating(TopKMetric):
         MetricBlock.TOP_K_INDICES,
     }
 
+    num_items: int
     item_clusters: Tensor
     item_counts: Tensor
     item_gains: Tensor
-    n_items: int
 
     def __init__(
         self,
         k: int,
-        train_set: csr_matrix,
+        num_items: int,
         *args: Any,
         item_cluster: Tensor = None,
         dist_sync_on_step: bool = False,
@@ -78,19 +77,19 @@ class ItemMADRating(TopKMetric):
     ):
         super().__init__(k, dist_sync_on_step)
 
-        self.n_items = train_set.shape[1]
+        self.num_items = num_items
 
         self.register_buffer("item_clusters", item_cluster)
 
         # Initialize accumulators for counts and gains (relevant items only)
         self.add_state(
             "item_counts",
-            torch.zeros(train_set.shape[1], dtype=torch.float),
+            torch.zeros(num_items),
             dist_reduce_fx="sum",
         )
         self.add_state(
             "item_gains",
-            torch.zeros(train_set.shape[1], dtype=torch.float),
+            torch.zeros(num_items),
             dist_reduce_fx="sum",
         )
 
@@ -106,7 +105,7 @@ class ItemMADRating(TopKMetric):
 
         # Item counts
         counts = torch.bincount(
-            top_k_indices.flatten(), minlength=self.n_items
+            top_k_indices.flatten(), minlength=self.num_items
         )  # [num_items]
 
         # Item gains
@@ -164,7 +163,7 @@ class ItemMADRating(TopKMetric):
         valid_cluster_means = cluster_mean[valid_clusters_mask]
 
         if valid_cluster_means.numel() < 2:
-            mad = torch.tensor(0.0, device=self.item_gains.device)
+            mad = torch.tensor(0.0, device=self.item_gains.device).item()
         else:
             i, j = torch.triu_indices(
                 valid_cluster_means.size(0), valid_cluster_means.size(0), offset=1
@@ -173,11 +172,6 @@ class ItemMADRating(TopKMetric):
                 valid_cluster_means.unsqueeze(0) - valid_cluster_means.unsqueeze(1)
             )
             differences = diff_matrix[i, j]
-            mad = differences.mean()
+            mad = differences.mean().item()
 
-        return {self.name: mad.item()}
-
-    def reset(self):
-        """Resets the metric state."""
-        self.item_counts.zero_()
-        self.item_gains.zero_()
+        return {self.name: mad}

@@ -1,5 +1,4 @@
 import os
-import tempfile
 import shutil
 from typing import List, Tuple, Optional, Dict, Any
 from copy import deepcopy
@@ -7,7 +6,6 @@ from copy import deepcopy
 import ray
 import torch
 from ray import tune
-from ray.tune import Checkpoint
 from ray.tune.stopper import Stopper
 from ray.air.integrations.wandb import WandbLoggerCallback
 from ray.air.integrations.mlflow import MLflowLoggerCallback
@@ -16,6 +14,7 @@ from codecarbon import EmissionsTracker
 from warprec.recommenders.base_recommender import Recommender
 from warprec.data.dataset import Dataset
 from warprec.evaluation.evaluator import Evaluator
+from warprec.recommenders.trainer.objectives import objective_function
 from warprec.recommenders.trainer.search_algorithm_wrapper import (
     BaseSearchWrapper,
 )
@@ -59,6 +58,7 @@ class Trainer:
         custom_callback (WarpRecCallback): The custom callback to use
             during training and evaluation. Default is an empty
             WarpRecCallback instance.
+        custom_models (str | List[str]): The list of custom models to load.
         enable_wandb (bool): Wether or not to enable Wandb.
         project_wandb (str): The name of the Wandb project.
         group_wandb (Optional[str]): The name of the Wandb group.
@@ -102,6 +102,7 @@ class Trainer:
         pop_ratio: float = 0.8,
         ray_verbose: int = 1,
         custom_callback: WarpRecCallback = WarpRecCallback(),
+        custom_models: str | List[str] = [],
         enable_wandb: bool = False,
         project_wandb: str = "WarpRec",
         group_wandb: Optional[str] = None,
@@ -162,14 +163,15 @@ class Trainer:
         self._model_params: RecomModel = params_registry.get(model_name, **model_params)
         self._dashboard = dashboard
         self._custom_callback = custom_callback
+        self._custom_models = custom_models
         self.model_name = model_name
         self._evaluator = Evaluator(
             [metric_name],
             [top_k],
             train_set=dataset.train_set.get_sparse(),
-            side_information=dataset.train_set.get_side_sparse(),
             beta=beta,
             pop_ratio=pop_ratio,
+            feature_lookup=dataset.get_features_lookup(),
             user_cluster=dataset.get_user_cluster(),
             item_cluster=dataset.get_item_cluster(),
         )
@@ -206,12 +208,19 @@ class Trainer:
 
         # Ray Tune parameters
         obj_function = tune.with_parameters(
-            self._objective_function,
+            objective_function,
             model_name=self.model_name,
             dataset=self._dataset,
+            info=self.infos,
+            top_k=self._top_k,
+            metric_name=self._metric_name,
             mode=mode,
             evaluator=self._evaluator,
             device=device,
+            implementation=self._model_params.meta.implementation,
+            seed=self._model_params.optimization.properties.seed,
+            block_size=self._model_params.optimization.block_size,
+            custom_models=self._custom_models,
         )
 
         search_alg: BaseSearchWrapper = search_algorithm_registry.get(
@@ -329,102 +338,6 @@ class Trainer:
         ray.shutdown()
 
         return best_model, best_checkpoint_callback.get_checkpoints()
-
-    def _objective_function(
-        self,
-        params: dict,
-        model_name: str,
-        dataset: Dataset,
-        mode: str,
-        evaluator: Evaluator,
-        device: str,
-    ) -> None:
-        """Objective function to optimize the hyperparameters.
-
-        Args:
-            params (dict): The parameter to train the model.
-            model_name (str): The name of the model to train.
-            dataset (Dataset): The dataset to train the model on.
-            mode (str): Whether or not to maximize or minimize the metric.
-            evaluator (Evaluator): The evaluator that will calculate the
-                validation metric.
-            device (str): The device used for tensor operations.
-
-        Returns:
-            None: This function reports metrics and checkpoints to Ray Tune
-                via `tune.report()` and does not explicitly return a value.
-        """
-
-        def _report(model: Recommender, **kwargs: Any):
-            """Reporting function. Will be used as a callback for Tune reporting.
-
-            Args:
-                model (Recommender): The trained model to report.
-                **kwargs (Any): The parameters of the model.
-            """
-            test_set = True if dataset.val_set is None else False
-            evaluator.evaluate(model, dataset, test_set=test_set)
-            results = evaluator.compute_results()
-            score = results[self._top_k][self._metric_name]
-
-            with tempfile.TemporaryDirectory() as tmpdir:
-                torch.save(
-                    {"model_state": model.state_dict()},
-                    os.path.join(tmpdir, "checkpoint.pt"),
-                )
-                tune.report(
-                    metrics={
-                        "score": score,
-                        **kwargs,  # Other metrics from the model itself
-                    },
-                    checkpoint=Checkpoint.from_directory(tmpdir),
-                )
-
-        # Trial parameter configuration check for consistency
-        model_params: RecomModel = params_registry.get(model_name, **params)
-        if model_params.need_single_trial_validation:
-            try:
-                model_params.validate_single_trial_params()
-            except ValueError as e:
-                logger.negative(
-                    str(e)
-                )  # Log the custom message from Pydantic validation
-
-                # Report to Ray Tune the trial failed
-                if mode == "max":
-                    tune.report(metrics={"score": -float("inf")})
-                else:
-                    tune.report(metrics={"score": float("inf")})
-
-                return  # Stop Ray Tune trial
-
-        # Proceed with normal model training behavior
-        model = model_registry.get(
-            name=model_name,
-            implementation=self._model_params.meta.implementation,
-            params=params,
-            device=device,
-            seed=self._model_params.optimization.properties.seed,
-            info=self.infos,
-            block_size=self._model_params.optimization.block_size,
-        )
-        try:
-            model.fit(
-                dataset.train_set, sessions=dataset.train_session, report_fn=_report
-            )
-        except Exception as e:
-            logger.negative(
-                f"The fitting of the model {model.name}, failed "
-                f"with parameters: {params}. Error: {e}"
-            )
-            if mode == "max":
-                tune.report(
-                    metrics={"score": -torch.inf},
-                )
-            else:
-                tune.report(
-                    metrics={"score": torch.inf},
-                )
 
     def parse_params(self, params: dict) -> dict:
         """This method parses the parameters of a model.

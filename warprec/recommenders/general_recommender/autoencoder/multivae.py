@@ -112,6 +112,7 @@ class MultiVAE(Recommender):
         latent_dim (int): Latent dimension size.
         dropout (float): Dropout probability.
         weight_decay (float): The value of weight decay used in the optimizer.
+        batch_size (int): The batch size used for training.
         epochs (int): The number of epochs.
         learning_rate (float): The learning rate value.
         anneal_cap (float): Annealing cap for KL divergence.
@@ -122,6 +123,7 @@ class MultiVAE(Recommender):
     latent_dim: int
     dropout: float
     weight_decay: float
+    batch_size: int
     epochs: int
     learning_rate: float
     anneal_cap: float
@@ -224,8 +226,8 @@ class MultiVAE(Recommender):
                 else self.anneal_cap
             )
 
-            for start in range(0, X.shape[0], interactions.batch_size):
-                end = min(start + interactions.batch_size, X.shape[0])
+            for start in range(0, X.shape[0], self.batch_size):
+                end = min(start + self.batch_size, X.shape[0])
 
                 rating_matrix = torch.tensor(
                     X[start:end].toarray(), device=self._device

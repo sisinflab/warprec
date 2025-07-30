@@ -39,6 +39,7 @@ class ConvNCF(Recommender):
         cnn_strides (List[int]): The list of stride sizes for each CNN layer.
         dropout_prob (float): The dropout probability for the prediction layer.
         weight_decay (float): The value of weight decay used in the optimizer.
+        batch_size (int): The batch size used for training.
         epochs (int): The number of epochs.
         learning_rate (float): The learning rate value.
     """
@@ -50,6 +51,7 @@ class ConvNCF(Recommender):
     cnn_strides: List[int]
     dropout_prob: float
     weight_decay: float
+    batch_size: int
     epochs: int
     learning_rate: float
 
@@ -137,7 +139,7 @@ class ConvNCF(Recommender):
             **kwargs (Any): The dictionary of keyword arguments.
         """
         # ConvNCF uses pairwise training, so we need positive and negative items.
-        dataloader = interactions.get_pos_neg_dataloader()
+        dataloader = interactions.get_pos_neg_dataloader(self.batch_size)
 
         self.train()
         for _ in range(self.epochs):

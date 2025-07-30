@@ -2,7 +2,6 @@ from typing import Any, Set
 
 import torch
 from torch import Tensor
-from scipy.sparse import csr_matrix
 from warprec.evaluation.metrics.base_metric import TopKMetric
 from warprec.utils.enums import MetricBlock
 from warprec.utils.registry import metric_registry
@@ -39,7 +38,7 @@ class UserMADRanking(TopKMetric):
 
     Args:
         k (int): Cutoff for top-k recommendations.
-        train_set (csr_matrix): Sparse matrix of training interactions (users x items).
+        num_users (int): Number of users in the training set.
         *args (Any): The argument list.
         user_cluster (Tensor): Lookup tensor of user clusters.
         dist_sync_on_step (bool): Whether to synchronize metric state across distributed processes.
@@ -59,7 +58,7 @@ class UserMADRanking(TopKMetric):
     def __init__(
         self,
         k: int,
-        train_set: csr_matrix,
+        num_users: int,
         *args: Any,
         user_cluster: Tensor = None,
         dist_sync_on_step: bool = False,
@@ -74,12 +73,12 @@ class UserMADRanking(TopKMetric):
         # Per-user accumulators
         self.add_state(
             "user_counts",
-            torch.zeros(train_set.shape[0], dtype=torch.float),
+            torch.zeros(num_users),
             dist_reduce_fx="sum",
         )
         self.add_state(
             "user_gains",
-            torch.zeros(train_set.shape[0], dtype=torch.float),
+            torch.zeros(num_users),
             dist_reduce_fx="sum",
         )
 
@@ -148,8 +147,3 @@ class UserMADRanking(TopKMetric):
             mad = pairwise.sum() / (m * (m - 1) / 2)
 
         return {self.name: mad.item()}
-
-    def reset(self):
-        """Resets the metric state."""
-        self.user_counts.zero_()
-        self.user_gains.zero_()

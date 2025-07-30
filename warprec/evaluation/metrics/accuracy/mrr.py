@@ -50,12 +50,17 @@ class MRR(TopKMetric):
     MRR@2 = (0.5 + 1) / 2 = 0.75
 
     Attributes:
-        reciprocal_rank_sum (Tensor): The reciprocal rank sum tensor.
+        reciprocal_rank (Tensor): The reciprocal rank tensor.
         users (Tensor): The number of users evaluated.
+        compute_per_user (bool): Wether or not to compute the metric
+            per user or globally.
 
     Args:
         k (int): The recommendation cutoff.
+        num_users (int): Number of users in the training set.
         *args (Any): Additional arguments to pass to the parent class.
+        compute_per_user (bool): Wether or not to compute the metric
+            per user or globally.
         dist_sync_on_step (bool): Torchmetrics parameter.
         **kwargs (Any): Additional keyword arguments to pass to the parent class.
     """
@@ -65,20 +70,35 @@ class MRR(TopKMetric):
         MetricBlock.VALID_USERS,
         MetricBlock.TOP_K_BINARY_RELEVANCE,
     }
+    _CAN_COMPUTE_PER_USER: bool = True
 
-    reciprocal_rank_sum: Tensor
+    reciprocal_rank: Tensor
     users: Tensor
+    compute_per_user: bool
 
     def __init__(
-        self, k: int, *args: Any, dist_sync_on_step: bool = False, **kwargs: Any
+        self,
+        k: int,
+        num_users: int,
+        *args: Any,
+        compute_per_user: bool = False,
+        dist_sync_on_step: bool = False,
+        **kwargs: Any,
     ):
         super().__init__(k, dist_sync_on_step)
-        self.add_state(
-            "reciprocal_rank_sum", default=torch.tensor(0.0), dist_reduce_fx="sum"
-        )
+        self.compute_per_user = compute_per_user
+
+        if self.compute_per_user:
+            self.add_state(
+                "reciprocal_rank", default=torch.zeros(num_users), dist_reduce_fx="sum"
+            )  # Initialize a tensor to store metric value for each user
+        else:
+            self.add_state(
+                "reciprocal_rank", default=torch.tensor(0.0), dist_reduce_fx="sum"
+            )  # Initialize a scalar to store global value
         self.add_state("users", default=torch.tensor(0.0), dist_reduce_fx="sum")
 
-    def update(self, preds: Tensor, **kwargs: Any):
+    def update(self, preds: Tensor, user_indices: Tensor, **kwargs: Any):
         """Updates the MRR metric state with a batch of predictions."""
         target: Tensor = kwargs.get("binary_relevance", torch.zeros_like(preds))
         users = kwargs.get("valid_users", self.valid_users(target))
@@ -91,16 +111,24 @@ class MRR(TopKMetric):
         reciprocal_ranks = (top_k_rel.argmax(dim=1) + 1).float().reciprocal()
         reciprocal_ranks[top_k_rel.sum(dim=1) == 0] = 0  # Assign 0 if no relevant items
 
-        self.reciprocal_rank_sum += reciprocal_ranks.sum()
+        if self.compute_per_user:
+            self.reciprocal_rank.index_add_(
+                0, user_indices, reciprocal_ranks
+            )  # Index metric values per user
+        else:
+            self.reciprocal_rank += reciprocal_ranks.sum()  # Sum the total RR values
 
         # Count only users with at least one interaction
         self.users += users
 
     def compute(self):
         """Computes the final MRR@K value."""
-        mrr = (
-            self.reciprocal_rank_sum / self.users
-            if self.users > 0
-            else torch.tensor(0.0)
-        )
-        return {self.name: mrr.item()}
+        if self.compute_per_user:
+            mrr = self.reciprocal_rank  # Return the tensor with per_user metric
+        else:
+            mrr = (
+                self.reciprocal_rank / self.users
+                if self.users > 0
+                else torch.tensor(0.0)
+            ).item()  # Return the metric value
+        return {self.name: mrr}

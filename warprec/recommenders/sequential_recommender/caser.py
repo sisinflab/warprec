@@ -8,20 +8,22 @@ from torch.nn.init import xavier_normal_, constant_
 from scipy.sparse import csr_matrix
 import torch.nn.functional as F
 
-from warprec.recommenders.base_recommender import Recommender
+from warprec.recommenders.base_recommender import (
+    Recommender,
+    SequentialRecommenderUtils,
+)
 from warprec.recommenders.losses import BPRLoss
 from warprec.data.dataset import Interactions, Sessions
 from warprec.utils.registry import model_registry
 
 
 @model_registry.register(name="Caser")
-class Caser(Recommender):
+class Caser(Recommender, SequentialRecommenderUtils):
     """Implementation of Caser algorithm from
     "Personalized Top-N Sequential Recommendation via Convolutional Sequence Embedding"
     in WSDM 2018.
 
-    This implementation is adapted to the WarpRec framework. It uses both horizontal
-    and vertical convolutional layers to capture sequential patterns.
+    For further details, check the `paper <https://arxiv.org/abs/1809.07426>`_.
 
     Args:
         params (dict): Model parameters.
@@ -41,6 +43,7 @@ class Caser(Recommender):
         n_v (int): The number of vertical filters.
         dropout_prob (float): The probability of dropout for the fully connected layer.
         weight_decay (float): The value of weight decay used in the optimizer.
+        batch_size (int): The batch size used during training.
         epochs (int): The number of training epochs.
         learning_rate (float): The learning rate value.
         neg_samples (int): The number of negative samples.
@@ -53,6 +56,7 @@ class Caser(Recommender):
     n_v: int
     dropout_prob: float
     weight_decay: float
+    batch_size: int
     epochs: int
     learning_rate: float
     neg_samples: int
@@ -226,6 +230,7 @@ class Caser(Recommender):
         dataloader = sessions.get_sequential_dataloader(
             max_seq_len=self.max_seq_len,
             num_negatives=self.neg_samples,
+            batch_size=self.batch_size,
             user_id=True,  # We need user ids for Caser
         )
 
@@ -266,13 +271,13 @@ class Caser(Recommender):
                 epoch_loss += total_loss.item()
 
             if report_fn is not None:
-                report_fn(self, loss=epoch_loss, epoch=epoch)
+                report_fn(self, loss=epoch_loss)
 
     @torch.no_grad()
     def predict(
         self,
         interaction_matrix: csr_matrix,
-        user_ids: Tensor,
+        user_id: Tensor,
         user_seq: Tensor,
         *args: Any,
         **kwargs: Any,
@@ -282,7 +287,7 @@ class Caser(Recommender):
 
         Args:
             interaction_matrix (csr_matrix): Matrix of seen interactions.
-            user_ids (Tensor): User IDs for which to make predictions.
+            user_id (Tensor): User IDs for which to make predictions.
             user_seq (Tensor): Padded item sequences for each user.
             *args (Any): Additional arguments.
             **kwargs (Any): Additional keyword arguments.
@@ -290,11 +295,11 @@ class Caser(Recommender):
         Returns:
             Tensor: The score matrix {user x item}.
         """
-        user_ids = user_ids.to(self._device)
+        user_id = user_id.to(self._device)
         user_seq = user_seq.to(self._device)
 
         # Get the final output embedding for each user
-        seq_output = self.forward(user_ids, user_seq)
+        seq_output = self.forward(user_id, user_seq)
 
         # Get embeddings for all items
         all_item_embeddings = self.item_embedding.weight[1:]

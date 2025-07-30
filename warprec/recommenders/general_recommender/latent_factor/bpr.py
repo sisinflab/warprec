@@ -34,6 +34,7 @@ class BPR(Recommender):
     Attributes:
         embedding_size (int): The embedding size of user and item.
         weight_decay (float): The value of weight decay used in the optimizer.
+        batch_size (int): The batch size used for training.
         epochs (int): The number of epochs.
         learning_rate (float): The learning rate value.
     """
@@ -41,6 +42,7 @@ class BPR(Recommender):
     # Model hyperparameters
     embedding_size: int
     weight_decay: float
+    batch_size: int
     epochs: int
     learning_rate: float
 
@@ -111,7 +113,7 @@ class BPR(Recommender):
             **kwargs (Any): The dictionary of keyword arguments.
         """
         # Get the dataloader from interactions
-        dataloader = interactions.get_pos_neg_dataloader()
+        dataloader = interactions.get_pos_neg_dataloader(self.batch_size)
 
         # Training loop
         self.train()

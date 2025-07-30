@@ -16,6 +16,7 @@ To make everything easier to digest, this documentation includes a Table of Cont
 ## 📚 Table of Contents
 - 📖 [Reader Configuration](#📖-reader-configuration)
 - ✍️ [Writer Configuration](#️✍️-writer-configuration)
+- 🧹 [Filtering Configuration](#🧹-filtering-configuration)
 - 🔀 [Splitter Configuration](#🔀-splitter-configuration)
 - 🖥️ [Dashboard Configuration](#🖥️-dashboard-configuration)
 - 🧠 [Models Configuration](#🧠-models-configuration)
@@ -223,6 +224,113 @@ writer:
 - The `local_experiment_path` must exist if you choose `local` as the `writing_method`. Otherwise, WarpRec will raise an error.
 - Custom separators (e.g., `|`, `,`, etc.) must be valid characters. Invalid separators will raise an exception.
 - Only local writing is currently supported, but this structure allows easy extension for remote/cloud options in future versions.
+
+## 🧹 Filtering Configuration
+
+The `Filtering Configuration` section specifies the preprocessing strategies applied to the dataset prior to the splitting phase. Filtering is essential in scenarios where the dataset contains redundant information or its size exceeds the available computational resources.
+Filtering strategies are executed sequentially, in the order they are defined, which may affect the final outcome. Each strategy must be specified using the following format:
+
+```yaml
+filtering:
+    strategy_name_1:
+        arg_name_1: value_1
+    strategy_name_2:
+        arg_name_1: value_1
+        arg_name_2: value_2
+...
+```
+
+The filtering strategies will be applied from top to bottom as listed. The following strategies are currently supported:
+
+`MinRating`: Removes all interactions with a rating value strictly lower than the specified `min_rating` threshold. This strategy is not compatible with implicit feedback datasets.
+
+```yaml
+filtering:
+    MinRating:
+        min_rating: 3.0
+...
+```
+
+`UserAverage`: Removes all interactions for which the rating is below the corresponding user’s average rating. Not applicable in implicit feedback scenarios.
+
+```yaml
+filtering:
+    UserAverage: {} # No parameters needed
+...
+```
+
+`UserMin`: Removes all interactions involving users with fewer interactions than the specified `min_interactions` threshold.
+
+```yaml
+filtering:
+    UserMin:
+        min_interactions: 5
+...
+```
+
+`UserMax`: Removes all interactions involving users with more interactions than the specified `max_interactions` threshold. This strategy is useful for analyzing cold-start user scenarios.
+
+```yaml
+filtering:
+    UserMax:
+        max_interactions: 2
+...
+```
+
+`ItemMin`: Removes all interactions involving items with fewer interactions than the specified `min_interactions` threshold.
+
+```yaml
+filtering:
+    ItemMin:
+        min_interactions: 5
+...
+```
+
+`ItemMax`: Removes all interactions involving items with more interactions than the specified `max_interactions` threshold. This strategy is useful for analyzing cold-start item scenarios.
+
+```yaml
+filtering:
+    ItemMax:
+        max_interactions: 2
+...
+```
+
+`IterativeKCore`: Applies `UserMin` and `ItemMin` iteratively until no further interactions can be removed (i.e., until convergence is reached).
+
+```yaml
+filtering:
+    IterativeKCore:
+        min_interactions: 5
+...
+```
+
+`NRoundsKCore`: Applies `UserMin` and `ItemMin` for a fixed number of iterations. This is a simplified variant of `IterativeKCore`, appropriate when convergence is not required.
+
+```yaml
+filtering:
+    NRoundsKCore:
+        rounds: 3
+        min_interactions: 5
+...
+```
+
+### 📌 Example of Filtering Configuration
+
+The following example demonstrates a configuration where all ratings below 3.0 are first removed, followed by the removal of users with fewer than 10 interactions:
+
+```yaml
+filtering:
+    MinRating:
+        min_rating: 3.0
+    UserMin:
+        min_interactions: 10
+...
+```
+
+### ⚠️ Notes and Validation
+
+- Strategy names and their respective parameter names must match exactly as defined; otherwise, the configuration will not be processed correctly.
+- The execution order of the filtering strategies affects the final dataset. Changing the sequence may lead to different results.
 
 ## 🔀 Splitter Configuration
 
@@ -541,10 +649,31 @@ The `Evaluation Configuration` can be configured using the following keywords:
 
 - **top_k**: The cutoff used to compute ranking metrics.
 - **metrics**: The metrics to be evaluated.
+- **batch_size**: The batch size used during evaluation. Defaults to 1024.
+- **stat_significance**: This is a nested section containing the information about the stat test to execute.
 - **max_metric_per_row**: The metric to be logged in each row. Defaults to 4.
 - **beta**: The beta value used by the F1-score metric. Defaults to 1.0.
 - **pop_ratio**: The ratio of transactions that will be considered popular. Defaults to 0.8.
 - **save_evaluation**: Flag that decides whether or not to save the evaluation. Defaults to true.
+
+#### ⚖️ Stat significance
+
+This nested section specifies which statistical significance tests should be applied:
+
+- **paired_t_test**: A flag indicating whether to activate the Paired t-test. Defaults to False.
+- **wilcoxon_test**: A flag indicating whether to activate the Wilcoxon signed-rank test. Defaults to False.
+- **kruskal_test**: A flag indicating whether to activate the Kruskal-Wallis H-test. Defaults to False.
+- **whitney_u_test**: A flag indicating whether to activate the Mann–Whitney U test. Defaults to False.
+- **corrections**: A nested section containing information about extra corrections to apply to stat tests.
+
+#### ✏️ Corrections
+
+This section defines which correction methods to apply for controlling the family-wise error rate or the false discovery rate:
+
+- **bonferroni**: A flag indicating whether to apply Bonferroni correction. Defaults to False.
+- **holm_bonferroni**: A flag indicating whether to apply Holm-Bonferroni correction. Defaults to False.
+- **fdr**: A flag indicating whether to apply False Discovery Rate (FDR) correction. Defaults to False.
+- **alpha**: Significance level (α) used for hypothesis testing. Defaults to 0,05.
 
 ### 📌 Example of Evaluation Configuration
 
@@ -554,6 +683,11 @@ Below is a full example of a `evaluation configuration` that evaluates the best 
 evaluation:
     top_k: [10, 20, 50]
     metrics: [nDCG, Precision, Recall, HitRate]
+    stat_significance:
+        wilcoxon_test: True
+        paired_t_test: True
+        corrections:
+            bonferroni: True
 ...
 ```
 
@@ -571,9 +705,92 @@ The `General Configuration` section defines some parameters that will affect the
 The `General Configuration` can be configured using the following keywords:
 
 - **precision**: The precision to be used inside the experiment. Defaults to float32.
-- **batch_size**: The batch size to be used inside the experiment. Defaults to 1024.
-- **ray_verbose**: . The Ray Tune verbosity value. Ray Tune accepts verbosity levels in a range from 0 to 3. Defaults to 1.
+- **ray_verbose**: The Ray Tune verbosity value. Ray Tune accepts verbosity levels in a range from 0 to 3. Defaults to 1.
+- **custom_models**: Modules to import into WarpRec for loading custom models within the main pipeline. Accepted values are a string or a list of strings.
 - **callback**: A nested section dedicated to the optional callback.
+
+### 🛠️ Custom models
+
+WarpRec supports the integration of user-defined models, allowing practitioners to benchmark personalized algorithms against established baselines or to leverage the framework’s training and evaluation capabilities for custom implementations.
+
+To load a custom model into WarpRec, two components are required:
+
+- A model implementation that inherits from the `Recommender` interface.
+- A corresponding parameter validation class.
+
+To implement a custom model, refer to the guide provided [here](../../recommenders/README.md). Once implemented, make sure to register the model using the `model_registry`. A minimal example is shown below:
+
+```python
+@model_registry.register("CustomModel")
+class CustomModel(Recommender):
+    param_1: float
+    param_2: bool
+    param_3: int
+    parma_4: str
+
+    def __init__(
+        self,
+        params: dict,
+        *args: Any,
+        device: str = "cpu",
+        seed: int = 42,
+        info: dict = None,
+        **kwargs: Any,
+    ):
+        super().__init__(params, device=device, seed=seed, *args, **kwargs)
+        self._name = "CustomModel"
+        # Initialization logic here
+
+    def fit(self):
+        # Training logic here
+
+    def forward(self):
+        # Forward pass logic here
+
+    def predict(self):
+        # Prediction logic here
+```
+
+Once the model is defined, WarpRec expects a corresponding parameter validation class to be registered using the `params_registry`. This class defines the expected hyperparameters and their validation logic, ensuring standardized input processing.
+
+Below is a sample parameter validation class matching the model above:
+
+```python
+@params_registry.register("CustomModel")
+class CustomModel(RecomModel):
+    param_1: FLOAT_FIELD
+    param_2: BOOL_FILED
+    param_3: INT_FIELD
+    param_4: STR_FIELD
+
+    @field_validator("param_1")
+    @classmethod
+    def check_param_1(cls, v: list):
+        """Validate param_1."""
+        return validate_greater_than_zero(cls, v, "param_1")
+
+    @field_validator("param_2")
+    @classmethod
+    def check_param_2(cls, v: list):
+        """Validate param_2."""
+        return validate_bool_values(cls, v, "param_2")
+
+    @field_validator("param_3")
+    @classmethod
+    def check_param_3(cls, v: list):
+        """Validate param_3."""
+        return validate_greater_equal_than_zero(cls, v, "param_3")
+
+    @field_validator("param_4")
+    @classmethod
+    def check_param_4(cls, v: list):
+        """Validate param_4."""
+        return validate_similarity(cls, v, "param_4")
+```
+
+Parameter validation consists of associating each declared field with a validation function. A collection of predefined validation utilities is available [here](common.py).
+
+**Important**: both the model class and its corresponding parameter class must share the same registration name to ensure consistency across the pipeline.
 
 #### 📞 Callback
 
@@ -591,7 +808,6 @@ Below is a full example of a `recommendation configuration`:
 ```yaml
 general:
     precision: float64
-    batch_size: 2048
     ray_verbose: 0
     callback:
         callback_path: path/to/the/script.py

@@ -3,7 +3,6 @@ from typing import Any, Set
 
 import torch
 from torch import Tensor
-from scipy.sparse import csr_matrix
 from warprec.evaluation.metrics.base_metric import TopKMetric
 from warprec.utils.enums import MetricBlock
 from warprec.utils.registry import metric_registry
@@ -57,14 +56,19 @@ class ARP(TopKMetric):
     For further details, please refer to this `paper <https://arxiv.org/abs/1901.07555>`_.
 
     Attributes:
-        total_pop (Tensor): The total number of interaction for every
+        retrieved_pop (Tensor): The number of interaction for every
             item recommended.
         users (Tensor): The number of users evaluated.
+        compute_per_user (bool): Wether or not to compute the metric
+            per user or globally.
 
     Args:
         k (int): The cutoff for recommendations.
-        train_set (csr_matrix): The training interaction data.
+        num_users (int): Number of users in the training set.
+        item_interactions (Tensor): The counts for item interactions in training set.
         *args (Any): The argument list.
+        compute_per_user (bool): Wether or not to compute the metric
+            per user or globally.
         dist_sync_on_step (bool): Torchmetrics parameter.
         **kwargs (Any): The keyword argument dictionary.
     """
@@ -75,24 +79,37 @@ class ARP(TopKMetric):
         MetricBlock.TOP_K_INDICES,
         MetricBlock.TOP_K_VALUES,
     }
+    _CAN_COMPUTE_PER_USER: bool = True
 
-    total_pop: Tensor
+    retrieved_pop: Tensor
     users: Tensor
+    compute_per_user: bool
 
     def __init__(
         self,
         k: int,
-        train_set: csr_matrix,
+        num_users: int,
+        item_interactions: Tensor,
         *args: Any,
+        compute_per_user: bool = False,
         dist_sync_on_step: bool = False,
         **kwargs: Any,
     ):
         super().__init__(k, dist_sync_on_step)
-        self.pop = self.compute_popularity(train_set).unsqueeze(0)
-        self.add_state("total_pop", default=torch.tensor(0.0), dist_reduce_fx="sum")
+        self.pop = self.compute_popularity(item_interactions)
+        self.compute_per_user = compute_per_user
+
+        if self.compute_per_user:
+            self.add_state(
+                "retrieved_pop", default=torch.zeros(num_users), dist_reduce_fx="sum"
+            )  # Initialize a tensor to store metric value for each user
+        else:
+            self.add_state(
+                "retrieved_pop", default=torch.tensor(0.0), dist_reduce_fx="sum"
+            )  # Initialize a scalar to store global value
         self.add_state("users", default=torch.tensor(0.0), dist_reduce_fx="sum")
 
-    def update(self, preds: Tensor, **kwargs: Any):
+    def update(self, preds: Tensor, user_indices: Tensor, **kwargs: Any):
         """Updates the metric state with the new batch of predictions."""
         target: Tensor = kwargs.get("binary_relevance", torch.zeros_like(preds))
         users = kwargs.get("valid_users", self.valid_users(target))
@@ -112,21 +129,22 @@ class ARP(TopKMetric):
 
         batch_pop = self.pop.repeat(target.shape[0], 1)  # [batch_size x items]
 
-        self.total_pop += (rel * batch_pop).sum()
+        if self.compute_per_user:
+            self.retrieved_pop.index_add_(0, user_indices, (rel * batch_pop).sum(dim=1))
+        else:
+            self.retrieved_pop += (rel * batch_pop).sum()
 
         # Count only users with at least one interaction
         self.users += users
 
     def compute(self):
         """Computes the final metric value."""
-        arp = (
-            self.total_pop / (self.users * self.k)
-            if self.users > 0
-            else torch.tensor(0.0)
-        )
-        return {self.name: arp.item()}
-
-    def reset(self):
-        """Resets the metric state."""
-        self.total_pop.zero_()
-        self.users.zero_()
+        if self.compute_per_user:
+            arp = self.retrieved_pop / self.k
+        else:
+            arp = (
+                self.retrieved_pop / (self.users * self.k)
+                if self.users > 0
+                else torch.tensor(0.0)
+            ).item()
+        return {self.name: arp}

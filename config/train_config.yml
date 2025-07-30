@@ -5,49 +5,131 @@ reader:
   local_path: tests/test_dataset/movielens.csv
   rating_type: explicit
   sep: ','
+  # side:
+  #   local_path: tests/test_dataset/movielens_side.csv
+  #   sep: ','
   labels:
     user_id_label: user_id
     item_id_label: item_id
     rating_label: rating
     timestamp_label: timestamp
-  side:
-    local_path: tests/test_dataset/movielens_side.csv
-    sep: ','
-  clustering:
-    user_local_path: tests/test_dataset/movielens_user_cluster.csv
-    item_local_path: tests/test_dataset/movielens_item_cluster.csv
-    user_sep: ','
-    item_sep: ','
+  dtypes:
+    user_id_type: str
+    item_id_type: str
+    rating_type: float32
+    timestamp_type: float32
 writer:
-  dataset_name: MovieLens
+  dataset_name: DataFormat_Test
   writing_method: local
   local_experiment_path: experiment/test/
+  # save_split: true
+  # split:
+  #   labels:
+  #     user_id_label: user_id:token
+  #     item_id_label: item_id:token
+  #     rating_label: rating:float
+  #     timestamp_label: timestamp:float
 splitter:
   strategy: temporal_holdout
   test_ratio: 0.1
   val_ratio: 0.1
 models:
   EASE:
-    optimization:
-      strategy: grid
-      scheduler: fifo
-      properties:
-        mode: max
-        seed: 42
-      device: cpu
-      validation_metric: nDCG@10
-      #num_samples: 5
-      cpu_per_trial: 12
-    l2: 10
+    l2: 910
+  NeuMF:
+    mf_embedding_size: 32
+    mlp_embedding_size: 32
+    mlp_hidden_size: [32, 16]
+    mf_train: True
+    mlp_train: True
+    dropout: 0
+    epochs: 1
+    learning_rate: 0.0001
+    neg_samples: 1
+  LightGCN:
+    embedding_size: 16
+    n_layers: 1
+    reg_weight: 0.0001
+    epochs: 1
+    learning_rate: 0.0001
+  # EsKNN:
+  #   optimization:
+  #     strategy: hopt
+  #     num_samples: 50
+  #     cpu_per_trial: 2
+  #   l2: ['uniform', 1.0, 100.0]
+  #   similarity: cosine
+  #   filtering: ['uniform', 0., 0.35]
+  # GRU4Rec:
+  #   embedding_size: 2
+  #   hidden_size: 4
+  #   num_layers: 1
+  #   dropout_prob: 0.0001
+  #   weight_decay: 0.00005
+  #   epochs: 1
+  #   learning_rate: 0.001
+  #   neg_samples: 2
+  #   max_seq_len: 10
+  # SASRec:
+  #   embedding_size: 64
+  #   n_layers: 2
+  #   n_heads: 4
+  #   inner_size: 128
+  #   dropout_prob: 0.1
+  #   attn_dropout_prob: 0.1
+  #   learning_rate: 0.001
+  #   weight_decay: 1e-5
+  #   epochs: 50
+  #   neg_samples: 5
+  #   max_seq_len: 50
+  # gSASRec:
+  #   embedding_size: 32
+  #   n_layers: 2
+  #   n_heads: 4
+  #   inner_size: 64
+  #   dropout_prob: 0.1
+  #   attn_dropout_prob: 0.1
+  #   learning_rate: 0.001
+  #   gbce_t: 0.5
+  #   weight_decay: 1e-5
+  #   epochs: 10
+  #   neg_samples: 5
+  #   max_seq_len: 50
+  #   reuse_item_embeddings: True
+  # Caser:
+  #   embedding_size: 64
+  #   n_h: 8
+  #   n_v: 4
+  #   dropout_prob: 0.5
+  #   weight_decay: 0.0
+  #   epochs: 3
+  #   learning_rate: 0.001
+  #   neg_samples: 5
+  #   max_seq_len: 20
+  # FOSSIL:
+  #   embedding_size: 32
+  #   order_len: 8
+  #   reg_weight: 0.001
+  #   alpha: 0.001
+  #   weight_decay: 0.0
+  #   epochs: 1
+  #   learning_rate: 0.001
+  #   neg_samples: 5
+  #   max_seq_len: 20
 evaluation:
   top_k: [10, 20, 50]
-  metrics: [nDCG, Precision, Recall, HitRate]
+  metrics: [nDCG, Precision, Recall, HitRate, ItemCoverage, Gini]
+  max_metric_per_row: 8
 general:
   precision: float32
   batch_size: 1024
   verbose: 1
-  #recommendation:
-  #  save_recs: True
-  #  sep: \t
-  #  ext: .tsv
-  #  k: 50
+  recommendation:
+    save_recs: True
+    ext: .tsv
+    sep: \t
+  # callback:
+  #   callback_path: callbacks/my_callback.py
+  #   callback_name: ComputeNDCGOverIterations
+  #   kwargs:
+  #     save_path: plots/nDCG_over_iterations.png

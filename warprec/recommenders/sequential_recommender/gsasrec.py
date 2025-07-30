@@ -42,6 +42,7 @@ class gSASRec(Recommender, SequentialRecommenderUtils):
         dropout_prob (float): The probability of dropout for embeddings and other layers.
         attn_dropout_prob (float): The probability of dropout for the attention weights.
         weight_decay (float): The value of weight decay used in the optimizer.
+        batch_size (int): The batch size used during training.
         epochs (int): The number of training epochs.
         learning_rate (float): The learning rate value.
         gbce_t (float): The temperature parameter for the Group-wise Binary Cross-Entropy loss.
@@ -58,6 +59,7 @@ class gSASRec(Recommender, SequentialRecommenderUtils):
     dropout_prob: float
     attn_dropout_prob: float
     weight_decay: float
+    batch_size: int
     epochs: int
     learning_rate: float
     gbce_t: float
@@ -271,6 +273,7 @@ class gSASRec(Recommender, SequentialRecommenderUtils):
         dataloader = sessions.get_group_sequential_dataloader(
             max_seq_len=self.max_seq_len,
             num_negatives=self.neg_samples,
+            batch_size=self.batch_size,
         )
 
         self.train()
