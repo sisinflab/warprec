@@ -457,6 +457,9 @@ class LocalWriter(Writer):
             report["Hyperparameter_Exploration_Time"] = report[
                 "Hyperparameter_Exploration_Time"
             ].apply(format_secs)
+            report["Average_Training_Time"] = report["Average_Training_Time"].apply(
+                format_secs
+            )
             report["Evaluation_Time"] = report["Evaluation_Time"].apply(format_secs)
             report["Total_Time"] = report["Total_Time"].apply(format_secs)
 

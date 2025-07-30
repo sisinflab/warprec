@@ -177,18 +177,19 @@ class Trainer:
         self._verbose = ray_verbose
         self._dataset = ray.put(dataset)
 
-    def train_and_evaluate(self) -> Tuple[Recommender, List[Tuple[str, dict]]]:
+    def train_and_evaluate(self) -> Tuple[Recommender, List[Tuple[str, dict]], float]:
         """Main method of the Trainer class.
 
         This method will execute the training of the model and evaluation,
         according to information passed through configuration.
 
         Returns:
-            Tuple[Recommender, List[Tuple[str, dict]]]:
+            Tuple[Recommender, List[Tuple[str, dict]], float]:
                 - Recommender: The model trained.
                 - List[Tuple[str, dict]]:
                     - str: Path of checkpoint
                     - dict: Params of the model
+                - float: Average time of training.
         """
         logger.separator()
         logger.msg(
@@ -301,6 +302,13 @@ class Trainer:
         # Run the hyperparameter tuning
         results = tuner.fit()
 
+        # Compute average training time
+        successful_trials = [r for r in results if not r.error]  # type: ignore[attr-defined]
+        average_time = 0
+        if successful_trials:
+            total_times = [r.metrics["time_total_s"] for r in successful_trials]
+            average_time = sum(total_times) / len(total_times)
+
         # Retrieve results
         best_result = results.get_best_result(metric="score", mode=mode)
         best_params = best_result.config
@@ -343,7 +351,7 @@ class Trainer:
 
         ray.shutdown()
 
-        return best_model, all_checkpoints
+        return best_model, all_checkpoints, average_time
 
     def _objective_function(
         self,
