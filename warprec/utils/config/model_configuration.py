@@ -114,6 +114,8 @@ class Optimization(BaseModel):
             Used by some neural models, increasing this value will affect memory usage.
         num_samples (Optional[int]): The number of trials that Ray Tune will try.
             In case of a grid search, this parameter should be set to 1.
+        checkpoint_to_keep (Optional[int]): The number of checkpoints to keep
+            in the ray directory.
         cpu_per_trial (Optional[float]): The number of cpu cores dedicated to
             each trial.
         gpu_per_trial (Optional[float]): The number of gpu dedicated to
@@ -127,6 +129,7 @@ class Optimization(BaseModel):
     device: Optional[str] = "cpu"
     block_size: Optional[int] = 50
     num_samples: Optional[int] = 1
+    checkpoint_to_keep: Optional[int] = 2
     cpu_per_trial: Optional[float] = os.cpu_count()
     gpu_per_trial: Optional[float] = 0.0
 

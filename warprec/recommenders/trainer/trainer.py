@@ -208,7 +208,6 @@ class Trainer:
         properties = self._model_params.optimization.properties.model_dump()
         mode = self._model_params.optimization.properties.mode
         device = self._model_params.optimization.device
-        keep_all_ray_checkpoints = self._model_params.meta.keep_all_ray_checkpoints
 
         # Ray Tune parameters
         obj_function = tune.with_parameters(
@@ -286,7 +285,7 @@ class Trainer:
             callbacks=callbacks,
             verbose=self._verbose,
             checkpoint_config=CheckpointConfig(
-                num_to_keep=1 if not keep_all_ray_checkpoints else None,
+                num_to_keep=self._model_params.optimization.checkpoint_to_keep,
                 checkpoint_score_attribute="score",
                 checkpoint_score_order=mode,
             ),

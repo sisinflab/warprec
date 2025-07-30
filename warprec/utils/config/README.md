@@ -485,6 +485,7 @@ The `optimization` section let you decide how to train your model.
 - **validation_metric**: The validation metric used during training. Defaults to nDCG@5.
 - **device**: The device used during training and evaluation. Defaults to cpu. Supports cuda devices and also cuda devices with indexing, like cuda:1.
 - **num_samples**: The number of samples to generate for the different strategies. If the strategy is set to grid, then this field must be set to 1. Defaults to 1.
+- **checkpoint_to_keep**: Specifies the number of checkpoints to retain in the Ray directory. Default is 2. Setting this value too low may result in warnings from Ray regarding multiple checkpoint deletion, while setting it too high may lead to excessive disk usage due to the accumulation of checkpoint data.
 - **cpu_per_trial**: The number of cpu cores per trial. Must be greater than 0. Supports floating numbers. Defaults to the maximum number of cpu cores available locally.
 - **gpu_per_trial**: The number of gpus per trial. Supports floating numbers. Defaults to 0.
 
