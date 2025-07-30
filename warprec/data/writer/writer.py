@@ -446,17 +446,10 @@ class LocalWriter(Writer):
         )
         try:
             report = pd.DataFrame(time_report)
-            report["Data_Preparation_Time"] = report["Data_Preparation_Time"].apply(
-                format_secs
-            )
-            report["Hyperparameter_Exploration_Time"] = report[
-                "Hyperparameter_Exploration_Time"
-            ].apply(format_secs)
-            report["Average_Training_Time"] = report["Average_Training_Time"].apply(
-                format_secs
-            )
-            report["Evaluation_Time"] = report["Evaluation_Time"].apply(format_secs)
-            report["Total_Time"] = report["Total_Time"].apply(format_secs)
+            float_columns = report.select_dtypes(include=["float32", "float64"]).columns
+
+            for col in float_columns:
+                report[col] = report[col].apply(format_secs)
 
             report.to_csv(
                 time_report_path,
