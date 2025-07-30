@@ -16,6 +16,7 @@ To make everything easier to digest, this documentation includes a Table of Cont
 ## 📚 Table of Contents
 - 📖 [Reader Configuration](#📖-reader-configuration)
 - ✍️ [Writer Configuration](#️✍️-writer-configuration)
+- 🧹 [Filtering Configuration](#🧹-filtering-configuration)
 - 🔀 [Splitter Configuration](#🔀-splitter-configuration)
 - 🖥️ [Dashboard Configuration](#🖥️-dashboard-configuration)
 - 🧠 [Models Configuration](#🧠-models-configuration)
@@ -223,6 +224,113 @@ writer:
 - The `local_experiment_path` must exist if you choose `local` as the `writing_method`. Otherwise, WarpRec will raise an error.
 - Custom separators (e.g., `|`, `,`, etc.) must be valid characters. Invalid separators will raise an exception.
 - Only local writing is currently supported, but this structure allows easy extension for remote/cloud options in future versions.
+
+## 🧹 Filtering Configuration
+
+The `Filtering Configuration` section specifies the preprocessing strategies applied to the dataset prior to the splitting phase. Filtering is essential in scenarios where the dataset contains redundant information or its size exceeds the available computational resources.
+Filtering strategies are executed sequentially, in the order they are defined, which may affect the final outcome. Each strategy must be specified using the following format:
+
+```yaml
+filtering:
+    strategy_name_1:
+        arg_name_1: value_1
+    strategy_name_2:
+        arg_name_1: value_1
+        arg_name_2: value_2
+...
+```
+
+The filtering strategies will be applied from top to bottom as listed. The following strategies are currently supported:
+
+`MinRating`: Removes all interactions with a rating value strictly lower than the specified `min_rating` threshold. This strategy is not compatible with implicit feedback datasets.
+
+```yaml
+filtering:
+    MinRating:
+        min_rating: 3.0
+...
+```
+
+`UserAverage`: Removes all interactions for which the rating is below the corresponding user’s average rating. Not applicable in implicit feedback scenarios.
+
+```yaml
+filtering:
+    UserAverage: {} # No parameters needed
+...
+```
+
+`UserMin`: Removes all interactions involving users with fewer interactions than the specified `min_interactions` threshold.
+
+```yaml
+filtering:
+    UserMin:
+        min_interactions: 5
+...
+```
+
+`UserMax`: Removes all interactions involving users with more interactions than the specified `max_interactions` threshold. This strategy is useful for analyzing cold-start user scenarios.
+
+```yaml
+filtering:
+    UserMax:
+        max_interactions: 2
+...
+```
+
+`ItemMin`: Removes all interactions involving items with fewer interactions than the specified `min_interactions` threshold.
+
+```yaml
+filtering:
+    ItemMin:
+        min_interactions: 5
+...
+```
+
+`ItemMax`: Removes all interactions involving items with more interactions than the specified `max_interactions` threshold. This strategy is useful for analyzing cold-start item scenarios.
+
+```yaml
+filtering:
+    ItemMax:
+        max_interactions: 2
+...
+```
+
+`IterativeKCore`: Applies `UserMin` and `ItemMin` iteratively until no further interactions can be removed (i.e., until convergence is reached).
+
+```yaml
+filtering:
+    IterativeKCore:
+        min_interactions: 5
+...
+```
+
+`NRoundsKCore`: Applies `UserMin` and `ItemMin` for a fixed number of iterations. This is a simplified variant of `IterativeKCore`, appropriate when convergence is not required.
+
+```yaml
+filtering:
+    NRoundsKCore:
+        rounds: 3
+        min_interactions: 5
+...
+```
+
+### 📌 Example of Filtering Configuration
+
+The following example demonstrates a configuration where all ratings below 3.0 are first removed, followed by the removal of users with fewer than 10 interactions:
+
+```yaml
+filtering:
+    MinRating:
+        min_rating: 3.0
+    UserMin:
+        min_interactions: 10
+...
+```
+
+### ⚠️ Notes and Validation
+
+- Strategy names and their respective parameter names must match exactly as defined; otherwise, the configuration will not be processed correctly.
+- The execution order of the filtering strategies affects the final dataset. Changing the sequence may lead to different results.
 
 ## 🔀 Splitter Configuration
 
