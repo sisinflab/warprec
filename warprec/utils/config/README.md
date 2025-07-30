@@ -464,7 +464,6 @@ The `meta` section let you decide some information about the model that do not i
 
 - **save_model**: Flag that decides whether or not to save the model in the experiment directory. Defaults to false.
 - **save_recs**: Flag that decides whether or not to save the recommendations. Defaults to false.
-- **keep_all_ray_checkpoints**: Flag that decides whether or not to keep all the checkpoints that Ray Tune will create. On a large scale training this option is advised to be set on false. Defaults to false.
 - **load_from**: Local path to a model weights to be loaded. Defaults to None.
 - **implementation**: The implementation used during the training, if more than one is present. Defaults to latest.
 

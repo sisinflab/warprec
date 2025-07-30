@@ -1,5 +1,4 @@
 import argparse
-import os
 import time
 from argparse import Namespace
 
@@ -13,7 +12,6 @@ from warprec.data.filtering import apply_filtering
 from warprec.utils.config import load_yaml, load_callback
 from warprec.utils.logger import logger
 from warprec.recommenders.trainer import Trainer
-from warprec.recommenders.base_recommender import generate_model_name
 from warprec.evaluation.evaluator import Evaluator
 from warprec.evaluation.statistical_significance import compute_paired_statistical_test
 
@@ -242,13 +240,6 @@ def main(args: Namespace):
         # Model serialization
         if params["meta"]["save_model"]:
             writer.write_model(best_model)
-
-            if params["meta"]["keep_all_ray_checkpoints"]:
-                for check_path, param in checkpoint_param:
-                    if os.path.exists(check_path):
-                        source_path = os.path.join(check_path, "checkpoint.pt")
-                        checkpoint_name = generate_model_name(model_name, param)
-                        writer.checkpoint_from_ray(source_path, checkpoint_name)
 
         # Timing report for the current model
         model_timing_report.append(

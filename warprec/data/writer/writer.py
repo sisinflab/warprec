@@ -1,4 +1,3 @@
-import shutil
 from os.path import join
 from pathlib import Path
 from typing import Dict, List, Any
@@ -63,10 +62,6 @@ class Writer(ABC):
     @abstractmethod
     def write_split(self, dataset: Dataset):
         """This method writes the split of the dataset into a destination."""
-
-    @abstractmethod
-    def checkpoint_from_ray(self, source: str, new_name: str):
-        """This method takes a ray checkpoint and moves to a destination."""
 
 
 class LocalWriter(Writer):
@@ -502,7 +497,3 @@ class LocalWriter(Writer):
             )
         except Exception as e:
             logger.negative(f"Error writing statistical significance test results: {e}")
-
-    def checkpoint_from_ray(self, source: str, new_name: str):
-        destination = join(self.experiment_serialized_models_dir, new_name + ".pth")
-        shutil.move(source, destination)
