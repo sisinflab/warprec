@@ -184,19 +184,16 @@ class Trainer:
         self._verbose = ray_verbose
         self._dataset = ray.put(dataset)
 
-    def train_and_evaluate(self) -> Tuple[Recommender, List[Tuple[str, dict]], float]:
+    def train_and_evaluate(self) -> Tuple[Recommender, dict]:
         """Main method of the Trainer class.
 
         This method will execute the training of the model and evaluation,
         according to information passed through configuration.
 
         Returns:
-            Tuple[Recommender, List[Tuple[str, dict]], float]:
+            Tuple[Recommender, dict]:
                 - Recommender: The model trained.
-                - List[Tuple[str, dict]]:
-                    - str: Path of checkpoint
-                    - dict: Params of the model
-                - float: Average time of training.
+                - dict: Summary report of the training.
         """
         logger.separator()
         logger.msg(
@@ -318,10 +315,12 @@ class Trainer:
 
         # Compute average training time
         successful_trials = [r for r in results if not r.error]  # type: ignore[attr-defined]
-        average_time = 0
+        report = {}
         if successful_trials:
-            total_times = [r.metrics["time_total_s"] for r in successful_trials]
-            average_time = sum(total_times) / len(total_times)
+            total_trial_times = [r.metrics["time_total_s"] for r in successful_trials]
+            report["Average_Trial_Time"] = sum(total_trial_times) / len(
+                total_trial_times
+            )
 
         # Retrieve results
         best_result = results.get_best_result(metric="score", mode=mode)
@@ -356,16 +355,9 @@ class Trainer:
         )
         best_model.load_state_dict(model_state)
 
-        # Get all checkpoints and their parameters
-        all_checkpoints = [
-            (r.checkpoint.to_directory(), r.config)
-            for r in results  # type: ignore[attr-defined]
-            if r.checkpoint
-        ]
-
         ray.shutdown()
 
-        return best_model, all_checkpoints, average_time
+        return best_model, report
 
     def parse_params(self, params: dict) -> dict:
         """This method parses the parameters of a model.

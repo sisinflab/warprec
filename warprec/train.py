@@ -182,7 +182,7 @@ def main(args: Namespace):
             custom_models=config.general.custom_models,
             config=config,
         )
-        best_model, checkpoint_param, avg_train_time = trainer.train_and_evaluate()
+        best_model, ray_report = trainer.train_and_evaluate()
         model_exploration_total_time = time.time() - model_exploration_start_time
 
         # Callback on training complete
@@ -247,7 +247,7 @@ def main(args: Namespace):
                 "Model_Name": model_name,
                 "Data_Preparation_Time": data_preparation_time,
                 "Hyperparameter_Exploration_Time": model_exploration_total_time,
-                "Average_Training_Time": avg_train_time,
+                **ray_report,
                 "Evaluation_Time": model_evaluation_total_time,
                 "Total_Time": model_exploration_total_time
                 + model_evaluation_total_time,
