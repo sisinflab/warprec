@@ -451,6 +451,11 @@ class LocalWriter(Writer):
             for col in float_columns:
                 report[col] = report[col].apply(format_secs)
 
+            # Reordering columns
+            first_columns = ["Model_Name", "Trainable_Params", "Total_Params"]
+            other_cols = [col for col in report.columns if col not in first_columns]
+            report = report[first_columns + other_cols]
+
             report.to_csv(
                 time_report_path,
                 sep=writing_params.sep,
