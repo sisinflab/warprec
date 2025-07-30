@@ -1,5 +1,6 @@
 import os
 import torch
+import uuid
 from typing import List, Tuple, Optional, Dict
 from copy import deepcopy
 
@@ -7,6 +8,7 @@ import ray
 from ray import tune
 from ray.tune import Tuner, TuneConfig, RunConfig, CheckpointConfig
 from ray.tune.stopper import Stopper
+from ray.tune.experiment import Trial
 from ray.air.integrations.wandb import WandbLoggerCallback
 from ray.air.integrations.mlflow import MLflowLoggerCallback
 from codecarbon import EmissionsTracker
@@ -296,6 +298,7 @@ class Trainer:
             search_alg=search_alg,  # type: ignore[arg-type]
             scheduler=scheduler,  # type: ignore[arg-type]
             num_samples=self._model_params.optimization.num_samples,
+            trial_name_creator=self.trail_name(),
         )
 
         tuner = Tuner(
@@ -394,6 +397,14 @@ class Trainer:
                 tune_params[k] = search_space_registry.get(v[0])(v[1:])
 
         return tune_params
+
+    def trail_name(self):
+        def _trial_name_creator(trial: Trial):
+            random_id = str(uuid.uuid4())[:8]
+
+            return f"{self.model_name}_{random_id}"
+
+        return _trial_name_creator
 
 
 class CodeCarbonCallback(tune.Callback):
