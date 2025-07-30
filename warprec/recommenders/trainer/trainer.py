@@ -164,15 +164,17 @@ class Trainer:
         self._custom_callback = custom_callback
         self._custom_models = custom_models
         self.model_name = model_name
-        self._evaluator = Evaluator(
-            [metric_name],
-            [top_k],
-            train_set=dataset.train_set.get_sparse(),
-            beta=beta,
-            pop_ratio=pop_ratio,
-            feature_lookup=dataset.get_features_lookup(),
-            user_cluster=dataset.get_user_cluster(),
-            item_cluster=dataset.get_item_cluster(),
+        self._evaluator = ray.put(
+            Evaluator(
+                [metric_name],
+                [top_k],
+                train_set=dataset.train_set.get_sparse(),
+                beta=beta,
+                pop_ratio=pop_ratio,
+                feature_lookup=dataset.get_features_lookup(),
+                user_cluster=dataset.get_user_cluster(),
+                item_cluster=dataset.get_item_cluster(),
+            )
         )
         self._train_param = self.parse_params(param)
         self._metric_name = metric_name
