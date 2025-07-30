@@ -313,15 +313,6 @@ class Trainer:
         # Run the hyperparameter tuning
         results = tuner.fit()
 
-        # Compute average training time
-        successful_trials = [r for r in results if not r.error]  # type: ignore[attr-defined]
-        report = {}
-        if successful_trials:
-            total_trial_times = [r.metrics["time_total_s"] for r in successful_trials]
-            report["Average_Trial_Time"] = sum(total_trial_times) / len(
-                total_trial_times
-            )
-
         # Retrieve results
         best_result = results.get_best_result(metric="score", mode=mode)
         best_params = best_result.config
@@ -354,6 +345,19 @@ class Trainer:
             info=self.infos,
         )
         best_model.load_state_dict(model_state)
+
+        # Produce the report of the training
+        successful_trials = [r for r in results if not r.error]  # type: ignore[attr-defined]
+        report = {}
+        if successful_trials:
+            total_trial_times = [r.metrics["time_total_s"] for r in successful_trials]
+            report["Average_Trial_Time"] = sum(total_trial_times) / len(
+                total_trial_times
+            )
+        report["Total_Params"] = sum(p.numel() for p in best_model.parameters())
+        report["Trainable_Params"] = sum(
+            p.numel() for p in best_model.parameters() if p.requires_grad
+        )
 
         ray.shutdown()
 
