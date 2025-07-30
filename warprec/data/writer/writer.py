@@ -432,7 +432,7 @@ class LocalWriter(Writer):
         """
 
         def format_secs(secs):
-            return str(timedelta(seconds=round(secs)))
+            return str(timedelta(seconds=secs))
 
         if self.config:
             writing_params = self.config.writer.results
