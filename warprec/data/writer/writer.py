@@ -5,6 +5,7 @@ from datetime import datetime
 from abc import ABC, abstractmethod
 
 import pandas as pd
+import numpy as np
 import torch
 import json
 from pandas import DataFrame
@@ -432,7 +433,10 @@ class LocalWriter(Writer):
         """
 
         def format_secs(secs):
-            return str(timedelta(seconds=secs))
+            try:
+                return str(timedelta(seconds=secs))
+            except Exception:
+                return np.nan
 
         if self.config:
             writing_params = self.config.writer.results
