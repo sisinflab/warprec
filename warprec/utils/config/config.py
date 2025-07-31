@@ -143,10 +143,18 @@ class Configuration(BaseModel):
                     # In case the RatingType is explicit, we add the
                     # score label and read scores from the source.
                     _column_names.append(self.reader.labels.rating_label)
-                if self.splitter is not None and self.splitter.strategy in [
-                    SplittingStrategies.TEMPORAL_HOLDOUT,
-                    SplittingStrategies.TEMPORAL_LEAVE_K_OUT,
-                ]:
+                if self.splitter is not None and (
+                    self.splitter.test_splitting.strategy
+                    in [
+                        SplittingStrategies.TEMPORAL_HOLDOUT,
+                        SplittingStrategies.TEMPORAL_LEAVE_K_OUT,
+                    ]
+                    or self.splitter.validation_splitting.strategy
+                    in [
+                        SplittingStrategies.TEMPORAL_HOLDOUT,
+                        SplittingStrategies.TEMPORAL_LEAVE_K_OUT,
+                    ]
+                ):
                     # In case the SplittingStrategy is temporal, we add the
                     # timestamp label and read timestamps from the source.
                     _column_names.append(self.reader.labels.timestamp_label)
@@ -175,10 +183,18 @@ class Configuration(BaseModel):
                 if self.reader.rating_type == RatingType.EXPLICIT:
                     _expected_columns += 1
                     _column_names.append(self.reader.labels.rating_label)
-                if self.splitter.strategy in [
-                    SplittingStrategies.TEMPORAL_HOLDOUT,
-                    SplittingStrategies.TEMPORAL_LEAVE_K_OUT,
-                ]:
+                if self.splitter is not None and (
+                    self.splitter.test_splitting.strategy
+                    in [
+                        SplittingStrategies.TEMPORAL_HOLDOUT,
+                        SplittingStrategies.TEMPORAL_LEAVE_K_OUT,
+                    ]
+                    or self.splitter.validation_splitting.strategy
+                    in [
+                        SplittingStrategies.TEMPORAL_HOLDOUT,
+                        SplittingStrategies.TEMPORAL_LEAVE_K_OUT,
+                    ]
+                ):
                     _expected_columns += 1
                     _column_names.append(self.reader.labels.timestamp_label)
                 if len(_header) != _expected_columns:
