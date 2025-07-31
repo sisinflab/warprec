@@ -452,7 +452,11 @@ class LocalWriter(Writer):
                 report[col] = report[col].apply(format_secs)
 
             # Reordering columns
-            first_columns = ["Model_Name", "Trainable_Params", "Total_Params"]
+            first_columns = [
+                "Model_Name",
+                "Trainable_Params (Best Model)",
+                "Total_Params (Best Model)",
+            ]
             other_cols = [col for col in report.columns if col not in first_columns]
             report = report[first_columns + other_cols]
 

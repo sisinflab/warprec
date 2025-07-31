@@ -354,8 +354,10 @@ class Trainer:
             report["Average_Trial_Time"] = sum(total_trial_times) / len(
                 total_trial_times
             )
-        report["Total_Params"] = sum(p.numel() for p in best_model.parameters())
-        report["Trainable_Params"] = sum(
+        report["Total_Params (Best Model)"] = sum(
+            p.numel() for p in best_model.parameters()
+        )
+        report["Trainable_Params (Best Model)"] = sum(
             p.numel() for p in best_model.parameters() if p.requires_grad
         )
 
