@@ -174,6 +174,11 @@ class SplittingConfig(BaseModel):
         """
         tol = 1e-6  # Tolerance will be used to check ratios
 
+        if self.test_splitting.strategy is None:
+            raise ValueError(
+                "The test requires a splitting strategy, but none have been provided."
+            )
+
         if self.test_splitting.ratio and self.validation_splitting.ratio:
             if self.test_splitting.ratio + self.validation_splitting.ratio + tol >= 1.0:
                 raise ValueError(
