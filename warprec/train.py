@@ -1,6 +1,6 @@
 import argparse
-import os
 from typing import List, Tuple
+import time
 from argparse import Namespace
 
 import ray
@@ -15,7 +15,6 @@ from warprec.utils.callback import WarpRecCallback
 from warprec.utils.config import load_yaml, load_callback
 from warprec.utils.logger import logger
 from warprec.recommenders.trainer import Trainer
-from warprec.recommenders.base_recommender import generate_model_name
 from warprec.evaluation.evaluator import Evaluator
 
 
@@ -25,6 +24,7 @@ def main(args: Namespace):
     This method will start the train pipeline.
     """
     logger.msg("Starting experiment.")
+    experiment_start_time = time.time()
 
     # Config parser testing
     config = load_yaml(args.config)
@@ -167,10 +167,17 @@ def main(args: Namespace):
         item_cluster=main_dataset.get_item_cluster(),
     )
 
+    data_preparation_time = time.time() - experiment_start_time
+    logger.positive(
+        f"Data preparation completed in {data_preparation_time:.2f} seconds."
+    )
+    model_timing_report = []
     # Before starting training process, initialize Ray
     ray.init(runtime_env={"py_modules": config.general.custom_models})
 
     for model_name in models:
+        model_exploration_start_time = time.time()
+
         params = config.models[model_name]
         val_metric, val_k = config.validation_metric(
             params["optimization"]["validation_metric"]
@@ -188,12 +195,14 @@ def main(args: Namespace):
             custom_models=config.general.custom_models,
             config=config,
         )
-        best_model, checkpoint_param = trainer.train_and_evaluate()
+        best_model, ray_report = trainer.train_and_evaluate()
+        model_exploration_total_time = time.time() - model_exploration_start_time
 
         # Callback on training complete
         callback.on_training_complete(model=best_model)
 
         # Evaluation testing
+        model_evaluation_start_time = time.time()
         evaluator.evaluate(
             best_model,
             main_dataset,
@@ -201,6 +210,7 @@ def main(args: Namespace):
             verbose=True,
         )
         results = evaluator.compute_results()
+        model_evaluation_total_time = time.time() - model_evaluation_start_time
         evaluator.print_console(results, "Test", config.evaluation.max_metric_per_row)
 
         if requires_stat_significance:
@@ -241,12 +251,21 @@ def main(args: Namespace):
         if params["meta"]["save_model"]:
             writer.write_model(best_model)
 
-            if params["meta"]["keep_all_ray_checkpoints"]:
-                for check_path, param in checkpoint_param:
-                    if os.path.exists(check_path):
-                        source_path = os.path.join(check_path, "checkpoint.pt")
-                        checkpoint_name = generate_model_name(model_name, param)
-                        writer.checkpoint_from_ray(source_path, checkpoint_name)
+        # Timing report for the current model
+        model_timing_report.append(
+            {
+                "Model_Name": model_name,
+                "Data_Preparation_Time": data_preparation_time,
+                "Hyperparameter_Exploration_Time": model_exploration_total_time,
+                **ray_report,
+                "Evaluation_Time": model_evaluation_total_time,
+                "Total_Time": model_exploration_total_time
+                + model_evaluation_total_time,
+            }
+        )
+
+    if config.general.time_report:
+        writer.write_time_report(model_timing_report)
 
     if requires_stat_significance:
         raise NotImplementedError("Temporary disabled.")

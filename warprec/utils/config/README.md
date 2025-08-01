@@ -464,7 +464,6 @@ The `meta` section let you decide some information about the model that do not i
 
 - **save_model**: Flag that decides whether or not to save the model in the experiment directory. Defaults to false.
 - **save_recs**: Flag that decides whether or not to save the recommendations. Defaults to false.
-- **keep_all_ray_checkpoints**: Flag that decides whether or not to keep all the checkpoints that Ray Tune will create. On a large scale training this option is advised to be set on false. Defaults to false.
 - **load_from**: Local path to a model weights to be loaded. Defaults to None.
 - **implementation**: The implementation used during the training, if more than one is present. Defaults to latest.
 
@@ -485,6 +484,7 @@ The `optimization` section let you decide how to train your model.
 - **validation_metric**: The validation metric used during training. Defaults to nDCG@5.
 - **device**: The device used during training and evaluation. Defaults to cpu. Supports cuda devices and also cuda devices with indexing, like cuda:1.
 - **num_samples**: The number of samples to generate for the different strategies. If the strategy is set to grid, then this field must be set to 1. Defaults to 1.
+- **checkpoint_to_keep**: Specifies the number of checkpoints to retain in the Ray directory. Default is 2. Setting this value too low may result in warnings from Ray regarding multiple checkpoint deletion, while setting it too high may lead to excessive disk usage due to the accumulation of checkpoint data.
 - **cpu_per_trial**: The number of cpu cores per trial. Must be greater than 0. Supports floating numbers. Defaults to the maximum number of cpu cores available locally.
 - **gpu_per_trial**: The number of gpus per trial. Supports floating numbers. Defaults to 0.
 
@@ -705,6 +705,8 @@ The `General Configuration` section defines some parameters that will affect the
 The `General Configuration` can be configured using the following keywords:
 
 - **precision**: The precision to be used inside the experiment. Defaults to float32.
+- **ray_verbose**: . The Ray Tune verbosity value. Ray Tune accepts verbosity levels in a range from 0 to 3. Defaults to 1.
+- **time_report**: Whether to report the time taken by each step. Defaults to True.
 - **ray_verbose**: The Ray Tune verbosity value. Ray Tune accepts verbosity levels in a range from 0 to 3. Defaults to 1.
 - **custom_models**: Modules to import into WarpRec for loading custom models within the main pipeline. Accepted values are a string or a list of strings.
 - **callback**: A nested section dedicated to the optional callback.

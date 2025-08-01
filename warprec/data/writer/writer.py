@@ -1,15 +1,17 @@
-import shutil
 from os.path import join
 from pathlib import Path
-from typing import Dict, List
+from typing import Dict, List, Any
 from datetime import datetime
 from abc import ABC, abstractmethod
 
 import pandas as pd
+import numpy as np
 import torch
 import json
 from pandas import DataFrame
 from torch import Tensor
+from datetime import timedelta
+
 from warprec.utils.config import Configuration
 from warprec.data.dataset import Dataset
 from warprec.recommenders.base_recommender import Recommender
@@ -61,10 +63,6 @@ class Writer(ABC):
     @abstractmethod
     def write_split(self, dataset: Dataset):
         """This method writes the split of the dataset into a destination."""
-
-    @abstractmethod
-    def checkpoint_from_ray(self, source: str, new_name: str):
-        """This method takes a ray checkpoint and moves to a destination."""
 
 
 class LocalWriter(Writer):
@@ -430,6 +428,54 @@ class LocalWriter(Writer):
                 index=None,
             )
 
+    def write_time_report(self, time_report: List[Dict[str, Any]]):
+        """This method writes the time report into a local path.
+
+        Args:
+            time_report (List[Dict[str, Any]]): The time report to write.
+        """
+
+        def format_secs(secs):
+            try:
+                return str(timedelta(seconds=secs))
+            except Exception:
+                return np.nan
+
+        if self.config:
+            writing_params = self.config.writer.results
+        else:
+            writing_params = ResultsWriting(sep="\t", ext=".tsv")
+
+        # experiment_path/evaluation/Time_Report_{timestamp}.{ext}
+        time_report_path = join(
+            self.experiment_evaluation_dir,
+            f"Time_Report_{self._timestamp}{writing_params.ext}",
+        )
+        try:
+            report = pd.DataFrame(time_report)
+            float_columns = report.select_dtypes(include=["float32", "float64"]).columns
+
+            for col in float_columns:
+                report[col] = report[col].apply(format_secs)
+
+            # Reordering columns
+            first_columns = [
+                "Model_Name",
+                "Trainable_Params (Best Model)",
+                "Total_Params (Best Model)",
+            ]
+            other_cols = [col for col in report.columns if col not in first_columns]
+            report = report[first_columns + other_cols]
+
+            report.to_csv(
+                time_report_path,
+                sep=writing_params.sep,
+                index=False,
+            )
+            logger.msg(f"Time report written to {time_report_path}")
+        except Exception as e:
+            logger.negative(f"Error writing time report: {e}")
+
     def write_statistical_significance_test(
         self, test_results: DataFrame, test_name: str
     ):
@@ -460,7 +506,3 @@ class LocalWriter(Writer):
             )
         except Exception as e:
             logger.negative(f"Error writing statistical significance test results: {e}")
-
-    def checkpoint_from_ray(self, source: str, new_name: str):
-        destination = join(self.experiment_serialized_models_dir, new_name + ".pth")
-        shutil.move(source, destination)

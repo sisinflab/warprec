@@ -30,27 +30,14 @@ class Meta(BaseModel):
     Attributes:
         save_model (Optional[bool]): Whether save or not the model state after training.
         save_recs (Optional[bool]): Whether save or not the recommendations after training.
-        keep_all_ray_checkpoints (Optional[bool]): Wether or not to save all the
-            checkpoints for the model optimization.
         load_from (Optional[str]): The path where a previous model state has been saved.
         implementation (Optional[str]): The implementation to be used.
     """
 
     save_model: Optional[bool] = False
     save_recs: Optional[bool] = False
-    keep_all_ray_checkpoints: Optional[bool] = False
     load_from: Optional[str] = None
     implementation: Optional[str] = "latest"
-
-    @model_validator(mode="after")
-    def model_validation(self):
-        """Meta model validation."""
-        if not self.save_model and self.keep_all_ray_checkpoints:
-            raise ValueError(
-                "You have set save_model to False but keep_all_ray_checkpoints to True. "
-                "You cannot save all checkpoints if the save_model parameter has not been set."
-            )
-        return self
 
 
 class Properties(BaseModel):
@@ -114,6 +101,8 @@ class Optimization(BaseModel):
             Used by some neural models, increasing this value will affect memory usage.
         num_samples (Optional[int]): The number of trials that Ray Tune will try.
             In case of a grid search, this parameter should be set to 1.
+        checkpoint_to_keep (Optional[int]): The number of checkpoints to keep
+            in the ray directory.
         cpu_per_trial (Optional[float]): The number of cpu cores dedicated to
             each trial.
         gpu_per_trial (Optional[float]): The number of gpu dedicated to
@@ -127,6 +116,7 @@ class Optimization(BaseModel):
     device: Optional[str] = "cpu"
     block_size: Optional[int] = 50
     num_samples: Optional[int] = 1
+    checkpoint_to_keep: Optional[int] = 2
     cpu_per_trial: Optional[float] = os.cpu_count()
     gpu_per_trial: Optional[float] = 0.0
 

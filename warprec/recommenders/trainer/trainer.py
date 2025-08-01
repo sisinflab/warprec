@@ -1,15 +1,16 @@
 import os
-import shutil
-from typing import List, Tuple, Optional, Dict, Any
+import torch
+import uuid
+from typing import List, Tuple, Optional, Dict
 from copy import deepcopy
 
 import ray
-import torch
 from ray import tune
+from ray.tune import Tuner, TuneConfig, RunConfig, CheckpointConfig
 from ray.tune.stopper import Stopper
+from ray.tune.experiment import Trial
 from ray.air.integrations.wandb import WandbLoggerCallback
 from ray.air.integrations.mlflow import MLflowLoggerCallback
-from ray.tune.experiment.trial import Trial
 from codecarbon import EmissionsTracker
 from warprec.recommenders.base_recommender import Recommender
 from warprec.data.dataset import Dataset
@@ -165,15 +166,17 @@ class Trainer:
         self._custom_callback = custom_callback
         self._custom_models = custom_models
         self.model_name = model_name
-        self._evaluator = Evaluator(
-            [metric_name],
-            [top_k],
-            train_set=dataset.train_set.get_sparse(),
-            beta=beta,
-            pop_ratio=pop_ratio,
-            feature_lookup=dataset.get_features_lookup(),
-            user_cluster=dataset.get_user_cluster(),
-            item_cluster=dataset.get_item_cluster(),
+        self._evaluator = ray.put(
+            Evaluator(
+                [metric_name],
+                [top_k],
+                train_set=dataset.train_set.get_sparse(),
+                beta=beta,
+                pop_ratio=pop_ratio,
+                feature_lookup=dataset.get_features_lookup(),
+                user_cluster=dataset.get_user_cluster(),
+                item_cluster=dataset.get_item_cluster(),
+            )
         )
         self._train_param = self.parse_params(param)
         self._metric_name = metric_name
@@ -181,18 +184,16 @@ class Trainer:
         self._verbose = ray_verbose
         self._dataset = ray.put(dataset)
 
-    def train_and_evaluate(self) -> Tuple[Recommender, List[Tuple[str, dict]]]:
+    def train_and_evaluate(self) -> Tuple[Recommender, dict]:
         """Main method of the Trainer class.
 
         This method will execute the training of the model and evaluation,
         according to information passed through configuration.
 
         Returns:
-            Tuple[Recommender, List[Tuple[str, dict]]]:
+            Tuple[Recommender, dict]:
                 - Recommender: The model trained.
-                - List[Tuple[str, dict]]:
-                    - str: Path of checkpoint
-                    - dict: Params of the model
+                - dict: Summary report of the training.
         """
         logger.separator()
         logger.msg(
@@ -204,7 +205,6 @@ class Trainer:
         properties = self._model_params.optimization.properties.model_dump()
         mode = self._model_params.optimization.properties.mode
         device = self._model_params.optimization.device
-        keep_all_ray_checkpoints = self._model_params.meta.keep_all_ray_checkpoints
 
         # Ray Tune parameters
         obj_function = tune.with_parameters(
@@ -230,10 +230,6 @@ class Trainer:
             self._model_params.optimization.scheduler, **properties
         )
 
-        best_checkpoint_callback = BestCheckpointCallback(
-            "score", mode, keep_all_ray_checkpoints
-        )
-
         early_stopping: Stopper = None
         if self._model_params.early_stopping is not None:
             early_stopping = EarlyStopping(
@@ -245,10 +241,7 @@ class Trainer:
             )
 
         # Setup callbacks
-        callbacks: List[tune.Callback] = [
-            best_checkpoint_callback,
-            self._custom_callback,
-        ]
+        callbacks: List[tune.Callback] = [self._custom_callback]
 
         if self._dashboard.wandb.enabled:
             callbacks.append(
@@ -271,7 +264,6 @@ class Trainer:
                     tracking_mode=self._dashboard.codecarbon.tracking_mode,
                 )
             )
-
         if self._dashboard.mlflow.enabled:
             callbacks.append(
                 MLflowLoggerCallback(
@@ -284,26 +276,49 @@ class Trainer:
                 )
             )
 
-        # Run the hyperparameter tuning
-        tune.run(
-            obj_function,
-            resources_per_trial={
-                "cpu": self._model_params.optimization.cpu_per_trial,
-                "gpu": self._model_params.optimization.gpu_per_trial,
-            },
-            config=self._train_param,
-            search_alg=search_alg,
-            scheduler=scheduler,
-            num_samples=self._model_params.optimization.num_samples,
-            verbose=self._verbose,
-            callbacks=callbacks,
+        # Configure Ray Tune Tuner
+        run_config = RunConfig(
             stop=early_stopping,
+            callbacks=callbacks,
+            verbose=self._verbose,
+            checkpoint_config=CheckpointConfig(
+                num_to_keep=self._model_params.optimization.checkpoint_to_keep,
+                checkpoint_score_attribute="score",
+                checkpoint_score_order=mode,
+            ),
         )
 
-        # Retrieve results from callback
-        best_params = best_checkpoint_callback.best_params
-        best_score = best_checkpoint_callback.best_score
-        best_iter = best_checkpoint_callback.best_iteration
+        tune_config = TuneConfig(
+            metric="score",
+            mode=mode,
+            search_alg=search_alg,  # type: ignore[arg-type]
+            scheduler=scheduler,  # type: ignore[arg-type]
+            num_samples=self._model_params.optimization.num_samples,
+            trial_name_creator=self.trail_name(),
+        )
+
+        tuner = Tuner(
+            tune.with_resources(
+                obj_function,
+                resources={
+                    "cpu": self._model_params.optimization.cpu_per_trial,
+                    "gpu": self._model_params.optimization.gpu_per_trial,
+                },
+            ),
+            param_space=self._train_param,
+            tune_config=tune_config,
+            run_config=run_config,
+        )
+
+        # Run the hyperparameter tuning
+        results = tuner.fit()
+
+        # Retrieve results
+        best_result = results.get_best_result(metric="score", mode=mode)
+        best_params = best_result.config
+        best_score = best_result.metrics["score"]
+        best_iter = best_result.metrics["training_iteration"]
+        best_checkpoint = best_result.checkpoint
 
         logger.msg(
             f"Best params combination: {best_params} with a score of "
@@ -312,19 +327,15 @@ class Trainer:
             f"{best_score} "
             f"during iteration {best_iter}."
         )
-
         logger.positive(
             f"Hyperparameter tuning for {self.model_name} ended successfully."
         )
 
         # Retrieve best model from checkpoint
-        checkpoint = torch.load(
-            os.path.join(
-                best_checkpoint_callback.get_best_checkpoint(), "checkpoint.pt"
-            )
-        )
+        checkpoint_path = os.path.join(best_checkpoint.to_directory(), "checkpoint.pt")
+        checkpoint_data = torch.load(checkpoint_path)
+        model_state = checkpoint_data["model_state"]
 
-        model_state = checkpoint["model_state"]
         best_model = model_registry.get(
             name=self.model_name,
             implementation=self._model_params.meta.implementation,
@@ -335,9 +346,24 @@ class Trainer:
         )
         best_model.load_state_dict(model_state)
 
+        # Produce the report of the training
+        successful_trials = [r for r in results if not r.error]  # type: ignore[attr-defined]
+        report = {}
+        if successful_trials:
+            total_trial_times = [r.metrics["time_total_s"] for r in successful_trials]
+            report["Average_Trial_Time"] = sum(total_trial_times) / len(
+                total_trial_times
+            )
+        report["Total_Params (Best Model)"] = sum(
+            p.numel() for p in best_model.parameters()
+        )
+        report["Trainable_Params (Best Model)"] = sum(
+            p.numel() for p in best_model.parameters() if p.requires_grad
+        )
+
         ray.shutdown()
 
-        return best_model, best_checkpoint_callback.get_checkpoints()
+        return best_model, report
 
     def parse_params(self, params: dict) -> dict:
         """This method parses the parameters of a model.
@@ -369,86 +395,13 @@ class Trainer:
 
         return tune_params
 
+    def trail_name(self):
+        def _trial_name_creator(trial: Trial):
+            random_id = str(uuid.uuid4())[:8]
 
-class BestCheckpointCallback(tune.Callback):
-    """The Callback that handles the definition of the best checkpoint.
+            return f"{self.model_name}_{random_id}"
 
-    Args:
-        metric (str): Name of the metric.
-        mode (str): Hyperparameter tuning mode. Either 'max' or 'min'.
-        keep_all_ray_checkpoints (bool): Wether or not to keep all checkpoints.
-    """
-
-    def __init__(self, metric: str, mode: str, keep_all_ray_checkpoints: bool):
-        self.metric = metric
-        self.mode = mode
-        self.keep_all_ray_checkpoints = keep_all_ray_checkpoints
-        self.best_score = -float("inf") if mode == "max" else float("inf")
-        self.best_checkpoint: Optional[str] = None
-        self.checkpoint_param: List[Tuple[str, dict]] = []
-        self.best_params: Dict[str, Any] = {}
-        self.best_iteration: int = 0
-
-    def on_trial_save(
-        self, iteration: int, trials: List[Trial], trial: Trial, **info
-    ) -> None:
-        """Callback when trial is completed.
-
-        Args:
-            iteration (int): Number of iteration.
-            trials (List[Trial]): List of trials.
-            trial (Trial): The trial that has just been completed.
-            **info: The keyword arguments.
-
-        Returns:
-            None: If the score is None.
-        """
-        score = trial.last_result.get(self.metric, None)
-        self.checkpoint_param.append((trial.checkpoint.path, trial.config))
-        if score is None:
-            return
-
-        is_better = (self.mode == "max" and score > self.best_score) or (
-            self.mode == "min" and score < self.best_score
-        )
-
-        if is_better:
-            # Delete previous best checkpoint
-            if (
-                not self.keep_all_ray_checkpoints
-                and self.best_checkpoint
-                and os.path.exists(self.best_checkpoint)
-            ):
-                shutil.rmtree(self.best_checkpoint)
-
-            # Update best score and checkpoint
-            self.best_score = score
-            self.best_checkpoint = trial.checkpoint.path
-            self.best_params = trial.config
-            self.best_iteration = trial.last_result["training_iteration"]
-
-        elif not self.keep_all_ray_checkpoints and os.path.exists(
-            trial.checkpoint.path
-        ):
-            shutil.rmtree(trial.checkpoint.path)
-
-    def get_best_checkpoint(self) -> str:
-        """Method to retrieve the best checkpoint.
-
-        Returns:
-            str: The path to the best checkpoint.
-        """
-        return self.best_checkpoint
-
-    def get_checkpoints(self) -> List[Tuple[str, dict]]:
-        """Method to retrieve checkpoint and their params.
-
-        Returns:
-            List[Tuple[str, dict]]:
-                str: The path to the checkpoint.
-                dict: The dictionary of the params.
-        """
-        return self.checkpoint_param
+        return _trial_name_creator
 
 
 class CodeCarbonCallback(tune.Callback):
