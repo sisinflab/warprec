@@ -1,20 +1,22 @@
 import argparse
 import os
+from typing import List, Tuple
 from argparse import Namespace
 
 import ray
+from pandas import DataFrame
 
 from warprec.data.reader import LocalReader
 from warprec.data.writer import LocalWriter
 from warprec.data.splitting import Splitter
-from warprec.data.dataset import TransactionDataset
+from warprec.data.dataset import Dataset
 from warprec.data.filtering import apply_filtering
+from warprec.utils.callback import WarpRecCallback
 from warprec.utils.config import load_yaml, load_callback
 from warprec.utils.logger import logger
 from warprec.recommenders.trainer import Trainer
 from warprec.recommenders.base_recommender import generate_model_name
 from warprec.evaluation.evaluator import Evaluator
-from warprec.evaluation.statistical_significance import compute_paired_statistical_test
 
 
 def main(args: Namespace):
@@ -28,7 +30,7 @@ def main(args: Namespace):
     config = load_yaml(args.config)
 
     # Load custom callback if specified
-    callback = load_callback(
+    callback: WarpRecCallback = load_callback(
         config.general.callback,
         *config.general.callback.args,
         **config.general.callback.kwargs,
@@ -41,7 +43,10 @@ def main(args: Namespace):
     reader = LocalReader(config)
 
     # Dataset loading
-    dataset = None
+    main_dataset: Dataset = None
+    fold_data: List[Tuple[DataFrame, DataFrame]] = None
+    train_data: DataFrame = None
+    test_data: DataFrame = None
     side_data = None
     user_cluster = None
     item_cluster = None
@@ -66,67 +71,74 @@ def main(args: Namespace):
             splitter = Splitter(config)
 
             if config.reader.data_type == "transaction":
-                train, test, val = splitter.split_transaction(data)
-                dataset = TransactionDataset(
-                    train,
-                    test,
-                    val,
-                    side_data=side_data,
-                    user_cluster=user_cluster,
-                    item_cluster=item_cluster,
-                    batch_size=config.evaluation.batch_size,
-                    rating_type=config.reader.rating_type,
-                    rating_label=config.reader.labels.rating_label,
-                    timestamp_label=config.reader.labels.timestamp_label,
-                    cluster_label=config.reader.labels.cluster_label,
-                    need_session_based_information=config.need_session_based_information,
-                    precision=config.general.precision,
-                )
+                train_data, fold_data, test_data = splitter.split_transaction(data)
+
             else:
                 raise ValueError("Data type not yet supported.")
-            # This branch is for 100% train and 0% test
-            pass
 
     elif config.reader.loading_strategy == "split":
-        if config.reader.data_type == "transaction":
-            train, test, val = reader.read_transaction_split()
+        raise NotImplementedError("Split reading feature disable.")
+        # if config.reader.data_type == "transaction":
+        #     train, test, val = reader.read_transaction_split()
 
-            # Side information reading
-            if config.reader.side:
-                side_data = reader.read_side_information()
+        #     # Side information reading
+        #     if config.reader.side:
+        #         side_data = reader.read_side_information()
 
-            # Cluster information reading
-            if config.reader.clustering:
-                user_cluster, item_cluster = reader.read_cluster_information()
+        #     # Cluster information reading
+        #     if config.reader.clustering:
+        #         user_cluster, item_cluster = reader.read_cluster_information()
 
-            dataset = TransactionDataset(
-                train,
-                test,
-                val,
-                side_data=side_data,
-                user_cluster=user_cluster,
-                item_cluster=item_cluster,
-                batch_size=config.evaluation.batch_size,
-                rating_type=config.reader.rating_type,
-                rating_label=config.reader.labels.rating_label,
-                timestamp_label=config.reader.labels.timestamp_label,
-                cluster_label=config.reader.labels.cluster_label,
-                need_session_based_information=config.need_session_based_information,
-                precision=config.general.precision,
+        # else:
+        #     raise ValueError("Data type not yet supported.")
+
+    # Dataset common information
+    common_params = {
+        "side_data": side_data,
+        "user_cluster": user_cluster,
+        "item_cluster": item_cluster,
+        "batch_size": config.evaluation.batch_size,
+        "rating_type": config.reader.rating_type,
+        "rating_label": config.reader.labels.rating_label,
+        "timestamp_label": config.reader.labels.timestamp_label,
+        "cluster_label": config.reader.labels.cluster_label,
+        "need_session_based_information": config.need_session_based_information,
+        "precision": config.general.precision,
+    }
+
+    logger.msg("Creating main dataset")
+    main_dataset = Dataset(
+        train_data,
+        test_data,
+        **common_params,
+    )
+    fold_dataset = []
+    if fold_data is not None:
+        n_folds = len(fold_data)
+        for idx, fold in enumerate(fold_data):
+            logger.msg(f"Creating fold dataset {idx + 1}/{n_folds}")
+            val_train, val_set = fold
+            fold_dataset.append(
+                Dataset(
+                    val_train,
+                    val_set,
+                    evaluation_set="Validation",
+                    **common_params,
+                )
             )
-        else:
-            raise ValueError("Data type not yet supported.")
+    logger.positive("All dataset created correctly.")
 
     # Callback on dataset creation
-    callback.on_dataset_creation(
-        dataset=dataset,
-        train_set=train,
-        test_set=test,
-        val_set=val,
-    )
+    # callback.on_dataset_creation(
+    #     dataset=dataset,
+    #     train_set=train,
+    #     test_set=test,
+    #     val_set=val,
+    # )
 
     if config.splitter and config.writer.save_split:
-        writer.write_split(dataset)
+        raise NotImplementedError("Temporary disabled")
+        # writer.write_split(dataset)
 
     # Trainer testing
     models = list(config.models.keys())
@@ -142,16 +154,17 @@ def main(args: Namespace):
         )
         model_results = {}
 
+    # Create instance of main evaluator used to evaluate the main dataset
     evaluator = Evaluator(
         list(config.evaluation.metrics),
         list(config.evaluation.top_k),
-        train_set=dataset.train_set.get_sparse(),
+        train_set=main_dataset.train_set.get_sparse(),
         beta=config.evaluation.beta,
         pop_ratio=config.evaluation.pop_ratio,
         compute_per_user=requires_stat_significance,
-        feature_lookup=dataset.get_features_lookup(),
-        user_cluster=dataset.get_user_cluster(),
-        item_cluster=dataset.get_item_cluster(),
+        feature_lookup=main_dataset.get_features_lookup(),
+        user_cluster=main_dataset.get_user_cluster(),
+        item_cluster=main_dataset.get_item_cluster(),
     )
 
     # Before starting training process, initialize Ray
@@ -165,7 +178,7 @@ def main(args: Namespace):
         trainer = Trainer(
             model_name,
             params,
-            dataset,
+            main_dataset,
             val_metric,
             val_k,
             beta=config.evaluation.beta,
@@ -181,17 +194,14 @@ def main(args: Namespace):
         callback.on_training_complete(model=best_model)
 
         # Evaluation testing
-        eval_validation = dataset.val_set is not None
-        eval_test = dataset.test_set is not None
         evaluator.evaluate(
             best_model,
-            dataset,
-            evaluate_on_validation=eval_validation,
-            evaluate_on_test=eval_test,
+            main_dataset,
+            device=str(best_model._device),
             verbose=True,
         )
         results = evaluator.compute_results()
-        evaluator.print_console(results, config.evaluation.max_metric_per_row)
+        evaluator.print_console(results, "Test", config.evaluation.max_metric_per_row)
 
         if requires_stat_significance:
             model_results[model_name] = (
@@ -213,9 +223,9 @@ def main(args: Namespace):
 
         # Recommendation
         if params["meta"]["save_recs"]:
-            umap_i, imap_i = dataset.get_inverse_mappings()
+            umap_i, imap_i = main_dataset.get_inverse_mappings()
             recs = best_model.get_recs(
-                dataset.train_set,
+                main_dataset.train_set,
                 umap_i,
                 imap_i,
                 k=config.writer.recommendation.k,
@@ -239,23 +249,24 @@ def main(args: Namespace):
                         writer.checkpoint_from_ray(source_path, checkpoint_name)
 
     if requires_stat_significance:
-        logger.msg(
-            f"Computing statistical significance tests for {len(models)} models."
-        )
+        raise NotImplementedError("Temporary disabled.")
+        # logger.msg(
+        #     f"Computing statistical significance tests for {len(models)} models."
+        # )
 
-        stat_significance = config.evaluation.stat_significance.model_dump(
-            exclude=["corrections"]  # type: ignore[arg-type]
-        )
-        corrections = config.evaluation.stat_significance.corrections.model_dump()
+        # stat_significance = config.evaluation.stat_significance.model_dump(
+        #     exclude=["corrections"]  # type: ignore[arg-type]
+        # )
+        # corrections = config.evaluation.stat_significance.corrections.model_dump()
 
-        for stat_name, enabled in stat_significance.items():
-            if enabled:
-                test_results = compute_paired_statistical_test(
-                    model_results, stat_name, **corrections
-                )
-                writer.write_statistical_significance_test(test_results, stat_name)
+        # for stat_name, enabled in stat_significance.items():
+        #     if enabled:
+        #         test_results = compute_paired_statistical_test(
+        #             model_results, stat_name, **corrections
+        #         )
+        #         writer.write_statistical_significance_test(test_results, stat_name)
 
-        logger.positive("Statistical significance tests completed successfully.")
+        # logger.positive("Statistical significance tests completed successfully.")
     logger.positive(
         "All models trained and evaluated successfully. WarpRec is shutting down."
     )
