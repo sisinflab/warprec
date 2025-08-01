@@ -404,11 +404,11 @@ class ItemSimRecommender(Recommender):
         Returns:
             Tensor: The score matrix {user x item}.
         """
-        r = interaction_matrix @ self.item_similarity.detach().numpy()  # pylint: disable=not-callable
+        r = interaction_matrix @ self.item_similarity  # pylint: disable=not-callable
 
         # Masking interaction already seen in train
-        r[interaction_matrix.nonzero()] = -torch.inf
-        return torch.from_numpy(r).to(self._device)
+        r[interaction_matrix != 0] = -torch.inf
+        return r.to(self._device)
 
     def forward(self, *args, **kwargs):
         """Forward method is empty because we don't need

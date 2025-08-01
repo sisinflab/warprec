@@ -45,7 +45,7 @@ class Writer(ABC):
     @abstractmethod
     def write_results(
         self,
-        result_dict: Dict[str, Dict[int, Dict[str, float | Tensor]]],
+        result_dict: Dict[int, Dict[str, float | Tensor]],
         model_name: str,
     ):
         """This function writes all the results of the experiment."""
@@ -142,7 +142,7 @@ class LocalWriter(Writer):
 
     def write_results(
         self,
-        result_data: Dict[str, Dict[int, Dict[str, float | Tensor]]],
+        result_data: Dict[int, Dict[str, float | Tensor]],
         model_name: str,
         sep: str = "\t",
         ext: str = ".tsv",
@@ -151,9 +151,9 @@ class LocalWriter(Writer):
         "Overall_Results_{timestamp}.tsv" file, merging with existing data if present.
 
         Args:
-            result_data (Dict[str, Dict[int, Dict[str, float | Tensor]]]): The dictionary containing the results.
-                Format: { "Set": { "k": { "MetricName": value } } }
-                Example: {"Test": {5: {"Precision": 0.1, "Recall": 0.2}}}
+            result_data (Dict[int, Dict[str, float | Tensor]]): The dictionary containing the results.
+                Format: { "k": { "MetricName": value } }
+                Example: {5: {"Precision": 0.1, "Recall": 0.2}}
             model_name (str): The name of the model which was evaluated.
             sep (str): The separator of the file.
             ext (str): The extension of the file.
@@ -186,22 +186,21 @@ class LocalWriter(Writer):
 
         # Convert new results to a DataFrame
         new_result_list = []
-        for set_name, top_k_data in result_data.items():
-            for k_value, metrics in top_k_data.items():
-                row = {"Model": model_name, "Set": set_name, "Top@k": k_value}
-                for metric_name, metric_result in metrics.items():
-                    value = (
-                        metric_result.mean().item()
-                        if isinstance(metric_result, Tensor)
-                        else metric_result
-                    )
-                    row.update({metric_name: value})
-                    new_result_list.append(row)
+        for k_value, metrics in result_data.items():
+            row = {"Model": model_name, "Top@k": k_value}
+            for metric_name, metric_result in metrics.items():
+                value = (
+                    metric_result.mean().item()
+                    if isinstance(metric_result, Tensor)
+                    else metric_result
+                )
+                row.update({metric_name: value})
+                new_result_list.append(row)
 
         new_df = pd.DataFrame(new_result_list)
 
         # Predefined columns used also as merge keys
-        merge_keys = ["Model", "Set", "Top@k"]
+        merge_keys = ["Model", "Top@k"]
 
         # If existing_df is empty, concat will just return new_df
         combined_df = pd.concat([existing_df, new_df], ignore_index=True)
@@ -374,7 +373,11 @@ class LocalWriter(Writer):
             header (bool): Whether to write the header in the file.
             column_names (List[str] | None): Optional list of column names to use for the DataFrame.
                 If None, the DataFrame's existing columns will be used.
+
+        Raises:
+            NotImplementedError: Temporary disabled.
         """
+        raise NotImplementedError("Temporary disabled.")
         if self.config:
             writing_params = self.config.writer.split
         else:

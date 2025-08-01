@@ -63,16 +63,9 @@ def objective_function(
             model (Recommender): The trained model to report.
             **kwargs (Any): The parameters of the model.
         """
-        key: str
-        if dataset.val_set is not None:
-            key = "validation"
-            evaluator.evaluate(model, dataset, evaluate_on_validation=True)
-        else:
-            key = "test"
-            evaluator.evaluate(model, dataset, evaluate_on_test=True)
-
+        evaluator.evaluate(model, dataset, device=device)
         results = evaluator.compute_results()
-        score = results[key][top_k][metric_name]
+        score = results[top_k][metric_name]
 
         with tempfile.TemporaryDirectory() as tmpdir:
             torch.save(
