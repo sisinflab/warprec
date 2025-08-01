@@ -1,8 +1,10 @@
 # pylint: disable=too-few-public-methods
-from typing import Tuple, Any, Union
+# mypy: disable-error-code=override
+from typing import Tuple, Any, Union, List
 from abc import ABC
 
 import numpy as np
+import pandas as pd
 from pandas import DataFrame
 from warprec.utils.enums import SplittingStrategies
 from warprec.utils.registry import splitting_registry
@@ -11,7 +13,9 @@ from warprec.utils.registry import splitting_registry
 class SplittingStrategy(ABC):
     """Abstract definition of a splitting strategy."""
 
-    def __call__(self, data: DataFrame, **kwargs: Any) -> Tuple[DataFrame, DataFrame]:
+    def __call__(
+        self, data: DataFrame, **kwargs: Any
+    ) -> List[Tuple[DataFrame, DataFrame]]:
         """This method will split the data in train/test/validation splits.
 
         If the validation split was not set then it will be None.
@@ -21,7 +25,7 @@ class SplittingStrategy(ABC):
             **kwargs (Any): The additional keyword arguments.
 
         Returns:
-            Tuple[DataFrame, DataFrame]:
+            List[Tuple[DataFrame, DataFrame]]:
                 - DataFrame: First partition of splitted data.
                 - DataFrame: Second partition of splitted data.
         """
@@ -39,7 +43,7 @@ class TemporalHoldoutSplit(SplittingStrategy):
         data: DataFrame,
         ratio: float = 0.2,
         **kwargs: Any,
-    ) -> Tuple[DataFrame, DataFrame]:
+    ) -> List[Tuple[DataFrame, DataFrame]]:
         """Method to split data in two partitions, using a timestamp.
 
         This method will split data based on time, using as test
@@ -51,7 +55,7 @@ class TemporalHoldoutSplit(SplittingStrategy):
             **kwargs (Any): The additional keyword arguments.
 
         Returns:
-            Tuple[DataFrame, DataFrame]:
+            List[Tuple[DataFrame, DataFrame]]:
                 - DataFrame: First partition of splitted data.
                 - DataFrame: Second partition of splitted data.
         """
@@ -73,7 +77,7 @@ class TemporalHoldoutSplit(SplittingStrategy):
             < split_indices.loc[data[user_label]].values
         )
 
-        return data[split_mask], data[~split_mask]
+        return [(data[split_mask], data[~split_mask])]
 
 
 @splitting_registry.register(SplittingStrategies.TEMPORAL_LEAVE_K_OUT)
@@ -88,7 +92,7 @@ class TemporalLeaveKOutSplit(SplittingStrategy):
         data: DataFrame,
         k: int = 1,
         **kwargs: Any,
-    ) -> Tuple[DataFrame, DataFrame]:
+    ) -> List[Tuple[DataFrame, DataFrame]]:
         """Method to split data in two partitions, using a timestamp.
 
         This method will split data based on time, using as test
@@ -100,7 +104,7 @@ class TemporalLeaveKOutSplit(SplittingStrategy):
             **kwargs (Any): The additional keyword arguments.
 
         Returns:
-            Tuple[DataFrame, DataFrame]:
+            List[Tuple[DataFrame, DataFrame]]:
                 - DataFrame: First partition of splitted data.
                 - DataFrame: Second partition of splitted data.
         """
@@ -127,7 +131,7 @@ class TemporalLeaveKOutSplit(SplittingStrategy):
             < split_indices.loc[data[user_label]].values
         )
 
-        return data[split_mask], data[~split_mask]
+        return [(data[split_mask], data[~split_mask])]
 
 
 @splitting_registry.register(SplittingStrategies.TIMESTAMP_SLICING)
@@ -150,7 +154,7 @@ class TimestampSlicingSplit(SplittingStrategy):
         data: DataFrame,
         timestamp: Union[int, str] = 0,
         **kwargs: Any,
-    ) -> Tuple[DataFrame, DataFrame]:
+    ) -> List[Tuple[DataFrame, DataFrame]]:
         """Implementation of the fixed timestamp splitting.
 
         Args:
@@ -159,7 +163,7 @@ class TimestampSlicingSplit(SplittingStrategy):
             **kwargs (Any): The additional keyword arguments.
 
         Returns:
-            Tuple[DataFrame, DataFrame]:
+            List[Tuple[DataFrame, DataFrame]]:
                 - DataFrame: First partition of splitted data.
                 - DataFrame: Second partition of splitted data.
         """
@@ -169,7 +173,7 @@ class TimestampSlicingSplit(SplittingStrategy):
         else:
             first_partition, second_partition = self._fixed_split(data, int(timestamp))
 
-        return first_partition, second_partition
+        return [(first_partition, second_partition)]
 
     def _best_split(
         self, data: DataFrame, min_below: int = 1, min_over: int = 1
@@ -245,7 +249,7 @@ class RandomHoldoutSplit(SplittingStrategy):
         ratio: float = 0.2,
         seed: int = 42,
         **kwargs: Any,
-    ) -> Tuple[DataFrame, DataFrame]:
+    ) -> List[Tuple[DataFrame, DataFrame]]:
         """Method to split data in two partitions, using a ratio.
 
         This method will split data based on the ratio provided.
@@ -257,7 +261,7 @@ class RandomHoldoutSplit(SplittingStrategy):
             **kwargs (Any): The additional keyword arguments.
 
         Returns:
-            Tuple[DataFrame, DataFrame]:
+            List[Tuple[DataFrame, DataFrame]]:
                 - DataFrame: First partition of splitted data.
                 - DataFrame: Second partition of splitted data.
         """
@@ -270,7 +274,7 @@ class RandomHoldoutSplit(SplittingStrategy):
         first_partition_idxs = permuted[n_partition:]
         second_partition_idxs = permuted[:n_partition]
 
-        return data.loc[first_partition_idxs], data.loc[second_partition_idxs]  # type: ignore[return-value]
+        return [(data.loc[first_partition_idxs], data.loc[second_partition_idxs])]  # type: ignore[return-value]
 
 
 @splitting_registry.register(SplittingStrategies.RANDOM_LEAVE_K_OUT)
@@ -283,7 +287,7 @@ class RandomLeaveKOutSplit(SplittingStrategy):
         k: int = 1,
         seed: int = 42,
         **kwargs: Any,
-    ) -> Tuple[DataFrame, DataFrame]:
+    ) -> List[Tuple[DataFrame, DataFrame]]:
         """Method to split data in two partitions, using a ratio.
 
         This method will split data based on the ratio provided.
@@ -295,7 +299,7 @@ class RandomLeaveKOutSplit(SplittingStrategy):
             **kwargs (Any): The additional keyword arguments.
 
         Returns:
-            Tuple[DataFrame, DataFrame]:
+            List[Tuple[DataFrame, DataFrame]]:
                 - DataFrame: First partition of splitted data.
                 - DataFrame: Second partition of splitted data.
         """
@@ -320,4 +324,61 @@ class RandomLeaveKOutSplit(SplittingStrategy):
             first_partition_all.extend(first_partition_idxs)
             second_partition_all.extend(second_partition_idxs)
 
-        return data.loc[first_partition_all], data.loc[second_partition_all]
+        return [(data.loc[first_partition_all], data.loc[second_partition_all])]
+
+
+@splitting_registry.register(SplittingStrategies.K_FOLD_CROSS_VALIDATION)
+class KFoldCrossValidation(SplittingStrategy):
+    """The definition of KFold Cross Validation."""
+
+    def __call__(
+        self,
+        data: DataFrame,
+        folds: int,
+        **kwargs: Any,
+    ) -> List[Tuple[DataFrame, DataFrame]]:
+        """Method to split data in 'folds' times.
+
+        Args:
+            data (DataFrame): The original data in DataFrame format.
+            folds (int): The number of folds to create.
+            **kwargs (Any): The additional keyword arguments.
+
+        Returns:
+            List[Tuple[DataFrame, DataFrame]]:
+                - DataFrame: First partition of splitted data.
+                - DataFrame: Second partition of splitted data.
+        """
+        user_label = data.columns[0]
+
+        for _, group in data.groupby(user_label):
+            data.loc[group.index, "fold"] = self.fold_list_generator(len(group), folds)
+
+        data["fold"] = pd.to_numeric(data["fold"], downcast="integer")
+        tuple_list = []
+        for i in range(folds):
+            test = data[data["fold"] == i].drop(columns=["fold"]).reset_index(drop=True)
+            train = (
+                data[data["fold"] != i].drop(columns=["fold"]).reset_index(drop=True)
+            )
+            tuple_list.append((train, test))
+        return tuple_list
+
+    def fold_list_generator(self, length: int, folds: int = 5) -> List[int]:
+        """Utility method to create the fold column for transaction data.
+
+        Args:
+            length (int): The length of the list.
+            folds (int): The number of folds to create.
+
+        Returns:
+            List[int]: The list of repetitive folds indices.
+        """
+
+        def infinite_looper(folds: int = 5):
+            while True:
+                for f in range(folds):
+                    yield f
+
+        looper = infinite_looper(folds)
+        return [next(looper) for _ in range(length)]
