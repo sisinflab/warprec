@@ -29,6 +29,8 @@ class SplittingStrategies(str, Enum):
             the splitting will be deterministic.
         - RANDOM_LEAVE_K_OUT: The splitting will be based on k. If a seed has been provided,
             the splitting will be deterministic.
+        - K_FOLD_CROSS_VALIDATION: The splitting will generate n 'folds' used for a more robust
+            validation step. Cannot be used on test set.
     """
 
     TEMPORAL_HOLDOUT = "temporal_holdout"
@@ -36,6 +38,7 @@ class SplittingStrategies(str, Enum):
     TIMESTAMP_SLICING = "timestamp_slicing"
     RANDOM_HOLDOUT = "random_holdout"
     RANDOM_LEAVE_K_OUT = "random_leave_k_out"
+    K_FOLD_CROSS_VALIDATION = "k_fold_cross_validation"
 
 
 class ReadingMethods(str, Enum):
