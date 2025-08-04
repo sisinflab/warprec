@@ -1,6 +1,7 @@
 import os
 import torch
 import uuid
+import math
 from typing import List, Tuple, Optional, Dict, Any
 from copy import deepcopy
 
@@ -227,7 +228,7 @@ class Trainer:
         early_stopping: Stopper = None
         if model_params.early_stopping is not None:
             early_stopping = EarlyStopping(
-                metric=model_params.early_stopping.monitor,
+                metric=validation_score,
                 mode=mode,
                 patience=model_params.early_stopping.patience,
                 grace_period=model_params.early_stopping.grace_period,
@@ -361,7 +362,7 @@ class Trainer:
         early_stopping: Stopper = None
         if model_params.early_stopping is not None:
             early_stopping = EarlyStopping(
-                metric=model_params.early_stopping.monitor,
+                metric=validation_score,
                 mode=mode,
                 patience=model_params.early_stopping.patience,
                 grace_period=model_params.early_stopping.grace_period,
@@ -428,6 +429,7 @@ class Trainer:
                 mean_score=(validation_score, "mean"),
                 std_score=(validation_score, "std"),
                 num_folds_completed=(validation_score, "size"),
+                median_training_iterations=("training_iteration", "median"),
             )
             .reset_index()
         )
@@ -438,9 +440,14 @@ class Trainer:
         )
         best_hyperparameters_row = best_config_df.iloc[0]
         best_mean_score = best_hyperparameters_row["mean_score"]
+        best_std_score = best_hyperparameters_row["std_score"]
+        best_median_iteration = math.ceil(
+            best_hyperparameters_row["median_training_iterations"]
+        )
 
         # Clear hyperparam format and create the clean dictionary
         best_hyperparameters: Dict[str, Any] = {}
+        best_hyperparameters["iterations"] = best_median_iteration
         for col in hyperparam_cols:
             param_name = col.replace("config/", "")
             value = best_hyperparameters_row[col]
@@ -456,8 +463,9 @@ class Trainer:
 
         logger.msg(
             f"Best params combination: {best_hyperparameters} with an average score of "
-            f"{validation_score}: {best_mean_score} on validation set."
-            # f"during iteration {best_iter}."
+            f"{validation_score}: {best_mean_score} and "
+            f"STD: {best_std_score} on validation set. "
+            f"The median of training iteration is: {best_median_iteration}"
         )
         logger.positive(f"Hyperparameter tuning for {model_name} ended successfully.")
 
