@@ -1,4 +1,4 @@
-from .objectives import objective_function
+from .objectives import objective_function_single_fold
 from .trainer import Trainer
 from .search_algorithm_wrapper import (
     GridSearchWrapper,
@@ -14,7 +14,7 @@ from .scheduler_wrapper import (
 )
 
 __all__ = [
-    "objective_function",
+    "objective_function_single_fold",
     "Trainer",
     "GridSearchWrapper",
     "RandomSearchWrapper",

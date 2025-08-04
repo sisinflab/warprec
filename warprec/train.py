@@ -126,7 +126,6 @@ def main(args: Namespace):
                     **common_params,
                 )
             )
-    logger.positive("All dataset created correctly.")
 
     # Callback on dataset creation
     # callback.on_dataset_creation(
@@ -183,6 +182,11 @@ def main(args: Namespace):
             params["optimization"]["validation_metric"]
         )
         trainer = Trainer(
+            custom_callback=callback,
+            custom_models=config.general.custom_models,
+            config=config,
+        )
+        best_model, ray_report = trainer.train_single_fold(
             model_name,
             params,
             main_dataset,
@@ -191,11 +195,7 @@ def main(args: Namespace):
             beta=config.evaluation.beta,
             pop_ratio=config.evaluation.pop_ratio,
             ray_verbose=config.general.ray_verbose,
-            custom_callback=callback,
-            custom_models=config.general.custom_models,
-            config=config,
         )
-        best_model, ray_report = trainer.train_and_evaluate()
         model_exploration_total_time = time.time() - model_exploration_start_time
 
         # Callback on training complete
