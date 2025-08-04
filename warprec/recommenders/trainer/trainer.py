@@ -1,10 +1,11 @@
 import os
 import torch
 import uuid
-from typing import List, Tuple, Optional, Dict
+from typing import List, Tuple, Optional, Dict, Any
 from copy import deepcopy
 
 import ray
+import numpy as np
 from ray import tune
 from ray.tune import Tuner, TuneConfig, RunConfig, CheckpointConfig
 from ray.tune.stopper import Stopper
@@ -14,7 +15,7 @@ from ray.air.integrations.mlflow import MLflowLoggerCallback
 from codecarbon import EmissionsTracker
 from warprec.recommenders.base_recommender import Recommender
 from warprec.data.dataset import Dataset
-from warprec.recommenders.trainer.objectives import objective_function_single_fold
+from warprec.recommenders.trainer.objectives import objective_function
 from warprec.recommenders.trainer.search_algorithm_wrapper import (
     BaseSearchWrapper,
 )
@@ -186,24 +187,24 @@ class Trainer:
         """
         # Retrieve model params
         model_params: RecomModel = params_registry.get(model_name, **params)
-        logger.separator()
-        logger.msg(
-            f"Starting hyperparameter tuning for {model_name} "
-            f"with {model_params.optimization.strategy.name} strategy "
-            f"and with {model_params.optimization.scheduler.name} scheduler."
-        )
-
         properties = model_params.optimization.properties.model_dump()
         optimization = model_params.optimization
         mode = model_params.optimization.properties.mode
         device = model_params.optimization.device
         validation_score = f"{validation_metric_name}@{validation_top_k}"
 
+        logger.separator()
+        logger.msg(
+            f"Starting hyperparameter tuning for {model_name} "
+            f"with {optimization.strategy.name} strategy "
+            f"and with {optimization.scheduler.name} scheduler."
+        )
+
         # Ray Tune parameters
         obj_function = tune.with_parameters(
-            objective_function_single_fold,
+            objective_function,
             model_name=model_name,
-            dataset=ray.put(dataset),
+            dataset_folds=ray.put(dataset),
             validation_top_k=validation_top_k,
             validation_metric_name=validation_metric_name,
             mode=mode,
@@ -240,7 +241,7 @@ class Trainer:
             verbose=ray_verbose,
             checkpoint_config=CheckpointConfig(
                 num_to_keep=optimization.checkpoint_to_keep,
-                checkpoint_score_attribute=validation_metric_name,
+                checkpoint_score_attribute=validation_score,
                 checkpoint_score_order=mode,
             ),
         )
@@ -270,61 +271,10 @@ class Trainer:
         # Run the hyperparameter tuning
         results = tuner.fit()
 
-        # df = results.get_dataframe()
-
-        # # 2. Identificare le colonne degli iperparametri (tutto ciò che è in 'config/' tranne 'fold')
-        # hyperparam_cols = [col for col in df.columns if col.startswith("config/") and col != "config/fold"]
-
-        # if not hyperparam_cols:
-        #     raise ValueError(
-        #         "No hyperparameter columns found in the results. "
-        #         "Ensure your parameters are defined in the config."
-        #     )
-
-        # # 3. Raggruppare per configurazione di iperparametri e calcolare media e deviazione standard
-        # agg_df = (
-        #     df.groupby(hyperparam_cols)
-        #     .agg(
-        #         mean_score=("score", "mean"),
-        #         std_score=("score", "std"),
-        #         num_folds_completed=("score", "size"), # Conta quanti fold sono stati completati per questo set di iperparametri
-        #     )
-        #     .reset_index()
-        # )
-
-        # print(agg_df)
-
-        # best_config_df = agg_df.sort_values(by="mean_score", ascending=True if mode == "min" else False)
-
-        # best_hyperparameters_row = best_config_df.iloc[0]
-        # best_hyperparameters = {}
-        # for col in hyperparam_cols:
-        #     # Rimuovi il prefisso 'config/'
-        #     param_name = col.replace("config/", "")
-        #     value = best_hyperparameters_row[col]
-
-        #     # Converti i tipi NumPy in tipi Python nativi
-        #     if isinstance(value, np.integer):
-        #         best_hyperparameters[param_name] = int(value)
-        #     elif isinstance(value, np.floating):
-        #         best_hyperparameters[param_name] = float(value)
-        #     elif isinstance(value, np.bool_):
-        #         best_hyperparameters[param_name] = bool(value)
-        #     else:
-        #         # Per altri tipi (es. stringhe), mantienili così come sono
-        #         best_hyperparameters[param_name] = value
-
-        # print("Migliore combinazione di iperparametri trovata:")
-        # print(best_hyperparameters)
-        # print(f"Punteggio medio sul test set: {best_hyperparameters_row['mean_score']:.4f}")
-        # print(f"Deviazione standard del punteggio: {best_hyperparameters_row['std_score']:.4f}")
-        # print(f"Numero di fold completati: {int(best_hyperparameters_row['num_folds_completed'])}")
-
         # Retrieve results
         best_result = results.get_best_result(metric=validation_score, mode=mode)
         best_params = best_result.config
         best_score = best_result.metrics[validation_score]
-        # best_fold = best_params["fold"]
         best_iter = best_result.metrics["training_iteration"]
         best_checkpoint = best_result.checkpoint
 
@@ -350,24 +300,170 @@ class Trainer:
         )
         best_model.load_state_dict(model_state)
 
-        # Produce the report of the training
-        successful_trials = [r for r in results if not r.error]  # type: ignore[attr-defined]
-        report = {}
-        if successful_trials:
-            total_trial_times = [r.metrics["time_total_s"] for r in successful_trials]
-            report["Average_Trial_Time"] = sum(total_trial_times) / len(
-                total_trial_times
-            )
-        report["Total_Params (Best Model)"] = sum(
-            p.numel() for p in best_model.parameters()
-        )
-        report["Trainable_Params (Best Model)"] = sum(
-            p.numel() for p in best_model.parameters() if p.requires_grad
-        )
+        report = self._create_report(results, best_model)
 
         ray.shutdown()
 
         return best_model, report
+
+    def train_multiple_fold(
+        self,
+        model_name: str,
+        params: dict,
+        datasets: List[Dataset],
+        validation_metric_name: str,
+        validation_top_k: int,
+        beta: float = 1.0,
+        pop_ratio: float = 0.8,
+        ray_verbose: int = 1,
+    ):
+        # Retrieve model params
+        model_params: RecomModel = params_registry.get(model_name, **params)
+        properties = model_params.optimization.properties.model_dump()
+        optimization = model_params.optimization
+        mode = model_params.optimization.properties.mode
+        device = model_params.optimization.device
+        validation_score = f"{validation_metric_name}@{validation_top_k}"
+        num_folds = len(datasets)
+
+        logger.separator()
+        logger.msg(
+            f"Starting hyperparameter tuning for {model_name} "
+            f"with {optimization.strategy.name} strategy "
+            f"and with {optimization.scheduler.name} scheduler. "
+            f"Number of validation folds: {num_folds}"
+        )
+
+        # Ray Tune parameters
+        obj_function = tune.with_parameters(
+            objective_function,
+            model_name=model_name,
+            dataset_folds=ray.put(datasets),
+            validation_top_k=validation_top_k,
+            validation_metric_name=validation_metric_name,
+            mode=mode,
+            device=device,
+            implementation=model_params.meta.implementation,
+            seed=optimization.properties.seed,
+            block_size=optimization.block_size,
+            beta=beta,
+            pop_ratio=pop_ratio,
+            custom_models=self._custom_models,
+        )
+
+        search_alg: BaseSearchWrapper = search_algorithm_registry.get(
+            optimization.strategy, **properties
+        )
+        scheduler: BaseSchedulerWrapper = scheduler_registry.get(
+            optimization.scheduler, **properties
+        )
+
+        early_stopping: Stopper = None
+        if model_params.early_stopping is not None:
+            early_stopping = EarlyStopping(
+                metric=model_params.early_stopping.monitor,
+                mode=mode,
+                patience=model_params.early_stopping.patience,
+                grace_period=model_params.early_stopping.grace_period,
+                min_delta=model_params.early_stopping.min_delta,
+            )
+
+        # Configure Ray Tune Tuner
+        run_config = RunConfig(
+            stop=early_stopping,
+            callbacks=self._callbacks,
+            verbose=ray_verbose,
+            checkpoint_config=CheckpointConfig(
+                num_to_keep=optimization.checkpoint_to_keep,
+                checkpoint_score_attribute=validation_score,
+                checkpoint_score_order=mode,
+            ),
+        )
+
+        tune_config = TuneConfig(
+            metric=validation_score,
+            mode=mode,
+            search_alg=search_alg,  # type: ignore[arg-type]
+            scheduler=scheduler,  # type: ignore[arg-type]
+            num_samples=optimization.num_samples,
+            trial_name_creator=self.trail_name(model_name),
+        )
+
+        tuner = Tuner(
+            tune.with_resources(
+                obj_function,
+                resources={
+                    "cpu": optimization.cpu_per_trial,
+                    "gpu": optimization.gpu_per_trial,
+                },
+            ),
+            param_space=self.parse_params(params, num_folds),
+            tune_config=tune_config,
+            run_config=run_config,
+        )
+
+        # Run the hyperparameter tuning
+        results = tuner.fit()
+
+        # Find the hyperparameter configuration that performed better
+        result_df = results.get_dataframe()
+        hyperparam_cols = [
+            col
+            for col in result_df.columns
+            if col.startswith("config/") and col != "config/fold"
+        ]
+
+        # WarpRec params with be treated as lists, we need
+        # to convert them to tuple in order to hash them
+        for col in hyperparam_cols:
+            if col in result_df.columns and result_df[col].dtype == "object":
+                result_df[col] = result_df[col].apply(
+                    lambda x: tuple(x) if isinstance(x, list) else x
+                )
+
+        # Aggregate results over hyperparameter combinations and compute mean and std
+        agg_df = (
+            result_df.groupby(hyperparam_cols)
+            .agg(
+                mean_score=(validation_score, "mean"),
+                std_score=(validation_score, "std"),
+                num_folds_completed=(validation_score, "size"),
+            )
+            .reset_index()
+        )
+
+        # Order by mean to find best hyperparameters (ordering will be dependent on mode)
+        best_config_df = agg_df.sort_values(
+            by="mean_score", ascending=True if mode == "min" else False
+        )
+        best_hyperparameters_row = best_config_df.iloc[0]
+        best_mean_score = best_hyperparameters_row["mean_score"]
+
+        # Clear hyperparam format and create the clean dictionary
+        best_hyperparameters: Dict[str, Any] = {}
+        for col in hyperparam_cols:
+            param_name = col.replace("config/", "")
+            value = best_hyperparameters_row[col]
+
+            if isinstance(value, np.integer):
+                best_hyperparameters[param_name] = int(value)
+            elif isinstance(value, np.floating):
+                best_hyperparameters[param_name] = float(value)
+            elif isinstance(value, np.bool_):
+                best_hyperparameters[param_name] = bool(value)
+            else:
+                best_hyperparameters[param_name] = value
+
+        logger.msg(
+            f"Best params combination: {best_hyperparameters} with an average score of "
+            f"{validation_score}: {best_mean_score} on validation set."
+            # f"during iteration {best_iter}."
+        )
+        logger.positive(f"Hyperparameter tuning for {model_name} ended successfully.")
+
+        report = self._create_report(results)
+
+        return best_hyperparameters, report
 
     def parse_params(self, params: dict, num_folds: int = 0) -> dict:
         """This method parses the parameters of a model.
@@ -450,6 +546,28 @@ class Trainer:
             )
 
         return callbacks
+
+    def _create_report(
+        self, results: tune.ResultGrid, model: Optional[Recommender] = None
+    ) -> dict:
+        # Produce the report of the training
+        successful_trials = [r for r in results if not r.error]  # type: ignore[attr-defined]
+        report = {}
+        if successful_trials:
+            total_trial_times = [r.metrics["time_total_s"] for r in successful_trials]
+            report["Average_Trial_Time"] = sum(total_trial_times) / len(
+                total_trial_times
+            )
+
+        if model is not None:
+            report["Total_Params (Best Model)"] = sum(
+                p.numel() for p in model.parameters()
+            )
+            report["Trainable_Params (Best Model)"] = sum(
+                p.numel() for p in model.parameters() if p.requires_grad
+            )
+
+        return report
 
 
 class CodeCarbonCallback(tune.Callback):

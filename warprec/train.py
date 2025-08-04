@@ -1,5 +1,5 @@
 import argparse
-from typing import List, Tuple
+from typing import List, Tuple, Dict, Any
 import time
 from argparse import Namespace
 
@@ -12,10 +12,13 @@ from warprec.data.splitting import Splitter
 from warprec.data.dataset import Dataset
 from warprec.data.filtering import apply_filtering
 from warprec.utils.callback import WarpRecCallback
-from warprec.utils.config import load_yaml, load_callback
+from warprec.utils.config import load_yaml, load_callback, Configuration
 from warprec.utils.logger import logger
 from warprec.recommenders.trainer import Trainer
+from warprec.recommenders.base_recommender import Recommender
 from warprec.evaluation.evaluator import Evaluator
+from warprec.evaluation.statistical_significance import compute_paired_statistical_test
+from warprec.utils.registry import model_registry
 
 
 def main(args: Namespace):
@@ -151,7 +154,7 @@ def main(args: Namespace):
         logger.attention(
             "Statistical significance is required, metrics will be computed user-wise."
         )
-        model_results = {}
+        model_results: Dict[str, Any] = {}
 
     # Create instance of main evaluator used to evaluate the main dataset
     evaluator = Evaluator(
@@ -186,16 +189,26 @@ def main(args: Namespace):
             custom_models=config.general.custom_models,
             config=config,
         )
-        best_model, ray_report = trainer.train_single_fold(
-            model_name,
-            params,
-            main_dataset,
-            val_metric,
-            val_k,
-            beta=config.evaluation.beta,
-            pop_ratio=config.evaluation.pop_ratio,
-            ray_verbose=config.general.ray_verbose,
-        )
+
+        if len(fold_dataset) > 0:
+            # We validate model results of validation data
+            # and then finalize results of test
+            best_model, ray_report = multiple_fold_validation_flow(
+                model_name,
+                params,
+                val_metric,
+                val_k,
+                main_dataset,
+                fold_dataset,
+                trainer,
+                config,
+            )
+        else:
+            # Model will be optimized and evaluated on test set
+            best_model, ray_report = single_train_test_split_flow(
+                model_name, params, val_metric, val_k, main_dataset, trainer, config
+            )
+
         model_exploration_total_time = time.time() - model_exploration_start_time
 
         # Callback on training complete
@@ -214,7 +227,7 @@ def main(args: Namespace):
         evaluator.print_console(results, "Test", config.evaluation.max_metric_per_row)
 
         if requires_stat_significance:
-            model_results[model_name] = (
+            model_results["Test"][model_name] = (
                 results  # Populate model_results for statistical significance
             )
 
@@ -268,27 +281,135 @@ def main(args: Namespace):
         writer.write_time_report(model_timing_report)
 
     if requires_stat_significance:
-        raise NotImplementedError("Temporary disabled.")
-        # logger.msg(
-        #     f"Computing statistical significance tests for {len(models)} models."
-        # )
+        logger.msg(
+            f"Computing statistical significance tests for {len(models)} models."
+        )
 
-        # stat_significance = config.evaluation.stat_significance.model_dump(
-        #     exclude=["corrections"]  # type: ignore[arg-type]
-        # )
-        # corrections = config.evaluation.stat_significance.corrections.model_dump()
+        stat_significance = config.evaluation.stat_significance.model_dump(
+            exclude=["corrections"]  # type: ignore[arg-type]
+        )
+        corrections = config.evaluation.stat_significance.corrections.model_dump()
 
-        # for stat_name, enabled in stat_significance.items():
-        #     if enabled:
-        #         test_results = compute_paired_statistical_test(
-        #             model_results, stat_name, **corrections
-        #         )
-        #         writer.write_statistical_significance_test(test_results, stat_name)
+        for stat_name, enabled in stat_significance.items():
+            if enabled:
+                test_results = compute_paired_statistical_test(
+                    model_results, stat_name, **corrections
+                )
+                writer.write_statistical_significance_test(test_results, stat_name)
 
-        # logger.positive("Statistical significance tests completed successfully.")
+        logger.positive("Statistical significance tests completed successfully.")
     logger.positive(
         "All models trained and evaluated successfully. WarpRec is shutting down."
     )
+
+
+def single_train_test_split_flow(
+    model_name: str,
+    params: dict,
+    val_metric: str,
+    val_k: int,
+    dataset: Dataset,
+    trainer: Trainer,
+    config: Configuration,
+) -> Tuple[Recommender, dict]:
+    """Hyperparameter optimization over a single train/test split.
+
+    Args:
+        model_name (str): Name of the model to optimize.
+        params (dict): The parameter used to train the model.
+        val_metric (str): The metric used to validate the model.
+        val_k (int): The cutoff used to validate the model.
+        dataset (Dataset): The main dataset which represents train/test split.
+        trainer (Trainer): The trainer instance used to optimize the model.
+        config (Configuration): The configuration file.
+
+    Returns:
+        Tuple[Recommender, dict]:
+            - Recommender: The best model, validated on the folds and trained on
+                the main data split.
+            - dict: Report dictionary.
+    """
+    best_model, ray_report = trainer.train_single_fold(
+        model_name,
+        params,
+        dataset,
+        val_metric,
+        val_k,
+        beta=config.evaluation.beta,
+        pop_ratio=config.evaluation.pop_ratio,
+        ray_verbose=config.general.ray_verbose,
+    )
+
+    return best_model, ray_report
+
+
+def multiple_fold_validation_flow(
+    model_name: str,
+    params: dict,
+    val_metric: str,
+    val_k: int,
+    main_dataset: Dataset,
+    val_datasets: List[Dataset],
+    trainer: Trainer,
+    config: Configuration,
+) -> Tuple[Recommender, dict]:
+    """Hyperparameter optimization with cross-validation logic.
+
+    Args:
+        model_name (str): Name of the model to optimize.
+        params (dict): The parameter used to train the model.
+        val_metric (str): The metric used to validate the model.
+        val_k (int): The cutoff used to validate the model.
+        main_dataset (Dataset): The main dataset which represents train/test split.
+        val_datasets (List[Dataset]): The validation datasets which represents train/val splits.
+            The list can contain n folds of train/val splits.
+        trainer (Trainer): The trainer instance used to optimize the model.
+        config (Configuration): The configuration file.
+
+    Returns:
+        Tuple[Recommender, dict]:
+            - Recommender: The best model, validated on the folds and trained on
+                the main data split.
+            - dict: Report dictionary.
+    """
+    implementation = params["meta"]["implementation"]
+    device = params["optimization"]["device"]
+    block_size = params["optimization"]["block_size"]
+    seed = params["optimization"]["properties"]["seed"]
+
+    best_params, report = trainer.train_multiple_fold(
+        model_name,
+        params,
+        val_datasets,
+        val_metric,
+        val_k,
+        beta=config.evaluation.beta,
+        pop_ratio=config.evaluation.pop_ratio,
+        ray_verbose=config.general.ray_verbose,
+    )
+
+    logger.msg("Starting training of the final model.")
+    best_model = model_registry.get(
+        name=model_name,
+        implementation=implementation,
+        params=best_params,
+        device=device,
+        seed=seed,
+        info=main_dataset.info(),
+        block_size=block_size,
+    )
+    best_model.fit(main_dataset.train_set, main_dataset.train_session, report_fn=None)
+
+    logger.positive("Final training complete.")
+
+    report["Total_Params (Best Model)"] = sum(
+        p.numel() for p in best_model.parameters()
+    )
+    report["Trainable_Params (Best Model)"] = sum(
+        p.numel() for p in best_model.parameters() if p.requires_grad
+    )
+
+    return best_model, report
 
 
 if __name__ == "__main__":

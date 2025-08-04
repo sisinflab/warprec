@@ -15,10 +15,10 @@ from warprec.utils.registry import model_registry, params_registry
 from warprec.utils.logger import logger
 
 
-def objective_function_single_fold(
+def objective_function(
     params: dict,
     model_name: str,
-    dataset: Dataset,
+    dataset_folds: Dataset | List[Dataset],
     validation_top_k: int,
     validation_metric_name: str,
     mode: str,
@@ -35,7 +35,8 @@ def objective_function_single_fold(
     Args:
         params (dict): The parameter to train the model.
         model_name (str): The name of the model to train.
-        dataset (Dataset): The dataset to train the model on.
+        dataset_folds (Dataset | List[Dataset]): The dataset to train the model on.
+            If a list is passed, then it will be handled as folding.
         validation_top_k (int): The number of top items to consider for evaluation.
         validation_metric_name (str): The name of the metric to optimize.
         mode (str): Whether or not to maximize or minimize the metric.
@@ -85,8 +86,11 @@ def objective_function_single_fold(
     load_custom_modules(custom_models)
 
     # Extract the correct dataset
-    # fold_index: int = params["fold"]
-    # current_fold = datasets[fold_index]
+    if isinstance(dataset_folds, list):
+        fold_index: int = params["fold"]
+        dataset = dataset_folds[fold_index]
+    else:
+        dataset = dataset_folds
 
     # Initialize the Evaluator for current Trial
     evaluator = Evaluator(
