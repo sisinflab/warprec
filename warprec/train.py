@@ -15,7 +15,8 @@ from warprec.utils.callback import WarpRecCallback
 from warprec.utils.config import load_yaml, load_callback, Configuration
 from warprec.utils.logger import logger
 from warprec.recommenders.trainer import Trainer
-from warprec.recommenders.base_recommender import Recommender
+from warprec.recommenders.loops import train_loop
+from warprec.recommenders.base_recommender import Recommender, IterativeRecommender
 from warprec.evaluation.evaluator import Evaluator
 from warprec.evaluation.statistical_significance import compute_paired_statistical_test
 from warprec.utils.registry import model_registry
@@ -329,6 +330,8 @@ def single_train_test_split_flow(
                 the main data split.
             - dict: Report dictionary.
     """
+    # Start HPO phase on test set,
+    # no need of further training
     best_model, ray_report = trainer.train_single_fold(
         model_name,
         params,
@@ -372,11 +375,13 @@ def multiple_fold_validation_flow(
                 the main data split.
             - dict: Report dictionary.
     """
+    # Retrieve common params
     implementation = params["meta"]["implementation"]
     device = params["optimization"]["device"]
     block_size = params["optimization"]["block_size"]
     seed = params["optimization"]["properties"]["seed"]
 
+    # Start HPO phase on validation folds
     best_params, report = trainer.train_multiple_fold(
         model_name,
         params,
@@ -388,7 +393,9 @@ def multiple_fold_validation_flow(
         ray_verbose=config.general.ray_verbose,
     )
 
-    logger.msg("Starting training of the final model.")
+    # Retrieve the model from the registry
+    # using the best parameters
+    iterations = best_params["iterations"]
     best_model = model_registry.get(
         name=model_name,
         implementation=implementation,
@@ -398,10 +405,14 @@ def multiple_fold_validation_flow(
         info=main_dataset.info(),
         block_size=block_size,
     )
-    best_model.fit(main_dataset.train_set, main_dataset.train_session, report_fn=None)
 
-    logger.positive("Final training complete.")
+    # Train the model using backpropagation if the model
+    # is iterative
+    if isinstance(best_model, IterativeRecommender):
+        # Training loop decorated with tqdm for a better visualization
+        train_loop(best_model, main_dataset, iterations)
 
+    # Final reporting
     report["Total_Params (Best Model)"] = sum(
         p.numel() for p in best_model.parameters()
     )

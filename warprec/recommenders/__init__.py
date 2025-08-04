@@ -3,6 +3,7 @@ from . import sequential_recommender
 from . import trainer
 from .base_recommender import (
     Recommender,
+    IterativeRecommender,
     GraphRecommenderUtils,
     SequentialRecommenderUtils,
     ItemSimRecommender,
@@ -10,12 +11,14 @@ from .base_recommender import (
 from .layers import MLP, CNN, SparseDropout, NGCFLayer
 from .losses import BPRLoss
 from .similarities import Similarity
+from .loops import train_loop
 
 __all__ = [
     "general_recommender",
     "sequential_recommender",
     "trainer",
     "Recommender",
+    "IterativeRecommender",
     "GraphRecommenderUtils",
     "SequentialRecommenderUtils",
     "ItemSimRecommender",
@@ -25,4 +28,5 @@ __all__ = [
     "NGCFLayer",
     "BPRLoss",
     "Similarity",
+    "train_loop",
 ]

@@ -6,6 +6,9 @@ import torch
 import pandas as pd
 import numpy as np
 from torch import nn, Tensor
+from torch.nn.modules.loss import _Loss
+from torch.optim.optimizer import Optimizer
+from torch.utils.data import DataLoader
 from pandas import DataFrame
 from scipy.sparse import csr_matrix, coo_matrix
 from torch_sparse import SparseTensor
@@ -235,6 +238,61 @@ class Recommender(nn.Module, ABC):
             else:
                 name += f"_{ann}={value}"
         return name
+
+
+class IterativeRecommender(Recommender):
+    loss: _Loss
+    optimizer: Optimizer
+
+    @abstractmethod
+    def get_dataloader(self, interactions: Interactions, **kwargs: Any) -> DataLoader:
+        """Returns a PyTorch DataLoader for the given interactions.
+
+        The DataLoader should provide batches suitable for the model's training.
+
+        Args:
+            interactions (Interactions): The interaction of users with items.
+            **kwargs (Any): Additional keyword arguments.
+
+        Returns:
+            DataLoader: The dataloader that will be used by the model during train.
+        """
+
+    def get_optimizer(self) -> Optimizer:
+        """Returns the PyTorch Optimizer instance for the model.
+
+        The optimizer should be initialized with the model's parameters.
+
+        Returns:
+            Optimizer: The optimizer used to perform the backward step.
+        """
+        return self.optimizer
+
+    def get_loss_function(self) -> _Loss:
+        """
+        Returns the PyTorch Loss function instance for the model.
+
+        Returns:
+            _Loss: The loss used by the model.
+        """
+        return self.loss
+
+    @abstractmethod
+    def train_step(self, model: nn.Module, batch: Any) -> Tensor:
+        """Performs a single training step for a given batch.
+
+        This method should compute the forward pass, calculate the loss,
+        and return the loss value.
+        It should NOT perform zero_grad, backward, or step on the optimizer,
+        as these will be handled by the generic training loop.
+
+        Args:
+            model (nn.Module): The model instance.
+            batch (Any): A single batch of data from the DataLoader.
+
+        Returns:
+            Tensor: The computed loss for the batch.
+        """
 
 
 class GraphRecommenderUtils(ABC):
