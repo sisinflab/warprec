@@ -45,27 +45,23 @@ class Recommender(nn.Module, ABC):
         self._name = ""
 
     @abstractmethod
-    def forward(self, *args: Any, **kwargs: Any):
-        """This method process a forward step of the model.
-
-        All recommendation models that implement a neural network or any
-        kind of backpropagation must implement this method, other model
-        can leave this empty.
-
-        Args:
-            *args (Any): List of arguments.
-            **kwargs (Any): The dictionary of keyword arguments.
-        """
-
-    @abstractmethod
     def predict(
-        self, interaction_matrix: csr_matrix, *args: Any, **kwargs: Any
+        self,
+        train_batch: Tensor,
+        user_indices: Tensor,
+        user_seq: Tensor,
+        seq_len: Tensor,
+        *args: Any,
+        **kwargs: Any,
     ) -> Tensor:
         """This method will produce the final predictions in the form of
         a dense Tensor.
 
         Args:
-            interaction_matrix (csr_matrix): The sparse interaction matrix.
+            train_batch (Tensor): The train batch of user interactions.
+            user_indices (Tensor): The batch of user indices.
+            user_seq (Tensor): The user sequence of item interactions.
+            seq_len (Tensor): The user sequence length.
             *args (Any): List of arguments.
             **kwargs (Any): The dictionary of keyword arguments.
 
@@ -106,7 +102,10 @@ class Recommender(nn.Module, ABC):
             # Process current batch
             batch_slice = slice(batch_start, batch_end)
             batch_scores = self.predict(
-                sparse_matrix[batch_slice], start=batch_start, end=batch_end
+                train_batch=Tensor(sparse_matrix[batch_slice].toarray()),
+                user_indices=torch.arange(batch_start, batch_end),
+                user_seq=None,
+                seq_len=None,
             )
 
             # Get top-k items and their scores for current batch
@@ -226,9 +225,32 @@ class Recommender(nn.Module, ABC):
 
 
 class IterativeRecommender(Recommender):
+    """Interface for recommendation model that use
+    an iterative approach to be trained.
+
+    Attributes:
+        loss (_Loss): The loss used to optimize the model.
+        optimizer (Optimizer): The optimizer used during the
+            training process.
+        epochs (int): The number of epochs used to
+            train the model.
+    """
+
     loss: _Loss
     optimizer: Optimizer
     epochs: int
+
+    @abstractmethod
+    def forward(self, *args: Any, **kwargs: Any):
+        """This method process a forward step of the model.
+
+        All recommendation models that implement a neural network or any
+        kind of backpropagation must implement this method.
+
+        Args:
+            *args (Any): List of arguments.
+            **kwargs (Any): The dictionary of keyword arguments.
+        """
 
     @abstractmethod
     def get_dataloader(self, interactions: Interactions, **kwargs: Any) -> DataLoader:
@@ -286,7 +308,7 @@ class GraphRecommenderUtils(ABC):
     Collection of common method used by all graph recommenders.
     """
 
-    def _get_adj_mat(
+    def get_adj_mat(
         self,
         interaction_matrix: coo_matrix,
         n_users: int,
@@ -329,7 +351,7 @@ class GraphRecommenderUtils(ABC):
         # so there is no need to do it here
         return adj
 
-    def _get_ego_embeddings(
+    def get_ego_embeddings(
         self, user_embedding: nn.Embedding, item_embedding: nn.Embedding
     ) -> Tensor:
         """Get the initial embedding of users and items and combine to an embedding matrix.
@@ -391,19 +413,12 @@ def generate_model_name(model_name: str, params: dict) -> str:
     return f"{model_name}_{param_str}"
 
 
-"""
-    In this section we have some common interfaces that Recommender model might use.
-    If you want to implement your own Recommender model you can either use the
-    Recommender class or one of the classes below. These function as a common
-    starting point.
-"""
-
-
 class ItemSimRecommender(Recommender):
     """ItemSimilarity common interface.
 
     Args:
         params (dict): The dictionary with the model params.
+        interactions (Interactions): The training interactions.
         *args (Any): Argument for PyTorch nn.Module.
         device (str): The device used for tensor operations.
         seed (int): The seed to use for reproducibility.
@@ -417,13 +432,16 @@ class ItemSimRecommender(Recommender):
     def __init__(
         self,
         params: dict,
+        interactions: Interactions,
         *args: Any,
         device: str = "cpu",
         seed: int = 42,
         info: dict = None,
         **kwargs: Any,
     ):
-        super().__init__(params, device=device, seed=seed, *args, **kwargs)
+        super().__init__(
+            params, interactions, device=device, seed=seed, *args, **kwargs
+        )
         self.items = info.get("items", None)
         if not self.items:
             raise ValueError(
@@ -434,26 +452,29 @@ class ItemSimRecommender(Recommender):
 
     @torch.no_grad()
     def predict(
-        self, interaction_matrix: csr_matrix, *args: Any, **kwargs: Any
+        self,
+        train_batch: Tensor,
+        user_indices: Tensor,
+        user_seq: Tensor,
+        seq_len: Tensor,
+        *args: Any,
+        **kwargs: Any,
     ) -> Tensor:
         """Prediction in the form of X@B where B is a {item x item} similarity matrix.
 
         Args:
-            interaction_matrix (csr_matrix): The matrix containing the
-                pairs of interactions to evaluate.
+            train_batch (Tensor): The train batch of user interactions.
+            user_indices (Tensor): The batch of user indices.
+            user_seq (Tensor): The user sequence of item interactions.
+            seq_len (Tensor): The user sequence length.
             *args (Any): List of arguments.
             **kwargs (Any): The dictionary of keyword arguments.
 
         Returns:
             Tensor: The score matrix {user x item}.
         """
-        r = interaction_matrix @ self.item_similarity  # pylint: disable=not-callable
+        predictions = train_batch @ self.item_similarity  # pylint: disable=not-callable
 
         # Masking interaction already seen in train
-        r[interaction_matrix != 0] = -torch.inf
-        return r.to(self._device)
-
-    def forward(self, *args, **kwargs):
-        """Forward method is empty because we don't need
-        back propagation.
-        """
+        predictions[train_batch != 0] = -torch.inf
+        return predictions.to(self._device)

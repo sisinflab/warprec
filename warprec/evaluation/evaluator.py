@@ -137,10 +137,6 @@ class Evaluator:
         self.metrics_to(device)
         model.eval()
 
-        # Extract main data structures from dataset
-        train_set = dataset.train_set
-        train_session = dataset.train_session
-
         # Retrieve evaluation dataloader
         dataloader = dataset.get_evaluation_dataloader()
 
@@ -151,7 +147,7 @@ class Evaluator:
             # If we are evaluating a sequential model, compute user history
             user_seq, seq_len = None, None
             if isinstance(model, SequentialRecommenderUtils):
-                user_seq, seq_len = train_session.get_user_history_sequences(
+                user_seq, seq_len = dataset.train_session.get_user_history_sequences(
                     user_indices.tolist(),
                     model.max_seq_len,  # Sequence length truncated
                 )
@@ -159,7 +155,6 @@ class Evaluator:
             predictions = model.predict(
                 train_batch,
                 user_indices=user_indices,
-                train_set=train_set,
                 user_seq=user_seq,
                 seq_len=seq_len,
             ).to(device)  # Get ratings tensor [batch_size x items]
@@ -244,7 +239,8 @@ class Evaluator:
                 "%H:%M:%S", time.gmtime(eval_total_time)
             )
             logger.positive(
-                f"Evaluation completed for model {model.name}. Evaluation process took: {frmt_eval_total_time}"
+                f"Evaluation completed for model {model.name}. "
+                f"Evaluation process took: {frmt_eval_total_time}"
             )
 
     def reset_metrics(self):
@@ -286,7 +282,8 @@ class Evaluator:
         """Utility function to print results using tabulate.
 
         Args:
-            results (Dict[int, Dict[str, float | Tensor]]): The dictionary containing all the results.
+            results (Dict[int, Dict[str, float | Tensor]]): The dictionary containing
+                all the results.
             header (str): The header of the table to be printed.
             max_metrics_per_row (int): The number of metrics
                 to print in each row.

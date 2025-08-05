@@ -44,7 +44,9 @@ class ItemKNN(ItemSimRecommender):
         info: dict = None,
         **kwargs: Any,
     ):
-        super().__init__(params, device=device, seed=seed, info=info, *args, **kwargs)
+        super().__init__(
+            params, interactions, device=device, seed=seed, info=info, *args, **kwargs
+        )
         self._name = "ItemKNN"
 
         X = interactions.get_sparse()
