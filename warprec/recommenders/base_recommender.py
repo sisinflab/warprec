@@ -274,7 +274,7 @@ class IterativeRecommender(Recommender):
         return self.optimizer
 
     @abstractmethod
-    def train_step(self, batch: Any) -> Tensor:
+    def train_step(self, batch: Any, epoch: int, *args: Any, **kwargs: Any) -> Tensor:
         """Performs a single training step for a given batch.
 
         This method should compute the forward pass, calculate the loss,
@@ -284,6 +284,9 @@ class IterativeRecommender(Recommender):
 
         Args:
             batch (Any): A single batch of data from the DataLoader.
+            epoch (int): The current epoch iteration.
+            *args (Any): The argument list.
+            **kwargs (Any): The keyword arguments.
 
         Returns:
             Tensor: The computed loss for the batch.
@@ -442,9 +445,6 @@ class ItemSimRecommender(Recommender):
     def predict(
         self,
         train_batch: Tensor,
-        user_indices: Tensor,
-        user_seq: Tensor,
-        seq_len: Tensor,
         *args: Any,
         **kwargs: Any,
     ) -> Tensor:
@@ -452,9 +452,6 @@ class ItemSimRecommender(Recommender):
 
         Args:
             train_batch (Tensor): The train batch of user interactions.
-            user_indices (Tensor): The batch of user indices.
-            user_seq (Tensor): The user sequence of item interactions.
-            seq_len (Tensor): The user sequence length.
             *args (Any): List of arguments.
             **kwargs (Any): The dictionary of keyword arguments.
 

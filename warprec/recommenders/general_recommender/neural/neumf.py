@@ -137,7 +137,7 @@ class NeuMF(IterativeRecommender):
             num_negatives=self.neg_samples, batch_size=self.batch_size
         )
 
-    def train_step(self, batch: Any):
+    def train_step(self, batch: Any, *args, **kwargs):
         user, item, rating = [x.to(self._device) for x in batch]
 
         predictions = self(user, item)
@@ -184,8 +184,6 @@ class NeuMF(IterativeRecommender):
         self,
         train_batch: Tensor,
         user_indices: Tensor,
-        user_seq: Tensor,
-        seq_len: Tensor,
         *args: Any,
         **kwargs: Any,
     ) -> Tensor:
@@ -194,8 +192,6 @@ class NeuMF(IterativeRecommender):
         Args:
             train_batch (Tensor): The train batch of user interactions.
             user_indices (Tensor): The batch of user indices.
-            user_seq (Tensor): The user sequence of item interactions.
-            seq_len (Tensor): The user sequence length.
             *args (Any): List of arguments.
             **kwargs (Any): The dictionary of keyword arguments.
 

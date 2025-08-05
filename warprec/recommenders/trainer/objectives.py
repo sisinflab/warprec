@@ -110,12 +110,12 @@ def objective_function(
             epochs = model.epochs
 
             model.train()
-            for _ in range(epochs):
+            for epoch in range(epochs):
                 epoch_loss = 0.0
                 for batch in train_dataloader:
                     optimizer.zero_grad()
 
-                    loss = model.train_step(batch)
+                    loss = model.train_step(batch, epoch)
                     loss.backward()
 
                     optimizer.step()

@@ -159,7 +159,7 @@ class MultiDAE(IterativeRecommender):
     def get_dataloader(self, interactions: Interactions, **kwargs):
         return interactions.get_interaction_loader(batch_size=self.batch_size)
 
-    def train_step(self, batch: Any):
+    def train_step(self, batch: Any, *args: Any, **kwargs: Any):
         rating_matrix = [x.to(self._device) for x in batch][0]
 
         reconstructed = self(rating_matrix)
@@ -190,9 +190,6 @@ class MultiDAE(IterativeRecommender):
     def predict(
         self,
         train_batch: Tensor,
-        user_indices: Tensor,
-        user_seq: Tensor,
-        seq_len: Tensor,
         *args: Any,
         **kwargs: Any,
     ) -> Tensor:
@@ -200,9 +197,6 @@ class MultiDAE(IterativeRecommender):
 
         Args:
             train_batch (Tensor): The train batch of user interactions.
-            user_indices (Tensor): The batch of user indices.
-            user_seq (Tensor): The user sequence of item interactions.
-            seq_len (Tensor): The user sequence length.
             *args (Any): List of arguments.
             **kwargs (Any): The dictionary of keyword arguments.
 
