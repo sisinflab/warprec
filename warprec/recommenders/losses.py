@@ -30,3 +30,25 @@ class BPRLoss(nn.Module):
 
         # Return the mean of the bpr losses computed
         return loss.mean()
+
+
+class MultiDAELoss(nn.Module):
+    """MultiDAELoss, used to train MultiDAE model.
+
+    For further details, check the `paper <https://dl.acm.org/doi/10.1145/3178876.3186150>`_.
+    """
+
+    def __init__(self):
+        super(MultiDAELoss, self).__init__()
+
+    def forward(self, rating_matrix: Tensor, reconstructed: Tensor) -> Tensor:
+        """Compute loss for MultiDAE model.
+
+        Args:
+            rating_matrix (Tensor): The original ratings.
+            reconstructed (Tensor): The reconstructed Tensor from
+                MultiDAE model.
+        Returns:
+            Tensor: The loss value computed.
+        """
+        return -(F.log_softmax(reconstructed, dim=1) * rating_matrix).sum(dim=1).mean()

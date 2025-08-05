@@ -9,7 +9,7 @@ from .base_recommender import (
     ItemSimRecommender,
 )
 from .layers import MLP, CNN, SparseDropout, NGCFLayer
-from .losses import BPRLoss
+from .losses import BPRLoss, MultiDAELoss
 from .similarities import Similarity
 from .loops import train_loop
 
@@ -27,6 +27,7 @@ __all__ = [
     "SparseDropout",
     "NGCFLayer",
     "BPRLoss",
+    "MultiDAELoss",
     "Similarity",
     "train_loop",
 ]
