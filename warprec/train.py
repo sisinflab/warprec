@@ -400,6 +400,7 @@ def multiple_fold_validation_flow(
         name=model_name,
         implementation=implementation,
         params=best_params,
+        interactions=main_dataset.train_set,
         device=device,
         seed=seed,
         info=main_dataset.info(),

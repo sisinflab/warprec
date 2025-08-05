@@ -295,6 +295,7 @@ class Trainer:
             name=model_name,
             implementation=model_params.meta.implementation,
             params=best_params,
+            interactions=dataset.train_set,
             device=device,
             seed=optimization.properties.seed,
             info=dataset.info(),

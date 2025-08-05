@@ -1,5 +1,5 @@
 import random
-from typing import Callable, Optional, Any
+from typing import Any
 from abc import ABC, abstractmethod
 
 import torch
@@ -20,6 +20,7 @@ class Recommender(nn.Module, ABC):
 
     Args:
         params (dict): The dictionary with the model params.
+        interactions (Interactions): The training interactions.
         *args (Any): Argument for PyTorch nn.Module.
         device (str): The device used for tensor operations.
         seed (int): The seed to use for reproducibility.
@@ -30,6 +31,7 @@ class Recommender(nn.Module, ABC):
     def __init__(
         self,
         params: dict,
+        interactions: Interactions,
         *args: Any,
         device: str = "cpu",
         seed: int = 42,
@@ -41,23 +43,6 @@ class Recommender(nn.Module, ABC):
         self.set_seed(seed)
         self._device = torch.device(device)
         self._name = ""
-
-    @abstractmethod
-    def fit(
-        self,
-        interactions: Interactions,
-        *args: Any,
-        report_fn: Optional[Callable],
-        **kwargs: Any,
-    ):
-        """This method will train the model on the dataset.
-
-        Args:
-            interactions (Interactions): The interactions object used for the training.
-            *args (Any): List of arguments.
-            report_fn (Optional[Callable]): The Ray Tune function to report the iteration.
-            **kwargs (Any): The dictionary of keyword arguments.
-        """
 
     @abstractmethod
     def forward(self, *args: Any, **kwargs: Any):
@@ -243,6 +228,7 @@ class Recommender(nn.Module, ABC):
 class IterativeRecommender(Recommender):
     loss: _Loss
     optimizer: Optimizer
+    epochs: int
 
     @abstractmethod
     def get_dataloader(self, interactions: Interactions, **kwargs: Any) -> DataLoader:
@@ -278,7 +264,7 @@ class IterativeRecommender(Recommender):
         return self.loss
 
     @abstractmethod
-    def train_step(self, model: nn.Module, batch: Any) -> Tensor:
+    def train_step(self, batch: Any) -> Tensor:
         """Performs a single training step for a given batch.
 
         This method should compute the forward pass, calculate the loss,
@@ -287,7 +273,6 @@ class IterativeRecommender(Recommender):
         as these will be handled by the generic training loop.
 
         Args:
-            model (nn.Module): The model instance.
             batch (Any): A single batch of data from the DataLoader.
 
         Returns:

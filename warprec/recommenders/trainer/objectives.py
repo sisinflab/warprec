@@ -3,12 +3,13 @@ import tempfile
 from typing import Any, List
 
 import torch
+from torch import Tensor
 from ray import tune
 from ray.tune import Checkpoint
 
 from warprec.data.dataset import Dataset
 from warprec.evaluation.evaluator import Evaluator
-from warprec.recommenders.base_recommender import Recommender
+from warprec.recommenders.base_recommender import Recommender, IterativeRecommender
 from warprec.utils.config import RecomModel
 from warprec.utils.helpers import load_custom_modules
 from warprec.utils.registry import model_registry, params_registry
@@ -55,31 +56,6 @@ def objective_function(
         None: This function reports metrics and checkpoints to Ray Tune
             via `tune.report()` and does not explicitly return a value.
     """
-
-    def _report(model: Recommender, **kwargs: Any):
-        """Reporting function. Will be used as a callback for Tune reporting.
-
-        Args:
-            model (Recommender): The trained model to report.
-            **kwargs (Any): The parameters of the model.
-        """
-        evaluator.evaluate(model, dataset, device=device)
-        results = evaluator.compute_results()
-        score = results[validation_top_k][validation_metric_name]
-
-        with tempfile.TemporaryDirectory() as tmpdir:
-            torch.save(
-                {"model_state": model.state_dict()},
-                os.path.join(tmpdir, "checkpoint.pt"),
-            )
-            tune.report(
-                metrics={
-                    validation_score: score,
-                    **kwargs,  # Other metrics from the model itself
-                },
-                checkpoint=Checkpoint.from_directory(tmpdir),
-            )
-
     validation_score = f"{validation_metric_name}@{validation_top_k}"
 
     # Load custom modules if provided
@@ -111,37 +87,87 @@ def objective_function(
             model_params.validate_single_trial_params()
         except ValueError as e:
             logger.negative(str(e))  # Log the custom message from Pydantic validation
-
-            # Report to Ray Tune the trial failed
-            if mode == "max":
-                tune.report(metrics={validation_score: -float("inf")})
-            else:
-                tune.report(metrics={validation_score: float("inf")})
+            failed_report(mode, validation_score)
 
             return  # Stop Ray Tune trial
 
     # Proceed with normal model training behavior
-    model = model_registry.get(
-        name=model_name,
-        implementation=implementation,
-        params=params,
-        device=device,
-        seed=seed,
-        info=dataset.info(),
-        block_size=block_size,
-    )
     try:
-        model.fit(dataset.train_set, sessions=dataset.train_session, report_fn=_report)
+        model = model_registry.get(
+            name=model_name,
+            implementation=implementation,
+            params=params,
+            interactions=dataset.train_set,
+            device=device,
+            seed=seed,
+            info=dataset.info(),
+            block_size=block_size,
+        )
+        if isinstance(model, IterativeRecommender):
+            # Proceed with standard training loop
+            train_dataloader = model.get_dataloader(dataset.train_set)
+            optimizer = model.get_optimizer()
+            epochs = model.epochs
+
+            model.train()
+            for _ in range(epochs):
+                epoch_loss = 0.0
+                for batch in train_dataloader:
+                    optimizer.zero_grad()
+
+                    loss = model.train_step(batch)
+                    loss.backward()
+
+                    optimizer.step()
+                    epoch_loss += loss.item()
+
+                # Evaluation at the end of each training epoch
+                evaluator.evaluate(model, dataset, device=device)
+                results = evaluator.compute_results()
+                score = results[validation_top_k][validation_metric_name]
+                validation_report(model, validation_score, score, loss=epoch_loss)
+
+        else:
+            # Model is trained in the __init__ we can directly evaluate it
+            evaluator.evaluate(model, dataset, device=device)
+            results = evaluator.compute_results()
+            score = results[validation_top_k][validation_metric_name]
+            validation_report(model, validation_score, score)
+
     except Exception as e:
         logger.negative(
             f"The fitting of the model {model.name}, failed "
             f"with parameters: {params}. Error: {e}"
         )
-        if mode == "max":
-            tune.report(
-                metrics={validation_score: -torch.inf},
-            )
-        else:
-            tune.report(
-                metrics={validation_score: torch.inf},
-            )
+        failed_report(mode, validation_score)
+
+
+def validation_report(
+    model: Recommender, validation_score: str, score: float | Tensor, **kwargs: Any
+):
+    # If the score has been computed per user we report only the mean
+    report_score = score if isinstance(score, float) else score.mean()
+    with tempfile.TemporaryDirectory() as tmpdir:
+        torch.save(
+            {"model_state": model.state_dict()},
+            os.path.join(tmpdir, "checkpoint.pt"),
+        )
+        tune.report(
+            metrics={
+                validation_score: report_score,
+                **kwargs,
+            },
+            checkpoint=Checkpoint.from_directory(tmpdir),
+        )
+
+
+def failed_report(mode: str, validation_score: str):
+    # Report to Ray Tune the trial failed
+    if mode == "max":
+        tune.report(
+            metrics={validation_score: -float("inf")},
+        )
+    else:
+        tune.report(
+            metrics={validation_score: float("inf")},
+        )
