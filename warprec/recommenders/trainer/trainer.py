@@ -453,7 +453,11 @@ class Trainer:
             param_name = col.replace("config/", "")
             value = best_hyperparameters_row[col]
 
-            if isinstance(value, np.integer):
+            if isinstance(value, np.floating) and value == int(value):
+                # This check converts aggregated hyperparameters that
+                # can become floating values back to integers
+                best_hyperparameters[param_name] = int(value)
+            elif isinstance(value, np.integer):
                 best_hyperparameters[param_name] = int(value)
             elif isinstance(value, np.floating):
                 best_hyperparameters[param_name] = float(value)
