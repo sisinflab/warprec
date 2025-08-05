@@ -29,7 +29,7 @@ def train_loop(model: IterativeRecommender, dataset: Dataset, epochs: int):
         ):
             optimizer.zero_grad()
 
-            loss = model.train_step(batch)
+            loss = model.train_step(batch, epoch)
             loss.backward()
 
             optimizer.step()
