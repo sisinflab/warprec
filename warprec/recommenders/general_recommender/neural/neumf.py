@@ -112,13 +112,8 @@ class NeuMF(IterativeRecommender):
 
         # Init embedding weights
         self.apply(self._init_weights)
-
-        # Loss and optimizer
-        self.optimizer = torch.optim.Adam(
-            self.parameters(), lr=self.learning_rate, weight_decay=self.weight_decay
-        )
-        self.loss = nn.BCEWithLogitsLoss()
         self.sigmoid = nn.Sigmoid()
+        self.loss = nn.BCEWithLogitsLoss()
 
         # Move to device
         self.to(self._device)
@@ -136,9 +131,6 @@ class NeuMF(IterativeRecommender):
         return torch.optim.Adam(
             self.parameters(), lr=self.learning_rate, weight_decay=self.weight_decay
         )
-
-    def get_loss_function(self):
-        return nn.BCEWithLogitsLoss()
 
     def get_dataloader(self, interactions: Interactions, **kwargs):
         return interactions.get_item_rating_dataloader(

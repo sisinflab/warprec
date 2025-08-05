@@ -6,7 +6,6 @@ import torch
 import pandas as pd
 import numpy as np
 from torch import nn, Tensor
-from torch.nn.modules.loss import _Loss
 from torch.optim.optimizer import Optimizer
 from torch.utils.data import DataLoader
 from pandas import DataFrame
@@ -229,14 +228,12 @@ class IterativeRecommender(Recommender):
     an iterative approach to be trained.
 
     Attributes:
-        loss (_Loss): The loss used to optimize the model.
         optimizer (Optimizer): The optimizer used during the
             training process.
         epochs (int): The number of epochs used to
             train the model.
     """
 
-    loss: _Loss
     optimizer: Optimizer
     epochs: int
 
@@ -275,15 +272,6 @@ class IterativeRecommender(Recommender):
             Optimizer: The optimizer used to perform the backward step.
         """
         return self.optimizer
-
-    def get_loss_function(self) -> _Loss:
-        """
-        Returns the PyTorch Loss function instance for the model.
-
-        Returns:
-            _Loss: The loss used by the model.
-        """
-        return self.loss
 
     @abstractmethod
     def train_step(self, batch: Any) -> Tensor:
