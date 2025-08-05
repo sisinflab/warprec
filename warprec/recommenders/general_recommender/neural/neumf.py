@@ -141,7 +141,9 @@ class NeuMF(IterativeRecommender):
         return nn.BCEWithLogitsLoss()
 
     def get_dataloader(self, interactions: Interactions, **kwargs):
-        return interactions.get_item_rating_dataloader(num_negatives=self.neg_samples)
+        return interactions.get_item_rating_dataloader(
+            num_negatives=self.neg_samples, batch_size=self.batch_size
+        )
 
     def train_step(self, batch: Any):
         user, item, rating = [x.to(self._device) for x in batch]
