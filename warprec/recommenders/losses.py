@@ -1,3 +1,4 @@
+import torch
 import torch.nn.functional as F
 from torch import nn, Tensor
 
@@ -48,7 +49,37 @@ class MultiDAELoss(nn.Module):
             rating_matrix (Tensor): The original ratings.
             reconstructed (Tensor): The reconstructed Tensor from
                 MultiDAE model.
+
         Returns:
             Tensor: The loss value computed.
         """
         return -(F.log_softmax(reconstructed, dim=1) * rating_matrix).sum(dim=1).mean()
+
+
+class MultiVAELoss(nn.Module):
+    def __init__(self):
+        super(MultiVAELoss, self).__init__()
+
+    def forward(
+        self,
+        rating_matrix: Tensor,
+        reconstructed: Tensor,
+        kl_loss: Tensor,
+        anneal: float,
+    ) -> Tensor:
+        """Compute loss for MultiVAE model.
+
+        Args:
+            rating_matrix (Tensor): The original ratings.
+            reconstructed (Tensor): The reconstructed Tensor from
+                MultiVAE model.
+            kl_loss (Tensor): The KL loss computed during the
+                forward step.
+            anneal (float): The anneal value based on epoch.
+
+        Returns:
+            Tensor: The loss value computed.
+        """
+        log_softmax = F.log_softmax(reconstructed, dim=1)
+        neg_ll = -torch.mean(torch.sum(log_softmax * rating_matrix, dim=1))
+        return neg_ll + anneal * kl_loss
