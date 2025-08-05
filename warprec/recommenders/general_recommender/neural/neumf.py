@@ -1,19 +1,18 @@
 # pylint: disable = R0801, E1102
-from typing import List, Optional, Callable, Any
+from typing import List, Any
 
 import torch
 from torch import nn, Tensor
 from torch.nn import Module
 from torch.nn.init import normal_
-from scipy.sparse import csr_matrix
 from warprec.recommenders.layers import MLP
 from warprec.data.dataset import Interactions
-from warprec.recommenders.base_recommender import Recommender
+from warprec.recommenders.base_recommender import IterativeRecommender
 from warprec.utils.registry import model_registry
 
 
 @model_registry.register(name="NeuMF")
-class NeuMF(Recommender):
+class NeuMF(IterativeRecommender):
     """Implementation of NeuMF algorithm from
         Neural Collaborative Filtering 2017.
 
@@ -133,51 +132,24 @@ class NeuMF(Recommender):
         if isinstance(module, nn.Embedding):
             normal_(module.weight.data, mean=0.0, std=0.01)
 
-    def fit(
-        self,
-        interactions: Interactions,
-        *args: Any,
-        report_fn: Optional[Callable] = None,
-        **kwargs: Any,
-    ):
-        """Main train method.
-
-        The training will be conducted on triplets of (user, item, rating).
-        If the negative sampling has been set, the dataloader will contain also
-        some negative samples for each user positive interaction.
-
-        Args:
-            interactions (Interactions): The interactions that will be used to train the model.
-            *args (Any): List of arguments.
-            report_fn (Optional[Callable]): The Ray Tune function to report the iteration.
-            **kwargs (Any): The dictionary of keyword arguments.
-        """
-        # Get the dataloader from interactions
-        dataloader = interactions.get_item_rating_dataloader(
-            num_negatives=self.neg_samples,
-            batch_size=self.batch_size,
+    def get_optimizer(self):
+        return torch.optim.Adam(
+            self.parameters(), lr=self.learning_rate, weight_decay=self.weight_decay
         )
 
-        # Training loop
-        self.train()
-        for _ in range(self.epochs):
-            epoch_loss = 0.0
-            for batch in dataloader:
-                user, item, rating = [x.to(self._device) for x in batch]
+    def get_loss_function(self):
+        return nn.BCEWithLogitsLoss()
 
-                # Forward pass and loss computation
-                self.optimizer.zero_grad()
-                predictions = self.forward(user, item)
-                loss: Tensor = self.loss(predictions, rating)
+    def get_dataloader(self, interactions: Interactions, **kwargs):
+        return interactions.get_item_rating_dataloader(num_negatives=self.neg_samples)
 
-                # Backward pass and optimization
-                loss.backward()
-                self.optimizer.step()
+    def train_step(self, batch: Any):
+        user, item, rating = [x.to(self._device) for x in batch]
 
-                epoch_loss += loss.item()
+        predictions = self(user, item)
+        loss: Tensor = self.loss(predictions, rating)
 
-            if report_fn is not None:
-                report_fn(self, loss=epoch_loss)
+        return loss
 
     # pylint: disable = E0606
     def forward(self, user: Tensor, item: Tensor) -> Tensor:
@@ -215,47 +187,48 @@ class NeuMF(Recommender):
 
     @torch.no_grad()
     def predict(
-        self, interaction_matrix: csr_matrix, *args: Any, **kwargs: Any
+        self,
+        train_batch: Tensor,
+        user_indices: Tensor,
+        user_seq: Tensor,
+        seq_len: Tensor,
+        *args: Any,
+        **kwargs: Any,
     ) -> Tensor:
         """Prediction using the learned embeddings.
 
         Args:
-            interaction_matrix (csr_matrix): The matrix containing the
-                pairs of interactions to evaluate.
+            train_batch (Tensor): The train batch of user interactions.
+            user_indices (Tensor): The batch of user indices.
+            user_seq (Tensor): The user sequence of item interactions.
+            seq_len (Tensor): The user sequence length.
             *args (Any): List of arguments.
             **kwargs (Any): The dictionary of keyword arguments.
 
         Returns:
             Tensor: The score matrix {user x item}.
         """
-        batch_size, num_items = interaction_matrix.shape
-        start_idx = kwargs.get("start", 0)
-        end_idx = kwargs.get("end", interaction_matrix.shape[0])
+        batch_size, num_items = train_batch.size()
 
         preds = []
-        for start in range(
-            0, num_items, self.block_size
-        ):  # We proceed with the evaluation in blocks
+        for start in range(0, num_items, self.block_size):
             end = min(start + self.block_size, num_items)
-            items_block = torch.arange(start, end, device=self._device).unsqueeze(0)
-            items_block = items_block.expand(batch_size, -1).reshape(
-                -1
-            )  # [batch_size * block]
-            users_block = torch.arange(
-                start_idx, end_idx, device=self._device
-            ).unsqueeze(1)
-            users_block = users_block.expand(-1, end - start).reshape(
-                -1
-            )  # [batch_size * block]
-            preds_block = self.sigmoid(self.forward(users_block, items_block))
-            preds.append(
-                preds_block.view(batch_size, end - start)
-            )  # [batch_size x block]
+            items_block = torch.arange(start, end, device=self._device)  # [block_size]
+
+            # Expand user_indices and items_block to create all user-item pairs
+            # within this block.
+            users_block = (
+                user_indices.unsqueeze(1).expand(-1, end - start).reshape(-1)
+            )  # [batch_size * block_size]
+            items_block_expanded = (
+                items_block.unsqueeze(0).expand(batch_size, -1).reshape(-1)
+            )  # [batch_size * block_size]
+
+            preds_block = self.sigmoid(self.forward(users_block, items_block_expanded))
+            preds.append(preds_block.view(batch_size, end - start))
+
         predictions = torch.cat(preds, dim=1)  # [batch_size x num_items]
 
-        coo = interaction_matrix.tocoo()
-        user_indices = torch.from_numpy(coo.row).to(self._device)
-        item_indices = torch.from_numpy(coo.col).to(self._device)
-        predictions[user_indices, item_indices] = -torch.inf
-
-        return predictions
+        # Masking interaction already seen in train
+        predictions[train_batch != 0] = -torch.inf
+        return predictions.to(self._device)
