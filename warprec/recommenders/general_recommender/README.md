@@ -144,7 +144,6 @@ models:
     AttributeItemKNN:
         k: 10
         similarity: cosine
-        normalize: True
 ...
 ```
 
@@ -164,7 +163,6 @@ models:
         k: 10
         similarity: cosine
         user_profile: tfidf
-        normalize: True
 ...
 ```
 
