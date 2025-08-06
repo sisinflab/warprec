@@ -1,21 +1,20 @@
 # pylint: disable = R0801, E1102
-from typing import List, Optional, Callable, Any
+from typing import List, Any
 
 import torch
 from torch import nn, Tensor
 from torch.nn import Module
 from torch.nn.init import normal_
-from scipy.sparse import csr_matrix
 
 from warprec.recommenders.layers import MLP, CNN
 from warprec.recommenders.losses import BPRLoss
 from warprec.data.dataset import Interactions
-from warprec.recommenders.base_recommender import Recommender
+from warprec.recommenders.base_recommender import IterativeRecommender
 from warprec.utils.registry import model_registry
 
 
 @model_registry.register(name="ConvNCF")
-class ConvNCF(Recommender):
+class ConvNCF(IterativeRecommender):
     """Implementation of ConvNCF algorithm from
         Outer Product-based Neural Collaborative Filtering 2018.
 
@@ -103,13 +102,9 @@ class ConvNCF(Recommender):
 
         # Init embedding weights
         self.apply(self._init_weights)
-
-        # Optimizer and losses
-        self.optimizer = torch.optim.Adam(
-            self.parameters(), lr=self.learning_rate, weight_decay=self.weight_decay
-        )
         self.loss = BPRLoss()
 
+        # Move to device
         self.to(self._device)
 
     def _init_weights(self, module: Module):
@@ -121,46 +116,22 @@ class ConvNCF(Recommender):
         if isinstance(module, nn.Embedding):
             normal_(module.weight.data, mean=0.0, std=0.01)
 
-    def fit(
-        self,
-        interactions: Interactions,
-        *args: Any,
-        report_fn: Optional[Callable] = None,
-        **kwargs: Any,
-    ):
-        """Main train method.
+    def get_optimizer(self):
+        return torch.optim.Adam(
+            self.parameters(), lr=self.learning_rate, weight_decay=self.weight_decay
+        )
 
-        The training will be conducted on triplets of (user, positive_item, negative_item).
+    def get_dataloader(self, interactions: Interactions, **kwargs):
+        return interactions.get_pos_neg_dataloader(self.batch_size)
 
-        Args:
-            interactions (Interactions): The interactions that will be used to train the model.
-            *args (Any): List of arguments.
-            report_fn (Optional[Callable]): The Ray Tune function to report the iteration.
-            **kwargs (Any): The dictionary of keyword arguments.
-        """
-        # ConvNCF uses pairwise training, so we need positive and negative items.
-        dataloader = interactions.get_pos_neg_dataloader(self.batch_size)
+    def train_step(self, batch: Any, *args, **kwargs):
+        user, pos_item, neg_item = [x.to(self._device) for x in batch]
 
-        self.train()
-        for _ in range(self.epochs):
-            epoch_loss = 0.0
-            for batch in dataloader:
-                user, pos_item, neg_item = [x.to(self._device) for x in batch]
+        pos_item_score = self.forward(user, pos_item)
+        neg_item_score = self.forward(user, neg_item)
+        loss: Tensor = self.loss(pos_item_score, neg_item_score)
 
-                # Forward pass for positive and negative items
-                self.optimizer.zero_grad()
-                pos_item_score = self.forward(user, pos_item)
-                neg_item_score = self.forward(user, neg_item)
-                loss: Tensor = self.loss(pos_item_score, neg_item_score)
-
-                # Backward pass and optimization
-                loss.backward()
-                self.optimizer.step()
-
-                epoch_loss += loss.item()
-
-            if report_fn is not None:
-                report_fn(self, loss=epoch_loss)
+        return loss
 
     def forward(self, user: Tensor, item: Tensor) -> Tensor:
         """Forward pass of the ConvNCF model.
@@ -176,11 +147,9 @@ class ConvNCF(Recommender):
         item_e = self.item_embedding(item)  # [batch_size, embedding_size]
 
         # Outer product to create interaction map
-        # user_e.unsqueeze(2) -> [batch_size, embedding_size, 1]
-        # item_e.unsqueeze(1) -> [batch_size, 1, embedding_size]
-        # torch.bmm(user_e.unsqueeze(2), item_e.unsqueeze(1))
-        # -> [batch_size, embedding_size, embedding_size]
-        interaction_map = torch.bmm(user_e.unsqueeze(2), item_e.unsqueeze(1))
+        interaction_map = torch.bmm(
+            user_e.unsqueeze(2), item_e.unsqueeze(1)
+        )  # [batch_size, embedding_size, embedding_size]
 
         # Add a channel dimension for CNN input: [batch_size, 1, embedding_size, embedding_size]
         interaction_map = interaction_map.unsqueeze(1)
@@ -201,71 +170,60 @@ class ConvNCF(Recommender):
 
     @torch.no_grad()
     def predict(
-        self, interaction_matrix: csr_matrix, *args: Any, **kwargs: Any
+        self,
+        train_batch: Tensor,
+        user_indices: Tensor,
+        *args: Any,
+        **kwargs: Any,
     ) -> Tensor:
         """
-        Prediction using the learned embeddings (optimized version).
+        Prediction using the learned embeddings.
 
         Args:
-            interaction_matrix (csr_matrix): The matrix containing the
-                pairs of interactions to evaluate.
+            train_batch (Tensor): The train batch of user interactions.
+            user_indices (Tensor): The batch of user indices.
             *args (Any): List of arguments.
             **kwargs (Any): The dictionary of keyword arguments.
 
         Returns:
             Tensor: The score matrix {user x item}.
         """
-        user_indices = torch.arange(
-            kwargs.get("start", 0),
-            kwargs.get("end", interaction_matrix.shape[0]),
-            device=self._device,
-        ).long()
-
-        num_users_in_batch = len(user_indices)
-        num_items = interaction_matrix.shape[1]
-
-        # Extract embedding of specific users in batch
+        num_users, num_items = train_batch.size()
         user_e_batch = self.user_embedding(user_indices)
 
-        # Process in blocks for memory efficiency
         all_scores = []
+        # We must iterate over items in blocks due to memory constraints
         for item_start_idx in range(0, num_items, self.block_size):
             item_end_idx = min(item_start_idx + self.block_size, num_items)
 
-            # Process embeddings of items in block
             item_indices_block = torch.arange(
                 item_start_idx, item_end_idx, device=self._device
-            ).long()
+            )
             item_e_block = self.item_embedding(item_indices_block)
             num_items_in_block = len(item_indices_block)
 
-            # Expand embeddings to match batch_size and block_size
+            # Expand embeddings to create all user-item pairs in the block
             user_e_exp = user_e_batch.unsqueeze(1).expand(-1, num_items_in_block, -1)
-            item_e_exp = item_e_block.unsqueeze(0).expand(num_users_in_batch, -1, -1)
+            item_e_exp = item_e_block.unsqueeze(0).expand(num_users, -1, -1)
 
-            # Compute outer product (batch_users x block_items)
+            # Compute outer product for the entire block
             interaction_map = torch.bmm(
                 user_e_exp.reshape(-1, self.embedding_size, 1),
                 item_e_exp.reshape(-1, 1, self.embedding_size),
             )
             interaction_map = interaction_map.unsqueeze(1)
 
-            # Pass through neural layers
+            # Pass through layers
             cnn_output = self.cnn_layers(interaction_map)
             cnn_output = cnn_output.sum(axis=(2, 3))
             prediction = self.predict_layers(cnn_output)
 
-            # Reshape scores to match expected format
-            scores_block = prediction.reshape(num_users_in_batch, num_items_in_block)
+            # Reshape scores to [num_users_in_batch, num_items_in_block]
+            scores_block = prediction.reshape(num_users, num_items_in_block)
             all_scores.append(scores_block)
 
-        # Concat predictions
         predictions = torch.cat(all_scores, dim=1)
 
-        # Mask seen items
-        coo = interaction_matrix.tocoo()
-        user_indices_in_batch = torch.from_numpy(coo.row).to(self._device)
-        item_indices = torch.from_numpy(coo.col).to(self._device)
-        predictions[user_indices_in_batch, item_indices] = -torch.inf
-
-        return predictions
+        # Masking interaction already seen in train
+        predictions[train_batch != 0] = -torch.inf
+        return predictions.to(self._device)
