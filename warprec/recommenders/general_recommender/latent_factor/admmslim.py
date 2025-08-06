@@ -1,10 +1,9 @@
 # pylint: disable = R0801, E1102
-from typing import Optional, Callable, Any
+from typing import Any
 
 import torch
 import numpy as np
 from torch import Tensor, nn
-from scipy.sparse import csr_matrix
 from warprec.data.dataset import Interactions
 from warprec.recommenders.base_recommender import ItemSimRecommender
 from warprec.utils.registry import model_registry
@@ -19,6 +18,7 @@ class ADMMSlim(ItemSimRecommender):
 
     Args:
         params (dict): Model parameters.
+        interactions (Interactions): The training interactions.
         *args (Any): Variable length argument list.
         device (str): The device used for tensor operations.
         seed (int): The seed to use for reproducibility.
@@ -46,34 +46,18 @@ class ADMMSlim(ItemSimRecommender):
     def __init__(
         self,
         params: dict,
+        interactions: Interactions,
         *args: Any,
         device: str = "cpu",
         seed: int = 42,
         info: dict = None,
         **kwargs: Any,
     ):
-        super().__init__(params, device=device, seed=seed, info=info, *args, **kwargs)
+        super().__init__(
+            params, interactions, device=device, seed=seed, info=info, *args, **kwargs
+        )
         self._name = "ADMMSlim"
-        self.item_means = None
 
-    def fit(
-        self,
-        interactions: Interactions,
-        *args: Any,
-        report_fn: Optional[Callable] = None,
-        **kwargs: Any,
-    ):
-        """Main train method.
-
-        The training will be conducted on the sparse representation of the interactions.
-        During the train a similarity matrix {item x item} will be learned.
-
-        Args:
-            interactions (Interactions): The interactions that will be used to train the model.
-            *args (Any): List of arguments.
-            report_fn (Optional[Callable]): The Ray Tune function to report the iteration.
-            **kwargs (Any): The dictionary of keyword arguments.
-        """
         X = interactions.get_sparse()
 
         # Calculate the item means
@@ -116,40 +100,36 @@ class ADMMSlim(ItemSimRecommender):
         # Update item_similarity with a new nn.Parameter
         self.item_similarity = nn.Parameter(torch.from_numpy(C))
 
-        if report_fn is not None:
-            report_fn(self)
-
     @torch.no_grad()
     def predict(
-        self, interaction_matrix: csr_matrix, *args: Any, **kwargs: Any
+        self,
+        train_batch: Tensor,
+        *args: Any,
+        **kwargs: Any,
     ) -> Tensor:
         """Prediction in the form of X@B where B is a {item x item} similarity matrix.
 
-        Additionally, if the center_columns parameter has been set to True,
-        the item means will be added to the result.
-
         Args:
-            interaction_matrix (csr_matrix): The matrix containing the
-                pairs of interactions to evaluate.
+            train_batch (Tensor): The train batch of user interactions.
             *args (Any): List of arguments.
             **kwargs (Any): The dictionary of keyword arguments.
 
         Returns:
             Tensor: The score matrix {user x item}.
         """
-
         if self.center_columns:
             # If centering was applied, then we center the interactions also
             # then add back the means
-            r = (
-                interaction_matrix - self.item_means
+            predictions_numpy = (
+                train_batch.detach().numpy() - self.item_means
             ) @ self.item_similarity.detach().numpy() + self.item_means
-        else:
-            r = interaction_matrix @ self.item_similarity.detach().numpy()
+            predictions = torch.from_numpy(predictions_numpy)
 
-        # Masking interaction already seen in train
-        r[interaction_matrix.nonzero()] = -torch.inf
-        return torch.from_numpy(r).to(self._device)
+            # Masking interaction already seen in train
+            predictions[train_batch != 0] = -torch.inf
+            return predictions.to(self._device)
+        else:
+            return super().predict(train_batch)
 
     def _soft_threshold(self, x: np.ndarray, threshold: float) -> np.ndarray:
         return (np.abs(x) > threshold) * (np.abs(x) - threshold) * np.sign(x)
