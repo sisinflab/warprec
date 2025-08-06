@@ -116,7 +116,7 @@ class Optimization(BaseModel):
     device: Optional[str] = "cpu"
     block_size: Optional[int] = 50
     num_samples: Optional[int] = 1
-    checkpoint_to_keep: Optional[int] = 2
+    checkpoint_to_keep: Optional[int] = 5
     cpu_per_trial: Optional[float] = os.cpu_count()
     gpu_per_trial: Optional[float] = 0.0
 
