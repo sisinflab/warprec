@@ -3,7 +3,6 @@ from typing import Any
 
 import torch
 from torch import Tensor
-from scipy.sparse import csr_matrix
 from warprec.recommenders.base_recommender import Recommender
 from warprec.utils.registry import model_registry
 
@@ -35,14 +34,17 @@ class Random(Recommender):
         super().__init__(params, device=device, seed=seed, info=info, *args, **kwargs)
         self._name = "Random"
 
+    @torch.no_grad()
     def predict(
-        self, interaction_matrix: csr_matrix, *args: Any, **kwargs: Any
+        self,
+        train_batch: Tensor,
+        *args: Any,
+        **kwargs: Any,
     ) -> Tensor:
         """Prediction using a random number generator.
 
         Args:
-            interaction_matrix (csr_matrix): The matrix containing the
-                pairs of interactions to evaluate.
+            train_batch (Tensor): The train batch of user interactions.
             *args (Any): List of arguments.
             **kwargs (Any): The dictionary of keyword arguments.
 
@@ -50,20 +52,8 @@ class Random(Recommender):
             Tensor: The score matrix {user x item}.
         """
         # Generate random predictions
-        predictions = torch.rand(interaction_matrix.shape, device=self._device)
+        predictions = torch.rand(train_batch.size(), device=self._device)
 
-        # Mask seen items
-        seen_mask = torch.tensor(interaction_matrix.toarray() != 0, device=self._device)
-        predictions[seen_mask] = -torch.inf
-
+        # Mask seen items from the training data
+        predictions[train_batch != 0] = -torch.inf
         return predictions
-
-    def fit(self, interactions, *args, report_fn, **kwargs):
-        """Empty definition, not used by the Random model."""
-        if report_fn is not None:
-            report_fn(self)
-        pass
-
-    def forward(self, *args, **kwargs):
-        """Empty definition, not used by the Random model."""
-        pass
