@@ -11,7 +11,7 @@ from torch.utils.data import DataLoader
 from pandas import DataFrame
 from scipy.sparse import coo_matrix
 from torch_sparse import SparseTensor
-from warprec.data.dataset import Interactions
+from warprec.data.dataset import Interactions, Sessions
 
 
 class Recommender(nn.Module, ABC):
@@ -237,13 +237,16 @@ class IterativeRecommender(Recommender):
         """
 
     @abstractmethod
-    def get_dataloader(self, interactions: Interactions, **kwargs: Any) -> DataLoader:
+    def get_dataloader(
+        self, interactions: Interactions, sessions: Sessions, **kwargs: Any
+    ) -> DataLoader:
         """Returns a PyTorch DataLoader for the given interactions.
 
         The DataLoader should provide batches suitable for the model's training.
 
         Args:
             interactions (Interactions): The interaction of users with items.
+            sessions (Sessions): The sessions of the users,
             **kwargs (Any): Additional keyword arguments.
 
         Returns:

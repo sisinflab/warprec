@@ -15,7 +15,9 @@ def train_loop(model: IterativeRecommender, dataset: Dataset, epochs: int):
     """
     logger.msg(f"Starting the training of model {model.name}")
 
-    train_dataloader = model.get_dataloader(dataset.train_set)
+    train_dataloader = model.get_dataloader(
+        interactions=dataset.train_set, sessions=dataset.train_session
+    )
     optimizer = model.get_optimizer()
 
     model.train()

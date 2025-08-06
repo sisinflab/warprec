@@ -101,7 +101,9 @@ def objective_function(
         )
         if isinstance(model, IterativeRecommender):
             # Proceed with standard training loop
-            train_dataloader = model.get_dataloader(dataset.train_set)
+            train_dataloader = model.get_dataloader(
+                interactions=dataset.train_set, sessions=dataset.train_session
+            )
             optimizer = model.get_optimizer()
             epochs = model.epochs
 
