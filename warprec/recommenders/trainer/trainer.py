@@ -210,7 +210,6 @@ class Trainer:
             validation_metric_name=validation_metric_name,
             mode=mode,
             device=device,
-            implementation=model_params.meta.implementation,
             seed=optimization.properties.seed,
             block_size=optimization.block_size,
             beta=beta,
@@ -293,7 +292,6 @@ class Trainer:
 
         best_model = model_registry.get(
             name=model_name,
-            implementation=model_params.meta.implementation,
             params=best_params,
             interactions=dataset.train_set,
             device=device,
@@ -345,7 +343,6 @@ class Trainer:
             validation_metric_name=validation_metric_name,
             mode=mode,
             device=device,
-            implementation=model_params.meta.implementation,
             seed=optimization.properties.seed,
             block_size=optimization.block_size,
             beta=beta,

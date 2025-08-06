@@ -453,7 +453,7 @@ WarpRec provides several options when it comes to setting up the training of you
 
 The `Model Configuration` is different from other configurations as it presents two main nested sections:
 
-- **meta**: The meta parameters of the model. Meta parameters affect initialization of the model, implementation and checkpoints.
+- **meta**: The meta parameters of the model. Meta parameters affect initialization of the model and checkpoints.
 - **optimization**: A nested section containing all the information about the hyperparameter optimization done through Ray Tune.
 - **early_stopping**: An optional strategy which will stop the trial if the model has reached a plateau.
 - **parameters**: The parameters of the model.
@@ -465,7 +465,6 @@ The `meta` section let you decide some information about the model that do not i
 - **save_model**: Flag that decides whether or not to save the model in the experiment directory. Defaults to false.
 - **save_recs**: Flag that decides whether or not to save the recommendations. Defaults to false.
 - **load_from**: Local path to a model weights to be loaded. Defaults to None.
-- **implementation**: The implementation used during the training, if more than one is present. Defaults to latest.
 
 #### ⚙️ Optimization
 

@@ -24,7 +24,6 @@ def objective_function(
     validation_metric_name: str,
     mode: str,
     device: str,
-    implementation: str = "latest",
     seed: int = 42,
     block_size: int = 50,
     beta: float = 1.0,
@@ -42,8 +41,6 @@ def objective_function(
         validation_metric_name (str): The name of the metric to optimize.
         mode (str): Whether or not to maximize or minimize the metric.
         device (str): The device used for tensor operations.
-        implementation (str): The implementation of the model to use.
-            Defaults to "latest".
         seed (int): The seed for reproducibility. Defaults to 42.
         block_size (int): The block size for the model optimization.
             Defaults to 50.
@@ -95,7 +92,6 @@ def objective_function(
     try:
         model = model_registry.get(
             name=model_name,
-            implementation=implementation,
             params=params,
             interactions=dataset.train_set,
             device=device,

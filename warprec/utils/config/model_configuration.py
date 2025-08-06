@@ -31,13 +31,11 @@ class Meta(BaseModel):
         save_model (Optional[bool]): Whether save or not the model state after training.
         save_recs (Optional[bool]): Whether save or not the recommendations after training.
         load_from (Optional[str]): The path where a previous model state has been saved.
-        implementation (Optional[str]): The implementation to be used.
     """
 
     save_model: Optional[bool] = False
     save_recs: Optional[bool] = False
     load_from: Optional[str] = None
-    implementation: Optional[str] = "latest"
 
 
 class Properties(BaseModel):
@@ -321,7 +319,6 @@ class RecomModel(BaseModel, ABC):
     def model_validation(self):
         """RecomModel model validation."""
         _name = self.__class__.__name__
-        _imp = self.meta.implementation
 
         # Create mapping of {field: typing}
         field_to_type = {}
@@ -329,7 +326,7 @@ class RecomModel(BaseModel, ABC):
             field_to_type[field] = typing
 
         # Basic controls
-        self.validate_model_and_implementation(_name, _imp)
+        self.validate_model(_name)
 
         # General parameters control
         updated_values = self.model_dump(
@@ -346,26 +343,19 @@ class RecomModel(BaseModel, ABC):
         self.__dict__.update(updated_values)
         return self
 
-    def validate_model_and_implementation(self, name: str, imp: str):
-        """Checks if the model and its implementation exist in the registry.
+    def validate_model(self, name: str):
+        """Checks if the model exist in the registry.
 
         Args:
             name (str): The name of the model.
-            imp (str): The name of the implementation.
 
         Raises:
-            ValueError: If model or implementation is not registered.
+            ValueError: If model is not registered.
         """
         if name.upper() not in model_registry.list_registered():
             raise ValueError(
                 f"Model {name} not in model_registry. "
                 f"These are the available models: {model_registry.list_registered()}."
-            )
-        if imp not in model_registry.list_implementations(name.upper()):
-            raise ValueError(
-                f"Model {name} does not have {imp} implementation. "
-                f"These are the available implementations: "
-                f"{model_registry.list_implementations(name.upper())}."
             )
 
     def validate_grid_search(

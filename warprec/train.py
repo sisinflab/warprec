@@ -376,7 +376,6 @@ def multiple_fold_validation_flow(
             - dict: Report dictionary.
     """
     # Retrieve common params
-    implementation = params["meta"]["implementation"]
     device = params["optimization"]["device"]
     block_size = params["optimization"]["block_size"]
     seed = params["optimization"]["properties"]["seed"]
@@ -400,7 +399,6 @@ def multiple_fold_validation_flow(
     iterations = best_params["iterations"]
     best_model = model_registry.get(
         name=model_name,
-        implementation=implementation,
         params=best_params,
         interactions=main_dataset.train_set,
         device=device,
