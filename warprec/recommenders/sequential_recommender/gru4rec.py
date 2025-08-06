@@ -68,15 +68,14 @@ class GRU4Rec(IterativeRecommender, SequentialRecommenderUtils):
         super().__init__(params, device=device, seed=seed, *args, **kwargs)
         self._name = "GRU4Rec"
 
-        # Get information from dataset info
-        self.n_items = info.get("items", None)
-        if not self.n_items:
+        items = info.get("items", None)
+        if not items:
             raise ValueError(
-                "Both 'items' must be provided to correctly initialize the model."
+                "Items value must be provided to correctly initialize the model."
             )
 
         self.item_embedding = nn.Embedding(
-            self.n_items + 1,
+            items + 1,
             self.embedding_size,
             padding_idx=0,  # Taking into account the extra "item" for padding
         )
