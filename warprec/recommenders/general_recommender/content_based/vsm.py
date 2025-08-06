@@ -1,5 +1,5 @@
 # pylint: disable = R0801, E1102
-from typing import Optional, Callable, Any
+from typing import Any
 
 import torch
 import numpy as np
@@ -20,6 +20,7 @@ class VSM(Recommender):
 
     Args:
         params (dict): Model parameters.
+        interactions (Interactions): The training interactions.
         *args (Any): Variable length argument list.
         device (str): The device used for tensor operations.
         seed (int): The seed to use for reproducibility.
@@ -30,9 +31,6 @@ class VSM(Recommender):
         similarity (str): Similarity measure.
         user_profile (str): The computation of the user profile.
         item_profile (str): The computation of the item profile.
-
-    Raises:
-        ValueError: If the items, users or features value was not passed through the info dict.
     """
 
     similarity: str
@@ -42,56 +40,22 @@ class VSM(Recommender):
     def __init__(
         self,
         params: dict,
+        interactions: Interactions,
         *args: Any,
         device: str = "cpu",
         seed: int = 42,
         info: dict = None,
         **kwargs: Any,
     ):
-        super().__init__(params, device=device, seed=seed, info=info, *args, **kwargs)
+        super().__init__(
+            params, interactions, device=device, seed=seed, info=info, *args, **kwargs
+        )
         self._name = "VSM"
 
-        users = info.get("users", None)
-        if not users:
-            raise ValueError(
-                "Users value must be provided to correctly initialize the model."
-            )
-        items = info.get("items", None)
-        if not items:
-            raise ValueError(
-                "Items value must be provided to correctly initialize the model."
-            )
-        features = info.get("features", None)
-        if not features:
-            raise ValueError(
-                "Features value must be provided to correctly initialize the model."
-            )
-
-        # Initialize similarity
-        self.sim_function = similarities_registry.get(self.similarity)
-
-        # Model initialization
-        self.i_profile = nn.Parameter(torch.sparse_coo_tensor(size=(items, features)))  # type: ignore[call-arg]
-        self.u_profile = nn.Parameter(torch.sparse_coo_tensor(size=(users, features)))  # type: ignore[call-arg]
-
-    def fit(
-        self,
-        interactions: Interactions,
-        *args: Any,
-        report_fn: Optional[Callable] = None,
-        **kwargs: Any,
-    ):
-        """Main train method.
-
-        Args:
-            interactions (Interactions): The interactions that will be used to train the model.
-            *args (Any): List of arguments.
-            report_fn (Optional[Callable]): The Ray Tune function to report the iteration.
-            **kwargs (Any): The dictionary of keyword arguments.
-        """
         # Get data from interactions
         X = interactions.get_sparse()  # [user x item]
         item_profile = interactions.get_side_sparse()  # [item x side]
+        self.sim_function = similarities_registry.get(self.similarity)
 
         if self.item_profile == "tfidf":
             # Compute TF-IDF
@@ -107,42 +71,38 @@ class VSM(Recommender):
         self.i_profile = nn.Parameter(self._scipy_sparse_to_torch_sparse(item_profile))
         self.u_profile = nn.Parameter(self._scipy_sparse_to_torch_sparse(user_profile))
 
-        if report_fn is not None:
-            report_fn(self)
-
     @torch.no_grad()
     def predict(
-        self, interaction_matrix: csr_matrix, *args: Any, **kwargs: Any
+        self,
+        train_batch: Tensor,
+        user_indices: Tensor,
+        *args: Any,
+        **kwargs: Any,
     ) -> Tensor:
         """Prediction in the form of X@B where B is a {item x item} similarity matrix.
 
         Args:
-            interaction_matrix (csr_matrix): The matrix containing the
-                pairs of interactions to evaluate.
+            train_batch (Tensor): The train batch of user interactions.
+            user_indices (Tensor): The batch of user indices.
             *args (Any): List of arguments.
             **kwargs (Any): The dictionary of keyword arguments.
 
         Returns:
             Tensor: The score matrix {user x item}.
         """
-        start_idx = kwargs.get("start", 0)
-        end_idx = kwargs.get("end", interaction_matrix.shape[0])
-
         # Extract profiles and convert them to scipy
         user_profile = self._torch_sparse_to_scipy_sparse(self.u_profile)
         item_profile = self._torch_sparse_to_scipy_sparse(self.i_profile)
 
         # Compute similarity
-        r = self.sim_function.compute(user_profile[start_idx:end_idx], item_profile)
+        predictions_numpy = self.sim_function.compute(
+            user_profile[user_indices.cpu().numpy()], item_profile
+        )
+        predictions = torch.from_numpy(predictions_numpy)
 
         # Masking interaction already seen in train
-        r[interaction_matrix.nonzero()] = -torch.inf
-        return torch.from_numpy(r).to(self._device)
-
-    def forward(self, *args, **kwargs):
-        """Forward method is empty because we don't need
-        back propagation.
-        """
+        predictions[train_batch != 0] = -torch.inf
+        return predictions.to(self._device)
 
     def _compute_item_tfidf(self, item_profile: csr_matrix) -> csr_matrix:
         """Computes TF-IDF for item features.
