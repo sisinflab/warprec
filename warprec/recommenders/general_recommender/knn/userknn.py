@@ -59,6 +59,7 @@ class UserKNN(Recommender):
         # Update item_similarity with a new nn.Parameter
         self.user_similarity = nn.Parameter(filtered_sim_matrix)
 
+    @torch.no_grad()
     def predict(
         self,
         train_batch: Tensor,

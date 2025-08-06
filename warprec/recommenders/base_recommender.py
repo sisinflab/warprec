@@ -9,7 +9,7 @@ from torch import nn, Tensor
 from torch.optim.optimizer import Optimizer
 from torch.utils.data import DataLoader
 from pandas import DataFrame
-from scipy.sparse import csr_matrix, coo_matrix
+from scipy.sparse import coo_matrix
 from torch_sparse import SparseTensor
 from warprec.data.dataset import Interactions
 
@@ -172,19 +172,6 @@ class Recommender(nn.Module, ABC):
             torch.cuda.manual_seed_all(seed)
         torch.backends.cudnn.deterministic = True
         torch.backends.cudnn.benchmark = False
-
-    def _normalize(self, X: csr_matrix) -> csr_matrix:
-        """Normalize matrix rows to unit length.
-
-        Args:
-            X (csr_matrix): The matrix to normalize.
-
-        Returns:
-            csr_matrix: The normalized matrix.
-        """
-        norms = np.sqrt(X.power(2).sum(axis=1))
-        norms[norms == 0] = 1e-10
-        return X.multiply(1 / norms)
 
     def _apply_topk_filtering(self, sim_matrix: Tensor, k: int) -> Tensor:
         """Keep only top-k similarities per item.

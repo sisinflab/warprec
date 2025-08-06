@@ -5,13 +5,11 @@ from warprec.utils.config.model_configuration import (
     RecomModel,
     INT_FIELD,
     STR_FIELD,
-    BOOL_FIELD,
 )
 from warprec.utils.config.common import (
     validate_greater_than_zero,
     validate_similarity,
     validate_profile,
-    validate_bool_values,
 )
 from warprec.utils.registry import params_registry
 
@@ -23,13 +21,11 @@ class AttributeItemKNN(RecomModel):
     Attributes:
         k (INT_FIELD): List of values for neighbor.
         similarity (STR_FIELD): List of names of similarity functions.
-        normalize (BOOL_FIELD): List of values for normalization flag.
         need_side_information (ClassVar[bool]): Wether or not the model needs side information.
     """
 
     k: INT_FIELD
     similarity: STR_FIELD
-    normalize: BOOL_FIELD
     need_side_information: ClassVar[bool] = True
 
     @field_validator("k")
@@ -44,12 +40,6 @@ class AttributeItemKNN(RecomModel):
         """Validate similarity."""
         return validate_similarity(cls, v, "similarity")
 
-    @field_validator("normalize")
-    @classmethod
-    def check_normalize(cls, v: list):
-        """Validate normalize."""
-        return validate_bool_values(v)
-
 
 @params_registry.register("AttributeUserKNN")
 class AttributeUserKNN(RecomModel):
@@ -59,14 +49,12 @@ class AttributeUserKNN(RecomModel):
         k (INT_FIELD): List of values for neighbor.
         similarity (STR_FIELD): List of names of similarity functions.
         user_profile (STR_FIELD): List of user profile computations.
-        normalize (BOOL_FIELD): List of values for normalization flag.
         need_side_information (ClassVar[bool]): Wether or not the model needs side information.
     """
 
     k: INT_FIELD
     similarity: STR_FIELD
     user_profile: STR_FIELD
-    normalize: BOOL_FIELD
     need_side_information: ClassVar[bool] = True
 
     @field_validator("k")
@@ -86,12 +74,6 @@ class AttributeUserKNN(RecomModel):
     def check_user_profile(cls, v: list):
         """Validate user_profile."""
         return validate_profile(cls, v, "user_profile")
-
-    @field_validator("normalize")
-    @classmethod
-    def check_normalize(cls, v: list):
-        """Validate normalize."""
-        return validate_bool_values(v)
 
 
 @params_registry.register("ItemKNN")
