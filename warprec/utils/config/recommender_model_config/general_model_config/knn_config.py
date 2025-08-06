@@ -101,12 +101,10 @@ class ItemKNN(RecomModel):
     Attributes:
         k (INT_FIELD): List of values for neighbor.
         similarity (STR_FIELD): List of names of similarity functions.
-        normalize (BOOL_FIELD): List of values for normalization flag.
     """
 
     k: INT_FIELD
     similarity: STR_FIELD
-    normalize: BOOL_FIELD
 
     @field_validator("k")
     @classmethod
@@ -119,12 +117,6 @@ class ItemKNN(RecomModel):
     def check_similarity(cls, v: list):
         """Validate similarity."""
         return validate_similarity(cls, v, "similarity")
-
-    @field_validator("normalize")
-    @classmethod
-    def check_normalize(cls, v: list):
-        """Validate normalize."""
-        return validate_bool_values(v)
 
 
 @params_registry.register("UserKNN")
@@ -134,12 +126,10 @@ class UserKNN(RecomModel):
     Attributes:
         k (INT_FIELD): List of values for neighbor.
         similarity (STR_FIELD): List of names of similarity functions.
-        normalize (BOOL_FIELD): List of values for normalization flag.
     """
 
     k: INT_FIELD
     similarity: STR_FIELD
-    normalize: BOOL_FIELD
 
     @field_validator("k")
     @classmethod
@@ -152,9 +142,3 @@ class UserKNN(RecomModel):
     def check_similarity(cls, v: list):
         """Validate similarity."""
         return validate_similarity(cls, v, "similarity")
-
-    @field_validator("normalize")
-    @classmethod
-    def check_normalize(cls, v: list):
-        """Validate normalize."""
-        return validate_bool_values(v)
