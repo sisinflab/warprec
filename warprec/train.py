@@ -393,6 +393,8 @@ def multiple_fold_validation_flow(
         ray_verbose=config.general.ray_verbose,
     )
 
+    logger.msg(f"Initializing {model_name} model for test set evaluation")
+
     # Retrieve the model from the registry
     # using the best parameters
     iterations = best_params["iterations"]
