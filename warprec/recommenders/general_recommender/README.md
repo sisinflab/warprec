@@ -135,7 +135,6 @@ models:
     ItemKNN:
         k: 10
         similarity: cosine
-        normalize: True
 ...
 ```
 

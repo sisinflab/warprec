@@ -27,12 +27,10 @@ class ItemKNN(ItemSimRecommender):
     Attributes:
         k (int): Number of nearest neighbors.
         similarity (str): Similarity measure.
-        normalize (bool): Wether or not to normalize the interactions.
     """
 
     k: int
     similarity: str
-    normalize: bool
 
     def __init__(
         self,
@@ -51,10 +49,6 @@ class ItemKNN(ItemSimRecommender):
 
         X = interactions.get_sparse()
         similarity = similarities_registry.get(self.similarity)
-
-        # Apply normalization of interactions if requested
-        if self.normalize:
-            X = self._normalize(X)
 
         # Compute similarity matrix
         sim_matrix = torch.from_numpy(similarity.compute(X.T))
