@@ -247,13 +247,9 @@ def main(args: Namespace):
 
         # Recommendation
         if params["meta"]["save_recs"]:
-            umap_i, imap_i = main_dataset.get_inverse_mappings()
             recs = best_model.get_recs(
-                main_dataset.train_set,
-                umap_i,
-                imap_i,
+                main_dataset,
                 k=config.writer.recommendation.k,
-                batch_size=config.evaluation.batch_size,
             )
             writer.write_recs(recs, model_name)
 

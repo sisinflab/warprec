@@ -11,7 +11,8 @@ from torch.utils.data import DataLoader
 from pandas import DataFrame
 from scipy.sparse import coo_matrix
 from torch_sparse import SparseTensor
-from warprec.data.dataset import Interactions, Sessions
+
+from warprec.data.dataset import Dataset, Interactions, Sessions
 
 
 class Recommender(nn.Module, ABC):
@@ -70,49 +71,47 @@ class Recommender(nn.Module, ABC):
 
     def get_recs(
         self,
-        X: Interactions,
-        umap_i: dict,
-        imap_i: dict,
+        dataset: Dataset,
         k: int,
-        batch_size: int = 1024,
     ) -> DataFrame:
         """This method turns the learned parameters into new
         recommendations in DataFrame format, without column headers.
 
         Args:
-            X (Interactions): The set that will be used to
-                produce recommendations.
-            umap_i (dict): The inverse mapping from index -> user_id.
-            imap_i (dict): The inverse mapping from index -> item_id.
+            dataset (Dataset):
             k (int): The top k recommendation to be produced.
-            batch_size (int): Number of users per batch
 
         Returns:
             DataFrame: A DataFrame (without header) containing the top k recommendations
                     for each user, including predicted ratings.
         """
-        sparse_matrix = X.get_sparse()
-        num_users = sparse_matrix.shape[0]
+        # Retrieve evaluation dataloader
+        dataloader = dataset.get_evaluation_dataloader()
+        umap_i, imap_i = dataset.get_inverse_mappings()
+
+        # Main evaluation loop
         all_recommendations = []
+        for train_batch, _, user_indices in dataloader:
+            user_indices = user_indices.to(self._device)
 
-        for batch_start in range(0, num_users, batch_size):
-            batch_end = min(batch_start + batch_size, num_users)
+            # If we are evaluating a sequential model, compute user history
+            user_seq, seq_len = None, None
+            if isinstance(self, SequentialRecommenderUtils):
+                user_seq, seq_len = dataset.train_session.get_user_history_sequences(
+                    user_indices.tolist(),
+                    self.max_seq_len,  # Sequence length truncated
+                )
 
-            # Process current batch
-            batch_slice = slice(batch_start, batch_end)
-            batch_scores = self.predict(
-                train_batch=Tensor(sparse_matrix[batch_slice].toarray()),
-                user_indices=torch.arange(batch_start, batch_end),
-                user_seq=None,
-                seq_len=None,
-            )
+            predictions = self.predict(
+                train_batch,
+                user_indices=user_indices,
+                user_seq=user_seq,
+                seq_len=seq_len,
+            ).to(self._device)  # Get ratings tensor [batch_size x items]
 
             # Get top-k items and their scores for current batch
-            top_k_scores, top_k_items = torch.topk(batch_scores, k, dim=1)
-
-            batch_users = (
-                torch.arange(batch_start, batch_end).unsqueeze(1).expand(-1, k)
-            )
+            top_k_scores, top_k_items = torch.topk(predictions, k, dim=1)
+            batch_users = user_indices.unsqueeze(1).expand(-1, k)
 
             # Store batch recommendations with scores
             batch_recs = torch.stack(
@@ -133,7 +132,9 @@ class Recommender(nn.Module, ABC):
         item_labels = [imap_i[idx] for idx in item_idxs]
 
         # Zip and turn into DataFrame (no header)
-        real_recs = np.array(list(zip(user_labels, item_labels, pred_scores)))
+        real_recs = np.array(
+            list(zip(map(str, user_labels), map(str, item_labels), pred_scores))
+        )
         recommendations_df = pd.DataFrame(real_recs)
 
         return recommendations_df
