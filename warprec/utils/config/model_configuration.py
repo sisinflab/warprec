@@ -48,6 +48,13 @@ class Properties(BaseModel):
         mode (Optional[str]): Wether to maximize or minimize the metric/loss.
             - min: Minimize the validation metric.
             - max: Maximize the validation metric.
+        desired_training_it (Optional[str]): Which strategy to use
+            during validation folding to determine the number of
+            iterations to use in the final evaluation.
+            - median: The median of the iterations of the best folds.
+            - mean: The mean of the iterations of the best folds.
+            - min: The min of the iterations of the best folds.
+            - max: The max of the iterations of the best folds.
         seed (Optional[int]): The seed to use during optimization.
             This parameter will make the experiment reproducible.
         time_attr (Optional[str]): The measure of time that will be used
@@ -58,6 +65,7 @@ class Properties(BaseModel):
     """
 
     mode: Optional[str] = "max"
+    desired_training_it: Optional[str] = "median"
     seed: Optional[int] = 42
     time_attr: Optional[str] = None
     max_t: Optional[int] = None
@@ -72,6 +80,18 @@ class Properties(BaseModel):
             raise ValueError("Mode must be provided.")
         if v.lower() not in ["min", "max"]:
             raise ValueError("Mode should be either min or max.")
+        return v.lower()
+
+    @field_validator("desired_training_it")
+    @classmethod
+    def check_desired_training_it(cls, v: str):
+        """Validate desired_training_it."""
+        if v is None:
+            raise ValueError("Desired_training_it must be provided.")
+        if v.lower() not in ["median", "mean", "min", "max"]:
+            raise ValueError(
+                "Desired_training_it should be either: median, mean, min or max."
+            )
         return v.lower()
 
 

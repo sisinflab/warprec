@@ -492,6 +492,7 @@ The `optimization` section let you decide how to train your model.
 The `properties` section is used to provide further information to the strategy or the scheduler, if needed.
 
 - **mode**: This values is used to determine whether to maximize the value of the validation metric or to minimize it. Accepted values are min and max. Defaults to max.
+- **desired_training_it**: After a cross-validation optimization, a new model will be trained on the entire training set and evaluated on the test set. If the model is an IterativeRecommender, the number of iterations of the final training will be defined based on an aggregation strategy over the best iterations of the folds. Available strategies are: median, mean, min and max. Defaults to median.
 - **seed**: The seed of the experimentation, used to set up the model initialization. Defaults to 42.
 - **time_attr**: The measure of time used by the scheduler.
 - **max_t**: Max time unit given to each trial.

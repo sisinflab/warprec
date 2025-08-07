@@ -372,6 +372,7 @@ def multiple_fold_validation_flow(
     # Retrieve common params
     device = params["optimization"]["device"]
     block_size = params["optimization"]["block_size"]
+    desired_training_it = params["optimization"]["properties"]["desired_training_it"]
     seed = params["optimization"]["properties"]["seed"]
 
     # Start HPO phase on validation folds
@@ -383,6 +384,7 @@ def multiple_fold_validation_flow(
         val_k,
         beta=config.evaluation.beta,
         pop_ratio=config.evaluation.pop_ratio,
+        desired_training_it=desired_training_it,
         ray_verbose=config.general.ray_verbose,
     )
 

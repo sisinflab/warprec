@@ -315,6 +315,7 @@ class Trainer:
         validation_top_k: int,
         beta: float = 1.0,
         pop_ratio: float = 0.8,
+        desired_training_it: str = "median",
         ray_verbose: int = 1,
     ):
         # Retrieve model params
@@ -430,7 +431,7 @@ class Trainer:
                 mean_score=(validation_score, "mean"),
                 std_score=(validation_score, "std"),
                 num_folds_completed=(validation_score, "size"),
-                median_training_iterations=("training_iteration", "median"),
+                desired_training_iterations=("training_iteration", desired_training_it),
             )
             .reset_index()
         )
@@ -442,13 +443,13 @@ class Trainer:
         best_hyperparameters_row = best_config_df.iloc[0]
         best_mean_score = best_hyperparameters_row["mean_score"]
         best_std_score = best_hyperparameters_row["std_score"]
-        best_median_iteration = math.ceil(
-            best_hyperparameters_row["median_training_iterations"]
+        desired_iteration = math.ceil(
+            best_hyperparameters_row["desired_training_iterations"]
         )
 
         # Clear hyperparam format and create the clean dictionary
         best_hyperparameters: Dict[str, Any] = {}
-        best_hyperparameters["iterations"] = best_median_iteration
+        best_hyperparameters["iterations"] = desired_iteration
         for col in hyperparam_cols:
             param_name = col.replace("config/", "")
             value = best_hyperparameters_row[col]
@@ -470,7 +471,7 @@ class Trainer:
             f"Best params combination: {best_hyperparameters} with an average score of "
             f"{validation_score}: {best_mean_score} and "
             f"STD: {best_std_score} on validation set. "
-            f"The median of training iteration is: {best_median_iteration}"
+            f"The {desired_training_it} of training iteration is: {desired_iteration}"
         )
         logger.positive(f"Hyperparameter tuning for {model_name} ended successfully.")
 
