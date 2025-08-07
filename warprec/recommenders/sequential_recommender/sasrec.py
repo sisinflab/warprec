@@ -104,10 +104,6 @@ class SASRec(IterativeRecommender, SequentialRecommenderUtils):
         # Initialize weights
         self.apply(self._init_weights)
 
-        self.optimizer = torch.optim.Adam(
-            self.parameters(), lr=self.learning_rate, weight_decay=self.weight_decay
-        )
-
         # Loss function will be based on number of
         # negative samples
         self.loss: nn.Module
