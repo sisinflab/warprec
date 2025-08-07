@@ -132,12 +132,10 @@ def main(args: Namespace):
             )
 
     # Callback on dataset creation
-    # callback.on_dataset_creation(
-    #     dataset=dataset,
-    #     train_set=train,
-    #     test_set=test,
-    #     val_set=val,
-    # )
+    callback.on_dataset_creation(
+        main_dataset=main_dataset,
+        validation_folds=fold_dataset,
+    )
 
     if config.splitter and config.writer.save_split:
         raise NotImplementedError("Temporary disabled")

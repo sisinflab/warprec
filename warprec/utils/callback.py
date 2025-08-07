@@ -1,6 +1,5 @@
-from typing import Any, Optional, TYPE_CHECKING
+from typing import Any, List, TYPE_CHECKING
 
-from pandas import DataFrame
 from ray.tune import Callback
 
 if TYPE_CHECKING:
@@ -24,10 +23,8 @@ class WarpRecCallback(Callback):
 
     def on_dataset_creation(
         self,
-        dataset: "Dataset",
-        train_set: DataFrame,
-        test_set: Optional[DataFrame],
-        val_set: Optional[DataFrame],
+        main_dataset: "Dataset",
+        validation_folds: List["Dataset"],
         *args: Any,
         **kwargs: Any,
     ):
@@ -37,10 +34,11 @@ class WarpRecCallback(Callback):
         perform actions after the dataset is created.
 
         Args:
-            dataset (Dataset): The dataset that has been created.
-            train_set (DataFrame): The training set.
-            test_set (Optional[DataFrame]): The test set.
-            val_set (Optional[DataFrame]): The validation set.
+            main_dataset (Dataset): The main dataset that has been created.
+                Contains information about the train/test main split.
+            validation_folds (List[Dataset]): The validation folds
+                created either with holdout or cross-validation methods.
+                Each 'Dataset' represents a train/validation split.
             *args (Any): Additional positional arguments.
             **kwargs (Any): Additional keyword arguments.
         """
