@@ -1,15 +1,14 @@
 # pylint: disable = R0801, E1102, W0221, C0103, W0613, W0235, R0914
-from typing import Optional, Callable, Any
+from typing import Any
 
 import torch
 from torch import nn, Tensor
 from torch.nn import Module
 from torch.nn.init import xavier_normal_, constant_
-from scipy.sparse import csr_matrix
 import torch.nn.functional as F
 
 from warprec.recommenders.base_recommender import (
-    Recommender,
+    IterativeRecommender,
     SequentialRecommenderUtils,
 )
 from warprec.recommenders.losses import BPRLoss
@@ -18,7 +17,7 @@ from warprec.utils.registry import model_registry
 
 
 @model_registry.register(name="Caser")
-class Caser(Recommender, SequentialRecommenderUtils):
+class Caser(IterativeRecommender, SequentialRecommenderUtils):
     """Implementation of Caser algorithm from
     "Personalized Top-N Sequential Recommendation via Convolutional Sequence Embedding"
     in WSDM 2018.
@@ -126,11 +125,6 @@ class Caser(Recommender, SequentialRecommenderUtils):
         # Initialize weights
         self.apply(self._init_weights)
 
-        # Optimizer
-        self.optimizer = torch.optim.Adam(
-            self.parameters(), lr=self.learning_rate, weight_decay=self.weight_decay
-        )
-
         # Loss function
         self.loss: nn.Module
         if self.neg_samples > 0:
@@ -152,6 +146,49 @@ class Caser(Recommender, SequentialRecommenderUtils):
             xavier_normal_(module.weight.data)
             if module.bias is not None:
                 constant_(module.bias.data, 0)
+
+    def get_dataloader(self, interactions: Interactions, sessions: Sessions, **kwargs):
+        return sessions.get_sequential_dataloader(
+            max_seq_len=self.max_seq_len,
+            num_negatives=self.neg_samples,
+            batch_size=self.batch_size,
+            user_id=True,
+        )
+
+    def get_optimizer(self):
+        return torch.optim.Adam(
+            self.parameters(), lr=self.learning_rate, weight_decay=self.weight_decay
+        )
+
+    def train_step(self, batch: Any, *args, **kwargs):
+        if self.neg_samples > 0:
+            user, item_seq, _, pos_item, neg_item = [x.to(self._device) for x in batch]
+        else:
+            user, item_seq, _, pos_item = [x.to(self._device) for x in batch]
+            neg_item = None
+
+        seq_output = self.forward(user, item_seq)
+
+        loss: Tensor
+        if self.neg_samples > 0:
+            pos_items_emb = self.item_embedding(
+                pos_item
+            )  # [batch_size, embedding_size]
+            neg_items_emb = self.item_embedding(
+                neg_item
+            )  # [batch_size, neg_samples, embedding_size]
+
+            pos_score = torch.sum(seq_output * pos_items_emb, dim=-1)  # [batch_size]
+            neg_score = torch.sum(
+                seq_output.unsqueeze(1) * neg_items_emb, dim=-1
+            )  # [batch_size, neg_samples]
+            loss = self.loss(pos_score, neg_score)
+        else:
+            test_item_emb = self.item_embedding.weight
+            logits = torch.matmul(seq_output, test_item_emb.transpose(0, 1))
+            loss = self.loss(logits, pos_item)
+
+        return loss
 
     def forward(self, user: Tensor, item_seq: Tensor) -> Tensor:
         """Forward pass of the Caser model.
@@ -205,113 +242,37 @@ class Caser(Recommender, SequentialRecommenderUtils):
 
         return seq_output
 
-    def fit(
-        self,
-        interactions: Interactions,
-        *args: Any,
-        report_fn: Optional[Callable] = None,
-        **kwargs: Any,
-    ):
-        """Main train method for Caser.
-
-        Args:
-            interactions (Interactions): The interactions that will be used to train the model.
-            *args (Any): List of arguments.
-            report_fn (Optional[Callable]): The Ray Tune function to report the iteration.
-            **kwargs (Any): The dictionary of keyword arguments.
-
-        Raises:
-            ValueError: If the Sessions object is not provided.
-        """
-        sessions = kwargs.get("sessions")
-        if not isinstance(sessions, Sessions):
-            raise ValueError("Sessions must be provided correctly to train the model.")
-
-        dataloader = sessions.get_sequential_dataloader(
-            max_seq_len=self.max_seq_len,
-            num_negatives=self.neg_samples,
-            batch_size=self.batch_size,
-            user_id=True,  # We need user ids for Caser
-        )
-
-        self.train()
-        for epoch in range(self.epochs):
-            epoch_loss = 0.0
-            for batch in dataloader:
-                if self.neg_samples > 0:
-                    user, item_seq, _, pos_item, neg_item = [
-                        x.to(self._device) for x in batch
-                    ]
-                else:
-                    user, item_seq, _, pos_item = [x.to(self._device) for x in batch]
-                    neg_item = None  # We set them to None for consistency
-
-                self.optimizer.zero_grad()
-                seq_output = self.forward(user, item_seq)
-
-                # Loss computation
-                total_loss: Tensor
-                if self.neg_samples > 0:
-                    pos_items_emb = self.item_embedding(pos_item)
-                    neg_items_emb = self.item_embedding(neg_item)
-
-                    pos_score = torch.sum(seq_output * pos_items_emb, dim=-1)
-                    neg_score = torch.sum(
-                        seq_output.unsqueeze(1) * neg_items_emb, dim=-1
-                    )
-                    total_loss = self.loss(pos_score, neg_score)
-                else:  # Cross-Entropy Loss
-                    test_item_emb = self.item_embedding.weight
-                    logits = torch.matmul(seq_output, test_item_emb.transpose(0, 1))
-                    total_loss = self.loss(logits, pos_item)
-
-                total_loss.backward()
-                self.optimizer.step()
-
-                epoch_loss += total_loss.item()
-
-            if report_fn is not None:
-                report_fn(self, loss=epoch_loss)
-
     @torch.no_grad()
     def predict(
         self,
-        interaction_matrix: csr_matrix,
-        user_id: Tensor,
+        train_batch: Tensor,
+        user_indices: Tensor,
         user_seq: Tensor,
+        seq_len: Tensor,
         *args: Any,
         **kwargs: Any,
     ) -> Tensor:
         """
-        Prediction using the learned embeddings (full sort prediction).
+        Prediction using the learned session embeddings (full sort prediction).
 
         Args:
-            interaction_matrix (csr_matrix): Matrix of seen interactions.
-            user_id (Tensor): User IDs for which to make predictions.
-            user_seq (Tensor): Padded item sequences for each user.
-            *args (Any): Additional arguments.
-            **kwargs (Any): Additional keyword arguments.
+            train_batch (Tensor): The train batch of user interactions.
+            user_indices (Tensor): The batch of user indices.
+            user_seq (Tensor): Padded sequences of item IDs for users to predict for.
+            seq_len (Tensor): Actual lengths of these sequences, before padding.
+            *args (Any): List of arguments.
+            **kwargs (Any): The dictionary of keyword arguments.
 
         Returns:
             Tensor: The score matrix {user x item}.
         """
-        user_id = user_id.to(self._device)
+        user_indices = user_indices.to(self._device)
         user_seq = user_seq.to(self._device)
 
-        # Get the final output embedding for each user
-        seq_output = self.forward(user_id, user_seq)
+        seq_output = self.forward(user_indices, user_seq)
 
-        # Get embeddings for all items
         all_item_embeddings = self.item_embedding.weight[1:]
-
-        # Calculate scores for all items via dot product
         predictions = torch.matmul(seq_output, all_item_embeddings.transpose(0, 1))
 
-        # Mask seen items
-        # Note: The interaction_matrix should correspond to the user_ids passed in.
-        coo = interaction_matrix.tocoo()
-        user_indices_in_batch = torch.from_numpy(coo.row).to(self._device)
-        item_indices = torch.from_numpy(coo.col).to(self._device)
-        predictions[user_indices_in_batch, item_indices] = -torch.inf
-
-        return predictions
+        predictions[train_batch != 0] = -torch.inf
+        return predictions.to(self._device)
