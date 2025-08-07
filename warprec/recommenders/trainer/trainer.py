@@ -405,7 +405,10 @@ class Trainer:
         results = tuner.fit()
 
         # Find the hyperparameter configuration that performed better
-        result_df = results.get_dataframe()
+        result_df = results.get_dataframe(
+            filter_metric=validation_score,
+            filter_mode=mode,
+        )
         hyperparam_cols = [
             col
             for col in result_df.columns
