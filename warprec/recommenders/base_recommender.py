@@ -78,7 +78,8 @@ class Recommender(nn.Module, ABC):
         recommendations in DataFrame format, without column headers.
 
         Args:
-            dataset (Dataset):
+            dataset (Dataset): The dataset that will be used to
+                retrieve train data and mappings.
             k (int): The top k recommendation to be produced.
 
         Returns:
