@@ -4,7 +4,7 @@ import torch
 import torch.nn.functional as F
 from torch import nn, Tensor
 from torch.nn.init import xavier_normal_, constant_
-from warprec.data.dataset import Interactions
+from warprec.data.dataset import Interactions, Sessions
 from warprec.recommenders.base_recommender import IterativeRecommender
 from warprec.recommenders.losses import MultiDAELoss
 from warprec.utils.registry import model_registry
@@ -151,12 +151,7 @@ class MultiDAE(IterativeRecommender):
             if module.bias is not None:
                 constant_(module.bias.data, 0)
 
-    def get_optimizer(self):
-        return torch.optim.Adam(
-            self.parameters(), lr=self.learning_rate, weight_decay=self.weight_decay
-        )
-
-    def get_dataloader(self, interactions: Interactions, **kwargs):
+    def get_dataloader(self, interactions: Interactions, sessions: Sessions, **kwargs):
         return interactions.get_interaction_loader(batch_size=self.batch_size)
 
     def train_step(self, batch: Any, *args: Any, **kwargs: Any):

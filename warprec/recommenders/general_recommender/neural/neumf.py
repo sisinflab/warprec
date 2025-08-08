@@ -6,7 +6,7 @@ from torch import nn, Tensor
 from torch.nn import Module
 from torch.nn.init import normal_
 from warprec.recommenders.layers import MLP
-from warprec.data.dataset import Interactions
+from warprec.data.dataset import Interactions, Sessions
 from warprec.recommenders.base_recommender import IterativeRecommender
 from warprec.utils.registry import model_registry
 
@@ -127,12 +127,7 @@ class NeuMF(IterativeRecommender):
         if isinstance(module, nn.Embedding):
             normal_(module.weight.data, mean=0.0, std=0.01)
 
-    def get_optimizer(self):
-        return torch.optim.Adam(
-            self.parameters(), lr=self.learning_rate, weight_decay=self.weight_decay
-        )
-
-    def get_dataloader(self, interactions: Interactions, **kwargs):
+    def get_dataloader(self, interactions: Interactions, sessions: Sessions, **kwargs):
         return interactions.get_item_rating_dataloader(
             num_negatives=self.neg_samples, batch_size=self.batch_size
         )

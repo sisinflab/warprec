@@ -8,7 +8,7 @@ from torch.nn import Module
 from torch.nn.init import xavier_normal_
 from torch_geometric.nn import LGConv
 
-from warprec.data.dataset import Interactions
+from warprec.data.dataset import Interactions, Sessions
 from warprec.recommenders.base_recommender import (
     IterativeRecommender,
     GraphRecommenderUtils,
@@ -118,12 +118,7 @@ class LightGCN(IterativeRecommender, GraphRecommenderUtils):
         if isinstance(module, nn.Embedding):
             xavier_normal_(module.weight.data)
 
-    def get_optimizer(self):
-        return torch.optim.Adam(
-            self.parameters(), lr=self.learning_rate, weight_decay=self.weight_decay
-        )
-
-    def get_dataloader(self, interactions: Interactions, **kwargs):
+    def get_dataloader(self, interactions: Interactions, sessions: Sessions, **kwargs):
         return interactions.get_pos_neg_dataloader(self.batch_size)
 
     def train_step(self, batch: Any, *args, **kwargs):

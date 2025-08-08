@@ -157,11 +157,6 @@ class gSASRec(IterativeRecommender, SequentialRecommenderUtils):
             batch_size=self.batch_size,
         )
 
-    def get_optimizer(self):
-        return torch.optim.Adam(
-            self.parameters(), lr=self.learning_rate, weight_decay=self.weight_decay
-        )
-
     def get_output_embeddings(self) -> nn.Embedding:
         """Return embeddings based on the flag value reuse_item_embeddings.
 

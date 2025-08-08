@@ -122,11 +122,6 @@ class FOSSIL(IterativeRecommender, SequentialRecommenderUtils):
             user_id=True,
         )
 
-    def get_optimizer(self):
-        return torch.optim.Adam(
-            self.parameters(), lr=self.learning_rate, weight_decay=self.weight_decay
-        )
-
     def _inverse_seq_item_embedding(
         self, seq_item_embedding: Tensor, seq_item_len: Tensor
     ) -> Tensor:

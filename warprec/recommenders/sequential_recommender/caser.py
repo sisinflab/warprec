@@ -155,11 +155,6 @@ class Caser(IterativeRecommender, SequentialRecommenderUtils):
             user_id=True,
         )
 
-    def get_optimizer(self):
-        return torch.optim.Adam(
-            self.parameters(), lr=self.learning_rate, weight_decay=self.weight_decay
-        )
-
     def train_step(self, batch: Any, *args, **kwargs):
         if self.neg_samples > 0:
             user, item_seq, _, pos_item, neg_item = [x.to(self._device) for x in batch]
