@@ -56,8 +56,9 @@ writer:
     writing_method: local
     local_experiment_path: experiment/test/
 splitter:
-    strategy: temporal_holdout
-    test_ratio: 0.1
+    test_splitting:
+        strategy: temporal_holdout
+        ratio: 0.1
 models:
     ItemKNN:
         k: 10
