@@ -138,8 +138,7 @@ def main(args: Namespace):
     )
 
     if config.splitter and config.writer.save_split:
-        raise NotImplementedError("Temporary disabled")
-        # writer.write_split(dataset)
+        writer.write_split(main_dataset, fold_dataset)
 
     # Trainer testing
     models = list(config.models.keys())

@@ -1,6 +1,6 @@
 from os.path import join
 from pathlib import Path
-from typing import Dict, List, Any
+from typing import Dict, List, Any, Optional
 from datetime import datetime
 from abc import ABC, abstractmethod
 
@@ -61,7 +61,7 @@ class Writer(ABC):
         """This method writes the model state into a destination."""
 
     @abstractmethod
-    def write_split(self, dataset: Dataset):
+    def write_split(self, main_dataset: Dataset, fold_dataset: Optional[List[Dataset]]):
         """This method writes the split of the dataset into a destination."""
 
 
@@ -356,7 +356,8 @@ class LocalWriter(Writer):
 
     def write_split(
         self,
-        dataset: Dataset,
+        main_dataset: Dataset,
+        fold_dataset: Optional[List[Dataset]],
         sep: str = "\t",
         ext: str = ".tsv",
         header: bool = True,
@@ -365,32 +366,50 @@ class LocalWriter(Writer):
         """This method writes the split into a local path.
 
         Args:
-            dataset (Dataset): The dataset splitted.
+            main_dataset (Dataset): The main dataset split.
+            fold_dataset (Optional[List[Dataset]]): The list of fold datasets.
             sep (str): The separator that will be used to write the results.
             ext (str): The extension that will be used to write the results.
             header (bool): Whether to write the header in the file.
             column_names (List[str] | None): Optional list of column names to use for the DataFrame.
                 If None, the DataFrame's existing columns will be used.
-
-        Raises:
-            NotImplementedError: Temporary disabled.
         """
-        raise NotImplementedError("Temporary disabled.")
+
+        def write_dataset(dataset: Dataset, path: Path, eval_set: str):
+            path_train = path.joinpath("train" + writing_params.ext)
+            path_eval = path.joinpath(eval_set + writing_params.ext)
+
+            df = dataset.train_set.get_df().copy()
+            df = df[validated_column_names]
+            df.to_csv(
+                path_train,
+                sep=writing_params.sep,
+                header=writing_params.header,
+                index=None,
+            )
+
+            df = dataset.eval_set.get_df().copy()
+            df = df[validated_column_names]
+            df.to_csv(
+                path_eval,
+                sep=writing_params.sep,
+                header=writing_params.header,
+                index=None,
+            )
+
         if self.config:
             writing_params = self.config.writer.split
         else:
             if not column_names:
-                column_names = dataset.train_set._inter_df.columns
+                column_names = main_dataset.train_set._inter_df.columns
             writing_params = SplitWriting(
                 sep=sep, ext=ext, header=header, labels=Labels.from_list(column_names)
             )
 
-        path_train = join(self.experiment_split_dir, "train" + writing_params.ext)
-        path_test = join(self.experiment_split_dir, "test" + writing_params.ext)
-        path_val = join(self.experiment_split_dir, "val" + writing_params.ext)
+        main_split_path = self.experiment_split_dir
 
         # Check the column to use
-        infos = dataset.info()
+        infos = main_dataset.info()
         validated_column_names = [
             writing_params.labels.user_id_label,
             writing_params.labels.item_id_label,
@@ -400,33 +419,15 @@ class LocalWriter(Writer):
         if infos["has_timestamp"]:
             validated_column_names.append(writing_params.labels.timestamp_label)
 
-        if dataset.train_set is not None:
-            df = dataset.train_set.get_df().copy()
-            df.columns = validated_column_names
-            df.to_csv(
-                path_train,
-                sep=writing_params.sep,
-                header=writing_params.header,
-                index=None,
-            )
-        if dataset.test_set is not None:
-            df = dataset.test_set.get_df().copy()
-            df.columns = validated_column_names
-            df.to_csv(
-                path_test,
-                sep=writing_params.sep,
-                header=writing_params.header,
-                index=None,
-            )
-        if dataset.val_set is not None:
-            df = dataset.val_set.get_df().copy()
-            df.columns = validated_column_names
-            df.to_csv(
-                path_val,
-                sep=writing_params.sep,
-                header=writing_params.header,
-                index=None,
-            )
+        write_dataset(main_dataset, main_split_path, "test")
+
+        if len(fold_dataset) > 0:
+            for i, fold in enumerate(fold_dataset):
+                fold_path = main_split_path.joinpath(str(i + 1))
+                fold_path.mkdir(parents=True, exist_ok=True)
+                write_dataset(fold, fold_path, "validation")
+
+        logger.msg(f"Split data written to {main_split_path}")
 
     def write_time_report(self, time_report: List[Dict[str, Any]]):
         """This method writes the time report into a local path.
