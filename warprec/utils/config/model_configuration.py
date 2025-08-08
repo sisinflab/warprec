@@ -30,27 +30,12 @@ class Meta(BaseModel):
     Attributes:
         save_model (Optional[bool]): Whether save or not the model state after training.
         save_recs (Optional[bool]): Whether save or not the recommendations after training.
-        keep_all_ray_checkpoints (Optional[bool]): Wether or not to save all the
-            checkpoints for the model optimization.
         load_from (Optional[str]): The path where a previous model state has been saved.
-        implementation (Optional[str]): The implementation to be used.
     """
 
     save_model: Optional[bool] = False
     save_recs: Optional[bool] = False
-    keep_all_ray_checkpoints: Optional[bool] = False
     load_from: Optional[str] = None
-    implementation: Optional[str] = "latest"
-
-    @model_validator(mode="after")
-    def model_validation(self):
-        """Meta model validation."""
-        if not self.save_model and self.keep_all_ray_checkpoints:
-            raise ValueError(
-                "You have set save_model to False but keep_all_ray_checkpoints to True. "
-                "You cannot save all checkpoints if the save_model parameter has not been set."
-            )
-        return self
 
 
 class Properties(BaseModel):
@@ -63,6 +48,13 @@ class Properties(BaseModel):
         mode (Optional[str]): Wether to maximize or minimize the metric/loss.
             - min: Minimize the validation metric.
             - max: Maximize the validation metric.
+        desired_training_it (Optional[str]): Which strategy to use
+            during validation folding to determine the number of
+            iterations to use in the final evaluation.
+            - median: The median of the iterations of the best folds.
+            - mean: The mean of the iterations of the best folds.
+            - min: The min of the iterations of the best folds.
+            - max: The max of the iterations of the best folds.
         seed (Optional[int]): The seed to use during optimization.
             This parameter will make the experiment reproducible.
         time_attr (Optional[str]): The measure of time that will be used
@@ -73,6 +65,7 @@ class Properties(BaseModel):
     """
 
     mode: Optional[str] = "max"
+    desired_training_it: Optional[str] = "median"
     seed: Optional[int] = 42
     time_attr: Optional[str] = None
     max_t: Optional[int] = None
@@ -87,6 +80,18 @@ class Properties(BaseModel):
             raise ValueError("Mode must be provided.")
         if v.lower() not in ["min", "max"]:
             raise ValueError("Mode should be either min or max.")
+        return v.lower()
+
+    @field_validator("desired_training_it")
+    @classmethod
+    def check_desired_training_it(cls, v: str):
+        """Validate desired_training_it."""
+        if v is None:
+            raise ValueError("Desired_training_it must be provided.")
+        if v.lower() not in ["median", "mean", "min", "max"]:
+            raise ValueError(
+                "Desired_training_it should be either: median, mean, min or max."
+            )
         return v.lower()
 
 
@@ -114,6 +119,8 @@ class Optimization(BaseModel):
             Used by some neural models, increasing this value will affect memory usage.
         num_samples (Optional[int]): The number of trials that Ray Tune will try.
             In case of a grid search, this parameter should be set to 1.
+        checkpoint_to_keep (Optional[int]): The number of checkpoints to keep
+            in the ray directory.
         cpu_per_trial (Optional[float]): The number of cpu cores dedicated to
             each trial.
         gpu_per_trial (Optional[float]): The number of gpu dedicated to
@@ -127,6 +134,7 @@ class Optimization(BaseModel):
     device: Optional[str] = "cpu"
     block_size: Optional[int] = 50
     num_samples: Optional[int] = 1
+    checkpoint_to_keep: Optional[int] = 5
     cpu_per_trial: Optional[float] = os.cpu_count()
     gpu_per_trial: Optional[float] = 0.0
 
@@ -331,7 +339,6 @@ class RecomModel(BaseModel, ABC):
     def model_validation(self):
         """RecomModel model validation."""
         _name = self.__class__.__name__
-        _imp = self.meta.implementation
 
         # Create mapping of {field: typing}
         field_to_type = {}
@@ -339,7 +346,7 @@ class RecomModel(BaseModel, ABC):
             field_to_type[field] = typing
 
         # Basic controls
-        self.validate_model_and_implementation(_name, _imp)
+        self.validate_model(_name)
 
         # General parameters control
         updated_values = self.model_dump(
@@ -356,26 +363,19 @@ class RecomModel(BaseModel, ABC):
         self.__dict__.update(updated_values)
         return self
 
-    def validate_model_and_implementation(self, name: str, imp: str):
-        """Checks if the model and its implementation exist in the registry.
+    def validate_model(self, name: str):
+        """Checks if the model exist in the registry.
 
         Args:
             name (str): The name of the model.
-            imp (str): The name of the implementation.
 
         Raises:
-            ValueError: If model or implementation is not registered.
+            ValueError: If model is not registered.
         """
         if name.upper() not in model_registry.list_registered():
             raise ValueError(
                 f"Model {name} not in model_registry. "
                 f"These are the available models: {model_registry.list_registered()}."
-            )
-        if imp not in model_registry.list_implementations(name.upper()):
-            raise ValueError(
-                f"Model {name} does not have {imp} implementation. "
-                f"These are the available implementations: "
-                f"{model_registry.list_implementations(name.upper())}."
             )
 
     def validate_grid_search(

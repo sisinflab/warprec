@@ -1,5 +1,5 @@
 # pylint: disable = R0801, E1102
-from typing import Optional, Callable, Any
+from typing import Any
 
 import torch
 import scipy.sparse as sp
@@ -19,6 +19,7 @@ class Slim(ItemSimRecommender):
 
     Args:
         params (dict): The dictionary with the model params.
+        interactions (Interactions): The training interactions.
         *args (Any): Variable length argument list.
         device (str): The device used for tensor operations.
         seed (int): The seed to use for reproducibility.
@@ -36,34 +37,18 @@ class Slim(ItemSimRecommender):
     def __init__(
         self,
         params: dict,
+        interactions: Interactions,
         *args: Any,
         device: str = "cpu",
         seed: int = 42,
         info: dict = None,
         **kwargs: Any,
     ):
-        super().__init__(params, device=device, seed=seed, *args, **kwargs)
+        super().__init__(
+            params, interactions, device=device, seed=seed, info=info, *args, **kwargs
+        )
         self._name = "Slim"
 
-    def fit(
-        self,
-        interactions: Interactions,
-        *args: Any,
-        report_fn: Optional[Callable] = None,
-        **kwargs: Any,
-    ):
-        """Main train method.
-
-        The training will be conducted for each user using ElasticNet.
-        This train loop might not scale much for large dataset with a lot of users.
-        During the train a similarity matrix {item x item} will be learned.
-
-        Args:
-            interactions (Interactions): The interactions that will be used to train the model.
-            *args (Any): List of arguments.
-            report_fn (Optional[Callable]): The Ray Tune function to report the iteration.
-            **kwargs (Any): The dictionary of keyword arguments.
-        """
         # Predefine the number of items, similarity matrix and ElasticNet
         X = interactions.get_sparse()
         X = X.tolil()
@@ -100,6 +85,3 @@ class Slim(ItemSimRecommender):
         self.item_similarity = nn.Parameter(
             torch.from_numpy(sp.vstack(item_coeffs).T.todense())
         )
-
-        if report_fn is not None:
-            report_fn(self)

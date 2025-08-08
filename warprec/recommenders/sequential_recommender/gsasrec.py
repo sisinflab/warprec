@@ -1,23 +1,22 @@
 # pylint: disable = R0801, E1102, W0221, C0103, W0613, W0235, R0902
-from typing import Optional, Callable, Any
+from typing import Callable, Any
 
 import torch
 from torch import nn, Tensor
 from torch.nn import Module
 from torch.nn.init import xavier_normal_
-from scipy.sparse import csr_matrix
 
 from warprec.recommenders.base_recommender import (
-    Recommender,
+    IterativeRecommender,
     SequentialRecommenderUtils,
 )
-from warprec.data.dataset import Interactions, Sessions
+from warprec.data.dataset import Sessions
 from warprec.utils.registry import model_registry
 
 
 @model_registry.register(name="gSASRec")
-class gSASRec(Recommender, SequentialRecommenderUtils):
-    """Implementation of gSASRec (Group-wise Self-Attentive Sequential Recommendation).
+class gSASRec(IterativeRecommender, SequentialRecommenderUtils):
+    """Implementation of gSASRec (generalized SASRec).
 
     This model adapts the SASRec architecture to predict the next item at every
     step of the sequence, using a Group-wise Binary Cross-Entropy (GBCE) loss function.
@@ -112,22 +111,11 @@ class gSASRec(Recommender, SequentialRecommenderUtils):
             num_layers=self.n_layers,
         )
 
+        # Initialize weights
         self.apply(self._init_weights)
-
-        self.optimizer = torch.optim.Adam(
-            self.parameters(), lr=self.learning_rate, weight_decay=self.weight_decay
-        )
+        self.loss = self._gbce_loss_function()
 
         self.to(self._device)
-
-    def _init_weights(self, module: Module):
-        if isinstance(module, (nn.Embedding, nn.Linear)):
-            xavier_normal_(module.weight.data)
-        elif isinstance(module, nn.LayerNorm):
-            module.bias.data.zero_()
-            module.weight.data.fill_(1.0)
-        if isinstance(module, nn.Linear) and module.bias is not None:
-            module.bias.data.zero_()
 
     def _generate_square_subsequent_mask(self, seq_len: int) -> Tensor:
         """Generate a square mask for the sequence.
@@ -141,6 +129,33 @@ class gSASRec(Recommender, SequentialRecommenderUtils):
         """
         mask = torch.triu(torch.ones(seq_len, seq_len, device=self._device), diagonal=1)
         return mask.bool()
+
+    def _get_output_embeddings(self) -> nn.Embedding:
+        """Return embeddings based on the flag value reuse_item_embeddings.
+
+        Returns:
+            nn.Embedding: The item embedding if reuse_item_embeddings is True,
+                else the output embedding.
+        """
+        if self.reuse_item_embeddings:
+            return self.item_embedding
+        return self.output_embedding
+
+    def _init_weights(self, module: Module):
+        if isinstance(module, (nn.Embedding, nn.Linear)):
+            xavier_normal_(module.weight.data)
+        elif isinstance(module, nn.LayerNorm):
+            module.bias.data.zero_()
+            module.weight.data.fill_(1.0)
+        if isinstance(module, nn.Linear) and module.bias is not None:
+            module.bias.data.zero_()
+
+    def get_dataloader(self, interactions, sessions: Sessions, **kwargs):
+        return sessions.get_group_sequential_dataloader(
+            max_seq_len=self.max_seq_len,
+            num_negatives=self.neg_samples,
+            batch_size=self.batch_size,
+        )
 
     def get_output_embeddings(self) -> nn.Embedding:
         """Return embeddings based on the flag value reuse_item_embeddings.
@@ -183,158 +198,114 @@ class gSASRec(Recommender, SequentialRecommenderUtils):
         )
         return transformer_output
 
-    def _compute_gbce_loss(
-        self,
-        sequence_hidden_states: Tensor,
-        labels: Tensor,
-        negatives: Tensor,
-        model_input: Tensor,
-    ) -> Tensor:
-        """
-        Computes the Group-wise Binary Cross-Entropy (GBCE) loss.
-
-        Args:
-            sequence_hidden_states (Tensor): Output of the Transformer encoder
-                                             [batch_size, seq_len, embedding_size].
-            labels (Tensor): Positive labels [batch_size, seq_len].
-            negatives (Tensor): Negative samples [batch_size, seq_len, neg_samples].
-            model_input (Tensor): Input sequence used for masking [batch_size, seq_len].
+    def _gbce_loss_function(self) -> Callable:
+        """Return the General Binary Cross-Entropy (GBCE) loss.
 
         Returns:
-            Tensor: The computed GBCE loss.
+            Callable: The GBCE loss.
         """
-        output_embeddings = self.get_output_embeddings()
 
-        pos_neg_concat = torch.cat(
-            [labels.unsqueeze(-1), negatives], dim=-1
-        )  # [batch_size, max_seq_len - 1, neg_samples + 1]
-        pos_neg_embeddings = output_embeddings(
-            pos_neg_concat
-        )  # [batch_size, max_seq_len - 1, neg_samples + 1, embedding_size]
+        def gbce_loss_fn(
+            sequence_hidden_states: Tensor,
+            labels: Tensor,
+            negatives: Tensor,
+            model_input: Tensor,
+        ):
+            pos_neg_concat = torch.cat([labels.unsqueeze(-1), negatives], dim=-1)
+            pos_neg_embeddings = self.get_output_embeddings()(pos_neg_concat)
 
-        # Compute the logits
-        logits = torch.einsum(
-            "bse, bsne -> bsn", sequence_hidden_states, pos_neg_embeddings
-        )  # [batch_size, max_seq_len - 1, neg_samples + 1]
+            logits = torch.einsum(
+                "bse, bsne -> bsn", sequence_hidden_states, pos_neg_embeddings
+            )
 
-        # Compute the Group-wise Binary Cross-Entropy loss
-        gt = torch.zeros_like(logits, device=self._device)
-        gt[:, :, 0] = 1.0
+            gt = torch.zeros_like(logits, device=self._device)
+            gt[:, :, 0] = 1.0
 
-        alpha = self.neg_samples / (self.n_items - 1)
-        t = self.gbce_t
-        beta = alpha * ((1 - 1 / alpha) * t + 1 / alpha)
+            alpha = self.neg_samples / (self.n_items - 1)
+            t = self.gbce_t
+            beta = alpha * ((1 - 1 / alpha) * t + 1 / alpha)
 
-        positive_logits = logits[:, :, 0:1].to(torch.float64)
-        negative_logits = logits[:, :, 1:].to(torch.float64)
-        eps = 1e-10
+            positive_logits = logits[:, :, 0:1].to(torch.float64)
+            negative_logits = logits[:, :, 1:].to(torch.float64)
+            eps = 1e-10
 
-        positive_probs = torch.clamp(torch.sigmoid(positive_logits), eps, 1 - eps)
-        positive_probs_pow = torch.clamp(
-            positive_probs.pow(-beta),
-            min=1.0 + eps,
-            max=torch.finfo(torch.float64).max,
-        )
-        to_log = torch.clamp(
-            torch.div(1.0, (positive_probs_pow - 1)),
-            eps,
-            torch.finfo(torch.float64).max,
-        )
-        positive_logits_transformed = to_log.log()
+            positive_probs = torch.clamp(torch.sigmoid(positive_logits), eps, 1 - eps)
+            positive_probs_pow = torch.clamp(
+                positive_probs.pow(-beta),
+                min=1.0 + eps,
+                max=torch.finfo(torch.float64).max,
+            )
+            to_log = torch.clamp(
+                torch.div(1.0, (positive_probs_pow - 1)),
+                eps,
+                torch.finfo(torch.float64).max,
+            )
+            positive_logits_transformed = to_log.log()
 
-        final_logits = torch.cat([positive_logits_transformed, negative_logits], -1).to(
-            torch.float32
-        )
+            final_logits = torch.cat(
+                [positive_logits_transformed, negative_logits], -1
+            ).to(torch.float32)
 
-        mask = (model_input != 0).float()
+            mask = (model_input != 0).float()
+            loss_per_element = nn.functional.binary_cross_entropy_with_logits(
+                final_logits, gt, reduction="none"
+            )
 
-        loss_per_element = nn.functional.binary_cross_entropy_with_logits(
-            final_logits, gt, reduction="none"
-        )
+            loss_per_element = loss_per_element.mean(-1) * mask
+            total_loss = loss_per_element.sum() / mask.sum().clamp(min=1)
+            return total_loss
 
-        # Mean over the negative dimension, then apply masking
-        loss_per_element = loss_per_element.mean(-1) * mask
+        return gbce_loss_fn
 
-        total_loss = loss_per_element.sum() / mask.sum().clamp(min=1)
+    def train_step(self, batch: Any, *args, **kwargs):
+        positives, negatives = [x.to(self._device) for x in batch]
+
+        if positives.shape[0] == 0 or positives.shape[1] < 2:
+            return torch.tensor(0.0, device=self._device, requires_grad=True)
+
+        model_input = positives[:, :-1]
+        labels = positives[:, 1:]
+
+        if model_input.shape[1] == 0:
+            return torch.tensor(0.0, device=self._device, requires_grad=True)
+
+        sequence_hidden_states = self.forward(model_input)
+        total_loss = self.loss(sequence_hidden_states, labels, negatives, model_input)
+
         return total_loss
-
-    def fit(
-        self,
-        interactions: Interactions,
-        *args: Any,
-        report_fn: Optional[Callable] = None,
-        **kwargs: Any,
-    ):
-        """Main train method for GSASRec."""
-        sessions = kwargs.get("sessions")
-        if not isinstance(sessions, Sessions):
-            raise ValueError("Sessions must be provided correctly to train the model.")
-
-        dataloader = sessions.get_group_sequential_dataloader(
-            max_seq_len=self.max_seq_len,
-            num_negatives=self.neg_samples,
-            batch_size=self.batch_size,
-        )
-
-        self.train()
-        for epoch in range(self.epochs):
-            epoch_loss = 0.0
-            for batch in dataloader:
-                positives, negatives = [x.to(self._device) for x in batch]
-
-                # Skip batches with no positive items or sequences shorter than 2
-                if positives.shape[0] == 0 or positives.shape[1] < 2:
-                    continue
-
-                self.optimizer.zero_grad()
-
-                # Prepare input
-                model_input = positives[:, :-1]  # [batch_size, max_seq_len - 1]
-                labels = positives[:, 1:]  # [batch_size, max_seq_len - 1]
-
-                # Skip empty sequences after slicing
-                if model_input.shape[1] == 0:
-                    continue
-
-                # Obtain hidden states from forward pass
-                sequence_hidden_states = self.forward(
-                    model_input
-                )  # [batch_size, max_seq_len - 1, embedding_size]
-
-                # Compute the loss over the transformer output
-                total_loss = self._compute_gbce_loss(
-                    sequence_hidden_states, labels, negatives, model_input
-                )
-
-                total_loss.backward()
-                self.optimizer.step()
-                epoch_loss += total_loss.item()
-
-            if report_fn is not None:
-                report_fn(self, loss=epoch_loss, epoch=epoch)
 
     @torch.no_grad()
     def predict(
         self,
-        interaction_matrix: csr_matrix,
+        train_batch: Tensor,
+        user_indices: Tensor,
         user_seq: Tensor,
         seq_len: Tensor,
         *args: Any,
         **kwargs: Any,
     ) -> Tensor:
-        """Prediction using the learned session embeddings (full sort prediction)."""
+        """
+        Prediction using the learned session embeddings (full sort prediction).
+
+        Args:
+            train_batch (Tensor): The train batch of user interactions.
+            user_indices (Tensor): The batch of user indices.
+            user_seq (Tensor): Padded sequences of item IDs for users to predict for.
+            seq_len (Tensor): Actual lengths of these sequences, before padding.
+            *args (Any): List of arguments.
+            **kwargs (Any): The dictionary of keyword arguments.
+
+        Returns:
+            Tensor: The score matrix {user x item}.
+        """
         user_seq = user_seq.to(self._device)
         seq_len = seq_len.to(self._device)
 
         transformer_output = self.forward(user_seq)
         seq_output = self._gather_indexes(transformer_output, seq_len - 1)
 
-        all_item_embeddings = self.get_output_embeddings().weight[1:]
+        all_item_embeddings = self._get_output_embeddings().weight[1:]
         predictions = torch.matmul(seq_output, all_item_embeddings.transpose(0, 1))
 
-        coo = interaction_matrix.tocoo()
-        user_indices_in_batch = torch.from_numpy(coo.row).to(self._device)
-        item_indices = torch.from_numpy(coo.col).to(self._device)
-        predictions[user_indices_in_batch, item_indices] = -torch.inf
-
-        return predictions
+        predictions[train_batch != 0] = -torch.inf
+        return predictions.to(self._device)

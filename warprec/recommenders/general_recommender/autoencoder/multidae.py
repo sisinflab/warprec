@@ -1,12 +1,12 @@
-from typing import Any, Optional, Callable
+from typing import Any
 
 import torch
 import torch.nn.functional as F
 from torch import nn, Tensor
 from torch.nn.init import xavier_normal_, constant_
-from scipy.sparse import csr_matrix
-from warprec.data.dataset import Interactions
-from warprec.recommenders.base_recommender import Recommender
+from warprec.data.dataset import Interactions, Sessions
+from warprec.recommenders.base_recommender import IterativeRecommender
+from warprec.recommenders.losses import MultiDAELoss
 from warprec.utils.registry import model_registry
 
 
@@ -71,7 +71,7 @@ class Decoder(nn.Module):
 
 
 @model_registry.register(name="MultiDAE")
-class MultiDAE(Recommender):
+class MultiDAE(IterativeRecommender):
     """Implementation of MultiDAE algorithm from
         Variational Autoencoders for Collaborative Filtering 2018.
 
@@ -140,9 +140,7 @@ class MultiDAE(Recommender):
 
         # Initialize weights
         self.apply(self._init_weights)
-        self.optimizer = torch.optim.Adam(
-            self.parameters(), lr=self.learning_rate, weight_decay=self.weight_decay
-        )
+        self.loss = MultiDAELoss()
 
         # Move to device
         self.to(self._device)
@@ -152,6 +150,17 @@ class MultiDAE(Recommender):
             xavier_normal_(module.weight.data)
             if module.bias is not None:
                 constant_(module.bias.data, 0)
+
+    def get_dataloader(self, interactions: Interactions, sessions: Sessions, **kwargs):
+        return interactions.get_interaction_loader(batch_size=self.batch_size)
+
+    def train_step(self, batch: Any, *args: Any, **kwargs: Any):
+        rating_matrix = [x.to(self._device) for x in batch][0]
+
+        reconstructed = self(rating_matrix)
+        loss: Tensor = self.loss(rating_matrix, reconstructed)
+
+        return loss
 
     def forward(self, rating_matrix: Tensor) -> Tensor:
         """Forward pass with normalization and dropout.
@@ -172,77 +181,26 @@ class MultiDAE(Recommender):
         h = self.encoder(h)
         return self.decoder(h)
 
-    def fit(
-        self,
-        interactions: Interactions,
-        *args: Any,
-        report_fn: Optional[Callable] = None,
-        **kwargs: Any,
-    ):
-        """Main train method.
-
-        The training will be conducted on dense user-item matrix in batches.
-
-        Args:
-            interactions (Interactions): The interactions that will be used to train the model.
-            *args (Any): List of arguments.
-            report_fn (Optional[Callable]): The Ray Tune function to report the iteration.
-            **kwargs (Any): The dictionary of keyword arguments.
-        """
-        self.train()
-        X = interactions.get_sparse()
-
-        for _ in range(self.epochs):
-            epoch_loss = 0.0
-            for start in range(0, self.batch_size, self.batch_size):
-                end = min(start + self.batch_size, X.shape[0])
-
-                # Create rating matrix
-                rating_matrix = torch.tensor(
-                    X[start:end].toarray(), device=self._device
-                ).float()
-
-                # Forward pass
-                self.optimizer.zero_grad()
-                reconstructed = self.forward(rating_matrix)
-
-                # Cross-entropy loss
-                loss = -(F.log_softmax(reconstructed, 1) * rating_matrix).sum(1).mean()
-
-                # Backward pass
-                loss.backward()
-                self.optimizer.step()
-
-                epoch_loss += loss.item()
-
-            if report_fn is not None:
-                report_fn(self, loss=epoch_loss)
-
     @torch.no_grad()
     def predict(
-        self, interaction_matrix: csr_matrix, *args: Any, **kwargs: Any
+        self,
+        train_batch: Tensor,
+        *args: Any,
+        **kwargs: Any,
     ) -> Tensor:
         """Prediction using the the encoder and decoder modules.
 
         Args:
-            interaction_matrix (csr_matrix): The matrix containing the
-                pairs of interactions to evaluate.
+            train_batch (Tensor): The train batch of user interactions.
             *args (Any): List of arguments.
             **kwargs (Any): The dictionary of keyword arguments.
 
         Returns:
             Tensor: The score matrix {user x item}.
         """
-        # Convert to dense matrix
-        dense_matrix = torch.tensor(
-            interaction_matrix.toarray(), device=self._device
-        ).float()
-
         # Forward pass
-        predictions = self.forward(dense_matrix)
+        predictions = self.forward(train_batch)
 
-        # Mask seen items
-        seen_mask = torch.tensor(interaction_matrix.toarray() != 0, device=self._device)
-        predictions[seen_mask] = -torch.inf
-
-        return predictions
+        # Masking interaction already seen in train
+        predictions[train_batch != 0] = -torch.inf
+        return predictions.to(self._device)

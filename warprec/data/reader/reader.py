@@ -1,5 +1,4 @@
 from typing import Any, List, Tuple
-from os.path import join, isfile
 from abc import ABC, abstractmethod
 from pathlib import Path
 
@@ -151,9 +150,8 @@ class LocalReader(Reader):
         dtypes: List[str] | None = None,
         rating_type: RatingType = RatingType.IMPLICIT,
         **kwargs: Any,
-    ) -> Tuple[DataFrame, DataFrame | None, DataFrame | None]:
-        """This method will read the split data from the local source,
-        using parameters from the config file.
+    ) -> Tuple[DataFrame, List[Tuple[DataFrame, DataFrame]], DataFrame]:
+        """This method reads the split data from a local source.
 
         Args:
             split_dir (str): The path to the split directory.
@@ -166,18 +164,18 @@ class LocalReader(Reader):
             **kwargs (Any): The keyword arguments.
 
         Returns:
-            Tuple[DataFrame, DataFrame | None, DataFrame | None]:
-                DataFrame: The training set data.
-                DataFrame: The test set data if present.
-                DataFrame | None: The validation set data if present.
+            Tuple[DataFrame, List[Tuple[DataFrame, DataFrame]], DataFrame]:
+                - DataFrame: The main training set data.
+                - List[Tuple[DataFrame, DataFrame]],: A list of tuples, where each tuple
+                    contains the train and validation data for a single fold.
+                - DataFrame: The main test set data.
 
         Raises:
-            FileNotFoundError: If the train split file was not found.
+            FileNotFoundError: If the main train split file was not found.
         """
         if self.config:
             read_config = self.config.reader
         else:
-            # Column names and dtypes default values are here for mypy waring
             if not column_names:
                 column_names = ["user_id", "item_id", "rating", "timestamp"]
             if not dtypes:
@@ -196,68 +194,73 @@ class LocalReader(Reader):
                 ),
             )
 
-        # Define the paths to the split files
-        path_train = join(read_config.split.local_path, "train" + read_config.split.ext)
-        path_test = join(read_config.split.local_path, "test" + read_config.split.ext)
-        path_val = join(read_config.split.local_path, "val" + read_config.split.ext)
-
-        logger.msg(f"Starting reading process from local source in: {path_train}")
-
-        # DataFrame init
-        train_data = None
-        test_data = None
-        val_data = None
-
-        if isfile(path_train):
-            if read_config.split.header:
-                train_data = pd.read_csv(
-                    path_train,
+        # Helper function to read a single file
+        def read_file(
+            path: Path,
+            read_config: ReaderConfig,
+        ) -> DataFrame:
+            if header:
+                return pd.read_csv(
+                    path,
                     sep=read_config.split.sep,
                     usecols=read_config.column_names,
-                    dtype=read_config.column_dtype(),
+                    dtype=read_config.dtypes,
                 )
             else:
-                train_data = pd.read_csv(
-                    path_train,
-                    sep=read_config.split.sep,
-                    header=None,
-                )
-                train_data.columns = read_config.column_names
+                df = pd.read_csv(path, sep=read_config.split.sep, header=None)
+                df.columns = read_config.column_names
+                # Use dictionary for dtypes and handle cases where column_names and dtypes don't match
+                df = df.astype(read_config.dtypes)
+                return df
 
-            if isfile(path_test):
-                if read_config.split.header:
-                    test_data = pd.read_csv(
-                        path_test,
-                        sep=read_config.split.sep,
-                        usecols=read_config.column_names,
-                        dtype=read_config.column_dtype(),
-                    )
+        path_split_dir = Path(read_config.split.local_path)
+
+        # Define paths for the main split files
+        path_main_train = path_split_dir.joinpath("train" + read_config.split.ext)
+        path_main_test = path_split_dir.joinpath("test" + read_config.split.ext)
+
+        # Check for the existence of the main train file
+        if not path_main_train.exists() or not path_main_test.exists():
+            raise FileNotFoundError(
+                "Split folder not correctly formatted. Train and "
+                "Test data expected in the main folder."
+            )
+
+        logger.msg(f"Starting reading process from local source in: {path_split_dir}")
+
+        # Read the main train and test data
+        train_data = read_file(path_main_train, read_config)
+        test_data = read_file(path_main_test, read_config)
+
+        # Iterate through subdirectories for folds
+        fold_data = []
+        fold_number = 1
+        while True:
+            fold_path = path_split_dir.joinpath(str(fold_number))
+
+            # Check if the directory for the current fold number exists
+            if fold_path.exists():
+                # Paths for fold train and validation files
+                path_fold_train = fold_path.joinpath("train" + read_config.split.ext)
+                path_fold_val = fold_path.joinpath("validation" + read_config.split.ext)
+
+                # Check if the required files exist inside the fold directory
+                if path_fold_train.is_file() and path_fold_val.is_file():
+                    fold_train = read_file(path_fold_train, read_config)
+                    fold_val = read_file(path_fold_val, read_config)
+                    fold_data.append((fold_train, fold_val))
+                    fold_number += 1  # Move to the next fold number
                 else:
-                    test_data = pd.read_csv(
-                        path_test,
-                        sep=read_config.split.sep,
-                        header=None,
-                    )
-                    test_data.columns = read_config.column_names
+                    break
+            else:
+                break
 
-            if isfile(path_val):
-                if read_config.split.header:
-                    val_data = pd.read_csv(
-                        path_val,
-                        sep=read_config.split.sep,
-                        usecols=read_config.column_names,
-                        dtype=read_config.column_dtype(),
-                    )
-                else:
-                    val_data = pd.read_csv(
-                        path_val,
-                        sep=read_config.split.sep,
-                        header=None,
-                    )
-                    val_data.columns = read_config.column_names
+        logger.msg(
+            "Main train and test data read from split directory. "
+            f"Found {fold_number - 1} train/validation folds."
+        )
 
-            return (train_data, test_data, val_data)
-        raise FileNotFoundError(f"Train split not found in {path_train}")
+        return (train_data, fold_data, test_data)
 
     def read_side_information(
         self,

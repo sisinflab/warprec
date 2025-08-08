@@ -1,13 +1,12 @@
 # pylint: disable = R0801, E1102
-from typing import Optional, Callable, Any
+from typing import Any
 
 import torch
 import pandas as pd
 import numpy as np
 from pandas import DataFrame
 from torch import Tensor
-from scipy.sparse import csr_matrix, coo_matrix
-from warprec.data.dataset import Interactions
+from scipy.sparse import coo_matrix
 from warprec.recommenders.base_recommender import Recommender
 
 
@@ -51,34 +50,49 @@ class ProxyRecommender(Recommender):
         super().__init__(params, device=device, seed=seed, info=info, *args, **kwargs)
         self._name = "ProxyRecommender"
 
-        self._imap = info.get("item_mapping", None)
-        self._umap = info.get("user_mapping", None)
-        self.items = info.get("items", None)
-        self.users = info.get("users", None)
-        if any(
-            x is None or x == {}
-            for x in [self._imap, self._umap, self.items, self.users]
-        ):
+        _imap: dict = info.get("item_mapping", None)
+        _umap: dict = info.get("user_mapping", None)
+        num_items: int = info.get("items", None)
+        num_users: int = info.get("users", None)
+        if any(x is None or x == {} for x in [_imap, _umap, num_items, num_users]):
             raise ValueError(
                 "Number of items and users must be provided in the info dictionary. "
                 "Item and user mapping must be provided to correctly initialize the model."
             )
 
         try:
-            self.recommendation_df: DataFrame
+            recommendation_df: DataFrame
             if self.header:
-                self.recommendation_df = pd.read_csv(
+                recommendation_df = pd.read_csv(
                     self.recommendation_file,
                     sep=self.separator,
                     dtype={"user_id": int, "item_id": int, "rating": float},
                     usecols=["user_id", "item_id", "rating"],
                 )
             else:
-                self.recommendation_df = pd.read_csv(
+                recommendation_df = pd.read_csv(
                     self.recommendation_file, sep=self.separator, header=None
                 )
-                self.recommendation_df = self.recommendation_df.iloc[:, :3]
-                self.recommendation_df.columns = ["user_id", "item_id", "rating"]
+                recommendation_df = recommendation_df.iloc[:, :3]
+                recommendation_df.columns = ["user_id", "item_id", "rating"]
+
+                users = recommendation_df["user_id"].map(_umap).values
+                items = recommendation_df["item_id"].map(_imap).values
+                ratings = recommendation_df["rating"].values
+
+                # Compute invalid values mask for faster filtering
+                mask = ~np.isnan(users) & ~np.isnan(items) & ~np.isnan(ratings)
+
+                # Filter out invalid values
+                users = users[mask]
+                items = items[mask]
+                ratings = ratings[mask]
+
+                self._predictions_sparse = coo_matrix(
+                    (ratings, (users, items)),
+                    shape=(num_users, num_items),
+                    dtype=np.float32,
+                ).tocsr()
         except FileNotFoundError:
             raise FileNotFoundError(
                 f"Recommendation file {self.recommendation_file} not found."
@@ -96,65 +110,29 @@ class ProxyRecommender(Recommender):
                 f"An error occurred while reading the recommendation file: {e}"
             )
 
-    def fit(
-        self,
-        interactions: Interactions,
-        *args: Any,
-        report_fn: Optional[Callable] = None,
-        **kwargs: Any,
-    ):
-        """Main train method.
-
-        Args:
-            interactions (Interactions): The interactions that will be used to train the model.
-            *args (Any): List of arguments.
-            report_fn (Optional[Callable]): The Ray Tune function to report the iteration.
-            **kwargs (Any): The dictionary of keyword arguments.
-        """
-
-        users = self.recommendation_df["user_id"].map(self._umap).values
-        items = self.recommendation_df["item_id"].map(self._imap).values
-        ratings = self.recommendation_df["rating"].values
-
-        # Compute invalid values mask for faster filtering
-        mask = ~np.isnan(users) & ~np.isnan(items) & ~np.isnan(ratings)
-
-        # Filter out invalid values
-        users = users[mask]
-        items = items[mask]
-        ratings = ratings[mask]
-
-        self._predictions_sparse = coo_matrix(
-            (ratings, (users, items)), shape=(self.users, self.items), dtype=np.float32
-        ).tocsr()
-
-        if report_fn is not None:
-            report_fn(self)
-
     @torch.no_grad()
     def predict(
-        self, interaction_matrix: csr_matrix, *args: Any, **kwargs: Any
+        self,
+        train_batch: Tensor,
+        user_indices: Tensor,
+        *args: Any,
+        **kwargs: Any,
     ) -> Tensor:
-        """.
+        """Prediction in the form of B@X where B is a {user x user} similarity matrix.
 
         Args:
-            interaction_matrix (csr_matrix): The matrix containing the
-                pairs of interactions to evaluate.
+            train_batch (Tensor): The train batch of user interactions.
+            user_indices (Tensor): The batch of user indices.
             *args (Any): List of arguments.
             **kwargs (Any): The dictionary of keyword arguments.
 
         Returns:
             Tensor: The score matrix {user x item}.
         """
-        start_idx = kwargs.get("start", 0)
-        end_idx = kwargs.get("end", interaction_matrix.shape[0])
-
         # Access the scores from the recommendation file
-        r = self._predictions_sparse[start_idx:end_idx].toarray()
+        predictions_numpy = self._predictions_sparse[user_indices.cpu()].toarray()
+        predictions = torch.from_numpy(predictions_numpy).to(self._device)
 
-        # Mask the non-zero entries and convert to tensor
-        r[interaction_matrix.nonzero()] = -torch.inf
-        return torch.from_numpy(r).to(self._device)
-
-    def forward(self, *args, **kwargs):
-        pass
+        # Masking interaction already seen in train
+        predictions[train_batch != 0] = -torch.inf
+        return predictions.to(self._device)

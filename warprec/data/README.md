@@ -51,10 +51,15 @@ When reading splits from a local source, WarpRec expects the files to be in the 
 split_dir/
 ├── train.tsv
 ├── test.tsv
-└── val.tsv
+├── 1/
+|   ├── train.tsv
+|   ├── validation.tsv
+└── 2/
+    ├── train.tsv
+    ├── validation.tsv
 ```
 
-Each individual file is expected to follow the same format as unsplit dataset files. In this setup, both the training and test sets must be provided, while the validation set is optional.
+Each individual file is expected to follow the same format as unsplit dataset files. In this setup, both the training and test sets must be provided, while the train/validation folds are optional.
 
 ### 📁 Reading side information from a local source
 
@@ -116,7 +121,7 @@ Results produced with WarpRec will be saved inside this folder with a timestamp.
 
 ## 🔀 Splitter
 
-The `Splitter` module in WarpRec is responsible for dividing the data into training and test sets, with an optional validation set. While the test set is mandatory, including a validation set is optional. The module supports various data splitting strategies, each of which is described in the following section along with how it partitions the data.
+The `Splitter` module in WarpRec is responsible for dividing the data into training and test sets, with an optional validation folds. While the test set is mandatory, including a validation set is optional. The module supports various data splitting strategies, each of which is described in the following section along with how it partitions the data.
 
 The WarpRec splitting module is built to be efficient on large datasets and robust in edge cases where certain users don't respect splitting criteria: in that case WarpRec handles the user by ensuring that they appear in the training set at least once.
 
@@ -137,6 +142,10 @@ The `Temporal splitting` will split the data using the timestamp. If a temporal 
 ### 📅 Timestamp slicing
 
 The `Timestamp slicing` will split the data based on a timestamp given as input. Every transaction before that timestamp will be considered training, every transaction after will be considered test. Validation is not available for this strategy. There is also a variant of this strategy called `best`. In that case WarpRec will find the timestamp that will better split the data.
+
+### ✂️ K-Fold Cross Validation
+
+The `K-Fold Cross Validation` will split evenly the data in K splits, using K-1 as training and the last one as validation. This process is repeated K times, exhausting all possible combinations of splits. This strategy is available only on validation set and will require more training time, but produce more accurate and less biased results.
 
 ## 📊 Dataset
 

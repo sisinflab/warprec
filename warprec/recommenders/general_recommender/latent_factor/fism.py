@@ -1,19 +1,18 @@
 # pylint: disable = R0801, E1102
-from typing import Any, Optional, Callable
+from typing import Any
 
 import torch
 from torch import nn, Tensor
 from torch.nn import Module
 from torch.nn.init import normal_
-from scipy.sparse import csr_matrix
 
-from warprec.data.dataset import Interactions
-from warprec.recommenders.base_recommender import Recommender
+from warprec.data.dataset import Interactions, Sessions
+from warprec.recommenders.base_recommender import IterativeRecommender
 from warprec.utils.registry import model_registry
 
 
 @model_registry.register(name="FISM")
-class FISM(Recommender):
+class FISM(IterativeRecommender):
     r"""Implementation of FISM model from
     FISM: Factored Item Similarity Models for Top-N Recommender Systems (KDD 2013).
 
@@ -21,6 +20,7 @@ class FISM(Recommender):
 
     Args:
         params (dict): Model parameters.
+        interactions (Interactions): The training interactions.
         *args (Any): Variable length argument list.
         device (str): The device used for tensor operations.
         seed (int): The seed to use for reproducibility.
@@ -52,55 +52,53 @@ class FISM(Recommender):
     def __init__(
         self,
         params: dict,
+        interactions: Interactions,
         *args: Any,
         device: str = "cpu",
         seed: int = 42,
         info: dict = None,
         **kwargs: Any,
     ):
-        super().__init__(params, *args, device=device, seed=seed, info=info, **kwargs)
+        super().__init__(
+            params, interactions, *args, device=device, seed=seed, info=info, **kwargs
+        )
         self._name = "FISM"
 
         # Get information from dataset info
-        self.n_users = info.get("users", None)
-        if not self.n_users:
+        users = info.get("users", None)
+        if not users:
             raise ValueError(
                 "Users value must be provided to correctly initialize the model."
             )
-        self.n_items = info.get("items", None)
-        if not self.n_items:
+        items = info.get("items", None)
+        if not items:
             raise ValueError(
                 "Items value must be provided to correctly initialize the model."
             )
-        self.block_size = kwargs.get("block_size", 50)
 
         # Embeddings and biases
         self.item_src_embedding = nn.Embedding(
-            self.n_items + 1, self.embedding_size, padding_idx=0
+            items + 1, self.embedding_size, padding_idx=0
         )  # +1 for padding
         self.item_dst_embedding = nn.Embedding(
-            self.n_items + 1, self.embedding_size, padding_idx=0
+            items + 1, self.embedding_size, padding_idx=0
         )  # +1 for padding
-        self.user_bias = nn.Parameter(torch.zeros(self.n_users))
-        self.item_bias = nn.Parameter(torch.zeros(self.n_items + 1))  # +1 for padding
+        self.user_bias = nn.Parameter(torch.zeros(users))
+        self.item_bias = nn.Parameter(torch.zeros(items + 1))  # +1 for padding
 
-        # Parameters initialization
-        self.apply(self._init_weights)
-
-        # Define the loss
-        self.bceloss = nn.BCEWithLogitsLoss()
-        self.optimizer = torch.optim.Adam(
-            self.parameters(), lr=self.learning_rate, weight_decay=self.weight_decay
+        # Prepare history information
+        self.history_matrix, self.history_lens, self.history_mask = (
+            interactions.get_history()
         )
 
-        # These will be set in the fit method
-        self.history_matrix: Tensor | None = None
-        self.history_lens: Tensor | None = None
-        self.history_mask: Tensor | None = None
-
         # Handle groups
-        self.group = torch.chunk(torch.arange(1, self.n_items + 1), self.split_to)
+        self.group = torch.chunk(torch.arange(1, items + 1), self.split_to)
 
+        # Init embedding weights
+        self.apply(self._init_weights)
+        self.loss = nn.BCEWithLogitsLoss()
+
+        # Move to device
         self.to(self._device)
 
     def _init_weights(self, module: Module):
@@ -111,6 +109,19 @@ class FISM(Recommender):
         """
         if isinstance(module, nn.Embedding):
             normal_(module.weight.data, 0, 0.01)  # Standard deviation
+
+    def get_dataloader(self, interactions: Interactions, sessions: Sessions, **kwargs):
+        return interactions.get_item_rating_dataloader(
+            num_negatives=0, batch_size=self.batch_size
+        )
+
+    def train_step(self, batch: Any, *args, **kwargs):
+        user, item, rating = [x.to(self._device) for x in batch]
+
+        predictions = self(user, item)
+        loss: Tensor = self.loss(predictions, rating)
+
+        return loss
 
     def forward(self, user: Tensor, item: Tensor) -> Tensor:
         """Forward pass for calculating scores for specific user-item pairs.
@@ -153,140 +164,64 @@ class FISM(Recommender):
         scores = coeff * torch.sum(similarity, dim=1) + user_bias + item_bias
         return scores
 
-    def fit(
-        self,
-        interactions: Interactions,
-        *args: Any,
-        report_fn: Optional[Callable] = None,
-        **kwargs: Any,
-    ):
-        """Main train method of FISM model.
-
-        Args:
-            interactions (Interactions): The interactions that will be used to train the model.
-            *args (Any): List of arguments.
-            report_fn (Optional[Callable]): The Ray Tune function to report the iteration.
-            **kwargs (Any): The dictionary of keyword arguments.
-        """
-        self.train()
-
-        # Prepare history information
-        self.history_matrix, self.history_lens, self.history_mask = (
-            interactions.get_history()
-        )
-
-        # Get training data (user_ids, item_ids, ratings)
-        train_coo = interactions.get_sparse().tocoo()
-        user_tensor = torch.tensor(train_coo.row, dtype=torch.long, device=self._device)
-        item_tensor = torch.tensor(train_coo.col, dtype=torch.long, device=self._device)
-        label_tensor = torch.tensor(
-            train_coo.data, dtype=torch.float, device=self._device
-        )  # Assuming ratings are 1.0 for positive interactions
-
-        dataset_size = user_tensor.size(0)
-        num_batches = (dataset_size + self.batch_size - 1) // self.batch_size
-
-        for _ in range(self.epochs):
-            epoch_loss = 0.0
-            # Shuffle data for each epoch
-            indices = torch.randperm(dataset_size, device=self._device)
-            shuffled_user_tensor = user_tensor[indices]
-            shuffled_item_tensor = item_tensor[indices]
-            shuffled_label_tensor = label_tensor[indices]
-
-            for i in range(num_batches):
-                start_idx = i * self.batch_size
-                end_idx = min((i + 1) * self.batch_size, dataset_size)
-
-                self.optimizer.zero_grad()
-
-                batch_user = shuffled_user_tensor[start_idx:end_idx]
-                batch_item = shuffled_item_tensor[start_idx:end_idx]
-                batch_label = shuffled_label_tensor[start_idx:end_idx]
-
-                output = self.forward(batch_user, batch_item)
-                loss: Tensor = self.bceloss(output, batch_label.float())
-
-                # Loss computation and backpropagation
-                loss.backward()
-                self.optimizer.step()
-
-                epoch_loss += loss.item()
-
-            if report_fn:
-                report_fn(self, loss=epoch_loss)
-
     @torch.no_grad()
     def predict(
-        self, interaction_matrix: csr_matrix, *args: Any, **kwargs: Any
+        self,
+        train_batch: Tensor,
+        user_indices: Tensor,
+        *args: Any,
+        **kwargs: Any,
     ) -> Tensor:
-        """Prediction using the learned embeddings."""
-        # Get user batching parameters from kwargs
-        start_user = kwargs.get("start", 0)
-        end_user = kwargs.get("end", self.n_users)
+        """Prediction using the learned embeddings.
 
-        # Retrieve training set to get history data
-        if (
-            self.history_matrix is None
-            or self.history_lens is None
-            or self.history_mask is None
-        ):
-            train_set: Interactions = kwargs.get("train_set", None)
-            if train_set is None:
-                raise RuntimeError(
-                    "The model has not been fit yet. Call fit() before predict() "
-                    "or pass the training set as kwargs."
-                )
-            self.history_matrix, self.history_lens, self.history_mask = (
-                train_set.get_history()
-            )
+        Args:
+            train_batch (Tensor): The train batch of user interactions.
+            user_indices (Tensor): The batch of user indices.
+            *args (Any): List of arguments.
+            **kwargs (Any): The dictionary of keyword arguments.
 
-        # Retrieve embedding and bias
-        all_item_dst_emb = self.item_dst_embedding.weight[1:]
-        all_item_bias = self.item_bias[1:]
+        Returns:
+            Tensor: The score matrix {user x item}.
+        """
+        # Retrieve embeddings + biases
+        all_item_src_emb = self.item_src_embedding.weight
+        all_item_dst_emb = self.item_dst_embedding.weight
+        all_user_bias = self.user_bias
+        all_item_bias = self.item_bias
 
-        # Tensor of indices
-        user_batch_indices = torch.arange(start_user, end_user, device=self._device)
+        # Select data for current batch
+        batch_history_matrix = self.history_matrix[user_indices]
+        batch_history_lens = self.history_lens[user_indices]
+        batch_history_mask = self.history_mask[user_indices]
+        batch_user_bias = all_user_bias[user_indices]
 
-        # Pre-compute indices and coefficient
-        user_batch_indices = torch.arange(start_user, end_user, device=self._device)
-        user_history_indices = self.history_matrix[user_batch_indices]
-        item_counts = self.history_lens[user_batch_indices]
-        batch_user_bias = self.user_bias[user_batch_indices]
-        user_history_emb = self.item_src_embedding(user_history_indices)
-        coeff = torch.pow(item_counts.float() + 1e-6, -self.alpha).unsqueeze(1)
+        # Compute aggregated embedding for user in batch
+        user_history_emb = all_item_src_emb[
+            batch_history_matrix
+        ]  # [batch_size, max_len, emb_size]
 
-        # Iter in blocks for efficiency
-        block_predictions = []
-        for start_item in range(0, self.n_items, self.block_size):
-            end_item = min(start_item + self.block_size, self.n_items)
+        # Apply masking
+        masked_user_history_emb = (
+            user_history_emb * batch_history_mask.unsqueeze(2).float()
+        )
+        user_aggregated_emb = masked_user_history_emb.sum(
+            dim=1
+        )  # [batch_size, emb_size]
 
-            # Item indices for this block
-            item_indices_block = torch.arange(start_item, end_item, device=self._device)
+        # Normalization coefficient (N_u ^ -alpha)
+        coeff = torch.pow(batch_history_lens.float() + 1e-6, -self.alpha).unsqueeze(1)
+        user_final_emb = user_aggregated_emb * coeff  # [batch_size, emb_size]
 
-            # Extract embeddings based on the block
-            chunk_item_dst_emb = all_item_dst_emb[item_indices_block]
-            chunk_item_bias = all_item_bias[item_indices_block]
+        # Compute the final matrix multiplication.
+        # NOTE: We use [1:] to ignore padding
+        predictions = torch.matmul(
+            user_final_emb, all_item_dst_emb[1:].transpose(0, 1)
+        )  # [batch_size, n_items]
 
-            # Compute similarity on the block
-            similarity_matrix = torch.matmul(user_history_emb, chunk_item_dst_emb.T)
-            sum_similarity = torch.sum(similarity_matrix, dim=1)
+        # Add the bias
+        predictions += batch_user_bias.unsqueeze(1)
+        predictions += all_item_bias[1:].unsqueeze(0)
 
-            chunk_scores = (
-                coeff * sum_similarity
-                + batch_user_bias.unsqueeze(1)
-                + chunk_item_bias.unsqueeze(0)
-            )
-            block_predictions.append(chunk_scores)
-
-        # Concat the scores of the different groups
-        predictions = torch.cat(block_predictions, dim=1)
-
-        # Mask previously seen items
-        coo = interaction_matrix.tocoo()
-        user_indices_in_batch = torch.from_numpy(coo.row).to(self._device)
-        item_indices = torch.from_numpy(coo.col).to(self._device)
-        predictions[user_indices_in_batch, item_indices] = -torch.inf
-
-        # We return raw scores without sigmoid
-        return predictions
+        # Masking interaction already seen in train
+        predictions[train_batch != 0] = -torch.inf
+        return predictions.to(self._device)

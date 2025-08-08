@@ -1,14 +1,13 @@
 # pylint: disable = R0801, E1102, W0221, C0103, W0613, W0235
-from typing import Optional, Callable, Any
+from typing import Any
 
 import torch
 from torch import nn, Tensor
 from torch.nn import Module
 from torch.nn.init import xavier_uniform_, xavier_normal_
-from scipy.sparse import csr_matrix
 
 from warprec.recommenders.base_recommender import (
-    Recommender,
+    IterativeRecommender,
     SequentialRecommenderUtils,
 )
 from warprec.recommenders.losses import BPRLoss
@@ -17,7 +16,7 @@ from warprec.utils.registry import model_registry
 
 
 @model_registry.register(name="GRU4Rec")
-class GRU4Rec(Recommender, SequentialRecommenderUtils):
+class GRU4Rec(IterativeRecommender, SequentialRecommenderUtils):
     """Implementation of GRU4Rec algorithm from
     "Improved Recurrent Neural Networks for Session-based Recommendations." in DLRS 2016.
 
@@ -69,15 +68,14 @@ class GRU4Rec(Recommender, SequentialRecommenderUtils):
         super().__init__(params, device=device, seed=seed, *args, **kwargs)
         self._name = "GRU4Rec"
 
-        # Get information from dataset info
-        self.n_items = info.get("items", None)
-        if not self.n_items:
+        items = info.get("items", None)
+        if not items:
             raise ValueError(
-                "Both 'items' must be provided to correctly initialize the model."
+                "Items value must be provided to correctly initialize the model."
             )
 
         self.item_embedding = nn.Embedding(
-            self.n_items + 1,
+            items + 1,
             self.embedding_size,
             padding_idx=0,  # Taking into account the extra "item" for padding
         )
@@ -97,10 +95,6 @@ class GRU4Rec(Recommender, SequentialRecommenderUtils):
         # Initialize weights
         self.apply(self._init_weights)
 
-        self.optimizer = torch.optim.Adam(
-            self.parameters(), lr=self.learning_rate, weight_decay=self.weight_decay
-        )
-
         # Loss function will be based on number of
         # negative samples
         self.loss: nn.Module
@@ -109,6 +103,7 @@ class GRU4Rec(Recommender, SequentialRecommenderUtils):
         else:
             self.loss = nn.CrossEntropyLoss()
 
+        # Move to device
         self.to(self._device)
 
     def _init_weights(self, module: Module):
@@ -133,6 +128,47 @@ class GRU4Rec(Recommender, SequentialRecommenderUtils):
             xavier_uniform_(module.weight.data)
             if module.bias is not None:
                 module.bias.data.zero_()
+
+    def get_dataloader(self, interactions: Interactions, sessions: Sessions, **kwargs):
+        return sessions.get_sequential_dataloader(
+            max_seq_len=self.max_seq_len,
+            num_negatives=self.neg_samples,
+            batch_size=self.batch_size,
+        )
+
+    def train_step(self, batch: Any, *args, **kwargs):
+        if self.neg_samples > 0:
+            item_seq, item_seq_len, pos_item, neg_item = [
+                x.to(self._device) for x in batch
+            ]
+        else:
+            item_seq, item_seq_len, pos_item = [x.to(self._device) for x in batch]
+            neg_item = None
+
+        seq_output = self.forward(item_seq, item_seq_len)
+
+        loss: Tensor
+        if self.neg_samples > 0:
+            pos_items_emb = self.item_embedding(
+                pos_item
+            )  # [batch_size, embedding_size]
+            neg_items_emb = self.item_embedding(
+                neg_item
+            )  # [batch_size, embedding_size]
+
+            pos_score = torch.sum(seq_output * pos_items_emb, dim=-1)  # [batch_size]
+            neg_score = torch.sum(
+                seq_output.unsqueeze(1) * neg_items_emb, dim=-1
+            )  # [batch_size]
+            loss = self.loss(pos_score, neg_score)
+        else:
+            test_item_emb = self.item_embedding.weight  # [num_items, embedding_size]
+            logits = torch.matmul(
+                seq_output, test_item_emb.transpose(0, 1)
+            )  # [batch_size, num_items]
+            loss = self.loss(logits, pos_item)
+
+        return loss
 
     def forward(self, item_seq: Tensor, item_seq_len: Tensor) -> Tensor:
         """Forward pass of the GRU4Rec model.
@@ -162,98 +198,11 @@ class GRU4Rec(Recommender, SequentialRecommenderUtils):
         )  # [batch_size, embedding_size]
         return seq_output
 
-    def fit(
-        self,
-        interactions: Interactions,
-        *args: Any,
-        report_fn: Optional[Callable] = None,
-        **kwargs: Any,
-    ):
-        """Main train method for GRU4Rec.
-
-        The training will be conducted on sequential data:
-        (item_sequence, sequence_length, positive_next_item, negative_next_item (optional)).
-
-        Args:
-            interactions (Interactions): The interactions that will be used to train the model.
-            *args (Any): List of arguments.
-            report_fn (Optional[Callable]): The Ray Tune function to report the iteration.
-            **kwargs (Any): The dictionary of keyword arguments.
-
-        Raises:
-            ValueError: If the Sessions object is not provided.
-        """
-        sessions = kwargs.get("sessions")
-        if not isinstance(sessions, Sessions):
-            raise ValueError("Sessions must be provided correctly to train the model.")
-
-        dataloader = sessions.get_sequential_dataloader(
-            max_seq_len=self.max_seq_len,
-            num_negatives=self.neg_samples,
-            batch_size=self.batch_size,
-        )
-
-        self.train()
-        for _ in range(self.epochs):
-            epoch_loss = 0.0
-            for batch in dataloader:
-                if self.neg_samples > 0:
-                    item_seq, item_seq_len, pos_item, neg_item = [
-                        x.to(self._device) for x in batch
-                    ]
-                else:
-                    item_seq, item_seq_len, pos_item = [
-                        x.to(self._device) for x in batch
-                    ]
-                    neg_item = None  # We set them to None for consistency
-
-                # Forward pass: get the session embedding
-                self.optimizer.zero_grad()
-                seq_output = self.forward(
-                    item_seq, item_seq_len
-                )  # [batch_size, embedding_size]
-
-                # Loss computation
-                total_loss: Tensor
-                if self.neg_samples > 0:
-                    pos_items_emb = self.item_embedding(
-                        pos_item
-                    )  # [batch_size, embedding_size]
-                    neg_items_emb = self.item_embedding(
-                        neg_item
-                    )  # [batch_size, embedding_size]
-
-                    pos_score = torch.sum(
-                        seq_output * pos_items_emb, dim=-1
-                    )  # [batch_size]
-                    neg_score = torch.sum(
-                        seq_output.unsqueeze(1) * neg_items_emb, dim=-1
-                    )  # [batch_size]
-                    total_loss = self.loss(pos_score, neg_score)
-                else:
-                    # Compute logits against all item embeddings
-                    test_item_emb = (
-                        self.item_embedding.weight
-                    )  # [n_items, embedding_size]
-                    logits = torch.matmul(
-                        seq_output, test_item_emb.transpose(0, 1)
-                    )  # [batch_size, n_items]
-                    # CrossEntropyLoss expects logits and target IDs
-                    total_loss = self.loss(logits, pos_item)
-
-                # Backward pass and optimization
-                total_loss.backward()
-                self.optimizer.step()
-
-                epoch_loss += total_loss.item()
-
-            if report_fn is not None:
-                report_fn(self, loss=epoch_loss)
-
     @torch.no_grad()
     def predict(
         self,
-        interaction_matrix: csr_matrix,
+        train_batch: Tensor,
+        user_indices: Tensor,
         user_seq: Tensor,
         seq_len: Tensor,
         *args: Any,
@@ -263,10 +212,10 @@ class GRU4Rec(Recommender, SequentialRecommenderUtils):
         Prediction using the learned session embeddings (full sort prediction).
 
         Args:
-            interaction_matrix (csr_matrix): The matrix containing the
-                pairs of interactions to evaluate.
-            user_seq (Tensor): Padded sequences of item IDs for users to predict for.
-            seq_len (Tensor): Actual lengths of these sequences, before padding.
+            train_batch (Tensor): The train batch of user interactions.
+            user_indices (Tensor): The batch of user indices.
+            user_seq (Tensor): The user sequence of item interactions.
+            seq_len (Tensor): The user sequence length.
             *args (Any): List of arguments.
             **kwargs (Any): The dictionary of keyword arguments.
 
@@ -277,23 +226,14 @@ class GRU4Rec(Recommender, SequentialRecommenderUtils):
         seq_len = seq_len.to(self._device)
 
         # Get the session output embedding for each user
-        seq_output = self.forward(user_seq, seq_len)  # [num_users, embedding_size]
+        seq_output = self.forward(user_seq, seq_len)
 
         # Get embeddings for all items
-        all_item_embeddings = self.item_embedding.weight[
-            1:
-        ]  # [n_items, embedding_size]
+        all_item_embeddings = self.item_embedding.weight[1:]
 
         # Calculate scores for all items
-        # Scores = dot product of session embedding with all item embeddings
-        predictions = torch.matmul(
-            seq_output, all_item_embeddings.transpose(0, 1)
-        )  # [num_users, n_items]
+        predictions = torch.matmul(seq_output, all_item_embeddings.transpose(0, 1))
 
-        # Mask seen items
-        coo = interaction_matrix.tocoo()
-        user_indices_in_batch = torch.from_numpy(coo.row).to(self._device)
-        item_indices = torch.from_numpy(coo.col).to(self._device)
-        predictions[user_indices_in_batch, item_indices] = -torch.inf
-
-        return predictions
+        # Masking interaction already seen in train
+        predictions[train_batch != 0] = -torch.inf
+        return predictions.to(self._device)

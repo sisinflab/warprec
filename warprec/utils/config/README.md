@@ -93,7 +93,7 @@ Some information to keep in mind regarding labels:
 
 - Only `user_id` and `item_id` are strictly required.
 - If you're using implicit feedback, `rating_label` is optional.
-- `timestamp_label` is only needed for time-based split strategies.
+- `timestamp_label` is only needed for time-based split strategies or sequential models.
 - In case `header=False`, columns are expected to be ordered correctly.
 
 #### 🧬 Dtypes
@@ -341,38 +341,89 @@ WarpRec provides several splitting strategies that can be configured to match yo
 - Temporal strategies
 - Random strategies
 - Timestamp slicing
+- K-Fold Cross Validation
 
-### 🔧 Available Keywords
+Now let's go through all possible splitting strategies and their configuration:
 
-- **strategy**: The splitting strategy to apply. Options currently include:
-    - *temporal_holdout*: Splits data using the temporal value of the transaction. Test/Validation set will be the latest transaction for each user. Ratio value must be provided in the configuration file. In edge cases, the transaction will be considered only in the training set.
-    - *temporal_leave_k_out*: Splits data using the temporal value of the transaction. Test/Validation set will be the latest transaction for each user. K value must be provided in the configuration file. In edge cases, the transaction will be considered only in the training set.
-    - *random_holdout*: Splits data randomly. Ratio value must be provided in the configuration file. In edge cases, the transaction will be considered only in the training set.
-    - *random_leave_k_out*: Splits data randomly. K value must be provided in the configuration file. In edge cases, the transaction will be considered only in the training set.
-    - *timestamp_slicing*: Splits data given a fixed timestamp. Timestamp must be provided in the configuration file. If 'best' is chosen, the algorithm will provide to find the best split.
-- **test_ratio**: The ratio of the test set. Must be provided if the strategy expects a ratio.
-- **val_ratio**: The ratio of the validation set. Must be provided if the strategy expects a ratio.
-- **test_k**: The k value of the test set. Must be provided if the strategy expects a k value.
-- **val_k**: The k value of the validation set. Must be provided if the strategy expects a k value.
-- **timestamp**: The timestamp used in the `timestamp_slicing` strategy. Can either be a timestamp value or 'best'.
-- **seed**: The seed used for random strategies. Defaults to 42.
-
-### 📌 Example of Splitter Configuration
-
-Below is a full example of a `splitter configuration` that splits data based on time of transaction:
+`Temporal_Holdout`: Ordering transactions based on timestamps, holds out a portion of the data as evaluation set.
 
 ```yaml
 splitter:
+  test_splitting:
     strategy: temporal_holdout
-    test_ratio: 0.2
-    val_ratio: 0.1
+    ratio: 0.1
+...
+```
+
+`Temporal_Leave_K_out`: Ordering transactions based on timestamps, leaves k interactions as evaluation set. In case of users with less than k interactions, these users will be kept in the train.
+
+```yaml
+splitter:
+  test_splitting:
+    strategy: temporal_leave_k_out
+    k: 1
+...
+```
+
+`Random_Holdout`: Holds out a random portion of the data as evaluation set.
+
+```yaml
+splitter:
+  test_splitting:
+    strategy: random_holdout
+    ratio: 0.1
+...
+```
+
+`Random_Leave_K_out`: Leaves k  random interactions as evaluation set. In case of users with less than k interactions, these users will be kept in the train.
+
+```yaml
+splitter:
+  test_splitting:
+    strategy: random_leave_k_out
+    k: 1
+...
+```
+
+`Timestamp_slicing`: Slices the dataset based on a given timestamp. Every interaction before that given timestamp will be considered training, everything after will be considered evaluation set. The 'best' keyword is supported, in that case the more efficient timestamp will be handled by WarpRec.
+
+```yaml
+splitter:
+  test_splitting:
+    strategy: timestamp_slicing
+    timestamp: 10009287 | best
+...
+```
+
+`K-Fold Cross Validation`: Split the data in  K folds, using K-1 as training and the last one as validation. This process is repeated K times, exhausting all possible combinations of splits. This strategy is available only on validation set and will require more training time, but produce more accurate and less biased results.
+
+```yaml
+splitter:
+  validation_splitting:
+    strategy: k_fold_cross_validation
+    folds: 10
+...
+```
+
+### 📌 Example of Splitter Configuration
+
+Below is a full example of a `splitter configuration` that splits test data based on time of transaction and crates 10 folds of validation:
+
+```yaml
+splitter:
+  test_splitting:
+    strategy: temporal_holdout
+    ratio: 0.1
+  validation_splitting:
+    strategy: k_fold_cross_validation
+    folds: 10
 ...
 ```
 
 ### ⚠️ Notes and Validation
 
 - Not every field must be provided. Each strategy needs different values.
-- The test set is required, the validation set is optional and can be omitted by simply not passing any value.
+- The test set is required, the validation set is optional and can be omitted by simply not passing any value. This option can be considered for a faster training but is *highly* prone to result in over-fitting.
 - Temporal strategies require the timestamp to be passed during the reading process.
 
 ## 🖥️ Dashboard Configuration
@@ -453,7 +504,7 @@ WarpRec provides several options when it comes to setting up the training of you
 
 The `Model Configuration` is different from other configurations as it presents two main nested sections:
 
-- **meta**: The meta parameters of the model. Meta parameters affect initialization of the model, implementation and checkpoints.
+- **meta**: The meta parameters of the model. Meta parameters affect initialization of the model and checkpoints.
 - **optimization**: A nested section containing all the information about the hyperparameter optimization done through Ray Tune.
 - **early_stopping**: An optional strategy which will stop the trial if the model has reached a plateau.
 - **parameters**: The parameters of the model.
@@ -464,9 +515,7 @@ The `meta` section let you decide some information about the model that do not i
 
 - **save_model**: Flag that decides whether or not to save the model in the experiment directory. Defaults to false.
 - **save_recs**: Flag that decides whether or not to save the recommendations. Defaults to false.
-- **keep_all_ray_checkpoints**: Flag that decides whether or not to keep all the checkpoints that Ray Tune will create. On a large scale training this option is advised to be set on false. Defaults to false.
 - **load_from**: Local path to a model weights to be loaded. Defaults to None.
-- **implementation**: The implementation used during the training, if more than one is present. Defaults to latest.
 
 #### ⚙️ Optimization
 
@@ -485,6 +534,7 @@ The `optimization` section let you decide how to train your model.
 - **validation_metric**: The validation metric used during training. Defaults to nDCG@5.
 - **device**: The device used during training and evaluation. Defaults to cpu. Supports cuda devices and also cuda devices with indexing, like cuda:1.
 - **num_samples**: The number of samples to generate for the different strategies. If the strategy is set to grid, then this field must be set to 1. Defaults to 1.
+- **checkpoint_to_keep**: Specifies the number of checkpoints to retain in the Ray directory. Default is 5. Setting this value too low may result in warnings from Ray regarding multiple checkpoint deletion, while setting it too high may lead to excessive disk usage due to the accumulation of checkpoint data.
 - **cpu_per_trial**: The number of cpu cores per trial. Must be greater than 0. Supports floating numbers. Defaults to the maximum number of cpu cores available locally.
 - **gpu_per_trial**: The number of gpus per trial. Supports floating numbers. Defaults to 0.
 
@@ -493,6 +543,7 @@ The `optimization` section let you decide how to train your model.
 The `properties` section is used to provide further information to the strategy or the scheduler, if needed.
 
 - **mode**: This values is used to determine whether to maximize the value of the validation metric or to minimize it. Accepted values are min and max. Defaults to max.
+- **desired_training_it**: After a cross-validation optimization, a new model will be trained on the entire training set and evaluated on the test set. If the model is an IterativeRecommender, the number of iterations of the final training will be defined based on an aggregation strategy over the best iterations of the folds. Available strategies are: median, mean, min and max. Defaults to median.
 - **seed**: The seed of the experimentation, used to set up the model initialization. Defaults to 42.
 - **time_attr**: The measure of time used by the scheduler.
 - **max_t**: Max time unit given to each trial.
@@ -705,6 +756,8 @@ The `General Configuration` section defines some parameters that will affect the
 The `General Configuration` can be configured using the following keywords:
 
 - **precision**: The precision to be used inside the experiment. Defaults to float32.
+- **ray_verbose**: . The Ray Tune verbosity value. Ray Tune accepts verbosity levels in a range from 0 to 3. Defaults to 1.
+- **time_report**: Whether to report the time taken by each step. Defaults to True.
 - **ray_verbose**: The Ray Tune verbosity value. Ray Tune accepts verbosity levels in a range from 0 to 3. Defaults to 1.
 - **custom_models**: Modules to import into WarpRec for loading custom models within the main pipeline. Accepted values are a string or a list of strings.
 - **callback**: A nested section dedicated to the optional callback.

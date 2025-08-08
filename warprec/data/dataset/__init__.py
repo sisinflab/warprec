@@ -1,6 +1,6 @@
 from .interactions import Interactions
 from .sessions import Sessions
-from .dataset import Dataset, TransactionDataset
+from .dataset import Dataset, EvaluationDataLoader
 
 
-__all__ = ["Dataset", "TransactionDataset", "Interactions", "Sessions"]
+__all__ = ["Dataset", "EvaluationDataLoader", "Interactions", "Sessions"]

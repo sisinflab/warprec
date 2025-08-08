@@ -180,6 +180,47 @@ class Interactions:
         )
         return self._inter_side_sparse
 
+    def get_interaction_loader(
+        self, batch_size: int = 1024, shuffle: bool = True
+    ) -> DataLoader:
+        """Create a PyTorch DataLoader that yields dense tensors of interaction batches.
+
+        This method retrieves the sparse interaction matrix, converts it into a PyTorch
+        TensorDataset, and then wraps it in a DataLoader. The batches are provided as
+        dense tensors of shape [batch_size, num_items].
+
+        Args:
+            batch_size (int): The batch size to be used for the DataLoader.
+            shuffle (bool): Whether to shuffle the data when loading.
+
+        Returns:
+            DataLoader: A DataLoader that yields batches of dense interaction tensors.
+        """
+        # Check if a DataLoader with the same batch_size is already cached
+        cache_key = (batch_size, "interaction_loader", shuffle)
+        if cache_key in self._cached_dataloaders:
+            return self._cached_dataloaders[cache_key]
+
+        # Get the sparse interaction matrix. This ensures it's created if it doesn't exist.
+        sparse_matrix = self.get_sparse()
+
+        # Convert the sparse matrix to a dense tensor.
+        dense_tensor = torch.from_numpy(sparse_matrix.todense()).to(dtype=torch.float32)
+
+        # Create a TensorDataset from the dense tensor.
+        # Each item in the dataset will be a row from the dense tensor, representing
+        # the interactions of a single user.
+        dataset = TensorDataset(dense_tensor)
+
+        # Wrap the dataset in a DataLoader.
+        # The DataLoader will handle batching and shuffling.
+        dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=shuffle)
+
+        # Cache the created dataloader before returning it.
+        self._cached_dataloaders[cache_key] = dataloader
+
+        return dataloader
+
     @typing.no_type_check
     def get_item_rating_dataloader(
         self, num_negatives: int = 0, batch_size: int = 1024, shuffle: bool = True

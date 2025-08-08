@@ -28,6 +28,7 @@ models:
 models:
     AddEASE:
         l2: 10
+        alpha: 0.1
 ...
 ```
 - [CEASE](autoencoder/cease.py): An extension of the EASE model using side information. Extends the EASE problem without adding more complexity. **This model requires side information to function properly**.
@@ -35,6 +36,7 @@ models:
 models:
     CEASE:
         l2: 10
+        alpha: 0.1
 ...
 ```
 - [MultiDAE (Multinomial Denoising Autoencoder)](autoencoder/multidae.py): A deep autoencoder trained with dropout for denoising input data. Learns robust latent representations from implicit feedback using a multinomial loss.
@@ -133,7 +135,6 @@ models:
     ItemKNN:
         k: 10
         similarity: cosine
-        normalize: True
 ...
 ```
 
@@ -143,7 +144,6 @@ models:
     AttributeItemKNN:
         k: 10
         similarity: cosine
-        normalize: True
 ...
 ```
 
@@ -153,7 +153,6 @@ models:
     UserKNN:
         k: 10
         similarity: cosine
-        normalize: True
 ...
 ```
 
@@ -164,7 +163,6 @@ models:
         k: 10
         similarity: cosine
         user_profile: tfidf
-        normalize: True
 ...
 ```
 

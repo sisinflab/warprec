@@ -1,15 +1,18 @@
 import random
-from typing import Callable, Optional, Any
+from typing import Any
 from abc import ABC, abstractmethod
 
 import torch
 import pandas as pd
 import numpy as np
 from torch import nn, Tensor
+from torch.optim.optimizer import Optimizer
+from torch.utils.data import DataLoader
 from pandas import DataFrame
-from scipy.sparse import csr_matrix, coo_matrix
+from scipy.sparse import coo_matrix
 from torch_sparse import SparseTensor
-from warprec.data.dataset import Interactions
+
+from warprec.data.dataset import Dataset, Interactions, Sessions
 
 
 class Recommender(nn.Module, ABC):
@@ -17,6 +20,7 @@ class Recommender(nn.Module, ABC):
 
     Args:
         params (dict): The dictionary with the model params.
+        interactions (Interactions): The training interactions.
         *args (Any): Argument for PyTorch nn.Module.
         device (str): The device used for tensor operations.
         seed (int): The seed to use for reproducibility.
@@ -27,6 +31,7 @@ class Recommender(nn.Module, ABC):
     def __init__(
         self,
         params: dict,
+        interactions: Interactions,
         *args: Any,
         device: str = "cpu",
         seed: int = 42,
@@ -40,44 +45,23 @@ class Recommender(nn.Module, ABC):
         self._name = ""
 
     @abstractmethod
-    def fit(
-        self,
-        interactions: Interactions,
-        *args: Any,
-        report_fn: Optional[Callable],
-        **kwargs: Any,
-    ):
-        """This method will train the model on the dataset.
-
-        Args:
-            interactions (Interactions): The interactions object used for the training.
-            *args (Any): List of arguments.
-            report_fn (Optional[Callable]): The Ray Tune function to report the iteration.
-            **kwargs (Any): The dictionary of keyword arguments.
-        """
-
-    @abstractmethod
-    def forward(self, *args: Any, **kwargs: Any):
-        """This method process a forward step of the model.
-
-        All recommendation models that implement a neural network or any
-        kind of backpropagation must implement this method, other model
-        can leave this empty.
-
-        Args:
-            *args (Any): List of arguments.
-            **kwargs (Any): The dictionary of keyword arguments.
-        """
-
-    @abstractmethod
     def predict(
-        self, interaction_matrix: csr_matrix, *args: Any, **kwargs: Any
+        self,
+        train_batch: Tensor,
+        user_indices: Tensor,
+        user_seq: Tensor,
+        seq_len: Tensor,
+        *args: Any,
+        **kwargs: Any,
     ) -> Tensor:
         """This method will produce the final predictions in the form of
         a dense Tensor.
 
         Args:
-            interaction_matrix (csr_matrix): The sparse interaction matrix.
+            train_batch (Tensor): The train batch of user interactions.
+            user_indices (Tensor): The batch of user indices.
+            user_seq (Tensor): The user sequence of item interactions.
+            seq_len (Tensor): The user sequence length.
             *args (Any): List of arguments.
             **kwargs (Any): The dictionary of keyword arguments.
 
@@ -87,46 +71,48 @@ class Recommender(nn.Module, ABC):
 
     def get_recs(
         self,
-        X: Interactions,
-        umap_i: dict,
-        imap_i: dict,
+        dataset: Dataset,
         k: int,
-        batch_size: int = 1024,
     ) -> DataFrame:
         """This method turns the learned parameters into new
         recommendations in DataFrame format, without column headers.
 
         Args:
-            X (Interactions): The set that will be used to
-                produce recommendations.
-            umap_i (dict): The inverse mapping from index -> user_id.
-            imap_i (dict): The inverse mapping from index -> item_id.
+            dataset (Dataset): The dataset that will be used to
+                retrieve train data and mappings.
             k (int): The top k recommendation to be produced.
-            batch_size (int): Number of users per batch
 
         Returns:
             DataFrame: A DataFrame (without header) containing the top k recommendations
                     for each user, including predicted ratings.
         """
-        sparse_matrix = X.get_sparse()
-        num_users = sparse_matrix.shape[0]
+        # Retrieve evaluation dataloader
+        dataloader = dataset.get_evaluation_dataloader()
+        umap_i, imap_i = dataset.get_inverse_mappings()
+
+        # Main evaluation loop
         all_recommendations = []
+        for train_batch, _, user_indices in dataloader:
+            user_indices = user_indices.to(self._device)
 
-        for batch_start in range(0, num_users, batch_size):
-            batch_end = min(batch_start + batch_size, num_users)
+            # If we are evaluating a sequential model, compute user history
+            user_seq, seq_len = None, None
+            if isinstance(self, SequentialRecommenderUtils):
+                user_seq, seq_len = dataset.train_session.get_user_history_sequences(
+                    user_indices.tolist(),
+                    self.max_seq_len,  # Sequence length truncated
+                )
 
-            # Process current batch
-            batch_slice = slice(batch_start, batch_end)
-            batch_scores = self.predict(
-                sparse_matrix[batch_slice], start=batch_start, end=batch_end
-            )
+            predictions = self.predict(
+                train_batch,
+                user_indices=user_indices,
+                user_seq=user_seq,
+                seq_len=seq_len,
+            ).to(self._device)  # Get ratings tensor [batch_size x items]
 
             # Get top-k items and their scores for current batch
-            top_k_scores, top_k_items = torch.topk(batch_scores, k, dim=1)
-
-            batch_users = (
-                torch.arange(batch_start, batch_end).unsqueeze(1).expand(-1, k)
-            )
+            top_k_scores, top_k_items = torch.topk(predictions, k, dim=1)
+            batch_users = user_indices.unsqueeze(1).expand(-1, k)
 
             # Store batch recommendations with scores
             batch_recs = torch.stack(
@@ -147,7 +133,9 @@ class Recommender(nn.Module, ABC):
         item_labels = [imap_i[idx] for idx in item_idxs]
 
         # Zip and turn into DataFrame (no header)
-        real_recs = np.array(list(zip(user_labels, item_labels, pred_scores)))
+        real_recs = np.array(
+            list(zip(map(str, user_labels), map(str, item_labels), pred_scores))
+        )
         recommendations_df = pd.DataFrame(real_recs)
 
         return recommendations_df
@@ -187,19 +175,6 @@ class Recommender(nn.Module, ABC):
         torch.backends.cudnn.deterministic = True
         torch.backends.cudnn.benchmark = False
 
-    def _normalize(self, X: csr_matrix) -> csr_matrix:
-        """Normalize matrix rows to unit length.
-
-        Args:
-            X (csr_matrix): The matrix to normalize.
-
-        Returns:
-            csr_matrix: The normalized matrix.
-        """
-        norms = np.sqrt(X.power(2).sum(axis=1))
-        norms[norms == 0] = 1e-10
-        return X.multiply(1 / norms)
-
     def _apply_topk_filtering(self, sim_matrix: Tensor, k: int) -> Tensor:
         """Keep only top-k similarities per item.
 
@@ -237,13 +212,82 @@ class Recommender(nn.Module, ABC):
         return name
 
 
+class IterativeRecommender(Recommender):
+    """Interface for recommendation model that use
+    an iterative approach to be trained.
+
+    Attributes:
+        optimizer (Optimizer): The optimizer used during the
+            training process.
+        epochs (int): The number of epochs used to
+            train the model.
+        learning_rate (float): The learning rate using
+            during optimization.
+        weight_decay (float): The l2 regularization applied
+            to the model.
+    """
+
+    optimizer: Optimizer
+    epochs: int
+    learning_rate: float
+    weight_decay: float
+
+    @abstractmethod
+    def forward(self, *args: Any, **kwargs: Any):
+        """This method process a forward step of the model.
+
+        All recommendation models that implement a neural network or any
+        kind of backpropagation must implement this method.
+
+        Args:
+            *args (Any): List of arguments.
+            **kwargs (Any): The dictionary of keyword arguments.
+        """
+
+    @abstractmethod
+    def get_dataloader(
+        self, interactions: Interactions, sessions: Sessions, **kwargs: Any
+    ) -> DataLoader:
+        """Returns a PyTorch DataLoader for the given interactions.
+
+        The DataLoader should provide batches suitable for the model's training.
+
+        Args:
+            interactions (Interactions): The interaction of users with items.
+            sessions (Sessions): The sessions of the users,
+            **kwargs (Any): Additional keyword arguments.
+
+        Returns:
+            DataLoader: The dataloader that will be used by the model during train.
+        """
+
+    @abstractmethod
+    def train_step(self, batch: Any, epoch: int, *args: Any, **kwargs: Any) -> Tensor:
+        """Performs a single training step for a given batch.
+
+        This method should compute the forward pass, calculate the loss,
+        and return the loss value.
+        It should NOT perform zero_grad, backward, or step on the optimizer,
+        as these will be handled by the generic training loop.
+
+        Args:
+            batch (Any): A single batch of data from the DataLoader.
+            epoch (int): The current epoch iteration.
+            *args (Any): The argument list.
+            **kwargs (Any): The keyword arguments.
+
+        Returns:
+            Tensor: The computed loss for the batch.
+        """
+
+
 class GraphRecommenderUtils(ABC):
     """Common definition for graph recommenders.
 
     Collection of common method used by all graph recommenders.
     """
 
-    def _get_adj_mat(
+    def get_adj_mat(
         self,
         interaction_matrix: coo_matrix,
         n_users: int,
@@ -286,7 +330,7 @@ class GraphRecommenderUtils(ABC):
         # so there is no need to do it here
         return adj
 
-    def _get_ego_embeddings(
+    def get_ego_embeddings(
         self, user_embedding: nn.Embedding, item_embedding: nn.Embedding
     ) -> Tensor:
         """Get the initial embedding of users and items and combine to an embedding matrix.
@@ -348,19 +392,12 @@ def generate_model_name(model_name: str, params: dict) -> str:
     return f"{model_name}_{param_str}"
 
 
-"""
-    In this section we have some common interfaces that Recommender model might use.
-    If you want to implement your own Recommender model you can either use the
-    Recommender class or one of the classes below. These function as a common
-    starting point.
-"""
-
-
 class ItemSimRecommender(Recommender):
     """ItemSimilarity common interface.
 
     Args:
         params (dict): The dictionary with the model params.
+        interactions (Interactions): The training interactions.
         *args (Any): Argument for PyTorch nn.Module.
         device (str): The device used for tensor operations.
         seed (int): The seed to use for reproducibility.
@@ -374,13 +411,16 @@ class ItemSimRecommender(Recommender):
     def __init__(
         self,
         params: dict,
+        interactions: Interactions,
         *args: Any,
         device: str = "cpu",
         seed: int = 42,
         info: dict = None,
         **kwargs: Any,
     ):
-        super().__init__(params, device=device, seed=seed, *args, **kwargs)
+        super().__init__(
+            params, interactions, device=device, seed=seed, *args, **kwargs
+        )
         self.items = info.get("items", None)
         if not self.items:
             raise ValueError(
@@ -391,26 +431,23 @@ class ItemSimRecommender(Recommender):
 
     @torch.no_grad()
     def predict(
-        self, interaction_matrix: csr_matrix, *args: Any, **kwargs: Any
+        self,
+        train_batch: Tensor,
+        *args: Any,
+        **kwargs: Any,
     ) -> Tensor:
         """Prediction in the form of X@B where B is a {item x item} similarity matrix.
 
         Args:
-            interaction_matrix (csr_matrix): The matrix containing the
-                pairs of interactions to evaluate.
+            train_batch (Tensor): The train batch of user interactions.
             *args (Any): List of arguments.
             **kwargs (Any): The dictionary of keyword arguments.
 
         Returns:
             Tensor: The score matrix {user x item}.
         """
-        r = interaction_matrix @ self.item_similarity.detach().numpy()  # pylint: disable=not-callable
+        predictions = train_batch @ self.item_similarity  # pylint: disable=not-callable
 
         # Masking interaction already seen in train
-        r[interaction_matrix.nonzero()] = -torch.inf
-        return torch.from_numpy(r).to(self._device)
-
-    def forward(self, *args, **kwargs):
-        """Forward method is empty because we don't need
-        back propagation.
-        """
+        predictions[train_batch != 0] = -torch.inf
+        return predictions.to(self._device)

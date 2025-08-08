@@ -127,6 +127,7 @@ class GeneralConfig(BaseModel):
     Attributes:
         precision (Optional[str]): The precision to use during computation.
         ray_verbose (Optional[int]): The Ray level of verbosity.
+        time_report (Optional[bool]): Whether to report the time taken by each step.
         custom_models (Optional[str | List[str]]): List of custom model paths to load.
             This is useful for loading custom models that are not part of the
             standard Warprec framework.
@@ -135,6 +136,7 @@ class GeneralConfig(BaseModel):
 
     precision: Optional[str] = "float32"
     ray_verbose: Optional[int] = 1
+    time_report: Optional[bool] = True
     custom_models: Optional[str | List[str]] = None
     callback: Optional[WarpRecCallbackConfig] = Field(
         default_factory=WarpRecCallbackConfig

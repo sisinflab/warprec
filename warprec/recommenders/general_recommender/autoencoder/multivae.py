@@ -1,12 +1,12 @@
-from typing import Any, Optional, Callable, Tuple
+from typing import Any, Tuple
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch import Tensor
 from torch.nn.init import xavier_normal_, constant_
-from scipy.sparse import csr_matrix
-from warprec.data.dataset import Interactions
-from warprec.recommenders.base_recommender import Recommender
+from warprec.data.dataset import Interactions, Sessions
+from warprec.recommenders.base_recommender import IterativeRecommender
+from warprec.recommenders.losses import MultiVAELoss
 from warprec.utils.registry import model_registry
 
 
@@ -90,7 +90,7 @@ class VADecoder(nn.Module):
 
 
 @model_registry.register(name="MultiVAE")
-class MultiVAE(Recommender):
+class MultiVAE(IterativeRecommender):
     """Implementation of MultiVAE algorithm from
         Variational Autoencoders for Collaborative Filtering 2018.
 
@@ -163,9 +163,7 @@ class MultiVAE(Recommender):
 
         # Initialize weights
         self.apply(self._init_weights)
-        self.optimizer = torch.optim.Adam(
-            self.parameters(), lr=self.learning_rate, weight_decay=self.weight_decay
-        )
+        self.loss = MultiVAELoss()
 
         # Move to device
         self.to(self._device)
@@ -175,6 +173,22 @@ class MultiVAE(Recommender):
             xavier_normal_(module.weight.data)
             if module.bias is not None:
                 constant_(module.bias.data, 0)
+
+    def get_dataloader(self, interactions: Interactions, sessions: Sessions, **kwargs):
+        return interactions.get_interaction_loader(batch_size=self.batch_size)
+
+    def train_step(self, batch: Any, epoch: int, *args: Any, **kwargs: Any):
+        rating_matrix = [x.to(self._device) for x in batch][0]
+
+        anneal = (
+            min(self.anneal_cap * epoch / self.anneal_step, self.anneal_cap)
+            if self.anneal_step > 0
+            else self.anneal_cap
+        )
+        reconstructed, kl_loss = self.forward(rating_matrix)
+        loss: Tensor = self.loss(rating_matrix, reconstructed, kl_loss, anneal)
+
+        return loss
 
     def forward(self, rating_matrix: Tensor) -> Tuple[Tensor, Tensor]:
         """Returns reconstruction and KL divergence.
@@ -196,88 +210,26 @@ class MultiVAE(Recommender):
         )
         return reconstructed, kl_loss
 
-    def fit(
-        self,
-        interactions: Interactions,
-        *args: Any,
-        report_fn: Optional[Callable] = None,
-        **kwargs: Any,
-    ):
-        """Main train method.
-
-        The training will be conducted on dense user-item matrix in batches.
-
-        Args:
-            interactions (Interactions): The interactions that will be used to train the model.
-            *args (Any): List of arguments.
-            report_fn (Optional[Callable]): The Ray Tune function to report the iteration.
-            **kwargs (Any): The dictionary of keyword arguments.
-        """
-        self.train()
-        X = interactions.get_sparse()
-
-        for epoch in range(self.epochs):
-            epoch_loss = 0.0
-
-            # Annealing schedule for KL divergence
-            anneal = (
-                min(self.anneal_cap * epoch / self.anneal_step, self.anneal_cap)
-                if self.anneal_step > 0
-                else self.anneal_cap
-            )
-
-            for start in range(0, X.shape[0], self.batch_size):
-                end = min(start + self.batch_size, X.shape[0])
-
-                rating_matrix = torch.tensor(
-                    X[start:end].toarray(), device=self._device
-                ).float()
-
-                self.optimizer.zero_grad()
-                reconstructed, kl_loss = self.forward(rating_matrix)
-
-                # Reconstruction loss
-                log_softmax = F.log_softmax(reconstructed, dim=1)
-                neg_ll = -torch.mean(torch.sum(log_softmax * rating_matrix, dim=1))
-
-                # Total loss with annealing
-                total_loss = neg_ll + anneal * kl_loss
-
-                # Backpropagation
-                total_loss.backward()
-                self.optimizer.step()
-
-                epoch_loss += total_loss.item()
-
-            if report_fn is not None:
-                report_fn(self, loss=epoch_loss)
-
     @torch.no_grad()
     def predict(
-        self, interaction_matrix: csr_matrix, *args: Any, **kwargs: Any
+        self,
+        train_batch: Tensor,
+        *args: Any,
+        **kwargs: Any,
     ) -> Tensor:
         """Prediction using the the encoder and decoder modules.
 
         Args:
-            interaction_matrix (csr_matrix): The matrix containing the
-                pairs of interactions to evaluate.
+            train_batch (Tensor): The train batch of user interactions.
             *args (Any): List of arguments.
             **kwargs (Any): The dictionary of keyword arguments.
 
         Returns:
             Tensor: The score matrix {user x item}.
         """
-        # Convert to dense matrix
-        dense_matrix = torch.tensor(
-            interaction_matrix.toarray(), device=self._device
-        ).float()
-
         # Forward pass
-        reconstructed, _ = self.forward(dense_matrix)
-        log_softmax = F.log_softmax(reconstructed, dim=1)
+        predictions, _ = self.forward(train_batch)
 
-        # Mask seen items
-        seen_mask = torch.tensor(interaction_matrix.toarray() != 0, device=self._device)
-        log_softmax[seen_mask] = -torch.inf
-
-        return log_softmax
+        # Masking interaction already seen in train
+        predictions[train_batch != 0] = -torch.inf
+        return predictions.to(self._device)

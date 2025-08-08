@@ -12,7 +12,7 @@ from .reader_configuration import (
     ClusteringInformationReading,
 )
 from .search_space_wrapper import SearchSpaceWrapper
-from .splitter_configuration import SplittingConfig
+from .splitter_configuration import SplittingConfig, SplitStrategy
 from .writer_configuration import (
     WriterConfig,
     ResultsWriting,
@@ -39,6 +39,7 @@ __all__ = [
     "ClusteringInformationReading",
     "SearchSpaceWrapper",
     "SplittingConfig",
+    "SplitStrategy",
     "WriterConfig",
     "ResultsWriting",
     "SplitWriting",
