@@ -62,14 +62,6 @@ def main(args: Namespace):
             filters = config.get_filters()
             data = apply_filtering(data, filters)
 
-        # Side information reading
-        if config.reader.side:
-            side_data = reader.read_side_information()
-
-        # Cluster information reading
-        if config.reader.clustering:
-            user_cluster, item_cluster = reader.read_cluster_information()
-
         # Splitter testing
         if config.splitter:
             splitter = Splitter(config)
@@ -81,20 +73,19 @@ def main(args: Namespace):
                 raise ValueError("Data type not yet supported.")
 
     elif config.reader.loading_strategy == "split":
-        raise NotImplementedError("Split reading feature disable.")
-        # if config.reader.data_type == "transaction":
-        #     train, test, val = reader.read_transaction_split()
+        if config.reader.data_type == "transaction":
+            train_data, fold_data, test_data = reader.read_transaction_split()
 
-        #     # Side information reading
-        #     if config.reader.side:
-        #         side_data = reader.read_side_information()
+        else:
+            raise ValueError("Data type not yet supported.")
 
-        #     # Cluster information reading
-        #     if config.reader.clustering:
-        #         user_cluster, item_cluster = reader.read_cluster_information()
+    # Side information reading
+    if config.reader.side:
+        side_data = reader.read_side_information()
 
-        # else:
-        #     raise ValueError("Data type not yet supported.")
+    # Cluster information reading
+    if config.reader.clustering:
+        user_cluster, item_cluster = reader.read_cluster_information()
 
     # Dataset common information
     common_params = {
