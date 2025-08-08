@@ -375,6 +375,7 @@ class LocalWriter(Writer):
                 If None, the DataFrame's existing columns will be used.
         """
 
+        # Helper function to write single dataset
         def write_dataset(dataset: Dataset, path: Path, eval_set: str):
             path_train = path.joinpath("train" + writing_params.ext)
             path_eval = path.joinpath(eval_set + writing_params.ext)
@@ -421,6 +422,8 @@ class LocalWriter(Writer):
 
         write_dataset(main_dataset, main_split_path, "test")
 
+        # If fold data is used, we iterate over it and
+        # write it locally
         if len(fold_dataset) > 0:
             for i, fold in enumerate(fold_dataset):
                 fold_path = main_split_path.joinpath(str(i + 1))
