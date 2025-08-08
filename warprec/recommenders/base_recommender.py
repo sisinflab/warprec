@@ -221,10 +221,16 @@ class IterativeRecommender(Recommender):
             training process.
         epochs (int): The number of epochs used to
             train the model.
+        learning_rate (float): The learning rate using
+            during optimization.
+        weight_decay (float): The l2 regularization applied
+            to the model.
     """
 
     optimizer: Optimizer
     epochs: int
+    learning_rate: float
+    weight_decay: float
 
     @abstractmethod
     def forward(self, *args: Any, **kwargs: Any):
@@ -254,16 +260,6 @@ class IterativeRecommender(Recommender):
         Returns:
             DataLoader: The dataloader that will be used by the model during train.
         """
-
-    def get_optimizer(self) -> Optimizer:
-        """Returns the PyTorch Optimizer instance for the model.
-
-        The optimizer should be initialized with the model's parameters.
-
-        Returns:
-            Optimizer: The optimizer used to perform the backward step.
-        """
-        return self.optimizer
 
     @abstractmethod
     def train_step(self, batch: Any, epoch: int, *args: Any, **kwargs: Any) -> Tensor:

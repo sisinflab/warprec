@@ -1,5 +1,7 @@
 from tqdm.auto import tqdm
 
+import torch
+
 from warprec.data.dataset import Dataset
 from warprec.recommenders.base_recommender import IterativeRecommender
 from warprec.utils.logger import logger
@@ -18,7 +20,9 @@ def train_loop(model: IterativeRecommender, dataset: Dataset, epochs: int):
     train_dataloader = model.get_dataloader(
         interactions=dataset.train_set, sessions=dataset.train_session
     )
-    optimizer = model.get_optimizer()
+    optimizer = torch.optim.Adam(
+        model.parameters(), lr=model.learning_rate, weight_decay=model.weight_decay
+    )
 
     model.train()
     for epoch in tqdm(range(epochs), desc="Training Model"):

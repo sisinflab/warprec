@@ -104,7 +104,11 @@ def objective_function(
             train_dataloader = model.get_dataloader(
                 interactions=dataset.train_set, sessions=dataset.train_session
             )
-            optimizer = model.get_optimizer()
+            optimizer = torch.optim.Adam(
+                model.parameters(),
+                lr=model.learning_rate,
+                weight_decay=model.weight_decay,
+            )
             epochs = model.epochs
 
             model.train()
