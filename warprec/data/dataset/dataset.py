@@ -1,4 +1,4 @@
-from typing import Tuple, Optional, List, Set, Any
+from typing import Tuple, Optional, List, Set, Any, Dict
 
 import torch
 import numpy as np
@@ -294,6 +294,9 @@ class Dataset:
         self._uc: Tensor = None
         self._ic: Tensor = None
 
+        # Initialize the dataset dataloader
+        self._precomputed_dataloader: Dict[str, DataLoader] = {}
+
         # Set user and item label
         user_label = train_data.columns[0]
         item_label = train_data.columns[1]
@@ -527,43 +530,50 @@ class Dataset:
 
         return inter_set
 
-    def get_evaluation_dataloader(self) -> "EvaluationDataLoader":
+    def get_evaluation_dataloader(self) -> DataLoader:
         """Retrieve the EvaluationDataLoader for the dataset.
 
         Returns:
-            EvaluationDataLoader: DataLoader that yields batches of interactions
+            DataLoader: DataLoader that yields batches of interactions
                 (train_batch, eval_batch, user_indices).
         """
-        train_sparse = self.train_set.get_sparse()
-        eval_sparse = self.eval_set.get_sparse()
+        key = "full"
+        if key not in self._precomputed_dataloader:
+            train_sparse = self.train_set.get_sparse()
+            eval_sparse = self.eval_set.get_sparse()
 
-        return EvaluationDataLoader(
-            train_interactions=train_sparse,
-            eval_interactions=eval_sparse,
-            batch_size=self._batch_size,
-        )
+            self._precomputed_dataloader[key] = EvaluationDataLoader(
+                train_interactions=train_sparse,
+                eval_interactions=eval_sparse,
+                batch_size=self._batch_size,
+            )
 
-    def get_neg_evaluation_dataloader(
-        self, num_negatives: int = 99
-    ) -> "NegativeEvaluationDataLoader":
+        return self._precomputed_dataloader[key]
+
+    def get_neg_evaluation_dataloader(self, num_negatives: int = 99) -> DataLoader:
         """Retrieve the NegativeEvaluationDataLoader for the dataset.
 
         Args:
             num_negatives (int): Number of negative samples per user.
 
         Returns:
-            NegativeEvaluationDataLoader: DataLoader that yields batches
-                of interactions (train_batch, pos_items, neg_items, user_indices)"""
+            DataLoader: DataLoader that yields batches
+                of interactions (train_batch, pos_items, neg_items, user_indices)
+        """
+        key = f"neg_{num_negatives}"
 
-        train_sparse = self.train_set.get_sparse()
-        eval_sparse = self.eval_set.get_sparse()
+        if key not in self._precomputed_dataloader:
+            train_sparse = self.train_set.get_sparse()
+            eval_sparse = self.eval_set.get_sparse()
 
-        return NegativeEvaluationDataLoader(
-            train_interactions=train_sparse,
-            eval_interactions=eval_sparse,
-            num_negatives=num_negatives,
-            batch_size=self._batch_size,
-        )
+            self._precomputed_dataloader[key] = NegativeEvaluationDataLoader(
+                train_interactions=train_sparse,
+                eval_interactions=eval_sparse,
+                num_negatives=num_negatives,
+                batch_size=self._batch_size,
+            )
+
+        return self._precomputed_dataloader[key]
 
     def get_dims(self) -> Tuple[int, int]:
         """Returns the dimensions of the data.
