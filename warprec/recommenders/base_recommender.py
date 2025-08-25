@@ -45,7 +45,7 @@ class Recommender(nn.Module, ABC):
         self._name = ""
 
     @abstractmethod
-    def predict(
+    def predict_full(
         self,
         train_batch: Tensor,
         user_indices: Tensor,
@@ -67,6 +67,32 @@ class Recommender(nn.Module, ABC):
 
         Returns:
             Tensor: The score matrix {user x item}.
+        """
+
+    def predict_sampled(
+        self,
+        train_batch: Tensor,
+        user_indices: Tensor,
+        item_indices: Tensor,
+        user_seq: Tensor,
+        seq_len: Tensor,
+        *args: Any,
+        **kwargs: Any,
+    ) -> Tensor:
+        """This method will produce predictions only of given item
+        indices.
+
+        Args:
+            train_batch (Tensor): The train batch of user interactions.
+            user_indices (Tensor): The batch of user indices.
+            item_indices (Tensor): The batch of item indices.
+            user_seq (Tensor): The user sequence of item interactions.
+            seq_len (Tensor): The user sequence length.
+            *args (Any): List of arguments.
+            **kwargs (Any): The dictionary of keyword arguments.
+
+        Returns:
+            Tensor: The score matrix {user x pad_seq}.
         """
 
     def get_recs(
@@ -103,7 +129,7 @@ class Recommender(nn.Module, ABC):
                     self.max_seq_len,  # Sequence length truncated
                 )
 
-            predictions = self.predict(
+            predictions = self.predict_full(
                 train_batch,
                 user_indices=user_indices,
                 user_seq=user_seq,
