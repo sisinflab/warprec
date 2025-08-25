@@ -1,5 +1,5 @@
 import argparse
-from typing import List, Tuple, Dict, Any
+from typing import List, Tuple, Dict, Any, Optional
 import time
 from argparse import Namespace
 
@@ -157,6 +157,9 @@ def main(args: Namespace):
         user_cluster=main_dataset.get_user_cluster(),
         item_cluster=main_dataset.get_item_cluster(),
     )
+
+    # Prepare dataloaders for evaluation
+    dataset_preparation(main_dataset, fold_dataset, config)
 
     data_preparation_time = time.time() - experiment_start_time
     logger.positive(
@@ -414,6 +417,30 @@ def multiple_fold_validation_flow(
     )
 
     return best_model, report
+
+
+def dataset_preparation(
+    main_dataset: Dataset, fold_dataset: Optional[List[Dataset]], config: Configuration
+):
+    def prepare_loaders(dataset: Dataset):
+        if config.evaluation.strategy == "full":
+            dataset.get_evaluation_dataloader()
+        elif config.evaluation.strategy == "sampled":
+            dataset.get_neg_evaluation_dataloader(
+                num_negatives=config.evaluation.num_negatives
+            )
+
+    logger.msg("Preparing main dataset inner structures for training and evaluation.")
+
+    prepare_loaders(main_dataset)
+    if fold_dataset is not None and isinstance(fold_dataset, list):
+        for i, dataset in enumerate(fold_dataset):
+            logger.msg(
+                f"Preparing fold dataset {i + 1}/{len(fold_dataset)} inner structures for training and evaluation."
+            )
+            prepare_loaders(dataset)
+
+    logger.positive("All dataset inner structures ready.")
 
 
 if __name__ == "__main__":
