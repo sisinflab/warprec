@@ -1,9 +1,10 @@
-from typing import Tuple, Any, Optional
+from typing import Tuple, Optional, List, Set, Any
 
 import torch
 import numpy as np
 from torch import Tensor
 from torch.utils.data import DataLoader, Dataset as TorchDataset
+from torch.nn.utils.rnn import pad_sequence
 from pandas import DataFrame
 from scipy.sparse import csr_matrix
 
@@ -13,24 +14,21 @@ from warprec.utils.logger import logger
 
 
 class EvaluationDataset(TorchDataset):
-    """PyTorch Dataset to yield (train, test, val) in batch,
+    """PyTorch Dataset to yield (train, eval, user_idx) in batch,
     converting sparse matrices in dense tensors.
 
     Args:
         train_interactions (csr_matrix): Sparse matrix of training interactions.
         eval_interactions (csr_matrix): Sparse matrix of evaluation interactions.
-        precision (Any): The precision that will be used to store interactions.
     """
 
     def __init__(
         self,
         train_interactions: csr_matrix,
         eval_interactions: csr_matrix,
-        precision: Any = torch.float32,
     ):
         self.train_interactions = train_interactions
         self.eval_interactions = eval_interactions
-        self.precision = precision
         self.num_users = train_interactions.shape[0]
         self.num_items = train_interactions.shape[1]
 
@@ -39,14 +37,120 @@ class EvaluationDataset(TorchDataset):
 
     def __getitem__(self, idx: int) -> Tuple[Tensor, Tensor, int]:
         train_row_tensor = torch.tensor(
-            self.train_interactions.getrow(idx).toarray(), dtype=self.precision
+            self.train_interactions.getrow(idx).toarray()
         ).squeeze(0)  # Remove extra dimension created from toarray()
 
         eval_row_tensor = torch.tensor(
-            self.eval_interactions.getrow(idx).toarray(), dtype=self.precision
+            self.eval_interactions.getrow(idx).toarray()
         ).squeeze(0)  # Remove extra dimension created from toarray()
 
         return train_row_tensor, eval_row_tensor, idx
+
+
+class NegativeEvaluationDataset(TorchDataset):
+    """PyTorch Dataset to yield (pos_item, neg_item, user_idx) in batch,
+    converting sparse matrices in dense tensors.
+
+    For each user, positive items are retrieve and a number of negatives
+    is sampled randomly.
+
+    Args:
+        train_interactions (csr_matrix): Sparse matrix of training interactions.
+        eval_interactions (csr_matrix): Sparse matrix of evaluation interactions.
+        num_negatives (int): Number of negatives to sample per user.
+    """
+
+    def __init__(
+        self,
+        train_interactions: csr_matrix,
+        eval_interactions: csr_matrix,
+        num_negatives: int = 99,
+    ):
+        super().__init__()
+        self.train_interactions = train_interactions
+        self.eval_interactions = eval_interactions
+        self.num_users, self.num_items = self.train_interactions.shape
+        self.num_negatives = num_negatives
+
+        # Init lists for faster access
+        self.users_with_positives = []
+        self.positive_items_list = []
+        self.negative_items_list = []
+
+        # Get positive interactions in eval set
+        eval_positives_by_user = [
+            self.eval_interactions.indices[
+                self.eval_interactions.indptr[u] : self.eval_interactions.indptr[u + 1]
+            ]
+            for u in range(self.num_users)
+        ]
+
+        for u in range(self.num_users):
+            # If no pos interaction in eval set, skip
+            if len(eval_positives_by_user[u]) == 0:
+                continue
+
+            self.users_with_positives.append(u)
+            self.positive_items_list.append(
+                torch.tensor(eval_positives_by_user[u], dtype=torch.long)
+            )
+
+            # Obtain all positive (train/eval)
+            train_positives = self.train_interactions[u].indices
+            user_all_positives = np.union1d(eval_positives_by_user[u], train_positives)
+
+            # Compute candidates
+            candidate_negatives_count = self.num_items - len(user_all_positives)
+            num_to_sample = min(self.num_negatives, candidate_negatives_count)
+
+            # Randomly sample negatives until correctly sampled
+            if num_to_sample > 0:
+                negatives: Set[Any] = set()
+                while len(negatives) < num_to_sample:
+                    candidate = np.random.randint(0, self.num_items)
+                    if candidate not in user_all_positives:
+                        negatives.add(candidate)
+                self.negative_items_list.append(
+                    torch.tensor(list(negatives), dtype=torch.long)
+                )
+            else:
+                self.negative_items_list.append(torch.tensor([], dtype=torch.long))
+
+    def __len__(self) -> int:
+        return len(self.users_with_positives)
+
+    def __getitem__(self, idx: int) -> Tuple[Tensor, Tensor, Tensor, int]:
+        """Yield data for a single user.
+
+        Args:
+            idx (int): Index of the user.
+
+        Returns:
+            Tuple[Tensor, Tensor, Tensor, int]:
+                - train_row_tensor (Tensor): The train interactions of
+                    the users.
+                - positive_items (Tensor): Tensor with positive items.
+                - negative_items (Tensor): Tensor with negative items.
+                - idx (int): User index.
+        """
+        # Retrieve valid user idxs
+        user_idx = self.users_with_positives[idx]
+
+        # Get the dense tensor on training interactions
+        train_row_tensor = torch.tensor(
+            self.train_interactions.getrow(user_idx).toarray()
+        ).squeeze(0)  # Remove extra dimension created from toarray()
+
+        # Fast access to pre-computed pos-neg interactions
+        positive_items = self.positive_items_list[idx]
+        negative_items = self.negative_items_list[idx]
+
+        return (
+            train_row_tensor,
+            positive_items,
+            negative_items,
+            user_idx,
+        )
 
 
 class EvaluationDataLoader(DataLoader):
@@ -57,16 +161,68 @@ class EvaluationDataLoader(DataLoader):
         train_interactions: csr_matrix,
         eval_interactions: csr_matrix,
         batch_size: int = 1024,
-        precision: Any = torch.float32,
         shuffle: bool = False,  # Evaluation will not need the shuffle
         **kwargs,
     ):
         dataset = EvaluationDataset(
             train_interactions=train_interactions,
             eval_interactions=eval_interactions,
-            precision=precision,
         )
         super().__init__(dataset, batch_size=batch_size, shuffle=shuffle, **kwargs)
+
+
+class NegativeEvaluationDataLoader(DataLoader):
+    """DataLoader for evaluation with negative sampling."""
+
+    def __init__(
+        self,
+        train_interactions: csr_matrix,
+        eval_interactions: csr_matrix,
+        num_negatives: int = 99,
+        batch_size: int = 1024,
+        **kwargs,
+    ):
+        dataset = NegativeEvaluationDataset(
+            train_interactions=train_interactions,
+            eval_interactions=eval_interactions,
+            num_negatives=num_negatives,
+        )
+
+        super().__init__(
+            dataset,
+            batch_size=batch_size,
+            shuffle=False,
+            collate_fn=self._collate_fn,
+            **kwargs,
+        )
+
+    @staticmethod
+    def _collate_fn(
+        batch: List[Tuple[Tensor, Tensor, Tensor, int]],
+    ) -> Tuple[Tensor, Tensor, Tensor, Tensor]:
+        """Custom collate_fn to handle negative sampling in evaluation."""
+        train_tensors, positive_tensors, negative_tensors, user_indices = zip(*batch)
+
+        # Stack the training interactions
+        train_batch = torch.stack(train_tensors)
+
+        # User indices will be a list of ints, so we convert it
+        user_indices_tensor = torch.tensor(list(user_indices), dtype=torch.long)
+
+        # We use the pad_sequence utility to pad item indices
+        # in order to have all tensor of the same size
+        positives_padded = pad_sequence(
+            positive_tensors,  # type: ignore[arg-type]
+            batch_first=True,
+            padding_value=-1,
+        )
+        negatives_padded = pad_sequence(
+            negative_tensors,  # type: ignore[arg-type]
+            batch_first=True,
+            padding_value=-1,
+        )
+
+        return train_batch, positives_padded, negatives_padded, user_indices_tensor
 
 
 class Dataset:
@@ -371,45 +527,42 @@ class Dataset:
 
         return inter_set
 
-    def _get_torch_dtype(self, precision: str) -> torch.dtype:
-        """Converts precision string to Torch dtypes.
-
-        Args:
-            precision (str): The desired precision.
-
-        Returns:
-            torch.dtype: The converted precision to torch dtype.
-
-        Raises:
-            ValueError: If the precision is not supported.
-        """
-        _STR_TO_TORCH_DTYPE_MAP = {
-            "float32": torch.float32,
-            "float64": torch.float64,
-        }
-        torch_dtype = _STR_TO_TORCH_DTYPE_MAP.get(precision)
-        if torch_dtype is None:
-            raise ValueError(f"Precision not found or not supported: {precision}")
-        return torch_dtype
-
     def get_evaluation_dataloader(self) -> "EvaluationDataLoader":
-        """Retrieve the EvaluationDataLoader for the dataset
+        """Retrieve the EvaluationDataLoader for the dataset.
 
         Returns:
             EvaluationDataLoader: DataLoader that yields batches of interactions
-                (train_batch, test_batch, val_batch).
+                (train_batch, eval_batch, user_indices).
         """
         train_sparse = self.train_set.get_sparse()
         eval_sparse = self.eval_set.get_sparse()
-        precision = self._get_torch_dtype(
-            self.train_set.precision
-        )  # We use the train precision for the evaluation
 
         return EvaluationDataLoader(
             train_interactions=train_sparse,
             eval_interactions=eval_sparse,
             batch_size=self._batch_size,
-            precision=precision,
+        )
+
+    def get_neg_evaluation_dataloader(
+        self, num_negatives: int = 99
+    ) -> "NegativeEvaluationDataLoader":
+        """Retrieve the NegativeEvaluationDataLoader for the dataset.
+
+        Args:
+            num_negatives (int): Number of negative samples per user.
+
+        Returns:
+            NegativeEvaluationDataLoader: DataLoader that yields batches
+                of interactions (train_batch, pos_items, neg_items, user_indices)"""
+
+        train_sparse = self.train_set.get_sparse()
+        eval_sparse = self.eval_set.get_sparse()
+
+        return NegativeEvaluationDataLoader(
+            train_interactions=train_sparse,
+            eval_interactions=eval_sparse,
+            num_negatives=num_negatives,
+            batch_size=self._batch_size,
         )
 
     def get_dims(self) -> Tuple[int, int]:
