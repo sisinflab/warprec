@@ -24,6 +24,8 @@ def objective_function(
     validation_metric_name: str,
     mode: str,
     device: str,
+    strategy: str = "full",
+    num_negatives: int = 99,
     seed: int = 42,
     block_size: int = 50,
     beta: float = 1.0,
@@ -41,6 +43,10 @@ def objective_function(
         validation_metric_name (str): The name of the metric to optimize.
         mode (str): Whether or not to maximize or minimize the metric.
         device (str): The device used for tensor operations.
+        strategy (str): Evaluation strategy, either "full" or "sampled".
+            Defaults to "full".
+        num_negatives (int): Number of negative samples to use in "sampled" strategy.
+            Defaults to 99.
         seed (int): The seed for reproducibility. Defaults to 42.
         block_size (int): The block size for the model optimization.
             Defaults to 50.
@@ -124,14 +130,26 @@ def objective_function(
                     epoch_loss += loss.item()
 
                 # Evaluation at the end of each training epoch
-                evaluator.evaluate(model, dataset, device=device)
+                evaluator.evaluate(
+                    model,
+                    dataset,
+                    device=device,
+                    strategy=strategy,
+                    num_negatives=num_negatives,
+                )
                 results = evaluator.compute_results()
                 score = results[validation_top_k][validation_metric_name]
                 validation_report(model, validation_score, score, loss=epoch_loss)
 
         else:
             # Model is trained in the __init__ we can directly evaluate it
-            evaluator.evaluate(model, dataset, device=device)
+            evaluator.evaluate(
+                model,
+                dataset,
+                device=device,
+                strategy=strategy,
+                num_negatives=num_negatives,
+            )
             results = evaluator.compute_results()
             score = results[validation_top_k][validation_metric_name]
             validation_report(model, validation_score, score)

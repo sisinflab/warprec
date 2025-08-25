@@ -209,6 +209,8 @@ def main(args: Namespace):
             best_model,
             main_dataset,
             device=str(best_model._device),
+            strategy=config.evaluation.strategy,
+            num_negatives=config.evaluation.num_negatives,
             verbose=True,
         )
         results = evaluator.compute_results()
@@ -322,6 +324,8 @@ def single_train_test_split_flow(
         dataset,
         val_metric,
         val_k,
+        evaluation_strategy=config.evaluation.strategy,
+        num_negatives=config.evaluation.num_negatives,
         beta=config.evaluation.beta,
         pop_ratio=config.evaluation.pop_ratio,
         ray_verbose=config.general.ray_verbose,
@@ -372,6 +376,8 @@ def multiple_fold_validation_flow(
         val_datasets,
         val_metric,
         val_k,
+        evaluation_strategy=config.evaluation.strategy,
+        num_negatives=config.evaluation.num_negatives,
         beta=config.evaluation.beta,
         pop_ratio=config.evaluation.pop_ratio,
         desired_training_it=desired_training_it,
