@@ -174,7 +174,7 @@ class BPR(IterativeRecommender):
         # NOTE: .clamp() is used for padded item_indices
         user_embeddings = self.user_embedding(
             user_indices
-        )  # # [batch_size, embedding_size]
+        )  # [batch_size, embedding_size]
         candidate_item_embeddings = self.item_embedding(
             item_indices.clamp(min=0)
         )  # [batch_size, pad_seq, embedding_size]
