@@ -422,7 +422,25 @@ def multiple_fold_validation_flow(
 def dataset_preparation(
     main_dataset: Dataset, fold_dataset: Optional[List[Dataset]], config: Configuration
 ):
-    def prepare_loaders(dataset: Dataset):
+    """This method prepares the dataloaders inside the dataset
+    that will be passed to Ray during HPO. It is important to
+    precompute these dataloaders before starting the optimization to
+    avoid multiple computations of the same dataloader.
+
+    Args:
+        main_dataset (Dataset): The main dataset of train/test split.
+        fold_dataset (Optional[List[Dataset]]): The list of validation datasets
+            of train/val splits.
+        config (Configuration): The configuration file used for the experiment.
+    """
+
+    def prepare_evaluation_loaders(dataset: Dataset):
+        """utility function to prepare the evaluation dataloaders
+        for a given dataset based on the evaluation strategy.
+
+        Args:
+            dataset (Dataset): The dataset to prepare.
+        """
         if config.evaluation.strategy == "full":
             dataset.get_evaluation_dataloader()
         elif config.evaluation.strategy == "sampled":
@@ -432,13 +450,13 @@ def dataset_preparation(
 
     logger.msg("Preparing main dataset inner structures for training and evaluation.")
 
-    prepare_loaders(main_dataset)
+    prepare_evaluation_loaders(main_dataset)
     if fold_dataset is not None and isinstance(fold_dataset, list):
         for i, dataset in enumerate(fold_dataset):
             logger.msg(
                 f"Preparing fold dataset {i + 1}/{len(fold_dataset)} inner structures for training and evaluation."
             )
-            prepare_loaders(dataset)
+            prepare_evaluation_loaders(dataset)
 
     logger.positive("All dataset inner structures ready.")
 
