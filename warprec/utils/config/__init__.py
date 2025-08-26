@@ -19,7 +19,14 @@ from .writer_configuration import (
     SplitWriting,
     RecommendationWriting,
 )
-from .config import Configuration, load_yaml, load_callback
+from .config import (
+    WarpRecConfiguration,
+    TrainConfiguration,
+    DesignConfiguration,
+    load_train_configuration,
+    load_design_configuration,
+    load_callback,
+)
 
 __all__ = [
     "recommender_model_config",
@@ -44,7 +51,10 @@ __all__ = [
     "ResultsWriting",
     "SplitWriting",
     "RecommendationWriting",
-    "Configuration",
-    "load_yaml",
+    "WarpRecConfiguration",
+    "TrainConfiguration",
+    "DesignConfiguration",
+    "load_train_configuration",
+    "load_design_configuration",
     "load_callback",
 ]

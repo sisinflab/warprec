@@ -2,12 +2,12 @@ import os
 import sys
 import importlib
 from pathlib import Path
-from typing import Tuple, ClassVar, Dict, Any, List
+from typing import ClassVar, Dict, Any, List
 
 import yaml
 import numpy as np
 import torch
-from pydantic import BaseModel, field_validator, model_validator, Field
+from pydantic import BaseModel, model_validator, Field
 from warprec.utils.helpers import load_custom_modules
 from warprec.data.filtering import Filter
 from warprec.utils.config import (
@@ -21,42 +21,30 @@ from warprec.utils.config import (
     EvaluationConfig,
 )
 from warprec.utils.callback import WarpRecCallback
-from warprec.utils.enums import RatingType, SplittingStrategies, ReadingMethods
+from warprec.utils.enums import ReadingMethods
 from warprec.utils.registry import model_registry, params_registry, filter_registry
 from warprec.utils.logger import logger
 
 
-class Configuration(BaseModel):
-    """Definition of configuration, used to interact with the framework.
-
-    This class defines the structure of the configuration file accepted by the framework.
+class WarpRecConfiguration(BaseModel):
+    """Definition of WarpRec base configuration file structure.
 
     Attributes:
         reader (ReaderConfig): Configuration of the reading process.
-        writer (WriterConfig): Configuration of the writing process.
         filtering (Dict[str, dict]): The dictionary containing filtering
             information in the format {filter_name: dict{param_1: value, param_2: value, ...}, ...}
-        splitter (SplittingConfig): Configuration of the splitting process.
-        dashboard (DashboardConfig): Configuration of the dashboard process.
         models (Dict[str, dict]): The dictionary containing model information
             in the format {model_name: dict{param_1: value, param_2: value, ...}, ...}
-        evaluation (EvaluationConfig): Configuration of the evaluation process.
         general (GeneralConfig): General configuration of the experiment
         sparse_np_dtype (ClassVar[dict]): The mapping between the string dtype
             and their numpy sparse counterpart.
         sparse_torch_dtype (ClassVar[dict]): The mapping between the string dtype
             and their torch sparse counterpart.
-        need_session_based_information (ClassVar[bool]): Wether or not the experiments
-            will be conducted on session data.
     """
 
     reader: ReaderConfig
-    writer: WriterConfig
     filtering: Dict[str, dict] = None
-    splitter: SplittingConfig = None
-    dashboard: DashboardConfig = Field(default_factory=DashboardConfig)
     models: Dict[str, dict]
-    evaluation: EvaluationConfig
     general: GeneralConfig = Field(default_factory=GeneralConfig)
 
     # Supported sparse precisions in numpy
@@ -71,159 +59,31 @@ class Configuration(BaseModel):
         "float64": torch.float64,
     }
 
-    # Track if session-based information is needed
-    need_session_based_information: ClassVar[bool] = False
-
-    @field_validator("splitter", mode="before")
-    @classmethod
-    def check_splitter(cls, v: SplittingConfig) -> SplittingConfig:
-        """Validate splitter."""
-        if v is None:
-            return SplittingConfig()
-        return v
-
-    @field_validator("general", mode="before")
-    @classmethod
-    def check_general(cls, v: GeneralConfig) -> GeneralConfig:
-        """Validate general configuration."""
-        if v is None:
-            return GeneralConfig()
-        return v
-
     @model_validator(mode="after")
-    def config_validation(self) -> "Configuration":
+    def config_validation(self) -> "WarpRecConfiguration":
         """This method checks if everything in the configuration file is missing or incorrect.
 
-        When the configuration passes this check, everything should be good to go.
-
         Returns:
-            Configuration: The validated configuration.
+            WarpRecConfiguration: The validated configuration.
 
         Raises:
             FileNotFoundError: If the local file has not been found.
             ValueError: If any information between parts of the configuration file is inconsistent.
         """
 
-        # Check if the local file exists and is correctly
-        # formatted
+        # Check if the local file exists
         if self.reader.reading_method == ReadingMethods.LOCAL:
-            _local_path: str = None
-            _sep: str = None
-            _has_header: bool = None
+            local_path: str = None
             if self.reader.local_path is not None:
-                _local_path = self.reader.local_path
-                _sep = self.reader.sep
-                _has_header = self.reader.header
+                local_path = self.reader.local_path
             elif self.reader.split.local_path is not None:
-                _ext = self.reader.split.ext
-                _local_path = os.path.join(self.reader.split.local_path, "train" + _ext)
-                _sep = self.reader.split.sep
-                _has_header = self.reader.split.header
+                ext = self.reader.split.ext
+                local_path = os.path.join(self.reader.split.local_path, "train" + ext)
             else:
                 raise ValueError("Unsupported local source or missing local path.")
 
-            if not os.path.exists(_local_path):
-                raise FileNotFoundError(f"Training file not at {_local_path}")
-
-            # Read the header of file to later check
-            with open(_local_path, "r", encoding="utf-8") as f:
-                first_line = f.readline()
-            _header = first_line.strip().split(_sep)
-
-            # If the source file should have header, we check
-            # if the column names are present.
-            if _has_header:
-                # Define column names to read after, if the input file
-                # contains more columns this is more efficient.
-                _column_names = [
-                    self.reader.labels.user_id_label,
-                    self.reader.labels.item_id_label,
-                ]
-                if self.reader.rating_type == RatingType.EXPLICIT:
-                    # In case the RatingType is explicit, we add the
-                    # score label and read scores from the source.
-                    _column_names.append(self.reader.labels.rating_label)
-                if self.splitter is not None and (
-                    self.splitter.test_splitting.strategy
-                    in [
-                        SplittingStrategies.TEMPORAL_HOLDOUT,
-                        SplittingStrategies.TEMPORAL_LEAVE_K_OUT,
-                    ]
-                    or self.splitter.validation_splitting.strategy
-                    in [
-                        SplittingStrategies.TEMPORAL_HOLDOUT,
-                        SplittingStrategies.TEMPORAL_LEAVE_K_OUT,
-                    ]
-                ):
-                    # In case the SplittingStrategy is temporal, we add the
-                    # timestamp label and read timestamps from the source.
-                    _column_names.append(self.reader.labels.timestamp_label)
-
-                # Check if column name defined in config are present in the header of the local file
-                if not set(_column_names).issubset(set(_header)):
-                    error_msg = (
-                        "Column labels required do not match with the "
-                        "column names found in the local file. "
-                        f"Expected: {', '.join(_column_names)}. "
-                        f"Found: {', '.join(_header)}. "
-                    )
-
-                    raise ValueError(error_msg)
-
-                # Updating reader config with the column names
-                ReaderConfig.column_names = _column_names
-            else:
-                # If the header is not present, we check if the number of columns
-                # in the file matches the number of columns expected.
-                _expected_columns = 2  # user_id and item_id
-                _column_names = [
-                    self.reader.labels.user_id_label,
-                    self.reader.labels.item_id_label,
-                ]
-                if self.reader.rating_type == RatingType.EXPLICIT:
-                    _expected_columns += 1
-                    _column_names.append(self.reader.labels.rating_label)
-                if self.splitter is not None and (
-                    self.splitter.test_splitting.strategy
-                    in [
-                        SplittingStrategies.TEMPORAL_HOLDOUT,
-                        SplittingStrategies.TEMPORAL_LEAVE_K_OUT,
-                    ]
-                    or self.splitter.validation_splitting.strategy
-                    in [
-                        SplittingStrategies.TEMPORAL_HOLDOUT,
-                        SplittingStrategies.TEMPORAL_LEAVE_K_OUT,
-                    ]
-                ):
-                    _expected_columns += 1
-                    _column_names.append(self.reader.labels.timestamp_label)
-                if len(_header) != _expected_columns:
-                    raise ValueError(
-                        "The number of columns in the local file does not match "
-                        "the number of columns expected. Check the configuration."
-                    )
-
-                # Updating reader config with the column names
-                ReaderConfig.column_names = _column_names
-
-        # Check if experiment has been set up correctly
-        if not self.writer.setup_experiment:
-            for model_name, model_data in self.models.items():
-                if model_data["meta"]["save_model"]:
-                    raise ValueError(
-                        f"You are trying to save the model state for {model_name} model but "
-                        "experiment must be setup first. Set setup_experiment to True."
-                    )
-            if self.writer.save_split:
-                raise ValueError(
-                    "You are trying to save the splits but experiment must be "
-                    "setup first. Set setup_experiment to True."
-                )
-            if self.evaluation.save_evaluation:
-                raise ValueError(
-                    "You are trying to save the evaluation but experiment must be "
-                    "setup first. Set setup_experiment to True."
-                )
+            if not os.path.exists(local_path):
+                raise FileNotFoundError(f"Training file not at {local_path}")
 
         # Load custom modules if specified
         load_custom_modules(self.general.custom_models)
@@ -243,7 +103,105 @@ class Configuration(BaseModel):
                         f"Error initializing filter '{filter_name}' with these params {filter_params}: {e}"
                     )
 
-        # Final checks and parsing
+        # Check if the precision is supported
+        self.check_precision()
+
+        return self
+
+    def check_precision(self) -> None:
+        """This method checks the precision passed through configuration.
+
+        Raises:
+            ValueError: If the precision is not supported or incorrect.
+        """
+        if self.general.precision not in self.sparse_np_dtype:
+            raise ValueError(
+                f"Custom dtype {self.general.precision} not supported as sparse data type."
+            )
+
+    def precision_numpy(self) -> np.dtype:
+        """This method returns the precision that will be used for this experiment.
+
+        Returns:
+            np.dtype: The numpy precision requested.
+        """
+        return self.sparse_np_dtype[self.general.precision]
+
+    def precision_torch(self) -> torch.dtype:
+        """This method returns the precision that will be used for this experiment.
+
+        Returns:
+            torch.dtype: The torch precision requested.
+        """
+        return self.sparse_torch_dtype[self.general.precision]
+
+    def get_filters(self) -> List[Filter]:
+        """Returns the initialized filters based on the configuration.
+
+        Returns:
+            List[Filter]: A list of initialized filter instances.
+        """
+        if not self.filtering:
+            return []
+        labels = self.reader.labels.model_dump()
+        return [
+            filter_registry.get(filter_name, **filter_params, **labels)
+            for filter_name, filter_params in self.filtering.items()
+        ]
+
+
+class TrainConfiguration(WarpRecConfiguration):
+    """Definition of configuration, used to interact with the framework.
+
+    This class defines the structure of the configuration file accepted by the framework.
+
+    Attributes:
+        writer (WriterConfig): Configuration of the writing process.
+        splitter (SplittingConfig): Configuration of the splitting process.
+        dashboard (DashboardConfig): Configuration of the dashboard process.
+        evaluation (EvaluationConfig): Configuration of the evaluation process.
+        need_session_based_information (ClassVar[bool]): Wether or not the experiments
+            will be conducted on session data.
+    """
+
+    writer: WriterConfig
+    splitter: SplittingConfig
+    dashboard: DashboardConfig = Field(default_factory=DashboardConfig)
+    evaluation: EvaluationConfig
+
+    # Track if session-based information is needed
+    need_session_based_information: ClassVar[bool] = False
+
+    @model_validator(mode="after")
+    def config_validation(self) -> "TrainConfiguration":
+        """This method checks if everything in the configuration file is missing or incorrect.
+
+        Returns:
+            TrainConfiguration: The validated configuration.
+
+        Raises:
+            ValueError: If any information between parts of the configuration file is inconsistent.
+        """
+        # Check if experiment has been set up correctly
+        if not self.writer.setup_experiment:
+            for model_name, model_data in self.models.items():
+                if model_data["meta"]["save_model"]:
+                    raise ValueError(
+                        f"You are trying to save the model state for {model_name} model but "
+                        "experiment must be setup first. Set setup_experiment to True."
+                    )
+            if self.writer.save_split:
+                raise ValueError(
+                    "You are trying to save the splits but experiment must be "
+                    "setup first. Set setup_experiment to True."
+                )
+            if self.evaluation.save_evaluation:
+                raise ValueError(
+                    "You are trying to save the evaluation but experiment must be "
+                    "setup first. Set setup_experiment to True."
+                )
+
+        # Parse and validate models
         self.check_precision()
         self.models = self.parse_models()
 
@@ -300,7 +258,7 @@ class Configuration(BaseModel):
                 # If at least one model is a sequential model, then
                 # we set the flag for session-based information
                 if model_class.need_timestamp:
-                    Configuration.need_session_based_information = True
+                    TrainConfiguration.need_session_based_information = True
 
                 # Extract model train parameters, removing the meta infos
                 model_data = {
@@ -313,78 +271,67 @@ class Configuration(BaseModel):
                 }
 
                 parsed_models[model_name] = model_class.model_dump()
+
         return parsed_models
 
-    def check_precision(self) -> None:
-        """This method checks the precision passed through configuration.
 
-        Raises:
-            ValueError: If the precision is not supported or incorrect.
-        """
-        if self.general.precision not in self.sparse_np_dtype:
-            raise ValueError(
-                f"Custom dtype {self.general.precision} not supported as sparse data type."
-            )
+class DesignConfiguration(WarpRecConfiguration):
+    """Definition of design pipeline configuration, used to test custom models.
 
-    def precision_numpy(self) -> np.dtype:
-        """This method returns the precision that will be used for this experiment.
+    Attributes:
+        splitter (SplittingConfig): Configuration of the splitting process.
+        evaluation (EvaluationConfig): Configuration of the evaluation process.
+    """
 
-        Returns:
-            np.dtype: The numpy precision requested.
-        """
-        return self.sparse_np_dtype[self.general.precision]
+    splitter: SplittingConfig = None
+    evaluation: EvaluationConfig
 
-    def precision_torch(self) -> torch.dtype:
-        """This method returns the precision that will be used for this experiment.
+    @model_validator(mode="after")
+    def config_validation(self) -> "DesignConfiguration":
+        """This method checks if everything in the configuration file is missing or incorrect.
 
         Returns:
-            torch.dtype: The torch precision requested.
+            DesignConfiguration: The validated configuration.
         """
-        return self.sparse_torch_dtype[self.general.precision]
 
-    def validation_metric(self, val_metric: str) -> Tuple[str, int]:
-        """This method will parse the validation metric.
+        # Load custom modules if specified
+        load_custom_modules(self.general.custom_models)
 
-        Args:
-            val_metric (str): The validation metric in string format.
-
-        Returns:
-            Tuple[str, int]:
-                str: The name of the metric to use for validation.
-                int: The cutoff to use for validation.
-        """
-        metric_name, top_k = val_metric.split("@")
-        return metric_name, int(top_k)
-
-    def get_filters(self) -> List[Filter]:
-        """Returns the initialized filters based on the configuration.
-
-        Returns:
-            List[Filter]: A list of initialized filter instances.
-        """
-        if not self.filtering:
-            return []
-        labels = self.reader.labels.model_dump()
-        return [
-            filter_registry.get(filter_name, **filter_params, **labels)
-            for filter_name, filter_params in self.filtering.items()
-        ]
+        return self
 
 
-def load_yaml(path: str) -> Configuration:
-    """This method reads the configuration file and returns a Configuration object.
+def load_train_configuration(path: str) -> TrainConfiguration:
+    """This method reads the train configuration file and returns
+        a TrainConfiguration object.
 
     Args:
         path (str): The path to the configuration file.
 
     Returns:
-        Configuration: The configuration object created from the configuration file.
+        TrainConfiguration: The configuration object created from the configuration file.
     """
-    logger.msg(f"Reading configuration file in: {path}")
+    logger.msg(f"Reading train configuration file in: {path}")
     with open(path, "r", encoding="utf-8") as file:
         data = yaml.safe_load(file)
     logger.msg("Reading process completed correctly.")
-    return Configuration(**data)
+    return TrainConfiguration(**data)
+
+
+def load_design_configuration(path: str) -> DesignConfiguration:
+    """This method reads the train configuration file and returns
+        a DesignConfiguration object.
+
+    Args:
+        path (str): The path to the configuration file.
+
+    Returns:
+        DesignConfiguration: The configuration object created from the configuration file.
+    """
+    logger.msg(f"Reading design configuration file in: {path}")
+    with open(path, "r", encoding="utf-8") as file:
+        data = yaml.safe_load(file)
+    logger.msg("Reading process completed correctly.")
+    return DesignConfiguration(**data)
 
 
 def load_callback(
