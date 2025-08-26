@@ -10,7 +10,10 @@ splitter:
     strategy: temporal_holdout
     ratio: 0.1
 models:
-  BPR:
+  # Models used in the design pipeline are
+  # expected to have one value per hyperparameter
+  # NOTE: these models can be user-defined
+  CustomBPR:
     embedding_size: 32
     weight_decay: 0.
     batch_size: 1024
@@ -20,3 +23,5 @@ evaluation:
   top_k: [10, 20, 50]
   batch_size: 1024
   metrics: [nDCG, Precision, Recall, HitRate]
+general:
+  custom_models: [my_custom_model.py]
