@@ -2,7 +2,12 @@ import time
 from typing import Tuple, Optional, Union, List
 
 from pandas import DataFrame
-from warprec.utils.config import Configuration, SplittingConfig, SplitStrategy
+from warprec.utils.config import (
+    TrainConfiguration,
+    DesignConfiguration,
+    SplittingConfig,
+    SplitStrategy,
+)
 from warprec.utils.enums import SplittingStrategies
 from warprec.utils.registry import splitting_registry
 from warprec.utils.logger import logger
@@ -12,15 +17,15 @@ class Splitter:
     """Splitter class will handle the splitting of the data.
 
     Args:
-        config (Configuration): The configuration file.
+        config (TrainConfiguration | DesignConfiguration): The configuration file.
 
     Attributes:
-        config (Configuration): The configuration file.
+        config (TrainConfiguration | DesignConfiguration): The configuration file.
     """
 
-    config: Configuration = None
+    config: TrainConfiguration | DesignConfiguration = None
 
-    def __init__(self, config: Configuration = None):
+    def __init__(self, config: TrainConfiguration | DesignConfiguration = None):
         if config:
             self.config = config
 
