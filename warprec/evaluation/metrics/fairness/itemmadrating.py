@@ -103,27 +103,41 @@ class ItemMADRating(TopKMetric):
             f"top_{self.k}_indices", self.top_k_values_indices(preds, self.k)[1]
         )
 
-        # Item counts
-        counts = torch.bincount(
-            top_k_indices.flatten(), minlength=self.num_items
-        )  # [num_items]
+        # Get the item indices for the current batch (either full or sampled)
+        item_indices = kwargs.get("item_indices", None)
+        if item_indices is not None:
+            batch_item_indices = item_indices
+        else:
+            batch_item_indices = (
+                torch.arange(preds.shape[1], device=preds.device)
+                .unsqueeze(0)
+                .repeat(preds.shape[0], 1)
+            )
 
-        # Item gains
+        # Compute relevance mask using local top_k_indices
         batch_size = target.size(0)
         row_indices = torch.arange(batch_size, device=target.device)[:, None].expand(
             -1, self.k
         )
-        relevance_mask = target[row_indices, top_k_indices]  # [batch_size x k]
+        relevance_mask = target[row_indices, top_k_indices].bool()  # [batch_size x k]
 
-        # Multiply scores by relevance mask (0 for non-relevant items)
-        gains = top_k_values * relevance_mask  # [batch_size x k]
+        # Filter out the global item indices for relevant items only
+        relevant_top_k_global_indices = torch.masked_select(
+            torch.gather(batch_item_indices, 1, top_k_indices), relevance_mask
+        )  # [batch_size, k]
 
-        # Scatter gains to full item dimension and sum
-        gain_matrix = torch.zeros_like(preds)
-        gain_matrix.scatter_(1, top_k_indices, gains)
+        # Filter out the gains and counts for relevant items only
+        relevant_top_k_gains = torch.masked_select(
+            top_k_values, relevance_mask
+        )  # [batch_size, k]
 
-        self.item_gains += gain_matrix.sum(dim=0)
-        self.item_counts += counts
+        # Accumulate counts and gains
+        self.item_counts.index_add_(
+            0, relevant_top_k_global_indices, torch.ones_like(relevant_top_k_gains)
+        )
+        self.item_gains.index_add_(
+            0, relevant_top_k_global_indices, relevant_top_k_gains
+        )
 
     def compute(self):
         item_avg_gain_when_recommended = torch.zeros_like(self.item_gains)
