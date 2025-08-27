@@ -167,17 +167,24 @@ class SRecall(TopKMetric):
         relevant_mask = target > 0
         relevant_top_k_mask = top_k_mask & relevant_mask  # [batch_size x num_items]
 
+        # Handle possible filtering of the lookup features
+        item_indices = kwargs.get("item_indices", None)
+        if item_indices is not None:
+            sampled_features = self.feature_lookup[item_indices]
+        else:
+            sampled_features = self.feature_lookup
+
         # Compute numerator as the number of features retrieved
         # from the recommender and relevant
-        masked_features = self.feature_lookup.unsqueeze(
-            0
-        ) * relevant_top_k_mask.unsqueeze(-1)  # [batch_size x num_items x num_features]
+        masked_features = sampled_features.unsqueeze(0) * relevant_top_k_mask.unsqueeze(
+            -1
+        )  # [batch_size x num_items x num_features]
         user_feature_counts = masked_features.sum(dim=1)  # [batch_size x num_features]
         unique_feature_mask = user_feature_counts > 0  # [batch_size x num_features]
         unique_feature_counts = unique_feature_mask.sum(dim=1)  # [batch_size]
 
         # Compute denominator as the number of features relevant to the user
-        relevant_features = self.feature_lookup.unsqueeze(0) * relevant_mask.unsqueeze(
+        relevant_features = sampled_features.unsqueeze(0) * relevant_mask.unsqueeze(
             -1
         )  # [batch_size x num_items x num_features]
         user_relevant_counts = relevant_features.sum(
