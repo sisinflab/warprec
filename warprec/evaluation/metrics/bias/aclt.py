@@ -72,7 +72,6 @@ class ACLT(TopKMetric):
         MetricBlock.BINARY_RELEVANCE,
         MetricBlock.VALID_USERS,
         MetricBlock.TOP_K_INDICES,
-        MetricBlock.TOP_K_VALUES,
     }
     _CAN_COMPUTE_PER_USER: bool = True
 
