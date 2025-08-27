@@ -95,7 +95,7 @@ class ShannonEntropy(TopKMetric):
         # Handle sampled item indices if provided
         item_indices = kwargs.get("item_indices", None)
         if item_indices is not None:
-            top_k_indices = torch.gather(kwargs.get("item_indices"), 1, top_k_indices)
+            top_k_indices = torch.gather(item_indices, 1, top_k_indices)
 
         # Flatten recommendations and count occurrences
         flattened = top_k_indices.flatten().long()
