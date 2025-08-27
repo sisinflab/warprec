@@ -72,7 +72,6 @@ class APLT(TopKMetric):
         MetricBlock.BINARY_RELEVANCE,
         MetricBlock.VALID_USERS,
         MetricBlock.TOP_K_INDICES,
-        MetricBlock.TOP_K_VALUES,
     }
     _CAN_COMPUTE_PER_USER: bool = True
 
@@ -110,27 +109,20 @@ class APLT(TopKMetric):
         """Updates the metric state with the new batch of predictions."""
         target: Tensor = kwargs.get("binary_relevance", torch.zeros_like(preds))
         users = kwargs.get("valid_users", self.valid_users(target))
-        top_k_values: Tensor = kwargs.get(
-            f"top_{self.k}_values", self.top_k_values_indices(preds, self.k)[0]
-        )
         top_k_indices: Tensor = kwargs.get(
             f"top_{self.k}_indices", self.top_k_values_indices(preds, self.k)[1]
         )
 
-        rel = torch.zeros_like(preds)
-        rel.scatter_(
-            dim=1, index=top_k_indices, src=top_k_values
-        )  # [batch_size x items]
-        rel = rel * target  # [batch_size x items]
-        rel[rel > 0] = 1
+        # Handle sampled item indices if provided
+        item_indices = kwargs.get("item_indices", None)
+        if item_indices is not None:
+            top_k_indices = torch.gather(item_indices, 1, top_k_indices)
 
-        # Expand long tail
-        long_tail_matrix = self.long_tail.expand(
-            int(users), -1
-        )  # [batch_size x long_tail]
+        # Create a boolean tensor where True indicates a long-tail item
+        long_tail_mask = torch.isin(top_k_indices, self.long_tail)
 
-        # Extract long tail items from recommendations
-        long_hits = torch.gather(rel, 1, long_tail_matrix)  # [batch_size x long_tail]
+        # Sum the number of long-tail hits per user
+        long_hits = long_tail_mask.sum(dim=1).float()  # [batch_size x long_tail]
 
         if self.compute_per_user:
             self.long_hits.index_add_(0, user_indices, long_hits.sum(dim=1))
