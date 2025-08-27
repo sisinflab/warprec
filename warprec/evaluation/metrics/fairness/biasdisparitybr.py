@@ -16,7 +16,7 @@ class BiasDisparityBR(TopKMetric):
 
     The metric is computed as:
 
-        BR(u, c) = (P_rec(u, c) / P_rec(u)) / P_global(c)
+        BiasDisparityBR(u, c) = (P_rec(u, c) / P_rec(u)) / P_global(c)
 
     where:
         - u is a user cluster index,
