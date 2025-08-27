@@ -295,7 +295,7 @@ class Dataset:
         self._ic: Tensor = None
 
         # Initialize the dataset dataloader
-        self._precomputed_dataloader: Dict[str, DataLoader] = {}
+        self._precomputed_dataloader: Dict[str, Any] = {}
 
         # Set user and item label
         user_label = train_data.columns[0]
@@ -530,11 +530,11 @@ class Dataset:
 
         return inter_set
 
-    def get_evaluation_dataloader(self) -> DataLoader:
+    def get_evaluation_dataloader(self) -> EvaluationDataLoader:
         """Retrieve the EvaluationDataLoader for the dataset.
 
         Returns:
-            DataLoader: DataLoader that yields batches of interactions
+            EvaluationDataLoader: DataLoader that yields batches of interactions
                 (train_batch, eval_batch, user_indices).
         """
         key = "full"
@@ -550,14 +550,16 @@ class Dataset:
 
         return self._precomputed_dataloader[key]
 
-    def get_neg_evaluation_dataloader(self, num_negatives: int = 99) -> DataLoader:
+    def get_neg_evaluation_dataloader(
+        self, num_negatives: int = 99
+    ) -> NegativeEvaluationDataLoader:
         """Retrieve the NegativeEvaluationDataLoader for the dataset.
 
         Args:
             num_negatives (int): Number of negative samples per user.
 
         Returns:
-            DataLoader: DataLoader that yields batches
+            NegativeEvaluationDataLoader: DataLoader that yields batches
                 of interactions (train_batch, pos_items, neg_items, user_indices)
         """
         key = f"neg_{num_negatives}"

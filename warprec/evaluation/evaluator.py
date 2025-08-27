@@ -164,6 +164,8 @@ class Evaluator:
 
         # Main evaluation loop
         for batch in dataloader:
+            candidates_local: Tensor = None
+
             # Based on strategy, call different predict method
             match strategy:
                 case "full":
@@ -288,6 +290,7 @@ class Evaluator:
                         "discounted_relevance": discounted_relevance,
                         "valid_users": valid_users,
                         "user_indices": user_indices,
+                        "item_indices": candidates_local,
                         **precomputed_blocks[k],
                     }
                     metric.update(
