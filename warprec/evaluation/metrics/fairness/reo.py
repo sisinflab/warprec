@@ -117,6 +117,13 @@ class REO(TopKMetric):
         )
         batch_size = preds.shape[0]
 
+        # Handle sampled item indices if provided
+        item_indices = kwargs.get("item_indices", None)
+        if item_indices is not None:
+            batch_item_clusters = self.item_clusters[item_indices]
+        else:
+            batch_item_clusters = self.item_clusters.unsqueeze(0).repeat(batch_size, 1)
+
         # Create a mask for items in the top-k recommendations
         top_k_mask = torch.zeros_like(preds, dtype=torch.bool)
         top_k_mask.scatter_(
@@ -130,9 +137,7 @@ class REO(TopKMetric):
         # Flatten the batch tensors and repeat cluster IDs for each user
         flat_relevant_recommended = rel.flatten()  # [batch_size * num_items]
         flat_target = target.flatten()  # [batch_size * num_items]
-        flat_item_clusters = self.item_clusters.repeat(
-            batch_size
-        )  # [batch_size * num_items]
+        flat_item_clusters = batch_item_clusters.flatten()  # [batch_size * num_items]
 
         # Initialize batch accumulators
         batch_rec_counts = torch.zeros(
