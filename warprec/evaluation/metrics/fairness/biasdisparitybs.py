@@ -16,13 +16,12 @@ class BiasDisparityBS(BaseMetric):
 
     The metric is computed as:
 
-        BiasDisparityBS(u, c) = (P_rec(u, c) / P_rec(u)) / P_global(c)
+        BiasDisparityBS(u, c) = P_train(u, c) / P_global(c)
 
     where:
         - u is a user cluster index,
         - c is an item cluster index,
-        - P_rec(u, c) is the proportion of recommended items from cluster c to users in cluster u,
-        - P_rec(u) is the total number of recommendations to users in cluster u,
+        - P_train(u, c) is the proportion of positive interactions from user cluster u with items in cluster c within the training set,
         - P_global(c) is the global proportion of items in cluster c.
 
     A value greater than 1 indicates over-recommendation of items from cluster c to user cluster u,
@@ -100,15 +99,22 @@ class BiasDisparityBS(BaseMetric):
         """Updates the metric state with the new batch of predictions."""
         target: Tensor = kwargs.get("ground", torch.zeros_like(preds))
 
-        # Find positive interactions in target
-        user_batch_idx, item_idx = target.nonzero(as_tuple=True)
+        # Find all positive interactions within the current batch
+        user_batch_idx, item_idx_local = target.nonzero(as_tuple=True)
 
-        # Map batch user indices to global user indices
-        user_idx = user_indices[user_batch_idx]
+        # Get the global user indices for the positive interactions
+        user_idx_global = user_indices[user_batch_idx]
+
+        # Get the global item indices. If sampled, use item_indices to map.
+        item_indices_global = kwargs.get("item_indices", None)
+        if item_indices_global is not None:
+            item_idx_global = item_indices_global[user_batch_idx, item_idx_local]
+        else:
+            item_idx_global = item_idx_local
 
         # Map to clusters
-        grp = self.user_clusters[user_idx]
-        cat = self.item_clusters[item_idx]
+        grp = self.user_clusters[user_idx_global]
+        cat = self.item_clusters[item_idx_global]
 
         # Accumulate counts
         self.category_sum.index_put_(
