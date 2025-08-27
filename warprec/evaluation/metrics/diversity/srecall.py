@@ -186,13 +186,19 @@ class SRecall(TopKMetric):
         unique_relevant_mask = user_relevant_counts > 0  # [batch_size x num_features]
         unique_relevant_counts = unique_relevant_mask.sum(dim=1)  # [batch_size]
 
+        # Update the state avoiding division by zero
+        non_zero_mask = unique_relevant_counts != 0
         if self.compute_per_user:
             self.ratio_feature_retrieved.index_add_(
-                0, user_indices, unique_feature_counts / unique_relevant_counts
+                0,
+                user_indices[non_zero_mask],
+                unique_feature_counts[non_zero_mask]
+                / unique_relevant_counts[non_zero_mask],
             )
         else:
             self.ratio_feature_retrieved += (
-                unique_feature_counts / unique_relevant_counts
+                unique_feature_counts[non_zero_mask]
+                / unique_relevant_counts[non_zero_mask]
             ).sum()
 
         # Count only users with at least one interaction
