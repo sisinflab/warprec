@@ -65,6 +65,7 @@ class EvaluationConfig(BaseModel):
         batch_size (Optional[int]): Batch size used during evaluation.
         strategy (Optional[str]): Evaluation strategy, either "full" or "sampled".
         num_negatives (Optional[int]): Number of negative samples to use in "sampled" strategy.
+        seed (Optional[int]): Random seed for reproducibility. Used in negative sampling.
         stat_significance (Optional[StatSignificance]): Statistical significance configuration.
         max_metric_per_row (Optional[int]): Number of metrics to show in each row on console.
         beta (Optional[float]): The beta value used in some metrics like F1 score.
@@ -78,6 +79,7 @@ class EvaluationConfig(BaseModel):
     batch_size: Optional[int] = 1024
     strategy: Optional[str] = "full"  # or "sampled"
     num_negatives: Optional[int] = 99
+    seed: Optional[int] = 42
     stat_significance: Optional[StatSignificance] = Field(
         default_factory=StatSignificance
     )

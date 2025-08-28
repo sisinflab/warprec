@@ -445,7 +445,8 @@ def dataset_preparation(
             dataset.get_evaluation_dataloader()
         elif config.evaluation.strategy == "sampled":
             dataset.get_neg_evaluation_dataloader(
-                num_negatives=config.evaluation.num_negatives
+                num_negatives=config.evaluation.num_negatives,
+                seed=config.evaluation.seed,
             )
 
     logger.msg("Preparing main dataset inner structures for training and evaluation.")

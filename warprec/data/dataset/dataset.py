@@ -58,6 +58,7 @@ class NegativeEvaluationDataset(TorchDataset):
         train_interactions (csr_matrix): Sparse matrix of training interactions.
         eval_interactions (csr_matrix): Sparse matrix of evaluation interactions.
         num_negatives (int): Number of negatives to sample per user.
+        seed (int): Random seed for negative sampling.
     """
 
     def __init__(
@@ -65,6 +66,7 @@ class NegativeEvaluationDataset(TorchDataset):
         train_interactions: csr_matrix,
         eval_interactions: csr_matrix,
         num_negatives: int = 99,
+        seed: int = 42,
     ):
         super().__init__()
         self.train_interactions = train_interactions
@@ -84,6 +86,9 @@ class NegativeEvaluationDataset(TorchDataset):
             ]
             for u in range(self.num_users)
         ]
+
+        # Set the random seed
+        np.random.seed(seed)
 
         for u in range(self.num_users):
             # If no pos interaction in eval set, skip
@@ -179,6 +184,7 @@ class NegativeEvaluationDataLoader(DataLoader):
         train_interactions: csr_matrix,
         eval_interactions: csr_matrix,
         num_negatives: int = 99,
+        seed: int = 42,
         batch_size: int = 1024,
         **kwargs,
     ):
@@ -186,6 +192,7 @@ class NegativeEvaluationDataLoader(DataLoader):
             train_interactions=train_interactions,
             eval_interactions=eval_interactions,
             num_negatives=num_negatives,
+            seed=seed,
         )
 
         super().__init__(
@@ -551,12 +558,15 @@ class Dataset:
         return self._precomputed_dataloader[key]
 
     def get_neg_evaluation_dataloader(
-        self, num_negatives: int = 99
+        self,
+        num_negatives: int = 99,
+        seed: int = 42,
     ) -> NegativeEvaluationDataLoader:
         """Retrieve the NegativeEvaluationDataLoader for the dataset.
 
         Args:
             num_negatives (int): Number of negative samples per user.
+            seed (int): Random seed for negative sampling.
 
         Returns:
             NegativeEvaluationDataLoader: DataLoader that yields batches
@@ -573,6 +583,7 @@ class Dataset:
                 eval_interactions=eval_sparse,
                 num_negatives=num_negatives,
                 batch_size=self._batch_size,
+                seed=seed,
             )
 
         return self._precomputed_dataloader[key]
