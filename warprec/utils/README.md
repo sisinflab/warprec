@@ -100,7 +100,7 @@ evaluation: {}
 general: {}
 ```
 
-Here is a minimal example of a configuration file for a simple design session:
+An important difference to keep in mind is that in the design pipeline, the `models` keyword expects the name of the model, followed by it's hyperparameter. These hyperparameter must have a single value, that's because HPO will not be executed. The device parameter can also be passed directly. Here is a minimal example of a configuration file for a simple design session:
 
 ```yaml
 reader:
@@ -124,6 +124,7 @@ models:
     batch_size: 1024
     epochs: 10
     learning_rate: 0.0001
+    device: cuda:0  # You can directly pass the device here
 evaluation:
   top_k: [10, 20, 50]
   batch_size: 1024
