@@ -125,11 +125,12 @@ def main(args: Namespace):
     )
 
     for model_name, params in config.models.items():
+        device = params.pop("device") if params.get("device") else "cpu"
         model = model_registry.get(
             name=model_name,
             params=params,
             interactions=main_dataset.train_set,
-            device="cpu",
+            device=device,
             seed=42,
             info=main_dataset.info(),
         )
