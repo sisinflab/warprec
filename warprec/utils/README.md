@@ -37,11 +37,24 @@ The module `utils` is structured as follows:
 
 ### ⚙️ Config
 
-The `config` module provides all the utilities needed to define a **configuration file** for your experiments. In the quick start section, we explain how to run a simple experiment with your data.
+The `config` module provides all the utilities needed to define a **configuration file** for your experiments. WarpRec offers functionalities to either run training, infer your models or to design them from scratch. Each of these tools requires a different configuration file format.
 
-#### 🚀 Quick Start
+#### 💪 Train Configuration
 
-First of all, let's create a simple configuration file. Here's how you can do it:
+To set up your training configuration file, you can use the following structure:
+
+```yaml
+reader: {}
+writer: {}
+filtering: {}
+splitter: {}
+dashboard: {}
+models: {}
+evaluation: {}
+general: {}
+```
+
+Here is a minimal example of a configuration file for a simple training session:
 
 ```yaml
 reader:
@@ -63,19 +76,69 @@ models:
     ItemKNN:
         k: 10
         similarity: cosine
-        normalize: False
 evaluation:
     top_k: [10, 20, 50]
     metrics: [nDCG, Precision, Recall, HitRate]
 ```
 
-To run an experiment with this configuration, just run the following:
+To run an experiment with this configuration file, execute:
 
 ```bash
 python warprec/train.py --config path/to/the/config.yml
 ```
 
-That's it! You're ready to go. This will get you started with the WarpRec configuration files. For a more in-depth description of all the possible configurations you can make, use **[`config`](config/README.md)** as reference.
+#### 📐 Design Configuration
+
+To set up your design configuration file, you can use the following structure:
+
+```yaml
+reader: {}
+filtering: {}
+splitter: {}
+models: {}
+evaluation: {}
+general: {}
+```
+
+Here is a minimal example of a configuration file for a simple design session:
+
+```yaml
+reader:
+  loading_strategy: dataset
+  data_type: transaction
+  reading_method: local
+  local_path: tests/test_dataset/movielens.csv
+  rating_type: explicit
+  sep: ','
+splitter:
+  test_splitting:
+    strategy: temporal_holdout
+    ratio: 0.1
+models:
+  # Models used in the design pipeline are
+  # expected to have one value per hyperparameter
+  # NOTE: these models can be user-defined
+  CustomBPR:
+    embedding_size: 32
+    weight_decay: 0.
+    batch_size: 1024
+    epochs: 10
+    learning_rate: 0.0001
+evaluation:
+  top_k: [10, 20, 50]
+  batch_size: 1024
+  metrics: [nDCG, Precision, Recall, HitRate]
+general:
+  custom_models: [my_custom_model.py]
+```
+
+To run the design with this configuration file, execute:
+
+```bash
+python warprec/design.py --config path/to/the/config.yml
+```
+
+For a detailed description of the available keywords in each section, see the **[`config`](config/README.md)** reference.
 
 ### 🧾 Logger
 
