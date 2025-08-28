@@ -183,6 +183,16 @@ The `split` section lets you control the structure of the split files.
 - **sep**: The separator used for the output files. Default is `\t`.
 - **ext**: The extension of the output files. Default is `.tsv`.
 - **header**: Whether to treat the first row of the file as a header or not. Defaults to True.
+- **labels**: This is a nested section of the split configuration, it is used if the user is using custom labels during the reading process.
+
+#### 🏷️ Labels
+
+WarpRec writes the split data using a standard format. If custom labels are provided, they must also be specified here:
+
+- **user_id_label**: The custom label for the user id.
+- **item_id_label**: The custom label for the item id.
+- **rating_label**: The custom label for the rating.
+- **timestamp_label**: The custom label for the timestamp.
 
 #### 🛍️ Recommendation
 The `recommendation` section lets you control the structure of the recommendation files.
