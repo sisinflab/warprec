@@ -126,14 +126,19 @@ class MAR(TopKMetric):
             torch.tensor(self.k, dtype=target.dtype, device=target.device),
         )  # [batch_size]
 
+        # Compute AR per user
+        ar_per_user = torch.where(
+            normalization > 0,
+            (recall_at_i * top_k_rel).sum(dim=1) / normalization,
+            torch.tensor(0.0, device=self._device),
+        )  # [batch_size]
+
         if self.compute_per_user:
             self.ar.index_add_(
-                0, user_indices, (recall_at_i * top_k_rel).sum(dim=1) / normalization
+                0, user_indices, ar_per_user
             )  # Index metric values per user
         else:
-            self.ar += (
-                (recall_at_i * top_k_rel).sum(dim=1) / normalization
-            ).sum()  # Compute total average recall
+            self.ar += ar_per_user.sum()  # Compute total average recall
 
         # Count only users with at least one interaction
         self.users += users
