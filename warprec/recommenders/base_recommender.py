@@ -93,7 +93,11 @@ class Recommender(nn.Module, ABC):
 
         Returns:
             Tensor: The score matrix {user x pad_seq}.
+
+        Raises:
+            NotImplementedError: If the model does not support sampled prediction.
         """
+        raise NotImplementedError("This model does not support sampled prediction.")
 
     def get_recs(
         self,
