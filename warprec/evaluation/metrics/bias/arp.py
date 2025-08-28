@@ -14,44 +14,44 @@ class ARP(TopKMetric):
     the average popularity of the top-k recommendations.
 
     The metric formula is defined as:
-        ARP = sum(long_hits) / (users * k)
+        ARP = (1 / |U|) * sum( (1 / k) * sum_{i in L_u} pop(i) )
 
     where:
-        -long_hits are the number of recommendation in the long tail.
+        - pop(i) is the popularity of item i (e.g., interaction count).
+        - L_u is the set of top-k recommended items for user u.
+        - k is the cutoff for recommendations.
+        - U is the set of users.
 
     Matrix computation of the metric:
-        PREDS                   TARGETS
+        PREDS                   POPULARITY TENSOR
     +---+---+---+---+       +---+---+---+---+
-    | 8 | 2 | 7 | 2 |       | 1 | 0 | 1 | 0 |
-    | 5 | 4 | 3 | 9 |       | 0 | 0 | 1 | 1 |
-    +---+---+---+---+       +---+---+---+---+
+    | 8 | 2 | 7 | 2 |       | 10| 5 | 15| 20|
+    | 5 | 4 | 3 | 9 |       +---+---+---+---+
+    +---+---+---+---+
 
-    We extract the top-k predictions and get their column index. Let's assume k=2:
-      TOP-K
+    1. Extract top-k predictions and get their item indices. Let's assume k=2:
+    TOP-K_INDICES
     +---+---+
     | 0 | 2 |
     | 3 | 0 |
     +---+---+
 
-    then we extract the relevance (original score) for that user in that column but maintaining the original dimensions:
-           REL
-    +---+---+---+---+
-    | 0 | 0 | 1 | 0 |
-    | 0 | 0 | 0 | 1 |
-    +---+---+---+---+
+    2. Use these indices to retrieve the popularity from the popularity tensor:
+    RECOMMENDED_ITEMS_POP
+    +---+---+
+    | 10| 15|
+    | 20| 10|
+    +---+---+
 
-    then we compute the item counts using the column indices:
-         COUNTS
-    +---+---+---+---+
-    | 0 | 0 | 1 | 1 |
-    +---+---+---+---+
+    3. Sum the popularity for each user:
+    USER_POP_SUM
+    +---+
+    | 25|
+    | 30|
+    +---+
 
-    Finally we multiply the relevance by the item counts (in this case we have only ones, so the result is the same):
-           POP
-    +---+---+---+---+
-    | 0 | 0 | 1 | 0 |
-    | 0 | 0 | 0 | 1 |
-    +---+---+---+---+
+    4. Average over all users and divide by k. For the global metric:
+        (25 + 30) / (2 * 2) = 13.75
 
     For further details, please refer to this `paper <https://arxiv.org/abs/1901.07555>`_.
 
@@ -77,7 +77,6 @@ class ARP(TopKMetric):
         MetricBlock.BINARY_RELEVANCE,
         MetricBlock.VALID_USERS,
         MetricBlock.TOP_K_INDICES,
-        MetricBlock.TOP_K_VALUES,
     }
     _CAN_COMPUTE_PER_USER: bool = True
 
@@ -111,28 +110,26 @@ class ARP(TopKMetric):
 
     def update(self, preds: Tensor, user_indices: Tensor, **kwargs: Any):
         """Updates the metric state with the new batch of predictions."""
-        target: Tensor = kwargs.get("binary_relevance", torch.zeros_like(preds))
-        users = kwargs.get("valid_users", self.valid_users(target))
-        top_k_values: Tensor = kwargs.get(
-            f"top_{self.k}_values", self.top_k_values_indices(preds, self.k)[0]
-        )
+        users = kwargs.get("valid_users", self.valid_users(preds))
         top_k_indices: Tensor = kwargs.get(
             f"top_{self.k}_indices", self.top_k_values_indices(preds, self.k)[1]
         )
 
-        rel = torch.zeros_like(preds)
-        rel.scatter_(
-            dim=1, index=top_k_indices, src=top_k_values
-        )  # [batch_size x items]
-        rel = rel * target  # [batch_size x items]
-        rel[rel > 0] = 1
+        # Handle sampled item indices if provided
+        item_indices = kwargs.get("item_indices", None)
+        if item_indices is not None:
+            top_k_indices = torch.gather(item_indices, 1, top_k_indices)
 
-        batch_pop = self.pop.repeat(target.shape[0], 1)  # [batch_size x items]
+        # Get the popularity of the recommended items
+        recommended_items_pop = self.pop[top_k_indices]  # [batch_size x k]
+
+        # Sum the popularity for each user
+        user_pop_sum = recommended_items_pop.sum(dim=1).float()  # [batch_size]
 
         if self.compute_per_user:
-            self.retrieved_pop.index_add_(0, user_indices, (rel * batch_pop).sum(dim=1))
+            self.retrieved_pop.index_add_(0, user_indices, user_pop_sum)
         else:
-            self.retrieved_pop += (rel * batch_pop).sum()
+            self.retrieved_pop += user_pop_sum.sum()
 
         # Count only users with at least one interaction
         self.users += users
