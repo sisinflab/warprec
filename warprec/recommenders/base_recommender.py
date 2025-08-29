@@ -491,7 +491,9 @@ class ItemSimRecommender(Recommender):
         *args: Any,
         **kwargs: Any,
     ) -> Tensor:
-        """This method will produce predictions only for given item indices.
+        """Prediction in the form of X@B where B is a {item x item} similarity matrix.
+
+        This method will produce predictions only for given item indices.
 
         Args:
             train_batch (Tensor): The train batch of user interactions.
