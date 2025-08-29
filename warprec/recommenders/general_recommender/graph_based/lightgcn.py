@@ -170,7 +170,7 @@ class LightGCN(IterativeRecommender, GraphRecommenderUtils):
         return user_all_embeddings, item_all_embeddings
 
     @torch.no_grad()
-    def predict(
+    def predict_full(
         self,
         train_batch: Tensor,
         user_indices: Tensor,
@@ -195,12 +195,54 @@ class LightGCN(IterativeRecommender, GraphRecommenderUtils):
         # Get the embeddings for the specific users in the batch
         u_embeddings_batch = user_e[user_indices]  # [batch_size, embedding_size]
 
-        # 3. Compute all item scores for the current user batch
-        # This is a dot product between the user embedding batch and all item embeddings.
+        # Compute all item scores for the current user batch
         predictions = torch.matmul(
             u_embeddings_batch, item_e.transpose(0, 1)
         )  # [batch_size, n_items]
 
         # Masking interaction already seen in train
         predictions[train_batch != 0] = -torch.inf
+        return predictions.to(self._device)
+
+    @torch.no_grad()
+    def predict_sampled(
+        self,
+        train_batch: Tensor,
+        user_indices: Tensor,
+        item_indices: Tensor,
+        *args: Any,
+        **kwargs: Any,
+    ) -> Tensor:
+        """Prediction using the learned embeddings.
+
+        This method will produce predictions only for given item indices.
+
+        Args:
+            train_batch (Tensor): The train batch of user interactions.
+            user_indices (Tensor): The batch of user indices.
+            item_indices (Tensor): The batch of item indices to sample.
+            *args (Any): List of arguments.
+            **kwargs (Any): The dictionary of keyword arguments.
+
+        Returns:
+            Tensor: The score matrix {user x pad_seq}.
+        """
+        user_e, item_e = (
+            self.forward()
+        )  # [n_users, embedding_size], [n_items, embedding_size]
+
+        # Get the embeddings for the specific users in the batch
+        # and items sampled
+        u_embeddings_batch = user_e[user_indices]  # [batch_size, embedding_size]
+        i_embeddings_sampled = item_e[
+            item_indices.clamp(min=0)
+        ]  # [batch_size, pad_seq, embedding_size]
+
+        # Compute all item scores for the current user batch
+        predictions = torch.einsum(
+            "be,bse->bs", u_embeddings_batch, i_embeddings_sampled
+        )  # [batch_size, pad_seq]
+
+        # Mask padded indices
+        predictions[item_indices == -1] = -torch.inf
         return predictions.to(self._device)
