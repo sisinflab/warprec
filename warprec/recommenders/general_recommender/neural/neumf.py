@@ -239,8 +239,7 @@ class NeuMF(IterativeRecommender):
         Returns:
             Tensor: The score matrix {user x pad_seq}.
         """
-        batch_size = user_indices.size(0)
-        pad_seq = item_indices.size(1)
+        batch_size, pad_seq = item_indices.size()
 
         # Prepare user and item indices for forward pass
         # Reshape user_indices to [batch_size * pad_seq]
