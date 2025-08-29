@@ -72,8 +72,25 @@ class AttributeUserKNN(Recommender):
         # Update item_similarity with a new nn.Parameter
         self.user_similarity = nn.Parameter(filtered_sim_matrix)
 
+    def _compute_user_tfidf(self, user_profile: csr_matrix) -> csr_matrix:
+        """Computes TF-IDF for user features.
+
+        Args:
+            user_profile (csr_matrix): The profile of the users.
+
+        Returns:
+            csr_matrix: The computed TF-IDF for users.
+        """
+        # Convert to average instead of sum
+        user_counts = user_profile.sum(axis=1).A.ravel()
+        user_counts[user_counts == 0] = 1  # Avoid division by zero
+        user_profile = user_profile.multiply(1 / user_counts[:, np.newaxis])
+
+        # L2 normalize
+        return normalize(user_profile, norm="l2", axis=1)
+
     @torch.no_grad()
-    def predict(
+    def predict_full(
         self,
         train_batch: Tensor,
         user_indices: Tensor,
@@ -99,19 +116,37 @@ class AttributeUserKNN(Recommender):
         predictions[train_batch != 0] = -torch.inf
         return predictions.to(self._device)
 
-    def _compute_user_tfidf(self, user_profile: csr_matrix) -> csr_matrix:
-        """Computes TF-IDF for user features.
+    @torch.no_grad()
+    def predict_sampled(
+        self,
+        train_batch: Tensor,
+        user_indices: Tensor,
+        item_indices: Tensor,
+        *args: Any,
+        **kwargs: Any,
+    ) -> Tensor:
+        """Prediction in the form of B@X where B is a {user x user} similarity matrix.
+
+        This method will produce predictions only for given item indices.
 
         Args:
-            user_profile (csr_matrix): The profile of the users.
+            train_batch (Tensor): The train batch of user interactions.
+            user_indices (Tensor): The batch of user indices.
+            item_indices (Tensor): The batch of item indices to sample.
+            *args (Any): List of arguments.
+            **kwargs (Any): The dictionary of keyword arguments.
 
         Returns:
-            csr_matrix: The computed TF-IDF for users.
+            Tensor: The score matrix {user x pad_seq}.
         """
-        # Convert to average instead of sum
-        user_counts = user_profile.sum(axis=1).A.ravel()
-        user_counts[user_counts == 0] = 1  # Avoid division by zero
-        user_profile = user_profile.multiply(1 / user_counts[:, np.newaxis])
+        # Compute predictions and gather only sampled items
+        predictions = (
+            self.user_similarity[user_indices, :][:, user_indices] @ train_batch
+        )
+        predictions = predictions.gather(
+            1, item_indices.clamp(min=0)
+        )  # [batch_size, pad_seq]
 
-        # L2 normalize
-        return normalize(user_profile, norm="l2", axis=1)
+        # Mask padded indices
+        predictions[item_indices == -1] = -torch.inf
+        return predictions.to(self._device)
