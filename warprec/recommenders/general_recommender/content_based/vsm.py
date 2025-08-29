@@ -71,39 +71,6 @@ class VSM(Recommender):
         self.i_profile = nn.Parameter(self._scipy_sparse_to_torch_sparse(item_profile))
         self.u_profile = nn.Parameter(self._scipy_sparse_to_torch_sparse(user_profile))
 
-    @torch.no_grad()
-    def predict(
-        self,
-        train_batch: Tensor,
-        user_indices: Tensor,
-        *args: Any,
-        **kwargs: Any,
-    ) -> Tensor:
-        """Prediction in the form of X@B where B is a {item x item} similarity matrix.
-
-        Args:
-            train_batch (Tensor): The train batch of user interactions.
-            user_indices (Tensor): The batch of user indices.
-            *args (Any): List of arguments.
-            **kwargs (Any): The dictionary of keyword arguments.
-
-        Returns:
-            Tensor: The score matrix {user x item}.
-        """
-        # Extract profiles and convert them to scipy
-        user_profile = self._torch_sparse_to_scipy_sparse(self.u_profile)
-        item_profile = self._torch_sparse_to_scipy_sparse(self.i_profile)
-
-        # Compute similarity
-        predictions_numpy = self.sim_function.compute(
-            user_profile[user_indices.cpu().numpy()], item_profile
-        )
-        predictions = torch.from_numpy(predictions_numpy)
-
-        # Masking interaction already seen in train
-        predictions[train_batch != 0] = -torch.inf
-        return predictions.to(self._device)
-
     def _compute_item_tfidf(self, item_profile: csr_matrix) -> csr_matrix:
         """Computes TF-IDF for item features.
 
@@ -178,3 +145,76 @@ class VSM(Recommender):
         shape = sparse_tensor.shape
         scipy_coo = coo_matrix((values, (indices[0], indices[1])), shape=shape)
         return scipy_coo.tocsr()
+
+    @torch.no_grad()
+    def predict_full(
+        self,
+        train_batch: Tensor,
+        user_indices: Tensor,
+        *args: Any,
+        **kwargs: Any,
+    ) -> Tensor:
+        """Prediction in the form of X@B where B is a {item x item} similarity matrix.
+
+        Args:
+            train_batch (Tensor): The train batch of user interactions.
+            user_indices (Tensor): The batch of user indices.
+            *args (Any): List of arguments.
+            **kwargs (Any): The dictionary of keyword arguments.
+
+        Returns:
+            Tensor: The score matrix {user x item}.
+        """
+        # Extract profiles and convert them to scipy
+        user_profile = self._torch_sparse_to_scipy_sparse(self.u_profile)
+        item_profile = self._torch_sparse_to_scipy_sparse(self.i_profile)
+
+        # Compute similarity
+        predictions_numpy = self.sim_function.compute(
+            user_profile[user_indices.cpu().numpy()], item_profile
+        )
+        predictions = torch.from_numpy(predictions_numpy)
+
+        # Masking interaction already seen in train
+        predictions[train_batch != 0] = -torch.inf
+        return predictions.to(self._device)
+
+    @torch.no_grad()
+    def predict_sampled(
+        self,
+        train_batch: Tensor,
+        user_indices: Tensor,
+        item_indices: Tensor,
+        *args: Any,
+        **kwargs: Any,
+    ) -> Tensor:
+        """Prediction in the form of X@B where B is a {item x item} similarity matrix.
+
+        This method will produce predictions only for given item indices.
+
+        Args:
+            train_batch (Tensor): The train batch of user interactions.
+            user_indices (Tensor): The batch of user indices.
+            item_indices (Tensor): The batch of item indices to sample.
+            *args (Any): List of arguments.
+            **kwargs (Any): The dictionary of keyword arguments.
+
+        Returns:
+            Tensor: The score matrix {user x pad_seq}.
+        """
+        # Extract profiles and convert them to scipy
+        user_profile = self._torch_sparse_to_scipy_sparse(self.u_profile)
+        item_profile = self._torch_sparse_to_scipy_sparse(self.i_profile)
+
+        # Compute predictions and gather only sampled items
+        predictions_numpy = self.sim_function.compute(
+            user_profile[user_indices.cpu().numpy()], item_profile
+        )
+        predictions = torch.from_numpy(predictions_numpy)
+        predictions = predictions.gather(
+            1, item_indices.clamp(min=0)
+        )  # [batch_size, pad_seq]
+
+        # Mask padded indices
+        predictions[item_indices == -1] = -torch.inf
+        return predictions.to(self._device)
