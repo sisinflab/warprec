@@ -52,7 +52,7 @@ class Pop(Recommender):
         )
 
     @torch.no_grad()
-    def predict(
+    def predict_full(
         self,
         train_batch: Tensor,
         user_indices: Tensor,
@@ -82,3 +82,36 @@ class Pop(Recommender):
         # Mask seen items from the training data
         predictions[train_batch != 0] = -torch.inf
         return predictions
+
+    @torch.no_grad()
+    def predict_sampled(
+        self,
+        train_batch: Tensor,
+        user_indices: Tensor,
+        item_indices: Tensor,
+        *args: Any,
+        **kwargs: Any,
+    ) -> Tensor:
+        """Prediction using a random number generator.
+
+        Args:
+            train_batch (Tensor): The train batch of user interactions.
+            user_indices (Tensor): The batch of user indices.
+            item_indices (Tensor): The batch of item indices.
+            *args (Any): List of arguments.
+            **kwargs (Any): The dictionary of keyword arguments.
+
+        Returns:
+            Tensor: The score matrix {user x pad_seq}.
+        """
+        # Normalize popularity by the total number of interactions
+        # Add epsilon to avoid division by zero if there are no interactions
+        normalized_popularity = self.popularity / (self.item_count + 1e-6)
+
+        # Retrieve the popularity scores for the sampled items
+        # Clamp item_indices to avoid out-of-bounds indexing with -1
+        predictions = normalized_popularity[item_indices.clamp(min=0)]
+
+        # Mask padded indices
+        predictions[item_indices == -1] = -torch.inf
+        return predictions.to(self._device)
