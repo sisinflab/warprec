@@ -17,6 +17,7 @@ The `data` module of WarpRec offers a wide variety of data structures used by th
 -  📊 [Dataset](#📊-dataset)
     - 🤝 [Interactions](#🤝-interactions)
     - 🧠 [Sessions](#🧠-sessions)
+    - 🗄️ [Stash](#🗄️-stash)
 
 ## 🔍 Reader
 
@@ -157,6 +158,7 @@ Its main functionalities include:
 - **Side information alignment**: Automatically integrates and aligns additional information (like item features) with transaction data.
 - **ID to index mapping**: Converts original user and item IDs into sequential numerical indices, optimizing memory and performance.
 - **Batch iteration**: Provides an efficient mechanism for iterating over data in batches, essential for training deep learning models.
+- **stashing mechanism**: A flexible key-value store for user-defined data structures, allowing precomputed features, tensors, or metadata to be attached to the dataset and accessed seamlessly during training and evaluation.
 
 ### 🤝 Interactions
 
@@ -169,6 +171,7 @@ Its main functionalities include:
 - **CSR Sparse Matrix for Side Information**: If side information is present, it's converted into a sparse matrix for efficient access.
 
 ### 🧠 Sessions
+
 The `Sessions` class is part of the `Dataset` module and is designed to **generate session-aware training data for sequential recommendation models**.
 
 This component processes raw interaction data (user, item, timestamp) to produce user-item sequences and corresponding targets, optionally with negative sampling, enabling models to learn temporal user behavior.
@@ -180,3 +183,70 @@ Key responsibilities:
 - Support user-specific batching with optional user IDs.
 - Efficient negative sampling avoiding items in the history or current target.
 - Internal caching mechanism to speed up repeated dataloader creation.
+
+### 🗄️ Stash
+
+The `Stash` serves as a flexible storage container for user-defined data structures. Recommender Systems are an ever-evolving field, and providing a one-size-fits-all solution for every possible use case is inherently challenging. The `Stash` mechanism allows developers to persist arbitrary data that can be later accessed during training or evaluation. The primary way to interact with the `Stash` through the **WarpRec Callback System**, which provides hooks at key stages of the data processing and training pipeline. You can find the full documentation for the callback system [here](../utils/README.md).
+
+#### **Example: Storing Item Popularity**
+
+The following example demonstrates how to extend the callback system to compute and store item popularity within the `Stash`. First, define a custom callback and override the `on_dataset_creation` method:
+
+```python
+class CustomStashCallback(WarpRecCallback):
+    def on_dataset_creation(self, main_dataset, validation_folds, *args, **kwargs):
+        pass
+```
+
+Inside this callback, you can load additional information (e.g., from a local file) or derive new features from the dataset itself. Here, we compute the popularity score for each item:
+
+```python
+class CustomStashCallback(WarpRecCallback):
+    def on_dataset_creation(self, main_dataset, validation_folds, *args, **kwargs):
+        interaction_matrix = main_dataset.train_set.get_sparse()
+        item_popularity = interaction_matrix.sum(axis=0).A1  # Sum over users to get item popularity
+        tensor_popularity = torch.tensor(item_popularity, dtype=torch.float32)
+
+        main_dataset.add_to_stash("item_popularity", tensor_popularity) # Stash the popularity tensor
+```
+
+At this point, the `Stash` contains a 1D tensor with the popularity score of each item. To make the callback robust in scenarios where validation folds are used, the computation can be generalized to include all datasets:
+
+```python
+class CustomStashCallback(WarpRecCallback):
+    def on_dataset_creation(self, main_dataset, validation_folds, *args, **kwargs):
+        def compute_item_popularity(dataset: Dataset):
+            interaction_matrix = dataset.train_set.get_sparse()
+            item_popularity = interaction_matrix.sum(axis=0).A1  # Sum over users to get item popularity
+            tensor_popularity = torch.tensor(item_popularity, dtype=torch.float32)
+
+            dataset.add_to_stash("item_popularity", tensor_popularity) # Stash the popularity tensor
+
+        compute_item_popularity(main_dataset)
+
+        if validation_folds is not None and len(validation_folds) > 0:  # Check if validation folds exist
+            for fold in validation_folds:
+                compute_item_popularity(fold)
+```
+
+With this setup, every dataset involved in the experiment is enriched with a stash entry containing the correct popularity values. These values can then be accessed within the model class as follows:
+
+```python
+class CustomModel(Recommender):
+    def __init__(
+        self,
+        params: dict,
+        interactions: Interactions,
+        *args: Any,
+        device: str = "cpu",
+        seed: int = 42,
+        info: dict = None,
+        **kwargs: Any,
+    ):
+        super().__init__(
+            params, interactions, device=device, seed=seed, info=info, *args, **kwargs
+        )
+        stash = kwargs.get("item_popularity")
+```
+
+This approach ensures that custom, precomputed features or auxiliary data are seamlessly integrated into the model’s training process. You can find the full example [here](../../callbacks/stash_callback.py)
