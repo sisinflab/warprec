@@ -249,4 +249,4 @@ class CustomModel(Recommender):
         item_popularity = kwargs.get("item_popularity")
 ```
 
-This approach ensures that custom, precomputed features or auxiliary data are seamlessly integrated into the model’s training process. You can find the full example [here](../../callbacks/stash_callback.py)
+This approach ensures that custom, precomputed features or auxiliary data are seamlessly integrated into the model’s training process. You can find the full example [here](../../callbacks/my_callback.py)
