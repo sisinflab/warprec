@@ -24,7 +24,7 @@ from warprec.recommenders.trainer.scheduler_wrapper import (
     BaseSchedulerWrapper,
 )
 from warprec.utils.config import (
-    Configuration,
+    TrainConfiguration,
     RecomModel,
     DashboardConfig,
     Wandb,
@@ -80,7 +80,7 @@ class Trainer:
         tracking_token_mlflow (Optional[str]): The token for MLflow tracking.
         save_artifacts_mlflow (bool): Wether or not to save artifacts
             in MLflow.
-        config (Configuration): The configuration of the experiment.
+        config (TrainConfiguration): The configuration of the experiment.
     """
 
     def __init__(
@@ -107,7 +107,7 @@ class Trainer:
         tags_mlflow: dict = {},
         tracking_token_mlflow: Optional[str] = None,
         save_artifacts_mlflow: bool = False,
-        config: Configuration = None,
+        config: TrainConfiguration = None,
     ):
         if config:
             dashboard = config.dashboard

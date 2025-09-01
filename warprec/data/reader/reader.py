@@ -6,7 +6,7 @@ import pandas as pd
 import joblib
 from pandas import DataFrame
 from warprec.utils.config import (
-    Configuration,
+    WarpRecConfiguration,
     ReaderConfig,
     Labels,
     CustomDtype,
@@ -22,12 +22,12 @@ class Reader(ABC):
     """The abstract definition of a reader. All readers must extend this class.
 
     Attributes:
-        config (Configuration): Configuration file.
+        config (WarpRecConfiguration): Configuration file.
 
     TODO: Use Factory Pattern for different reader.
     """
 
-    config: Configuration = None
+    config: WarpRecConfiguration = None
 
     @abstractmethod
     def read(self, **kwargs: Any) -> DataFrame:
@@ -49,10 +49,10 @@ class LocalReader(Reader):
     all the data reading part from a local machine.
 
     Args:
-        config (Configuration): Configuration file.
+        config (WarpRecConfiguration): Configuration file.
     """
 
-    def __init__(self, config: Configuration = None) -> None:
+    def __init__(self, config: WarpRecConfiguration = None) -> None:
         if config:
             self.config = config
 
