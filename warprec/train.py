@@ -176,7 +176,7 @@ def main(args: Namespace):
 
         params = config.models[model_name]
         val_metric, val_k = validation_metric(
-            params["optimization"]["validation_metric"]
+            params.get("optimization", {}).get("validation_metric", "nDCG@5")
         )
         trainer = Trainer(
             custom_callback=callback,
