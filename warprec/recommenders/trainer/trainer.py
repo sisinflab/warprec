@@ -301,6 +301,7 @@ class Trainer:
             device=device,
             seed=optimization.properties.seed,
             info=dataset.info(),
+            **dataset.get_stash(),
         )
         best_model.load_state_dict(model_state)
 

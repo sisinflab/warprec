@@ -101,6 +101,7 @@ def objective_function(
             device=device,
             seed=seed,
             info=dataset.info(),
+            **dataset.get_stash(),
             block_size=block_size,
         )
         if isinstance(model, IterativeRecommender):
