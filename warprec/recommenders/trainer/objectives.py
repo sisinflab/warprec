@@ -78,7 +78,11 @@ def objective_function(
     )
 
     # Trial parameter configuration check for consistency
-    model_params: RecomModel = params_registry.get(model_name, **params)
+    model_params: RecomModel = (
+        params_registry.get(model_name, **params)
+        if model_name in params_registry.list_registered()
+        else RecomModel(**params)
+    )
     if model_params.need_single_trial_validation:
         try:
             model_params.validate_single_trial_params()
