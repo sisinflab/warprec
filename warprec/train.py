@@ -395,7 +395,7 @@ def multiple_fold_validation_flow(
         device=device,
         seed=seed,
         info=main_dataset.info(),
-        stash=main_dataset.get_stash(),
+        **main_dataset.get_stash(),
         block_size=block_size,
     )
 

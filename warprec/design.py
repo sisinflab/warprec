@@ -133,7 +133,7 @@ def main(args: Namespace):
             device=device,
             seed=42,
             info=main_dataset.info(),
-            stash=main_dataset.get_stash(),
+            **main_dataset.get_stash(),
         )
 
         if isinstance(model, IterativeRecommender):
