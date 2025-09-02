@@ -179,7 +179,7 @@ def main(args: Namespace):
 
         params = config.models[model_name]
         val_metric, val_k = validation_metric(
-            params["optimization"]["validation_metric"]
+            params.get("optimization", {}).get("validation_metric", "nDCG@5")
         )
         trainer = Trainer(
             custom_callback=callback,
@@ -404,6 +404,7 @@ def multiple_fold_validation_flow(
         device=device,
         seed=seed,
         info=main_dataset.info(),
+        **main_dataset.get_stash(),
         block_size=block_size,
     )
 
@@ -425,7 +426,9 @@ def multiple_fold_validation_flow(
 
 
 def dataset_preparation(
-    main_dataset: Dataset, fold_dataset: Optional[List[Dataset]], config: Configuration
+    main_dataset: Dataset,
+    fold_dataset: Optional[List[Dataset]],
+    config: TrainConfiguration,
 ):
     """This method prepares the dataloaders inside the dataset
     that will be passed to Ray during HPO. It is important to
@@ -436,7 +439,7 @@ def dataset_preparation(
         main_dataset (Dataset): The main dataset of train/test split.
         fold_dataset (Optional[List[Dataset]]): The list of validation datasets
             of train/val splits.
-        config (Configuration): The configuration file used for the experiment.
+        config (TrainConfiguration): The configuration file used for the experiment.
     """
 
     def prepare_evaluation_loaders(dataset: Dataset):

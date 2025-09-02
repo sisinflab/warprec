@@ -300,6 +300,9 @@ class Dataset:
         self._feat_lookup: Tensor = None
         self._uc: Tensor = None
         self._ic: Tensor = None
+        self._stash: Dict[
+            str, Any
+        ] = {}  # Stash will be used by the user for custom needs
 
         # Initialize the dataset dataloader
         self._precomputed_dataloader: Dict[str, Any] = {}
@@ -644,6 +647,15 @@ class Dataset:
         """
         return self._ic
 
+    def get_stash(self) -> Dict[str, Any]:
+        """This method retrieves the stash dictionary
+        containing all user custom structures.
+
+        Returns:
+            Dict[str, Any]: The stash dictionary.
+        """
+        return self._stash
+
     def info(self) -> dict:
         """This method returns the main information of the
         dataset in dict format.
@@ -661,6 +673,15 @@ class Dataset:
             "item_mapping": self._imap,
             "user_mapping": self._umap,
         }
+
+    def add_to_stash(self, key: str, value: Any):
+        """Add a custom structure to the stash.
+
+        Args:
+            key (str): The key of the custom structure.
+            value (Any): The value of the custom structure.
+        """
+        self._stash[key] = value
 
     def update_mappings(self, user_mapping: dict, item_mapping: dict):
         """Update the mappings of the dataset.

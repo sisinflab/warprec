@@ -182,7 +182,11 @@ class Trainer:
                 - dict: Summary report of the training.
         """
         # Retrieve model params
-        model_params: RecomModel = params_registry.get(model_name, **params)
+        model_params: RecomModel = (
+            params_registry.get(model_name, **params)
+            if model_name in params_registry.list_registered()
+            else RecomModel(**params)
+        )
         properties = model_params.optimization.properties.model_dump()
         optimization = model_params.optimization
         mode = model_params.optimization.properties.mode
@@ -294,6 +298,7 @@ class Trainer:
             device=device,
             seed=optimization.properties.seed,
             info=dataset.info(),
+            **dataset.get_stash(),
         )
         best_model.load_state_dict(model_state)
 
@@ -343,7 +348,11 @@ class Trainer:
                 - Dict: Summary report of the training.
         """
         # Retrieve model params
-        model_params: RecomModel = params_registry.get(model_name, **params)
+        model_params: RecomModel = (
+            params_registry.get(model_name, **params)
+            if model_name in params_registry.list_registered()
+            else RecomModel(**params)
+        )
         properties = model_params.optimization.properties.model_dump()
         optimization = model_params.optimization
         mode = model_params.optimization.properties.mode
@@ -528,6 +537,8 @@ class Trainer:
             params_copy.pop("optimization")
         if "early_stopping" in params_copy:
             params_copy.pop("early_stopping")
+
+        print(params_copy)
         for k, v in params_copy.items():
             if v[0] is not SearchSpace.CHOICE:
                 tune_params[k] = search_space_registry.get(v[0])(*v[1:])

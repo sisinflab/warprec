@@ -173,7 +173,7 @@ class TrainConfiguration(WarpRecConfiguration):
     need_session_based_information: ClassVar[bool] = False
 
     @model_validator(mode="after")
-    def config_validation(self) -> "TrainConfiguration":
+    def train_validation(self) -> "TrainConfiguration":
         """This method checks if everything in the configuration file is missing or incorrect.
 
         Returns:
@@ -219,6 +219,7 @@ class TrainConfiguration(WarpRecConfiguration):
         parsed_models = {}
 
         for model_name, model_data in self.models.items():
+            model_class: RecomModel
             if model_name.upper() not in model_registry.list_registered():
                 logger.negative(
                     f"The model {model_name} is not registered in the model registry. "
@@ -230,14 +231,15 @@ class TrainConfiguration(WarpRecConfiguration):
                 model_name.upper() in model_registry.list_registered()
                 and model_name.upper() not in params_registry.list_registered()
             ):
-                logger.negative(
+                logger.attention(
                     f"The model {model_name} is registered in the model registry, but not in parameter registry. "
-                    "The model will not be loaded and will not be available for training. "
-                    "Check the configuration file."
+                    "The model will be loaded but the hyperparameter will not be validated."
                 )
+                model_class = RecomModel(**model_data)
+                parsed_models[model_name] = model_class.model_dump()
                 continue
             else:
-                model_class: RecomModel = params_registry.get(model_name, **model_data)
+                model_class = params_registry.get(model_name, **model_data)
 
                 if model_class.need_side_information and self.reader.side is None:
                     raise ValueError(
@@ -285,19 +287,6 @@ class DesignConfiguration(WarpRecConfiguration):
 
     splitter: SplittingConfig = None
     evaluation: EvaluationConfig
-
-    @model_validator(mode="after")
-    def config_validation(self) -> "DesignConfiguration":
-        """This method checks if everything in the configuration file is missing or incorrect.
-
-        Returns:
-            DesignConfiguration: The validated configuration.
-        """
-
-        # Load custom modules if specified
-        load_custom_modules(self.general.custom_models)
-
-        return self
 
 
 def load_train_configuration(path: str) -> TrainConfiguration:
