@@ -12,7 +12,7 @@ from pandas import DataFrame
 from torch import Tensor
 from datetime import timedelta
 
-from warprec.utils.config import Configuration
+from warprec.utils.config import TrainConfiguration
 from warprec.data.dataset import Dataset
 from warprec.recommenders.base_recommender import Recommender
 from warprec.utils.enums import WritingMethods
@@ -31,12 +31,12 @@ class Writer(ABC):
     during an experiment multiple writers can be defined.
 
     Attributes:
-        config (Configuration): The configuration of the experiment.
+        config (TrainConfiguration): The configuration of the experiment.
 
     TODO: Use Factory Pattern for different writer.
     """
 
-    config: Configuration = None
+    config: TrainConfiguration = None
 
     @abstractmethod
     def setup_experiment(self):
@@ -72,7 +72,7 @@ class LocalWriter(Writer):
     Args:
         dataset_name (str): The name of the dataset.
         local_path (str): The path to the dataset.
-        config (Configuration): The configuration of the experiment.
+        config (TrainConfiguration): The configuration of the experiment.
         setup (bool): Flag value for the setup of the experiment.
 
     TODO: Using context manager
@@ -82,7 +82,7 @@ class LocalWriter(Writer):
         self,
         dataset_name: str = None,
         local_path: str = None,
-        config: Configuration = None,
+        config: TrainConfiguration = None,
         setup: bool = True,
     ):
         if config:
@@ -115,7 +115,7 @@ class LocalWriter(Writer):
         if writer_params.setup_experiment:
             self.setup_experiment(config)
 
-    def setup_experiment(self, config: Configuration = None):
+    def setup_experiment(self, config: TrainConfiguration = None):
         """This is the main function to be executed, it sets up all
         the important directory to then later save results."""
         logger.msg("Setting up experiment local folder.")

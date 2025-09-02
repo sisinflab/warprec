@@ -3,7 +3,7 @@ from typing import List, Optional, Union, ClassVar, Any
 from abc import ABC
 
 import torch
-from pydantic import BaseModel, Field, model_validator, field_validator
+from pydantic import BaseModel, ConfigDict, Field, model_validator, field_validator
 from warprec.utils.enums import (
     SearchAlgorithms,
     Schedulers,
@@ -11,6 +11,7 @@ from warprec.utils.enums import (
 )
 from warprec.utils.registry import (
     model_registry,
+    params_registry,
     metric_registry,
     search_algorithm_registry,
 )
@@ -318,6 +319,7 @@ class RecomModel(BaseModel, ABC):
     """Definition of a RecommendationModel configuration. All models must extend this class.
 
     Attributes:
+        model_config: Configuration of the PyDantic model.
         meta (Meta): The meta-information about the model. Defaults to Meta default values.
         optimization (Optimization): The optimization information that will be used by Ray Tune.
         early_stopping (Optional[EarlyStopping]): The early stopping information that
@@ -327,6 +329,8 @@ class RecomModel(BaseModel, ABC):
         need_single_trial_validation (ClassVar[bool]): Wether or not the model needs to be
             validated during training.
     """
+
+    model_config = ConfigDict(extra="allow")
 
     meta: Meta = Field(default_factory=Meta)
     optimization: Optimization = Field(default_factory=Optimization)
@@ -339,6 +343,22 @@ class RecomModel(BaseModel, ABC):
     def model_validation(self):
         """RecomModel model validation."""
         _name = self.__class__.__name__
+
+        # If validation has not been registered, return the model not
+        # validated
+        if _name.upper() not in params_registry.list_registered():
+            for field, value in self.model_extra.items():
+                if not isinstance(value, list):
+                    self.model_extra[field] = [value]
+
+                current_list = self.model_extra[field]
+                if current_list and not any(
+                    current_list[0] == ss for ss in SearchSpace
+                ):
+                    current_list.insert(0, SearchSpace.GRID)
+                    self.model_extra[field] = current_list
+
+            return self
 
         # Create mapping of {field: typing}
         field_to_type = {}

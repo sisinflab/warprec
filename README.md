@@ -9,6 +9,7 @@ Whether you're learning how recommender systems work or conducting high-performa
 ## ✨ Key Features
 
 - **Model Training**: WarpRec includes out-of-the-box support for a variety of recommendation algorithms, including classic models like `ItemKNN` and `EASE`, as well as deep learning approaches such as `MultiDAE`. Each model can be easily configured, trained, and extended, making the framework suitable for both simple baselines and advanced research.
+- **Model Design**: WarpRec provides a flexible API for designing and integrating custom recommendation models. Developers can implement their own architectures by extending standardized base classes, ensuring compatibility with the training, evaluation, and optimization modules of the framework. This feature enables rapid prototyping and experimentation, allowing researchers and practitioners to seamlessly test novel approaches alongside existing baselines.
 - **Evaluation**: The evaluation module offers a wide range of metrics, all of which are configurable and easy to extend. Metrics are computed in batches to ensure scalability and memory efficiency, and GPU acceleration is supported to speed up the evaluation process in large-scale experiments.
 - **Custom Pipelines**: WarpRec allows you to build your own training and evaluation pipelines directly in Python, without relying on external configuration files. This feature is particularly useful for advanced users who want full control over the logic and flow of experiments, enabling faster iterations and experiments.
 - **Hyperparameter Optimization**: The framework integrates seamlessly with Ray Tune, providing access to advanced search and scheduling algorithms. Whether you're running a basic grid search or a complex multi-trial optimization, WarpRec automates and accelerates the tuning process.
@@ -144,6 +145,18 @@ To run inference on a model, use the `infer.py` script. Here's an example:
     poetry run python warprec/infer.py --config config/infer_config.yml
 
 This command starts the inference process using the specified configuration file.
+
+### ✏️ Design a model
+
+To implement a custom model, WarpRec provides a dedicated design interface via the `design.py` script. The recommended workflow is as follows:
+
+1. Prepare a configuration file (e.g. `config/design_config.yml`) with details
+    about the custom models, dataset and training parameters.
+2. Run the following command:
+    ```bash
+    poetry run python warprec/design.py --config config/design_config.yml
+
+This command initializes a lightweight training pipeline, specifically intended for rapid prototyping and debugging of custom architectures within the framework.
 
 ## 📄 Documentation
 

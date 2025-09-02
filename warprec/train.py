@@ -12,7 +12,12 @@ from warprec.data.splitting import Splitter
 from warprec.data.dataset import Dataset
 from warprec.data.filtering import apply_filtering
 from warprec.utils.callback import WarpRecCallback
-from warprec.utils.config import load_yaml, load_callback, Configuration
+from warprec.utils.config import (
+    load_train_configuration,
+    load_callback,
+    TrainConfiguration,
+)
+from warprec.utils.helpers import validation_metric
 from warprec.utils.logger import logger
 from warprec.recommenders.trainer import Trainer
 from warprec.recommenders.loops import train_loop
@@ -31,7 +36,7 @@ def main(args: Namespace):
     experiment_start_time = time.time()
 
     # Config parser testing
-    config = load_yaml(args.config)
+    config = load_train_configuration(args.config)
 
     # Load custom callback if specified
     callback: WarpRecCallback = load_callback(
@@ -170,8 +175,8 @@ def main(args: Namespace):
         model_exploration_start_time = time.time()
 
         params = config.models[model_name]
-        val_metric, val_k = config.validation_metric(
-            params["optimization"]["validation_metric"]
+        val_metric, val_k = validation_metric(
+            params.get("optimization", {}).get("validation_metric", "nDCG@5")
         )
         trainer = Trainer(
             custom_callback=callback,
@@ -295,7 +300,7 @@ def single_train_test_split_flow(
     val_k: int,
     dataset: Dataset,
     trainer: Trainer,
-    config: Configuration,
+    config: TrainConfiguration,
 ) -> Tuple[Recommender, dict]:
     """Hyperparameter optimization over a single train/test split.
 
@@ -306,7 +311,7 @@ def single_train_test_split_flow(
         val_k (int): The cutoff used to validate the model.
         dataset (Dataset): The main dataset which represents train/test split.
         trainer (Trainer): The trainer instance used to optimize the model.
-        config (Configuration): The configuration file.
+        config (TrainConfiguration): The configuration file.
 
     Returns:
         Tuple[Recommender, dict]:
@@ -338,7 +343,7 @@ def multiple_fold_validation_flow(
     main_dataset: Dataset,
     val_datasets: List[Dataset],
     trainer: Trainer,
-    config: Configuration,
+    config: TrainConfiguration,
 ) -> Tuple[Recommender, dict]:
     """Hyperparameter optimization with cross-validation logic.
 
@@ -351,7 +356,7 @@ def multiple_fold_validation_flow(
         val_datasets (List[Dataset]): The validation datasets which represents train/val splits.
             The list can contain n folds of train/val splits.
         trainer (Trainer): The trainer instance used to optimize the model.
-        config (Configuration): The configuration file.
+        config (TrainConfiguration): The configuration file.
 
     Returns:
         Tuple[Recommender, dict]:
@@ -390,6 +395,7 @@ def multiple_fold_validation_flow(
         device=device,
         seed=seed,
         info=main_dataset.info(),
+        **main_dataset.get_stash(),
         block_size=block_size,
     )
 

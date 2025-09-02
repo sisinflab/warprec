@@ -1,5 +1,5 @@
 import importlib
-from typing import List
+from typing import List, Tuple
 from pathlib import Path
 
 from warprec.utils.logger import logger
@@ -44,3 +44,18 @@ def is_python_module(path: str | Path) -> bool:
         return True
 
     return False
+
+
+def validation_metric(val_metric: str) -> Tuple[str, int]:
+    """This method will parse the validation metric.
+
+    Args:
+        val_metric (str): The validation metric in string format.
+
+    Returns:
+        Tuple[str, int]:
+            str: The name of the metric to use for validation.
+            int: The cutoff to use for validation.
+    """
+    metric_name, top_k = val_metric.split("@")
+    return metric_name, int(top_k)
