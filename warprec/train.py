@@ -4,6 +4,7 @@ import time
 from argparse import Namespace
 
 import ray
+import numpy as np
 from pandas import DataFrame
 
 from warprec.data.reader import LocalReader
@@ -254,18 +255,32 @@ def main(args: Namespace):
         if params["meta"]["save_model"]:
             writer.write_model(best_model)
 
-        # Timing report for the current model
-        model_timing_report.append(
-            {
-                "Model_Name": model_name,
-                "Data_Preparation_Time": data_preparation_time,
-                "Hyperparameter_Exploration_Time": model_exploration_total_time,
-                **ray_report,
-                "Evaluation_Time": model_evaluation_total_time,
-                "Total_Time": model_exploration_total_time
-                + model_evaluation_total_time,
-            }
-        )
+        if config.general.time_report:
+            inference_time = np.nan
+            if isinstance(best_model, IterativeRecommender):
+                dataloader = best_model.get_dataloader(
+                    main_dataset.train_set, main_dataset.train_session
+                )
+                batch = next(iter(dataloader))
+                batch = [x.to(best_model._device) for x in batch]
+
+                infer_time_start = time.time()
+                best_model(*batch)
+                inference_time = time.time() - infer_time_start
+
+            # Timing report for the current model
+            model_timing_report.append(
+                {
+                    "Model_Name": model_name,
+                    "Data_Preparation_Time": data_preparation_time,
+                    "Hyperparameter_Exploration_Time": model_exploration_total_time,
+                    **ray_report,
+                    "Evaluation_Time": model_evaluation_total_time,
+                    "Inference_Time": inference_time,
+                    "Total_Time": model_exploration_total_time
+                    + model_evaluation_total_time,
+                }
+            )
 
     if config.general.time_report:
         writer.write_time_report(model_timing_report)
