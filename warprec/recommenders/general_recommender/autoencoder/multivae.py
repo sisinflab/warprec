@@ -190,11 +190,15 @@ class MultiVAE(IterativeRecommender):
 
         return loss
 
-    def forward(self, rating_matrix: Tensor) -> Tuple[Tensor, Tensor]:
+    def forward(
+        self, rating_matrix: Tensor, *args: Any, **kwargs: Any
+    ) -> Tuple[Tensor, Tensor]:
         """Returns reconstruction and KL divergence.
 
         Args:
             rating_matrix (Tensor): The input rating matrix.
+            *args (Any): Optional arguments.
+            **kwargs (Any): Optional keyword arguments.
 
         Returns:
             Tuple[Tensor, Tensor]:

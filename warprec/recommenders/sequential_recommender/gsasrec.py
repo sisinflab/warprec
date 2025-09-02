@@ -168,12 +168,14 @@ class gSASRec(IterativeRecommender, SequentialRecommenderUtils):
             return self.item_embedding
         return self.output_embedding
 
-    def forward(self, item_seq: Tensor) -> Tensor:
+    def forward(self, item_seq: Tensor, *args: Any, **kwargs: Any) -> Tensor:
         """Forward pass of gSASRec. Returns the output of the Transformer
         for each token in the input sequence.
 
         Args:
             item_seq (Tensor): Sequence of items [batch_size, seq_len].
+            *args (Any): Optional arguments.
+            **kwargs (Any): Optional keyword arguments.
 
         Returns:
             Tensor: Output of the Transformer encoder [batch_size, seq_len, embedding_size].

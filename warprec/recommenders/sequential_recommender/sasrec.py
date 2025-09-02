@@ -177,12 +177,16 @@ class SASRec(IterativeRecommender, SequentialRecommenderUtils):
 
         return loss
 
-    def forward(self, item_seq: Tensor, item_seq_len: Tensor) -> Tensor:
+    def forward(
+        self, item_seq: Tensor, item_seq_len: Tensor, *args: Any, **kwargs: Any
+    ) -> Tensor:
         """Forward pass of the SASRec model.
 
         Args:
             item_seq (Tensor): Padded sequences of item IDs [batch_size, max_seq_len].
             item_seq_len (Tensor): Actual lengths of sequences [batch_size,].
+            *args (Any): Optional arguments.
+            **kwargs (Any): Optional keyword arguments.
 
         Returns:
             Tensor: The embedding of the predicted item (last session state)

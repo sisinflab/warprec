@@ -123,12 +123,14 @@ class FISM(IterativeRecommender):
 
         return loss
 
-    def forward(self, user: Tensor, item: Tensor) -> Tensor:
+    def forward(self, user: Tensor, item: Tensor, *args: Any, **kwargs: Any) -> Tensor:
         """Forward pass for calculating scores for specific user-item pairs.
 
         Args:
             user (Tensor): User indices.
             item (Tensor): Item indices.
+            *args (Any): Optional arguments.
+            **kwargs (Any): Optional keyword arguments.
 
         Returns:
             Tensor: Predicted scores.

@@ -139,8 +139,12 @@ class LightGCN(IterativeRecommender, GraphRecommenderUtils):
 
         return loss
 
-    def forward(self) -> Tuple[Tensor, Tensor]:
+    def forward(self, *args: Any, **kwargs: Any) -> Tuple[Tensor, Tensor]:
         """Forward pass of the LightGCN model for embedding propagation.
+
+        Args:
+            *args (Any): Optional arguments.
+            **kwargs (Any): Optional keyword arguments.
 
         Returns:
             Tuple[Tensor, Tensor]: User and item embeddings after propagation.

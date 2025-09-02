@@ -261,7 +261,7 @@ class FOSSIL(IterativeRecommender, SequentialRecommenderUtils):
             ]
             neg_item = None
 
-        seq_output = self.forward(item_seq, item_seq_len, user_id)
+        seq_output = self.forward(user_id, item_seq, item_seq_len)
 
         pos_items_emb = self.item_embedding(pos_item)
 
@@ -279,14 +279,21 @@ class FOSSIL(IterativeRecommender, SequentialRecommenderUtils):
         return loss
 
     def forward(
-        self, item_seq: Tensor, item_seq_len: Tensor, user_id: Tensor
+        self,
+        user_id: Tensor,
+        item_seq: Tensor,
+        item_seq_len: Tensor,
+        *args: Any,
+        **kwargs: Any,
     ) -> Tensor:
         """Forward pass of the FOSSIL model.
 
         Args:
+            user_id (Tensor): User IDs for each sequence [batch_size,].
             item_seq (Tensor): Padded sequences of item IDs [batch_size, max_seq_len].
             item_seq_len (Tensor): Actual lengths of sequences [batch_size,].
-            user_id (Tensor): User IDs for each sequence [batch_size,].
+            *args (Any): Optional arguments.
+            **kwargs (Any): Optional keyword arguments.
 
         Returns:
             Tensor: The combined embedding for prediction [batch_size, embedding_size].
@@ -331,7 +338,7 @@ class FOSSIL(IterativeRecommender, SequentialRecommenderUtils):
         user_seq = user_seq.to(self._device)
         seq_len = seq_len.to(self._device)
 
-        seq_output = self.forward(user_seq, seq_len, user_indices)
+        seq_output = self.forward(user_indices, user_seq, seq_len)
 
         all_item_embeddings = self.item_embedding.weight[1:]
         predictions = torch.matmul(seq_output, all_item_embeddings.transpose(0, 1))

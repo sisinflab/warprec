@@ -128,12 +128,14 @@ class ConvNCF(IterativeRecommender):
 
         return loss
 
-    def forward(self, user: Tensor, item: Tensor) -> Tensor:
+    def forward(self, user: Tensor, item: Tensor, *args: Any, **kwargs: Any) -> Tensor:
         """Forward pass of the ConvNCF model.
 
         Args:
             user (Tensor): The tensor containing the user indexes.
             item (Tensor): The tensor containing the item indexes.
+            *args (Any): Optional arguments.
+            **kwargs (Any): Optional keyword arguments.
 
         Returns:
             Tensor: The predicted score for each pair (user, item).
