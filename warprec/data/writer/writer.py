@@ -433,7 +433,7 @@ class LocalWriter(Writer):
         logger.msg(f"Split data written to {main_split_path}")
 
     def write_time_report(self, time_report: List[Dict[str, Any]]):
-        """This method writes the time report into a local path.
+        """This method writes the time report into a local path, with incremental updates.
 
         Args:
             time_report (List[Dict[str, Any]]): The time report to write.
@@ -451,15 +451,40 @@ class LocalWriter(Writer):
             writing_params = ResultsWriting(sep="\t", ext=".tsv")
 
         # experiment_path/evaluation/Time_Report_{timestamp}.{ext}
-        time_report_path = join(
-            self.experiment_evaluation_dir,
-            f"Time_Report_{self._timestamp}{writing_params.ext}",
+        time_report_path = Path(
+            join(
+                self.experiment_evaluation_dir,
+                f"Time_Report_{self._timestamp}{writing_params.ext}",
+            )
         )
+
         try:
-            report = pd.DataFrame(time_report)
+            # Load existing data if the file exists
+            existing_df = pd.DataFrame()
+            if time_report_path.exists():
+                try:
+                    existing_df = pd.read_csv(time_report_path, sep=writing_params.sep)
+                except Exception as e:
+                    logger.attention(
+                        f"Could not read existing time report from {time_report_path}: {e}. "
+                        "A new file will be created or existing data will be overwritten."
+                    )
+                    existing_df = pd.DataFrame()
+
+            # Convert new results to a DataFrame
+            new_df = pd.DataFrame(time_report)
+
+            # Merge the new data with the existing data
+            # 'Model Name' is the key to identify unique reports for a model
+            merge_keys = ["Model Name"]
+
+            # Concat the two dataframes and drop duplicates based on merge keys, keeping the last (newest) data
+            combined_df = pd.concat([existing_df, new_df], ignore_index=True)
+            report = combined_df.drop_duplicates(subset=merge_keys, keep="last")
+
+            # Now, proceed with formatting and reordering as in your original method
             float_columns = report.select_dtypes(include=["float32", "float64"]).columns
 
-            # Format only columns relative to time
             columns_to_exclude = [
                 "RAM Mean Usage (MB)",
                 "RAM STD Usage (MB)",
@@ -473,6 +498,8 @@ class LocalWriter(Writer):
             columns_to_format = [
                 col for col in float_columns if col not in columns_to_exclude
             ]
+
+            report = report.copy()
             for col in columns_to_format:
                 report[col] = report[col].apply(format_secs)
 
@@ -484,6 +511,9 @@ class LocalWriter(Writer):
             ]
             other_cols = [col for col in report.columns if col not in first_columns]
             report = report[first_columns + other_cols]
+
+            # Sort the final dataframe by the Model Name for consistency
+            report = report.sort_values(by=merge_keys).reset_index(drop=True)
 
             report.to_csv(
                 time_report_path,

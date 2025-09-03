@@ -282,8 +282,8 @@ def main(args: Namespace):
                 }
             )
 
-    if config.general.time_report:
-        writer.write_time_report(model_timing_report)
+            # Update time report
+            writer.write_time_report(model_timing_report)
 
     if requires_stat_significance:
         logger.msg(
