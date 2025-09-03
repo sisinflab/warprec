@@ -459,7 +459,21 @@ class LocalWriter(Writer):
             report = pd.DataFrame(time_report)
             float_columns = report.select_dtypes(include=["float32", "float64"]).columns
 
-            for col in float_columns:
+            # Format only columns relative to time
+            columns_to_exclude = [
+                "RAM_Mean_Usage",
+                "RAM_STD_Usage",
+                "RAM_Max_Usage",
+                "RAM_Min_Usage",
+                "VRAM_Mean_Usage",
+                "VRAM_STD_Usage",
+                "VRAM_Max_Usage",
+                "VRAM_Min_Usage",
+            ]
+            columns_to_format = [
+                col for col in float_columns if col not in columns_to_exclude
+            ]
+            for col in columns_to_format:
                 report[col] = report[col].apply(format_secs)
 
             # Reordering columns

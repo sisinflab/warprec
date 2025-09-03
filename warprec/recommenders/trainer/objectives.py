@@ -3,6 +3,7 @@ import tempfile
 from typing import Any, List
 
 import torch
+import psutil
 from torch import Tensor
 from ray import tune
 from ray.tune import Checkpoint
@@ -92,6 +93,12 @@ def objective_function(
 
             return  # Stop Ray Tune trial
 
+    # Memory reporting
+    process = psutil.Process(os.getpid())
+    initial_ram_mb = process.memory_info().rss / 1024**2
+    if str(device) != "cpu" and torch.cuda.is_available():
+        torch.cuda.reset_peak_memory_stats(device=device)
+
     # Proceed with normal model training behavior
     try:
         model = model_registry.get(
@@ -128,18 +135,44 @@ def objective_function(
                     optimizer.step()
                     epoch_loss += loss.item()
 
+                # Update memory usage
+                ram_peak_mb = max(initial_ram_mb, process.memory_info().rss / 1024**2)
+
                 # Evaluation at the end of each training epoch
                 evaluator.evaluate(model, dataset, device=device)
                 results = evaluator.compute_results()
                 score = results[validation_top_k][validation_metric_name]
-                validation_report(model, validation_score, score, loss=epoch_loss)
+                validation_report(
+                    model,
+                    validation_score,
+                    score,
+                    loss=epoch_loss,
+                    ram_peak_mb=ram_peak_mb,
+                    vram_peak_mb=(
+                        torch.cuda.max_memory_allocated(device=device) / 1024**2
+                    )
+                    if str(device) != "cpu" and torch.cuda.is_available()
+                    else 0,
+                )
 
         else:
             # Model is trained in the __init__ we can directly evaluate it
             evaluator.evaluate(model, dataset, device=device)
             results = evaluator.compute_results()
             score = results[validation_top_k][validation_metric_name]
-            validation_report(model, validation_score, score)
+
+            # Update memory usage
+            ram_peak_mb = max(initial_ram_mb, process.memory_info().rss / 1024**2)
+
+            validation_report(
+                model=model,
+                validation_score=validation_score,
+                score=score,
+                ram_peak_mb=ram_peak_mb,
+                vram_peak_mb=(torch.cuda.max_memory_allocated(device=device) / 1024**2)
+                if str(device) != "cpu" and torch.cuda.is_available()
+                else 0,
+            )
 
     except Exception as e:
         logger.negative(

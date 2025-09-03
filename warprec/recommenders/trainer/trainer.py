@@ -282,6 +282,19 @@ class Trainer:
         best_iter = best_result.metrics["training_iteration"]
         best_checkpoint = best_result.checkpoint
 
+        # Memory report
+        result_df = results.get_dataframe()
+        additional_report = {
+            "RAM_Mean_Usage": result_df["ram_peak_mb"].mean(),
+            "RAM_STD_Usage": result_df["ram_peak_mb"].std(),
+            "RAM_Max_Usage": result_df["ram_peak_mb"].max(),
+            "RAM_Min_Usage": result_df["ram_peak_mb"].min(),
+            "VRAM_Mean_Usage": result_df["vram_peak_mb"].mean(),
+            "VRAM_STD_Usage": result_df["vram_peak_mb"].std(),
+            "VRAM_Max_Usage": result_df["vram_peak_mb"].max(),
+            "VRAM_Min_Usage": result_df["vram_peak_mb"].min(),
+        }
+
         logger.msg(
             f"Best params combination: {best_params} with a score of "
             f"{validation_score}: {best_score} "
@@ -305,7 +318,7 @@ class Trainer:
         )
         best_model.load_state_dict(model_state)
 
-        report = self._create_report(results, best_model)
+        report = self._create_report(results, additional_report, best_model)
 
         ray.shutdown()
 
@@ -456,6 +469,18 @@ class Trainer:
             best_hyperparameters_row["desired_training_iterations"]
         )
 
+        # Memory report
+        additional_report = {
+            "RAM_Mean_Usage": result_df["ram_peak_mb"].mean(),
+            "RAM_STD_Usage": result_df["ram_peak_mb"].std(),
+            "RAM_Max_Usage": result_df["ram_peak_mb"].max(),
+            "RAM_Min_Usage": result_df["ram_peak_mb"].min(),
+            "VRAM_Mean_Usage": result_df["vram_peak_mb"].mean(),
+            "VRAM_STD_Usage": result_df["vram_peak_mb"].std(),
+            "VRAM_Max_Usage": result_df["vram_peak_mb"].max(),
+            "VRAM_Min_Usage": result_df["vram_peak_mb"].min(),
+        }
+
         # Clear hyperparam format and create the clean dictionary
         best_hyperparameters: Dict[str, Any] = {}
         best_hyperparameters["iterations"] = desired_iteration
@@ -484,7 +509,9 @@ class Trainer:
         )
         logger.positive(f"Hyperparameter tuning for {model_name} ended successfully.")
 
-        report = self._create_report(results)
+        report = self._create_report(results, additional_report)
+
+        ray.shutdown()
 
         return best_hyperparameters, report
 
@@ -572,7 +599,10 @@ class Trainer:
         return callbacks
 
     def _create_report(
-        self, results: tune.ResultGrid, model: Optional[Recommender] = None
+        self,
+        results: tune.ResultGrid,
+        additional_reports: Dict[str, float],
+        model: Optional[Recommender] = None,
     ) -> dict:
         # Produce the report of the training
         successful_trials = [r for r in results if not r.error]  # type: ignore[attr-defined]
@@ -590,6 +620,9 @@ class Trainer:
             report["Trainable_Params (Best Model)"] = sum(
                 p.numel() for p in model.parameters() if p.requires_grad
             )
+
+        # Add additional reports
+        report.update(additional_reports)
 
         return report
 
