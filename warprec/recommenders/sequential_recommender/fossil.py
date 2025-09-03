@@ -379,7 +379,7 @@ class FOSSIL(IterativeRecommender, SequentialRecommenderUtils):
 
         # Calculate the sequential output embedding for each user in the batch
         seq_output = self.forward(
-            user_seq, seq_len, user_indices
+            user_indices, user_seq, seq_len
         )  # [batch_size, embedding_size]
 
         # Get embeddings for candidate items. We clamp the indices to avoid
