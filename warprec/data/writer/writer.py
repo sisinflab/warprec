@@ -5,12 +5,10 @@ from datetime import datetime
 from abc import ABC, abstractmethod
 
 import pandas as pd
-import numpy as np
 import torch
 import json
 from pandas import DataFrame
 from torch import Tensor
-from datetime import timedelta
 
 from warprec.utils.config import TrainConfiguration
 from warprec.data.dataset import Dataset
@@ -438,13 +436,6 @@ class LocalWriter(Writer):
         Args:
             time_report (List[Dict[str, Any]]): The time report to write.
         """
-
-        def format_secs(secs):
-            try:
-                return str(timedelta(seconds=secs))
-            except Exception:
-                return np.nan
-
         if self.config:
             writing_params = self.config.writer.results
         else:
@@ -481,27 +472,6 @@ class LocalWriter(Writer):
             # Concat the two dataframes and drop duplicates based on merge keys, keeping the last (newest) data
             combined_df = pd.concat([existing_df, new_df], ignore_index=True)
             report = combined_df.drop_duplicates(subset=merge_keys, keep="last")
-
-            # Now, proceed with formatting and reordering as in your original method
-            float_columns = report.select_dtypes(include=["float32", "float64"]).columns
-
-            columns_to_exclude = [
-                "RAM Mean Usage (MB)",
-                "RAM STD Usage (MB)",
-                "RAM Max Usage (MB)",
-                "RAM Min Usage (MB)",
-                "VRAM Mean Usage (MB)",
-                "VRAM STD Usage (MB)",
-                "VRAM Max Usage (MB)",
-                "VRAM Min Usage (MB)",
-            ]
-            columns_to_format = [
-                col for col in float_columns if col not in columns_to_exclude
-            ]
-
-            report = report.copy()
-            for col in columns_to_format:
-                report[col] = report[col].apply(format_secs)
 
             # Reordering columns
             first_columns = [
