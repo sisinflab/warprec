@@ -119,7 +119,7 @@ class BPR(IterativeRecommender):
         return torch.mul(user_e, item_e).sum(dim=1)
 
     @torch.no_grad()
-    def predict(
+    def predict_full(
         self,
         train_batch: Tensor,
         user_indices: Tensor,
@@ -149,4 +149,43 @@ class BPR(IterativeRecommender):
 
         # Masking interaction already seen in train
         predictions[train_batch != 0] = -torch.inf
+        return predictions.to(self._device)
+
+    @torch.no_grad()
+    def predict_sampled(
+        self,
+        train_batch: Tensor,
+        user_indices: Tensor,
+        item_indices: Tensor,
+        *args: Any,
+        **kwargs: Any,
+    ) -> Tensor:
+        """Prediction of given items using the learned embeddings.
+
+        Args:
+            train_batch (Tensor): The train batch of user interactions.
+            user_indices (Tensor): The batch of user indices.
+            item_indices (Tensor): The batch of item indices.
+            *args (Any): List of arguments.
+            **kwargs (Any): The dictionary of keyword arguments.
+
+        Returns:
+            Tensor: The score matrix {user x pad_seq}.
+        """
+        # Retrieve embeddings
+        # NOTE: .clamp() is used for padded item_indices
+        user_embeddings = self.user_embedding(
+            user_indices
+        )  # [batch_size, embedding_size]
+        candidate_item_embeddings = self.item_embedding(
+            item_indices.clamp(min=0)
+        )  # [batch_size, pad_seq, embedding_size]
+
+        # Compute predictions efficiently
+        predictions = torch.einsum(
+            "bi,bji->bj", user_embeddings, candidate_item_embeddings
+        )
+
+        # Mask padded indices
+        predictions[item_indices == -1] = -torch.inf
         return predictions.to(self._device)

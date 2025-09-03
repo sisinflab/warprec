@@ -167,7 +167,7 @@ class FISM(IterativeRecommender):
         return scores
 
     @torch.no_grad()
-    def predict(
+    def predict_full(
         self,
         train_batch: Tensor,
         user_indices: Tensor,
@@ -226,4 +226,70 @@ class FISM(IterativeRecommender):
 
         # Masking interaction already seen in train
         predictions[train_batch != 0] = -torch.inf
+        return predictions.to(self._device)
+
+    @torch.no_grad()
+    def predict_sampled(
+        self,
+        train_batch: Tensor,
+        user_indices: Tensor,
+        item_indices: Tensor,
+        *args: Any,
+        **kwargs: Any,
+    ) -> Tensor:
+        """Prediction of given items using the learned embeddings.
+
+        Args:
+            train_batch (Tensor): The train batch of user interactions.
+            user_indices (Tensor): The batch of user indices.
+            item_indices (Tensor): The batch of item indices.
+            *args (Any): List of arguments.
+            **kwargs (Any): The dictionary of keyword arguments.
+
+        Returns:
+            Tensor: The score matrix {user x pad_seq}.
+        """
+        # Select data for current batch
+        batch_history_matrix = self.history_matrix[user_indices]
+        batch_history_lens = self.history_lens[user_indices]
+        batch_history_mask = self.history_mask[user_indices]
+        batch_user_bias = self.user_bias[user_indices]
+
+        # Compute aggregated embedding for user in batch
+        user_history_emb = self.item_src_embedding(
+            batch_history_matrix
+        )  # [batch_size, max_len, emb_size]
+
+        # Apply masking
+        masked_user_history_emb = (
+            user_history_emb * batch_history_mask.unsqueeze(2).float()
+        )
+        user_aggregated_emb = masked_user_history_emb.sum(
+            dim=1
+        )  # [batch_size, emb_size]
+
+        # Normalization coefficient (N_u ^ -alpha)
+        coeff = torch.pow(batch_history_lens.float() + 1e-6, -self.alpha).unsqueeze(1)
+        user_final_emb = user_aggregated_emb * coeff  # [batch_size, emb_size]
+
+        # Retrieve embeddings for candidate items, handling padding (-1)
+        # We need to add 1 to the item indices because 0 is the padding index
+        candidate_item_embeddings = self.item_dst_embedding(
+            item_indices.clamp(min=0)
+        )  # [batch_size, pad_seq, embedding_size]
+        candidate_item_biases = self.item_bias[
+            item_indices.clamp(min=0)
+        ]  # [batch_size, pad_seq]
+
+        # Compute the final matrix multiplication using einsum
+        predictions = torch.einsum(
+            "bi,bji->bj", user_final_emb, candidate_item_embeddings
+        )
+
+        # Add the biases
+        predictions += batch_user_bias.unsqueeze(1)
+        predictions += candidate_item_biases
+
+        # Mask padded indices
+        predictions[item_indices == -1] = -torch.inf
         return predictions.to(self._device)

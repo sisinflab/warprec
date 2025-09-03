@@ -16,7 +16,7 @@ class BiasDisparityBR(TopKMetric):
 
     The metric is computed as:
 
-        BR(u, c) = (P_rec(u, c) / P_rec(u)) / P_global(c)
+        BiasDisparityBR(u, c) = (P_rec(u, c) / P_rec(u)) / P_global(c)
 
     where:
         - u is a user cluster index,
@@ -106,6 +106,11 @@ class BiasDisparityBR(TopKMetric):
         top_k_indices: Tensor = kwargs.get(
             f"top_{self.k}_indices", self.top_k_values_indices(preds, self.k)[1]
         )
+
+        # Handle sampled item indices if provided
+        item_indices = kwargs.get("item_indices", None)
+        if item_indices is not None:
+            top_k_indices = torch.gather(kwargs.get("item_indices"), 1, top_k_indices)
 
         # Map user indices to user clusters
         user_clusters = self.user_clusters[user_indices]  # [batch_size]

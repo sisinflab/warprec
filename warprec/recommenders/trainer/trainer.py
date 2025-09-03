@@ -141,17 +141,8 @@ class Trainer:
                 ),
             )
 
-        # self._model_params: RecomModel = params_registry.get(model_name, **model_params)
         self._callbacks = self._setup_callbacks(dashboard, custom_callback)
         self._custom_models = custom_models
-        # self.model_name = model_name
-        # self._train_param = self.parse_params(param, len(datasets))
-        # self._metric_name = metric_name
-        # self._top_k = top_k
-        # self._beta = beta
-        # self._pop_ratio = pop_ratio
-        # self._verbose = ray_verbose
-        # self._datasets = ray.put(datasets)
 
     def train_single_fold(
         self,
@@ -160,6 +151,8 @@ class Trainer:
         dataset: Dataset,
         validation_metric_name: str,
         validation_top_k: int,
+        evaluation_strategy: str = "full",
+        num_negatives: int = 99,
         beta: float = 1.0,
         pop_ratio: float = 0.8,
         ray_verbose: int = 1,
@@ -177,6 +170,8 @@ class Trainer:
             validation_metric_name (str): The name of the metric that will be used
                 as validation.
             validation_top_k (int): The cutoff tu use as validation.
+            evaluation_strategy (str): Evaluation strategy, either "full" or "sampled".
+            num_negatives (int): Number of negative samples to use in "sampled" strategy.
             beta (float): The beta value for the evaluation.
             pop_ratio (float): The pop ratio value for the evaluation.
             ray_verbose (int): The Ray level of verbosity.
@@ -214,6 +209,8 @@ class Trainer:
             validation_metric_name=validation_metric_name,
             mode=mode,
             device=device,
+            strategy=evaluation_strategy,
+            num_negatives=num_negatives,
             seed=optimization.properties.seed,
             block_size=optimization.block_size,
             beta=beta,
@@ -331,11 +328,38 @@ class Trainer:
         datasets: List[Dataset],
         validation_metric_name: str,
         validation_top_k: int,
+        evaluation_strategy: str = "full",
+        num_negatives: int = 99,
         beta: float = 1.0,
         pop_ratio: float = 0.8,
         desired_training_it: str = "median",
         ray_verbose: int = 1,
-    ):
+    ) -> Tuple[Dict, Dict]:
+        """Main method of the Trainer class for cross-validation.
+
+        Args:
+            model_name (str): The name of the model to optimize.
+            params (dict): The parameters of the model already in
+                Ray Tune format.
+            datasets (List[Dataset]): The list of datasets to use during training.
+            validation_metric_name (str): The name of the metric that will be used
+                as validation.
+            validation_top_k (int): The cutoff tu use as validation.
+            evaluation_strategy (str): Evaluation strategy, either "full" or "sampled".
+            num_negatives (int): Number of negative samples to use in "sampled" strategy.
+            beta (float): The beta value for the evaluation.
+            pop_ratio (float): The pop ratio value for the evaluation.
+            desired_training_it (str): The type of statistic to use to
+                select the number of training iterations to use
+                when training on the full dataset. Either "min", "max",
+                "mean" or "median". Default is "median".
+            ray_verbose (int): The Ray level of verbosity.
+
+        Returns:
+            Tuple[Dict, Dict]:
+                - Dict: The best hyperparameters found.
+                - Dict: Summary report of the training.
+        """
         # Retrieve model params
         model_params: RecomModel = (
             params_registry.get(model_name, **params)
@@ -366,6 +390,8 @@ class Trainer:
             validation_metric_name=validation_metric_name,
             mode=mode,
             device=device,
+            strategy=evaluation_strategy,
+            num_negatives=num_negatives,
             seed=optimization.properties.seed,
             block_size=optimization.block_size,
             beta=beta,

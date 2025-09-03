@@ -51,6 +51,7 @@ class ItemMADRanking(TopKMetric):
 
     _REQUIRED_COMPONENTS: Set[MetricBlock] = {
         MetricBlock.DISCOUNTED_RELEVANCE,
+        MetricBlock.TOP_K_VALUES,
         MetricBlock.TOP_K_INDICES,
     }
 
@@ -92,18 +93,32 @@ class ItemMADRanking(TopKMetric):
             f"top_{self.k}_indices", self.top_k_values_indices(preds, self.k)[1]
         )
 
-        # Item counts
-        counts = torch.bincount(
-            top_k_indices.flatten(), minlength=self.num_items
-        )  # [num_items]
+        # Get the item indices for the current batch (either full or sampled)
+        item_indices = kwargs.get("item_indices", None)
+        if item_indices is not None:
+            batch_item_indices = item_indices
+        else:
+            batch_item_indices = (
+                torch.arange(preds.shape[1], device=preds.device)
+                .unsqueeze(0)
+                .repeat(preds.shape[0], 1)
+            )
 
-        # Item gains
-        rel = torch.zeros_like(preds)
+        # Use local top_k_indices to get gains and item indices
         top_k_values = torch.gather(target, 1, top_k_indices)
-        rel.scatter_(1, top_k_indices, top_k_values)  # [batch_size x num_items]
+        top_k_global_indices = torch.gather(batch_item_indices, 1, top_k_indices)
 
-        self.item_counts += counts
-        self.item_gains += rel.sum(dim=0)
+        # Accumulate counts and gains using the global indices
+        self.item_counts.index_add_(
+            0,
+            top_k_global_indices.flatten(),
+            torch.ones_like(top_k_global_indices.flatten(), dtype=torch.float),
+        )
+
+        # Gains: use scatter_ to place gains at the correct global indices for each user
+        rel_to_add = torch.zeros(preds.shape[0], self.num_items, device=preds.device)
+        rel_to_add.scatter_(1, top_k_global_indices, top_k_values)
+        self.item_gains += rel_to_add.sum(dim=0)
 
     def compute(self):
         item_avg_gain_when_recommended = torch.zeros_like(self.item_gains)

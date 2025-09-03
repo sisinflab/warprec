@@ -177,7 +177,7 @@ class NeuMF(IterativeRecommender):
         return output.squeeze(-1)
 
     @torch.no_grad()
-    def predict(
+    def predict_full(
         self,
         train_batch: Tensor,
         user_indices: Tensor,
@@ -218,4 +218,46 @@ class NeuMF(IterativeRecommender):
 
         # Masking interaction already seen in train
         predictions[train_batch != 0] = -torch.inf
+        return predictions.to(self._device)
+
+    @torch.no_grad()
+    def predict_sampled(
+        self,
+        train_batch: Tensor,
+        user_indices: Tensor,
+        item_indices: Tensor,
+        *args: Any,
+        **kwargs: Any,
+    ) -> Tensor:
+        """Prediction of given items using the learned embeddings.
+
+        Args:
+            train_batch (Tensor): The train batch of user interactions.
+            user_indices (Tensor): The batch of user indices.
+            item_indices (Tensor): The batch of item indices.
+            *args (Any): List of arguments.
+            **kwargs (Any): The dictionary of keyword arguments.
+
+        Returns:
+            Tensor: The score matrix {user x pad_seq}.
+        """
+        batch_size, pad_seq = item_indices.size()
+
+        # Prepare user and item indices for forward pass
+        # Reshape user_indices to [batch_size * pad_seq]
+        users_expanded = user_indices.unsqueeze(1).expand(-1, pad_seq).reshape(-1)
+        # Reshape item_indices, handling padding (-1)
+        # We need to clamp to avoid out-of-bounds indexing. The forward pass will handle index 0
+        items_expanded = item_indices.clamp(min=0).reshape(-1)
+
+        # Compute predictions using the forward pass
+        predictions_flat = self.forward(users_expanded, items_expanded)
+        # Reshape the predictions back to the original batch shape
+        predictions = predictions_flat.view(batch_size, pad_seq)
+
+        # Apply sigmoid to get scores between 0 and 1
+        predictions = self.sigmoid(predictions)
+
+        # Mask padded indices
+        predictions[item_indices == -1] = -torch.inf
         return predictions.to(self._device)

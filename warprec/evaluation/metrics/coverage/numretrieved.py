@@ -100,7 +100,11 @@ class NumRetrieved(TopKMetric):
         if self.compute_per_user:
             num_retrieved = self.num_retrieved
         else:
-            num_retrieved = (
-                self.num_retrieved / self.users if self.users > 0 else torch.tensor(0.0)
-            ).item()
+            num_retrieved = int(
+                (
+                    self.num_retrieved / self.users
+                    if self.users > 0
+                    else torch.tensor(0.0)
+                ).item()
+            )
         return {self.name: num_retrieved}

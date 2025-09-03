@@ -149,7 +149,7 @@ class BaseMetric(Metric, ABC):
         # Avoid division by zero: set minimum interaction
         # count to 1 if any item has zero interactions
         item_interactions = torch.clamp(item_interactions, min=1)
-        return item_interactions.unsqueeze(0)
+        return item_interactions
 
     def compute_novelty_profile(
         self, item_interactions: Tensor, num_users: int, log_discount: bool = False

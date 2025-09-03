@@ -311,7 +311,7 @@ class FOSSIL(IterativeRecommender, SequentialRecommenderUtils):
         return high_order + similarity
 
     @torch.no_grad()
-    def predict(
+    def predict_full(
         self,
         train_batch: Tensor,
         user_indices: Tensor,
@@ -344,4 +344,55 @@ class FOSSIL(IterativeRecommender, SequentialRecommenderUtils):
         predictions = torch.matmul(seq_output, all_item_embeddings.transpose(0, 1))
 
         predictions[train_batch != 0] = -torch.inf
+        return predictions.to(self._device)
+
+    @torch.no_grad()
+    def predict_sampled(
+        self,
+        train_batch: Tensor,
+        user_indices: Tensor,
+        item_indices: Tensor,
+        user_seq: Tensor,
+        seq_len: Tensor,
+        *args: Any,
+        **kwargs: Any,
+    ) -> Tensor:
+        """Prediction of given items using the learned embeddings.
+
+        Args:
+            train_batch (Tensor): The train batch of user interactions.
+            user_indices (Tensor): The batch of user indices.
+            item_indices (Tensor): The batch of item indices to predict for.
+            user_seq (Tensor): Padded sequences of item IDs for users to predict for.
+            seq_len (Tensor): Actual lengths of these sequences, before padding.
+            *args (Any): List of arguments.
+            **kwargs (Any): The dictionary of keyword arguments.
+
+        Returns:
+            Tensor: The score matrix {user x pad_seq}.
+        """
+        # Move inputs to the correct device
+        user_indices = user_indices.to(self._device)
+        user_seq = user_seq.to(self._device)
+        seq_len = seq_len.to(self._device)
+        item_indices = item_indices.to(self._device)
+
+        # Calculate the sequential output embedding for each user in the batch
+        seq_output = self.forward(
+            user_seq, seq_len, user_indices
+        )  # [batch_size, embedding_size]
+
+        # Get embeddings for candidate items. We clamp the indices to avoid
+        # out-of-bounds errors with the padding value (-1)
+        candidate_item_embeddings = self.item_embedding(
+            item_indices.clamp(min=0)
+        )  # [batch_size, pad_seq, embedding_size]
+
+        # Compute scores using a batch matrix multiplication or einsum
+        predictions = torch.einsum(
+            "bi,bji->bj", seq_output, candidate_item_embeddings
+        )  # [batch_size, pad_seq]
+
+        # Mask padded indices
+        predictions[item_indices == -1] = -torch.inf
         return predictions.to(self._device)

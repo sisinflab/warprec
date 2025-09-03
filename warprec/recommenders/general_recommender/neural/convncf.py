@@ -166,7 +166,7 @@ class ConvNCF(IterativeRecommender):
         return prediction.squeeze(-1)  # [batch_size]
 
     @torch.no_grad()
-    def predict(
+    def predict_full(
         self,
         train_batch: Tensor,
         user_indices: Tensor,
@@ -223,4 +223,46 @@ class ConvNCF(IterativeRecommender):
 
         # Masking interaction already seen in train
         predictions[train_batch != 0] = -torch.inf
+        return predictions.to(self._device)
+
+    @torch.no_grad()
+    def predict_sampled(
+        self,
+        train_batch: Tensor,
+        user_indices: Tensor,
+        item_indices: Tensor,
+        *args: Any,
+        **kwargs: Any,
+    ) -> Tensor:
+        """Prediction of given items using the learned embeddings.
+
+        Args:
+            train_batch (Tensor): The train batch of user interactions.
+            user_indices (Tensor): The batch of user indices.
+            item_indices (Tensor): The batch of item indices.
+            *args (Any): List of arguments.
+            **kwargs (Any): The dictionary of keyword arguments.
+
+        Returns:
+            Tensor: The score matrix {user x pad_seq}.
+        """
+        batch_size, pad_seq = item_indices.size()
+
+        # Prepare user and item indices for a single forward pass
+        # This flattens the tensors to create a list of all user-item pairs
+        # to be evaluated.
+        users_expanded = user_indices.unsqueeze(1).expand(-1, pad_seq).reshape(-1)
+
+        # Clamp item indices to handle padding (-1)
+        items_expanded = item_indices.clamp(min=0).reshape(-1)
+
+        # Use the forward pass to compute scores for all pairs at once.
+        # This is a more concise and reusable way to get the predictions.
+        predictions_flat = self.forward(users_expanded, items_expanded)
+
+        # Reshape the flat predictions back to the original batch shape
+        predictions = predictions_flat.view(batch_size, pad_seq)
+
+        # Mask padded indices
+        predictions[item_indices == -1] = -torch.inf
         return predictions.to(self._device)

@@ -127,14 +127,19 @@ class MAP(TopKMetric):
             torch.tensor(self.k, dtype=target.dtype, device=target.device),
         )  # [batch_size]
 
+        # Compute AP per user
+        ap_per_user = torch.where(
+            normalization > 0,
+            (precision_at_i * top_k_rel).sum(dim=1) / normalization,
+            torch.tensor(0.0, device=self._device),
+        )  # [batch_size]
+
         if self.compute_per_user:
             self.ap.index_add_(
-                0, user_indices, (precision_at_i * top_k_rel).sum(dim=1) / normalization
+                0, user_indices, ap_per_user
             )  # Index metric values per user
         else:
-            self.ap += (
-                (precision_at_i * top_k_rel).sum(dim=1) / normalization
-            ).sum()  # Compute total average precision
+            self.ap += ap_per_user.sum()  # Compute total average precision
 
         # Count only users with at least one interaction
         self.users += users

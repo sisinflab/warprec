@@ -57,10 +57,8 @@ class PopRSP(TopKMetric):
     For further details, please refer to this `paper <https://dl.acm.org/doi/abs/10.1145/3397271.3401177>`_.
 
     Attributes:
-        short_hits (Tensor): The short head recommendation hits.
-        long_hits (Tensor): The long tail recommendation hits.
-        short_gt (Tensor): The short head items in the target.
-        long_gt (Tensor): The long tail items in the target.
+        short_recs (Tensor): The short head recommendations.
+        long_recs (Tensor): The long tail recommendations.
 
     Args:
         k (int): The cutoff for recommendations.
@@ -74,13 +72,10 @@ class PopRSP(TopKMetric):
     _REQUIRED_COMPONENTS: Set[MetricBlock] = {
         MetricBlock.BINARY_RELEVANCE,
         MetricBlock.TOP_K_INDICES,
-        MetricBlock.TOP_K_VALUES,
     }
 
-    short_hits: Tensor
-    long_hits: Tensor
-    short_gt: Tensor
-    long_gt: Tensor
+    short_recs: Tensor
+    long_recs: Tensor
 
     def __init__(
         self,
@@ -95,76 +90,44 @@ class PopRSP(TopKMetric):
         sh, lt = self.compute_head_tail(item_interactions, pop_ratio)
         self.short_head = sh
         self.long_tail = lt
-        self.add_state("short_hits", default=torch.tensor(0.0), dist_reduce_fx="sum")
-        self.add_state("long_hits", default=torch.tensor(0.0), dist_reduce_fx="sum")
-        self.add_state("short_gt", default=torch.tensor(0.0), dist_reduce_fx="sum")
-        self.add_state("long_gt", default=torch.tensor(0.0), dist_reduce_fx="sum")
+        self.add_state("short_recs", default=torch.tensor(0.0), dist_reduce_fx="sum")
+        self.add_state("long_recs", default=torch.tensor(0.0), dist_reduce_fx="sum")
+
+        # Store the total number of items in each group
+        self.total_short = torch.tensor(len(self.short_head), dtype=torch.float32)
+        self.total_long = torch.tensor(len(self.long_tail), dtype=torch.float32)
 
     def update(self, preds: Tensor, **kwargs: Any):
         """Updates the metric state with the new batch of predictions."""
-        target: Tensor = kwargs.get("binary_relevance", torch.zeros_like(preds))
-        top_k_values: Tensor = kwargs.get(
-            f"top_{self.k}_values", self.top_k_values_indices(preds, self.k)[0]
-        )
         top_k_indices: Tensor = kwargs.get(
             f"top_{self.k}_indices", self.top_k_values_indices(preds, self.k)[1]
         )
 
-        rel = torch.zeros_like(preds)
-        rel.scatter_(
-            dim=1, index=top_k_indices, src=top_k_values
-        )  # [batch_size x items]
-        rel[rel > 0] = 1
+        # Handle sampled item indices if provided
+        item_indices = kwargs.get("item_indices", None)
+        if item_indices is not None:
+            top_k_indices = torch.gather(item_indices, 1, top_k_indices)
 
-        # Retrieve user number (consider only user with at least
-        # one interaction)
-        # The cast to int is used for a mypy check
-        users = int((target > 0).any(dim=1).sum().item())
-
-        # Retrieve train tensor
-        train_batch = torch.zeros_like(preds)
-        train_batch = torch.where(
-            preds == -torch.inf, torch.tensor(1.0), train_batch
-        )  # [batch_size x items]
-
-        # Expand short head and long tail
-        short_head_matrix = self.short_head.expand(
-            users, -1
-        )  # [batch_size x short_head]
-        long_tail_matrix = self.long_tail.expand(users, -1)  # [batch_size x long_tail]
-
-        # Extract short head and long tail items from recommendations
-        short_hits = torch.gather(
-            rel, 1, short_head_matrix
-        )  # [batch_size x short_head]
-        long_hits = torch.gather(rel, 1, long_tail_matrix)  # [batch_size x long_tail]
-
-        # Extract short head and long tail items from gt
-        short_gt = torch.gather(
-            (1 - train_batch), 1, short_head_matrix
-        )  # [batch_size x short_head]
-        long_gt = torch.gather(
-            (1 - train_batch), 1, long_tail_matrix
-        )  # [batch_size x long_tail]
+        # Count short head and long tail items in recommendations
+        short_recs = torch.isin(top_k_indices, self.short_head).sum().float()
+        long_recs = torch.isin(top_k_indices, self.long_tail).sum().float()
 
         # Update
-        self.short_hits += short_hits.sum()
-        self.long_hits += long_hits.sum()
-        self.short_gt += short_gt.sum()
-        self.long_gt += long_gt.sum()
+        self.short_recs += short_recs
+        self.long_recs += long_recs
 
     def compute(self):
         """Computes the final metric value."""
         # Handle division by zero
-        if self.short_gt == 0 or self.long_gt == 0:
-            return torch.tensor(0.0)
+        if self.total_short == 0 or self.total_long == 0:
+            return torch.tensor(0.0).item()
 
-        pr_short = self.short_hits / self.short_gt
-        pr_long = self.long_hits / self.long_gt
+        pr_short = self.short_recs / self.total_short
+        pr_long = self.long_recs / self.total_long
 
         # Handle NaN/Inf when both groups have zero probability
         if torch.isnan(pr_short) or torch.isnan(pr_long):
-            return torch.tensor(0.0)
+            return torch.tensor(0.0).item()
 
         pr = torch.stack([pr_short, pr_long])
         pop_rsp = torch.std(pr, unbiased=False) / torch.mean(pr)
