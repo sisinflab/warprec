@@ -374,6 +374,10 @@ class RecomModel(BaseModel, ABC):
         )
 
         for field, value in updated_values.items():
+            # In case of cross-validation the fold becomes an hyperparameter
+            # that we do not need to handle/validate
+            if field == "fold":
+                continue
             typing = field_to_type[field]
             if self.optimization.strategy == SearchAlgorithms.GRID:
                 updated_values[field] = self.validate_grid_search(field, value)
