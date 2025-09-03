@@ -285,14 +285,14 @@ class Trainer:
         # Memory report
         result_df = results.get_dataframe()
         additional_report = {
-            "RAM_Mean_Usage": result_df["ram_peak_mb"].mean(),
-            "RAM_STD_Usage": result_df["ram_peak_mb"].std(),
-            "RAM_Max_Usage": result_df["ram_peak_mb"].max(),
-            "RAM_Min_Usage": result_df["ram_peak_mb"].min(),
-            "VRAM_Mean_Usage": result_df["vram_peak_mb"].mean(),
-            "VRAM_STD_Usage": result_df["vram_peak_mb"].std(),
-            "VRAM_Max_Usage": result_df["vram_peak_mb"].max(),
-            "VRAM_Min_Usage": result_df["vram_peak_mb"].min(),
+            "RAM Mean Usage (MB)": result_df["ram_peak_mb"].mean(),
+            "RAM STD Usage (MB)": result_df["ram_peak_mb"].std(),
+            "RAM Max Usage (MB)": result_df["ram_peak_mb"].max(),
+            "RAM Min Usage (MB)": result_df["ram_peak_mb"].min(),
+            "VRAM Mean Usage (MB)": result_df["vram_peak_mb"].mean(),
+            "VRAM STD Usage (MB)": result_df["vram_peak_mb"].std(),
+            "VRAM Max Usage (MB)": result_df["vram_peak_mb"].max(),
+            "VRAM Min Usage (MB)": result_df["vram_peak_mb"].min(),
         }
 
         logger.msg(
@@ -471,14 +471,14 @@ class Trainer:
 
         # Memory report
         additional_report = {
-            "RAM_Mean_Usage": result_df["ram_peak_mb"].mean(),
-            "RAM_STD_Usage": result_df["ram_peak_mb"].std(),
-            "RAM_Max_Usage": result_df["ram_peak_mb"].max(),
-            "RAM_Min_Usage": result_df["ram_peak_mb"].min(),
-            "VRAM_Mean_Usage": result_df["vram_peak_mb"].mean(),
-            "VRAM_STD_Usage": result_df["vram_peak_mb"].std(),
-            "VRAM_Max_Usage": result_df["vram_peak_mb"].max(),
-            "VRAM_Min_Usage": result_df["vram_peak_mb"].min(),
+            "RAM Mean Usage (MB)": result_df["ram_peak_mb"].mean(),
+            "RAM STD Usage (MB)": result_df["ram_peak_mb"].std(),
+            "RAM Max Usage (MB)": result_df["ram_peak_mb"].max(),
+            "RAM Min Usage (MB)": result_df["ram_peak_mb"].min(),
+            "VRAM Mean Usage (MB)": result_df["vram_peak_mb"].mean(),
+            "VRAM STD Usage (MB)": result_df["vram_peak_mb"].std(),
+            "VRAM Max Usage (MB)": result_df["vram_peak_mb"].max(),
+            "VRAM Min Usage (MB)": result_df["vram_peak_mb"].min(),
         }
 
         # Clear hyperparam format and create the clean dictionary
@@ -609,15 +609,15 @@ class Trainer:
         report = {}
         if successful_trials:
             total_trial_times = [r.metrics["time_total_s"] for r in successful_trials]
-            report["Average_Trial_Time"] = sum(total_trial_times) / len(
+            report["Average Trial Time"] = sum(total_trial_times) / len(
                 total_trial_times
             )
 
         if model is not None:
-            report["Total_Params (Best Model)"] = sum(
+            report["Total Params (Best Model)"] = sum(
                 p.numel() for p in model.parameters()
             )
-            report["Trainable_Params (Best Model)"] = sum(
+            report["Trainable Params (Best Model)"] = sum(
                 p.numel() for p in model.parameters() if p.requires_grad
             )
 

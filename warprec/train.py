@@ -271,13 +271,13 @@ def main(args: Namespace):
             # Timing report for the current model
             model_timing_report.append(
                 {
-                    "Model_Name": model_name,
-                    "Data_Preparation_Time": data_preparation_time,
-                    "Hyperparameter_Exploration_Time": model_exploration_total_time,
+                    "Model Name": model_name,
+                    "Data Preparation Time": data_preparation_time,
+                    "Hyperparameter Exploration Time": model_exploration_total_time,
                     **ray_report,
-                    "Evaluation_Time": model_evaluation_total_time,
-                    "Inference_Time": inference_time,
-                    "Total_Time": model_exploration_total_time
+                    "Evaluation Time": model_evaluation_total_time,
+                    "Inference Time": inference_time,
+                    "Total Time": model_exploration_total_time
                     + model_evaluation_total_time,
                 }
             )
@@ -421,10 +421,10 @@ def multiple_fold_validation_flow(
         train_loop(best_model, main_dataset, iterations)
 
     # Final reporting
-    report["Total_Params (Best Model)"] = sum(
+    report["Total Params (Best Model)"] = sum(
         p.numel() for p in best_model.parameters()
     )
-    report["Trainable_Params (Best Model)"] = sum(
+    report["Trainable Params (Best Model)"] = sum(
         p.numel() for p in best_model.parameters() if p.requires_grad
     )
 

@@ -461,14 +461,14 @@ class LocalWriter(Writer):
 
             # Format only columns relative to time
             columns_to_exclude = [
-                "RAM_Mean_Usage",
-                "RAM_STD_Usage",
-                "RAM_Max_Usage",
-                "RAM_Min_Usage",
-                "VRAM_Mean_Usage",
-                "VRAM_STD_Usage",
-                "VRAM_Max_Usage",
-                "VRAM_Min_Usage",
+                "RAM Mean Usage (MB)",
+                "RAM STD Usage (MB)",
+                "RAM Max Usage (MB)",
+                "RAM Min Usage (MB)",
+                "VRAM Mean Usage (MB)",
+                "VRAM STD Usage (MB)",
+                "VRAM Max Usage (MB)",
+                "VRAM Min Usage (MB)",
             ]
             columns_to_format = [
                 col for col in float_columns if col not in columns_to_exclude
@@ -478,9 +478,9 @@ class LocalWriter(Writer):
 
             # Reordering columns
             first_columns = [
-                "Model_Name",
-                "Trainable_Params (Best Model)",
-                "Total_Params (Best Model)",
+                "Model Name",
+                "Trainable Params (Best Model)",
+                "Total Params (Best Model)",
             ]
             other_cols = [col for col in report.columns if col not in first_columns]
             report = report[first_columns + other_cols]
