@@ -270,7 +270,11 @@ def main(args: Namespace):
 
                 infer_time_start = time.time()
                 best_model(*batch)
-                inference_time = time.time() - infer_time_start
+
+                # Estimate inference time normalizing with batch size
+                inference_time = (
+                    time.time() - infer_time_start
+                ) / dataloader.batch_size
 
             # Timing report for the current model
             model_timing_report.append(
