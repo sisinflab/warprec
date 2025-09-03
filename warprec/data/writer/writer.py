@@ -5,10 +5,12 @@ from datetime import datetime
 from abc import ABC, abstractmethod
 
 import pandas as pd
+import numpy as np
 import torch
 import json
 from pandas import DataFrame
 from torch import Tensor
+from datetime import timedelta
 
 from warprec.utils.config import TrainConfiguration
 from warprec.data.dataset import Dataset
@@ -436,6 +438,13 @@ class LocalWriter(Writer):
         Args:
             time_report (List[Dict[str, Any]]): The time report to write.
         """
+
+        def format_secs(secs):
+            try:
+                return str(timedelta(seconds=secs))
+            except Exception:
+                return np.nan
+
         if self.config:
             writing_params = self.config.writer.results
         else:
@@ -464,6 +473,41 @@ class LocalWriter(Writer):
 
             # Convert new results to a DataFrame
             new_df = pd.DataFrame(time_report)
+
+            # Inference time conversion for cleaner output
+            new_df["Inference Time"] = (new_df["Inference Time"] * 1000000).round(6)
+            new_df = new_df.rename(columns={"Inference Time": "Inference Time (μs)"})
+
+            # Rounding memory usage values
+            new_df["RAM Mean Usage (MB)"] = new_df["RAM Mean Usage (MB)"].round(6)
+            new_df["RAM STD Usage (MB)"] = new_df["RAM STD Usage (MB)"].round(6)
+            new_df["RAM Max Usage (MB)"] = new_df["RAM Max Usage (MB)"].round(6)
+            new_df["RAM Min Usage (MB)"] = new_df["RAM Min Usage (MB)"].round(6)
+            new_df["VRAM Mean Usage (MB)"] = new_df["VRAM Mean Usage (MB)"].round(6)
+            new_df["VRAM STD Usage (MB)"] = new_df["VRAM STD Usage (MB)"].round(6)
+            new_df["VRAM Max Usage (MB)"] = new_df["VRAM Max Usage (MB)"].round(6)
+            new_df["VRAM Min Usage (MB)"] = new_df["VRAM Min Usage (MB)"].round(6)
+
+            # Now, proceed with formatting and reordering as in your original method
+            float_columns = new_df.select_dtypes(include=["float32", "float64"]).columns
+            columns_to_exclude = [
+                "RAM Mean Usage (MB)",
+                "RAM STD Usage (MB)",
+                "RAM Max Usage (MB)",
+                "RAM Min Usage (MB)",
+                "VRAM Mean Usage (MB)",
+                "VRAM STD Usage (MB)",
+                "VRAM Max Usage (MB)",
+                "VRAM Min Usage (MB)",
+                "Inference Time (μs)",
+            ]
+            columns_to_format = [
+                col for col in float_columns if col not in columns_to_exclude
+            ]
+
+            new_df = new_df.copy()
+            for col in columns_to_format:
+                new_df[col] = new_df[col].apply(format_secs)
 
             # Merge the new data with the existing data
             # 'Model Name' is the key to identify unique reports for a model
