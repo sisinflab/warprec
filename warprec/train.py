@@ -4,7 +4,6 @@ import time
 from argparse import Namespace
 
 import ray
-import numpy as np
 from pandas import DataFrame
 
 from warprec.data.reader import LocalReader
@@ -256,7 +255,7 @@ def main(args: Namespace):
             writer.write_model(best_model)
 
         if config.general.time_report:
-            inference_time = np.nan
+            inference_time = 0.0
             if isinstance(best_model, IterativeRecommender):
                 dataloader = best_model.get_dataloader(
                     main_dataset.train_set, main_dataset.train_session
