@@ -109,12 +109,12 @@ class LocalReader(Reader):
             data = pd.read_csv(
                 read_config.local_path,
                 sep=read_config.sep,
-                usecols=read_config.column_names,
+                usecols=read_config.column_names(),
                 dtype=read_config.column_dtype(),
             )
         else:
             data = pd.read_csv(read_config.local_path, sep=read_config.sep, header=None)
-            data.columns = read_config.column_names
+            data.columns = read_config.column_names()
         logger.msg("Data loaded correctly from local source.")
 
         return data
@@ -203,12 +203,12 @@ class LocalReader(Reader):
                 return pd.read_csv(
                     path,
                     sep=read_config.split.sep,
-                    usecols=read_config.column_names,
+                    usecols=read_config.column_names(),
                     dtype=read_config.dtypes,
                 )
             else:
                 df = pd.read_csv(path, sep=read_config.split.sep, header=None)
-                df.columns = read_config.column_names
+                df.columns = read_config.column_names()
                 # Use dictionary for dtypes and handle cases where column_names and dtypes don't match
                 df = df.astype(read_config.dtypes)
                 return df
