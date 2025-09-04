@@ -162,13 +162,11 @@ class MultiDAE(IterativeRecommender):
 
         return loss
 
-    def forward(self, rating_matrix: Tensor, *args: Any, **kwargs: Any) -> Tensor:
+    def forward(self, rating_matrix: Tensor) -> Tensor:
         """Forward pass with normalization and dropout.
 
         Args:
             rating_matrix (Tensor): The input rating matrix.
-            *args (Any): Optional arguments.
-            **kwargs (Any): Optional keyword arguments.
 
         Returns:
             Tensor: The reconstructed rating matrix.

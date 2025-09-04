@@ -283,8 +283,6 @@ class FOSSIL(IterativeRecommender, SequentialRecommenderUtils):
         user_id: Tensor,
         item_seq: Tensor,
         item_seq_len: Tensor,
-        *args: Any,
-        **kwargs: Any,
     ) -> Tensor:
         """Forward pass of the FOSSIL model.
 
@@ -292,8 +290,6 @@ class FOSSIL(IterativeRecommender, SequentialRecommenderUtils):
             user_id (Tensor): User IDs for each sequence [batch_size,].
             item_seq (Tensor): Padded sequences of item IDs [batch_size, max_seq_len].
             item_seq_len (Tensor): Actual lengths of sequences [batch_size,].
-            *args (Any): Optional arguments.
-            **kwargs (Any): Optional keyword arguments.
 
         Returns:
             Tensor: The combined embedding for prediction [batch_size, embedding_size].

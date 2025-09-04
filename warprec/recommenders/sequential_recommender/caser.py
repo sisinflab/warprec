@@ -185,16 +185,12 @@ class Caser(IterativeRecommender, SequentialRecommenderUtils):
 
         return loss
 
-    def forward(
-        self, user: Tensor, item_seq: Tensor, *args: Any, **kwargs: Any
-    ) -> Tensor:
+    def forward(self, user: Tensor, item_seq: Tensor) -> Tensor:
         """Forward pass of the Caser model.
 
         Args:
             user (Tensor): The user ID for each sequence [batch_size,].
             item_seq (Tensor): Padded sequences of item IDs [batch_size, max_seq_len].
-            *args (Any): Optional arguments.
-            **kwargs (Any): Optional keyword arguments.
 
         Returns:
             Tensor: The final sequence output embedding [batch_size, embedding_size].

@@ -141,14 +141,12 @@ class NeuMF(IterativeRecommender):
         return loss
 
     # pylint: disable = E0606
-    def forward(self, user: Tensor, item: Tensor, *args: Any, **kwargs: Any) -> Tensor:
+    def forward(self, user: Tensor, item: Tensor) -> Tensor:
         """Forward pass of the NeuMF model.
 
         Args:
             user (Tensor): The tensor containing the user indexes.
             item (Tensor): The tensor containing the item indexes.
-            *args (Any): Optional arguments.
-            **kwargs (Any): Optional keyword arguments.
 
         Returns:
             Tensor: The predicted score for each pair (user, item).
