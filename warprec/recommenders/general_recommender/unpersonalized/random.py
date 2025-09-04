@@ -35,7 +35,7 @@ class Random(Recommender):
         self._name = "Random"
 
     @torch.no_grad()
-    def predict(
+    def predict_full(
         self,
         train_batch: Tensor,
         *args: Any,
@@ -52,8 +52,36 @@ class Random(Recommender):
             Tensor: The score matrix {user x item}.
         """
         # Generate random predictions
-        predictions = torch.rand(train_batch.size(), device=self._device)
+        predictions = torch.rand(train_batch.size())
 
         # Mask seen items from the training data
         predictions[train_batch != 0] = -torch.inf
-        return predictions
+        return predictions.to(self._device)
+
+    @torch.no_grad()
+    def predict_sampled(
+        self,
+        train_batch: Tensor,
+        user_indices: Tensor,
+        item_indices: Tensor,
+        *args: Any,
+        **kwargs: Any,
+    ) -> Tensor:
+        """Prediction using a random number generator.
+
+        Args:
+            train_batch (Tensor): The train batch of user interactions.
+            user_indices (Tensor): The batch of user indices.
+            item_indices (Tensor): The batch of item indices.
+            *args (Any): List of arguments.
+            **kwargs (Any): The dictionary of keyword arguments.
+
+        Returns:
+            Tensor: The score matrix {user x pad_seq}.
+        """
+        # Generate random predictions
+        predictions = torch.rand(item_indices.size())
+
+        # Mask padded indices
+        predictions[item_indices == -1] = -torch.inf
+        return predictions.to(self._device)

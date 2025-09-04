@@ -45,7 +45,7 @@ class Recommender(nn.Module, ABC):
         self._name = ""
 
     @abstractmethod
-    def predict(
+    def predict_full(
         self,
         train_batch: Tensor,
         user_indices: Tensor,
@@ -68,6 +68,36 @@ class Recommender(nn.Module, ABC):
         Returns:
             Tensor: The score matrix {user x item}.
         """
+
+    def predict_sampled(
+        self,
+        train_batch: Tensor,
+        user_indices: Tensor,
+        item_indices: Tensor,
+        user_seq: Tensor,
+        seq_len: Tensor,
+        *args: Any,
+        **kwargs: Any,
+    ) -> Tensor:
+        """This method will produce predictions only of given item
+        indices.
+
+        Args:
+            train_batch (Tensor): The train batch of user interactions.
+            user_indices (Tensor): The batch of user indices.
+            item_indices (Tensor): The batch of item indices.
+            user_seq (Tensor): The user sequence of item interactions.
+            seq_len (Tensor): The user sequence length.
+            *args (Any): List of arguments.
+            **kwargs (Any): The dictionary of keyword arguments.
+
+        Returns:
+            Tensor: The score matrix {user x pad_seq}.
+
+        Raises:
+            NotImplementedError: If the model does not support sampled prediction.
+        """
+        raise NotImplementedError("This model does not support sampled prediction.")
 
     def get_recs(
         self,
@@ -103,7 +133,7 @@ class Recommender(nn.Module, ABC):
                     self.max_seq_len,  # Sequence length truncated
                 )
 
-            predictions = self.predict(
+            predictions = self.predict_full(
                 train_batch,
                 user_indices=user_indices,
                 user_seq=user_seq,
@@ -430,7 +460,7 @@ class ItemSimRecommender(Recommender):
         self.item_similarity = nn.Parameter(torch.rand(self.items, self.items))
 
     @torch.no_grad()
-    def predict(
+    def predict_full(
         self,
         train_batch: Tensor,
         *args: Any,
@@ -450,4 +480,37 @@ class ItemSimRecommender(Recommender):
 
         # Masking interaction already seen in train
         predictions[train_batch != 0] = -torch.inf
+        return predictions.to(self._device)
+
+    @torch.no_grad()
+    def predict_sampled(
+        self,
+        train_batch: Tensor,
+        user_indices: Tensor,
+        item_indices: Tensor,
+        *args: Any,
+        **kwargs: Any,
+    ) -> Tensor:
+        """Prediction in the form of X@B where B is a {item x item} similarity matrix.
+
+        This method will produce predictions only for given item indices.
+
+        Args:
+            train_batch (Tensor): The train batch of user interactions.
+            user_indices (Tensor): The batch of user indices.
+            item_indices (Tensor): The batch of item indices to sample.
+            *args (Any): List of arguments.
+            **kwargs (Any): The dictionary of keyword arguments.
+
+        Returns:
+            Tensor: The score matrix {user x pad_seq}.
+        """
+        # Compute predictions and gather only sampled items
+        predictions = train_batch @ self.item_similarity  # pylint: disable=not-callable
+        predictions = predictions.gather(
+            1, item_indices.clamp(min=0)
+        )  # [batch_size, pad_seq]
+
+        # Mask padded indices
+        predictions[item_indices == -1] = -torch.inf
         return predictions.to(self._device)

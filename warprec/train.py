@@ -1,5 +1,5 @@
 import argparse
-from typing import List, Tuple, Dict, Any
+from typing import List, Tuple, Dict, Any, Optional
 import time
 from argparse import Namespace
 
@@ -163,6 +163,9 @@ def main(args: Namespace):
         item_cluster=main_dataset.get_item_cluster(),
     )
 
+    # Prepare dataloaders for evaluation
+    dataset_preparation(main_dataset, fold_dataset, config)
+
     data_preparation_time = time.time() - experiment_start_time
     logger.positive(
         f"Data preparation completed in {data_preparation_time:.2f} seconds."
@@ -214,6 +217,8 @@ def main(args: Namespace):
             best_model,
             main_dataset,
             device=str(best_model._device),
+            strategy=config.evaluation.strategy,
+            num_negatives=config.evaluation.num_negatives,
             verbose=True,
         )
         results = evaluator.compute_results()
@@ -327,6 +332,8 @@ def single_train_test_split_flow(
         dataset,
         val_metric,
         val_k,
+        evaluation_strategy=config.evaluation.strategy,
+        num_negatives=config.evaluation.num_negatives,
         beta=config.evaluation.beta,
         pop_ratio=config.evaluation.pop_ratio,
         ray_verbose=config.general.ray_verbose,
@@ -377,6 +384,8 @@ def multiple_fold_validation_flow(
         val_datasets,
         val_metric,
         val_k,
+        evaluation_strategy=config.evaluation.strategy,
+        num_negatives=config.evaluation.num_negatives,
         beta=config.evaluation.beta,
         pop_ratio=config.evaluation.pop_ratio,
         desired_training_it=desired_training_it,
@@ -414,6 +423,51 @@ def multiple_fold_validation_flow(
     )
 
     return best_model, report
+
+
+def dataset_preparation(
+    main_dataset: Dataset,
+    fold_dataset: Optional[List[Dataset]],
+    config: TrainConfiguration,
+):
+    """This method prepares the dataloaders inside the dataset
+    that will be passed to Ray during HPO. It is important to
+    precompute these dataloaders before starting the optimization to
+    avoid multiple computations of the same dataloader.
+
+    Args:
+        main_dataset (Dataset): The main dataset of train/test split.
+        fold_dataset (Optional[List[Dataset]]): The list of validation datasets
+            of train/val splits.
+        config (TrainConfiguration): The configuration file used for the experiment.
+    """
+
+    def prepare_evaluation_loaders(dataset: Dataset):
+        """utility function to prepare the evaluation dataloaders
+        for a given dataset based on the evaluation strategy.
+
+        Args:
+            dataset (Dataset): The dataset to prepare.
+        """
+        if config.evaluation.strategy == "full":
+            dataset.get_evaluation_dataloader()
+        elif config.evaluation.strategy == "sampled":
+            dataset.get_neg_evaluation_dataloader(
+                num_negatives=config.evaluation.num_negatives,
+                seed=config.evaluation.seed,
+            )
+
+    logger.msg("Preparing main dataset inner structures for training and evaluation.")
+
+    prepare_evaluation_loaders(main_dataset)
+    if fold_dataset is not None and isinstance(fold_dataset, list):
+        for i, dataset in enumerate(fold_dataset):
+            logger.msg(
+                f"Preparing fold dataset {i + 1}/{len(fold_dataset)} inner structures for training and evaluation."
+            )
+            prepare_evaluation_loaders(dataset)
+
+    logger.positive("All dataset inner structures ready.")
 
 
 if __name__ == "__main__":

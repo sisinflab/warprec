@@ -63,6 +63,9 @@ class EvaluationConfig(BaseModel):
         top_k (List[int]): List of cutoffs to evaluate.
         metrics (List[str]): List of metrics to compute during evaluation.
         batch_size (Optional[int]): Batch size used during evaluation.
+        strategy (Optional[str]): Evaluation strategy, either "full" or "sampled".
+        num_negatives (Optional[int]): Number of negative samples to use in "sampled" strategy.
+        seed (Optional[int]): Random seed for reproducibility. Used in negative sampling.
         stat_significance (Optional[StatSignificance]): Statistical significance configuration.
         max_metric_per_row (Optional[int]): Number of metrics to show in each row on console.
         beta (Optional[float]): The beta value used in some metrics like F1 score.
@@ -74,6 +77,9 @@ class EvaluationConfig(BaseModel):
     top_k: List[int]
     metrics: List[str]
     batch_size: Optional[int] = 1024
+    strategy: Optional[str] = "full"  # or "sampled"
+    num_negatives: Optional[int] = 99
+    seed: Optional[int] = 42
     stat_significance: Optional[StatSignificance] = Field(
         default_factory=StatSignificance
     )
@@ -155,6 +161,26 @@ class EvaluationConfig(BaseModel):
             logger.attention(
                 f"Duplicated metrics found inside evaluation. "
                 f"{len_before - len_after} metrics removed."
+            )
+        return v
+
+    @field_validator("strategy")
+    @classmethod
+    def strategy_validator(cls, v: str):
+        """Validate strategy."""
+        if v not in ["full", "sampled"]:
+            raise ValueError(
+                f"The strategy value should be either 'full' or 'sampled'. Value provided: {v}"
+            )
+        return v
+
+    @field_validator("num_negatives")
+    @classmethod
+    def num_negatives_validator(cls, v: int):
+        """Validate num_negatives."""
+        if v is not None and v <= 0:
+            raise ValueError(
+                f"The num_negatives value should be a positive integer. Value provided: {v}"
             )
         return v
 

@@ -182,7 +182,7 @@ class MultiDAE(IterativeRecommender):
         return self.decoder(h)
 
     @torch.no_grad()
-    def predict(
+    def predict_full(
         self,
         train_batch: Tensor,
         *args: Any,
@@ -203,4 +203,37 @@ class MultiDAE(IterativeRecommender):
 
         # Masking interaction already seen in train
         predictions[train_batch != 0] = -torch.inf
+        return predictions.to(self._device)
+
+    @torch.no_grad()
+    def predict_sampled(
+        self,
+        train_batch: Tensor,
+        user_indices: Tensor,
+        item_indices: Tensor,
+        *args: Any,
+        **kwargs: Any,
+    ) -> Tensor:
+        """Prediction using the the encoder and decoder modules.
+
+        This method will produce predictions only for given item indices.
+
+        Args:
+            train_batch (Tensor): The train batch of user interactions.
+            user_indices (Tensor): The batch of user indices.
+            item_indices (Tensor): The batch of item indices to sample.
+            *args (Any): List of arguments.
+            **kwargs (Any): The dictionary of keyword arguments.
+
+        Returns:
+            Tensor: The score matrix {user x pad_seq}.
+        """
+        # Compute predictions and gather only sampled items
+        predictions = self.forward(train_batch)
+        predictions = predictions.gather(
+            1, item_indices.clamp(min=0)
+        )  # [batch_size, pad_seq]
+
+        # Mask padded indices
+        predictions[item_indices == -1] = -torch.inf
         return predictions.to(self._device)

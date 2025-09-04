@@ -1,13 +1,17 @@
 import re
 import time
 from math import ceil
-from typing import List, Dict, Optional, Set, Any
+from typing import List, Dict, Optional, Set, Any, Tuple
 
 import torch
 from torch import Tensor
 from scipy.sparse import csr_matrix
 from tabulate import tabulate
-from warprec.data.dataset import Dataset
+from warprec.data.dataset import (
+    Dataset,
+    EvaluationDataLoader,
+    NegativeEvaluationDataLoader,
+)
 from warprec.evaluation.metrics.base_metric import BaseMetric
 from warprec.recommenders.base_recommender import (
     Recommender,
@@ -53,6 +57,7 @@ class Evaluator:
     ):
         self.k_values = k_values
         self.metric_list = metric_list
+        self.num_items = train_set.shape[1]
         self.metrics: Dict[int, List[BaseMetric]] = {}
         self.required_blocks: Dict[int, Set[MetricBlock]] = {}
         self.common_params: Dict[str, Any] = {
@@ -117,6 +122,8 @@ class Evaluator:
         model: Recommender,
         dataset: Dataset,
         device: str = "cpu",
+        strategy: str = "full",
+        num_negatives: int = 99,
         verbose: bool = False,
     ):
         """The main method to evaluate a list of metrics on the prediction of a model.
@@ -125,7 +132,13 @@ class Evaluator:
             model (Recommender): The trained model.
             dataset (Dataset): The dataset used for the evaluation.
             device (str): The device on which the metrics will be calculated.
+            strategy (str): The strategy to use during evaluation. Defaults to 'full'.
+            num_negatives (int): The number of negative samples to
+                use during the sampled evaluation. Defaults to 99.
             verbose (bool): Wether of not the method should write with logger.
+
+        Raises:
+            ValueError: If the strategy is not supported.
         """
         eval_start_time: float
         if verbose:
@@ -138,26 +151,77 @@ class Evaluator:
         model.eval()
 
         # Retrieve evaluation dataloader
-        dataloader = dataset.get_evaluation_dataloader()
+        dataloader: EvaluationDataLoader | NegativeEvaluationDataLoader
+        match strategy:
+            case "full":
+                dataloader = dataset.get_evaluation_dataloader()
+            case "sampled":
+                dataloader = dataset.get_neg_evaluation_dataloader(
+                    num_negatives=num_negatives
+                )
+            case _:
+                raise ValueError(f"Evaluation strategy {strategy} not supported.")
 
         # Main evaluation loop
-        for train_batch, eval_batch, user_indices in dataloader:
-            user_indices = user_indices.to(device)
+        for batch in dataloader:
+            candidates_local: Tensor = None
 
-            # If we are evaluating a sequential model, compute user history
-            user_seq, seq_len = None, None
-            if isinstance(model, SequentialRecommenderUtils):
-                user_seq, seq_len = dataset.train_session.get_user_history_sequences(
-                    user_indices.tolist(),
-                    model.max_seq_len,  # Sequence length truncated
-                )
+            # Based on strategy, call different predict method
+            match strategy:
+                case "full":
+                    train_batch, eval_batch, user_indices = [
+                        x.to(device) for x in batch
+                    ]
 
-            predictions = model.predict(
-                train_batch,
-                user_indices=user_indices,
-                user_seq=user_seq,
-                seq_len=seq_len,
-            ).to(device)  # Get ratings tensor [batch_size x items]
+                    # In case of sequential model, we need to retrieve sequences
+                    user_seq, seq_len = None, None
+                    if isinstance(model, SequentialRecommenderUtils):
+                        user_seq, seq_len = self._retrieve_sequences_for_user(
+                            dataset,
+                            user_indices.tolist(),
+                            model.max_seq_len,
+                        )
+
+                    predictions = model.predict_full(
+                        train_batch,
+                        user_indices=user_indices,
+                        user_seq=user_seq,
+                        seq_len=seq_len,
+                    ).to(device)  # Get ratings tensor [batch_size, num_items]
+                case "sampled":
+                    train_batch, pos_batch, neg_batch, user_indices = [
+                        x.to(device) for x in batch
+                    ]
+
+                    # In case of sequential model, we need to retrieve sequences
+                    user_seq, seq_len = None, None
+                    if isinstance(model, SequentialRecommenderUtils):
+                        user_seq, seq_len = self._retrieve_sequences_for_user(
+                            dataset,
+                            user_indices.tolist(),
+                            model.max_seq_len,
+                        )
+
+                    # Cat all the sampled items in a single tensor
+                    candidates_local = torch.cat([pos_batch, neg_batch], dim=1)
+
+                    # This method will rate only sampled items
+                    # Output tensor size will depend on longest sampled
+                    # list in current batch
+                    predictions = model.predict_sampled(
+                        train_batch,
+                        user_indices=user_indices,
+                        item_indices=candidates_local,
+                        user_seq=user_seq,
+                        seq_len=seq_len,
+                    ).to(device)  # Get ratings tensor [batch_size, pad_seq]
+
+                    # Create the local GT
+                    num_positives_per_user = (pos_batch != -1).sum(dim=1)
+                    col_indices = torch.arange(candidates_local.shape[1], device=device)
+                    eval_batch = (
+                        col_indices < num_positives_per_user.unsqueeze(1)
+                    ).float()  # [batch_size, pad_seq]
 
             # Pre-compute metric blocks
             precomputed_blocks: Dict[int, Dict[str, Tensor]] = {}
@@ -226,6 +290,7 @@ class Evaluator:
                         "discounted_relevance": discounted_relevance,
                         "valid_users": valid_users,
                         "user_indices": user_indices,
+                        "item_indices": candidates_local,
                         **precomputed_blocks[k],
                     }
                     metric.update(
@@ -329,3 +394,25 @@ class Evaluator:
             logger.msg(title.center(_rlen, "-"))
             for row in table.split("\n"):
                 logger.msg(row)
+
+    def _retrieve_sequences_for_user(
+        self, dataset: Dataset, user_indices: List[int], max_seq_len: int
+    ) -> Tuple[Tensor, Tensor]:
+        """Utility method to retrieve user sequences from dataset.
+
+        Args:
+            dataset (Dataset): The dataset containing the user sessions.
+            user_indices (List[int]): The list of user indices.
+            max_seq_len (int): The maximum sequence length.
+
+        Returns:
+            Tuple[Tensor, Tensor]: A tuple containing two elements:
+                - Tensor: The user sequences.
+                - Tensor: The lengths of the sequences.
+        """
+        # If we are evaluating a sequential model, compute user history
+        user_seq, seq_len = dataset.train_session.get_user_history_sequences(
+            user_indices,
+            max_seq_len,  # Sequence length truncated
+        )
+        return (user_seq, seq_len)
