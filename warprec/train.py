@@ -4,6 +4,7 @@ import time
 from argparse import Namespace
 
 import ray
+import torch
 from pandas import DataFrame
 
 from warprec.data.reader import LocalReader
@@ -21,7 +22,11 @@ from warprec.utils.helpers import validation_metric
 from warprec.utils.logger import logger
 from warprec.recommenders.trainer import Trainer
 from warprec.recommenders.loops import train_loop
-from warprec.recommenders.base_recommender import Recommender, IterativeRecommender
+from warprec.recommenders.base_recommender import (
+    Recommender,
+    IterativeRecommender,
+    SequentialRecommenderUtils,
+)
 from warprec.evaluation.evaluator import Evaluator
 from warprec.evaluation.statistical_significance import compute_paired_statistical_test
 from warprec.utils.registry import model_registry
@@ -260,21 +265,39 @@ def main(args: Namespace):
             writer.write_model(best_model)
 
         if config.general.time_report:
-            inference_time = 0.0
-            if isinstance(best_model, IterativeRecommender):
-                dataloader = best_model.get_dataloader(
-                    main_dataset.train_set, main_dataset.train_session
-                )
-                batch = next(iter(dataloader))
-                batch = [x.to(best_model._device) for x in batch]
+            # Retrieve dataset information
+            info = main_dataset.info()
+            num_users = info.get("users", None)
+            num_items = info.get("items", None)
 
-                infer_time_start = time.time()
-                best_model(*batch)
+            # Define simple sample to measure prediction time
+            num_users_to_predict = min(1000, num_users)
+            num_items_to_predict = min(1000, num_items)
 
-                # Estimate inference time normalizing with batch size
-                inference_time = (
-                    time.time() - infer_time_start
-                ) / dataloader.batch_size
+            # Create mock data to test model performance during inference
+            if isinstance(best_model, SequentialRecommenderUtils):
+                max_seq_len = best_model.max_seq_len
+            else:
+                max_seq_len = 10
+
+            train_batch = torch.randint(0, 2, (num_users_to_predict, num_items)).float()
+            user_indices = torch.arange(num_users_to_predict)
+            item_indices = torch.randint(
+                1, num_items, (num_users_to_predict, num_items_to_predict)
+            )
+            user_seq = torch.randint(1, num_items, (num_users_to_predict, max_seq_len))
+            seq_len = torch.randint(1, max_seq_len + 1, (num_users_to_predict,))
+
+            # Test inference time
+            inference_time_start = time.time()
+            best_model.predict_sampled(
+                train_batch,
+                user_indices=user_indices,
+                item_indices=item_indices,
+                user_seq=user_seq,
+                seq_len=seq_len,
+            )
+            inference_time = time.time() - inference_time_start
 
             # Timing report for the current model
             model_timing_report.append(
