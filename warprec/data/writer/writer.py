@@ -475,8 +475,8 @@ class LocalWriter(Writer):
             new_df = pd.DataFrame(time_report)
 
             # Inference time conversion for cleaner output
-            new_df["Inference Time"] = (new_df["Inference Time"] * 1000000).round(6)
-            new_df = new_df.rename(columns={"Inference Time": "Inference Time (μs)"})
+            new_df["Inference Time"] = (new_df["Inference Time"] * 1000).round(6)
+            new_df = new_df.rename(columns={"Inference Time": "Inference Time (ms)"})
 
             # Rounding memory usage values
             new_df["RAM Mean Usage (MB)"] = new_df["RAM Mean Usage (MB)"].round(6)
@@ -499,7 +499,7 @@ class LocalWriter(Writer):
                 "VRAM STD Usage (MB)",
                 "VRAM Max Usage (MB)",
                 "VRAM Min Usage (MB)",
-                "Inference Time (μs)",
+                "Inference Time (ms)",
             ]
             columns_to_format = [
                 col for col in float_columns if col not in columns_to_exclude
