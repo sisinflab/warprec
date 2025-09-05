@@ -17,8 +17,9 @@ from warprec.utils.config import (
     load_train_configuration,
     load_callback,
     TrainConfiguration,
+    RecomModel,
 )
-from warprec.utils.helpers import validation_metric
+from warprec.utils.helpers import model_param_from_dict
 from warprec.utils.logger import logger
 from warprec.recommenders.trainer import Trainer
 from warprec.recommenders.loops import train_loop
@@ -182,10 +183,7 @@ def main(args: Namespace):
     for model_name in models:
         model_exploration_start_time = time.time()
 
-        params = config.models[model_name]
-        val_metric, val_k = validation_metric(
-            params.get("optimization", {}).get("validation_metric", "nDCG@5")
-        )
+        params = model_param_from_dict(model_name, config.models[model_name])
         trainer = Trainer(
             custom_callback=callback,
             custom_models=config.general.custom_models,
@@ -198,8 +196,6 @@ def main(args: Namespace):
             best_model, ray_report = multiple_fold_validation_flow(
                 model_name,
                 params,
-                val_metric,
-                val_k,
                 main_dataset,
                 fold_dataset,
                 trainer,
@@ -208,7 +204,7 @@ def main(args: Namespace):
         else:
             # Model will be optimized and evaluated on test set
             best_model, ray_report = single_train_test_split_flow(
-                model_name, params, val_metric, val_k, main_dataset, trainer, config
+                model_name, params, main_dataset, trainer, config
             )
 
         model_exploration_total_time = time.time() - model_exploration_start_time
@@ -238,7 +234,7 @@ def main(args: Namespace):
         # Callback after complete evaluation
         callback.on_evaluation_complete(
             model=best_model,
-            params=params,
+            params=params.model_dump(),
             results=results,
         )
 
@@ -249,7 +245,7 @@ def main(args: Namespace):
         )
 
         # Recommendation
-        if params["meta"]["save_recs"]:
+        if params.meta.save_recs:
             recs = best_model.get_recs(
                 main_dataset,
                 k=config.writer.recommendation.k,
@@ -261,7 +257,7 @@ def main(args: Namespace):
         writer.write_params(model_params)
 
         # Model serialization
-        if params["meta"]["save_model"]:
+        if params.meta.save_model:
             writer.write_model(best_model)
 
         # Timing report for the current model
@@ -305,9 +301,7 @@ def main(args: Namespace):
 
 def single_train_test_split_flow(
     model_name: str,
-    params: dict,
-    val_metric: str,
-    val_k: int,
+    params: RecomModel,
     dataset: Dataset,
     trainer: Trainer,
     config: TrainConfiguration,
@@ -316,9 +310,7 @@ def single_train_test_split_flow(
 
     Args:
         model_name (str): Name of the model to optimize.
-        params (dict): The parameter used to train the model.
-        val_metric (str): The metric used to validate the model.
-        val_k (int): The cutoff used to validate the model.
+        params (RecomModel): The parameter used to train the model.
         dataset (Dataset): The main dataset which represents train/test split.
         trainer (Trainer): The trainer instance used to optimize the model.
         config (TrainConfiguration): The configuration file.
@@ -335,8 +327,6 @@ def single_train_test_split_flow(
         model_name,
         params,
         dataset,
-        val_metric,
-        val_k,
         evaluation_strategy=config.evaluation.strategy,
         num_negatives=config.evaluation.num_negatives,
         beta=config.evaluation.beta,
@@ -349,9 +339,7 @@ def single_train_test_split_flow(
 
 def multiple_fold_validation_flow(
     model_name: str,
-    params: dict,
-    val_metric: str,
-    val_k: int,
+    params: RecomModel,
     main_dataset: Dataset,
     val_datasets: List[Dataset],
     trainer: Trainer,
@@ -361,9 +349,7 @@ def multiple_fold_validation_flow(
 
     Args:
         model_name (str): Name of the model to optimize.
-        params (dict): The parameter used to train the model.
-        val_metric (str): The metric used to validate the model.
-        val_k (int): The cutoff used to validate the model.
+        params (RecomModel): The parameter used to train the model.
         main_dataset (Dataset): The main dataset which represents train/test split.
         val_datasets (List[Dataset]): The validation datasets which represents train/val splits.
             The list can contain n folds of train/val splits.
@@ -377,18 +363,16 @@ def multiple_fold_validation_flow(
             - dict: Report dictionary.
     """
     # Retrieve common params
-    device = params["optimization"]["device"]
-    block_size = params["optimization"]["block_size"]
-    desired_training_it = params["optimization"]["properties"]["desired_training_it"]
-    seed = params["optimization"]["properties"]["seed"]
+    device = params.optimization.device
+    block_size = params.optimization.block_size
+    desired_training_it = params.optimization.properties.desired_training_it
+    seed = params.optimization.properties.seed
 
     # Start HPO phase on validation folds
     best_params, report = trainer.train_multiple_fold(
         model_name,
         params,
         val_datasets,
-        val_metric,
-        val_k,
         evaluation_strategy=config.evaluation.strategy,
         num_negatives=config.evaluation.num_negatives,
         beta=config.evaluation.beta,
