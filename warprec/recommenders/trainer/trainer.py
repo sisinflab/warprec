@@ -290,7 +290,7 @@ class Trainer:
 
         # Retrieve best model from checkpoint
         checkpoint_path = os.path.join(best_checkpoint.to_directory(), "checkpoint.pt")
-        checkpoint_data = torch.load(checkpoint_path)
+        checkpoint_data = torch.load(checkpoint_path, weights_only=True)
         model_state = checkpoint_data["model_state"]
 
         best_model = model_registry.get(
