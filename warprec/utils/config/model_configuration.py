@@ -116,16 +116,16 @@ class Optimization(BaseModel):
         validation_metric (Optional[str]): The metric/loss that will
             validate each trial in Ray Tune.
         device (Optional[str]): The device that will be used for tensor operations.
+        max_cpu_count (Optional[int]): The maximum number of CPU cores to assign to
+            the experiments. Defaults to the maximum number of cores.
+        parallel_trials (Optional[int]): The number of trials to execute in parallel.
+            Defaults to 1. Increasing this number will require more computational resources.
         block_size (Optional[int]): The number of items to process during prediction.
             Used by some neural models, increasing this value will affect memory usage.
         num_samples (Optional[int]): The number of trials that Ray Tune will try.
             In case of a grid search, this parameter should be set to 1.
         checkpoint_to_keep (Optional[int]): The number of checkpoints to keep
             in the ray directory.
-        cpu_per_trial (Optional[float]): The number of cpu cores dedicated to
-            each trial.
-        gpu_per_trial (Optional[float]): The number of gpu dedicated to
-            each trial.
     """
 
     strategy: Optional[SearchAlgorithms] = SearchAlgorithms.GRID
@@ -133,11 +133,11 @@ class Optimization(BaseModel):
     properties: Optional[Properties] = Field(default_factory=Properties)
     validation_metric: Optional[str] = "nDCG@5"
     device: Optional[str] = "cpu"
+    max_cpu_count: Optional[int] = os.cpu_count()
+    parallel_trials: Optional[int] = 1
     block_size: Optional[int] = 50
     num_samples: Optional[int] = 1
     checkpoint_to_keep: Optional[int] = 5
-    cpu_per_trial: Optional[float] = os.cpu_count()
-    gpu_per_trial: Optional[float] = 0.0
 
     @field_validator("strategy")
     @classmethod
@@ -187,32 +187,24 @@ class Optimization(BaseModel):
                     "Cuda device was selected but not available on current machine."
                 )
             return v
-        if v.startswith("cuda:"):
-            parts = v.split(":")
-            if len(parts) == 2 and parts[1].isdigit():
-                if parts[1] not in list(range(torch.cuda.device_count())):
-                    raise ValueError(
-                        f"The GPU with the idx {parts[1]} is not available. "
-                        f"This is a list of available GPU idxs: "
-                        f"{list(range(torch.cuda.device_count()))}."
-                    )
-                return v
-        raise ValueError(f'Device {v} is not supported. Use "cpu" or "cuda[:index]".')
+        raise ValueError(f'Device {v} is not supported. Use "cpu" or "cuda".')
 
-    @field_validator("cpu_per_trial")
+    @field_validator("max_cpu_count")
     @classmethod
-    def check_cpu_per_trial(cls, v: float):
-        """Validate cpu_per_trial."""
-        if v <= 0:
-            raise ValueError("Value for cpu_per_trial must be > 0.")
+    def check_max_cpu_count(cls, v: int):
+        """Validate max_cpu_count."""
+        if v > os.cpu_count():
+            raise ValueError(
+                "Requested a number of CPU cores higher than the available ones."
+            )
         return v
 
-    @field_validator("gpu_per_trial")
+    @field_validator("parallel_trials")
     @classmethod
-    def check_gpu_per_trial(cls, v: float):
-        """Validate gpu_per_trial."""
-        if v < 0:
-            raise ValueError("Value for gpu_per_trial must be >= 0.")
+    def check_parallel_trials(cls, v: int):
+        """Validate parallel_trials."""
+        if v < 1:
+            raise ValueError("Number of parallel trials must be >= 1.")
         return v
 
     @model_validator(mode="after")

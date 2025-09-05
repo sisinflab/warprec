@@ -1,6 +1,7 @@
+import os
 import argparse
-from typing import List, Tuple, Dict, Any, Optional
 import time
+from typing import List, Tuple, Dict, Any, Optional
 from argparse import Namespace
 
 import ray
@@ -37,6 +38,10 @@ def main(args: Namespace):
 
     # Config parser testing
     config = load_train_configuration(args.config)
+
+    # Setup visible devices
+    visible_devices = config.general.cuda_visible_devices
+    os.environ["CUDA_VISIBLE_DEVICES"] = ",".join(map(str, visible_devices))  # type: ignore[arg-type]
 
     # Load custom callback if specified
     callback: WarpRecCallback = load_callback(

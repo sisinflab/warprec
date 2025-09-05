@@ -260,8 +260,10 @@ class Trainer:
             tune.with_resources(
                 obj_function,
                 resources={
-                    "cpu": optimization.cpu_per_trial,
-                    "gpu": optimization.gpu_per_trial,
+                    "cpu": optimization.max_cpu_count // optimization.parallel_trials,
+                    "gpu": min(
+                        torch.cuda.device_count() / optimization.parallel_trials, 1.0
+                    ),
                 },
             ),
             param_space=self.parse_params(params),
@@ -428,8 +430,10 @@ class Trainer:
             tune.with_resources(
                 obj_function,
                 resources={
-                    "cpu": optimization.cpu_per_trial,
-                    "gpu": optimization.gpu_per_trial,
+                    "cpu": optimization.max_cpu_count // optimization.parallel_trials,
+                    "gpu": min(
+                        torch.cuda.device_count() / optimization.parallel_trials, 1.0
+                    ),
                 },
             ),
             param_space=self.parse_params(params, num_folds),
