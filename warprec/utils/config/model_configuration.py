@@ -253,11 +253,7 @@ class Optimization(BaseModel):
                     "Reduction_factor property is required for ASHA scheduling. "
                     "Change type of scheduling or provide the reduction_factor attribute."
                 )
-        if self.device != "cpu" and self.gpu_per_trial == 0:
-            raise ValueError(
-                "You are trying to use one (or more) CUDA device(s) but you did "
-                "not pass a value for gpu_per_trial. Check your configuration."
-            )
+
         return self
 
 
