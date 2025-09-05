@@ -1,10 +1,12 @@
 import importlib
-from typing import List, Tuple
+from typing import List, Tuple, TYPE_CHECKING
 from pathlib import Path
 
-from warprec.utils.config import RecomModel
 from warprec.utils.registry import params_registry
 from warprec.utils.logger import logger
+
+if TYPE_CHECKING:
+    from warprec.utils.config import RecomModel
 
 
 def load_custom_modules(custom_modules: str | List[str] | None):
@@ -63,7 +65,7 @@ def validation_metric(val_metric: str) -> Tuple[str, int]:
     return metric_name, int(top_k)
 
 
-def model_param_from_dict(model_name: str, params: dict) -> RecomModel:
+def model_param_from_dict(model_name: str, params: dict) -> "RecomModel":
     """Retrieve the Pydantic model and validate the parameters.
 
     Args:
