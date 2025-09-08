@@ -5,6 +5,7 @@ from typing import List, Tuple, Dict, Any, Optional
 from argparse import Namespace
 
 import ray
+import torch
 from pandas import DataFrame
 
 from warprec.data.reader import LocalReader
@@ -23,7 +24,11 @@ from warprec.utils.helpers import model_param_from_dict
 from warprec.utils.logger import logger
 from warprec.recommenders.trainer import Trainer
 from warprec.recommenders.loops import train_loop
-from warprec.recommenders.base_recommender import Recommender, IterativeRecommender
+from warprec.recommenders.base_recommender import (
+    Recommender,
+    IterativeRecommender,
+    SequentialRecommenderUtils,
+)
 from warprec.evaluation.evaluator import Evaluator
 from warprec.evaluation.statistical_significance import compute_paired_statistical_test
 from warprec.utils.registry import model_registry
@@ -260,21 +265,57 @@ def main(args: Namespace):
         if params.meta.save_model:
             writer.write_model(best_model)
 
-        # Timing report for the current model
-        model_timing_report.append(
-            {
-                "Model_Name": model_name,
-                "Data_Preparation_Time": data_preparation_time,
-                "Hyperparameter_Exploration_Time": model_exploration_total_time,
-                **ray_report,
-                "Evaluation_Time": model_evaluation_total_time,
-                "Total_Time": model_exploration_total_time
-                + model_evaluation_total_time,
-            }
-        )
+        if config.general.time_report:
+            # Retrieve dataset information
+            info = main_dataset.info()
+            num_users = info.get("users", None)
+            num_items = info.get("items", None)
 
-    if config.general.time_report:
-        writer.write_time_report(model_timing_report)
+            # Define simple sample to measure prediction time
+            num_users_to_predict = min(1000, num_users)
+            num_items_to_predict = min(1000, num_items)
+
+            # Create mock data to test model performance during inference
+            if isinstance(best_model, SequentialRecommenderUtils):
+                max_seq_len = best_model.max_seq_len
+            else:
+                max_seq_len = 10
+
+            train_batch = torch.randint(0, 2, (num_users_to_predict, num_items)).float()
+            user_indices = torch.arange(num_users_to_predict)
+            item_indices = torch.randint(
+                1, num_items, (num_users_to_predict, num_items_to_predict)
+            )
+            user_seq = torch.randint(1, num_items, (num_users_to_predict, max_seq_len))
+            seq_len = torch.randint(1, max_seq_len + 1, (num_users_to_predict,))
+
+            # Test inference time
+            inference_time_start = time.time()
+            best_model.predict_sampled(
+                train_batch,
+                user_indices=user_indices,
+                item_indices=item_indices,
+                user_seq=user_seq,
+                seq_len=seq_len,
+            )
+            inference_time = time.time() - inference_time_start
+
+            # Timing report for the current model
+            model_timing_report.append(
+                {
+                    "Model Name": model_name,
+                    "Data Preparation Time": data_preparation_time,
+                    "Hyperparameter Exploration Time": model_exploration_total_time,
+                    **ray_report,
+                    "Evaluation Time": model_evaluation_total_time,
+                    "Inference Time": inference_time,
+                    "Total Time": model_exploration_total_time
+                    + model_evaluation_total_time,
+                }
+            )
+
+            # Update time report
+            writer.write_time_report(model_timing_report)
 
     if requires_stat_significance:
         logger.msg(
@@ -404,10 +445,10 @@ def multiple_fold_validation_flow(
         train_loop(best_model, main_dataset, iterations)
 
     # Final reporting
-    report["Total_Params (Best Model)"] = sum(
+    report["Total Params (Best Model)"] = sum(
         p.numel() for p in best_model.parameters()
     )
-    report["Trainable_Params (Best Model)"] = sum(
+    report["Trainable Params (Best Model)"] = sum(
         p.numel() for p in best_model.parameters() if p.requires_grad
     )
 
