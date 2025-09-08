@@ -382,7 +382,6 @@ class Trainer:
         if "early_stopping" in params_copy:
             params_copy.pop("early_stopping")
 
-        print(params_copy)
         for k, v in params_copy.items():
             if v[0] is not SearchSpace.CHOICE:
                 tune_params[k] = search_space_registry.get(v[0])(*v[1:])
