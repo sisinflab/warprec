@@ -4,7 +4,9 @@ import importlib
 from pathlib import Path
 from typing import Optional, Type, List, Dict, Any
 
+import torch
 from pydantic import BaseModel, field_validator, model_validator, Field
+
 from warprec.utils.helpers import is_python_module
 from warprec.utils.callback import WarpRecCallback
 
@@ -128,6 +130,8 @@ class GeneralConfig(BaseModel):
         precision (Optional[str]): The precision to use during computation.
         ray_verbose (Optional[int]): The Ray level of verbosity.
         time_report (Optional[bool]): Whether to report the time taken by each step.
+        cuda_visible_devices (Optional[List[int] | int]): The list of visible CUDA devices.
+            Defaults to all visible devices.
         custom_models (Optional[str | List[str]]): List of custom model paths to load.
             This is useful for loading custom models that are not part of the
             standard Warprec framework.
@@ -137,10 +141,30 @@ class GeneralConfig(BaseModel):
     precision: Optional[str] = "float32"
     ray_verbose: Optional[int] = 1
     time_report: Optional[bool] = True
+    cuda_visible_devices: Optional[List[int] | int] = list(
+        range(torch.cuda.device_count())
+    )
     custom_models: Optional[str | List[str]] = None
     callback: Optional[WarpRecCallbackConfig] = Field(
         default_factory=WarpRecCallbackConfig
     )
+
+    @field_validator("cuda_visible_devices")
+    @classmethod
+    def check_cuda_visible_devices(cls, v: List[int] | int):
+        """Validate cuda_visible_devices."""
+        available_gpu_indexes = list(range(torch.cuda.device_count()))
+
+        if isinstance(v, int):
+            v = [v]
+
+        if v is not None:
+            for index in v:
+                if index not in available_gpu_indexes:
+                    raise ValueError(
+                        f"Indexes specified not available. Available indexes: {available_gpu_indexes}"
+                    )
+        return v
 
     @field_validator("custom_models")
     @classmethod

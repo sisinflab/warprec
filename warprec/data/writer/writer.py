@@ -433,7 +433,7 @@ class LocalWriter(Writer):
         logger.msg(f"Split data written to {main_split_path}")
 
     def write_time_report(self, time_report: List[Dict[str, Any]]):
-        """This method writes the time report into a local path.
+        """This method writes the time report into a local path, with incremental updates.
 
         Args:
             time_report (List[Dict[str, Any]]): The time report to write.
@@ -451,25 +451,83 @@ class LocalWriter(Writer):
             writing_params = ResultsWriting(sep="\t", ext=".tsv")
 
         # experiment_path/evaluation/Time_Report_{timestamp}.{ext}
-        time_report_path = join(
-            self.experiment_evaluation_dir,
-            f"Time_Report_{self._timestamp}{writing_params.ext}",
+        time_report_path = Path(
+            join(
+                self.experiment_evaluation_dir,
+                f"Time_Report_{self._timestamp}{writing_params.ext}",
+            )
         )
-        try:
-            report = pd.DataFrame(time_report)
-            float_columns = report.select_dtypes(include=["float32", "float64"]).columns
 
-            for col in float_columns:
-                report[col] = report[col].apply(format_secs)
+        try:
+            # Load existing data if the file exists
+            existing_df = pd.DataFrame()
+            if time_report_path.exists():
+                try:
+                    existing_df = pd.read_csv(time_report_path, sep=writing_params.sep)
+                except Exception as e:
+                    logger.attention(
+                        f"Could not read existing time report from {time_report_path}: {e}. "
+                        "A new file will be created or existing data will be overwritten."
+                    )
+                    existing_df = pd.DataFrame()
+
+            # Convert new results to a DataFrame
+            new_df = pd.DataFrame(time_report)
+
+            # Inference time conversion for cleaner output
+            new_df["Inference Time"] = (new_df["Inference Time"] * 1000).round(6)
+            new_df = new_df.rename(columns={"Inference Time": "Inference Time (ms)"})
+
+            # Rounding memory usage values
+            new_df["RAM Mean Usage (MB)"] = new_df["RAM Mean Usage (MB)"].round(6)
+            new_df["RAM STD Usage (MB)"] = new_df["RAM STD Usage (MB)"].round(6)
+            new_df["RAM Max Usage (MB)"] = new_df["RAM Max Usage (MB)"].round(6)
+            new_df["RAM Min Usage (MB)"] = new_df["RAM Min Usage (MB)"].round(6)
+            new_df["VRAM Mean Usage (MB)"] = new_df["VRAM Mean Usage (MB)"].round(6)
+            new_df["VRAM STD Usage (MB)"] = new_df["VRAM STD Usage (MB)"].round(6)
+            new_df["VRAM Max Usage (MB)"] = new_df["VRAM Max Usage (MB)"].round(6)
+            new_df["VRAM Min Usage (MB)"] = new_df["VRAM Min Usage (MB)"].round(6)
+
+            # Now, proceed with formatting and reordering as in your original method
+            float_columns = new_df.select_dtypes(include=["float32", "float64"]).columns
+            columns_to_exclude = [
+                "RAM Mean Usage (MB)",
+                "RAM STD Usage (MB)",
+                "RAM Max Usage (MB)",
+                "RAM Min Usage (MB)",
+                "VRAM Mean Usage (MB)",
+                "VRAM STD Usage (MB)",
+                "VRAM Max Usage (MB)",
+                "VRAM Min Usage (MB)",
+                "Inference Time (ms)",
+            ]
+            columns_to_format = [
+                col for col in float_columns if col not in columns_to_exclude
+            ]
+
+            new_df = new_df.copy()
+            for col in columns_to_format:
+                new_df[col] = new_df[col].apply(format_secs)
+
+            # Merge the new data with the existing data
+            # 'Model Name' is the key to identify unique reports for a model
+            merge_keys = ["Model Name"]
+
+            # Concat the two dataframes and drop duplicates based on merge keys, keeping the last (newest) data
+            combined_df = pd.concat([existing_df, new_df], ignore_index=True)
+            report = combined_df.drop_duplicates(subset=merge_keys, keep="last")
 
             # Reordering columns
             first_columns = [
-                "Model_Name",
-                "Trainable_Params (Best Model)",
-                "Total_Params (Best Model)",
+                "Model Name",
+                "Trainable Params (Best Model)",
+                "Total Params (Best Model)",
             ]
             other_cols = [col for col in report.columns if col not in first_columns]
             report = report[first_columns + other_cols]
+
+            # Sort the final dataframe by the Model Name for consistency
+            report = report.sort_values(by=merge_keys).reset_index(drop=True)
 
             report.to_csv(
                 time_report_path,

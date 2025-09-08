@@ -1,9 +1,11 @@
+import os
 import argparse
-from typing import List, Tuple, Dict, Any, Optional
 import time
+from typing import List, Tuple, Dict, Any, Optional
 from argparse import Namespace
 
 import ray
+import torch
 from pandas import DataFrame
 
 from warprec.data.reader import LocalReader
@@ -16,12 +18,17 @@ from warprec.utils.config import (
     load_train_configuration,
     load_callback,
     TrainConfiguration,
+    RecomModel,
 )
-from warprec.utils.helpers import validation_metric
+from warprec.utils.helpers import model_param_from_dict
 from warprec.utils.logger import logger
 from warprec.recommenders.trainer import Trainer
 from warprec.recommenders.loops import train_loop
-from warprec.recommenders.base_recommender import Recommender, IterativeRecommender
+from warprec.recommenders.base_recommender import (
+    Recommender,
+    IterativeRecommender,
+    SequentialRecommenderUtils,
+)
 from warprec.evaluation.evaluator import Evaluator
 from warprec.evaluation.statistical_significance import compute_paired_statistical_test
 from warprec.utils.registry import model_registry
@@ -37,6 +44,10 @@ def main(args: Namespace):
 
     # Config parser testing
     config = load_train_configuration(args.config)
+
+    # Setup visible devices
+    visible_devices = config.general.cuda_visible_devices
+    os.environ["CUDA_VISIBLE_DEVICES"] = ",".join(map(str, visible_devices))  # type: ignore[arg-type]
 
     # Load custom callback if specified
     callback: WarpRecCallback = load_callback(
@@ -177,10 +188,7 @@ def main(args: Namespace):
     for model_name in models:
         model_exploration_start_time = time.time()
 
-        params = config.models[model_name]
-        val_metric, val_k = validation_metric(
-            params.get("optimization", {}).get("validation_metric", "nDCG@5")
-        )
+        params = model_param_from_dict(model_name, config.models[model_name])
         trainer = Trainer(
             custom_callback=callback,
             custom_models=config.general.custom_models,
@@ -193,8 +201,6 @@ def main(args: Namespace):
             best_model, ray_report = multiple_fold_validation_flow(
                 model_name,
                 params,
-                val_metric,
-                val_k,
                 main_dataset,
                 fold_dataset,
                 trainer,
@@ -203,7 +209,7 @@ def main(args: Namespace):
         else:
             # Model will be optimized and evaluated on test set
             best_model, ray_report = single_train_test_split_flow(
-                model_name, params, val_metric, val_k, main_dataset, trainer, config
+                model_name, params, main_dataset, trainer, config
             )
 
         model_exploration_total_time = time.time() - model_exploration_start_time
@@ -233,7 +239,7 @@ def main(args: Namespace):
         # Callback after complete evaluation
         callback.on_evaluation_complete(
             model=best_model,
-            params=params,
+            params=params.model_dump(),
             results=results,
         )
 
@@ -244,7 +250,7 @@ def main(args: Namespace):
         )
 
         # Recommendation
-        if params["meta"]["save_recs"]:
+        if params.meta.save_recs:
             recs = best_model.get_recs(
                 main_dataset,
                 k=config.writer.recommendation.k,
@@ -256,24 +262,60 @@ def main(args: Namespace):
         writer.write_params(model_params)
 
         # Model serialization
-        if params["meta"]["save_model"]:
+        if params.meta.save_model:
             writer.write_model(best_model)
 
-        # Timing report for the current model
-        model_timing_report.append(
-            {
-                "Model_Name": model_name,
-                "Data_Preparation_Time": data_preparation_time,
-                "Hyperparameter_Exploration_Time": model_exploration_total_time,
-                **ray_report,
-                "Evaluation_Time": model_evaluation_total_time,
-                "Total_Time": model_exploration_total_time
-                + model_evaluation_total_time,
-            }
-        )
+        if config.general.time_report:
+            # Retrieve dataset information
+            info = main_dataset.info()
+            num_users = info.get("users", None)
+            num_items = info.get("items", None)
 
-    if config.general.time_report:
-        writer.write_time_report(model_timing_report)
+            # Define simple sample to measure prediction time
+            num_users_to_predict = min(1000, num_users)
+            num_items_to_predict = min(1000, num_items)
+
+            # Create mock data to test model performance during inference
+            if isinstance(best_model, SequentialRecommenderUtils):
+                max_seq_len = best_model.max_seq_len
+            else:
+                max_seq_len = 10
+
+            train_batch = torch.randint(0, 2, (num_users_to_predict, num_items)).float()
+            user_indices = torch.arange(num_users_to_predict)
+            item_indices = torch.randint(
+                1, num_items, (num_users_to_predict, num_items_to_predict)
+            )
+            user_seq = torch.randint(1, num_items, (num_users_to_predict, max_seq_len))
+            seq_len = torch.randint(1, max_seq_len + 1, (num_users_to_predict,))
+
+            # Test inference time
+            inference_time_start = time.time()
+            best_model.predict_sampled(
+                train_batch,
+                user_indices=user_indices,
+                item_indices=item_indices,
+                user_seq=user_seq,
+                seq_len=seq_len,
+            )
+            inference_time = time.time() - inference_time_start
+
+            # Timing report for the current model
+            model_timing_report.append(
+                {
+                    "Model Name": model_name,
+                    "Data Preparation Time": data_preparation_time,
+                    "Hyperparameter Exploration Time": model_exploration_total_time,
+                    **ray_report,
+                    "Evaluation Time": model_evaluation_total_time,
+                    "Inference Time": inference_time,
+                    "Total Time": model_exploration_total_time
+                    + model_evaluation_total_time,
+                }
+            )
+
+            # Update time report
+            writer.write_time_report(model_timing_report)
 
     if requires_stat_significance:
         logger.msg(
@@ -300,9 +342,7 @@ def main(args: Namespace):
 
 def single_train_test_split_flow(
     model_name: str,
-    params: dict,
-    val_metric: str,
-    val_k: int,
+    params: RecomModel,
     dataset: Dataset,
     trainer: Trainer,
     config: TrainConfiguration,
@@ -311,9 +351,7 @@ def single_train_test_split_flow(
 
     Args:
         model_name (str): Name of the model to optimize.
-        params (dict): The parameter used to train the model.
-        val_metric (str): The metric used to validate the model.
-        val_k (int): The cutoff used to validate the model.
+        params (RecomModel): The parameter used to train the model.
         dataset (Dataset): The main dataset which represents train/test split.
         trainer (Trainer): The trainer instance used to optimize the model.
         config (TrainConfiguration): The configuration file.
@@ -330,8 +368,6 @@ def single_train_test_split_flow(
         model_name,
         params,
         dataset,
-        val_metric,
-        val_k,
         evaluation_strategy=config.evaluation.strategy,
         num_negatives=config.evaluation.num_negatives,
         beta=config.evaluation.beta,
@@ -344,9 +380,7 @@ def single_train_test_split_flow(
 
 def multiple_fold_validation_flow(
     model_name: str,
-    params: dict,
-    val_metric: str,
-    val_k: int,
+    params: RecomModel,
     main_dataset: Dataset,
     val_datasets: List[Dataset],
     trainer: Trainer,
@@ -356,9 +390,7 @@ def multiple_fold_validation_flow(
 
     Args:
         model_name (str): Name of the model to optimize.
-        params (dict): The parameter used to train the model.
-        val_metric (str): The metric used to validate the model.
-        val_k (int): The cutoff used to validate the model.
+        params (RecomModel): The parameter used to train the model.
         main_dataset (Dataset): The main dataset which represents train/test split.
         val_datasets (List[Dataset]): The validation datasets which represents train/val splits.
             The list can contain n folds of train/val splits.
@@ -372,18 +404,16 @@ def multiple_fold_validation_flow(
             - dict: Report dictionary.
     """
     # Retrieve common params
-    device = params["optimization"]["device"]
-    block_size = params["optimization"]["block_size"]
-    desired_training_it = params["optimization"]["properties"]["desired_training_it"]
-    seed = params["optimization"]["properties"]["seed"]
+    device = params.optimization.device
+    block_size = params.optimization.block_size
+    desired_training_it = params.optimization.properties.desired_training_it
+    seed = params.optimization.properties.seed
 
     # Start HPO phase on validation folds
     best_params, report = trainer.train_multiple_fold(
         model_name,
         params,
         val_datasets,
-        val_metric,
-        val_k,
         evaluation_strategy=config.evaluation.strategy,
         num_negatives=config.evaluation.num_negatives,
         beta=config.evaluation.beta,
@@ -415,10 +445,10 @@ def multiple_fold_validation_flow(
         train_loop(best_model, main_dataset, iterations)
 
     # Final reporting
-    report["Total_Params (Best Model)"] = sum(
+    report["Total Params (Best Model)"] = sum(
         p.numel() for p in best_model.parameters()
     )
-    report["Trainable_Params (Best Model)"] = sum(
+    report["Trainable Params (Best Model)"] = sum(
         p.numel() for p in best_model.parameters() if p.requires_grad
     )
 
@@ -442,30 +472,38 @@ def dataset_preparation(
         config (TrainConfiguration): The configuration file used for the experiment.
     """
 
-    def prepare_evaluation_loaders(dataset: Dataset):
+    def prepare_evaluation_loaders(dataset: Dataset, devices: set):
         """utility function to prepare the evaluation dataloaders
         for a given dataset based on the evaluation strategy.
 
         Args:
             dataset (Dataset): The dataset to prepare.
+            devices (set): The set of devices to use.
         """
-        if config.evaluation.strategy == "full":
-            dataset.get_evaluation_dataloader()
-        elif config.evaluation.strategy == "sampled":
-            dataset.get_neg_evaluation_dataloader(
-                num_negatives=config.evaluation.num_negatives,
-                seed=config.evaluation.seed,
-            )
+        for device in devices:
+            if config.evaluation.strategy == "full":
+                dataset.get_evaluation_dataloader(device=device)
+            elif config.evaluation.strategy == "sampled":
+                dataset.get_neg_evaluation_dataloader(
+                    num_negatives=config.evaluation.num_negatives,
+                    seed=config.evaluation.seed,
+                    device=device,
+                )
 
     logger.msg("Preparing main dataset inner structures for training and evaluation.")
 
-    prepare_evaluation_loaders(main_dataset)
+    models = config.models
+    devices = set()
+    for model in models.values():
+        devices.add(model.get("optimization").get("device"))
+
+    prepare_evaluation_loaders(main_dataset, devices)
     if fold_dataset is not None and isinstance(fold_dataset, list):
         for i, dataset in enumerate(fold_dataset):
             logger.msg(
                 f"Preparing fold dataset {i + 1}/{len(fold_dataset)} inner structures for training and evaluation."
             )
-            prepare_evaluation_loaders(dataset)
+            prepare_evaluation_loaders(dataset, devices)
 
     logger.positive("All dataset inner structures ready.")
 

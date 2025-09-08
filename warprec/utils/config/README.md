@@ -543,10 +543,11 @@ The `optimization` section let you decide how to train your model.
 - **properties**: A nested section dedicated for strategy and scheduler parameters.
 - **validation_metric**: The validation metric used during training. Defaults to nDCG@5.
 - **device**: The device used during training and evaluation. Defaults to cpu. Supports cuda devices and also cuda devices with indexing, like cuda:1.
+- **max_cpu_count**: The number of virtual CPU cores that WarpRec can should use. Defaults to the maximum available.
 - **num_samples**: The number of samples to generate for the different strategies. If the strategy is set to grid, then this field must be set to 1. Defaults to 1.
+- **parallel_trials**: Number of trials to execute in parallel. Defaults to 1.
+- **block_size**: The size of items to predict at the same time, used by some models for efficiency. Defaults to 50.
 - **checkpoint_to_keep**: Specifies the number of checkpoints to retain in the Ray directory. Default is 5. Setting this value too low may result in warnings from Ray regarding multiple checkpoint deletion, while setting it too high may lead to excessive disk usage due to the accumulation of checkpoint data.
-- **cpu_per_trial**: The number of cpu cores per trial. Must be greater than 0. Supports floating numbers. Defaults to the maximum number of cpu cores available locally.
-- **gpu_per_trial**: The number of gpus per trial. Supports floating numbers. Defaults to 0.
 
 #### 🧩 Properties
 
@@ -771,9 +772,9 @@ The `General Configuration` section defines some parameters that will affect the
 The `General Configuration` can be configured using the following keywords:
 
 - **precision**: The precision to be used inside the experiment. Defaults to float32.
-- **ray_verbose**: . The Ray Tune verbosity value. Ray Tune accepts verbosity levels in a range from 0 to 3. Defaults to 1.
-- **time_report**: Whether to report the time taken by each step. Defaults to True.
 - **ray_verbose**: The Ray Tune verbosity value. Ray Tune accepts verbosity levels in a range from 0 to 3. Defaults to 1.
+- **time_report**: Whether to report the time taken by each step. Defaults to True.
+- **cuda_visible_devices**: The indexes of cuda devices that WarpRec can use. Defaults to all devices.
 - **custom_models**: Modules to import into WarpRec for loading custom models within the main pipeline. Accepted values are a string or a list of strings.
 - **callback**: A nested section dedicated to the optional callback.
 
