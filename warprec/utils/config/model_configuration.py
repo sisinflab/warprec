@@ -362,6 +362,8 @@ class RecomModel(BaseModel, ABC):
         )
 
         for field, value in updated_values.items():
+            if field == "fold":  # Skip fold, no need to validate
+                continue
             typing = field_to_type[field]
             if self.optimization.strategy == SearchAlgorithms.GRID:
                 updated_values[field] = self.validate_grid_search(field, value)
