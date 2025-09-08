@@ -472,30 +472,38 @@ def dataset_preparation(
         config (TrainConfiguration): The configuration file used for the experiment.
     """
 
-    def prepare_evaluation_loaders(dataset: Dataset):
+    def prepare_evaluation_loaders(dataset: Dataset, devices: set):
         """utility function to prepare the evaluation dataloaders
         for a given dataset based on the evaluation strategy.
 
         Args:
             dataset (Dataset): The dataset to prepare.
+            devices (set): The set of devices to use.
         """
-        if config.evaluation.strategy == "full":
-            dataset.get_evaluation_dataloader()
-        elif config.evaluation.strategy == "sampled":
-            dataset.get_neg_evaluation_dataloader(
-                num_negatives=config.evaluation.num_negatives,
-                seed=config.evaluation.seed,
-            )
+        for device in devices:
+            if config.evaluation.strategy == "full":
+                dataset.get_evaluation_dataloader(device=device)
+            elif config.evaluation.strategy == "sampled":
+                dataset.get_neg_evaluation_dataloader(
+                    num_negatives=config.evaluation.num_negatives,
+                    seed=config.evaluation.seed,
+                    device=device,
+                )
 
     logger.msg("Preparing main dataset inner structures for training and evaluation.")
 
-    prepare_evaluation_loaders(main_dataset)
+    models = config.models
+    devices = set()
+    for model in models.values():
+        devices.add(model.get("optimization").get("device"))
+
+    prepare_evaluation_loaders(main_dataset, devices)
     if fold_dataset is not None and isinstance(fold_dataset, list):
         for i, dataset in enumerate(fold_dataset):
             logger.msg(
                 f"Preparing fold dataset {i + 1}/{len(fold_dataset)} inner structures for training and evaluation."
             )
-            prepare_evaluation_loaders(dataset)
+            prepare_evaluation_loaders(dataset, devices)
 
     logger.positive("All dataset inner structures ready.")
 

@@ -154,10 +154,11 @@ class Evaluator:
         dataloader: EvaluationDataLoader | NegativeEvaluationDataLoader
         match strategy:
             case "full":
-                dataloader = dataset.get_evaluation_dataloader()
+                dataloader = dataset.get_evaluation_dataloader(device=device)
             case "sampled":
                 dataloader = dataset.get_neg_evaluation_dataloader(
-                    num_negatives=num_negatives
+                    num_negatives=num_negatives,
+                    device=device,
                 )
             case _:
                 raise ValueError(f"Evaluation strategy {strategy} not supported.")
