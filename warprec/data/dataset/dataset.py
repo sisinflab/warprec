@@ -31,19 +31,28 @@ class EvaluationDataset(TorchDataset):
     ):
         self.num_users, self.num_items = train_interactions.shape
 
+        # Create copies of csr data
+        train_indptr = train_interactions.indptr.copy()
+        train_indices = train_interactions.indices.copy()
+        train_values = train_interactions.data.copy()
+
+        eval_indptr = eval_interactions.indptr.copy()
+        eval_indices = eval_interactions.indices.copy()
+        eval_values = eval_interactions.data.copy()
+
         # Create sparse training set representation
-        crow_indices_train = torch.from_numpy(train_interactions.indptr).to(torch.int64)
-        col_indices_train = torch.from_numpy(train_interactions.indices).to(torch.int64)
-        values_train = torch.from_numpy(train_interactions.data)
+        crow_indices_train = torch.from_numpy(train_indptr).to(torch.int64)
+        col_indices_train = torch.from_numpy(train_indices).to(torch.int64)
+        values_train = torch.from_numpy(train_values)
         size_train = train_interactions.shape
         self.torch_sparse_train = torch.sparse_csr_tensor(
             crow_indices_train, col_indices_train, values_train, size=size_train
         ).to(device)
 
         # Create sparse evaluation set representation
-        crow_indices_eval = torch.from_numpy(eval_interactions.indptr).to(torch.int64)
-        col_indices_eval = torch.from_numpy(eval_interactions.indices).to(torch.int64)
-        values_eval = torch.from_numpy(eval_interactions.data)
+        crow_indices_eval = torch.from_numpy(eval_indptr).to(torch.int64)
+        col_indices_eval = torch.from_numpy(eval_indices).to(torch.int64)
+        values_eval = torch.from_numpy(eval_values)
         size_eval = eval_interactions.shape
         self.torch_sparse_eval = torch.sparse_csr_tensor(
             crow_indices_eval, col_indices_eval, values_eval, size=size_eval
@@ -117,10 +126,15 @@ class NegativeEvaluationDataset(TorchDataset):
         self.num_users, self.num_items = train_interactions.shape
         self.num_negatives = num_negatives
 
+        # Create copies of csr data
+        train_indptr = train_interactions.indptr.copy()
+        train_indices = train_interactions.indices.copy()
+        train_values = train_interactions.data.copy()
+
         # Create sparse training set representation
-        crow_indices = torch.from_numpy(train_interactions.indptr).to(torch.int64)
-        col_indices = torch.from_numpy(train_interactions.indices).to(torch.int64)
-        values = torch.from_numpy(train_interactions.data)
+        crow_indices = torch.from_numpy(train_indptr).to(torch.int64)
+        col_indices = torch.from_numpy(train_indices).to(torch.int64)
+        values = torch.from_numpy(train_values)
         size = train_interactions.shape
         self.torch_sparse_csr = torch.sparse_csr_tensor(
             crow_indices, col_indices, values, size=size
