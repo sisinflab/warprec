@@ -2,7 +2,6 @@ import os
 from typing import List, Optional, Union, ClassVar, Any
 from abc import ABC
 
-import torch
 from pydantic import BaseModel, ConfigDict, Field, model_validator, field_validator
 from warprec.utils.enums import (
     SearchAlgorithms,
@@ -115,7 +114,6 @@ class Optimization(BaseModel):
         properties (Optional[Properties]): The attributes required for Ray Tune to work.
         validation_metric (Optional[str]): The metric/loss that will
             validate each trial in Ray Tune.
-        device (Optional[str]): The device that will be used for tensor operations.
         max_cpu_count (Optional[int]): The maximum number of CPU cores to assign to
             the experiments. Defaults to the maximum number of cores.
         parallel_trials (Optional[int]): The number of trials to execute in parallel.
@@ -132,7 +130,6 @@ class Optimization(BaseModel):
     scheduler: Optional[Schedulers] = Schedulers.FIFO
     properties: Optional[Properties] = Field(default_factory=Properties)
     validation_metric: Optional[str] = "nDCG@5"
-    device: Optional[str] = "cpu"
     max_cpu_count: Optional[int] = os.cpu_count()
     parallel_trials: Optional[int] = 1
     block_size: Optional[int] = 50
@@ -176,18 +173,6 @@ class Optimization(BaseModel):
                 "Validation metric should be provided with a top_k number."
             )
         return v
-
-    @field_validator("device")
-    @classmethod
-    def check_device(cls, v: str):
-        """Validate device."""
-        if v in ("cuda", "cpu"):
-            if v == "cuda" and not torch.cuda.is_available():
-                raise ValueError(
-                    "Cuda device was selected but not available on current machine."
-                )
-            return v
-        raise ValueError(f'Device {v} is not supported. Use "cpu" or "cuda".')
 
     @field_validator("max_cpu_count")
     @classmethod

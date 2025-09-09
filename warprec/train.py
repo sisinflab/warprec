@@ -368,6 +368,7 @@ def single_train_test_split_flow(
         model_name,
         params,
         dataset,
+        device=config.general.device,
         evaluation_strategy=config.evaluation.strategy,
         num_negatives=config.evaluation.num_negatives,
         beta=config.evaluation.beta,
@@ -404,8 +405,8 @@ def multiple_fold_validation_flow(
             - dict: Report dictionary.
     """
     # Retrieve common params
-    device = params.optimization.device
     block_size = params.optimization.block_size
+    device = config.general.device
     desired_training_it = params.optimization.properties.desired_training_it
     seed = params.optimization.properties.seed
 
@@ -414,6 +415,7 @@ def multiple_fold_validation_flow(
         model_name,
         params,
         val_datasets,
+        device=device,
         evaluation_strategy=config.evaluation.strategy,
         num_negatives=config.evaluation.num_negatives,
         beta=config.evaluation.beta,
