@@ -72,6 +72,7 @@ def main(args: Namespace):
     item_cluster = None
     if config.reader.loading_strategy == "dataset":
         data = reader.read()
+        data = callback.on_data_reading(data)
 
         # Check for optional filtering
         if config.filtering is not None:
@@ -362,12 +363,19 @@ def single_train_test_split_flow(
                 the main data split.
             - dict: Report dictionary.
     """
+    # Check for device
+    general_device = config.general.device
+    model_device = params.optimization.device
+    device = general_device if model_device is None else model_device
+
     # Start HPO phase on test set,
     # no need of further training
     best_model, ray_report = trainer.train_single_fold(
         model_name,
         params,
         dataset,
+        validation_score=config.evaluation.validation_metric,
+        device=device,
         evaluation_strategy=config.evaluation.strategy,
         num_negatives=config.evaluation.num_negatives,
         beta=config.evaluation.beta,
@@ -403,9 +411,14 @@ def multiple_fold_validation_flow(
                 the main data split.
             - dict: Report dictionary.
     """
+    # Check for device
+    general_device = config.general.device
+    model_device = params.optimization.device
+    device = general_device if model_device is None else model_device
+
     # Retrieve common params
-    device = params.optimization.device
     block_size = params.optimization.block_size
+    validation_metric = config.evaluation.validation_metric
     desired_training_it = params.optimization.properties.desired_training_it
     seed = params.optimization.properties.seed
 
@@ -414,6 +427,8 @@ def multiple_fold_validation_flow(
         model_name,
         params,
         val_datasets,
+        validation_score=validation_metric,
+        device=device,
         evaluation_strategy=config.evaluation.strategy,
         num_negatives=config.evaluation.num_negatives,
         beta=config.evaluation.beta,
@@ -472,38 +487,33 @@ def dataset_preparation(
         config (TrainConfiguration): The configuration file used for the experiment.
     """
 
-    def prepare_evaluation_loaders(dataset: Dataset, devices: set):
+    def prepare_evaluation_loaders(dataset: Dataset, device: str):
         """utility function to prepare the evaluation dataloaders
         for a given dataset based on the evaluation strategy.
 
         Args:
             dataset (Dataset): The dataset to prepare.
-            devices (set): The set of devices to use.
+            device (str): The device to use.
         """
-        for device in devices:
-            if config.evaluation.strategy == "full":
-                dataset.get_evaluation_dataloader(device=device)
-            elif config.evaluation.strategy == "sampled":
-                dataset.get_neg_evaluation_dataloader(
-                    num_negatives=config.evaluation.num_negatives,
-                    seed=config.evaluation.seed,
-                    device=device,
-                )
+        if config.evaluation.strategy == "full":
+            dataset.get_evaluation_dataloader(device=device)
+        elif config.evaluation.strategy == "sampled":
+            dataset.get_neg_evaluation_dataloader(
+                num_negatives=config.evaluation.num_negatives,
+                seed=config.evaluation.seed,
+                device=device,
+            )
 
     logger.msg("Preparing main dataset inner structures for training and evaluation.")
 
-    models = config.models
-    devices = set()
-    for model in models.values():
-        devices.add(model.get("optimization").get("device"))
-
-    prepare_evaluation_loaders(main_dataset, devices)
+    device = config.general.device
+    prepare_evaluation_loaders(main_dataset, device)
     if fold_dataset is not None and isinstance(fold_dataset, list):
         for i, dataset in enumerate(fold_dataset):
             logger.msg(
                 f"Preparing fold dataset {i + 1}/{len(fold_dataset)} inner structures for training and evaluation."
             )
-            prepare_evaluation_loaders(dataset, devices)
+            prepare_evaluation_loaders(dataset, device)
 
     logger.positive("All dataset inner structures ready.")
 

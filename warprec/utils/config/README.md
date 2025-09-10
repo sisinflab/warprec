@@ -541,8 +541,7 @@ The `optimization` section let you decide how to train your model.
     - *fifo*: Classic First In First Out.
     - *asha*: The ASHA scheduler for a more optimized scheduling approach.
 - **properties**: A nested section dedicated for strategy and scheduler parameters.
-- **validation_metric**: The validation metric used during training. Defaults to nDCG@5.
-- **device**: The device used during training and evaluation. Defaults to cpu. Supports cuda devices and also cuda devices with indexing, like cuda:1.
+- **device**: The device used during training and evaluation. Defaults to cpu. Supports cuda devices. Overrides general device.
 - **max_cpu_count**: The number of virtual CPU cores that WarpRec can should use. Defaults to the maximum available.
 - **num_samples**: The number of samples to generate for the different strategies. If the strategy is set to grid, then this field must be set to 1. Defaults to 1.
 - **parallel_trials**: Number of trials to execute in parallel. Defaults to 1.
@@ -583,7 +582,6 @@ models:
             properties:
                 mode: max
                 seed: 42
-            device: cpu
             validation_metric: nDCG@10
             cpu_per_trial: 12
         l2: 10
@@ -711,6 +709,7 @@ The `Evaluation Configuration` can be configured using the following keywords:
 
 - **top_k**: The cutoff used to compute ranking metrics.
 - **metrics**: The metrics to be evaluated.
+- **validation_metric**: The validation metric used during training. Defaults to nDCG@5.
 - **batch_size**: The batch size used during evaluation. Defaults to 1024.
 - **strategy**: The strategy to use during sampling. Can either be full or sampled. Sampled strategy is advised for large datasets. Defaults to "full".
 - **num_negatives**: The number of negative samples to use during sampled strategy.
@@ -772,6 +771,7 @@ The `General Configuration` section defines some parameters that will affect the
 The `General Configuration` can be configured using the following keywords:
 
 - **precision**: The precision to be used inside the experiment. Defaults to float32.
+- **device**: The device used during training and evaluation. Defaults to cpu. Supports cuda devices.
 - **ray_verbose**: The Ray Tune verbosity value. Ray Tune accepts verbosity levels in a range from 0 to 3. Defaults to 1.
 - **time_report**: Whether to report the time taken by each step. Defaults to True.
 - **cuda_visible_devices**: The indexes of cuda devices that WarpRec can use. Defaults to all devices.

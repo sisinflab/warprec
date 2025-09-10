@@ -12,7 +12,6 @@ from warprec.utils.enums import (
 from warprec.utils.registry import (
     model_registry,
     params_registry,
-    metric_registry,
     search_algorithm_registry,
 )
 from warprec.utils.logger import logger
@@ -113,9 +112,8 @@ class Optimization(BaseModel):
             - asha: ASHA Scheduler, more information can be found at:
                 https://docs.ray.io/en/latest/tune/api/doc/ray.tune.schedulers.ASHAScheduler.html.
         properties (Optional[Properties]): The attributes required for Ray Tune to work.
-        validation_metric (Optional[str]): The metric/loss that will
-            validate each trial in Ray Tune.
         device (Optional[str]): The device that will be used for tensor operations.
+            Overrides general device.
         max_cpu_count (Optional[int]): The maximum number of CPU cores to assign to
             the experiments. Defaults to the maximum number of cores.
         parallel_trials (Optional[int]): The number of trials to execute in parallel.
@@ -131,8 +129,7 @@ class Optimization(BaseModel):
     strategy: Optional[SearchAlgorithms] = SearchAlgorithms.GRID
     scheduler: Optional[Schedulers] = Schedulers.FIFO
     properties: Optional[Properties] = Field(default_factory=Properties)
-    validation_metric: Optional[str] = "nDCG@5"
-    device: Optional[str] = "cpu"
+    device: Optional[str] = None
     max_cpu_count: Optional[int] = os.cpu_count()
     parallel_trials: Optional[int] = 1
     block_size: Optional[int] = 50
@@ -150,37 +147,13 @@ class Optimization(BaseModel):
             )
         return v
 
-    @field_validator("validation_metric")
-    @classmethod
-    def check_validation_metric(cls, v: str):
-        """Validate validation metric."""
-        if v is None:
-            raise ValueError("Validation metric must be provided.")
-        if "@" not in v:
-            raise ValueError(
-                f"Validation metric {v} not valid. Validation metric "
-                f"should be defined as: metric_name@top_k."
-            )
-        if v.count("@") > 1:
-            raise ValueError(
-                "Validation metric contains more than one @, check your configuration file."
-            )
-        metric, top_k = v.split("@")
-        if metric.upper() not in metric_registry.list_registered():
-            raise ValueError(
-                f"Metric {metric} not in metric registry. This is the list"
-                f"of supported metrics: {metric_registry.list_registered()}"
-            )
-        if not top_k.isnumeric():
-            raise ValueError(
-                "Validation metric should be provided with a top_k number."
-            )
-        return v
-
     @field_validator("device")
     @classmethod
     def check_device(cls, v: str):
         """Validate device."""
+        if v is None:
+            return v
+
         if v in ("cuda", "cpu"):
             if v == "cuda" and not torch.cuda.is_available():
                 raise ValueError(

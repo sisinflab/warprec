@@ -128,6 +128,7 @@ class GeneralConfig(BaseModel):
 
     Attributes:
         precision (Optional[str]): The precision to use during computation.
+        device (Optional[str]): The device that will be used for tensor operations.
         ray_verbose (Optional[int]): The Ray level of verbosity.
         time_report (Optional[bool]): Whether to report the time taken by each step.
         cuda_visible_devices (Optional[List[int] | int]): The list of visible CUDA devices.
@@ -139,6 +140,7 @@ class GeneralConfig(BaseModel):
     """
 
     precision: Optional[str] = "float32"
+    device: Optional[str] = "cpu"
     ray_verbose: Optional[int] = 1
     time_report: Optional[bool] = True
     cuda_visible_devices: Optional[List[int] | int] = list(
@@ -148,6 +150,18 @@ class GeneralConfig(BaseModel):
     callback: Optional[WarpRecCallbackConfig] = Field(
         default_factory=WarpRecCallbackConfig
     )
+
+    @field_validator("device")
+    @classmethod
+    def check_device(cls, v: str):
+        """Validate device."""
+        if v in ("cuda", "cpu"):
+            if v == "cuda" and not torch.cuda.is_available():
+                raise ValueError(
+                    "Cuda device was selected but not available on current machine."
+                )
+            return v
+        raise ValueError(f'Device {v} is not supported. Use "cpu" or "cuda".')
 
     @field_validator("cuda_visible_devices")
     @classmethod

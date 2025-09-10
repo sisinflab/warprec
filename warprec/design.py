@@ -48,6 +48,7 @@ def main(args: Namespace):
     item_cluster = None
     if config.reader.loading_strategy == "dataset":
         data = reader.read()
+        data = callback.on_data_reading(data)
 
         # Check for optional filtering
         if config.filtering is not None:
@@ -119,13 +120,15 @@ def main(args: Namespace):
         item_cluster=main_dataset.get_item_cluster(),
     )
 
+    # Experiment device
+    device = config.general.device
+
     data_preparation_time = time.time() - experiment_start_time
     logger.positive(
         f"Data preparation completed in {data_preparation_time:.2f} seconds."
     )
 
     for model_name, params in config.models.items():
-        device = params.pop("device") if params.get("device") else "cpu"
         model = model_registry.get(
             name=model_name,
             params=params,

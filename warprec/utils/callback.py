@@ -1,5 +1,6 @@
 from typing import Any, List, TYPE_CHECKING
 
+from pandas import DataFrame
 from ray.tune import Callback
 
 if TYPE_CHECKING:
@@ -20,6 +21,22 @@ class WarpRecCallback(Callback):
 
     def __init__(self, *args: Any, **kwargs: Any):
         pass
+
+    def on_data_reading(
+        self,
+        data: DataFrame,
+    ) -> DataFrame:
+        """Callback method to be called after the data reading.
+
+        This method can be overridden in custom callbacks to
+        perform actions after the data has been read.
+
+        Args:
+            data (DataFrame): The raw data read from source.
+
+        Returns:
+            DataFrame: The data processed by this callback.
+        """
 
     def on_dataset_creation(
         self,

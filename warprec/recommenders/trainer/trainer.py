@@ -149,6 +149,8 @@ class Trainer:
         model_name: str,
         params: RecomModel,
         dataset: Dataset,
+        validation_score: str,
+        device: str = "cpu",
         evaluation_strategy: str = "full",
         num_negatives: int = 99,
         beta: float = 1.0,
@@ -164,6 +166,8 @@ class Trainer:
             model_name (str): The name of the model to optimize.
             params (RecomModel): The parameters of the model.
             dataset (Dataset): The dataset to use during training.
+            validation_score (str): The metric to monitor during training.
+            device (str): The device that will be used for tensor operations.
             evaluation_strategy (str): Evaluation strategy, either "full" or "sampled".
             num_negatives (int): Number of negative samples to use in "sampled" strategy.
             beta (float): The beta value for the evaluation.
@@ -176,8 +180,6 @@ class Trainer:
                 - dict: Summary report of the training.
         """
         # Retrieve common parameters
-        validation_score = params.optimization.validation_metric
-        device = params.optimization.device
         mode = params.optimization.properties.mode
         seed = params.optimization.properties.seed
 
@@ -186,6 +188,8 @@ class Trainer:
             model_name=model_name,
             params=params,
             dataset=dataset,
+            validation_score=validation_score,
+            device=device,
             evaluation_strategy=evaluation_strategy,
             num_negatives=num_negatives,
             beta=beta,
@@ -250,6 +254,8 @@ class Trainer:
         model_name: str,
         params: RecomModel,
         datasets: List[Dataset],
+        validation_score: str,
+        device: str = "cpu",
         evaluation_strategy: str = "full",
         num_negatives: int = 99,
         beta: float = 1.0,
@@ -263,6 +269,8 @@ class Trainer:
             model_name (str): The name of the model to optimize.
             params (RecomModel): The parameters of the model.
             datasets (List[Dataset]): The list of datasets to use during training.
+            validation_score (str): The metric to monitor during training.
+            device (str): The device that will be used for tensor operations.
             evaluation_strategy (str): Evaluation strategy, either "full" or "sampled".
             num_negatives (int): Number of negative samples to use in "sampled" strategy.
             beta (float): The beta value for the evaluation.
@@ -279,7 +287,6 @@ class Trainer:
                 - Dict: Summary report of the training.
         """
         # Retrieve common parameters
-        validation_score = params.optimization.validation_metric
         mode = params.optimization.properties.mode
 
         # Prepare the Tuner
@@ -287,6 +294,8 @@ class Trainer:
             model_name=model_name,
             params=params,
             dataset=datasets,
+            validation_score=validation_score,
+            device=device,
             evaluation_strategy=evaluation_strategy,
             num_negatives=num_negatives,
             beta=beta,
@@ -433,6 +442,8 @@ class Trainer:
         model_name: str,
         params: RecomModel,
         dataset: Dataset | List[Dataset],
+        validation_score: str,
+        device: str = "cpu",
         evaluation_strategy: str = "full",
         num_negatives: int = 99,
         beta: float = 1.0,
@@ -443,8 +454,6 @@ class Trainer:
         properties = params.optimization.properties.model_dump()
         optimization = params.optimization
         mode = params.optimization.properties.mode
-        device = params.optimization.device
-        validation_score = params.optimization.validation_metric
         validation_metric_name, validation_top_k = validation_metric(validation_score)
 
         # Log the start of HPO setup

@@ -62,6 +62,8 @@ class EvaluationConfig(BaseModel):
     Attributes:
         top_k (List[int]): List of cutoffs to evaluate.
         metrics (List[str]): List of metrics to compute during evaluation.
+        validation_metric (Optional[str]): The metric/loss that will
+            validate each trial in Ray Tune.
         batch_size (Optional[int]): Batch size used during evaluation.
         strategy (Optional[str]): Evaluation strategy, either "full" or "sampled".
         num_negatives (Optional[int]): Number of negative samples to use in "sampled" strategy.
@@ -76,6 +78,7 @@ class EvaluationConfig(BaseModel):
 
     top_k: List[int]
     metrics: List[str]
+    validation_metric: Optional[str] = "nDCG@5"
     batch_size: Optional[int] = 1024
     strategy: Optional[str] = "full"  # or "sampled"
     num_negatives: Optional[int] = 99
@@ -161,6 +164,33 @@ class EvaluationConfig(BaseModel):
             logger.attention(
                 f"Duplicated metrics found inside evaluation. "
                 f"{len_before - len_after} metrics removed."
+            )
+        return v
+
+    @field_validator("validation_metric")
+    @classmethod
+    def check_validation_metric(cls, v: str):
+        """Validate validation metric."""
+        if v is None:
+            raise ValueError("Validation metric must be provided.")
+        if "@" not in v:
+            raise ValueError(
+                f"Validation metric {v} not valid. Validation metric "
+                f"should be defined as: metric_name@top_k."
+            )
+        if v.count("@") > 1:
+            raise ValueError(
+                "Validation metric contains more than one @, check your configuration file."
+            )
+        metric, top_k = v.split("@")
+        if metric.upper() not in metric_registry.list_registered():
+            raise ValueError(
+                f"Metric {metric} not in metric registry. This is the list"
+                f"of supported metrics: {metric_registry.list_registered()}"
+            )
+        if not top_k.isnumeric():
+            raise ValueError(
+                "Validation metric should be provided with a top_k number."
             )
         return v
 
