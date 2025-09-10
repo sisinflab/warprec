@@ -48,6 +48,7 @@ def main(args: Namespace):
     item_cluster = None
     if config.reader.loading_strategy == "dataset":
         data = reader.read()
+        data = callback.on_data_reading(data)
 
         # Check for optional filtering
         if config.filtering is not None:
