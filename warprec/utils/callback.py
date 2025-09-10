@@ -37,6 +37,7 @@ class WarpRecCallback(Callback):
         Returns:
             DataFrame: The data processed by this callback.
         """
+        return data
 
     def on_dataset_creation(
         self,
