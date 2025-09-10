@@ -541,6 +541,7 @@ The `optimization` section let you decide how to train your model.
     - *fifo*: Classic First In First Out.
     - *asha*: The ASHA scheduler for a more optimized scheduling approach.
 - **properties**: A nested section dedicated for strategy and scheduler parameters.
+- **device**: The device used during training and evaluation. Defaults to cpu. Supports cuda devices. Overrides general device.
 - **validation_metric**: The validation metric used during training. Defaults to nDCG@5.
 - **max_cpu_count**: The number of virtual CPU cores that WarpRec can should use. Defaults to the maximum available.
 - **num_samples**: The number of samples to generate for the different strategies. If the strategy is set to grid, then this field must be set to 1. Defaults to 1.
