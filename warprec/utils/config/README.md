@@ -542,7 +542,6 @@ The `optimization` section let you decide how to train your model.
     - *asha*: The ASHA scheduler for a more optimized scheduling approach.
 - **properties**: A nested section dedicated for strategy and scheduler parameters.
 - **device**: The device used during training and evaluation. Defaults to cpu. Supports cuda devices. Overrides general device.
-- **validation_metric**: The validation metric used during training. Defaults to nDCG@5.
 - **max_cpu_count**: The number of virtual CPU cores that WarpRec can should use. Defaults to the maximum available.
 - **num_samples**: The number of samples to generate for the different strategies. If the strategy is set to grid, then this field must be set to 1. Defaults to 1.
 - **parallel_trials**: Number of trials to execute in parallel. Defaults to 1.
@@ -710,6 +709,7 @@ The `Evaluation Configuration` can be configured using the following keywords:
 
 - **top_k**: The cutoff used to compute ranking metrics.
 - **metrics**: The metrics to be evaluated.
+- **validation_metric**: The validation metric used during training. Defaults to nDCG@5.
 - **batch_size**: The batch size used during evaluation. Defaults to 1024.
 - **strategy**: The strategy to use during sampling. Can either be full or sampled. Sampled strategy is advised for large datasets. Defaults to "full".
 - **num_negatives**: The number of negative samples to use during sampled strategy.
