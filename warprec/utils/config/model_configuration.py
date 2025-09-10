@@ -2,6 +2,7 @@ import os
 from typing import List, Optional, Union, ClassVar, Any
 from abc import ABC
 
+import torch
 from pydantic import BaseModel, ConfigDict, Field, model_validator, field_validator
 from warprec.utils.enums import (
     SearchAlgorithms,
@@ -112,6 +113,8 @@ class Optimization(BaseModel):
             - asha: ASHA Scheduler, more information can be found at:
                 https://docs.ray.io/en/latest/tune/api/doc/ray.tune.schedulers.ASHAScheduler.html.
         properties (Optional[Properties]): The attributes required for Ray Tune to work.
+        device (Optional[str]): The device that will be used for tensor operations.
+            Overrides general device.
         validation_metric (Optional[str]): The metric/loss that will
             validate each trial in Ray Tune.
         max_cpu_count (Optional[int]): The maximum number of CPU cores to assign to
@@ -129,6 +132,7 @@ class Optimization(BaseModel):
     strategy: Optional[SearchAlgorithms] = SearchAlgorithms.GRID
     scheduler: Optional[Schedulers] = Schedulers.FIFO
     properties: Optional[Properties] = Field(default_factory=Properties)
+    device: Optional[str] = None
     validation_metric: Optional[str] = "nDCG@5"
     max_cpu_count: Optional[int] = os.cpu_count()
     parallel_trials: Optional[int] = 1
@@ -146,6 +150,18 @@ class Optimization(BaseModel):
                 f"supported strategies: {search_algorithm_registry.list_registered()}"
             )
         return v
+
+    @field_validator("device")
+    @classmethod
+    def check_device(cls, v: str):
+        """Validate device."""
+        if v in ("cuda", "cpu"):
+            if v == "cuda" and not torch.cuda.is_available():
+                raise ValueError(
+                    "Cuda device was selected but not available on current machine."
+                )
+            return v
+        raise ValueError(f'Device {v} is not supported. Use "cpu" or "cuda".')
 
     @field_validator("validation_metric")
     @classmethod

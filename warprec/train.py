@@ -362,13 +362,18 @@ def single_train_test_split_flow(
                 the main data split.
             - dict: Report dictionary.
     """
+    # Check for device
+    general_device = config.general.device
+    model_device = params.optimization.device
+    device = general_device if model_device is None else model_device
+
     # Start HPO phase on test set,
     # no need of further training
     best_model, ray_report = trainer.train_single_fold(
         model_name,
         params,
         dataset,
-        device=config.general.device,
+        device=device,
         evaluation_strategy=config.evaluation.strategy,
         num_negatives=config.evaluation.num_negatives,
         beta=config.evaluation.beta,
@@ -404,9 +409,13 @@ def multiple_fold_validation_flow(
                 the main data split.
             - dict: Report dictionary.
     """
+    # Check for device
+    general_device = config.general.device
+    model_device = params.optimization.device
+    device = general_device if model_device is None else model_device
+
     # Retrieve common params
     block_size = params.optimization.block_size
-    device = config.general.device
     desired_training_it = params.optimization.properties.desired_training_it
     seed = params.optimization.properties.seed
 
