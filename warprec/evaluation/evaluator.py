@@ -305,6 +305,24 @@ class Evaluator:
                         **update_kwargs,
                     )
 
+            # Manual garbage collection for heavy data
+            del (
+                predictions,
+                candidates_local,
+                eval_batch,
+                binary_relevance,
+                discounted_relevance,
+                valid_users,
+            )
+            if "top_k_values_full" in locals():
+                del top_k_values_full, top_k_indices_full, top_k_values, top_k_indices
+            if "precomputed_blocks" in locals():
+                del precomputed_blocks
+            if "batch" in locals():
+                del batch
+            if torch.cuda.is_available():
+                torch.cuda.empty_cache()
+
         if verbose:
             eval_total_time = time.time() - eval_start_time
             frmt_eval_total_time = time.strftime(
