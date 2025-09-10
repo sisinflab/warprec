@@ -151,6 +151,9 @@ class Optimization(BaseModel):
     @classmethod
     def check_device(cls, v: str):
         """Validate device."""
+        if v is None:
+            return v
+
         if v in ("cuda", "cpu"):
             if v == "cuda" and not torch.cuda.is_available():
                 raise ValueError(
