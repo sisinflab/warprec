@@ -289,6 +289,7 @@ WarpRec provides a set of built-in callbacks that are triggered at specific stag
 
 | Callback name        | Origin    | Description                       | Reference                         |
 | -------------------- | --------- | --------------------------------- | --------------------------------- |
+| on_data_reading  | WarpRec   | Invoked after data reading.    | [WarpRecCallback](callback.py)    |
 | on_dataset_creation  | WarpRec   | Invoked after dataset creation.    | [WarpRecCallback](callback.py)    |
 | on_training_complete  | WarpRec   | Invoked after model training completion.    | [WarpRecCallback](callback.py)    |
 | on_evaluation_complete  | WarpRec   | Invoked after model evaluation completion.    | [WarpRecCallback](callback.py)    |
