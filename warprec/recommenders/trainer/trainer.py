@@ -52,6 +52,7 @@ class Trainer:
             WarpRecCallback instance.
         custom_models (str | List[str]): The list of custom models to load.
         enable_wandb (bool): Wether or not to enable Wandb.
+        team_wandb (Optional[str]): The name of the Wandb team.
         project_wandb (str): The name of the Wandb project.
         group_wandb (Optional[str]): The name of the Wandb group.
         api_key_file_wandb (Optional[str]): The path to the Wandb
@@ -88,6 +89,7 @@ class Trainer:
         custom_callback: WarpRecCallback = WarpRecCallback(),
         custom_models: str | List[str] = [],
         enable_wandb: bool = False,
+        team_wandb: Optional[str] = None,
         project_wandb: str = "WarpRec",
         group_wandb: Optional[str] = None,
         api_key_file_wandb: Optional[str] = None,
@@ -115,6 +117,7 @@ class Trainer:
             dashboard = DashboardConfig(
                 wandb=Wandb(
                     enabled=enable_wandb,
+                    team=team_wandb,
                     project=project_wandb,
                     group=group_wandb,
                     api_key_file=api_key_file_wandb,
@@ -562,6 +565,7 @@ class Trainer:
                     excludes=dashboard.wandb.excludes,
                     log_config=dashboard.wandb.log_config,
                     upload_checkpoints=dashboard.wandb.upload_checkpoints,
+                    entity=dashboard.wandb.team,  # Will be passed to wandb.init()
                 )
             )
         if dashboard.codecarbon.enabled:
