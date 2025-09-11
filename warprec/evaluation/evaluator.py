@@ -225,10 +225,12 @@ class Evaluator:
                     ).float()  # [batch_size, pad_seq]
 
             # Pre-compute metric blocks
-            precomputed_blocks: Dict[int, Dict[str, Tensor]] = {}
+            precomputed_blocks: Dict[int, Dict[str, Tensor]] = {
+                k: {} for k in self.k_values
+            }
             all_required_blocks = set()
             for k in self.k_values:
-                all_required_blocks.update(self.required_blocks[k])
+                all_required_blocks.update(self.required_blocks.get(k, set()))
 
             # First we check for relevance
             binary_relevance = (
@@ -249,22 +251,26 @@ class Evaluator:
                 else None
             )
 
-            # Then we check all the needed blocks that are shared
-            # between metrics so we can pre-computed
-            for k in self.k_values:
-                precomputed_blocks[k] = {}
-                required_blocks_for_k = self.required_blocks[k]
+            # Efficiently compute top_k once for the maximum k
+            if self.k_values and (
+                MetricBlock.TOP_K_VALUES in all_required_blocks
+                or MetricBlock.TOP_K_INDICES in all_required_blocks
+                or MetricBlock.TOP_K_BINARY_RELEVANCE in all_required_blocks
+                or MetricBlock.TOP_K_DISCOUNTED_RELEVANCE in all_required_blocks
+            ):
+                max_k = max(self.k_values)
+                top_k_values_full, top_k_indices_full = BaseMetric.top_k_values_indices(
+                    predictions, max_k
+                )
 
-                # Check first if we need .top_k() method
-                if (
-                    MetricBlock.TOP_K_VALUES
-                    or MetricBlock.TOP_K_INDICES
-                    or MetricBlock.TOP_K_BINARY_RELEVANCE
-                    or MetricBlock.TOP_K_DISCOUNTED_RELEVANCE
-                ):
-                    top_k_values, top_k_indices = BaseMetric.top_k_values_indices(
-                        predictions, k
-                    )
+                # Then we check all the needed blocks that are shared
+                # between metrics so we can pre-compute by slicing
+                for k in self.k_values:
+                    required_blocks_for_k = self.required_blocks.get(k, set())
+
+                    top_k_values = top_k_values_full[:, :k]
+                    top_k_indices = top_k_indices_full[:, :k]
+
                     precomputed_blocks[k][f"top_{k}_values"] = top_k_values
                     precomputed_blocks[k][f"top_{k}_indices"] = top_k_indices
 
@@ -298,6 +304,24 @@ class Evaluator:
                         predictions,
                         **update_kwargs,
                     )
+
+            # Manual garbage collection for heavy data
+            del (
+                predictions,
+                candidates_local,
+                eval_batch,
+                binary_relevance,
+                discounted_relevance,
+                valid_users,
+            )
+            if "top_k_values_full" in locals():
+                del top_k_values_full, top_k_indices_full, top_k_values, top_k_indices
+            if "precomputed_blocks" in locals():
+                del precomputed_blocks
+            if "batch" in locals():
+                del batch
+            if torch.cuda.is_available():
+                torch.cuda.empty_cache()
 
         if verbose:
             eval_total_time = time.time() - eval_start_time
