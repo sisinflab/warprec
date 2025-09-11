@@ -282,13 +282,26 @@ def main(args: Namespace):
             else:
                 max_seq_len = 10
 
-            train_batch = torch.randint(0, 2, (num_users_to_predict, num_items)).float()
-            user_indices = torch.arange(num_users_to_predict)
+            # Track the best model device
+            best_model_device = best_model._device
+
+            train_batch = (
+                torch.randint(0, 2, (num_users_to_predict, num_items))
+                .float()
+                .to(device=best_model_device)
+            )
+            user_indices = torch.arange(num_users_to_predict).to(
+                device=best_model_device
+            )
             item_indices = torch.randint(
                 1, num_items, (num_users_to_predict, num_items_to_predict)
+            ).to(device=best_model_device)
+            user_seq = torch.randint(
+                1, num_items, (num_users_to_predict, max_seq_len)
+            ).to(device=best_model_device)
+            seq_len = torch.randint(1, max_seq_len + 1, (num_users_to_predict,)).to(
+                device=best_model_device
             )
-            user_seq = torch.randint(1, num_items, (num_users_to_predict, max_seq_len))
-            seq_len = torch.randint(1, max_seq_len + 1, (num_users_to_predict,))
 
             # Test inference time
             inference_time_start = time.time()
