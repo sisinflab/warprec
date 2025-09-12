@@ -282,7 +282,7 @@ def main(args: Namespace):
             else:
                 max_seq_len = 10
 
-            # Track the best model device
+            # Retrieve best model device
             best_model_device = best_model._device
 
             train_batch = (
