@@ -8,6 +8,7 @@ class Wandb(BaseModel):
 
     Attributes:
         enabled (bool): Whether to enable Wandb tracking.
+        team (Optional[str]): Name of a specific team in Wandb.
         project (str): Name of the Wandb project. Defaults to WarpRec.
         group (Optional[str]): Name of the Wandb group.
         api_key_file (Optional[str]): Path to the file containing the Wandb API key.
@@ -18,6 +19,7 @@ class Wandb(BaseModel):
     """
 
     enabled: bool = False
+    team: Optional[str] = None
     project: str = "WarpRec"
     group: Optional[str] = None
     api_key_file: Optional[str] = None

@@ -453,6 +453,7 @@ The `Dashboard Configuration` contains different nested sections dedicated to ea
 WarpRec, through Ray, supports the Weights & Biases dashboard.
 
 - **enabled**: A flag indicating whether to activate the dashboard. Defaults to False.
+- **team**: Name of a specific team. When None, defaults to the first team. Defaults to None.
 - **project**: Name of the project.
 - **group**: Name of the group.
 - **api_key_file**: Path to the file with the API key.
