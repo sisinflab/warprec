@@ -20,14 +20,14 @@ class EvaluationDataset(TorchDataset):
     Args:
         train_interactions (csr_matrix): Sparse matrix of training interactions.
         eval_interactions (csr_matrix): Sparse matrix of evaluation interactions.
-        device (str): The device for the interaction matrix.
+        device (str | torch.device): The device for the interaction matrix.
     """
 
     def __init__(
         self,
         train_interactions: csr_matrix,
         eval_interactions: csr_matrix,
-        device: str = "cpu",
+        device: str | torch.device = "cpu",
     ):
         self.num_users, self.num_items = train_interactions.shape
 
@@ -111,7 +111,7 @@ class NegativeEvaluationDataset(TorchDataset):
         eval_interactions (csr_matrix): Sparse matrix of evaluation interactions.
         num_negatives (int): Number of negatives to sample per user.
         seed (int): Random seed for negative sampling.
-        device (str): The device for the interaction matrix.
+        device (str | torch.device): The device for the interaction matrix.
     """
 
     def __init__(
@@ -120,7 +120,7 @@ class NegativeEvaluationDataset(TorchDataset):
         eval_interactions: csr_matrix,
         num_negatives: int = 99,
         seed: int = 42,
-        device: str = "cpu",
+        device: str | torch.device = "cpu",
     ):
         super().__init__()
         self.num_users, self.num_items = train_interactions.shape
@@ -234,6 +234,57 @@ class NegativeEvaluationDataset(TorchDataset):
         )
 
 
+class FullDataset(TorchDataset):
+    """PyTorch Dataset to yield (train_batch, user_idx) in batch,
+    converting sparse matrices in dense tensors."""
+
+    def __init__(
+        self, train_interactions: csr_matrix, device: str | torch.device = "cpu"
+    ):
+        self.num_users, self.num_items = train_interactions.shape
+        self.device = device
+
+        # Create copies of csr data
+        train_indptr = train_interactions.indptr.copy()
+        train_indices = train_interactions.indices.copy()
+        train_values = train_interactions.data.copy()
+
+        # Create sparse training set representation
+        crow_indices_train = torch.from_numpy(train_indptr).to(torch.int64)
+        col_indices_train = torch.from_numpy(train_indices).to(torch.int64)
+        values_train = torch.from_numpy(train_values)
+        size_train = train_interactions.shape
+        self.torch_sparse_train = torch.sparse_csr_tensor(
+            crow_indices_train, col_indices_train, values_train, size=size_train
+        ).to(device)
+
+    def __len__(self) -> int:
+        return self.num_users
+
+    def __getitem__(self, idx: int) -> Tuple[torch.Tensor, int]:
+        # --- Process Train Tensor ---
+        row_start_train = self.torch_sparse_train.crow_indices()[idx]
+        row_end_train = self.torch_sparse_train.crow_indices()[idx + 1]
+
+        row_col_indices_train = self.torch_sparse_train.col_indices()[
+            row_start_train:row_end_train
+        ]
+        row_values_train = self.torch_sparse_train.values()[
+            row_start_train:row_end_train
+        ]
+
+        num_cols = self.torch_sparse_train.size(1)
+
+        train_row_tensor = torch.zeros(
+            num_cols,
+            dtype=row_values_train.dtype,
+            device=self.torch_sparse_train.device,
+        )
+        train_row_tensor[row_col_indices_train] = row_values_train
+
+        return train_row_tensor, idx
+
+
 class EvaluationDataLoader(DataLoader):
     """Custom DataLoader to yield tuple (train, eval) in batch size."""
 
@@ -242,7 +293,7 @@ class EvaluationDataLoader(DataLoader):
         train_interactions: csr_matrix,
         eval_interactions: csr_matrix,
         batch_size: int = 1024,
-        device: str = "cpu",
+        device: str | torch.device = "cpu",
         **kwargs,
     ):
         dataset = EvaluationDataset(
@@ -263,7 +314,7 @@ class NegativeEvaluationDataLoader(DataLoader):
         num_negatives: int = 99,
         seed: int = 42,
         batch_size: int = 1024,
-        device: str = "cpu",
+        device: str | torch.device = "cpu",
         **kwargs,
     ):
         dataset = NegativeEvaluationDataset(
@@ -311,12 +362,29 @@ class NegativeEvaluationDataLoader(DataLoader):
         return train_batch, positives_padded, negatives_padded, user_indices_tensor
 
 
+class FullDatasetLoader(DataLoader):
+    """Custom DataLoader to yield tuple (train, user_idx) in batch size."""
+
+    def __init__(
+        self,
+        train_interactions: csr_matrix,
+        batch_size: int = 1024,
+        device: str | torch.device = "cpu",
+        **kwargs,
+    ):
+        dataset = FullDataset(
+            train_interactions=train_interactions,
+            device=device,
+        )
+        super().__init__(dataset, batch_size=batch_size, shuffle=False, **kwargs)
+
+
 class Dataset:
     """The definition of the Dataset class that will handle transaction data.
 
     Args:
         train_data (DataFrame): The train data.
-        eval_data (DataFrame): The evaluation data.
+        eval_data (Optional[DataFrame]): The evaluation data.
         side_data (Optional[DataFrame]): The side information data.
         user_cluster (Optional[DataFrame]): The user cluster data.
         item_cluster (Optional[DataFrame]): The item cluster data.
@@ -350,7 +418,7 @@ class Dataset:
     def __init__(
         self,
         train_data: DataFrame,
-        eval_data: DataFrame,
+        eval_data: Optional[DataFrame] = None,
         side_data: Optional[DataFrame] = None,
         user_cluster: Optional[DataFrame] = None,
         item_cluster: Optional[DataFrame] = None,
@@ -487,18 +555,19 @@ class Dataset:
             precision=precision,
         )
 
-        self.eval_set = self._create_inner_set(
-            eval_data,
-            side_data=side_data,
-            user_cluster=self.user_cluster,
-            item_cluster=self.item_cluster,
-            header_msg=evaluation_set,
-            batch_size=batch_size,
-            rating_type=rating_type,
-            rating_label=rating_label,
-            timestamp_label=timestamp_label,
-            precision=precision,
-        )
+        if eval_data is not None:
+            self.eval_set = self._create_inner_set(
+                eval_data,
+                side_data=side_data,
+                user_cluster=self.user_cluster,
+                item_cluster=self.item_cluster,
+                header_msg=evaluation_set,
+                batch_size=batch_size,
+                rating_type=rating_type,
+                rating_label=rating_label,
+                timestamp_label=timestamp_label,
+                precision=precision,
+            )
 
         # Save side information inside the dataset
         self.side = side_data if side_data is not None else None
@@ -619,11 +688,13 @@ class Dataset:
 
         return inter_set
 
-    def get_evaluation_dataloader(self, device: str = "cpu") -> EvaluationDataLoader:
+    def get_evaluation_dataloader(
+        self, device: str | torch.device = "cpu"
+    ) -> EvaluationDataLoader:
         """Retrieve the EvaluationDataLoader for the dataset.
 
         Args:
-            device (str): The device of the dataloader.
+            device (str | torch.device): The device of the dataloader.
 
         Returns:
             EvaluationDataLoader: DataLoader that yields batches of interactions
@@ -647,14 +718,14 @@ class Dataset:
         self,
         num_negatives: int = 99,
         seed: int = 42,
-        device: str = "cpu",
+        device: str | torch.device = "cpu",
     ) -> NegativeEvaluationDataLoader:
         """Retrieve the NegativeEvaluationDataLoader for the dataset.
 
         Args:
             num_negatives (int): Number of negative samples per user.
             seed (int): Random seed for negative sampling.
-            device (str): The device of the dataloader.
+            device (str | torch.device): The device of the dataloader.
 
         Returns:
             NegativeEvaluationDataLoader: DataLoader that yields batches
@@ -672,6 +743,30 @@ class Dataset:
                 num_negatives=num_negatives,
                 batch_size=self._batch_size,
                 seed=seed,
+                device=device,
+            )
+
+        return self._precomputed_dataloader[key]
+
+    def get_fulldataset_dataloader(
+        self, device: str | torch.device = "cpu"
+    ) -> FullDatasetLoader:
+        """Retrieve the FullDatasetLoader for the dataset.
+
+        Args:
+            device (str | torch.device): The device of the dataloader.
+
+        Returns:
+            FullDatasetLoader: DataLoader that yields batches of interactions
+                (train_batch, user_indices).
+        """
+        key = f"fulldataset_{device}"
+        if key not in self._precomputed_dataloader:
+            train_sparse = self.train_set.get_sparse()
+
+            self._precomputed_dataloader[key] = FullDatasetLoader(
+                train_interactions=train_sparse,
+                batch_size=self._batch_size,
                 device=device,
             )
 
