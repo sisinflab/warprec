@@ -20,7 +20,7 @@ from warprec.utils.config import (
     TrainConfiguration,
     RecomModel,
 )
-from warprec.utils.helpers import model_param_from_dict
+from warprec.utils.helpers import model_param_from_dict, validation_metric
 from warprec.utils.logger import logger
 from warprec.recommenders.trainer import Trainer
 from warprec.recommenders.loops import train_loop
@@ -381,12 +381,30 @@ def single_train_test_split_flow(
     model_device = params.optimization.device
     device = general_device if model_device is None else model_device
 
+    # Evaluation on report
+    eval_config = config.evaluation
+    val_metric, val_k = validation_metric(config.evaluation.validation_metric)
+    if eval_config.full_evaluation_on_report:
+        metrics = eval_config.metrics
+        topk = eval_config.top_k
+
+        # Check if validation metric is included
+        if val_metric not in metrics:
+            metrics.append(val_metric)
+        if val_k not in topk:
+            topk.append(val_k)
+    else:
+        metrics = [val_metric]
+        topk = [val_k]
+
     # Start HPO phase on test set,
     # no need of further training
     best_model, ray_report = trainer.train_single_fold(
         model_name,
         params,
         dataset,
+        metrics=metrics,
+        topk=topk,
         validation_score=config.evaluation.validation_metric,
         device=device,
         evaluation_strategy=config.evaluation.strategy,
@@ -431,16 +449,34 @@ def multiple_fold_validation_flow(
 
     # Retrieve common params
     block_size = params.optimization.block_size
-    validation_metric = config.evaluation.validation_metric
+    validation_score = config.evaluation.validation_metric
     desired_training_it = params.optimization.properties.desired_training_it
     seed = params.optimization.properties.seed
+
+    # Evaluation on report
+    eval_config = config.evaluation
+    val_metric, val_k = validation_metric(config.evaluation.validation_metric)
+    if eval_config.full_evaluation_on_report:
+        metrics = eval_config.metrics
+        topk = eval_config.top_k
+
+        # Check if validation metric is included
+        if val_metric not in metrics:
+            metrics.append(val_metric)
+        if val_k not in topk:
+            topk.append(val_k)
+    else:
+        metrics = [val_metric]
+        topk = [val_k]
 
     # Start HPO phase on validation folds
     best_params, report = trainer.train_multiple_fold(
         model_name,
         params,
         val_datasets,
-        validation_score=validation_metric,
+        metrics=metrics,
+        topk=topk,
+        validation_score=validation_score,
         device=device,
         evaluation_strategy=config.evaluation.strategy,
         num_negatives=config.evaluation.num_negatives,

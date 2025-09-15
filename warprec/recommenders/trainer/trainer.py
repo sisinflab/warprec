@@ -152,6 +152,8 @@ class Trainer:
         model_name: str,
         params: RecomModel,
         dataset: Dataset,
+        metrics: List[str],
+        topk: List[int],
         validation_score: str,
         device: str = "cpu",
         evaluation_strategy: str = "full",
@@ -169,6 +171,8 @@ class Trainer:
             model_name (str): The name of the model to optimize.
             params (RecomModel): The parameters of the model.
             dataset (Dataset): The dataset to use during training.
+            metrics (List[str]): List of metrics to compute on each report.
+            topk (List[int]): List of cutoffs for metrics.
             validation_score (str): The metric to monitor during training.
             device (str): The device that will be used for tensor operations.
             evaluation_strategy (str): Evaluation strategy, either "full" or "sampled".
@@ -191,6 +195,8 @@ class Trainer:
             model_name=model_name,
             params=params,
             dataset=dataset,
+            metrics=metrics,
+            topk=topk,
             validation_score=validation_score,
             device=device,
             evaluation_strategy=evaluation_strategy,
@@ -257,6 +263,8 @@ class Trainer:
         model_name: str,
         params: RecomModel,
         datasets: List[Dataset],
+        metrics: List[str],
+        topk: List[int],
         validation_score: str,
         device: str = "cpu",
         evaluation_strategy: str = "full",
@@ -272,6 +280,8 @@ class Trainer:
             model_name (str): The name of the model to optimize.
             params (RecomModel): The parameters of the model.
             datasets (List[Dataset]): The list of datasets to use during training.
+            metrics (List[str]): List of metrics to compute on each report.
+            topk (List[int]): List of cutoffs for metrics.
             validation_score (str): The metric to monitor during training.
             device (str): The device that will be used for tensor operations.
             evaluation_strategy (str): Evaluation strategy, either "full" or "sampled".
@@ -297,6 +307,8 @@ class Trainer:
             model_name=model_name,
             params=params,
             dataset=datasets,
+            metrics=metrics,
+            topk=topk,
             validation_score=validation_score,
             device=device,
             evaluation_strategy=evaluation_strategy,
@@ -445,6 +457,8 @@ class Trainer:
         model_name: str,
         params: RecomModel,
         dataset: Dataset | List[Dataset],
+        metrics: List[str],
+        topk: List[int],
         validation_score: str,
         device: str = "cpu",
         evaluation_strategy: str = "full",
@@ -482,6 +496,8 @@ class Trainer:
             objective_function,
             model_name=model_name,
             dataset_folds=ray.put(dataset),
+            metrics=metrics,
+            topk=topk,
             validation_top_k=validation_top_k,
             validation_metric_name=validation_metric_name,
             mode=mode,
