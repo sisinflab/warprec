@@ -1,12 +1,10 @@
 import importlib
-from typing import List, Tuple, TYPE_CHECKING
+from typing import List, Tuple
 from pathlib import Path
 
+from warprec.utils.config.model_configuration import RecomModel
 from warprec.utils.registry import params_registry
 from warprec.utils.logger import logger
-
-if TYPE_CHECKING:
-    from warprec.utils.config import RecomModel
 
 
 def load_custom_modules(custom_modules: str | List[str] | None):
