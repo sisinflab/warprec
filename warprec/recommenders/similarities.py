@@ -66,8 +66,8 @@ class Manhattan(Similarity):
 
     def compute(self, X: csr_matrix, Y: Optional[csr_matrix] = None) -> ndarray:
         if Y is not None:
-            return 1 / (1 + manhattan_distances(X, Y))
-        return 1 / (1 + manhattan_distances(X))
+            return (1 / (1 + manhattan_distances(X, Y))).astype(X.dtype)
+        return (1 / (1 + manhattan_distances(X))).astype(X.dtype)
 
 
 @similarities_registry.register(Similarities.HAVERSINE)
