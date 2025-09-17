@@ -69,6 +69,8 @@ class EvaluationConfig(BaseModel):
         num_negatives (Optional[int]): Number of negative samples to use in "sampled" strategy.
         seed (Optional[int]): Random seed for reproducibility. Used in negative sampling.
         stat_significance (Optional[StatSignificance]): Statistical significance configuration.
+        full_evaluation_on_report (Optional[bool]): Wether or not to compute all metric
+            for each report produced.
         max_metric_per_row (Optional[int]): Number of metrics to show in each row on console.
         beta (Optional[float]): The beta value used in some metrics like F1 score.
         pop_ratio (Optional[float]): The percentage of item transactions that
@@ -86,6 +88,7 @@ class EvaluationConfig(BaseModel):
     stat_significance: Optional[StatSignificance] = Field(
         default_factory=StatSignificance
     )
+    full_evaluation_on_report: Optional[bool] = False
     max_metric_per_row: Optional[int] = 4
     beta: Optional[float] = 1.0
     pop_ratio: Optional[float] = 0.8

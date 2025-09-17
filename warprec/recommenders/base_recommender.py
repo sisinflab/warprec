@@ -117,12 +117,12 @@ class Recommender(nn.Module, ABC):
                     for each user, including predicted ratings.
         """
         # Retrieve evaluation dataloader
-        dataloader = dataset.get_evaluation_dataloader()
+        dataloader = dataset.get_fulldataset_dataloader(device=self._device)
         umap_i, imap_i = dataset.get_inverse_mappings()
 
         # Main evaluation loop
         all_recommendations = []
-        for train_batch, _, user_indices in dataloader:
+        for train_batch, user_indices in dataloader:
             user_indices = user_indices.to(self._device)
 
             # If we are evaluating a sequential model, compute user history

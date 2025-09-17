@@ -21,6 +21,8 @@ def objective_function(
     params: dict,
     model_name: str,
     dataset_folds: Dataset | List[Dataset],
+    metrics: List[str],
+    topk: List[int],
     validation_top_k: int,
     validation_metric_name: str,
     mode: str,
@@ -40,6 +42,8 @@ def objective_function(
         model_name (str): The name of the model to train.
         dataset_folds (Dataset | List[Dataset]): The dataset to train the model on.
             If a list is passed, then it will be handled as folding.
+        metrics (List[str]): List of metrics to compute on each report.
+        topk (List[int]): List of cutoffs for metrics.
         validation_top_k (int): The number of top items to consider for evaluation.
         validation_metric_name (str): The name of the metric to optimize.
         mode (str): Whether or not to maximize or minimize the metric.
@@ -74,8 +78,8 @@ def objective_function(
 
     # Initialize the Evaluator for current Trial
     evaluator = Evaluator(
-        [validation_metric_name],
-        [validation_top_k],
+        metrics,
+        topk,
         train_set=dataset.train_set.get_sparse(),
         beta=beta,
         pop_ratio=pop_ratio,
@@ -153,11 +157,14 @@ def objective_function(
                     num_negatives=num_negatives,
                 )
                 results = evaluator.compute_results()
-                score = results[validation_top_k][validation_metric_name]
+                metric_report = {
+                    f"{metric_name}@{k}": value
+                    for k, metrics_results in results.items()
+                    for metric_name, value in metrics_results.items()
+                }
                 validation_report(
                     model,
-                    validation_score,
-                    score,
+                    **metric_report,
                     loss=epoch_loss,
                     ram_peak_mb=ram_peak_mb,
                     vram_peak_mb=(
@@ -177,15 +184,18 @@ def objective_function(
                 num_negatives=num_negatives,
             )
             results = evaluator.compute_results()
-            score = results[validation_top_k][validation_metric_name]
+            metric_report = {
+                f"{metric_name}@{k}": value
+                for k, metrics_results in results.items()
+                for metric_name, value in metrics_results.items()
+            }
 
             # Update memory usage
             ram_peak_mb = max(initial_ram_mb, process.memory_info().rss / 1024**2)
 
             validation_report(
                 model=model,
-                validation_score=validation_score,
-                score=score,
+                **metric_report,
                 ram_peak_mb=ram_peak_mb,
                 vram_peak_mb=(torch.cuda.max_memory_allocated(device=device) / 1024**2)
                 if str(device) != "cpu" and torch.cuda.is_available()
@@ -200,11 +210,11 @@ def objective_function(
         failed_report(mode, validation_score)
 
 
-def validation_report(
-    model: Recommender, validation_score: str, score: float | Tensor, **kwargs: Any
-):
+def validation_report(model: Recommender, **kwargs: Any):
     # If the score has been computed per user we report only the mean
-    report_score = score if isinstance(score, float) else score.mean()
+    for key, value in kwargs.items():
+        if isinstance(value, Tensor):
+            kwargs[key] = value.mean()
     with tempfile.TemporaryDirectory() as tmpdir:
         torch.save(
             {"model_state": model.state_dict()},
@@ -212,7 +222,6 @@ def validation_report(
         )
         tune.report(
             metrics={
-                validation_score: report_score,
                 **kwargs,
             },
             checkpoint=Checkpoint.from_directory(tmpdir),

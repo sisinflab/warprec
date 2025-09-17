@@ -20,7 +20,7 @@ from warprec.utils.config import (
     TrainConfiguration,
     RecomModel,
 )
-from warprec.utils.helpers import model_param_from_dict
+from warprec.utils.helpers import model_param_from_dict, validation_metric
 from warprec.utils.logger import logger
 from warprec.recommenders.trainer import Trainer
 from warprec.recommenders.loops import train_loop
@@ -282,13 +282,26 @@ def main(args: Namespace):
             else:
                 max_seq_len = 10
 
-            train_batch = torch.randint(0, 2, (num_users_to_predict, num_items)).float()
-            user_indices = torch.arange(num_users_to_predict)
+            # Retrieve best model device
+            best_model_device = best_model._device
+
+            train_batch = (
+                torch.randint(0, 2, (num_users_to_predict, num_items))
+                .float()
+                .to(device=best_model_device)
+            )
+            user_indices = torch.arange(num_users_to_predict).to(
+                device=best_model_device
+            )
             item_indices = torch.randint(
                 1, num_items, (num_users_to_predict, num_items_to_predict)
+            ).to(device=best_model_device)
+            user_seq = torch.randint(
+                1, num_items, (num_users_to_predict, max_seq_len)
+            ).to(device=best_model_device)
+            seq_len = torch.randint(1, max_seq_len + 1, (num_users_to_predict,)).to(
+                device=best_model_device
             )
-            user_seq = torch.randint(1, num_items, (num_users_to_predict, max_seq_len))
-            seq_len = torch.randint(1, max_seq_len + 1, (num_users_to_predict,))
 
             # Test inference time
             inference_time_start = time.time()
@@ -368,12 +381,24 @@ def single_train_test_split_flow(
     model_device = params.optimization.device
     device = general_device if model_device is None else model_device
 
+    # Evaluation on report
+    eval_config = config.evaluation
+    val_metric, val_k = validation_metric(config.evaluation.validation_metric)
+    if eval_config.full_evaluation_on_report:
+        metrics = eval_config.metrics
+        topk = eval_config.top_k
+    else:
+        metrics = [val_metric]
+        topk = [val_k]
+
     # Start HPO phase on test set,
     # no need of further training
     best_model, ray_report = trainer.train_single_fold(
         model_name,
         params,
         dataset,
+        metrics=metrics,
+        topk=topk,
         validation_score=config.evaluation.validation_metric,
         device=device,
         evaluation_strategy=config.evaluation.strategy,
@@ -418,16 +443,28 @@ def multiple_fold_validation_flow(
 
     # Retrieve common params
     block_size = params.optimization.block_size
-    validation_metric = config.evaluation.validation_metric
+    validation_score = config.evaluation.validation_metric
     desired_training_it = params.optimization.properties.desired_training_it
     seed = params.optimization.properties.seed
+
+    # Evaluation on report
+    eval_config = config.evaluation
+    val_metric, val_k = validation_metric(config.evaluation.validation_metric)
+    if eval_config.full_evaluation_on_report:
+        metrics = eval_config.metrics
+        topk = eval_config.top_k
+    else:
+        metrics = [val_metric]
+        topk = [val_k]
 
     # Start HPO phase on validation folds
     best_params, report = trainer.train_multiple_fold(
         model_name,
         params,
         val_datasets,
-        validation_score=validation_metric,
+        metrics=metrics,
+        topk=topk,
+        validation_score=validation_score,
         device=device,
         evaluation_strategy=config.evaluation.strategy,
         num_negatives=config.evaluation.num_negatives,

@@ -52,6 +52,7 @@ class Trainer:
             WarpRecCallback instance.
         custom_models (str | List[str]): The list of custom models to load.
         enable_wandb (bool): Wether or not to enable Wandb.
+        team_wandb (Optional[str]): The name of the Wandb team.
         project_wandb (str): The name of the Wandb project.
         group_wandb (Optional[str]): The name of the Wandb group.
         api_key_file_wandb (Optional[str]): The path to the Wandb
@@ -88,6 +89,7 @@ class Trainer:
         custom_callback: WarpRecCallback = WarpRecCallback(),
         custom_models: str | List[str] = [],
         enable_wandb: bool = False,
+        team_wandb: Optional[str] = None,
         project_wandb: str = "WarpRec",
         group_wandb: Optional[str] = None,
         api_key_file_wandb: Optional[str] = None,
@@ -115,6 +117,7 @@ class Trainer:
             dashboard = DashboardConfig(
                 wandb=Wandb(
                     enabled=enable_wandb,
+                    team=team_wandb,
                     project=project_wandb,
                     group=group_wandb,
                     api_key_file=api_key_file_wandb,
@@ -149,6 +152,8 @@ class Trainer:
         model_name: str,
         params: RecomModel,
         dataset: Dataset,
+        metrics: List[str],
+        topk: List[int],
         validation_score: str,
         device: str = "cpu",
         evaluation_strategy: str = "full",
@@ -166,6 +171,8 @@ class Trainer:
             model_name (str): The name of the model to optimize.
             params (RecomModel): The parameters of the model.
             dataset (Dataset): The dataset to use during training.
+            metrics (List[str]): List of metrics to compute on each report.
+            topk (List[int]): List of cutoffs for metrics.
             validation_score (str): The metric to monitor during training.
             device (str): The device that will be used for tensor operations.
             evaluation_strategy (str): Evaluation strategy, either "full" or "sampled".
@@ -188,6 +195,8 @@ class Trainer:
             model_name=model_name,
             params=params,
             dataset=dataset,
+            metrics=metrics,
+            topk=topk,
             validation_score=validation_score,
             device=device,
             evaluation_strategy=evaluation_strategy,
@@ -254,6 +263,8 @@ class Trainer:
         model_name: str,
         params: RecomModel,
         datasets: List[Dataset],
+        metrics: List[str],
+        topk: List[int],
         validation_score: str,
         device: str = "cpu",
         evaluation_strategy: str = "full",
@@ -269,6 +280,8 @@ class Trainer:
             model_name (str): The name of the model to optimize.
             params (RecomModel): The parameters of the model.
             datasets (List[Dataset]): The list of datasets to use during training.
+            metrics (List[str]): List of metrics to compute on each report.
+            topk (List[int]): List of cutoffs for metrics.
             validation_score (str): The metric to monitor during training.
             device (str): The device that will be used for tensor operations.
             evaluation_strategy (str): Evaluation strategy, either "full" or "sampled".
@@ -294,6 +307,8 @@ class Trainer:
             model_name=model_name,
             params=params,
             dataset=datasets,
+            metrics=metrics,
+            topk=topk,
             validation_score=validation_score,
             device=device,
             evaluation_strategy=evaluation_strategy,
@@ -442,6 +457,8 @@ class Trainer:
         model_name: str,
         params: RecomModel,
         dataset: Dataset | List[Dataset],
+        metrics: List[str],
+        topk: List[int],
         validation_score: str,
         device: str = "cpu",
         evaluation_strategy: str = "full",
@@ -479,6 +496,8 @@ class Trainer:
             objective_function,
             model_name=model_name,
             dataset_folds=ray.put(dataset),
+            metrics=metrics,
+            topk=topk,
             validation_top_k=validation_top_k,
             validation_metric_name=validation_metric_name,
             mode=mode,
@@ -562,6 +581,7 @@ class Trainer:
                     excludes=dashboard.wandb.excludes,
                     log_config=dashboard.wandb.log_config,
                     upload_checkpoints=dashboard.wandb.upload_checkpoints,
+                    entity=dashboard.wandb.team,  # Will be passed to wandb.init()
                 )
             )
         if dashboard.codecarbon.enabled:

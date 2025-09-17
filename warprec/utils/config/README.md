@@ -453,6 +453,7 @@ The `Dashboard Configuration` contains different nested sections dedicated to ea
 WarpRec, through Ray, supports the Weights & Biases dashboard.
 
 - **enabled**: A flag indicating whether to activate the dashboard. Defaults to False.
+- **team**: Name of a specific team. When None, defaults to the first team. Defaults to None.
 - **project**: Name of the project.
 - **group**: Name of the group.
 - **api_key_file**: Path to the file with the API key.
@@ -715,6 +716,7 @@ The `Evaluation Configuration` can be configured using the following keywords:
 - **num_negatives**: The number of negative samples to use during sampled strategy.
 - **seed**: The seed used during the sampling. Used for reproducibility. Defaults to 42.
 - **stat_significance**: This is a nested section containing the information about the stat test to execute.
+- **full_evaluation_on_report**: Flag that decides whether or not to conduct a full evaluation each epoch. Defaults to False. If set to True, the validation metric must be included in the metrics and in the topk.
 - **max_metric_per_row**: The metric to be logged in each row. Defaults to 4.
 - **beta**: The beta value used by the F1-score metric. Defaults to 1.0.
 - **pop_ratio**: The ratio of transactions that will be considered popular. Defaults to 0.8.
