@@ -387,12 +387,6 @@ def single_train_test_split_flow(
     if eval_config.full_evaluation_on_report:
         metrics = eval_config.metrics
         topk = eval_config.top_k
-
-        # Check if validation metric is included
-        if val_metric not in metrics:
-            metrics.append(val_metric)
-        if val_k not in topk:
-            topk.append(val_k)
     else:
         metrics = [val_metric]
         topk = [val_k]
@@ -459,12 +453,6 @@ def multiple_fold_validation_flow(
     if eval_config.full_evaluation_on_report:
         metrics = eval_config.metrics
         topk = eval_config.top_k
-
-        # Check if validation metric is included
-        if val_metric not in metrics:
-            metrics.append(val_metric)
-        if val_k not in topk:
-            topk.append(val_k)
     else:
         metrics = [val_metric]
         topk = [val_k]

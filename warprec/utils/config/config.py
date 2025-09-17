@@ -8,7 +8,7 @@ import yaml
 import numpy as np
 import torch
 from pydantic import BaseModel, model_validator, Field
-from warprec.utils.helpers import load_custom_modules
+from warprec.utils.helpers import load_custom_modules, validation_metric
 from warprec.data.filtering import Filter
 from warprec.utils.config import (
     GeneralConfig,
@@ -199,6 +199,24 @@ class TrainConfiguration(WarpRecConfiguration):
                 raise ValueError(
                     "You are trying to save the evaluation but experiment must be "
                     "setup first. Set setup_experiment to True."
+                )
+
+        # Check if evaluation has been set up correctly
+        if self.evaluation.full_evaluation_on_report:
+            # Check if the validation metric is in the
+            # metrics to evaluate
+            val_metric, val_k = validation_metric(self.evaluation.validation_metric)
+
+            if (
+                val_metric not in self.evaluation.metrics
+                or val_k not in self.evaluation.top_k
+            ):
+                raise ValueError(
+                    "Full evaluation on report has been requested but the "
+                    "validation metric it's not contained in the evaluation metrics. "
+                    f"Validation metric: {self.evaluation.validation_metric} ."
+                    f"Metrics to evaluate: {self.evaluation.metrics}. "
+                    f"TopK to evaluate: {self.evaluation.top_k}."
                 )
 
         # Parse and validate models
