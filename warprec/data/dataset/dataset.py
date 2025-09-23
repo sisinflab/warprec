@@ -111,7 +111,6 @@ class NegativeEvaluationDataset(TorchDataset):
         eval_interactions (csr_matrix): Sparse matrix of evaluation interactions.
         num_negatives (int): Number of negatives to sample per user.
         seed (int): Random seed for negative sampling.
-        device (str | torch.device): The device for the interaction matrix.
     """
 
     def __init__(
@@ -120,25 +119,10 @@ class NegativeEvaluationDataset(TorchDataset):
         eval_interactions: csr_matrix,
         num_negatives: int = 99,
         seed: int = 42,
-        device: str | torch.device = "cpu",
     ):
         super().__init__()
         self.num_users, self.num_items = train_interactions.shape
         self.num_negatives = num_negatives
-
-        # Create copies of csr data
-        train_indptr = train_interactions.indptr.copy()
-        train_indices = train_interactions.indices.copy()
-        train_values = train_interactions.data.copy()
-
-        # Create sparse training set representation
-        crow_indices = torch.from_numpy(train_indptr).to(torch.int64)
-        col_indices = torch.from_numpy(train_indices).to(torch.int64)
-        values = torch.from_numpy(train_values)
-        size = train_interactions.shape
-        self.torch_sparse_csr = torch.sparse_csr_tensor(
-            crow_indices, col_indices, values, size=size
-        ).to(device)
 
         # Init lists for faster access
         self.users_with_positives = []
@@ -190,44 +174,26 @@ class NegativeEvaluationDataset(TorchDataset):
     def __len__(self) -> int:
         return len(self.users_with_positives)
 
-    def __getitem__(self, idx: int) -> Tuple[Tensor, Tensor, Tensor, int]:
+    def __getitem__(self, idx: int) -> Tuple[Tensor, Tensor, int]:
         """Yield data for a single user.
 
         Args:
             idx (int): Index of the user.
 
         Returns:
-            Tuple[Tensor, Tensor, Tensor, int]:
-                - train_row_tensor (Tensor): The train interactions of
-                    the users.
+            Tuple[Tensor, Tensor, int]:
                 - positive_items (Tensor): Tensor with positive items.
                 - negative_items (Tensor): Tensor with negative items.
                 - idx (int): User index.
         """
-        # Retrieve valid user idxs
-        user_idx = self.users_with_positives[idx]
-
-        # Get user interactions from sparse csr
-        row_start = self.torch_sparse_csr.crow_indices()[user_idx]
-        row_end = self.torch_sparse_csr.crow_indices()[user_idx + 1]
-
-        # Extract values from sparse csr
-        row_col_indices = self.torch_sparse_csr.col_indices()[row_start:row_end]
-        row_values = self.torch_sparse_csr.values()[row_start:row_end]
-        num_cols = self.torch_sparse_csr.size(1)
-
-        # Allocate memory and populate final tensor
-        train_row_tensor = torch.zeros(
-            num_cols, dtype=row_values.dtype, device=row_values.device
-        )
-        train_row_tensor[row_col_indices] = row_values
-
         # Fast access to pre-computed pos-neg interactions
         positive_items = self.positive_items_list[idx]
         negative_items = self.negative_items_list[idx]
 
+        # Retrieve valid user idxs
+        user_idx = self.users_with_positives[idx]
+
         return (
-            train_row_tensor,
             positive_items,
             negative_items,
             user_idx,
@@ -314,7 +280,6 @@ class NegativeEvaluationDataLoader(DataLoader):
         num_negatives: int = 99,
         seed: int = 42,
         batch_size: int = 1024,
-        device: str | torch.device = "cpu",
         **kwargs,
     ):
         dataset = NegativeEvaluationDataset(
@@ -322,7 +287,6 @@ class NegativeEvaluationDataLoader(DataLoader):
             eval_interactions=eval_interactions,
             num_negatives=num_negatives,
             seed=seed,
-            device=device,
         )
 
         super().__init__(
@@ -335,13 +299,10 @@ class NegativeEvaluationDataLoader(DataLoader):
 
     @staticmethod
     def _collate_fn(
-        batch: List[Tuple[Tensor, Tensor, Tensor, int]],
-    ) -> Tuple[Tensor, Tensor, Tensor, Tensor]:
+        batch: List[Tuple[Tensor, Tensor, int]],
+    ) -> Tuple[Tensor, Tensor, Tensor]:
         """Custom collate_fn to handle negative sampling in evaluation."""
-        train_tensors, positive_tensors, negative_tensors, user_indices = zip(*batch)
-
-        # Stack the training interactions
-        train_batch = torch.stack(train_tensors)
+        positive_tensors, negative_tensors, user_indices = zip(*batch)
 
         # User indices will be a list of ints, so we convert it
         user_indices_tensor = torch.tensor(list(user_indices), dtype=torch.long)
@@ -359,7 +320,7 @@ class NegativeEvaluationDataLoader(DataLoader):
             padding_value=-1,
         )
 
-        return train_batch, positives_padded, negatives_padded, user_indices_tensor
+        return positives_padded, negatives_padded, user_indices_tensor
 
 
 class FullDatasetLoader(DataLoader):
@@ -718,20 +679,18 @@ class Dataset:
         self,
         num_negatives: int = 99,
         seed: int = 42,
-        device: str | torch.device = "cpu",
     ) -> NegativeEvaluationDataLoader:
         """Retrieve the NegativeEvaluationDataLoader for the dataset.
 
         Args:
             num_negatives (int): Number of negative samples per user.
             seed (int): Random seed for negative sampling.
-            device (str | torch.device): The device of the dataloader.
 
         Returns:
             NegativeEvaluationDataLoader: DataLoader that yields batches
                 of interactions (train_batch, pos_items, neg_items, user_indices)
         """
-        key = f"neg_{num_negatives}_{seed}_{device}"
+        key = f"neg_{num_negatives}_{seed}"
 
         if key not in self._precomputed_dataloader:
             train_sparse = self.train_set.get_sparse()
@@ -743,7 +702,6 @@ class Dataset:
                 num_negatives=num_negatives,
                 batch_size=self._batch_size,
                 seed=seed,
-                device=device,
             )
 
         return self._precomputed_dataloader[key]
