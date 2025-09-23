@@ -154,25 +154,29 @@ class Evaluator:
         dataloader: EvaluationDataLoader | NegativeEvaluationDataLoader
         match strategy:
             case "full":
-                dataloader = dataset.get_evaluation_dataloader(device=device)
+                dataloader = dataset.get_evaluation_dataloader()
             case "sampled":
                 dataloader = dataset.get_neg_evaluation_dataloader(
-                    num_negatives=num_negatives,
-                    device=device,
+                    num_negatives=num_negatives
                 )
             case _:
                 raise ValueError(f"Evaluation strategy {strategy} not supported.")
 
+        # Set the train interactions
+        train_sparse = dataset.train_set.get_sparse()
+
         # Main evaluation loop
         for batch in dataloader:
             candidates_local: Tensor = None
+            train_batch: csr_matrix = None
 
             # Based on strategy, call different predict method
             match strategy:
                 case "full":
-                    train_batch, eval_batch, user_indices = [
-                        x.to(device) for x in batch
-                    ]
+                    eval_batch, user_indices = [x.to(device) for x in batch]
+
+                    # Index the interactions of the current users
+                    train_batch = train_sparse[user_indices.tolist(), :]
 
                     # In case of sequential model, we need to retrieve sequences
                     user_seq, seq_len = None, None
@@ -184,15 +188,19 @@ class Evaluator:
                         )
 
                     predictions = model.predict_full(
-                        train_batch,
                         user_indices=user_indices,
                         user_seq=user_seq,
                         seq_len=seq_len,
+                        train_batch=train_batch,
                     ).to(device)  # Get ratings tensor [batch_size, num_items]
+
+                    # Masking interaction already seen in train
+                    predictions[train_batch.nonzero()] = -torch.inf
                 case "sampled":
-                    train_batch, pos_batch, neg_batch, user_indices = [
-                        x.to(device) for x in batch
-                    ]
+                    pos_batch, neg_batch, user_indices = [x.to(device) for x in batch]
+
+                    # Index the interactions of the current users
+                    train_batch = train_sparse[user_indices.tolist(), :]
 
                     # In case of sequential model, we need to retrieve sequences
                     user_seq, seq_len = None, None
@@ -210,12 +218,15 @@ class Evaluator:
                     # Output tensor size will depend on longest sampled
                     # list in current batch
                     predictions = model.predict_sampled(
-                        train_batch,
                         user_indices=user_indices,
                         item_indices=candidates_local,
                         user_seq=user_seq,
                         seq_len=seq_len,
+                        train_batch=train_batch,
                     ).to(device)  # Get ratings tensor [batch_size, pad_seq]
+
+                    # Mask padded indices
+                    predictions[candidates_local == -1] = -torch.inf
 
                     # Create the local GT
                     num_positives_per_user = (pos_batch != -1).sum(dim=1)
