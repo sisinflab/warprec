@@ -18,85 +18,24 @@ class EvaluationDataset(TorchDataset):
     converting sparse matrices in dense tensors.
 
     Args:
-        train_interactions (csr_matrix): Sparse matrix of training interactions.
         eval_interactions (csr_matrix): Sparse matrix of evaluation interactions.
-        device (str | torch.device): The device for the interaction matrix.
     """
 
     def __init__(
         self,
-        train_interactions: csr_matrix,
         eval_interactions: csr_matrix,
-        device: str | torch.device = "cpu",
     ):
-        self.num_users, self.num_items = train_interactions.shape
-
-        # Create copies of csr data
-        train_indptr = train_interactions.indptr.copy()
-        train_indices = train_interactions.indices.copy()
-        train_values = train_interactions.data.copy()
-
-        eval_indptr = eval_interactions.indptr.copy()
-        eval_indices = eval_interactions.indices.copy()
-        eval_values = eval_interactions.data.copy()
-
-        # Create sparse training set representation
-        crow_indices_train = torch.from_numpy(train_indptr).to(torch.int64)
-        col_indices_train = torch.from_numpy(train_indices).to(torch.int64)
-        values_train = torch.from_numpy(train_values)
-        size_train = train_interactions.shape
-        self.torch_sparse_train = torch.sparse_csr_tensor(
-            crow_indices_train, col_indices_train, values_train, size=size_train
-        ).to(device)
-
-        # Create sparse evaluation set representation
-        crow_indices_eval = torch.from_numpy(eval_indptr).to(torch.int64)
-        col_indices_eval = torch.from_numpy(eval_indices).to(torch.int64)
-        values_eval = torch.from_numpy(eval_values)
-        size_eval = eval_interactions.shape
-        self.torch_sparse_eval = torch.sparse_csr_tensor(
-            crow_indices_eval, col_indices_eval, values_eval, size=size_eval
-        ).to(device)
+        self.num_users, self.num_items = eval_interactions.shape
+        self.eval_interactions = eval_interactions
 
     def __len__(self) -> int:
         return self.num_users
 
-    def __getitem__(self, idx: int) -> Tuple[Tensor, Tensor, int]:
-        # --- Process Train Tensor ---
-        row_start_train = self.torch_sparse_train.crow_indices()[idx]
-        row_end_train = self.torch_sparse_train.crow_indices()[idx + 1]
+    def __getitem__(self, idx: int) -> Tuple[Tensor, int]:
+        eval_row = self.eval_interactions.getrow(idx)
+        eval_batch = torch.from_numpy(eval_row.toarray()).to(torch.float32).squeeze(0)
 
-        row_col_indices_train = self.torch_sparse_train.col_indices()[
-            row_start_train:row_end_train
-        ]
-        row_values_train = self.torch_sparse_train.values()[
-            row_start_train:row_end_train
-        ]
-
-        num_cols = self.torch_sparse_train.size(1)
-
-        train_row_tensor = torch.zeros(
-            num_cols,
-            dtype=row_values_train.dtype,
-            device=self.torch_sparse_train.device,
-        )
-        train_row_tensor[row_col_indices_train] = row_values_train
-
-        # --- Process Eval Tensor ---
-        row_start_eval = self.torch_sparse_eval.crow_indices()[idx]
-        row_end_eval = self.torch_sparse_eval.crow_indices()[idx + 1]
-
-        row_col_indices_eval = self.torch_sparse_eval.col_indices()[
-            row_start_eval:row_end_eval
-        ]
-        row_values_eval = self.torch_sparse_eval.values()[row_start_eval:row_end_eval]
-
-        eval_row_tensor = torch.zeros(
-            num_cols, dtype=row_values_eval.dtype, device=self.torch_sparse_eval.device
-        )
-        eval_row_tensor[row_col_indices_eval] = row_values_eval
-
-        return train_row_tensor, eval_row_tensor, idx
+        return eval_batch, idx
 
 
 class NegativeEvaluationDataset(TorchDataset):
@@ -205,16 +144,12 @@ class EvaluationDataLoader(DataLoader):
 
     def __init__(
         self,
-        train_interactions: csr_matrix,
         eval_interactions: csr_matrix,
         batch_size: int = 1024,
-        device: str | torch.device = "cpu",
         **kwargs,
     ):
         dataset = EvaluationDataset(
-            train_interactions=train_interactions,
             eval_interactions=eval_interactions,
-            device=device,
         )
         super().__init__(dataset, batch_size=batch_size, shuffle=False, **kwargs)
 
@@ -581,28 +516,20 @@ class Dataset:
 
         return inter_set
 
-    def get_evaluation_dataloader(
-        self, device: str | torch.device = "cpu"
-    ) -> EvaluationDataLoader:
+    def get_evaluation_dataloader(self) -> EvaluationDataLoader:
         """Retrieve the EvaluationDataLoader for the dataset.
-
-        Args:
-            device (str | torch.device): The device of the dataloader.
 
         Returns:
             EvaluationDataLoader: DataLoader that yields batches of interactions
-                (train_batch, eval_batch, user_indices).
+                (eval_batch, user_indices).
         """
-        key = f"full_{device}"
+        key = "full"
         if key not in self._precomputed_dataloader:
-            train_sparse = self.train_set.get_sparse()
             eval_sparse = self.eval_set.get_sparse()
 
             self._precomputed_dataloader[key] = EvaluationDataLoader(
-                train_interactions=train_sparse,
                 eval_interactions=eval_sparse,
                 batch_size=self._batch_size,
-                device=device,
             )
 
         return self._precomputed_dataloader[key]
@@ -620,7 +547,7 @@ class Dataset:
 
         Returns:
             NegativeEvaluationDataLoader: DataLoader that yields batches
-                of interactions (train_batch, pos_items, neg_items, user_indices)
+                of interactions (pos_items, neg_items, user_indices)
         """
         key = f"neg_{num_negatives}_{seed}"
 
