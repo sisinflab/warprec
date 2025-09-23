@@ -298,7 +298,8 @@ def main(args: Namespace):
             seq_len = torch.randint(1, max_seq_len + 1, (num_users_to_predict,)).to(
                 device=best_model_device
             )
-            train_batch = main_dataset.train_set.get_sparse()[user_indices.tolist(), :]
+            train_sparse = main_dataset.train_set.get_sparse()
+            train_batch = train_sparse[user_indices.tolist(), :]
 
             # Test inference time
             inference_time_start = time.time()
@@ -308,6 +309,7 @@ def main(args: Namespace):
                 user_seq=user_seq,
                 seq_len=seq_len,
                 train_batch=train_batch,
+                train_sparse=train_sparse,
             )
             inference_time = time.time() - inference_time_start
 

@@ -192,6 +192,7 @@ class Evaluator:
                         user_seq=user_seq,
                         seq_len=seq_len,
                         train_batch=train_batch,
+                        train_sparse=train_sparse,
                     ).to(device)  # Get ratings tensor [batch_size, num_items]
 
                     # Masking interaction already seen in train
@@ -223,6 +224,7 @@ class Evaluator:
                         user_seq=user_seq,
                         seq_len=seq_len,
                         train_batch=train_batch,
+                        train_sparse=train_sparse,
                     ).to(device)  # Get ratings tensor [batch_size, pad_seq]
 
                     # Mask padded indices
