@@ -502,7 +502,7 @@ class ItemSimRecommender(Recommender):
         Returns:
             Tensor: The score matrix {user x pad_seq}.
         """
-        # Compute predictions and gather only sampled items
+        # Compute predictions
         predictions = train_batch @ self.item_similarity  # pylint: disable=not-callable
 
         # Convert to Tensor and gather only required indices
