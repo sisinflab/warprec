@@ -457,7 +457,7 @@ class ItemSimRecommender(Recommender):
     def predict_full(
         self,
         user_indices: Tensor,
-        train_sparse: csr_matrix,
+        train_batch: csr_matrix,
         *args: Any,
         **kwargs: Any,
     ) -> Tensor:
@@ -465,22 +465,17 @@ class ItemSimRecommender(Recommender):
 
         Args:
             user_indices (Tensor): The batch of user indices.
-            train_sparse (csr_matrix): The train sparse interaction matrix.
+            train_batch (csr_matrix): The batch of train sparse
+                interaction matrix.
             *args (Any): List of arguments.
             **kwargs (Any): The dictionary of keyword arguments.
 
         Returns:
             Tensor: The score matrix {user x item}.
         """
-        # Index the interactions of the current users
-        train_batch: csr_matrix = train_sparse[user_indices.tolist(), :]
-
         # Compute predictions and convert to Tensor
         predictions = train_batch @ self.item_similarity  # pylint: disable=not-callable
         predictions = torch.from_numpy(predictions)
-
-        # Masking interaction already seen in train
-        predictions[train_batch.nonzero()] = -torch.inf
         return predictions.to(self._device)
 
     @torch.no_grad()
@@ -488,7 +483,7 @@ class ItemSimRecommender(Recommender):
         self,
         user_indices: Tensor,
         item_indices: Tensor,
-        train_sparse: csr_matrix,
+        train_batch: csr_matrix,
         *args: Any,
         **kwargs: Any,
     ) -> Tensor:
@@ -499,16 +494,14 @@ class ItemSimRecommender(Recommender):
         Args:
             user_indices (Tensor): The batch of user indices.
             item_indices (Tensor): The batch of item indices to sample.
-            train_sparse (csr_matrix): The train sparse interaction matrix.
+            train_batch (csr_matrix): The batch of train sparse
+                interaction matrix.
             *args (Any): List of arguments.
             **kwargs (Any): The dictionary of keyword arguments.
 
         Returns:
             Tensor: The score matrix {user x pad_seq}.
         """
-        # Index the interactions of the current users
-        train_batch: csr_matrix = train_sparse[user_indices.tolist(), :]
-
         # Compute predictions and gather only sampled items
         predictions = train_batch @ self.item_similarity  # pylint: disable=not-callable
 
@@ -517,7 +510,4 @@ class ItemSimRecommender(Recommender):
         predictions = predictions.gather(
             1, item_indices.clamp(min=0)
         )  # [batch_size, pad_seq]
-
-        # Mask padded indices
-        predictions[item_indices == -1] = -torch.inf
         return predictions.to(self._device)
