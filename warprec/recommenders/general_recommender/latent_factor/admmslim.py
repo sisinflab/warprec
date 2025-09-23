@@ -1,9 +1,7 @@
 # pylint: disable = R0801, E1102
 from typing import Any
 
-import torch
 import numpy as np
-from torch import Tensor, nn
 from warprec.data.dataset import Interactions
 from warprec.recommenders.base_recommender import ItemSimRecommender
 from warprec.utils.registry import model_registry
@@ -97,39 +95,8 @@ class ADMMSlim(ItemSimRecommender):
                 C = np.maximum(C, 0)
             Gamma += self.rho * (B - C)
 
-        # Update item_similarity with a new nn.Parameter
-        self.item_similarity = nn.Parameter(torch.from_numpy(C))
-
-    @torch.no_grad()
-    def predict(
-        self,
-        train_batch: Tensor,
-        *args: Any,
-        **kwargs: Any,
-    ) -> Tensor:
-        """Prediction in the form of X@B where B is a {item x item} similarity matrix.
-
-        Args:
-            train_batch (Tensor): The train batch of user interactions.
-            *args (Any): List of arguments.
-            **kwargs (Any): The dictionary of keyword arguments.
-
-        Returns:
-            Tensor: The score matrix {user x item}.
-        """
-        if self.center_columns:
-            # If centering was applied, then we center the interactions also
-            # then add back the means
-            predictions_numpy = (
-                train_batch.detach().numpy() - self.item_means
-            ) @ self.item_similarity.detach().numpy() + self.item_means
-            predictions = torch.from_numpy(predictions_numpy)
-
-            # Masking interaction already seen in train
-            predictions[train_batch != 0] = -torch.inf
-            return predictions.to(self._device)
-        else:
-            return super().predict(train_batch)
+        # Update item_similarity
+        self.item_similarity = C
 
     def _soft_threshold(self, x: np.ndarray, threshold: float) -> np.ndarray:
         return (np.abs(x) > threshold) * (np.abs(x) - threshold) * np.sign(x)
