@@ -3,8 +3,8 @@ from typing import Any
 
 import torch
 import numpy as np
-from torch import Tensor, nn
-from scipy.sparse import csr_matrix, coo_matrix, diags
+from torch import Tensor
+from scipy.sparse import csr_matrix, diags
 from sklearn.preprocessing import normalize
 from warprec.data.dataset import Interactions
 from warprec.recommenders.base_recommender import Recommender
@@ -68,8 +68,8 @@ class VSM(Recommender):
             user_profile = self._compute_user_tfidf(user_profile)
 
         # Save profiles
-        self.i_profile = nn.Parameter(self._scipy_sparse_to_torch_sparse(item_profile))
-        self.u_profile = nn.Parameter(self._scipy_sparse_to_torch_sparse(user_profile))
+        self.i_profile = item_profile
+        self.u_profile = user_profile
 
     def _compute_item_tfidf(self, item_profile: csr_matrix) -> csr_matrix:
         """Computes TF-IDF for item features.
@@ -115,41 +115,9 @@ class VSM(Recommender):
         # L2 normalize
         return normalize(user_profile, norm="l2", axis=1)
 
-    def _scipy_sparse_to_torch_sparse(self, sparse_matrix: csr_matrix) -> Tensor:
-        """Convert the sparse scipy to torch sparse.
-
-        Args:
-            sparse_matrix (csr_matrix): The sparse matrix in csr format.
-
-        Returns:
-            Tensor: The converted tensor.
-        """
-        coo_matrix = sparse_matrix.tocoo()
-        indices = torch.tensor(np.vstack((coo_matrix.row, coo_matrix.col)))
-        data = torch.tensor(coo_matrix.data)
-        shape = coo_matrix.shape
-        return torch.sparse_coo_tensor(indices, data, shape)
-
-    def _torch_sparse_to_scipy_sparse(self, sparse_tensor: Tensor) -> csr_matrix:
-        """Convert the sparse tensor to scipy sparse.
-
-        Args:
-            sparse_tensor (Tensor): The sparse tensor in csr format.
-
-        Returns:
-            csr_matrix: The converted matrix.
-        """
-        sparse_tensor = sparse_tensor.coalesce()
-        indices = sparse_tensor.indices().numpy()
-        values = sparse_tensor.values().detach().numpy()
-        shape = sparse_tensor.shape
-        scipy_coo = coo_matrix((values, (indices[0], indices[1])), shape=shape)
-        return scipy_coo.tocsr()
-
     @torch.no_grad()
     def predict_full(
         self,
-        train_batch: Tensor,
         user_indices: Tensor,
         *args: Any,
         **kwargs: Any,
@@ -157,7 +125,6 @@ class VSM(Recommender):
         """Prediction in the form of X@B where B is a {item x item} similarity matrix.
 
         Args:
-            train_batch (Tensor): The train batch of user interactions.
             user_indices (Tensor): The batch of user indices.
             *args (Any): List of arguments.
             **kwargs (Any): The dictionary of keyword arguments.
@@ -165,24 +132,16 @@ class VSM(Recommender):
         Returns:
             Tensor: The score matrix {user x item}.
         """
-        # Extract profiles and convert them to scipy
-        user_profile = self._torch_sparse_to_scipy_sparse(self.u_profile)
-        item_profile = self._torch_sparse_to_scipy_sparse(self.i_profile)
-
         # Compute similarity
         predictions_numpy = self.sim_function.compute(
-            user_profile[user_indices.cpu().numpy()], item_profile
+            self.u_profile[user_indices.tolist()], self.i_profile
         )
         predictions = torch.from_numpy(predictions_numpy)
-
-        # Masking interaction already seen in train
-        predictions[train_batch != 0] = -torch.inf
         return predictions.to(self._device)
 
     @torch.no_grad()
     def predict_sampled(
         self,
-        train_batch: Tensor,
         user_indices: Tensor,
         item_indices: Tensor,
         *args: Any,
@@ -193,7 +152,6 @@ class VSM(Recommender):
         This method will produce predictions only for given item indices.
 
         Args:
-            train_batch (Tensor): The train batch of user interactions.
             user_indices (Tensor): The batch of user indices.
             item_indices (Tensor): The batch of item indices to sample.
             *args (Any): List of arguments.
@@ -202,19 +160,12 @@ class VSM(Recommender):
         Returns:
             Tensor: The score matrix {user x pad_seq}.
         """
-        # Extract profiles and convert them to scipy
-        user_profile = self._torch_sparse_to_scipy_sparse(self.u_profile)
-        item_profile = self._torch_sparse_to_scipy_sparse(self.i_profile)
-
-        # Compute predictions and gather only sampled items
+        # Compute similarity
         predictions_numpy = self.sim_function.compute(
-            user_profile[user_indices.cpu().numpy()], item_profile
+            self.u_profile[user_indices.tolist()], self.i_profile
         )
         predictions = torch.from_numpy(predictions_numpy)
         predictions = predictions.gather(
             1, item_indices.clamp(min=0)
         )  # [batch_size, pad_seq]
-
-        # Mask padded indices
-        predictions[item_indices == -1] = -torch.inf
         return predictions.to(self._device)
