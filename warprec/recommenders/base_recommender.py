@@ -387,6 +387,57 @@ class SequentialRecommenderUtils(ABC):
 
     max_seq_len: int = 0
 
+    @abstractmethod
+    def predict_full(
+        self,
+        user_indices: Tensor,
+        user_seq: Tensor,
+        seq_len: Tensor,
+        *args: Any,
+        **kwargs: Any,
+    ) -> Tensor:
+        """This method will produce the final predictions in the form of
+        a dense Tensor.
+
+        Args:
+            user_indices (Tensor): The batch of user indices.
+            user_seq (Tensor): Padded sequences of item IDs for users to predict for.
+            seq_len (Tensor): Actual lengths of these sequences, before padding.
+            *args (Any): List of arguments.
+            **kwargs (Any): The dictionary of keyword arguments.
+
+        Returns:
+            Tensor: The score matrix {user x item}.
+        """
+
+    def predict_sampled(
+        self,
+        user_indices: Tensor,
+        item_indices: Tensor,
+        user_seq: Tensor,
+        seq_len: Tensor,
+        *args: Any,
+        **kwargs: Any,
+    ) -> Tensor:
+        """This method will produce predictions only of given item
+        indices.
+
+        Args:
+            user_indices (Tensor): The batch of user indices.
+            item_indices (Tensor): The batch of item indices.
+            user_seq (Tensor): Padded sequences of item IDs for users to predict for.
+            seq_len (Tensor): Actual lengths of these sequences, before padding.
+            *args (Any): List of arguments.
+            **kwargs (Any): The dictionary of keyword arguments.
+
+        Returns:
+            Tensor: The score matrix {user x pad_seq}.
+
+        Raises:
+            NotImplementedError: If the model does not support sampled prediction.
+        """
+        raise NotImplementedError("This model does not support sampled prediction.")
+
     def _gather_indexes(self, output: Tensor, gather_index: Tensor) -> Tensor:
         """Gathers the output from specific indexes for each batch.
 
