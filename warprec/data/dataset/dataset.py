@@ -393,7 +393,6 @@ class Dataset:
         rating_label (str): The label of the rating column.
         timestamp_label (str): The label of the timestamp column.
         cluster_label (str): The label of the cluster column.
-        need_session_based_information (bool): Wether or not to initialize session data.
         precision (Any): The precision of the internal representation of the data.
         evaluation_set (str): The type of evaluation set. Can either be 'Test'
             or 'Validation'.
@@ -427,7 +426,6 @@ class Dataset:
         rating_label: str = None,
         timestamp_label: str = None,
         cluster_label: str = None,
-        need_session_based_information: bool = False,
         precision: Any = np.float32,
         evaluation_set: str = "Test",
     ):
@@ -580,14 +578,13 @@ class Dataset:
             ).float()
 
         # Sequential recommendation sessions
-        if need_session_based_information:
-            self.train_session = Sessions(
-                train_data,
-                self._umap,
-                self._imap,
-                batch_size=batch_size,
-                timestamp_label=timestamp_label,
-            )
+        self.train_session = Sessions(
+            train_data,
+            self._umap,
+            self._imap,
+            batch_size=batch_size,
+            timestamp_label=timestamp_label,
+        )
 
     def _filter_data(
         self,

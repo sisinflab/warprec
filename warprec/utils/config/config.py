@@ -160,17 +160,12 @@ class TrainConfiguration(WarpRecConfiguration):
         splitter (SplittingConfig): Configuration of the splitting process.
         dashboard (DashboardConfig): Configuration of the dashboard process.
         evaluation (EvaluationConfig): Configuration of the evaluation process.
-        need_session_based_information (ClassVar[bool]): Wether or not the experiments
-            will be conducted on session data.
     """
 
     writer: WriterConfig
     splitter: SplittingConfig
     dashboard: DashboardConfig = Field(default_factory=DashboardConfig)
     evaluation: EvaluationConfig
-
-    # Track if session-based information is needed
-    need_session_based_information: ClassVar[bool] = False
 
     @model_validator(mode="after")
     def train_validation(self) -> "TrainConfiguration":
@@ -274,11 +269,6 @@ class TrainConfiguration(WarpRecConfiguration):
                         f"The model {model_name} requires timestamps to work properly, "
                         "be sure that your dataset contains them."
                     )
-
-                # If at least one model is a sequential model, then
-                # we set the flag for session-based information
-                if model_class.need_timestamp:
-                    TrainConfiguration.need_session_based_information = True
 
                 # Extract model train parameters, removing the meta infos
                 model_data = {
