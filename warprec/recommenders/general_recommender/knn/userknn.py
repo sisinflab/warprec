@@ -81,7 +81,7 @@ class UserKNN(Recommender):
             Tensor: The score matrix {user x item}.
         """
         # Compute predictions and convert to Tensor
-        predictions = self.user_similarity[user_indices, :] @ train_sparse
+        predictions = self.user_similarity[user_indices.cpu(), :] @ train_sparse
         predictions = torch.from_numpy(predictions)
         return predictions.to(self._device)
 
@@ -110,11 +110,11 @@ class UserKNN(Recommender):
             Tensor: The score matrix {user x pad_seq}.
         """
         # Compute predictions
-        predictions = self.user_similarity[user_indices, :] @ train_sparse
+        predictions = self.user_similarity[user_indices.cpu(), :] @ train_sparse
 
         # Convert to Tensor and gather only required indices
-        predictions = torch.from_numpy(predictions)
+        predictions = torch.from_numpy(predictions).to(self._device)
         predictions = predictions.gather(
             1, item_indices.clamp(min=0)
         )  # [batch_size, pad_seq]
-        return predictions.to(self._device)
+        return predictions
