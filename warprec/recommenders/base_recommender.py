@@ -120,6 +120,9 @@ class Recommender(nn.Module, ABC):
             # Extract the correct batch of user indices
             user_indices = all_user_indices[i : i + batch_size]
 
+            # Index the interactions of the current users
+            train_batch = train_sparse[user_indices.tolist(), :]
+
             # If we are evaluating a sequential model, compute user history
             user_seq, seq_len = None, None
             if isinstance(self, SequentialRecommenderUtils):
@@ -129,11 +132,15 @@ class Recommender(nn.Module, ABC):
                 )
 
             predictions = self.predict_full(
-                train_sparse=train_sparse,
                 user_indices=user_indices,
                 user_seq=user_seq,
                 seq_len=seq_len,
+                train_batch=train_batch,
+                train_sparse=train_sparse,
             ).to(self._device)  # Get ratings tensor [batch_size x items]
+
+            # Masking interaction already seen in train
+            predictions[train_batch.nonzero()] = -torch.inf
 
             # Get top-k items and their scores for current batch
             top_k_scores, top_k_items = torch.topk(predictions, k, dim=1)
