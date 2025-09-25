@@ -240,7 +240,6 @@ class Caser(IterativeRecommender, SequentialRecommenderUtils):
     @torch.no_grad()
     def predict_full(
         self,
-        train_batch: Tensor,
         user_indices: Tensor,
         user_seq: Tensor,
         seq_len: Tensor,
@@ -251,7 +250,6 @@ class Caser(IterativeRecommender, SequentialRecommenderUtils):
         Prediction using the learned session embeddings (full sort prediction).
 
         Args:
-            train_batch (Tensor): The train batch of user interactions.
             user_indices (Tensor): The batch of user indices.
             user_seq (Tensor): Padded sequences of item IDs for users to predict for.
             seq_len (Tensor): Actual lengths of these sequences, before padding.
@@ -268,14 +266,11 @@ class Caser(IterativeRecommender, SequentialRecommenderUtils):
 
         all_item_embeddings = self.item_embedding.weight[1:]
         predictions = torch.matmul(seq_output, all_item_embeddings.transpose(0, 1))
-
-        predictions[train_batch != 0] = -torch.inf
         return predictions.to(self._device)
 
     @torch.no_grad()
     def predict_sampled(
         self,
-        train_batch: Tensor,
         user_indices: Tensor,
         item_indices: Tensor,
         user_seq: Tensor,
@@ -286,7 +281,6 @@ class Caser(IterativeRecommender, SequentialRecommenderUtils):
         """Prediction of given items using the learned session embeddings.
 
         Args:
-            train_batch (Tensor): The train batch of user interactions.
             user_indices (Tensor): The batch of user indices.
             item_indices (Tensor): The batch of item indices to predict for.
             user_seq (Tensor): Padded sequences of item IDs for users to predict for.
@@ -317,7 +311,4 @@ class Caser(IterativeRecommender, SequentialRecommenderUtils):
         predictions = torch.einsum(
             "bi,bji->bj", seq_output, candidate_item_embeddings
         )  # [batch_size, pad_seq]
-
-        # Mask padded indices
-        predictions[item_indices == -1] = -torch.inf
         return predictions.to(self._device)
