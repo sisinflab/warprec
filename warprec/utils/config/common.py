@@ -162,6 +162,46 @@ def _check_between_zero_and_one(value: Any) -> bool:
     return isinstance(value, (float, int)) and (value < 0 or value > 1)
 
 
+def _scientific_notation_conversion(values: list) -> list:
+    """Converts an input list to force scientific
+    notation numbers to be floats.
+
+    Args:
+        values (list): The original list.
+
+    Returns:
+        list: The converted list.
+    """
+
+    def _attempt_conversion(value: Any) -> Any:
+        """Performs the conversion logic for a single element.
+
+        Args:
+            value (Any): The original value.
+
+        Returns:
+            Any: The converted value.
+        """
+        # Skip non-string elements immediately (int, float, etc.)
+        if not isinstance(value, str):
+            return value
+
+        # Skip strings that don't contain 'e' or 'E' (e.g., "grid", "randint")
+        if "e" not in value.lower():
+            return value
+
+        # Attempt the safe conversion for scientific notation
+        try:
+            # Successful conversion to float (e.g., "1e10")
+            return float(value)
+        except ValueError:
+            # We return the original string in this case.
+            return value
+
+    # Apply conversion logic to the entire list
+    return [_attempt_conversion(value) for value in values]
+
+
 def validate_greater_than_zero(cls: Type[T], value: Any, field: str) -> list:
     """Validate a hyperparameter.
 
@@ -179,6 +219,7 @@ def validate_greater_than_zero(cls: Type[T], value: Any, field: str) -> list:
         ValueError: If any of the values are not greater then zero.
     """
     value = _convert_to_list(value)
+    value = _scientific_notation_conversion(value)
     for v in value:
         if _check_less_equal_zero(v):
             raise ValueError(
@@ -205,6 +246,7 @@ def validate_greater_equal_than_zero(cls: Type[T], value: Any, field: str) -> li
         ValueError: If any of the values are not greater or equal then zero.
     """
     value = _convert_to_list(value)
+    value = _scientific_notation_conversion(value)
     for v in value:
         if _check_less_than_zero(v):
             raise ValueError(
@@ -284,6 +326,7 @@ def validate_between_zero_and_one(cls: Type[T], value: Any, field: str) -> list:
         ValueError: If any of the values are not between zero and one.
     """
     value = _convert_to_list(value)
+    value = _scientific_notation_conversion(value)
     for v in value:
         if _check_between_zero_and_one(v):
             raise ValueError(
