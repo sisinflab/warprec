@@ -3,7 +3,7 @@ from typing import Any
 
 import torch
 import numpy as np
-from torch import Tensor, nn
+from torch import Tensor
 from scipy.sparse import csr_matrix
 from sklearn.preprocessing import normalize
 from warprec.data.dataset import Interactions
@@ -69,8 +69,8 @@ class AttributeUserKNN(Recommender):
         # Compute top_k filtering
         filtered_sim_matrix = self._apply_topk_filtering(sim_matrix, self.k)
 
-        # Update item_similarity with a new nn.Parameter
-        self.user_similarity = nn.Parameter(filtered_sim_matrix)
+        # Update item_similarity
+        self.user_similarity = filtered_sim_matrix.numpy()
 
     def _compute_user_tfidf(self, user_profile: csr_matrix) -> csr_matrix:
         """Computes TF-IDF for user features.
@@ -92,36 +92,34 @@ class AttributeUserKNN(Recommender):
     @torch.no_grad()
     def predict_full(
         self,
-        train_batch: Tensor,
         user_indices: Tensor,
+        train_sparse: csr_matrix,
         *args: Any,
         **kwargs: Any,
     ) -> Tensor:
         """Prediction in the form of B@X where B is a {user x user} similarity matrix.
 
         Args:
-            train_batch (Tensor): The train batch of user interactions.
             user_indices (Tensor): The batch of user indices.
+            train_sparse (csr_matrix): The full of train sparse
+                interaction matrix.
             *args (Any): List of arguments.
             **kwargs (Any): The dictionary of keyword arguments.
 
         Returns:
             Tensor: The score matrix {user x item}.
         """
-        predictions = (
-            self.user_similarity[user_indices, :][:, user_indices] @ train_batch
-        )
-
-        # Masking interaction already seen in train
-        predictions[train_batch != 0] = -torch.inf
+        # Compute predictions and convert to Tensor
+        predictions = self.user_similarity[user_indices.cpu(), :] @ train_sparse
+        predictions = torch.from_numpy(predictions)
         return predictions.to(self._device)
 
     @torch.no_grad()
     def predict_sampled(
         self,
-        train_batch: Tensor,
         user_indices: Tensor,
         item_indices: Tensor,
+        train_sparse: csr_matrix,
         *args: Any,
         **kwargs: Any,
     ) -> Tensor:
@@ -130,23 +128,22 @@ class AttributeUserKNN(Recommender):
         This method will produce predictions only for given item indices.
 
         Args:
-            train_batch (Tensor): The train batch of user interactions.
             user_indices (Tensor): The batch of user indices.
             item_indices (Tensor): The batch of item indices to sample.
+            train_sparse (csr_matrix): The full train sparse
+                interaction matrix.
             *args (Any): List of arguments.
             **kwargs (Any): The dictionary of keyword arguments.
 
         Returns:
             Tensor: The score matrix {user x pad_seq}.
         """
-        # Compute predictions and gather only sampled items
-        predictions = (
-            self.user_similarity[user_indices, :][:, user_indices] @ train_batch
-        )
+        # Compute predictions
+        predictions = self.user_similarity[user_indices.cpu(), :] @ train_sparse
+
+        # Convert to Tensor and gather only required indices
+        predictions = torch.from_numpy(predictions).to(self._device)
         predictions = predictions.gather(
             1, item_indices.clamp(min=0)
         )  # [batch_size, pad_seq]
-
-        # Mask padded indices
-        predictions[item_indices == -1] = -torch.inf
-        return predictions.to(self._device)
+        return predictions

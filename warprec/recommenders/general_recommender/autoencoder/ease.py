@@ -2,8 +2,6 @@
 from typing import Any
 
 import numpy as np
-import torch
-from torch import nn
 from warprec.recommenders.base_recommender import ItemSimRecommender
 from warprec.data.dataset import Interactions
 from warprec.utils.registry import model_registry
@@ -53,4 +51,4 @@ class EASE(ItemSimRecommender):
         B /= -np.diag(B)
         np.fill_diagonal(B, 0.0)
 
-        self.item_similarity = nn.Parameter(torch.tensor(B, dtype=torch.float32))
+        self.item_similarity = B

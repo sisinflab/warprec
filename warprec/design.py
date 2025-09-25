@@ -149,6 +149,8 @@ def main(args: Namespace):
         evaluator.evaluate(
             model,
             main_dataset,
+            strategy=config.evaluation.strategy,
+            num_negatives=config.evaluation.num_negatives,
             device=str(model._device),
             verbose=True,
         )
