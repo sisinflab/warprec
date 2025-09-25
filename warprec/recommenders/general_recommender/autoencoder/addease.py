@@ -2,8 +2,6 @@
 from typing import Any
 
 import numpy as np
-import torch
-from torch import nn
 from warprec.recommenders.base_recommender import ItemSimRecommender
 from warprec.data.dataset import Interactions
 from warprec.utils.registry import model_registry
@@ -64,6 +62,4 @@ class AddEASE(ItemSimRecommender):
         np.fill_diagonal(U, 0.0)
 
         # Linear combination
-        sim = self.alpha * B + (1 - self.alpha) * U
-
-        self.item_similarity = nn.Parameter(torch.tensor(sim, dtype=torch.float32))
+        self.item_similarity = self.alpha * B + (1 - self.alpha) * U

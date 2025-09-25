@@ -285,11 +285,7 @@ def main(args: Namespace):
             # Retrieve best model device
             best_model_device = best_model._device
 
-            train_batch = (
-                torch.randint(0, 2, (num_users_to_predict, num_items))
-                .float()
-                .to(device=best_model_device)
-            )
+            # Create mock data to test prediction time
             user_indices = torch.arange(num_users_to_predict).to(
                 device=best_model_device
             )
@@ -302,15 +298,18 @@ def main(args: Namespace):
             seq_len = torch.randint(1, max_seq_len + 1, (num_users_to_predict,)).to(
                 device=best_model_device
             )
+            train_sparse = main_dataset.train_set.get_sparse()
+            train_batch = train_sparse[user_indices.tolist(), :]
 
             # Test inference time
             inference_time_start = time.time()
             best_model.predict_sampled(
-                train_batch,
                 user_indices=user_indices,
                 item_indices=item_indices,
                 user_seq=user_seq,
                 seq_len=seq_len,
+                train_batch=train_batch,
+                train_sparse=train_sparse,
             )
             inference_time = time.time() - inference_time_start
 
@@ -533,12 +532,11 @@ def dataset_preparation(
             device (str): The device to use.
         """
         if config.evaluation.strategy == "full":
-            dataset.get_evaluation_dataloader(device=device)
+            dataset.get_evaluation_dataloader()
         elif config.evaluation.strategy == "sampled":
             dataset.get_neg_evaluation_dataloader(
                 num_negatives=config.evaluation.num_negatives,
                 seed=config.evaluation.seed,
-                device=device,
             )
 
     logger.msg("Preparing main dataset inner structures for training and evaluation.")

@@ -1,0 +1,186 @@
+reader:
+  loading_strategy: [dataset, split]
+  data_type: transaction
+  reading_method: local
+  local_path: path/to/dataset.csv
+  sep: ','
+  header: [True, False]
+  rating_type: [implicit, explicit]
+  split:
+    local_path: path/to/split/dir/
+    ext: .csv
+    sep: ','
+    header: [True, False]
+  side:
+    local_path: path/to/side_information.csv
+    sep: ','
+    header: [True, False]
+  clustering:
+    user_local_path: path/to/user_clustering.csv
+    item_local_path: path/to/item_clustering.csv
+    user_sep: ','
+    item_sep: ','
+    user_header: [True, False]
+    item_header: [True, False]
+  labels:
+    user_id_label: my_user_id_label
+    item_id_label: my_item_id_label
+    rating_label: my_rating_label
+    timestamp_label: my_timestamp_label
+  dtypes:
+    user_id_type: [int8, int16, int32, int64, float32, float64, str]
+    item_id_type: [int8, int16, int32, int64, float32, float64, str]
+    rating_type: [int8, int16, int32, int64, float32, float64, str]
+    timestamp_type: [int8, int16, int32, int64, float32, float64, str]
+writer:
+  dataset_name: MyDataset
+  writing_method: local
+  local_experiment_path: path/to/experiment/dir/
+  setup_experiment: [True, False]
+  save_split: [True, False]
+  results:
+    sep: ','
+    ext: .csv
+  split:
+    sep: ','
+    ext: .csv
+    header: [True, False]
+    labels:
+      user_id_label: my_user_id_label
+      item_id_label: my_item_id_label
+      rating_label: my_rating_label
+      timestamp_label: my_timestamp_label
+  recommendation:
+    sep: ','
+    ext: .csv
+    header: [True, False]
+    k: 50
+    user_label: my_user_id_label
+    item_label: my_item_id_label
+    rating_label: my_rating_label
+filtering:
+  MinRating:
+    min_rating: 3.0
+  UserAverage: {}
+  UserMin:
+    min_interactions: 5
+  UserMax:
+    max_interactions: 2
+  ItemMin:
+    min_interactions: 5
+  ItemMax:
+    max_interactions: 2
+  IterativeKCore:
+    min_interactions: 5
+  NRoundsKCore:
+    rounds: 3
+    min_interactions: 5
+splitter:
+  test_splitting:
+    strategy: [temporal_holdout, temporal_leave_k_out, random_holdout, random_leave_k_out, timestamp_slicing]
+    ratio: 0.1
+    k: 10
+    timestamp: [123456789, best]
+  validation_splitting:
+    strategy: [temporal_holdout, temporal_leave_k_out, random_holdout, random_leave_k_out, timestamp_slicing, k_fold_cross_validation]
+    ratio: 0.1
+    k: 10
+    timestamp: [123456789, best]
+    folds: 10
+dashboard:
+  wandb:
+    enabled: [True, False]
+    team: MyTeam
+    project: MyProject
+    group: MyGroup
+    api_key_file: path/to/api/key/file
+    api_key: my_api_key
+    excludes: [loss, nDCG@5, ...]
+    log_config: [True, False]
+    upload_checkpoints: [True, False]
+  mlflow:
+    enabled: [True, False]
+    tracking_uri: my_tracking_uri
+    registry_uri: my_registry_uri
+    experiment_name: MyExperiment
+    tags: [Tag_1, Tag_2, ...]
+    tracking_token: my_tracking_token
+    save_artifacts: [True, False]
+  codecarbon:
+    enabled: [True, False]
+    save_to_api: [True, False]
+    save_to_file: [True, False]
+    output_dir: path/to/output/dir/
+    tracking_mode: [machine, process]
+models:
+  MyModel:
+    meta:
+      save_model: [True, False]
+      save_recs: [True, False]
+      load_from: path/to/model/checkpoint
+    optimization:
+      strategy: [grid, random, hopt, optuna, bohb]
+      scheduler: [fifo, asha]
+      properties:
+        mode: [max, min]
+        desired_training_it: [median, mean, min, max]
+        seed: 42
+        time_attr: iter
+        max_t: 100
+        grace_period: 50
+        reduction_factor: 2.0
+      device: [cpu, cuda]
+      max_cpu_count: 32
+      num_samples: 10
+      parallel_trials: 5
+      block_size: 50
+      checkpoint_to_keep: 5
+    early_stopping:
+      monitor: [score, loss]
+      patience: 20
+      grace_period: 50
+      min_delta: 0.0001
+    # Parameters depends on the model,
+    # here are some examples
+    param_1: 10
+    param_2: cosine
+    param_3: [10, 20, 30, 40, 50]
+    param_4: [uniform, 1.0, 100.0]
+    param_5: [qrandint, 10, 10_000, 5]
+evaluation:
+  top_k: [5, 10, ...]
+  metrics: [Precision, Recall, nDCG, ...]
+  validation_metric: Recall@20
+  batch_size: 4096
+  strategy: [full, sampled]
+  num_negatives: 99
+  seed: 42
+  stat_significance:
+    paired_t_test: [True, False]
+    wilcoxon_test: [True, False]
+    kruskal_test: [True, False]
+    whitney_u_test: [True, False]
+    corrections:
+      bonferroni: [True, False]
+      holm_bonferroni: [True, False]
+      fdr: [True, False]
+      alpha: 0.05
+  full_evaluation_on_report: [True, False]
+  max_metric_per_row: 10
+  beta: 1.0
+  pop_ratio: 0.8
+  save_evaluation: [True, False]
+general:
+  precision: [float32, float64]
+  device: [cpu, cuda]
+  ray_verbose: [0, 1, 2, 3]
+  time_report: [True, False]
+  cuda_visible_devices: [0, 1]
+  custom_models: [path/to/python/module, path/to/python/script.py]
+  callback:
+    callback_path: path/to/python/script.py
+    callback_name: MyCustomCallback
+    args: [arg_1, arg_2, ...]
+    kwargs:
+      kwarg_1: 10
+      kwarg_2: string

@@ -5,6 +5,7 @@ import torch
 from torch import nn, Tensor
 from torch.nn import Module
 from torch.nn.init import normal_
+from scipy.sparse import csr_matrix
 
 from warprec.recommenders.layers import MLP, CNN
 from warprec.recommenders.losses import BPRLoss
@@ -166,8 +167,8 @@ class ConvNCF(IterativeRecommender):
     @torch.no_grad()
     def predict_full(
         self,
-        train_batch: Tensor,
         user_indices: Tensor,
+        train_batch: csr_matrix,
         *args: Any,
         **kwargs: Any,
     ) -> Tensor:
@@ -175,15 +176,16 @@ class ConvNCF(IterativeRecommender):
         Prediction using the learned embeddings.
 
         Args:
-            train_batch (Tensor): The train batch of user interactions.
             user_indices (Tensor): The batch of user indices.
+            train_batch (csr_matrix): The batch of train sparse
+                interaction matrix.
             *args (Any): List of arguments.
             **kwargs (Any): The dictionary of keyword arguments.
 
         Returns:
             Tensor: The score matrix {user x item}.
         """
-        num_users, num_items = train_batch.size()
+        batch_size, num_items = train_batch.shape
         user_e_batch = self.user_embedding(user_indices)
 
         all_scores = []
@@ -199,7 +201,7 @@ class ConvNCF(IterativeRecommender):
 
             # Expand embeddings to create all user-item pairs in the block
             user_e_exp = user_e_batch.unsqueeze(1).expand(-1, num_items_in_block, -1)
-            item_e_exp = item_e_block.unsqueeze(0).expand(num_users, -1, -1)
+            item_e_exp = item_e_block.unsqueeze(0).expand(batch_size, -1, -1)
 
             # Compute outer product for the entire block
             interaction_map = torch.bmm(
@@ -214,19 +216,15 @@ class ConvNCF(IterativeRecommender):
             prediction = self.predict_layers(cnn_output)
 
             # Reshape scores to [num_users_in_batch, num_items_in_block]
-            scores_block = prediction.reshape(num_users, num_items_in_block)
+            scores_block = prediction.reshape(batch_size, num_items_in_block)
             all_scores.append(scores_block)
 
         predictions = torch.cat(all_scores, dim=1)
-
-        # Masking interaction already seen in train
-        predictions[train_batch != 0] = -torch.inf
         return predictions.to(self._device)
 
     @torch.no_grad()
     def predict_sampled(
         self,
-        train_batch: Tensor,
         user_indices: Tensor,
         item_indices: Tensor,
         *args: Any,
@@ -235,7 +233,6 @@ class ConvNCF(IterativeRecommender):
         """Prediction of given items using the learned embeddings.
 
         Args:
-            train_batch (Tensor): The train batch of user interactions.
             user_indices (Tensor): The batch of user indices.
             item_indices (Tensor): The batch of item indices.
             *args (Any): List of arguments.
@@ -260,7 +257,4 @@ class ConvNCF(IterativeRecommender):
 
         # Reshape the flat predictions back to the original batch shape
         predictions = predictions_flat.view(batch_size, pad_seq)
-
-        # Mask padded indices
-        predictions[item_indices == -1] = -torch.inf
         return predictions.to(self._device)

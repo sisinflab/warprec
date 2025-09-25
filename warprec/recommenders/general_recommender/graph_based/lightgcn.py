@@ -172,7 +172,6 @@ class LightGCN(IterativeRecommender, GraphRecommenderUtils):
     @torch.no_grad()
     def predict_full(
         self,
-        train_batch: Tensor,
         user_indices: Tensor,
         *args: Any,
         **kwargs: Any,
@@ -180,7 +179,6 @@ class LightGCN(IterativeRecommender, GraphRecommenderUtils):
         """Prediction using the learned embeddings.
 
         Args:
-            train_batch (Tensor): The train batch of user interactions.
             user_indices (Tensor): The batch of user indices.
             *args (Any): List of arguments.
             **kwargs (Any): The dictionary of keyword arguments.
@@ -199,15 +197,11 @@ class LightGCN(IterativeRecommender, GraphRecommenderUtils):
         predictions = torch.matmul(
             u_embeddings_batch, item_e.transpose(0, 1)
         )  # [batch_size, n_items]
-
-        # Masking interaction already seen in train
-        predictions[train_batch != 0] = -torch.inf
         return predictions.to(self._device)
 
     @torch.no_grad()
     def predict_sampled(
         self,
-        train_batch: Tensor,
         user_indices: Tensor,
         item_indices: Tensor,
         *args: Any,
@@ -218,7 +212,6 @@ class LightGCN(IterativeRecommender, GraphRecommenderUtils):
         This method will produce predictions only for given item indices.
 
         Args:
-            train_batch (Tensor): The train batch of user interactions.
             user_indices (Tensor): The batch of user indices.
             item_indices (Tensor): The batch of item indices to sample.
             *args (Any): List of arguments.
@@ -242,7 +235,4 @@ class LightGCN(IterativeRecommender, GraphRecommenderUtils):
         predictions = torch.einsum(
             "be,bse->bs", u_embeddings_batch, i_embeddings_sampled
         )  # [batch_size, pad_seq]
-
-        # Mask padded indices
-        predictions[item_indices == -1] = -torch.inf
         return predictions.to(self._device)
