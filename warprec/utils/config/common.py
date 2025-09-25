@@ -163,7 +163,7 @@ def _check_between_zero_and_one(value: Any) -> bool:
 
 
 def _scientific_notation_conversion(values: list) -> list:
-    """Converts an input list to have force scientific
+    """Converts an input list to force scientific
     notation numbers to be floats.
 
     Args:
