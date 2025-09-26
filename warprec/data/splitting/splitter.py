@@ -44,7 +44,9 @@ class Splitter:
         val_folds: Optional[int] = None,
         val_timestamp: Optional[Union[int, str]] = None,
         val_seed: int = 42,
-    ) -> Tuple[DataFrame, Optional[List[Tuple[DataFrame, DataFrame]]], DataFrame]:
+    ) -> Tuple[
+        DataFrame, Optional[List[Tuple[DataFrame, DataFrame]] | DataFrame], DataFrame
+    ]:
         """The main method of the class. This method must be called to split the data.
 
         When called, this method will return the splitting calculated by
@@ -72,13 +74,14 @@ class Splitter:
             val_seed (int): The seed value for validation set.  Defaults to 42.
 
         Returns:
-            Tuple[DataFrame, Optional[List[Tuple[DataFrame, DataFrame]]], DataFrame]:
+            Tuple[DataFrame, Optional[List[Tuple[DataFrame, DataFrame]] | DataFrame], DataFrame]:
                 - DataFrame: The original train data, used to train
                     the final model of the experiment.
-                - Optional[List[Tuple[DataFrame, DataFrame]]]:
+                - Optional[List[Tuple[DataFrame, DataFrame]] | DataFrame]: Either return a list of tuples
                     - DataFrame: The train data used to train the model.
                     - DataFrame: The validation data used to evaluate
                         the model during training.
+                    or just a single DataFrame representing the validation set.
                 - DataFrame: The unique test data, used at the end of
                     the experiment to evaluate the model.
         """
@@ -143,12 +146,18 @@ class Splitter:
             # CASE 1: Only train and test set
             return (original_train_set, None, test_set)
 
+        if len(validation_folds) == 1:
+            # CASE 2: Train/Validation/Test
+            train_set, validation_set = validation_folds[0]
+            self._filter_sets(train, test_set)
+            return (train_set, validation_set, test_set)
+
         # Filter out each validation set based on
         # corresponding train set
         for train, validation in validation_folds:
             self._filter_sets(train, validation)
 
-        # CASE 2: N folds of train and validation + the test set
+        # CASE 3: N folds of train and validation + the test set
         return (original_train_set, validation_folds, test_set)
 
     def split_context(

@@ -64,7 +64,7 @@ def main(args: Namespace):
 
     # Dataset loading
     main_dataset: Dataset = None
-    fold_data: List[Tuple[DataFrame, DataFrame]] = None
+    val_data: List[Tuple[DataFrame, DataFrame]] | DataFrame = None
     train_data: DataFrame = None
     test_data: DataFrame = None
     side_data = None
@@ -84,14 +84,14 @@ def main(args: Namespace):
             splitter = Splitter(config)
 
             if config.reader.data_type == "transaction":
-                train_data, fold_data, test_data = splitter.split_transaction(data)
+                train_data, val_data, test_data = splitter.split_transaction(data)
 
             else:
                 raise ValueError("Data type not yet supported.")
 
     elif config.reader.loading_strategy == "split":
         if config.reader.data_type == "transaction":
-            train_data, fold_data, test_data = reader.read_transaction_split()
+            train_data, val_data, test_data = reader.read_transaction_split()
 
         else:
             raise ValueError("Data type not yet supported.")
@@ -123,29 +123,44 @@ def main(args: Namespace):
         test_data,
         **common_params,
     )
+
+    # Handle validation data
+    val_dataset = None
     fold_dataset = []
-    if fold_data is not None:
-        n_folds = len(fold_data)
-        for idx, fold in enumerate(fold_data):
-            logger.msg(f"Creating fold dataset {idx + 1}/{n_folds}")
-            val_train, val_set = fold
-            fold_dataset.append(
-                Dataset(
-                    val_train,
-                    val_set,
-                    evaluation_set="Validation",
-                    **common_params,
-                )
+    if val_data is not None:
+        if not isinstance(val_data, list):
+            # CASE 2: Train/Validation/Test
+            logger.msg("Creating validation dataset")
+            val_dataset = Dataset(
+                train_data,
+                val_data,
+                evaluation_set="Validation",
+                **common_params,
             )
+        else:
+            # CASE 3: Cross-Validation
+            n_folds = len(val_data)
+            for idx, fold in enumerate(val_data):
+                logger.msg(f"Creating fold dataset {idx + 1}/{n_folds}")
+                val_train, val_set = fold
+                fold_dataset.append(
+                    Dataset(
+                        val_train,
+                        val_set,
+                        evaluation_set="Validation",
+                        **common_params,
+                    )
+                )
 
     # Callback on dataset creation
     callback.on_dataset_creation(
         main_dataset=main_dataset,
+        val_dataset=val_dataset,
         validation_folds=fold_dataset,
     )
 
     if config.splitter and config.writer.save_split:
-        writer.write_split(main_dataset, fold_dataset)
+        writer.write_split(main_dataset, val_dataset, fold_dataset)
 
     # Trainer testing
     models = list(config.models.keys())
@@ -195,9 +210,13 @@ def main(args: Namespace):
             config=config,
         )
 
-        if len(fold_dataset) > 0:
-            # We validate model results of validation data
-            # and then finalize results of test
+        if val_dataset is not None:
+            # CASE 2: Train/Validation/Test
+            best_model, ray_report = single_split_flow(
+                model_name, params, val_dataset, trainer, config
+            )
+        elif len(fold_dataset) > 0:
+            # CASE 3: Cross-validation
             best_model, ray_report = multiple_fold_validation_flow(
                 model_name,
                 params,
@@ -207,8 +226,8 @@ def main(args: Namespace):
                 config,
             )
         else:
-            # Model will be optimized and evaluated on test set
-            best_model, ray_report = single_train_test_split_flow(
+            # CASE 1: Train/Test
+            best_model, ray_report = single_split_flow(
                 model_name, params, main_dataset, trainer, config
             )
 
@@ -352,14 +371,16 @@ def main(args: Namespace):
     )
 
 
-def single_train_test_split_flow(
+def single_split_flow(
     model_name: str,
     params: RecomModel,
     dataset: Dataset,
     trainer: Trainer,
     config: TrainConfiguration,
 ) -> Tuple[Recommender, dict]:
-    """Hyperparameter optimization over a single train/test split.
+    """Hyperparameter optimization over a single split.
+
+    The split can either be train/test or train/validation.
 
     Args:
         model_name (str): Name of the model to optimize.

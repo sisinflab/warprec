@@ -42,6 +42,7 @@ class WarpRecCallback(Callback):
     def on_dataset_creation(
         self,
         main_dataset: "Dataset",
+        val_dataset: "Dataset",
         validation_folds: List["Dataset"],
         *args: Any,
         **kwargs: Any,
@@ -54,6 +55,8 @@ class WarpRecCallback(Callback):
         Args:
             main_dataset (Dataset): The main dataset that has been created.
                 Contains information about the train/test main split.
+            val_dataset (Dataset): The validation dataset that has been created.
+                Contains information about the train/val split.
             validation_folds (List[Dataset]): The validation folds
                 created either with holdout or cross-validation methods.
                 Each 'Dataset' represents a train/validation split.

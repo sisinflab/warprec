@@ -61,7 +61,12 @@ class Writer(ABC):
         """This method writes the model state into a destination."""
 
     @abstractmethod
-    def write_split(self, main_dataset: Dataset, fold_dataset: Optional[List[Dataset]]):
+    def write_split(
+        self,
+        main_dataset: Dataset,
+        val_dataset: Optional[DataFrame],
+        fold_dataset: Optional[List[Dataset]],
+    ):
         """This method writes the split of the dataset into a destination."""
 
 
@@ -357,6 +362,7 @@ class LocalWriter(Writer):
     def write_split(
         self,
         main_dataset: Dataset,
+        val_dataset: Optional[Dataset],
         fold_dataset: Optional[List[Dataset]],
         sep: str = "\t",
         ext: str = ".tsv",
@@ -367,6 +373,7 @@ class LocalWriter(Writer):
 
         Args:
             main_dataset (Dataset): The main dataset split.
+            val_dataset (Optional[Dataset]): The validation dataset split.
             fold_dataset (Optional[List[Dataset]]): The list of fold datasets.
             sep (str): The separator that will be used to write the results.
             ext (str): The extension that will be used to write the results.
@@ -421,6 +428,11 @@ class LocalWriter(Writer):
             validated_column_names.append(writing_params.labels.timestamp_label)
 
         write_dataset(main_dataset, main_split_path, "test")
+
+        # If validation data is used, write it
+        # in the main path
+        if val_dataset is not None:
+            write_dataset(val_dataset, main_split_path, "validation")
 
         # If fold data is used, we iterate over it and
         # write it locally
