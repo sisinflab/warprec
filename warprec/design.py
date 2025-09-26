@@ -104,6 +104,7 @@ def main(args: Namespace):
     # Callback on dataset creation
     callback.on_dataset_creation(
         main_dataset=main_dataset,
+        val_dataset=None,
         validation_folds=[],
     )
 
