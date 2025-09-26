@@ -1,0 +1,23 @@
+reader:
+  loading_strategy: dataset
+  data_type: transaction
+  reading_method: local
+  local_path: path/to/your/dataset.tsv
+  rating_type: explicit
+writer:
+  dataset_name: MyDataset
+  writing_method: local
+  local_experiment_path: experiment/test/
+splitter:
+  test_splitting:
+    strategy: temporal_holdout
+    ratio: 0.1
+models:
+  ItemKNN:
+    k: 100
+    similarity: cosine
+evaluation:
+  top_k: [5, 10]
+  strategy: sampled
+  num_negatives: 100
+  metrics: [Precision, Recall, nDCG]
