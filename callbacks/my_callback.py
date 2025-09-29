@@ -29,7 +29,7 @@ class ComputeNDCGOverIterations(WarpRecCallback):
         if self._save_path:
             try:
                 plt.savefig(self._save_path)
-                print(f"Plot successfully save to: {self._save_path}")
+                print(f"Plot successfully saved to: {self._save_path}")
             except Exception as e:
                 print(f"Error during the saving process in {self._save_path}: {e}")
             plt.close()
