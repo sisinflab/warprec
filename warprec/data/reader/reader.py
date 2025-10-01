@@ -1,4 +1,4 @@
-from typing import Any, List, Tuple
+from typing import Any, List, Tuple, Optional
 from abc import ABC, abstractmethod
 from pathlib import Path
 
@@ -150,7 +150,9 @@ class LocalReader(Reader):
         dtypes: List[str] | None = None,
         rating_type: RatingType = RatingType.IMPLICIT,
         **kwargs: Any,
-    ) -> Tuple[DataFrame, List[Tuple[DataFrame, DataFrame]], DataFrame]:
+    ) -> Tuple[
+        DataFrame, Optional[List[Tuple[DataFrame, DataFrame]] | DataFrame], DataFrame
+    ]:
         """This method reads the split data from a local source.
 
         Args:
@@ -164,7 +166,7 @@ class LocalReader(Reader):
             **kwargs (Any): The keyword arguments.
 
         Returns:
-            Tuple[DataFrame, List[Tuple[DataFrame, DataFrame]], DataFrame]:
+            Tuple[DataFrame, Optional[List[Tuple[DataFrame, DataFrame]] | DataFrame], DataFrame]:
                 - DataFrame: The main training set data.
                 - List[Tuple[DataFrame, DataFrame]],: A list of tuples, where each tuple
                     contains the train and validation data for a single fold.
@@ -204,7 +206,7 @@ class LocalReader(Reader):
                     path,
                     sep=read_config.split.sep,
                     usecols=read_config.column_names(),
-                    dtype=read_config.dtypes,
+                    dtype=read_config.column_dtype(),
                 )
             else:
                 df = pd.read_csv(path, sep=read_config.split.sep, header=None)
@@ -217,6 +219,7 @@ class LocalReader(Reader):
 
         # Define paths for the main split files
         path_main_train = path_split_dir.joinpath("train" + read_config.split.ext)
+        path_main_val = path_split_dir.joinpath("validation" + read_config.split.ext)
         path_main_test = path_split_dir.joinpath("test" + read_config.split.ext)
 
         # Check for the existence of the main train file
@@ -231,6 +234,11 @@ class LocalReader(Reader):
         # Read the main train and test data
         train_data = read_file(path_main_train, read_config)
         test_data = read_file(path_main_test, read_config)
+
+        # Check if validation is in the main directory
+        if path_main_val.exists():
+            val_data = read_file(path_main_val, read_config)
+            return (train_data, val_data, test_data)
 
         # Iterate through subdirectories for folds
         fold_data = []
@@ -255,12 +263,12 @@ class LocalReader(Reader):
             else:
                 break
 
-        logger.msg(
-            "Main train and test data read from split directory. "
-            f"Found {fold_number - 1} train/validation folds."
-        )
+        logger.positive("Reading process completed successfully.")
 
-        return (train_data, fold_data, test_data)
+        # Final check to conform to the return typing
+        if len(fold_data) > 0:
+            return (train_data, fold_data, test_data)
+        return (train_data, None, test_data)
 
     def read_side_information(
         self,
