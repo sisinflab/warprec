@@ -270,11 +270,7 @@ def main(args: Namespace):
 
         # Recommendation
         if params.meta.save_recs:
-            recs = best_model.get_recs(
-                main_dataset,
-                k=config.writer.recommendation.k,
-            )
-            writer.write_recs(recs, model_name)
+            writer.write_recs(best_model, main_dataset, config.writer.recommendation.k)
 
         # Save params
         model_params = {model_name: best_model.get_params()}

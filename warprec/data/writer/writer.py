@@ -8,13 +8,18 @@ import pandas as pd
 import numpy as np
 import torch
 import json
+import csv
 from pandas import DataFrame
 from torch import Tensor
 from datetime import timedelta
+from tqdm import tqdm
 
 from warprec.utils.config import TrainConfiguration
 from warprec.data.dataset import Dataset
-from warprec.recommenders.base_recommender import Recommender
+from warprec.recommenders.base_recommender import (
+    Recommender,
+    SequentialRecommenderUtils,
+)
 from warprec.utils.enums import WritingMethods
 from warprec.utils.config import (
     WriterConfig,
@@ -53,7 +58,12 @@ class Writer(ABC):
         """This function writes all the results of the experiment."""
 
     @abstractmethod
-    def write_recs(self, recs: DataFrame, model_name: str):
+    def write_recs(
+        self,
+        model: Recommender,
+        dataset: Dataset,
+        k: int,
+    ):
         """This method writes recommendations in the destination."""
 
     @abstractmethod
@@ -239,26 +249,29 @@ class LocalWriter(Writer):
 
     def write_recs(
         self,
-        recs: DataFrame,
-        model_name: str,
+        model: Recommender,
+        dataset: Dataset,
+        k: int,
         sep: str = "\t",
         ext: str = ".tsv",
-        header: bool = False,
+        header: bool = True,
         user_label: str = "user_id",
         item_label: str = "item_id",
         rating_label: str = "rating",
     ) -> None:
-        """This method writes recommendations in the local path.
+        """
+        This method generates and writes recommendations to a file sequentially (batch by batch).
 
         Args:
-            recs (DataFrame): The recommendations in DataFrame format.
-            model_name (str): The name of the model which produced the recommendations.
-            sep (str): The separator of the file.
-            ext (str): The extension of the file.
+            model (Recommender): The trained recommender model instance.
+            dataset (Dataset): The dataset to use for retrieving data and mappings.
+            k (int): The number of top-k recommendations to generate per user.
+            sep (str): The separator for the output file.
+            ext (str): The extension for the output file.
             header (bool): Whether to write the header in the file.
-            user_label (str): The label of the user data.
-            item_label (str): The label of the item data.
-            rating_label (str): The label of the rating data.
+            user_label (str): The label for the user column.
+            item_label (str): The label for the item column.
+            rating_label (str): The label for the rating column.
         """
         if self.config:
             writing_params = self.config.writer.recommendation
@@ -272,26 +285,83 @@ class LocalWriter(Writer):
                 rating_label=rating_label,
             )
 
-        # experiment_path/recs/model_name.{custom_extension}
-        recommendation_folder_path = join(
+        # Define the full output file path
+        recommendation_file_path = join(
             self.experiment_recommendation_dir,
-            f"{model_name}_{self._timestamp}{writing_params.ext}",
+            f"{model.name}_{self._timestamp}{writing_params.ext}",
         )
 
+        # Prepare data from the dataset
+        train_sparse = dataset.train_set.get_sparse()
+        umap_i, imap_i = dataset.get_inverse_mappings()
+        num_users = train_sparse.shape[0]
+        all_user_indices = torch.arange(num_users, device=model._device)
+        batch_size = dataset._batch_size
+
         try:
-            # Save in path
-            recs.to_csv(
-                recommendation_folder_path,
-                sep=writing_params.sep,
-                header=writing_params.get_header(),
-                index=None,
-            )
+            # Open the file in write mode ('w')
+            with open(recommendation_file_path, "w", newline="", encoding="utf-8") as f:
+                # Use the csv module for more robust writing
+                writer = csv.writer(f, delimiter=writing_params.sep)
+
+                # Write the header once at the beginning, if requested
+                if writing_params.header:
+                    writer.writerow(
+                        [
+                            writing_params.user_label,
+                            writing_params.item_label,
+                            writing_params.rating_label,
+                        ]
+                    )
+
+                # Main loop for batch processing with tqdm
+                batch_iterator = range(0, num_users, batch_size)
+                for i in tqdm(batch_iterator, desc="Processing recommendation batches"):
+                    user_indices = all_user_indices[i : i + batch_size]
+                    train_batch = train_sparse[user_indices.tolist(), :]
+
+                    user_seq, seq_len = None, None
+                    if isinstance(model, SequentialRecommenderUtils):
+                        user_seq, seq_len = (
+                            dataset.train_session.get_user_history_sequences(
+                                user_indices.tolist(),
+                                model.max_seq_len,
+                            )
+                        )
+
+                    # Generate predictions for the current batch
+                    predictions = model.predict_full(
+                        user_indices=user_indices,
+                        user_seq=user_seq,
+                        seq_len=seq_len,
+                        train_batch=train_batch,
+                        train_sparse=train_sparse,
+                    )
+
+                    predictions[train_batch.nonzero()] = -torch.inf
+                    top_k_scores, top_k_items = torch.topk(predictions, k, dim=1)
+
+                    # Prepare the data for writing
+                    batch_users = user_indices.unsqueeze(1).expand(-1, k).flatten()
+                    top_k_items = top_k_items.flatten()
+                    top_k_scores = top_k_scores.flatten()
+
+                    # Map indices back to original labels
+                    user_labels = [umap_i[idx.item()] for idx in batch_users]
+                    item_labels = [imap_i[idx.item()] for idx in top_k_items]
+                    scores = top_k_scores.tolist()
+
+                    # Combine data into rows and write them to the file
+                    rows_to_write = zip(user_labels, item_labels, scores)
+                    writer.writerows(rows_to_write)
+
             logger.msg(
-                f"Recommendations successfully written in {recommendation_folder_path}"
+                f"Recommendations successfully written in {recommendation_file_path}"
             )
+
         except Exception as e:
             logger.negative(
-                f"Error writing recommendations to {recommendation_folder_path}: {e}"
+                f"Error writing recommendations to {recommendation_file_path}: {e}"
             )
 
     def write_model(self, model: Recommender):
