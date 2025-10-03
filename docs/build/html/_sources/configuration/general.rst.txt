@@ -1,0 +1,55 @@
+.. _general:
+
+########################
+General Configuration
+########################
+
+The **General Configuration** section defines parameters that affect the overall behavior of WarpRec.
+It allows customization of numerical precision, device usage, logging verbosity, and integration of custom models or callbacks.
+
+-----------------------------
+Available Keywords
+-----------------------------
+
+- **precision**: Numerical precision for computations during the experiment. Defaults to ``float32``. Higher precision (e.g., ``float64``) increases memory usage.
+- **device**: Device used for training and evaluation. Supports ``cpu`` or ``cuda`` devices. Defaults to ``cpu``.
+- **ray_verbose**: Verbosity level of Ray Tune. Acceptable values are integers from 0 (silent) to 3 (very verbose). Defaults to ``1``.
+- **time_report**: Whether to report the time taken by each step. Defaults to ``True``.
+- **cuda_visible_devices**: Indexes of CUDA devices that WarpRec can use. Defaults to all available devices.
+- **custom_models**: Python modules to import custom models into WarpRec. Can be a string or a list of strings.
+- **callback**: Nested section to configure a custom callback.
+
+.. warning::
+    Increasing the **precision** of computations (e.g., using ``float64`` instead of ``float32``) may significantly increase memory usage. For most experiments, ``float32`` is sufficient.
+
+Callback Configuration
+----------------------
+
+The **callback** section allows pointing to a custom callback implementation and passing initialization parameters directly from the configuration:
+
+- **callback_path**: Path to the Python script containing the callback implementation.
+- **callback_name**: Name of the callback class. Must inherit from ``WarpRecCallback``.
+- **args**: List of positional arguments to pass to the callback constructor.
+- **kwargs**: Dictionary of keyword arguments to pass to the callback constructor.
+
+.. important::
+    Custom callbacks must inherit from ``WarpRecCallback`` and be compatible with the provided arguments and keyword arguments. Follow this guide on how to implement your first callback.
+
+Example General Configuration
+-----------------------------
+
+Below is a complete example of a **general configuration** including precision, verbosity, and a custom callback:
+
+.. code-block:: yaml
+
+   general:
+       device: cuda
+       cuda_visible_devices: [0, 1]
+       ray_verbose: 0
+       callback:
+           callback_path: path/to/the/script.py
+           callback_name: class_name
+           args: [arg_1, arg_2]
+           kwargs:
+               kwargs_1: kwargs_value_1
+               kwargs_2: kwargs_value_2
