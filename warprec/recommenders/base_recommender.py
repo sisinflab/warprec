@@ -3,17 +3,14 @@ from typing import Any
 from abc import ABC, abstractmethod
 
 import torch
-import pandas as pd
 import numpy as np
 from torch import nn, Tensor
 from torch.optim.optimizer import Optimizer
 from torch.utils.data import DataLoader
-from pandas import DataFrame
 from scipy.sparse import coo_matrix, csr_matrix
 from torch_sparse import SparseTensor
-from tqdm import tqdm
 
-from warprec.data.dataset import Dataset, Interactions, Sessions
+from warprec.data.dataset import Interactions, Sessions
 
 
 class Recommender(nn.Module, ABC):
@@ -87,90 +84,6 @@ class Recommender(nn.Module, ABC):
             NotImplementedError: If the model does not support sampled prediction.
         """
         raise NotImplementedError("This model does not support sampled prediction.")
-
-    def get_recs(
-        self,
-        dataset: Dataset,
-        k: int,
-    ) -> DataFrame:
-        """This method turns the learned parameters into new
-        recommendations in DataFrame format, without column headers.
-
-        Args:
-            dataset (Dataset): The dataset that will be used to
-                retrieve train data and mappings.
-            k (int): The top k recommendation to be produced.
-
-        Returns:
-            DataFrame: A DataFrame (without header) containing the top k recommendations
-                    for each user, including predicted ratings.
-        """
-        # Retrieve interaction data
-        train_sparse = dataset.train_set.get_sparse()
-        umap_i, imap_i = dataset.get_inverse_mappings()
-
-        # Pre-allocate a Tensor with user indices
-        num_users = train_sparse.shape[0]
-        all_user_indices = torch.arange(num_users, device=self._device)
-        batch_size = dataset._batch_size
-
-        # Main evaluation loop
-        all_recommendations = []
-        for i in tqdm(range(0, num_users, batch_size)):
-            # Extract the correct batch of user indices
-            user_indices = all_user_indices[i : i + batch_size]
-
-            # Index the interactions of the current users
-            train_batch = train_sparse[user_indices.tolist(), :]
-
-            # If we are evaluating a sequential model, compute user history
-            user_seq, seq_len = None, None
-            if isinstance(self, SequentialRecommenderUtils):
-                user_seq, seq_len = dataset.train_session.get_user_history_sequences(
-                    user_indices.tolist(),
-                    self.max_seq_len,  # Sequence length truncated
-                )
-
-            predictions = self.predict_full(
-                user_indices=user_indices,
-                user_seq=user_seq,
-                seq_len=seq_len,
-                train_batch=train_batch,
-                train_sparse=train_sparse,
-            ).to(self._device)  # Get ratings tensor [batch_size x items]
-
-            # Masking interaction already seen in train
-            predictions[train_batch.nonzero()] = -torch.inf
-
-            # Get top-k items and their scores for current batch
-            top_k_scores, top_k_items = torch.topk(predictions, k, dim=1)
-            batch_users = user_indices.unsqueeze(1).expand(-1, k)
-
-            # Store batch recommendations with scores
-            batch_recs = torch.stack(
-                (batch_users, top_k_items, top_k_scores), dim=2
-            ).reshape(-1, 3)
-            all_recommendations.append(batch_recs)
-
-        # Combine all batches
-        recommendations = torch.cat(all_recommendations, dim=0)
-
-        # Extract user, item indices and predicted scores
-        user_idxs = recommendations[:, 0].tolist()
-        item_idxs = recommendations[:, 1].tolist()
-        pred_scores = recommendations[:, 2].tolist()
-
-        # Map them back to original labels
-        user_labels = [umap_i[idx] for idx in user_idxs]
-        item_labels = [imap_i[idx] for idx in item_idxs]
-
-        # Zip and turn into DataFrame (no header)
-        real_recs = np.array(
-            list(zip(map(str, user_labels), map(str, item_labels), pred_scores))
-        )
-        recommendations_df = pd.DataFrame(real_recs)
-
-        return recommendations_df
 
     def init_params(self, params: dict):
         """This method sets up the model with the correct parameters.
