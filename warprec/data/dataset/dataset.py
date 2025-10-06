@@ -580,7 +580,7 @@ class Dataset:
                 dict: Mapping of user_id -> user_idx.
                 dict: Mapping of item_id -> item_idx.
         """
-        return (self.umap, self.imap)
+        return (self._umap, self._imap)
 
     def get_inverse_mappings(self) -> Tuple[dict, dict]:
         """Returns the inverse of the mapping.
