@@ -2,7 +2,6 @@ from os.path import join
 from pathlib import Path
 from typing import Dict, List, Any, Optional
 from datetime import datetime
-from abc import ABC, abstractmethod
 
 import pandas as pd
 import numpy as np
@@ -14,12 +13,13 @@ from torch import Tensor
 from datetime import timedelta
 from tqdm import tqdm
 
-from warprec.utils.config import TrainConfiguration
+from warprec.data.writer.base_writer import Writer
 from warprec.data.dataset import Dataset
 from warprec.recommenders.base_recommender import (
     Recommender,
     SequentialRecommenderUtils,
 )
+from warprec.utils.config import TrainConfiguration
 from warprec.utils.enums import WritingMethods
 from warprec.utils.config import (
     WriterConfig,
@@ -31,55 +31,6 @@ from warprec.utils.config.common import Labels
 from warprec.utils.logger import logger
 
 
-class Writer(ABC):
-    """Writer is the abstract definition of a writer,
-    during an experiment multiple writers can be defined.
-
-    Attributes:
-        config (TrainConfiguration): The configuration of the experiment.
-
-    TODO: Use Factory Pattern for different writer.
-    """
-
-    config: TrainConfiguration = None
-
-    @abstractmethod
-    def setup_experiment(self):
-        """This is the main function to be executed, it sets up all
-        the important directory to then later save results.
-        """
-
-    @abstractmethod
-    def write_results(
-        self,
-        result_dict: Dict[int, Dict[str, float | Tensor]],
-        model_name: str,
-    ):
-        """This function writes all the results of the experiment."""
-
-    @abstractmethod
-    def write_recs(
-        self,
-        model: Recommender,
-        dataset: Dataset,
-        k: int,
-    ):
-        """This method writes recommendations in the destination."""
-
-    @abstractmethod
-    def write_model(self, model: Recommender):
-        """This method writes the model state into a destination."""
-
-    @abstractmethod
-    def write_split(
-        self,
-        main_dataset: Dataset,
-        val_dataset: Optional[DataFrame],
-        fold_dataset: Optional[List[Dataset]],
-    ):
-        """This method writes the split of the dataset into a destination."""
-
-
 class LocalWriter(Writer):
     """LocalWriter is the class to be used when the results of
     the experiment want to be saved locally.
@@ -88,9 +39,6 @@ class LocalWriter(Writer):
         dataset_name (str): The name of the dataset.
         local_path (str): The path to the dataset.
         config (TrainConfiguration): The configuration of the experiment.
-        setup (bool): Flag value for the setup of the experiment.
-
-    TODO: Using context manager
     """
 
     def __init__(
@@ -98,7 +46,6 @@ class LocalWriter(Writer):
         dataset_name: str = None,
         local_path: str = None,
         config: TrainConfiguration = None,
-        setup: bool = True,
     ):
         if config:
             self.config = config
@@ -109,7 +56,6 @@ class LocalWriter(Writer):
                 dataset_name=dataset_name,
                 writing_method=WritingMethods.LOCAL,
                 local_experiment_path=local_path,
-                setup_experiment=setup,
             )
 
         self._timestamp = datetime.now().strftime("%d.%m.%Y_%H:%M:%S")
@@ -127,8 +73,8 @@ class LocalWriter(Writer):
         self.experiment_params_dir = Path(join(self.experiment_path, "params"))
         self.experiment_split_dir = Path(join(self.experiment_path, "split"))
 
-        if writer_params.setup_experiment:
-            self.setup_experiment(config)
+        # Setup the experimentation folder
+        self.setup_experiment(config)
 
     def setup_experiment(self, config: TrainConfiguration = None):
         """This is the main function to be executed, it sets up all
