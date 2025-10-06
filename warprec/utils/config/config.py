@@ -177,25 +177,6 @@ class TrainConfiguration(WarpRecConfiguration):
         Raises:
             ValueError: If any information between parts of the configuration file is inconsistent.
         """
-        # Check if experiment has been set up correctly
-        if not self.writer.setup_experiment:
-            for model_name, model_data in self.models.items():
-                if model_data["meta"]["save_model"]:
-                    raise ValueError(
-                        f"You are trying to save the model state for {model_name} model but "
-                        "experiment must be setup first. Set setup_experiment to True."
-                    )
-            if self.writer.save_split:
-                raise ValueError(
-                    "You are trying to save the splits but experiment must be "
-                    "setup first. Set setup_experiment to True."
-                )
-            if self.evaluation.save_evaluation:
-                raise ValueError(
-                    "You are trying to save the evaluation but experiment must be "
-                    "setup first. Set setup_experiment to True."
-                )
-
         # Check if evaluation has been set up correctly
         if self.evaluation.full_evaluation_on_report:
             # Check if the validation metric is in the
