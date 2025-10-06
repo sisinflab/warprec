@@ -87,7 +87,6 @@ class WriterConfig(BaseModel):
         dataset_name (str): Name of the dataset.
         writing_method (WritingMethods): The writing method that will be used.
         local_experiment_path (Optional[str]): Path to the file containing the transaction data.
-        setup_experiment (bool): Flag value for the setup of the experiment.
         save_split (Optional[bool]): Whether or not to save the splits created for later use.
         results (ResultsWriting): The configuration of the results writing process.
         split (SplitWriting): The configuration of the split writing process.
@@ -97,7 +96,6 @@ class WriterConfig(BaseModel):
     dataset_name: str
     writing_method: WritingMethods
     local_experiment_path: Optional[str] = None
-    setup_experiment: bool = True
     save_split: Optional[bool] = False
     results: ResultsWriting = Field(default_factory=ResultsWriting)
     split: SplitWriting = Field(default_factory=SplitWriting)
