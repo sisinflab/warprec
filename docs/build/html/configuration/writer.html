@@ -343,7 +343,6 @@ This value will be used in naming output directories and files to ensure traceab
 </ul>
 <p>This parameter is <strong>required</strong> when using the <code class="docutils literal notranslate"><span class="pre">local</span></code> writing method.</p>
 </li>
-<li><p><strong>setup_experiment</strong>: Whether WarpRec should automatically create and structure a new experiment folder. Defaults to <code class="docutils literal notranslate"><span class="pre">True</span></code>.</p></li>
 <li><p><strong>save_split</strong>: Whether to save the train/validation/test splits generated during preprocessing. Defaults to <code class="docutils literal notranslate"><span class="pre">False</span></code>.</p></li>
 <li><p><strong>results</strong>: A nested section controlling the formatting of result files.</p></li>
 <li><p><strong>split</strong>: A nested section controlling the formatting of split files.</p></li>
@@ -418,7 +417,6 @@ Increasing this value may lead to larger files and slower post-processing.</p>
 <span class="w">    </span><span class="nt">dataset_name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">movielens</span>
 <span class="w">    </span><span class="nt">writing_method</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">local</span>
 <span class="w">    </span><span class="nt">local_experiment_path</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">results/movielens_experiment</span>
-<span class="w">    </span><span class="nt">setup_experiment</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
 <span class="w">    </span><span class="nt">save_split</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
 <span class="w">    </span><span class="nt">results</span><span class="p">:</span>
 <span class="w">        </span><span class="nt">sep</span><span class="p">:</span><span class="w"> </span><span class="s">&#39;,&#39;</span>

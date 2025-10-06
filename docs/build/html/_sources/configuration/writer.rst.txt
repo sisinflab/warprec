@@ -35,8 +35,6 @@ The following keywords are available for configuring the writer:
 
   This parameter is **required** when using the ``local`` writing method.
 
-- **setup_experiment**: Whether WarpRec should automatically create and structure a new experiment folder. Defaults to ``True``.
-
 - **save_split**: Whether to save the train/validation/test splits generated during preprocessing. Defaults to ``False``.
 
 - **results**: A nested section controlling the formatting of result files.
@@ -118,7 +116,6 @@ The following example shows a complete writer configuration that saves experimen
        dataset_name: movielens
        writing_method: local
        local_experiment_path: results/movielens_experiment
-       setup_experiment: true
        save_split: true
        results:
            sep: ','
