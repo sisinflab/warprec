@@ -2,9 +2,12 @@ from typing import Any, Tuple
 from abc import ABC, abstractmethod
 
 from pandas import DataFrame
+
+from warprec.data.reader import LocalReader, AzureBlobReader
 from warprec.utils.config import (
     WarpRecConfiguration,
 )
+from warprec.utils.enums import ReadingMethods
 
 
 class Reader(ABC):
@@ -12,8 +15,6 @@ class Reader(ABC):
 
     Attributes:
         config (WarpRecConfiguration): Configuration file.
-
-    TODO: Use Factory Pattern for different reader.
     """
 
     config: WarpRecConfiguration = None
@@ -31,3 +32,36 @@ class Reader(ABC):
         self, **kwargs: Any
     ) -> Tuple[DataFrame, DataFrame | None, DataFrame | None]:
         """This method will read the split data from the source."""
+
+
+class ReaderFactory:
+    """Factory class for creating Reader instances based on configuration.
+
+    Attributes:
+        config (WarpRecConfiguration): Configuration file.
+    """
+
+    config: WarpRecConfiguration = None
+
+    @classmethod
+    def get_reader(cls, config: WarpRecConfiguration) -> Reader:
+        """Factory method to get the appropriate Reader instance based on the configuration.
+
+        Args:
+            config (WarpRecConfiguration): Configuration file.
+
+        Returns:
+            Reader: An instance of a class that extends the Reader abstract class.
+
+        Raises:
+            ValueError: If the reading method specified in the configuration is unknown.
+        """
+        reader_type = config.reader.reading_method
+
+        # Create the appropriate Reader instance based on the reading method
+        if reader_type == ReadingMethods.LOCAL:
+            return LocalReader(config=config)
+        elif reader_type == ReadingMethods.AZURE_BLOB:
+            return AzureBlobReader(config=config)
+        else:
+            raise ValueError(f"Unknown reader type: {reader_type}")

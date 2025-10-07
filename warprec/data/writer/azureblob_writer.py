@@ -48,8 +48,8 @@ class AzureBlobWriter(Writer):
 
     def __init__(
         self,
-        storage_account_name: str,
-        container_name: str,
+        storage_account_name: str = None,
+        container_name: str = None,
         dataset_name: str = None,
         blob_experiment_container: str = "experiments",
         config: TrainConfiguration = None,

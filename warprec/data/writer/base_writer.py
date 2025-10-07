@@ -5,11 +5,13 @@ from abc import ABC, abstractmethod
 from pandas import DataFrame
 from torch import Tensor
 
-from warprec.utils.config import TrainConfiguration
 from warprec.data.dataset import Dataset
+from warprec.data.writer import LocalWriter, AzureBlobWriter
 from warprec.recommenders.base_recommender import (
     Recommender,
 )
+from warprec.utils.config import TrainConfiguration
+from warprec.utils.enums import WritingMethods
 
 
 class Writer(ABC):
@@ -59,3 +61,36 @@ class Writer(ABC):
         fold_dataset: Optional[List[Dataset]],
     ):
         """This method writes the split of the dataset into a destination."""
+
+
+class WriterFactory:
+    """Factory class for creating Writer instances based on configuration.
+
+    Attributes:
+        config (TrainConfiguration): The configuration of the experiment.
+    """
+
+    config: TrainConfiguration = None
+
+    @classmethod
+    def get_writer(cls, config: TrainConfiguration) -> Writer:
+        """Factory method to get the appropriate Writer instance based on the configuration.
+
+        Args:
+            config (TrainConfiguration): The configuration of the experiment.
+
+        Returns:
+            Writer: An instance of a class that extends the Writer abstract class.
+
+        Raises:
+            ValueError: If the writing method specified in the configuration is unknown.
+        """
+        writer_type = config.writer.writing_method
+
+        # Create the appropriate Writer instance based on the writing method
+        if writer_type == WritingMethods.LOCAL:
+            return LocalWriter(config=config)
+        elif writer_type == WritingMethods.AZURE_BLOB:
+            return AzureBlobWriter(config=config)
+        else:
+            raise ValueError(f"Unknown writer type: {writer_type}")

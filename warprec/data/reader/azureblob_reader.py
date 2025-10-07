@@ -36,8 +36,8 @@ class AzureBlobReader(Reader):
 
     def __init__(
         self,
-        storage_account_name: str,
-        container_name: str,
+        storage_account_name: str = None,
+        container_name: str = None,
         config: WarpRecConfiguration = None,
     ) -> None:
         if config:
