@@ -17,6 +17,7 @@ from warprec.utils.config import (
     SplitReading,
     SideInformationReading,
     ClusteringInformationReading,
+    AzureConfig,
 )
 from warprec.utils.enums import RatingType, ReadingMethods
 from warprec.utils.logger import logger
@@ -41,20 +42,28 @@ class AzureBlobReader(Reader):
     ) -> None:
         if config:
             self.config = config
+            azure_config = config.azure
+        else:
+            azure_config = AzureConfig(
+                storage_account_name=storage_account_name,
+                container_name=container_name,
+            )
 
         # Retrieve Azure credentials from environment
         credential = DefaultAzureCredential()
 
         # Create the BlobService client
-        account_url = f"https://{storage_account_name}.blob.core.windows.net"
+        account_url = (
+            f"https://{azure_config.storage_account_name}.blob.core.windows.net"
+        )
         self.blob_service_client = BlobServiceClient(
             account_url=account_url, credential=credential
         )
 
         # Retrieve the container client
-        self.container_name = container_name
+        self.container_name = azure_config.container_name
         self.container_client = self.blob_service_client.get_container_client(
-            container_name
+            azure_config.container_name
         )
 
         logger.msg(

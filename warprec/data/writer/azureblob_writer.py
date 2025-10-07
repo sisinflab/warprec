@@ -27,6 +27,7 @@ from warprec.utils.config import (
     ResultsWriting,
     SplitWriting,
     RecommendationWriting,
+    AzureConfig,
 )
 from warprec.utils.config.common import Labels
 from warprec.utils.config import TrainConfiguration
@@ -53,10 +54,10 @@ class AzureBlobWriter(Writer):
         blob_experiment_container: str = "experiments",
         config: TrainConfiguration = None,
     ):
-        # TODO: Write correct config
         if config:
             self.config = config
             writer_params = config.writer
+            azure_config = config.azure
         else:
             # Setup experiment information from args
             writer_params = WriterConfig(
@@ -65,19 +66,27 @@ class AzureBlobWriter(Writer):
                 azure_blob_experiment_container=blob_experiment_container,
             )
 
+            # Create a AzureConfig instance from provided args
+            azure_config = AzureConfig(
+                storage_account_name=storage_account_name,
+                container_name=container_name,
+            )
+
         # Retrieve Azure credentials from environment
         credential = DefaultAzureCredential()
 
         # Create the BlobService client
-        account_url = f"https://{storage_account_name}.blob.core.windows.net"
+        account_url = (
+            f"https://{azure_config.storage_account_name}.blob.core.windows.net"
+        )
         self.blob_service_client = BlobServiceClient(
             account_url=account_url, credential=credential
         )
 
         # Retrieve the container client
-        self.container_name = container_name
+        self.container_name = azure_config.container_name
         self.container_client = self.blob_service_client.get_container_client(
-            container_name
+            azure_config.container_name
         )
 
         self._timestamp = datetime.now().strftime("%d.%m.%Y_%H:%M:%S")
