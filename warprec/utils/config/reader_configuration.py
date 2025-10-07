@@ -14,12 +14,14 @@ class SplitReading(BaseModel):
 
     Attributes:
         local_path (Optional[str]): The directory where the splits are saved.
+        azure_blob_prefix (Optional[str]): The prefix of the Azure Blob to read the splits from.
         ext (Optional[str]): The extension of the split files.
         sep (Optional[str]): The separator of the split files.
         header (Optional[bool]): Whether the file has a header or not. Defaults to True.
     """
 
     local_path: Optional[str] = None
+    azure_blob_prefix: Optional[str] = None
     ext: Optional[str] = ".tsv"
     sep: Optional[str] = "\t"
     header: Optional[bool] = True
@@ -38,11 +40,13 @@ class SideInformationReading(BaseModel):
 
     Attributes:
         local_path (Optional[str]): The directory where the side information are saved.
+        azure_blob_name (Optional[str]): The name of the Azure Blob to read the side information from.
         sep (Optional[str]): The separator of the split files.
         header (Optional[bool]): Whether the file has a header or not. Defaults to True.
     """
 
     local_path: Optional[str] = None
+    azure_blob_name: Optional[str] = None
     sep: Optional[str] = "\t"
     header: Optional[bool] = True
 
@@ -61,6 +65,8 @@ class ClusteringInformationReading(BaseModel):
     Attributes:
         user_local_path (Optional[str]): The path to the user clustering information.
         item_local_path (Optional[str]): The path to the item clustering information.
+        user_azure_blob_name (Optional[str]): The name of the Azure Blob to read the user clustering information from.
+        item_azure_blob_name (Optional[str]): The name of the Azure Blob to read the item clustering information from.
         user_sep (Optional[str]): The separator of the user clustering file.
         item_sep (Optional[str]): The separator of the item clustering file.
         user_header (Optional[bool]): Whether the user clustering file has a header. Defaults to True.
@@ -69,6 +75,8 @@ class ClusteringInformationReading(BaseModel):
 
     user_local_path: Optional[str] = None
     item_local_path: Optional[str] = None
+    user_azure_blob_name: Optional[str] = None
+    item_azure_blob_name: Optional[str] = None
     user_sep: Optional[str] = "\t"
     item_sep: Optional[str] = "\t"
     user_header: Optional[bool] = True
@@ -109,6 +117,7 @@ class ReaderConfig(BaseModel):
         data_type (str): The type of data to be loaded. Can be 'transaction'.
         reading_method (ReadingMethods): The strategy used to read the data.
         local_path (Optional[str | None]): The path to the local dataset.
+        azure_blob_name (Optional[str]): The name of the Azure Blob to read.
         sep (Optional[str]): The separator of the file to read.
         header (Optional[bool]): Whether the file has a header or not. Defaults to True.
         rating_type (RatingType): The type of rating to be used. If 'implicit' is chosen,
@@ -127,6 +136,7 @@ class ReaderConfig(BaseModel):
     data_type: str
     reading_method: ReadingMethods
     local_path: Optional[str | None] = None
+    azure_blob_name: Optional[str] = None
     sep: Optional[str] = "\t"
     header: Optional[bool] = True
     rating_type: RatingType
