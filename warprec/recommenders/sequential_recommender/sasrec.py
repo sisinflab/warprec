@@ -73,7 +73,6 @@ class SASRec(IterativeRecommender, SequentialRecommenderUtils):
         **kwargs: Any,
     ):
         super().__init__(params, device=device, seed=seed, *args, **kwargs)
-        self._name = "SASRec"
 
         items = info.get("items", None)
         if not items:

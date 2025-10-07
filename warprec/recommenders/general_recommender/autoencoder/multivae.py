@@ -141,7 +141,6 @@ class MultiVAE(IterativeRecommender):
         **kwargs: Any,
     ):
         super().__init__(params, device=device, seed=seed, *args, **kwargs)
-        self._name = "MultiVAE"
 
         # Get dataset information
         self.items = info.get("items")

@@ -66,7 +66,6 @@ class GRU4Rec(IterativeRecommender, SequentialRecommenderUtils):
         **kwargs: Any,
     ):
         super().__init__(params, device=device, seed=seed, *args, **kwargs)
-        self._name = "GRU4Rec"
 
         items = info.get("items", None)
         if not items:

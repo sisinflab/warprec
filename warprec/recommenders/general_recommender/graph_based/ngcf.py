@@ -73,7 +73,6 @@ class NGCF(IterativeRecommender, GraphRecommenderUtils):
         super().__init__(
             params, interactions, device=device, seed=seed, *args, **kwargs
         )
-        self._name = "NGCF"
 
         # Get information from dataset info
         self.n_users = info.get("users", None)

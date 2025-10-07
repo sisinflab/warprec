@@ -42,7 +42,6 @@ class EASE(ItemSimRecommender):
         super().__init__(
             params, interactions, device=device, seed=seed, info=info, *args, **kwargs
         )
-        self._name = "EASE"
 
         X = interactions.get_sparse()
 

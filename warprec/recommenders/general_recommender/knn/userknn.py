@@ -46,7 +46,6 @@ class UserKNN(Recommender):
         super().__init__(
             params, interactions, device=device, seed=seed, *args, **kwargs
         )
-        self._name = "UserKNN"
 
         X = interactions.get_sparse()
         similarity = similarities_registry.get(self.similarity)

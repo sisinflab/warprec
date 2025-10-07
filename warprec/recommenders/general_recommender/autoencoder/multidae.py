@@ -118,7 +118,6 @@ class MultiDAE(IterativeRecommender):
         **kwargs: Any,
     ):
         super().__init__(params, device=device, seed=seed, *args, **kwargs)
-        self._name = "MultiDAE"
 
         # Get dataset information
         self.items = info.get("items")
