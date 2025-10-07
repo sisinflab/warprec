@@ -8,6 +8,7 @@ from typing import Dict, List, Any, Optional
 import numpy as np
 import pandas as pd
 import torch
+from azure.identity import DefaultAzureCredential
 from azure.core.exceptions import ResourceNotFoundError, ResourceExistsError
 from azure.storage.blob import BlobServiceClient
 from pandas import DataFrame
@@ -37,7 +38,7 @@ class AzureBlobWriter(Writer):
     the experiment want to be saved on Azure Blob Storage.
 
     Args:
-        connection_string (str): The connection string for the Azure Storage Account.
+        storage_account_name (str): The storage account name of the Azure Blob Storage.
         container_name (str): The name of the blob container where results will be stored.
         dataset_name (str): The name of the dataset.
         blob_experiment_container (str): The Azure Blob container name. Defaults to "experiments".
@@ -46,7 +47,7 @@ class AzureBlobWriter(Writer):
 
     def __init__(
         self,
-        connection_string: str,
+        storage_account_name: str,
         container_name: str,
         dataset_name: str = None,
         blob_experiment_container: str = "experiments",
@@ -64,10 +65,16 @@ class AzureBlobWriter(Writer):
                 azure_blob_experiment_container=blob_experiment_container,
             )
 
-        # Init Azure Blob client
-        self.blob_service_client = BlobServiceClient.from_connection_string(
-            connection_string
+        # Retrieve Azure credentials from environment
+        credential = DefaultAzureCredential()
+
+        # Create the BlobService client
+        account_url = f"https://{storage_account_name}.blob.core.windows.net"
+        self.blob_service_client = BlobServiceClient(
+            account_url=account_url, credential=credential
         )
+
+        # Retrieve the container client
         self.container_name = container_name
         self.container_client = self.blob_service_client.get_container_client(
             container_name

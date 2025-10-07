@@ -4,6 +4,7 @@ from typing import Any, List, Tuple, Optional
 
 import pandas as pd
 import joblib
+from azure.identity import DefaultAzureCredential
 from azure.core.exceptions import ResourceNotFoundError
 from azure.storage.blob import BlobServiceClient
 from pandas import DataFrame
@@ -27,24 +28,30 @@ class AzureBlobReader(Reader):
     reading part from an Azure Blob Storage container.
 
     Args:
-        connection_string (str): The connection string for the Azure Storage Account.
+        storage_account_name (str): The storage account name of the Azure Blob Storage.
         container_name (str): The name of the blob container where data is stored.
         config (WarpRecConfiguration): Configuration file.
     """
 
     def __init__(
         self,
-        connection_string: str,
+        storage_account_name: str,
         container_name: str,
         config: WarpRecConfiguration = None,
     ) -> None:
         if config:
             self.config = config
 
-        # Init Azure Blob client
-        self.blob_service_client = BlobServiceClient.from_connection_string(
-            connection_string
+        # Retrieve Azure credentials from environment
+        credential = DefaultAzureCredential()
+
+        # Create the BlobService client
+        account_url = f"https://{storage_account_name}.blob.core.windows.net"
+        self.blob_service_client = BlobServiceClient(
+            account_url=account_url, credential=credential
         )
+
+        # Retrieve the container client
         self.container_name = container_name
         self.container_client = self.blob_service_client.get_container_client(
             container_name
@@ -126,7 +133,7 @@ class AzureBlobReader(Reader):
                 dtypes=CustomDtype(**dtypes_map),
             )
 
-        blob_to_read = blob_name if blob_name else read_config.azure_blob_name
+        blob_to_read = blob_name or read_config.azure_blob_name
         logger.msg(f"Starting reading process from blob: {blob_to_read}")
 
         blob_content = self._download_blob_content(blob_to_read)
