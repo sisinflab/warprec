@@ -48,7 +48,6 @@ class ProxyRecommender(Recommender):
         **kwargs: Any,
     ):
         super().__init__(params, device=device, seed=seed, info=info, *args, **kwargs)
-        self._name = "ProxyRecommender"
 
         _imap: dict = info.get("item_mapping", None)
         _umap: dict = info.get("user_mapping", None)

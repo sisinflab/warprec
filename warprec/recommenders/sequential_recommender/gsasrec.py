@@ -76,7 +76,6 @@ class gSASRec(IterativeRecommender, SequentialRecommenderUtils):
         **kwargs: Any,
     ):
         super().__init__(params, device=device, seed=seed, *args, **kwargs)
-        self._name = "gSASRec"
 
         # Get information from dataset info
         self.n_items = info.get("items", None)

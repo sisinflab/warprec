@@ -68,7 +68,6 @@ class NeuMF(IterativeRecommender):
         **kwargs: Any,
     ):
         super().__init__(params, device=device, seed=seed, *args, **kwargs)
-        self._name = "NeuMF"
 
         # Get information from dataset info
         users = info.get("users", None)

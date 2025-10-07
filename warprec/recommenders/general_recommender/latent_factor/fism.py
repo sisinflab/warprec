@@ -62,7 +62,6 @@ class FISM(IterativeRecommender):
         super().__init__(
             params, interactions, *args, device=device, seed=seed, info=info, **kwargs
         )
-        self._name = "FISM"
 
         # Get information from dataset info
         users = info.get("users", None)

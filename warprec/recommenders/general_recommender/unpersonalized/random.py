@@ -34,7 +34,6 @@ class Random(Recommender):
         **kwargs: Any,
     ):
         super().__init__(params, device=device, seed=seed, info=info, *args, **kwargs)
-        self._name = "Random"
 
     @torch.no_grad()
     def predict_full(

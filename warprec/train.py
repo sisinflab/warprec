@@ -229,6 +229,12 @@ def main(args: Namespace):
                 model_name, params, main_dataset, trainer, config
             )
 
+        if best_model is None:
+            logger.attention(
+                f"Hyperparameter optimization for {model_name} returned no valid model."
+            )
+            continue
+
         model_exploration_total_time = time.time() - model_exploration_start_time
 
         # Callback on training complete
@@ -360,9 +366,7 @@ def main(args: Namespace):
                 writer.write_statistical_significance_test(test_results, stat_name)
 
         logger.positive("Statistical significance tests completed successfully.")
-    logger.positive(
-        "All models trained and evaluated successfully. WarpRec is shutting down."
-    )
+    logger.positive("All experiments concluded. WarpRec is shutting down.")
 
 
 def single_split_flow(
@@ -486,6 +490,10 @@ def multiple_fold_validation_flow(
         desired_training_it=desired_training_it,
         ray_verbose=config.general.ray_verbose,
     )
+
+    # Check in case the HPO failed
+    if best_params is None:
+        return None, report
 
     logger.msg(f"Initializing {model_name} model for test set evaluation")
 

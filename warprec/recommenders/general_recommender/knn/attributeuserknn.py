@@ -50,7 +50,6 @@ class AttributeUserKNN(Recommender):
         super().__init__(
             params, interactions, device=device, seed=seed, info=info, *args, **kwargs
         )
-        self._name = "AttributeUserKNN"
 
         X_inter = interactions.get_sparse()
         X_feat = interactions.get_side_sparse()
