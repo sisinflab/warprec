@@ -33,6 +33,14 @@ class Reader(ABC):
     ) -> Tuple[DataFrame, DataFrame | None, DataFrame | None]:
         """This method will read the split data from the source."""
 
+    @abstractmethod
+    def read_side_information(self, **kwargs: Any) -> DataFrame:
+        """This method will read the side information from a source."""
+
+    @abstractmethod
+    def read_cluster_information(self, **kwargs: Any) -> Tuple[DataFrame, DataFrame]:
+        """This method will read the cluster information (user and item) from a source."""
+
 
 class ReaderFactory:
     """Factory class for creating Reader instances based on configuration.

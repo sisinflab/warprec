@@ -1,4 +1,4 @@
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Any
 from abc import ABC, abstractmethod
 
 
@@ -61,6 +61,20 @@ class Writer(ABC):
         fold_dataset: Optional[List[Dataset]],
     ):
         """This method writes the split of the dataset into a destination."""
+
+    @abstractmethod
+    def write_params(self, params: dict) -> None:
+        """This method writes the model parameters into a destination."""
+
+    @abstractmethod
+    def write_time_report(self, time_report: List[Dict[str, Any]]) -> None:
+        """This method writes the time report into a destination, with incremental updates."""
+
+    @abstractmethod
+    def write_statistical_significance_test(
+        self, test_results: DataFrame, test_name: str
+    ) -> None:
+        """This method writes the results of a statistical significance test into a destination."""
 
 
 class WriterFactory:
