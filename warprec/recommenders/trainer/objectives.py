@@ -204,7 +204,7 @@ def objective_function(
 
     except Exception as e:
         logger.negative(
-            f"The fitting of the model {model.name}, failed "
+            f"The fitting of the model {model_name}, failed "
             f"with parameters: {params}. Error: {e}"
         )
         failed_report(mode, validation_score)
