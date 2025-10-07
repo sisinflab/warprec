@@ -22,7 +22,7 @@ from warprec.utils.config import (
     AzureConfig,
 )
 from warprec.utils.callback import WarpRecCallback
-from warprec.utils.enums import ReadingMethods
+from warprec.utils.enums import ReadingMethods, WritingMethods
 from warprec.utils.registry import model_registry, params_registry, filter_registry
 from warprec.utils.logger import logger
 
@@ -74,7 +74,7 @@ class WarpRecConfiguration(BaseModel):
             ValueError: If any information between parts of the configuration file is inconsistent.
         """
 
-        # Check if the local file exists
+        # Reading method specific checks
         if self.reader.reading_method == ReadingMethods.LOCAL:
             local_path: str = None
             if self.reader.local_path is not None:
@@ -87,6 +87,17 @@ class WarpRecConfiguration(BaseModel):
 
             if not os.path.exists(local_path):
                 raise FileNotFoundError(f"Training file not at {local_path}")
+
+        elif self.reader.reading_method == ReadingMethods.AZURE_BLOB:
+            # Check if the Azure configuration is complete
+            if self.azure is None:
+                raise ValueError(
+                    "Azure configuration must be provided for Azure Blob reading method."
+                )
+            if not self.azure.storage_account_name or not self.azure.container_name:
+                raise ValueError(
+                    "Both storage_account_name and container_name must be provided in Azure configuration."
+                )
 
         # Load custom modules if specified
         load_custom_modules(self.general.custom_models)
@@ -180,6 +191,19 @@ class TrainConfiguration(WarpRecConfiguration):
         Raises:
             ValueError: If any information between parts of the configuration file is inconsistent.
         """
+
+        # Writing method specific checks
+        if self.writer.writing_method == WritingMethods.AZURE_BLOB:
+            # Check if the Azure configuration is complete
+            if self.azure is None:
+                raise ValueError(
+                    "Azure configuration must be provided for Azure Blob writing method."
+                )
+            if not self.azure.storage_account_name or not self.azure.container_name:
+                raise ValueError(
+                    "Both storage_account_name and container_name must be provided in Azure configuration."
+                )
+
         # Check if evaluation has been set up correctly
         if self.evaluation.full_evaluation_on_report:
             # Check if the validation metric is in the
