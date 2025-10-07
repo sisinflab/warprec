@@ -3,7 +3,6 @@ from abc import ABC, abstractmethod
 
 from pandas import DataFrame
 
-from warprec.data.reader import LocalReader, AzureBlobReader
 from warprec.utils.config import (
     WarpRecConfiguration,
 )
@@ -42,7 +41,7 @@ class Reader(ABC):
         """This method will read the cluster information (user and item) from a source."""
 
 
-class ReaderFactory:
+class ReaderFactory:  # pylint: disable=C0415, R0903
     """Factory class for creating Reader instances based on configuration.
 
     Attributes:
@@ -68,8 +67,11 @@ class ReaderFactory:
 
         # Create the appropriate Reader instance based on the reading method
         if reader_type == ReadingMethods.LOCAL:
+            from warprec.data.reader import LocalReader
+
             return LocalReader(config=config)
-        elif reader_type == ReadingMethods.AZURE_BLOB:
+        if reader_type == ReadingMethods.AZURE_BLOB:
+            from warprec.data.reader import AzureBlobReader
+
             return AzureBlobReader(config=config)
-        else:
-            raise ValueError(f"Unknown reader type: {reader_type}")
+        raise ValueError(f"Unknown reader type: {reader_type}")

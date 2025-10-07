@@ -6,7 +6,6 @@ from pandas import DataFrame
 from torch import Tensor
 
 from warprec.data.dataset import Dataset
-from warprec.data.writer import LocalWriter, AzureBlobWriter
 from warprec.recommenders.base_recommender import (
     Recommender,
 )
@@ -20,8 +19,6 @@ class Writer(ABC):
 
     Attributes:
         config (TrainConfiguration): The configuration of the experiment.
-
-    TODO: Use Factory Pattern for different writer.
     """
 
     config: TrainConfiguration = None
@@ -77,7 +74,7 @@ class Writer(ABC):
         """This method writes the results of a statistical significance test into a destination."""
 
 
-class WriterFactory:
+class WriterFactory:  # pylint: disable=C0415, R0903
     """Factory class for creating Writer instances based on configuration.
 
     Attributes:
@@ -103,8 +100,11 @@ class WriterFactory:
 
         # Create the appropriate Writer instance based on the writing method
         if writer_type == WritingMethods.LOCAL:
+            from warprec.data.writer import LocalWriter
+
             return LocalWriter(config=config)
-        elif writer_type == WritingMethods.AZURE_BLOB:
+        if writer_type == WritingMethods.AZURE_BLOB:
+            from warprec.data.writer import AzureBlobWriter
+
             return AzureBlobWriter(config=config)
-        else:
-            raise ValueError(f"Unknown writer type: {writer_type}")
+        raise ValueError(f"Unknown writer type: {writer_type}")
