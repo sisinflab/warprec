@@ -50,7 +50,6 @@ class VSM(Recommender):
         super().__init__(
             params, interactions, device=device, seed=seed, info=info, *args, **kwargs
         )
-        self._name = "VSM"
 
         # Get data from interactions
         X = interactions.get_sparse()  # [user x item]

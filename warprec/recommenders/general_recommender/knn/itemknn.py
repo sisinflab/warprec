@@ -44,7 +44,6 @@ class ItemKNN(ItemSimRecommender):
         super().__init__(
             params, interactions, device=device, seed=seed, info=info, *args, **kwargs
         )
-        self._name = "ItemKNN"
 
         X = interactions.get_sparse()
         similarity = similarities_registry.get(self.similarity)

@@ -50,7 +50,6 @@ class RP3Beta(ItemSimRecommender):
         super().__init__(
             params, interactions, device=device, seed=seed, info=info, *args, **kwargs
         )
-        self._name = "RP3Beta"
 
         X = interactions.get_sparse()
 

@@ -54,7 +54,6 @@ class ADMMSlim(ItemSimRecommender):
         super().__init__(
             params, interactions, device=device, seed=seed, info=info, *args, **kwargs
         )
-        self._name = "ADMMSlim"
 
         X = interactions.get_sparse()
 
