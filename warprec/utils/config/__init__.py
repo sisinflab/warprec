@@ -11,6 +11,7 @@ from .reader_configuration import (
     SideInformationReading,
     ClusteringInformationReading,
 )
+from .remote_configuration import AzureConfig
 from .search_space_wrapper import SearchSpaceWrapper
 from .splitter_configuration import SplittingConfig, SplitStrategy
 from .writer_configuration import (
@@ -44,6 +45,7 @@ __all__ = [
     "SplitReading",
     "SideInformationReading",
     "ClusteringInformationReading",
+    "AzureConfig",
     "SearchSpaceWrapper",
     "SplittingConfig",
     "SplitStrategy",
