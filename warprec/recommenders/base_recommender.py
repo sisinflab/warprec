@@ -40,7 +40,6 @@ class Recommender(nn.Module, ABC):
         self.init_params(params)
         self.set_seed(seed)
         self._device = torch.device(device)
-        self._name = ""
 
     @abstractmethod
     def predict_full(
@@ -142,12 +141,12 @@ class Recommender(nn.Module, ABC):
     @property
     def name(self):
         """The name of the model."""
-        return self._name
+        return self.__class__.__name__
 
     @property
     def name_param(self):
         """The name of the model with all it's parameters."""
-        name = self._name
+        name = self.name
         for ann, _ in self.__class__.__annotations__.items():
             value = getattr(self, ann, None)
             if isinstance(value, float):
