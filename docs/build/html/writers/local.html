@@ -3,7 +3,7 @@
   <head><meta charset="utf-8"/>
     <meta name="viewport" content="width=device-width,initial-scale=1"/>
     <meta name="color-scheme" content="light dark"><meta name="viewport" content="width=device-width, initial-scale=1" />
-<link rel="index" title="Index" href="../genindex.html" /><link rel="search" title="Search" href="../search.html" /><link rel="next" title="Stash" href="../others/stash.html" /><link rel="prev" title="Writers" href="index.html" />
+<link rel="index" title="Index" href="../genindex.html" /><link rel="search" title="Search" href="../search.html" /><link rel="next" title="Azure Writer" href="azure.html" /><link rel="prev" title="Writers" href="index.html" />
 
     <!-- Generated with Sphinx 8.2.3 and Furo 2025.07.19 -->
         <title>Local Writer - WarpRec</title>
@@ -260,12 +260,15 @@
 </ul>
 <p class="caption" role="heading"><span class="caption-text">I/O MODULES</span></p>
 <ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../authentication.html">Authentication</a></li>
 <li class="toctree-l1 has-children"><a class="reference internal" href="../readers/index.html">Readers</a><input class="toctree-checkbox" id="toctree-checkbox-9" name="toctree-checkbox-9" role="switch" type="checkbox"/><label for="toctree-checkbox-9"><div class="visually-hidden">Toggle navigation of Readers</div><i class="icon"><svg><use href="#svg-arrow-right"></use></svg></i></label><ul>
 <li class="toctree-l2"><a class="reference internal" href="../readers/local.html">Local Reader</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../readers/azure.html">Azure Reader</a></li>
 </ul>
 </li>
 <li class="toctree-l1 current has-children"><a class="reference internal" href="index.html">Writers</a><input checked="" class="toctree-checkbox" id="toctree-checkbox-10" name="toctree-checkbox-10" role="switch" type="checkbox"/><label for="toctree-checkbox-10"><div class="visually-hidden">Toggle navigation of Writers</div><i class="icon"><svg><use href="#svg-arrow-right"></use></svg></i></label><ul class="current">
 <li class="toctree-l2 current current-page"><a class="current reference internal" href="#">Local Writer</a></li>
+<li class="toctree-l2"><a class="reference internal" href="azure.html">Azure Writer</a></li>
 </ul>
 </li>
 </ul>
@@ -317,7 +320,7 @@
 <p>The <code class="docutils literal notranslate"><span class="pre">Local</span> <span class="pre">Writer</span></code> of <strong>WarpRec</strong> is designed to track and persist all experiment results, trained models, and configuration details to a local source.</p>
 <section id="writing-to-a-local-source">
 <h2>Writing to a Local Source<a class="headerlink" href="#writing-to-a-local-source" title="Link to this heading">¶</a></h2>
-<p>When an experiment starts, WarpRec automatically initializes a dedicated, timestamped directory for the run, unless explicitly disabled via configuration. This directory houses all generated outputs and follows the structure below:</p>
+<p>When an experiment starts, WarpRec automatically initializes a dedicated, timestamped directory for the run. This directory houses all generated outputs and follows the structure below:</p>
 <div class="highlight-default notranslate"><div class="highlight"><pre><span></span>experiment_dir/
 ├── evaluation/
 ├── params/
@@ -432,12 +435,12 @@
       <footer>
 
         <div class="related-pages">
-          <a class="next-page" href="../others/stash.html">
+          <a class="next-page" href="azure.html">
               <div class="page-info">
                 <div class="context">
                   <span>Next</span>
                 </div>
-                <div class="title">Stash</div>
+                <div class="title">Azure Writer</div>
               </div>
               <svg class="furo-related-icon"><use href="#svg-arrow-right"></use></svg>
             </a>

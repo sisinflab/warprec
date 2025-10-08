@@ -35,6 +35,7 @@ Welcome to WarpRec
    :caption: I/O MODULES
    :maxdepth: 2
 
+   authentication
    readers/index
    writers/index
 

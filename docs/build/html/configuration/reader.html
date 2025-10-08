@@ -260,12 +260,15 @@
 </ul>
 <p class="caption" role="heading"><span class="caption-text">I/O MODULES</span></p>
 <ul>
+<li class="toctree-l1"><a class="reference internal" href="../authentication.html">Authentication</a></li>
 <li class="toctree-l1 has-children"><a class="reference internal" href="../readers/index.html">Readers</a><input class="toctree-checkbox" id="toctree-checkbox-9" name="toctree-checkbox-9" role="switch" type="checkbox"/><label for="toctree-checkbox-9"><div class="visually-hidden">Toggle navigation of Readers</div><i class="icon"><svg><use href="#svg-arrow-right"></use></svg></i></label><ul>
 <li class="toctree-l2"><a class="reference internal" href="../readers/local.html">Local Reader</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../readers/azure.html">Azure Reader</a></li>
 </ul>
 </li>
 <li class="toctree-l1 has-children"><a class="reference internal" href="../writers/index.html">Writers</a><input class="toctree-checkbox" id="toctree-checkbox-10" name="toctree-checkbox-10" role="switch" type="checkbox"/><label for="toctree-checkbox-10"><div class="visually-hidden">Toggle navigation of Writers</div><i class="icon"><svg><use href="#svg-arrow-right"></use></svg></i></label><ul>
 <li class="toctree-l2"><a class="reference internal" href="../writers/local.html">Local Writer</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../writers/azure.html">Azure Writer</a></li>
 </ul>
 </li>
 </ul>
@@ -333,9 +336,16 @@ invalid data ingestion, inconsistent training behavior, or unexpected runtime er
 </ul>
 </li>
 <li><p><strong>data_type</strong>: The data format accepted by WarpRec. Currently, only <code class="docutils literal notranslate"><span class="pre">transaction</span></code> data is supported.</p></li>
-<li><p><strong>reading_method</strong>: The source from which the data is read. At the moment, only <code class="docutils literal notranslate"><span class="pre">local</span></code> is supported.</p></li>
+<li><p><strong>reading_method</strong>: The source from which the data is read:</p>
+<ul>
+<li><p><code class="docutils literal notranslate"><span class="pre">local</span></code> – Reads data from the local filesystem.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">azure_blob</span></code> – Reads data from an Azure Blob Storage. Needs <em>remote-io</em> extra to be installed.</p></li>
+</ul>
+</li>
 <li><p><strong>local_path</strong>: The path to the dataset on the local filesystem.
 This option is mandatory when <code class="docutils literal notranslate"><span class="pre">reading_method</span></code> is set to <code class="docutils literal notranslate"><span class="pre">local</span></code>.</p></li>
+<li><p><strong>azure_blob_name</strong>: The name of the Azure Blob to read from.
+This option is mandatory when <code class="docutils literal notranslate"><span class="pre">reading_method</span></code> is set to <code class="docutils literal notranslate"><span class="pre">azure_blob</span></code>.</p></li>
 <li><p><strong>sep</strong>: Column separator used in the dataset file. Defaults to <code class="docutils literal notranslate"><span class="pre">'\t'</span></code>.</p></li>
 <li><p><strong>header</strong>: Boolean flag to indicate whether the first row of the file is a header. Defaults to <code class="docutils literal notranslate"><span class="pre">True</span></code>.</p></li>
 <li><p><strong>rating_type</strong>: Specifies the feedback type:</p>
@@ -366,6 +376,7 @@ This is achieved through the <code class="docutils literal notranslate"><span cl
 </ol>
 <ul class="simple">
 <li><p><strong>local_path</strong>: Directory containing all split files. All splits must be located in the same directory.</p></li>
+<li><p><strong>azure_blob_prefix</strong>: Prefix path in the Azure Blob Storage where split files are located.</p></li>
 <li><p><strong>ext</strong>: Extension of the split files. Defaults to <code class="docutils literal notranslate"><span class="pre">.tsv</span></code>.</p></li>
 <li><p><strong>sep</strong>: Column separator used by the split files. Defaults to <code class="docutils literal notranslate"><span class="pre">'\t'</span></code>.</p></li>
 <li><p><strong>header</strong>: Whether to treat the first row of the split files as headers. Defaults to <code class="docutils literal notranslate"><span class="pre">True</span></code>.</p></li>
@@ -386,6 +397,7 @@ Mismatched labels or inconsistent file structures will result in errors.</p>
 This can be configured using the <code class="docutils literal notranslate"><span class="pre">side</span></code> nested section:</p>
 <ul class="simple">
 <li><p><strong>local_path</strong>: Path to the file containing side information.</p></li>
+<li><p><strong>azure_blob_name</strong>: Name of the Azure Blob containing side information.</p></li>
 <li><p><strong>sep</strong>: Column separator for the side information file.</p></li>
 <li><p><strong>header</strong>: Whether the first row of the file is a header. Defaults to <code class="docutils literal notranslate"><span class="pre">True</span></code>.</p></li>
 </ul>
@@ -401,6 +413,8 @@ This is configured under the <code class="docutils literal notranslate"><span cl
 <ul class="simple">
 <li><p><strong>user_local_path</strong>: Path to the user clustering file.</p></li>
 <li><p><strong>item_local_path</strong>: Path to the item clustering file.</p></li>
+<li><p><strong>user_azure_blob_name</strong>: Name of the Azure Blob containing user clustering information.</p></li>
+<li><p><strong>item_azure_blob_name</strong>: Name of the Azure Blob containing item clustering information.</p></li>
 <li><p><strong>user_sep</strong>: Column separator for the user clustering file.</p></li>
 <li><p><strong>item_sep</strong>: Column separator for the item clustering file.</p></li>
 <li><p><strong>user_header</strong>: Whether the user clustering file contains a header. Defaults to <code class="docutils literal notranslate"><span class="pre">True</span></code>.</p></li>

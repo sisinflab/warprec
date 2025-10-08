@@ -7,10 +7,12 @@ Readers
    :maxdepth: 2
 
    local
+   azure
 
 The WarpRec data reading module provides a unified interface to ingest datasets for recommendation tasks. It is designed to be flexible and extensible, allowing users to load interaction data from different sources, including:
 
 - Local files
+- Azure Blob Storage
 
 The module abstracts the underlying data source, returning a consistent ``DataFrame`` object that contains user-item interactions and optionally also side information, and clustering information. This ensures that downstream components, such as dataset splitters, models, and callbacks, can operate without concern for the original data format or storage location.
 

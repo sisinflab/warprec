@@ -18,6 +18,7 @@ Available Keywords
 - **cuda_visible_devices**: Indexes of CUDA devices that WarpRec can use. Defaults to all available devices.
 - **custom_models**: Python modules to import custom models into WarpRec. Can be a string or a list of strings.
 - **callback**: Nested section to configure a custom callback.
+- **azure**: Nested section to configure Azure information needed for reading and writing data from/to Azure Blob Storage.
 
 .. warning::
     Increasing the **precision** of computations (e.g., using ``float64`` instead of ``float32``) may significantly increase memory usage. For most experiments, ``float32`` is sufficient.
@@ -34,6 +35,14 @@ The **callback** section allows pointing to a custom callback implementation and
 
 .. important::
     Custom callbacks must inherit from ``WarpRecCallback`` and be compatible with the provided arguments and keyword arguments. Follow this guide on how to implement your first callback.
+
+Azure Configuration
+-------------------
+
+The **azure** section is required when using Azure Blob Storage for reading or writing data. The *remote-io* extra must be installed to enable this functionality. The section includes:
+
+- **storage_account_name**: Name of the Azure Storage Account.
+- **container_name**: Name of the Azure Blob container.
 
 Example General Configuration
 -----------------------------

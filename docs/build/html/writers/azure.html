@@ -3,10 +3,10 @@
   <head><meta charset="utf-8"/>
     <meta name="viewport" content="width=device-width,initial-scale=1"/>
     <meta name="color-scheme" content="light dark"><meta name="viewport" content="width=device-width, initial-scale=1" />
-<link rel="index" title="Index" href="../genindex.html" /><link rel="search" title="Search" href="../search.html" /><link rel="next" title="Dashboard Configuration" href="dashboard.html" /><link rel="prev" title="Filtering Configuration" href="filtering.html" />
+<link rel="index" title="Index" href="../genindex.html" /><link rel="search" title="Search" href="../search.html" /><link rel="next" title="Stash" href="../others/stash.html" /><link rel="prev" title="Local Writer" href="local.html" />
 
     <!-- Generated with Sphinx 8.2.3 and Furo 2025.07.19 -->
-        <title>Splitter Configuration - WarpRec</title>
+        <title>Azure Writer - WarpRec</title>
       <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=d111a655" />
     <link rel="stylesheet" type="text/css" href="../_static/styles/furo.css?v=25af2a20" />
     <link rel="stylesheet" type="text/css" href="../_static/styles/furo-extensions.css?v=8dab3a3b" />
@@ -198,21 +198,21 @@
 </form>
 <div id="searchbox"></div><div class="sidebar-scroll"><div class="sidebar-tree">
   <p class="caption" role="heading"><span class="caption-text">GET STARTED</span></p>
-<ul class="current">
+<ul>
 <li class="toctree-l1 has-children"><a class="reference internal" href="../introduction.html">Introduction</a><input class="toctree-checkbox" id="toctree-checkbox-1" name="toctree-checkbox-1" role="switch" type="checkbox"/><label for="toctree-checkbox-1"><div class="visually-hidden">Toggle navigation of Introduction</div><i class="icon"><svg><use href="#svg-arrow-right"></use></svg></i></label><ul>
 <li class="toctree-l2"><a class="reference internal" href="../install.html">Install WarpRec</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../quick-start.html">Quick Start</a></li>
 </ul>
 </li>
-<li class="toctree-l1 current has-children"><a class="reference internal" href="index.html">Configuration</a><input checked="" class="toctree-checkbox" id="toctree-checkbox-2" name="toctree-checkbox-2" role="switch" type="checkbox"/><label for="toctree-checkbox-2"><div class="visually-hidden">Toggle navigation of Configuration</div><i class="icon"><svg><use href="#svg-arrow-right"></use></svg></i></label><ul class="current">
-<li class="toctree-l2"><a class="reference internal" href="reader.html">Reader Configuration</a></li>
-<li class="toctree-l2"><a class="reference internal" href="writer.html">Writer Configuration</a></li>
-<li class="toctree-l2"><a class="reference internal" href="filtering.html">Filtering Configuration</a></li>
-<li class="toctree-l2 current current-page"><a class="current reference internal" href="#">Splitter Configuration</a></li>
-<li class="toctree-l2"><a class="reference internal" href="dashboard.html">Dashboard Configuration</a></li>
-<li class="toctree-l2"><a class="reference internal" href="models.html">Models Configuration</a></li>
-<li class="toctree-l2"><a class="reference internal" href="evaluation.html">Evaluation Configuration</a></li>
-<li class="toctree-l2"><a class="reference internal" href="general.html">General Configuration</a></li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../configuration/index.html">Configuration</a><input class="toctree-checkbox" id="toctree-checkbox-2" name="toctree-checkbox-2" role="switch" type="checkbox"/><label for="toctree-checkbox-2"><div class="visually-hidden">Toggle navigation of Configuration</div><i class="icon"><svg><use href="#svg-arrow-right"></use></svg></i></label><ul>
+<li class="toctree-l2"><a class="reference internal" href="../configuration/reader.html">Reader Configuration</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../configuration/writer.html">Writer Configuration</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../configuration/filtering.html">Filtering Configuration</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../configuration/splitter.html">Splitter Configuration</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../configuration/dashboard.html">Dashboard Configuration</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../configuration/models.html">Models Configuration</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../configuration/evaluation.html">Evaluation Configuration</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../configuration/general.html">General Configuration</a></li>
 </ul>
 </li>
 </ul>
@@ -259,16 +259,16 @@
 <li class="toctree-l1"><a class="reference internal" href="../scripting/index.html">Scripting</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">I/O MODULES</span></p>
-<ul>
+<ul class="current">
 <li class="toctree-l1"><a class="reference internal" href="../authentication.html">Authentication</a></li>
 <li class="toctree-l1 has-children"><a class="reference internal" href="../readers/index.html">Readers</a><input class="toctree-checkbox" id="toctree-checkbox-9" name="toctree-checkbox-9" role="switch" type="checkbox"/><label for="toctree-checkbox-9"><div class="visually-hidden">Toggle navigation of Readers</div><i class="icon"><svg><use href="#svg-arrow-right"></use></svg></i></label><ul>
 <li class="toctree-l2"><a class="reference internal" href="../readers/local.html">Local Reader</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../readers/azure.html">Azure Reader</a></li>
 </ul>
 </li>
-<li class="toctree-l1 has-children"><a class="reference internal" href="../writers/index.html">Writers</a><input class="toctree-checkbox" id="toctree-checkbox-10" name="toctree-checkbox-10" role="switch" type="checkbox"/><label for="toctree-checkbox-10"><div class="visually-hidden">Toggle navigation of Writers</div><i class="icon"><svg><use href="#svg-arrow-right"></use></svg></i></label><ul>
-<li class="toctree-l2"><a class="reference internal" href="../writers/local.html">Local Writer</a></li>
-<li class="toctree-l2"><a class="reference internal" href="../writers/azure.html">Azure Writer</a></li>
+<li class="toctree-l1 current has-children"><a class="reference internal" href="index.html">Writers</a><input checked="" class="toctree-checkbox" id="toctree-checkbox-10" name="toctree-checkbox-10" role="switch" type="checkbox"/><label for="toctree-checkbox-10"><div class="visually-hidden">Toggle navigation of Writers</div><i class="icon"><svg><use href="#svg-arrow-right"></use></svg></i></label><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="local.html">Local Writer</a></li>
+<li class="toctree-l2 current current-page"><a class="current reference internal" href="#">Azure Writer</a></li>
 </ul>
 </li>
 </ul>
@@ -295,7 +295,7 @@
         </a>
         <div class="content-icon-container">
           <div class="view-this-page">
-  <a class="muted-link" href="../_sources/configuration/splitter.rst.txt" title="View this page">
+  <a class="muted-link" href="../_sources/writers/azure.rst.txt" title="View this page">
     <svg><use href="#svg-eye"></use></svg>
     <span class="visually-hidden">View this page</span>
   </a>
@@ -315,110 +315,128 @@
           </label>
         </div>
         <article role="main" id="furo-main-content">
-          <section id="splitter-configuration">
-<h1>Splitter Configuration<a class="headerlink" href="#splitter-configuration" title="Link to this heading">¶</a></h1>
-<p>The <strong>Splitter Configuration</strong> module defines how a dataset is partitioned into <strong>training</strong>, <strong>validation</strong>,
-and <strong>test sets</strong> prior to model training.
-Proper splitting is crucial to build a reliable evaluation pipeline and ensure fair comparison between models.</p>
-<p>WarpRec provides multiple splitting strategies that can be tailored to your experimental needs, including:</p>
-<ul class="simple">
-<li><p>Temporal strategies</p></li>
-<li><p>Random strategies</p></li>
-<li><p>Timestamp slicing</p></li>
-<li><p>K-Fold Cross Validation</p></li>
-</ul>
-<div class="admonition note">
-<p class="admonition-title">Note</p>
-<p>Each strategy requires specific parameters, and different strategies may apply to either test or validation sets.
-Careful configuration is essential to avoid data leakage and ensure reproducible results.</p>
-</div>
-<div class="admonition important">
-<p class="admonition-title">Important</p>
-<ul class="simple">
-<li><p>Temporal strategies require that <strong>timestamps</strong> are present in the dataset loaded by the reader.</p></li>
-<li><p><strong>Test set</strong> is required for train and design pipelines; <strong>validation set</strong> is optional.
-- Omitting validation can speed up training but increases the risk of overfitting.</p></li>
-</ul>
-</div>
-<section id="supported-splitting-strategies">
-<h2>Supported Splitting Strategies<a class="headerlink" href="#supported-splitting-strategies" title="Link to this heading">¶</a></h2>
-<p><strong>1. Temporal Holdout</strong></p>
-<p>Orders interactions by <strong>timestamp</strong> and reserves a portion of the most recent interactions as the test set.</p>
-<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">splitter</span><span class="p">:</span>
-<span class="w">  </span><span class="nt">test_splitting</span><span class="p">:</span>
-<span class="w">    </span><span class="nt">strategy</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">temporal_holdout</span>
-<span class="w">    </span><span class="nt">ratio</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0.1</span>
+          <section id="azure-writer">
+<h1>Azure Writer<a class="headerlink" href="#azure-writer" title="Link to this heading">¶</a></h1>
+<p>The <code class="docutils literal notranslate"><span class="pre">Azure</span> <span class="pre">Writer</span></code> of <strong>WarpRec</strong> is designed to track and persist all experiment results, trained models, and configuration details directly to <strong>Azure Blob Storage</strong>.
+It provides seamless cloud-based persistence while maintaining the same organizational structure and conventions as the <code class="docutils literal notranslate"><span class="pre">Local</span> <span class="pre">Writer</span></code>.</p>
+<div class="admonition warning">
+<p class="admonition-title">Warning</p>
+<p>The Azure Writer is part of the extra <em>remote-io</em>. You can download it via pip:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>pip<span class="w"> </span>install<span class="w"> </span>warprec<span class="o">[</span>remote-io<span class="o">]</span>
 </pre></div>
 </div>
-<p><strong>2. Temporal Leave-K-Out</strong></p>
-<p>Orders interactions by <strong>timestamp</strong> and leaves exactly <strong>K</strong> interactions per user for the test set.
-Users with fewer than K interactions remain entirely in the training set.</p>
-<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">splitter</span><span class="p">:</span>
-<span class="w">  </span><span class="nt">test_splitting</span><span class="p">:</span>
-<span class="w">    </span><span class="nt">strategy</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">temporal_leave_k_out</span>
-<span class="w">    </span><span class="nt">k</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">1</span>
+</div>
+<section id="writing-to-azure-blob-storage">
+<h2>Writing to Azure Blob Storage<a class="headerlink" href="#writing-to-azure-blob-storage" title="Link to this heading">¶</a></h2>
+<p>When an experiment starts, WarpRec automatically initializes a dedicated, timestamped <strong>Azure Blob directory</strong> (i.e., a virtual folder) within the specified container.
+All experiment artifacts are uploaded to this location, following the same logical structure as a local experiment directory:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>azure-container/
+├── evaluation/
+├── params/
+├── recs/
+├── serialized/
+├── split/
+└── config.json
 </pre></div>
 </div>
-<p><strong>3. Random Holdout</strong></p>
-<p>Randomly selects a portion of interactions to include in the test set.</p>
-<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">splitter</span><span class="p">:</span>
-<span class="w">  </span><span class="nt">test_splitting</span><span class="p">:</span>
-<span class="w">    </span><span class="nt">strategy</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">random_holdout</span>
-<span class="w">    </span><span class="nt">ratio</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0.1</span>
-</pre></div>
+<p>Each blob and virtual directory is <strong>timestamped</strong> to ensure reproducibility and allow multiple runs within the same Azure container without overwriting previous results.</p>
+<section id="directory-blob-contents">
+<h3>Directory (Blob) Contents<a class="headerlink" href="#directory-blob-contents" title="Link to this heading">¶</a></h3>
+<div class="table-wrapper colwidths-given docutils container">
+<table class="docutils align-default">
+<colgroup>
+<col style="width: 25.0%" />
+<col style="width: 75.0%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>Virtual Directory / Blob</p></th>
+<th class="head"><p>Description</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><strong>evaluation/</strong></p></td>
+<td><p>Contains model evaluation results, including metric scores and a detailed report with temporal and spatial information (unless disabled).</p></td>
+</tr>
+<tr class="row-odd"><td><p><strong>params/</strong></p></td>
+<td><p>Stores hyperparameter configurations found during the Hyperparameter Optimization (HPO) phase.</p></td>
+</tr>
+<tr class="row-even"><td><p><strong>recs/</strong></p></td>
+<td><p>Contains the final recommendations produced by each model (if enabled).</p></td>
+</tr>
+<tr class="row-odd"><td><p><strong>serialized/</strong></p></td>
+<td><p>Stores the serialized (pickled) versions of trained models (if serialization is enabled).</p></td>
+</tr>
+<tr class="row-even"><td><p><strong>split/</strong></p></td>
+<td><p>Contains the dataset splits (train/validation/test) used for the experiment (if enabled).</p></td>
+</tr>
+<tr class="row-odd"><td><p><strong>config.json</strong></p></td>
+<td><p>A fully resolved configuration file for the experiment. This includes user-specified values and automatically set default parameters, ensuring precise tracking of the configuration used for each run.</p></td>
+</tr>
+</tbody>
+</table>
 </div>
-<p><strong>4. Random Leave-K-Out</strong></p>
-<p>Randomly selects <strong>K</strong> interactions per user to include in the test set.
-Users with fewer than K interactions remain entirely in the training set.</p>
-<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">splitter</span><span class="p">:</span>
-<span class="w">  </span><span class="nt">test_splitting</span><span class="p">:</span>
-<span class="w">    </span><span class="nt">strategy</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">random_leave_k_out</span>
-<span class="w">    </span><span class="nt">k</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">1</span>
-</pre></div>
-</div>
-<p><strong>5. Timestamp Slicing</strong></p>
-<p>Splits the dataset based on a specific <strong>timestamp</strong>:</p>
-<ul class="simple">
-<li><p>Interactions before the timestamp → training set</p></li>
-<li><p>Interactions after the timestamp → test set</p></li>
-</ul>
-<p>WarpRec also supports the special keyword <code class="docutils literal notranslate"><span class="pre">best</span></code> to automatically select an optimal timestamp.</p>
-<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">splitter</span><span class="p">:</span>
-<span class="w">  </span><span class="nt">test_splitting</span><span class="p">:</span>
-<span class="w">    </span><span class="nt">strategy</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">timestamp_slicing</span>
-<span class="w">    </span><span class="nt">timestamp</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">10009287 | best</span>
-</pre></div>
-</div>
-<p><strong>6. K-Fold Cross Validation</strong></p>
-<p>Partitions the dataset into <strong>K folds</strong>, using K-1 folds for training and the remaining fold for validation.
-The process is repeated K times to exhaust all possible fold combinations.</p>
-<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">splitter</span><span class="p">:</span>
-<span class="w">  </span><span class="nt">validation_splitting</span><span class="p">:</span>
-<span class="w">    </span><span class="nt">strategy</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">k_fold_cross_validation</span>
-<span class="w">    </span><span class="nt">folds</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">10</span>
+</section>
+</section>
+<section id="evaluation-reporting-artifacts">
+<h2>Evaluation Reporting Artifacts<a class="headerlink" href="#evaluation-reporting-artifacts" title="Link to this heading">¶</a></h2>
+<p>Within the <code class="docutils literal notranslate"><span class="pre">evaluation/</span></code> blob directory, WarpRec produces two primary, timestamped artifacts that are automatically uploaded to Azure Blob Storage.</p>
+<section id="overall-results">
+<h3>Overall Results<a class="headerlink" href="#overall-results" title="Link to this heading">¶</a></h3>
+<p>A tabular file (<code class="docutils literal notranslate"><span class="pre">Overall_Results</span></code>) summarizing the evaluation metrics per model and cutoff <span class="math notranslate nohighlight">\(\mathbf{k}\)</span>:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">Model</span>       <span class="n">Top</span><span class="nd">@k</span>   <span class="n">Metric_1</span>    <span class="n">Metric_2</span>    <span class="o">...</span>
+<span class="n">My_Model</span>    <span class="mi">10</span>      <span class="mf">0.001</span>       <span class="mf">0.002</span>       <span class="o">...</span>
+<span class="o">...</span>
 </pre></div>
 </div>
 <div class="admonition note">
 <p class="admonition-title">Note</p>
 <ul class="simple">
-<li><p>This strategy is applicable <strong>only for validation sets</strong>, not test sets.</p></li>
-<li><p>Provides less biased and more accurate evaluation metrics, but requires additional training time.</p></li>
+<li><p>One row is produced per <span class="math notranslate nohighlight">\(\mathbf{(model, k)}\)</span> combination.</p></li>
+<li><p>Metrics reflect the configured evaluation protocol (e.g., full vs. sampled).</p></li>
 </ul>
 </div>
 </section>
-<section id="example-splitter-configuration">
-<h2>Example Splitter Configuration<a class="headerlink" href="#example-splitter-configuration" title="Link to this heading">¶</a></h2>
-<p>This example demonstrates a full configuration:
-- Test set split using <strong>temporal holdout</strong> (10% of the most recent interactions)
-- Validation set using <strong>10-fold cross validation</strong></p>
-<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">splitter</span><span class="p">:</span>
-<span class="w">  </span><span class="nt">test_splitting</span><span class="p">:</span>
-<span class="w">    </span><span class="nt">strategy</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">temporal_holdout</span>
-<span class="w">    </span><span class="nt">ratio</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0.1</span>
-<span class="w">  </span><span class="nt">validation_splitting</span><span class="p">:</span>
-<span class="w">    </span><span class="nt">strategy</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">k_fold_cross_validation</span>
-<span class="w">    </span><span class="nt">folds</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">10</span>
+<section id="time-report">
+<h3>Time Report<a class="headerlink" href="#time-report" title="Link to this heading">¶</a></h3>
+<p>A timing and environment summary file (<code class="docutils literal notranslate"><span class="pre">Time_Report</span></code>) with wall-clock measurements:</p>
+<ul class="simple">
+<li><p><strong>Data Preparation Time:</strong> End-to-end data preparation (splitting, filtering, evaluation sampling if enabled).</p></li>
+<li><p><strong>Hyperparameter Exploration Time:</strong> Total HPO duration, including Ray cluster bootstrap/initialization overhead.</p></li>
+<li><p><strong>Average Trial Time:</strong> Mean training time per trial, including end-of-epoch evaluation.</p></li>
+<li><p><strong>Evaluation Time:</strong> Time to evaluate the best model; depends on the evaluation strategy (“full” or “sampled”).</p></li>
+<li><p><strong>Inference Time (ms):</strong> Time to predict for <span class="math notranslate nohighlight">\(\mathbf{1,000 users \times 1,000 items}\)</span>; intended as a comparative guideline.</p></li>
+<li><p><strong>Total Time:</strong> Aggregate end-to-end duration for the model’s experiment pipeline.</p></li>
+</ul>
+<p>Unless otherwise specified, durations are wall-clock; inference time is reported in milliseconds.</p>
+</section>
+</section>
+<section id="dataset-split-structure">
+<h2>Dataset Split Structure<a class="headerlink" href="#dataset-split-structure" title="Link to this heading">¶</a></h2>
+<p>The <code class="docutils literal notranslate"><span class="pre">split/</span></code> blob directory contains the dataset partitions generated by WarpRec, if dataset splitting is enabled.
+The structure mirrors that of the local version, but all files are uploaded as separate blobs under the Azure container:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>azure-container/
+├── split/
+|   ├── train.tsv
+|   ├── validation.tsv
+|   ├── test.tsv
+|   ├── 1/
+|   |   ├── train.tsv
+|   |   ├── validation.tsv
+|   ├── 2/
+|   |   ├── train.tsv
+|   |   ├── validation.tsv
+...
+└── config.json
 </pre></div>
+</div>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<ul class="simple">
+<li><p>The output format (e.g., <strong>TSV</strong>) is configurable.</p></li>
+<li><p>At the <strong>top level</strong> of the <code class="docutils literal notranslate"><span class="pre">split/</span></code> blob directory, you will find the primary <strong>train/validation/test split</strong>.</p></li>
+<li><p>If validation folds are generated (e.g., for cross-validation), subdirectories named <code class="docutils literal notranslate"><span class="pre">1/</span></code>, <code class="docutils literal notranslate"><span class="pre">2/</span></code>, etc., are created. Each contains its own <strong>train/validation split</strong>.</p></li>
+<li><p>Each file is automatically uploaded as a distinct blob with its corresponding name and virtual path.</p></li>
+</ul>
 </div>
 </section>
 </section>
@@ -428,23 +446,23 @@ The process is repeated K times to exhaust all possible fold combinations.</p>
       <footer>
 
         <div class="related-pages">
-          <a class="next-page" href="dashboard.html">
+          <a class="next-page" href="../others/stash.html">
               <div class="page-info">
                 <div class="context">
                   <span>Next</span>
                 </div>
-                <div class="title">Dashboard Configuration</div>
+                <div class="title">Stash</div>
               </div>
               <svg class="furo-related-icon"><use href="#svg-arrow-right"></use></svg>
             </a>
-          <a class="prev-page" href="filtering.html">
+          <a class="prev-page" href="local.html">
               <svg class="furo-related-icon"><use href="#svg-arrow-right"></use></svg>
               <div class="page-info">
                 <div class="context">
                   <span>Previous</span>
                 </div>
 
-                <div class="title">Filtering Configuration</div>
+                <div class="title">Local Writer</div>
 
               </div>
             </a>
@@ -478,9 +496,17 @@ The process is repeated K times to exhaust all possible fold combinations.</p>
         <div class="toc-tree-container">
           <div class="toc-tree">
             <ul>
-<li><a class="reference internal" href="#">Splitter Configuration</a><ul>
-<li><a class="reference internal" href="#supported-splitting-strategies">Supported Splitting Strategies</a></li>
-<li><a class="reference internal" href="#example-splitter-configuration">Example Splitter Configuration</a></li>
+<li><a class="reference internal" href="#">Azure Writer</a><ul>
+<li><a class="reference internal" href="#writing-to-azure-blob-storage">Writing to Azure Blob Storage</a><ul>
+<li><a class="reference internal" href="#directory-blob-contents">Directory (Blob) Contents</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#evaluation-reporting-artifacts">Evaluation Reporting Artifacts</a><ul>
+<li><a class="reference internal" href="#overall-results">Overall Results</a></li>
+<li><a class="reference internal" href="#time-report">Time Report</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#dataset-split-structure">Dataset Split Structure</a></li>
 </ul>
 </li>
 </ul>
@@ -496,5 +522,6 @@ The process is repeated K times to exhaust all possible fold combinations.</p>
     <script src="../_static/doctools.js?v=9bcbadda"></script>
     <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../_static/scripts/furo.js?v=46bd48cc"></script>
+    <script async="async" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
     </body>
 </html>

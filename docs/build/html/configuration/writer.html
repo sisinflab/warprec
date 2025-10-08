@@ -260,12 +260,15 @@
 </ul>
 <p class="caption" role="heading"><span class="caption-text">I/O MODULES</span></p>
 <ul>
+<li class="toctree-l1"><a class="reference internal" href="../authentication.html">Authentication</a></li>
 <li class="toctree-l1 has-children"><a class="reference internal" href="../readers/index.html">Readers</a><input class="toctree-checkbox" id="toctree-checkbox-9" name="toctree-checkbox-9" role="switch" type="checkbox"/><label for="toctree-checkbox-9"><div class="visually-hidden">Toggle navigation of Readers</div><i class="icon"><svg><use href="#svg-arrow-right"></use></svg></i></label><ul>
 <li class="toctree-l2"><a class="reference internal" href="../readers/local.html">Local Reader</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../readers/azure.html">Azure Reader</a></li>
 </ul>
 </li>
 <li class="toctree-l1 has-children"><a class="reference internal" href="../writers/index.html">Writers</a><input class="toctree-checkbox" id="toctree-checkbox-10" name="toctree-checkbox-10" role="switch" type="checkbox"/><label for="toctree-checkbox-10"><div class="visually-hidden">Toggle navigation of Writers</div><i class="icon"><svg><use href="#svg-arrow-right"></use></svg></i></label><ul>
 <li class="toctree-l2"><a class="reference internal" href="../writers/local.html">Local Writer</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../writers/azure.html">Azure Writer</a></li>
 </ul>
 </li>
 </ul>
@@ -331,18 +334,19 @@ Always verify the experiment path and labels before running large-scale experime
 <section id="available-keywords">
 <h2>Available Keywords<a class="headerlink" href="#available-keywords" title="Link to this heading">¶</a></h2>
 <p>The following keywords are available for configuring the writer:</p>
-<ul>
+<ul class="simple">
 <li><p><strong>dataset_name</strong>: The name of the dataset currently being used.
 This value will be used in naming output directories and files to ensure traceability.</p></li>
-<li><p><strong>writing_method</strong>: The strategy used to write output files. Currently, only <code class="docutils literal notranslate"><span class="pre">local</span></code> is supported.</p></li>
-<li><p><strong>local_experiment_path</strong>: The directory path where all experiment-related files are stored, including:</p>
-<ul class="simple">
-<li><p>Recommendations</p></li>
-<li><p>Metrics</p></li>
-<li><p>Data splits</p></li>
+<li><p><strong>writing_method</strong>: The strategy used to write output files:</p>
+<ul>
+<li><p><code class="docutils literal notranslate"><span class="pre">local</span></code> – Writes data to local filesystem.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">azure_blob</span></code> – Writes data to an Azure Blob Storage. Needs <em>remote-io</em> extra to be installed.</p></li>
 </ul>
-<p>This parameter is <strong>required</strong> when using the <code class="docutils literal notranslate"><span class="pre">local</span></code> writing method.</p>
 </li>
+<li><p><strong>local_experiment_path</strong>: The directory path where experiment files will be stored.
+This parameter is <strong>required</strong> when using the <code class="docutils literal notranslate"><span class="pre">local</span></code> writing method.</p></li>
+<li><p><strong>azure_blob_experiment_container</strong>: The name of the Azure Blob container where experiment files will be stored.
+This parameter is <strong>required</strong> when using the <code class="docutils literal notranslate"><span class="pre">azure_blob</span></code> writing method.</p></li>
 <li><p><strong>save_split</strong>: Whether to save the train/validation/test splits generated during preprocessing. Defaults to <code class="docutils literal notranslate"><span class="pre">False</span></code>.</p></li>
 <li><p><strong>results</strong>: A nested section controlling the formatting of result files.</p></li>
 <li><p><strong>split</strong>: A nested section controlling the formatting of split files.</p></li>

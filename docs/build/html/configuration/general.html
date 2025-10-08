@@ -260,12 +260,15 @@
 </ul>
 <p class="caption" role="heading"><span class="caption-text">I/O MODULES</span></p>
 <ul>
+<li class="toctree-l1"><a class="reference internal" href="../authentication.html">Authentication</a></li>
 <li class="toctree-l1 has-children"><a class="reference internal" href="../readers/index.html">Readers</a><input class="toctree-checkbox" id="toctree-checkbox-9" name="toctree-checkbox-9" role="switch" type="checkbox"/><label for="toctree-checkbox-9"><div class="visually-hidden">Toggle navigation of Readers</div><i class="icon"><svg><use href="#svg-arrow-right"></use></svg></i></label><ul>
 <li class="toctree-l2"><a class="reference internal" href="../readers/local.html">Local Reader</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../readers/azure.html">Azure Reader</a></li>
 </ul>
 </li>
 <li class="toctree-l1 has-children"><a class="reference internal" href="../writers/index.html">Writers</a><input class="toctree-checkbox" id="toctree-checkbox-10" name="toctree-checkbox-10" role="switch" type="checkbox"/><label for="toctree-checkbox-10"><div class="visually-hidden">Toggle navigation of Writers</div><i class="icon"><svg><use href="#svg-arrow-right"></use></svg></i></label><ul>
 <li class="toctree-l2"><a class="reference internal" href="../writers/local.html">Local Writer</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../writers/azure.html">Azure Writer</a></li>
 </ul>
 </li>
 </ul>
@@ -326,6 +329,7 @@ It allows customization of numerical precision, device usage, logging verbosity,
 <li><p><strong>cuda_visible_devices</strong>: Indexes of CUDA devices that WarpRec can use. Defaults to all available devices.</p></li>
 <li><p><strong>custom_models</strong>: Python modules to import custom models into WarpRec. Can be a string or a list of strings.</p></li>
 <li><p><strong>callback</strong>: Nested section to configure a custom callback.</p></li>
+<li><p><strong>azure</strong>: Nested section to configure Azure information needed for reading and writing data from/to Azure Blob Storage.</p></li>
 </ul>
 <div class="admonition warning">
 <p class="admonition-title">Warning</p>
@@ -344,6 +348,14 @@ It allows customization of numerical precision, device usage, logging verbosity,
 <p class="admonition-title">Important</p>
 <p>Custom callbacks must inherit from <code class="docutils literal notranslate"><span class="pre">WarpRecCallback</span></code> and be compatible with the provided arguments and keyword arguments. Follow this guide on how to implement your first callback.</p>
 </div>
+</section>
+<section id="azure-configuration">
+<h3>Azure Configuration<a class="headerlink" href="#azure-configuration" title="Link to this heading">¶</a></h3>
+<p>The <strong>azure</strong> section is required when using Azure Blob Storage for reading or writing data. The <em>remote-io</em> extra must be installed to enable this functionality. The section includes:</p>
+<ul class="simple">
+<li><p><strong>storage_account_name</strong>: Name of the Azure Storage Account.</p></li>
+<li><p><strong>container_name</strong>: Name of the Azure Blob container.</p></li>
+</ul>
 </section>
 <section id="example-general-configuration">
 <h3>Example General Configuration<a class="headerlink" href="#example-general-configuration" title="Link to this heading">¶</a></h3>
@@ -423,6 +435,7 @@ It allows customization of numerical precision, device usage, logging verbosity,
 <li><a class="reference internal" href="#">General Configuration</a><ul>
 <li><a class="reference internal" href="#available-keywords">Available Keywords</a><ul>
 <li><a class="reference internal" href="#callback-configuration">Callback Configuration</a></li>
+<li><a class="reference internal" href="#azure-configuration">Azure Configuration</a></li>
 <li><a class="reference internal" href="#example-general-configuration">Example General Configuration</a></li>
 </ul>
 </li>
