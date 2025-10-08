@@ -99,12 +99,14 @@ class WriterFactory:  # pylint: disable=C0415, R0903
         writer_type = config.writer.writing_method
 
         # Create the appropriate Writer instance based on the writing method
-        if writer_type == WritingMethods.LOCAL:
-            from warprec.data.writer import LocalWriter
+        match writer_type:
+            case WritingMethods.LOCAL:
+                from warprec.data.writer import LocalWriter
 
-            return LocalWriter(config=config)
-        if writer_type == WritingMethods.AZURE_BLOB:
-            from warprec.data.writer import AzureBlobWriter
+                return LocalWriter(config=config)
+            case WritingMethods.AZURE_BLOB:
+                from warprec.data.writer import AzureBlobWriter
 
-            return AzureBlobWriter(config=config)
+                return AzureBlobWriter(config=config)
+
         raise ValueError(f"Unknown writer type: {writer_type}")

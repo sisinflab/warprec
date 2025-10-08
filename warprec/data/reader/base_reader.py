@@ -66,12 +66,14 @@ class ReaderFactory:  # pylint: disable=C0415, R0903
         reader_type = config.reader.reading_method
 
         # Create the appropriate Reader instance based on the reading method
-        if reader_type == ReadingMethods.LOCAL:
-            from warprec.data.reader import LocalReader
+        match reader_type:
+            case ReadingMethods.LOCAL:
+                from warprec.data.reader import LocalReader
 
-            return LocalReader(config=config)
-        if reader_type == ReadingMethods.AZURE_BLOB:
-            from warprec.data.reader import AzureBlobReader
+                return LocalReader(config=config)
+            case ReadingMethods.AZURE_BLOB:
+                from warprec.data.reader import AzureBlobReader
 
-            return AzureBlobReader(config=config)
+                return AzureBlobReader(config=config)
+
         raise ValueError(f"Unknown reader type: {reader_type}")
