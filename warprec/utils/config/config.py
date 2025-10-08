@@ -19,7 +19,6 @@ from warprec.utils.config import (
     DashboardConfig,
     RecomModel,
     EvaluationConfig,
-    AzureConfig,
 )
 from warprec.utils.callback import WarpRecCallback
 from warprec.utils.enums import ReadingMethods, WritingMethods
@@ -37,7 +36,6 @@ class WarpRecConfiguration(BaseModel):
         models (Dict[str, dict]): The dictionary containing model information
             in the format {model_name: dict{param_1: value, param_2: value, ...}, ...}
         general (GeneralConfig): General configuration of the experiment.
-        azure (AzureConfig): Configuration for Azure services.
         sparse_np_dtype (ClassVar[dict]): The mapping between the string dtype
             and their numpy sparse counterpart.
         sparse_torch_dtype (ClassVar[dict]): The mapping between the string dtype
@@ -48,7 +46,6 @@ class WarpRecConfiguration(BaseModel):
     filtering: Dict[str, dict] = None
     models: Dict[str, dict]
     general: GeneralConfig = Field(default_factory=GeneralConfig)
-    azure: AzureConfig = None
 
     # Supported sparse precisions in numpy
     sparse_np_dtype: ClassVar[dict] = {
@@ -90,11 +87,14 @@ class WarpRecConfiguration(BaseModel):
 
         elif self.reader.reading_method == ReadingMethods.AZURE_BLOB:
             # Check if the Azure configuration is complete
-            if self.azure is None:
+            if self.general.azure is None:
                 raise ValueError(
                     "Azure configuration must be provided for Azure Blob reading method."
                 )
-            if not self.azure.storage_account_name or not self.azure.container_name:
+            if (
+                not self.general.azure.storage_account_name
+                or not self.general.azure.container_name
+            ):
                 raise ValueError(
                     "Both storage_account_name and container_name must be provided in Azure configuration."
                 )
@@ -195,11 +195,14 @@ class TrainConfiguration(WarpRecConfiguration):
         # Writing method specific checks
         if self.writer.writing_method == WritingMethods.AZURE_BLOB:
             # Check if the Azure configuration is complete
-            if self.azure is None:
+            if self.general.azure is None:
                 raise ValueError(
                     "Azure configuration must be provided for Azure Blob writing method."
                 )
-            if not self.azure.storage_account_name or not self.azure.container_name:
+            if (
+                not self.general.azure.storage_account_name
+                or not self.general.azure.container_name
+            ):
                 raise ValueError(
                     "Both storage_account_name and container_name must be provided in Azure configuration."
                 )

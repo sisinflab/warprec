@@ -2,7 +2,7 @@ from . import recommender_model_config
 from .common import Labels
 from .dashboard_configuration import DashboardConfig, Wandb, CodeCarbon, MLflow
 from .evaluation_configuration import EvaluationConfig
-from .general_configuration import GeneralConfig, WarpRecCallbackConfig
+from .general_configuration import GeneralConfig, WarpRecCallbackConfig, AzureConfig
 from .model_configuration import RecomModel
 from .reader_configuration import (
     ReaderConfig,
@@ -11,7 +11,6 @@ from .reader_configuration import (
     SideInformationReading,
     ClusteringInformationReading,
 )
-from .remote_configuration import AzureConfig
 from .search_space_wrapper import SearchSpaceWrapper
 from .splitter_configuration import SplittingConfig, SplitStrategy
 from .writer_configuration import (
@@ -39,13 +38,13 @@ __all__ = [
     "EvaluationConfig",
     "GeneralConfig",
     "WarpRecCallbackConfig",
+    "AzureConfig",
     "RecomModel",
     "ReaderConfig",
     "CustomDtype",
     "SplitReading",
     "SideInformationReading",
     "ClusteringInformationReading",
-    "AzureConfig",
     "SearchSpaceWrapper",
     "SplittingConfig",
     "SplitStrategy",

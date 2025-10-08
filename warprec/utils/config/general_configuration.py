@@ -121,6 +121,18 @@ class WarpRecCallbackConfig(BaseModel):
             sys.path = original_sys_path
 
 
+class AzureConfig(BaseModel):
+    """Configuration for Azure services.
+
+    Attributes:
+        storage_account_name (str): The name of the Azure Storage Account.
+        container_name (str): The name of the Azure Container.
+    """
+
+    storage_account_name: str
+    container_name: str
+
+
 class GeneralConfig(BaseModel):
     """Definition of the general configuration part of the configuration file.
 
@@ -137,6 +149,7 @@ class GeneralConfig(BaseModel):
             This is useful for loading custom models that are not part of the
             standard Warprec framework.
         callback (Optional[WarpRecCallbackConfig]): The custom callback configuration.
+        azure (Optional[AzureConfig]): The Azure configuration.
     """
 
     precision: Optional[str] = "float32"
@@ -150,6 +163,7 @@ class GeneralConfig(BaseModel):
     callback: Optional[WarpRecCallbackConfig] = Field(
         default_factory=WarpRecCallbackConfig
     )
+    azure: Optional[AzureConfig] = None
 
     @field_validator("device")
     @classmethod

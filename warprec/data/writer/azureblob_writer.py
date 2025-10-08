@@ -57,7 +57,7 @@ class AzureBlobWriter(Writer):
         if config:
             self.config = config
             writer_params = config.writer
-            azure_config = config.azure
+            azure_config = config.general.azure
         else:
             # Setup experiment information from args
             writer_params = WriterConfig(

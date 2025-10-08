@@ -42,7 +42,7 @@ class AzureBlobReader(Reader):
     ) -> None:
         if config:
             self.config = config
-            azure_config = config.azure
+            azure_config = config.general.azure
         else:
             azure_config = AzureConfig(
                 storage_account_name=storage_account_name,
