@@ -333,6 +333,7 @@ All experiment artifacts are uploaded to this location, following the same logic
 <div class="highlight-default notranslate"><div class="highlight"><pre><span></span>azure-container/
 ├── evaluation/
 ├── params/
+├── ray_results/
 ├── recs/
 ├── serialized/
 ├── split/
@@ -340,6 +341,10 @@ All experiment artifacts are uploaded to this location, following the same logic
 </pre></div>
 </div>
 <p>Each blob and virtual directory is <strong>timestamped</strong> to ensure reproducibility and allow multiple runs within the same Azure container without overwriting previous results.</p>
+<div class="admonition important">
+<p class="admonition-title">Important</p>
+<p>The <em>ray_results/</em> virtual directory is created by the <strong>Ray</strong> library and may contain large files. Repetitive experiments can lead to significant storage usage. It is advisable to periodically clean up this blob.</p>
+</div>
 <section id="directory-blob-contents">
 <h3>Directory (Blob) Contents<a class="headerlink" href="#directory-blob-contents" title="Link to this heading">¶</a></h3>
 <div class="table-wrapper colwidths-given docutils container">

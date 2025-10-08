@@ -324,6 +324,7 @@
 <div class="highlight-default notranslate"><div class="highlight"><pre><span></span>experiment_dir/
 ├── evaluation/
 ├── params/
+├── ray_results/
 ├── recs/
 ├── serialized/
 ├── split/
@@ -331,6 +332,10 @@
 </pre></div>
 </div>
 <p>Each file and subdirectory is <strong>timestamped</strong> to ensure reproducibility and allow multiple runs within the same environment without overwriting results.</p>
+<div class="admonition important">
+<p class="admonition-title">Important</p>
+<p>The <em>ray_results/</em> directory is created by the <strong>Ray</strong> library and may contain large files. Repetitive experiments can lead to significant disk space usage. It is advisable to periodically clean up this directory.</p>
+</div>
 <section id="directory-contents">
 <h3>Directory Contents<a class="headerlink" href="#directory-contents" title="Link to this heading">¶</a></h3>
 <div class="table-wrapper colwidths-given docutils container">
