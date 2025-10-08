@@ -70,6 +70,7 @@ This is achieved through the ``split`` nested configuration block. To enable thi
 2. Provide the following options:
 
 - **local_path**: Directory containing all split files. All splits must be located in the same directory.
+- **azure_blob_prefix**: Prefix path in the Azure Blob Storage where split files are located.
 - **ext**: Extension of the split files. Defaults to ``.tsv``.
 - **sep**: Column separator used by the split files. Defaults to ``'\t'``.
 - **header**: Whether to treat the first row of the split files as headers. Defaults to ``True``.
@@ -89,6 +90,7 @@ WarpRec allows integration of **side information** (e.g., item attributes or met
 This can be configured using the ``side`` nested section:
 
 - **local_path**: Path to the file containing side information.
+- **azure_blob_name**: Name of the Azure Blob containing side information.
 - **sep**: Column separator for the side information file.
 - **header**: Whether the first row of the file is a header. Defaults to ``True``.
 
@@ -104,6 +106,8 @@ This is configured under the ``clustering`` nested section:
 
 - **user_local_path**: Path to the user clustering file.
 - **item_local_path**: Path to the item clustering file.
+- **user_azure_blob_name**: Name of the Azure Blob containing user clustering information.
+- **item_azure_blob_name**: Name of the Azure Blob containing item clustering information.
 - **user_sep**: Column separator for the user clustering file.
 - **item_sep**: Column separator for the item clustering file.
 - **user_header**: Whether the user clustering file contains a header. Defaults to ``True``.
