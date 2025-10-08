@@ -25,15 +25,16 @@ The following keywords are available for configuring the writer:
 - **dataset_name**: The name of the dataset currently being used.
   This value will be used in naming output directories and files to ensure traceability.
 
-- **writing_method**: The strategy used to write output files. Currently, only ``local`` is supported.
+- **writing_method**: The strategy used to write output files:
 
-- **local_experiment_path**: The directory path where all experiment-related files are stored, including:
+  * ``local`` – Writes data to local filesystem.
+  * ``azure_blob`` – Writes data to an Azure Blob Storage. Needs *remote-io* extra to be installed.
 
-  * Recommendations
-  * Metrics
-  * Data splits
-
+- **local_experiment_path**: The directory path where experiment files will be stored.
   This parameter is **required** when using the ``local`` writing method.
+
+- **azure_blob_experiment_container**: The name of the Azure Blob container where experiment files will be stored.
+  This parameter is **required** when using the ``azure_blob`` writing method.
 
 - **save_split**: Whether to save the train/validation/test splits generated during preprocessing. Defaults to ``False``.
 

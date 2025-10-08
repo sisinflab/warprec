@@ -25,10 +25,16 @@ The following keywords are available to configure the reader:
 
 - **data_type**: The data format accepted by WarpRec. Currently, only ``transaction`` data is supported.
 
-- **reading_method**: The source from which the data is read. At the moment, only ``local`` is supported.
+- **reading_method**: The source from which the data is read:
+
+  * ``local`` – Reads data from the local filesystem.
+  * ``azure_blob`` – Reads data from an Azure Blob Storage. Needs *remote-io* extra to be installed.
 
 - **local_path**: The path to the dataset on the local filesystem.
   This option is mandatory when ``reading_method`` is set to ``local``.
+
+- **azure_blob_name**: The name of the Azure Blob to read from.
+  This option is mandatory when ``reading_method`` is set to ``azure_blob``.
 
 - **sep**: Column separator used in the dataset file. Defaults to ``'\t'``.
 
