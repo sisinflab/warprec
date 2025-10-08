@@ -19,25 +19,27 @@ class Reader(ABC):
     config: WarpRecConfiguration = None
 
     @abstractmethod
-    def read(self, **kwargs: Any) -> DataFrame:
+    def read(self, *args: Any, **kwargs: Any) -> DataFrame:
         """This method will read the data from the source."""
 
     @abstractmethod
-    def load_model_state(self, **kwargs: Any) -> dict:
+    def load_model_state(self, *args: Any, **kwargs: Any) -> dict:
         """This method will load a model state from a source."""
 
     @abstractmethod
     def read_transaction_split(
-        self, **kwargs: Any
+        self, *args: Any, **kwargs: Any
     ) -> Tuple[DataFrame, DataFrame | None, DataFrame | None]:
         """This method will read the split data from the source."""
 
     @abstractmethod
-    def read_side_information(self, **kwargs: Any) -> DataFrame:
+    def read_side_information(self, *args: Any, **kwargs: Any) -> DataFrame:
         """This method will read the side information from a source."""
 
     @abstractmethod
-    def read_cluster_information(self, **kwargs: Any) -> Tuple[DataFrame, DataFrame]:
+    def read_cluster_information(
+        self, *args: Any, **kwargs: Any
+    ) -> Tuple[DataFrame, DataFrame]:
         """This method will read the cluster information (user and item) from a source."""
 
 
