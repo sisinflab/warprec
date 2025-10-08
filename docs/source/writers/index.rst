@@ -7,10 +7,12 @@ Writers
    :maxdepth: 2
 
    local
+   azure
 
 The WarpRec data writing module provides a unified interface to **persist** the results and artifacts generated during the recommendation pipeline. It is designed to be flexible and extensible, allowing users to save data to different destinations, including:
 
 - Local files
+- Azure Blob Storage
 
 Key features include:
 
