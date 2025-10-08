@@ -6,7 +6,7 @@ The ``Local Writer`` of **WarpRec** is designed to track and persist all experim
 Writing to a Local Source
 -------------------------
 
-When an experiment starts, WarpRec automatically initializes a dedicated, timestamped directory for the run, unless explicitly disabled via configuration. This directory houses all generated outputs and follows the structure below::
+When an experiment starts, WarpRec automatically initializes a dedicated, timestamped directory for the run. This directory houses all generated outputs and follows the structure below::
 
     experiment_dir/
     ├── evaluation/
