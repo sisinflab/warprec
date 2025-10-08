@@ -21,12 +21,17 @@ All experiment artifacts are uploaded to this location, following the same logic
     azure-container/
     ├── evaluation/
     ├── params/
+    ├── ray_results/
     ├── recs/
     ├── serialized/
     ├── split/
     └── config.json
 
 Each blob and virtual directory is **timestamped** to ensure reproducibility and allow multiple runs within the same Azure container without overwriting previous results.
+
+.. important::
+
+  The *ray_results/* virtual directory is created by the **Ray** library and may contain large files. Repetitive experiments can lead to significant storage usage. It is advisable to periodically clean up this blob.
 
 Directory (Blob) Contents
 ^^^^^^^^^^^^^^^^^^^^^^^^^

@@ -11,12 +11,17 @@ When an experiment starts, WarpRec automatically initializes a dedicated, timest
     experiment_dir/
     ├── evaluation/
     ├── params/
+    ├── ray_results/
     ├── recs/
     ├── serialized/
     ├── split/
     └── config.json
 
 Each file and subdirectory is **timestamped** to ensure reproducibility and allow multiple runs within the same environment without overwriting results.
+
+.. important::
+
+  The *ray_results/* directory is created by the **Ray** library and may contain large files. Repetitive experiments can lead to significant disk space usage. It is advisable to periodically clean up this directory.
 
 Directory Contents
 ^^^^^^^^^^^^^^^^^^
