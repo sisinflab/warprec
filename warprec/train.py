@@ -408,6 +408,10 @@ def single_split_flow(
         metrics = [val_metric]
         topk = [val_k]
 
+    # Retrieve storage path for Ray results
+    # based on the writer configuration
+    storage_path = config.get_storage_path()
+
     # Start HPO phase on test set,
     # no need of further training
     best_model, ray_report = trainer.train_single_fold(
@@ -417,6 +421,7 @@ def single_split_flow(
         metrics=metrics,
         topk=topk,
         validation_score=config.evaluation.validation_metric,
+        storage_path=storage_path,
         device=device,
         evaluation_strategy=config.evaluation.strategy,
         num_negatives=config.evaluation.num_negatives,
@@ -474,6 +479,10 @@ def multiple_fold_validation_flow(
         metrics = [val_metric]
         topk = [val_k]
 
+    # Retrieve storage path for Ray results
+    # based on the writer configuration
+    storage_path = config.get_storage_path()
+
     # Start HPO phase on validation folds
     best_params, report = trainer.train_multiple_fold(
         model_name,
@@ -482,6 +491,7 @@ def multiple_fold_validation_flow(
         metrics=metrics,
         topk=topk,
         validation_score=validation_score,
+        storage_path=storage_path,
         device=device,
         evaluation_strategy=config.evaluation.strategy,
         num_negatives=config.evaluation.num_negatives,

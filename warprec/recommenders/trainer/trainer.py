@@ -155,6 +155,7 @@ class Trainer:
         metrics: List[str],
         topk: List[int],
         validation_score: str,
+        storage_path: str,
         device: str = "cpu",
         evaluation_strategy: str = "full",
         num_negatives: int = 99,
@@ -174,6 +175,7 @@ class Trainer:
             metrics (List[str]): List of metrics to compute on each report.
             topk (List[int]): List of cutoffs for metrics.
             validation_score (str): The metric to monitor during training.
+            storage_path (str): Path to store Ray results.
             device (str): The device that will be used for tensor operations.
             evaluation_strategy (str): Evaluation strategy, either "full" or "sampled".
             num_negatives (int): Number of negative samples to use in "sampled" strategy.
@@ -198,6 +200,7 @@ class Trainer:
             metrics=metrics,
             topk=topk,
             validation_score=validation_score,
+            storage_path=storage_path,
             device=device,
             evaluation_strategy=evaluation_strategy,
             num_negatives=num_negatives,
@@ -282,6 +285,7 @@ class Trainer:
         metrics: List[str],
         topk: List[int],
         validation_score: str,
+        storage_path: str,
         device: str = "cpu",
         evaluation_strategy: str = "full",
         num_negatives: int = 99,
@@ -299,6 +303,7 @@ class Trainer:
             metrics (List[str]): List of metrics to compute on each report.
             topk (List[int]): List of cutoffs for metrics.
             validation_score (str): The metric to monitor during training.
+            storage_path (str): Path to store Ray results.
             device (str): The device that will be used for tensor operations.
             evaluation_strategy (str): Evaluation strategy, either "full" or "sampled".
             num_negatives (int): Number of negative samples to use in "sampled" strategy.
@@ -326,6 +331,7 @@ class Trainer:
             metrics=metrics,
             topk=topk,
             validation_score=validation_score,
+            storage_path=storage_path,
             device=device,
             evaluation_strategy=evaluation_strategy,
             num_negatives=num_negatives,
@@ -490,6 +496,7 @@ class Trainer:
         metrics: List[str],
         topk: List[int],
         validation_score: str,
+        storage_path: str,
         device: str = "cpu",
         evaluation_strategy: str = "full",
         num_negatives: int = 99,
@@ -563,6 +570,7 @@ class Trainer:
             stop=early_stopping,
             callbacks=self._callbacks,
             verbose=ray_verbose,
+            storage_path=storage_path,
             checkpoint_config=CheckpointConfig(
                 num_to_keep=optimization.checkpoint_to_keep,
                 checkpoint_score_attribute=validation_score,

@@ -295,6 +295,33 @@ class TrainConfiguration(WarpRecConfiguration):
 
         return parsed_models
 
+    def get_storage_path(self) -> str:
+        """Returns the storage path for the ray results.
+
+        Returns:
+            str: The storage path.
+        """
+        match self.writer.writing_method:
+            case WritingMethods.LOCAL:
+                # The local path will be ~/experiment_path/dataset_name/ray_results
+                return os.path.join(
+                    os.getcwd(),
+                    self.writer.local_experiment_path,
+                    self.writer.dataset_name,
+                    "ray_results",
+                )
+            case WritingMethods.AZURE_BLOB:
+                # The azure blob path will be az://<container_name>/<blob_experiment_container>/dataset_name/ray_results
+                return os.path.join(
+                    "az://",
+                    self.general.azure.container_name,
+                    self.writer.azure_blob_experiment_container,
+                    self.writer.dataset_name,
+                    "ray_results",
+                )
+
+        return os.path.join(os.getcwd(), "ray_results")
+
 
 class DesignConfiguration(WarpRecConfiguration):
     """Definition of design pipeline configuration, used to test custom models.
