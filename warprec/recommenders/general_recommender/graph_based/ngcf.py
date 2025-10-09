@@ -13,10 +13,13 @@ from scipy.sparse import coo_matrix
 from warprec.data.dataset import Interactions, Sessions
 from warprec.recommenders.base_recommender import (
     IterativeRecommender,
+)
+from warprec.recommenders.general_recommender.graph_based import (
     GraphRecommenderUtils,
+    SparseDropout,
+    NGCFLayer,
 )
 from warprec.recommenders.losses import BPRLoss
-from warprec.recommenders.layers import SparseDropout, NGCFLayer
 from warprec.utils.registry import model_registry
 
 

@@ -11,8 +11,8 @@ from torch_geometric.nn import LGConv
 from warprec.data.dataset import Interactions, Sessions
 from warprec.recommenders.base_recommender import (
     IterativeRecommender,
-    GraphRecommenderUtils,
 )
+from warprec.recommenders.general_recommender.graph_based import GraphRecommenderUtils
 from warprec.recommenders.losses import BPRLoss
 from warprec.utils.registry import model_registry
 
