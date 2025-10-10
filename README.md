@@ -18,58 +18,46 @@ Whether you're learning how recommender systems work or conducting high-performa
 
 ## ⚙️ Installation
 
+WarpRec is designed with a modular dependency structure leveraging Poetry to manage a lean core installation and optional extras for advanced functionalities (like experiment tracking or cloud I/O).
+
 ### 📋 Prerequisites
 
 - Python 3.12
-- [Poetry 2.1.2](https://python-poetry.org/) for dependency management.
+- [Poetry 2.1.2](https://python-poetry.org/) for development and dependency management (highly recommended).
 
-### 🧰 Makefile Commands
+### 🛠️ Installing WarpRec for different environments
 
-The project includes a Makefile to simplify common operations:
+**PyG is only required if you intend to use or develop Graph-based recommendation models.** Due to strict compatibility constraints, you must install PyG manually, ensuring the versions match your specific CUDA setup. To ensure the correct installation, follow the [PyG Installation Guide](https://pytorch-geometric.readthedocs.io/en/latest/install/installation.html).
 
-- 🎼 Install dependencies with Poetry:
-    ```bash
-    make install-poetry
-- 🧪 Install dependencies with venv:
-    ```bash
-    make install-venv
-- 🐍 Install dependencies with Conda/Mamba:
-    ```bash
-    make install-conda
-- 🧹 Run linting:
-    ```bash
-    make lint
-- 🧑‍🔬 Run tests:
-    ```bash
-    make test
+#### 📦 Using Poetry (`pyproject.toml`) - Preferred for Development
 
-### 🛠️ Personalized Installation
-
-While WarpRec supports quick setup via `make install-*` commands, you may want to manually create and customize your environment using your preferred tool. Here are three supported approaches, depending on your workflow:
-
-#### 📦 Using Poetry (`pyproject.toml`)
+Poetry is the recommended tool, as it installs only the core dependencies by default, allowing you to selectively add specialized dependency groups (extras).
 
 1. Create and activate environment:
     ```bash
     poetry env use python3.12
+
+    # If you want to install only the core
+    poetry install --only main
+
+    # If you want to install all dependencies
     poetry install
 
-2. Install PyTorch and PyG manually:
+    # If you want to install a specific subset of utilities
+    poetry install --only main remote-io
 
-    Due to compatibility constraints, PyG must be installed with the correct PyTorch and CUDA version. You can find the correct installation commands on the official pages:
-
-    - [PyTorch Installation Guide](https://pytorch.org/get-started/locally/)
-    - [PyG Installation Guide](https://pytorch-geometric.readthedocs.io/en/latest/install/installation.html)
+2. Install PyTorch Geometric (PyG) - Optional for Graph Models:
 
     Example (replace with your CUDA version):
     ```bash
-    # Example for CUDA 12.1
-    poetry run pip install torch==2.5.1+cu121 --index-url https://download.pytorch.org/whl/cu121
+    # Example for CUDA 11.8
     poetry run pip install torch-scatter torch-sparse torch-cluster torch-spline-conv \
-    -f https://data.pyg.org/whl/torch-2.5.1+cu121.html
-    poetry run pip install torch-geometric torchmetrics
+    -f https://data.pyg.org/whl/torch-2.7.0+cu118.html
+    poetry run pip install torch-geometric
 
 #### 🧪 Using venv (`requirements.txt`)
+
+When installing via `pip` and `requirements.txt`, all dependencies from the core and all extra groups are installed simultaneously.
 
 1. Create the virtual environment and activate it:
     ```bash
@@ -81,15 +69,11 @@ While WarpRec supports quick setup via `make install-*` commands, you may want t
     pip install --upgrade pip
     pip install -r requirements.txt
 
-3. Install compatible versions of PyTorch and PyG:
-    ```bash
-    # Make sure to install the correct versions matching your CUDA setup
-    pip install torch==2.5.1+cu121 --index-url https://download.pytorch.org/whl/cu121
-    pip install torch-scatter torch-sparse torch-cluster torch-spline-conv \
-    -f https://data.pyg.org/whl/torch-2.5.1+cu121.html
-    pip install torch-geometric torchmetrics
+3. Manually install compatible versions of PyTorch and PyG (if needed for graph models, see step 3 in the Poetry section).
 
 #### 🐍 Using Conda/Mamba (`environment.yml`)
+
+Similar to `venv`, the Conda environment file typically includes all dependencies (core and extras) for maximum convenience and broader compatibility.
 
 1. Create or update the environment:
     ```bash
@@ -101,15 +85,13 @@ While WarpRec supports quick setup via `make install-*` commands, you may want t
     ```bash
     conda activate warprec
 
-3. Manually install compatible PyTorch and PyG:
-
-    Conda may not always provide the latest compatible versions. For full compatibility, refer to the installation links above and install with `pip` inside the Conda environment.
+3. Manually install compatible PyTorch and PyG (if needed for graph models, see step 3 in the Poetry section). Conda may not always provide the latest compatible versions; for full compatibility, installing with `pip` inside the Conda environment is often required.
 
 ### ⚠️ Important Notes
 
-- PyG (PyTorch Geometric) is highly sensitive to the version of PyTorch and CUDA. Incorrect combinations may lead to runtime errors or failed builds.
+- **PyG is Optional:** Only install PyG (PyTorch Geometric) if you need **Graph Neural Network (GNN)** models.
 
-- Always check the official compatibility matrix before installing PyTorch and PyG:
+- **PyG Compatibility:** PyG is highly sensitive to the version of **PyTorch** and **CUDA**. Incorrect combinations may lead to runtime errors or failed builds. Always check the official compatibility matrix before installing:
     - [PyTorch CUDA Support Matrix](https://pytorch.org/get-started/previous-versions/)
     - [PyG CUDA Compatibility](https://pytorch-geometric.readthedocs.io/en/latest/install/installation.html)
 
@@ -158,14 +140,16 @@ To implement a custom model, WarpRec provides a dedicated design interface via t
 
 This command initializes a lightweight training pipeline, specifically intended for rapid prototyping and debugging of custom architectures within the framework.
 
-## 📄 Documentation
+### 🧰 Makefile Commands
 
-WarpRec provides documentation for each module. You can navigate to each section directly from here:
+The project includes a Makefile to simplify common operations:
 
-1. 📦 [Data Module](warprec/data/README.md)
-2. 📈 [Evaluation Module](warprec/evaluation/README.md)
-3. 💡 [Recommenders Module](warprec/recommenders/README.md)
-4. 🛠️ [Utils Module](warprec/utils/README.md)
+- 🧹 Run linting:
+    ```bash
+    make lint
+- 🧑‍🔬 Run tests:
+    ```bash
+    make test
 
 ## 🤝 Contributing
 We welcome contributions from the community! Whether you're fixing bugs, improving documentation, or proposing new features, your input is highly valued.
