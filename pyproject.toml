@@ -6,7 +6,7 @@ authors = ["JTOVS <joseph.trotta@ovs.it>", "MarcoWV <marco@wideverse.com>"]
 readme = "README.md"
 
 [tool.poetry.dependencies]
-python = ">=3.12 <3.13"
+python = "~3.12"
 pandas = "^2.2.3"
 scipy = "^1.15.1"
 numpy = "^2.2.2"
@@ -14,15 +14,14 @@ pydantic = "^2.10.6"
 tabulate = "^0.9.0"
 scikit-learn = "^1.6.1"
 hyperopt = "^0.2.7"
-ray = {extras = ["data", "serve", "train", "tune"], version = "^2.42.1"}
+ray = {extras = ["data", "serve", "train", "tune"], version = "~2.45"}
 types-pyyaml = "^6.0.12.20241230"
 types-tabulate = "^0.9.0.20241207"
 loguru = "^0.7.3"
 tensorboard = "^2.19.0"
 tensorboardx = "^2.6.2.2"
-wandb = "^0.19.10"
-codecarbon = "^3.0.0"
-mlflow = "^2.22.0"
+torch = "~2.7"
+torchmetrics = "^1.8.2"
 
 
 [tool.poetry.group.dev.dependencies]
@@ -40,6 +39,11 @@ pydata-sphinx-theme = "^0.16.1"
 furo = "^2025.7.19"
 
 
+[tool.poetry.group.dashboard.dependencies]
+wandb = "^0.19.10"
+codecarbon = "^3.0.0"
+mlflow = "^2.22.0"
+
 [tool.poetry.group.remote-io.dependencies]
 azure-storage-blob = "^12.26.0"
 azure-identity = "^1.25.1"
@@ -50,9 +54,14 @@ poetry-plugin-export = ">=1.8"
 
 
 [tool.poetry.extras]
+dashboard = [
+    "wandb",
+    "codecarbon",
+    "mlflow",
+]
 remote-io = [
     "azure-storage-blob",
-    "azure-identity"
+    "azure-identity",
 ]
 
 
