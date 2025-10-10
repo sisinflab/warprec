@@ -408,6 +408,10 @@ A classical content-based recommender that represents items and users in a share
 <p>Graph-based recommenders exploit the structure of the user-item interaction graph to infer relationships and make recommendations.
 These models capture high-order proximity and implicit associations through walks or neighborhood propagation.
 They are well-suited for uncovering complex patterns in sparse datasets.</p>
+<div class="admonition warning">
+<p class="admonition-title">Warning</p>
+<p>Graph-based models require PyTorch Geometric (PyG) dependencies to be installed correctly. Check the <a class="reference internal" href="../install.html#install-guide"><span class="std std-ref">installation guide</span></a> for more information on how to install them.</p>
+</div>
 <ul class="simple">
 <li><p>LightGCN:
 A simplified graph convolutional network designed for collaborative filtering. It eliminates feature transformations and nonlinear activations, focusing solely on neighborhood aggregation.</p></li>

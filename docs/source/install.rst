@@ -7,37 +7,30 @@ The procedure to install WarpRec its very simple, there are not many pre-requisi
 - Python 3.12
 - `Poetry 2.1.2 <https://python-poetry.org/>`_ for dependency management. Poetry is required only for development.
 
-Install with MakeFile
+WarpRec is designed with a **modular dependency structure** leveraging Poetry. This allows you to install a lean **core** and selectively add optional *extras* for advanced functionalities (like experiment tracking or cloud I/O).
+
+.. list-table:: **Dependency Groups**
+   :widths: 20 60
+   :header-rows: 1
+
+   * - Group
+     - Description
+   * - ``core`` (main)
+     - Essential functionalities, including base models (ItemKNN, EASE, MultiDAE), data handling, and evaluation metrics.
+   * - ``dashboard``
+     - Remote logging and experiment tracking tools (`Weights & Biases`, `MLflow`, `CodeCarbon`).
+   * - ``remote-io``
+     - Functionality for reading and writing data to/from cloud storage (e.g., Azure Blob Storage).
+
+
+Also the core of WarpRec supports a wide variety of recommendation models, Graph-based models requires manual installation of **PyTorch Geometric (PyG)** due to strict CUDA/PyTorch version constraints. It enables the use of Graph Neural Network (GNN) models.
+
+.. _install_guide:
+
+Installation guide
 ---------------------
 
-WarpRec provides a **Makefile** to simplify common setup and development tasks.
-Using these commands is **highly recommended for newcomers**, as they perform all the necessary checks to ensure a clean and consistent installation of the development environment:
-
-- Install dependencies with Poetry:
-.. code-block:: bash
-
-    make install-poetry
-- Install dependencies with venv:
-.. code-block:: bash
-
-    make install-venv
-- Install dependencies with Conda/Mamba:
-.. code-block:: bash
-
-    make install-conda
-- Run linting:
-.. code-block:: bash
-
-    make lint
-- Run tests:
-.. code-block:: bash
-
-    make test
-
-Manual Installation
----------------------
-
-While WarpRec supports quick setup via `make install-*` commands, you may want to manually create and customize your environment using your preferred tool. Here are three supported approaches, depending on your workflow.
+In the following sections you will be guided on how to install WarpRec. Here are three supported approaches, depending on your workflow.
 
 .. note::
 
@@ -59,16 +52,37 @@ While WarpRec supports quick setup via `make install-*` commands, you may want t
 Using Poetry (`pyproject.toml`)
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+Poetry is the recommended tool, as it allows you to selectively install dependencies.
+
 1. **Create and activate the environment:**
 
    .. code-block:: bash
 
       poetry env use python3.12
+
+2. **Install core and optional extras:**
+
+   To install only the **core** dependencies (``main``):
+
+   .. code-block:: bash
+
+      poetry install --only main
+
+   To install the **core plus specific extras** (e.g., ``remote-io``):
+
+   .. code-block:: bash
+
+      poetry install --only main remote-io
+
+   To install the **core plus ALL extras** (``dashboard``, ``remote-io``, etc.):
+
+   .. code-block:: bash
+
       poetry install
 
-2. **Install PyTorch and PyG manually:**
+3. **Install PyTorch Geometric (PyG) - Optional for Graph Models:**
 
-   Due to compatibility constraints, PyG must be installed with the correct PyTorch and CUDA version. Refer to the official guides for the latest instructions:
+   **PyG is only required if you intend to use or develop Graph-based recommendation models.** It must be installed manually with the correct PyTorch and CUDA version. Refer to the official guides for the latest instructions:
 
    - `PyTorch Installation Guide <https://pytorch.org/get-started/locally/>`_
    - `PyG Installation Guide <https://pytorch-geometric.readthedocs.io/en/latest/install/installation.html>`_
@@ -77,14 +91,15 @@ Using Poetry (`pyproject.toml`)
 
    .. code-block:: bash
 
-      # Example for CUDA 12.1
-      poetry run pip install torch==2.5.1+cu121 --index-url https://download.pytorch.org/whl/cu121
+      # Example for CUDA 11.8
       poetry run pip install torch-scatter torch-sparse torch-cluster torch-spline-conv \
-      -f https://data.pyg.org/whl/torch-2.5.1+cu121.html
-      poetry run pip install torch-geometric torchmetrics
+      -f https://data.pyg.org/whl/torch-2.7.0+cu118.html
+      poetry run pip install torch-geometric
 
 Using venv (`requirements.txt`)
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+When installing via `pip` and `requirements.txt`, **all dependencies (core and all extras) are installed simultaneously** for maximum functionality.
 
 1. **Create and activate a virtual environment:**
 
@@ -93,25 +108,26 @@ Using venv (`requirements.txt`)
       python3.12 -m venv .venv
       source .venv/bin/activate
 
-2. **Install base dependencies:**
+2. **Install all dependencies:**
 
    .. code-block:: bash
 
       pip install --upgrade pip
       pip install -r requirements.txt
 
-3. **Install compatible versions of PyTorch and PyG:**
+3. **Install compatible versions of PyTorch and PyG (if needed):**
 
    .. code-block:: bash
 
       # Make sure to install the correct versions matching your CUDA setup
-      pip install torch==2.5.1+cu121 --index-url https://download.pytorch.org/whl/cu121
       pip install torch-scatter torch-sparse torch-cluster torch-spline-conv \
-      -f https://data.pyg.org/whl/torch-2.5.1+cu121.html
-      pip install torch-geometric torchmetrics
+      -f https://data.pyg.org/whl/torch-2.7.0+cu118.html
+      pip install torch-geometric
 
 Using Conda/Mamba (`environment.yml`)
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Similar to ``venv``, the Conda environment file typically includes **all dependencies (core and extras)**.
 
 1. **Create or update the environment:**
 
@@ -127,16 +143,16 @@ Using Conda/Mamba (`environment.yml`)
 
       conda activate warprec
 
-3. **Manually install compatible PyTorch and PyG:**
+3. **Manually install compatible PyTorch and PyG (if needed):**
 
    Conda may not always provide the latest compatible versions. For full compatibility, refer to the installation links above and install with `pip` inside the Conda environment.
 
 .. note::
 
-   On some Linux systems, it has been observed that the `grpcio` library may need to be upgraded manually.
+   On some Linux systems, it has been observed that the ``grpcio`` library may need to be upgraded manually.
    This is typically required if you encounter errors related to gRPC during installation or runtime.
 
-   You can upgrade `grpcio` using `pip` as follows:
+   You can upgrade ``grpcio`` using ``pip`` as follows:
 
    .. code-block:: bash
 
