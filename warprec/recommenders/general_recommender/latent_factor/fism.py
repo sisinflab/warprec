@@ -62,7 +62,6 @@ class FISM(IterativeRecommender):
         super().__init__(
             params, interactions, *args, device=device, seed=seed, info=info, **kwargs
         )
-        self._name = "FISM"
 
         # Get information from dataset info
         users = info.get("users", None)
@@ -167,7 +166,6 @@ class FISM(IterativeRecommender):
     @torch.no_grad()
     def predict_full(
         self,
-        train_batch: Tensor,
         user_indices: Tensor,
         *args: Any,
         **kwargs: Any,
@@ -175,7 +173,6 @@ class FISM(IterativeRecommender):
         """Prediction using the learned embeddings.
 
         Args:
-            train_batch (Tensor): The train batch of user interactions.
             user_indices (Tensor): The batch of user indices.
             *args (Any): List of arguments.
             **kwargs (Any): The dictionary of keyword arguments.
@@ -221,15 +218,11 @@ class FISM(IterativeRecommender):
         # Add the bias
         predictions += batch_user_bias.unsqueeze(1)
         predictions += all_item_bias[1:].unsqueeze(0)
-
-        # Masking interaction already seen in train
-        predictions[train_batch != 0] = -torch.inf
         return predictions.to(self._device)
 
     @torch.no_grad()
     def predict_sampled(
         self,
-        train_batch: Tensor,
         user_indices: Tensor,
         item_indices: Tensor,
         *args: Any,
@@ -238,7 +231,6 @@ class FISM(IterativeRecommender):
         """Prediction of given items using the learned embeddings.
 
         Args:
-            train_batch (Tensor): The train batch of user interactions.
             user_indices (Tensor): The batch of user indices.
             item_indices (Tensor): The batch of item indices.
             *args (Any): List of arguments.
@@ -287,7 +279,4 @@ class FISM(IterativeRecommender):
         # Add the biases
         predictions += batch_user_bias.unsqueeze(1)
         predictions += candidate_item_biases
-
-        # Mask padded indices
-        predictions[item_indices == -1] = -torch.inf
         return predictions.to(self._device)

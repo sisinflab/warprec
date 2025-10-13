@@ -5,6 +5,8 @@ import torch
 from torch import nn, Tensor
 from torch.nn import Module
 from torch.nn.init import normal_
+from scipy.sparse import csr_matrix
+
 from warprec.recommenders.layers import MLP
 from warprec.data.dataset import Interactions, Sessions
 from warprec.recommenders.base_recommender import IterativeRecommender
@@ -66,7 +68,6 @@ class NeuMF(IterativeRecommender):
         **kwargs: Any,
     ):
         super().__init__(params, device=device, seed=seed, *args, **kwargs)
-        self._name = "NeuMF"
 
         # Get information from dataset info
         users = info.get("users", None)
@@ -177,23 +178,24 @@ class NeuMF(IterativeRecommender):
     @torch.no_grad()
     def predict_full(
         self,
-        train_batch: Tensor,
         user_indices: Tensor,
+        train_batch: csr_matrix,
         *args: Any,
         **kwargs: Any,
     ) -> Tensor:
         """Prediction using the learned embeddings.
 
         Args:
-            train_batch (Tensor): The train batch of user interactions.
             user_indices (Tensor): The batch of user indices.
+            train_batch (csr_matrix): The batch of train sparse
+                interaction matrix.
             *args (Any): List of arguments.
             **kwargs (Any): The dictionary of keyword arguments.
 
         Returns:
             Tensor: The score matrix {user x item}.
         """
-        batch_size, num_items = train_batch.size()
+        batch_size, num_items = train_batch.shape
 
         preds = []
         for start in range(0, num_items, self.block_size):
@@ -213,15 +215,11 @@ class NeuMF(IterativeRecommender):
             preds.append(preds_block.view(batch_size, end - start))
 
         predictions = torch.cat(preds, dim=1)  # [batch_size x num_items]
-
-        # Masking interaction already seen in train
-        predictions[train_batch != 0] = -torch.inf
         return predictions.to(self._device)
 
     @torch.no_grad()
     def predict_sampled(
         self,
-        train_batch: Tensor,
         user_indices: Tensor,
         item_indices: Tensor,
         *args: Any,
@@ -230,7 +228,6 @@ class NeuMF(IterativeRecommender):
         """Prediction of given items using the learned embeddings.
 
         Args:
-            train_batch (Tensor): The train batch of user interactions.
             user_indices (Tensor): The batch of user indices.
             item_indices (Tensor): The batch of item indices.
             *args (Any): List of arguments.
@@ -255,7 +252,4 @@ class NeuMF(IterativeRecommender):
 
         # Apply sigmoid to get scores between 0 and 1
         predictions = self.sigmoid(predictions)
-
-        # Mask padded indices
-        predictions[item_indices == -1] = -torch.inf
         return predictions.to(self._device)

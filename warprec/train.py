@@ -8,8 +8,8 @@ import ray
 import torch
 from pandas import DataFrame
 
-from warprec.data.reader import LocalReader
-from warprec.data.writer import LocalWriter
+from warprec.data.reader import ReaderFactory
+from warprec.data.writer import WriterFactory
 from warprec.data.splitting import Splitter
 from warprec.data.dataset import Dataset
 from warprec.data.filtering import apply_filtering
@@ -56,15 +56,13 @@ def main(args: Namespace):
         **config.general.callback.kwargs,
     )
 
-    # Writer module testing
-    writer = LocalWriter(config=config)
-
-    # Reader module testing
-    reader = LocalReader(config)
+    # Initialize I/O modules
+    reader = ReaderFactory.get_reader(config=config)
+    writer = WriterFactory.get_writer(config=config)
 
     # Dataset loading
     main_dataset: Dataset = None
-    fold_data: List[Tuple[DataFrame, DataFrame]] = None
+    val_data: List[Tuple[DataFrame, DataFrame]] | DataFrame = None
     train_data: DataFrame = None
     test_data: DataFrame = None
     side_data = None
@@ -84,14 +82,14 @@ def main(args: Namespace):
             splitter = Splitter(config)
 
             if config.reader.data_type == "transaction":
-                train_data, fold_data, test_data = splitter.split_transaction(data)
+                train_data, val_data, test_data = splitter.split_transaction(data)
 
             else:
                 raise ValueError("Data type not yet supported.")
 
     elif config.reader.loading_strategy == "split":
         if config.reader.data_type == "transaction":
-            train_data, fold_data, test_data = reader.read_transaction_split()
+            train_data, val_data, test_data = reader.read_transaction_split()
 
         else:
             raise ValueError("Data type not yet supported.")
@@ -114,7 +112,6 @@ def main(args: Namespace):
         "rating_label": config.reader.labels.rating_label,
         "timestamp_label": config.reader.labels.timestamp_label,
         "cluster_label": config.reader.labels.cluster_label,
-        "need_session_based_information": config.need_session_based_information,
         "precision": config.general.precision,
     }
 
@@ -124,29 +121,44 @@ def main(args: Namespace):
         test_data,
         **common_params,
     )
+
+    # Handle validation data
+    val_dataset = None
     fold_dataset = []
-    if fold_data is not None:
-        n_folds = len(fold_data)
-        for idx, fold in enumerate(fold_data):
-            logger.msg(f"Creating fold dataset {idx + 1}/{n_folds}")
-            val_train, val_set = fold
-            fold_dataset.append(
-                Dataset(
-                    val_train,
-                    val_set,
-                    evaluation_set="Validation",
-                    **common_params,
-                )
+    if val_data is not None:
+        if not isinstance(val_data, list):
+            # CASE 2: Train/Validation/Test
+            logger.msg("Creating validation dataset")
+            val_dataset = Dataset(
+                train_data,
+                val_data,
+                evaluation_set="Validation",
+                **common_params,
             )
+        else:
+            # CASE 3: Cross-Validation
+            n_folds = len(val_data)
+            for idx, fold in enumerate(val_data):
+                logger.msg(f"Creating fold dataset {idx + 1}/{n_folds}")
+                val_train, val_set = fold
+                fold_dataset.append(
+                    Dataset(
+                        val_train,
+                        val_set,
+                        evaluation_set="Validation",
+                        **common_params,
+                    )
+                )
 
     # Callback on dataset creation
     callback.on_dataset_creation(
         main_dataset=main_dataset,
+        val_dataset=val_dataset,
         validation_folds=fold_dataset,
     )
 
     if config.splitter and config.writer.save_split:
-        writer.write_split(main_dataset, fold_dataset)
+        writer.write_split(main_dataset, val_dataset, fold_dataset)
 
     # Trainer testing
     models = list(config.models.keys())
@@ -196,9 +208,13 @@ def main(args: Namespace):
             config=config,
         )
 
-        if len(fold_dataset) > 0:
-            # We validate model results of validation data
-            # and then finalize results of test
+        if val_dataset is not None:
+            # CASE 2: Train/Validation/Test
+            best_model, ray_report = single_split_flow(
+                model_name, params, val_dataset, trainer, config
+            )
+        elif len(fold_dataset) > 0:
+            # CASE 3: Cross-validation
             best_model, ray_report = multiple_fold_validation_flow(
                 model_name,
                 params,
@@ -208,10 +224,16 @@ def main(args: Namespace):
                 config,
             )
         else:
-            # Model will be optimized and evaluated on test set
-            best_model, ray_report = single_train_test_split_flow(
+            # CASE 1: Train/Test
+            best_model, ray_report = single_split_flow(
                 model_name, params, main_dataset, trainer, config
             )
+
+        if best_model is None:
+            logger.attention(
+                f"Hyperparameter optimization for {model_name} returned no valid model."
+            )
+            continue
 
         model_exploration_total_time = time.time() - model_exploration_start_time
 
@@ -252,11 +274,7 @@ def main(args: Namespace):
 
         # Recommendation
         if params.meta.save_recs:
-            recs = best_model.get_recs(
-                main_dataset,
-                k=config.writer.recommendation.k,
-            )
-            writer.write_recs(recs, model_name)
+            writer.write_recs(best_model, main_dataset, config.writer.recommendation.k)
 
         # Save params
         model_params = {model_name: best_model.get_params()}
@@ -285,11 +303,7 @@ def main(args: Namespace):
             # Retrieve best model device
             best_model_device = best_model._device
 
-            train_batch = (
-                torch.randint(0, 2, (num_users_to_predict, num_items))
-                .float()
-                .to(device=best_model_device)
-            )
+            # Create mock data to test prediction time
             user_indices = torch.arange(num_users_to_predict).to(
                 device=best_model_device
             )
@@ -302,15 +316,18 @@ def main(args: Namespace):
             seq_len = torch.randint(1, max_seq_len + 1, (num_users_to_predict,)).to(
                 device=best_model_device
             )
+            train_sparse = main_dataset.train_set.get_sparse()
+            train_batch = train_sparse[user_indices.tolist(), :]
 
             # Test inference time
             inference_time_start = time.time()
             best_model.predict_sampled(
-                train_batch,
                 user_indices=user_indices,
                 item_indices=item_indices,
                 user_seq=user_seq,
                 seq_len=seq_len,
+                train_batch=train_batch,
+                train_sparse=train_sparse,
             )
             inference_time = time.time() - inference_time_start
 
@@ -349,19 +366,19 @@ def main(args: Namespace):
                 writer.write_statistical_significance_test(test_results, stat_name)
 
         logger.positive("Statistical significance tests completed successfully.")
-    logger.positive(
-        "All models trained and evaluated successfully. WarpRec is shutting down."
-    )
+    logger.positive("All experiments concluded. WarpRec is shutting down.")
 
 
-def single_train_test_split_flow(
+def single_split_flow(
     model_name: str,
     params: RecomModel,
     dataset: Dataset,
     trainer: Trainer,
     config: TrainConfiguration,
 ) -> Tuple[Recommender, dict]:
-    """Hyperparameter optimization over a single train/test split.
+    """Hyperparameter optimization over a single split.
+
+    The split can either be train/test or train/validation.
 
     Args:
         model_name (str): Name of the model to optimize.
@@ -391,6 +408,10 @@ def single_train_test_split_flow(
         metrics = [val_metric]
         topk = [val_k]
 
+    # Retrieve storage path for Ray results
+    # based on the writer configuration
+    storage_path = config.get_storage_path()
+
     # Start HPO phase on test set,
     # no need of further training
     best_model, ray_report = trainer.train_single_fold(
@@ -400,6 +421,7 @@ def single_train_test_split_flow(
         metrics=metrics,
         topk=topk,
         validation_score=config.evaluation.validation_metric,
+        storage_path=storage_path,
         device=device,
         evaluation_strategy=config.evaluation.strategy,
         num_negatives=config.evaluation.num_negatives,
@@ -457,6 +479,10 @@ def multiple_fold_validation_flow(
         metrics = [val_metric]
         topk = [val_k]
 
+    # Retrieve storage path for Ray results
+    # based on the writer configuration
+    storage_path = config.get_storage_path()
+
     # Start HPO phase on validation folds
     best_params, report = trainer.train_multiple_fold(
         model_name,
@@ -465,6 +491,7 @@ def multiple_fold_validation_flow(
         metrics=metrics,
         topk=topk,
         validation_score=validation_score,
+        storage_path=storage_path,
         device=device,
         evaluation_strategy=config.evaluation.strategy,
         num_negatives=config.evaluation.num_negatives,
@@ -473,6 +500,10 @@ def multiple_fold_validation_flow(
         desired_training_it=desired_training_it,
         ray_verbose=config.general.ray_verbose,
     )
+
+    # Check in case the HPO failed
+    if best_params is None:
+        return None, report
 
     logger.msg(f"Initializing {model_name} model for test set evaluation")
 
@@ -533,12 +564,11 @@ def dataset_preparation(
             device (str): The device to use.
         """
         if config.evaluation.strategy == "full":
-            dataset.get_evaluation_dataloader(device=device)
+            dataset.get_evaluation_dataloader()
         elif config.evaluation.strategy == "sampled":
             dataset.get_neg_evaluation_dataloader(
                 num_negatives=config.evaluation.num_negatives,
                 seed=config.evaluation.seed,
-                device=device,
             )
 
     logger.msg("Preparing main dataset inner structures for training and evaluation.")

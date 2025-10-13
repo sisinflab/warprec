@@ -155,13 +155,14 @@ class Trainer:
         metrics: List[str],
         topk: List[int],
         validation_score: str,
+        storage_path: str,
         device: str = "cpu",
         evaluation_strategy: str = "full",
         num_negatives: int = 99,
         beta: float = 1.0,
         pop_ratio: float = 0.8,
         ray_verbose: int = 1,
-    ) -> Tuple[Recommender, dict]:
+    ) -> Tuple[Optional[Recommender], dict]:
         """Main method of the Trainer class.
 
         This method will execute the training of the model and evaluation,
@@ -174,6 +175,7 @@ class Trainer:
             metrics (List[str]): List of metrics to compute on each report.
             topk (List[int]): List of cutoffs for metrics.
             validation_score (str): The metric to monitor during training.
+            storage_path (str): Path to store Ray results.
             device (str): The device that will be used for tensor operations.
             evaluation_strategy (str): Evaluation strategy, either "full" or "sampled".
             num_negatives (int): Number of negative samples to use in "sampled" strategy.
@@ -182,7 +184,7 @@ class Trainer:
             ray_verbose (int): The Ray level of verbosity.
 
         Returns:
-            Tuple[Recommender, dict]:
+            Tuple[Optional[Recommender], dict]:
                 - Recommender: The model trained.
                 - dict: Summary report of the training.
         """
@@ -198,6 +200,7 @@ class Trainer:
             metrics=metrics,
             topk=topk,
             validation_score=validation_score,
+            storage_path=storage_path,
             device=device,
             evaluation_strategy=evaluation_strategy,
             num_negatives=num_negatives,
@@ -211,6 +214,19 @@ class Trainer:
 
         # Retrieve results
         best_result = results.get_best_result(metric=validation_score, mode=mode)
+
+        # Early check for no successful trials
+        if (
+            mode == "max"
+            and best_result.metrics[validation_score] == -torch.inf
+            or mode == "min"
+            and best_result.metrics[validation_score] == torch.inf
+        ):
+            logger.negative(
+                f"All trials failed during training for {model_name}. Shutting down the Trainer."
+            )
+            ray.shutdown()
+            return None, {}
         best_params = best_result.config
         best_score = best_result.metrics[validation_score]
         best_iter = best_result.metrics["training_iteration"]
@@ -218,16 +234,19 @@ class Trainer:
 
         # Memory report
         result_df = results.get_dataframe()
-        additional_report = {
-            "RAM Mean Usage (MB)": result_df["ram_peak_mb"].mean(),
-            "RAM STD Usage (MB)": result_df["ram_peak_mb"].std(),
-            "RAM Max Usage (MB)": result_df["ram_peak_mb"].max(),
-            "RAM Min Usage (MB)": result_df["ram_peak_mb"].min(),
-            "VRAM Mean Usage (MB)": result_df["vram_peak_mb"].mean(),
-            "VRAM STD Usage (MB)": result_df["vram_peak_mb"].std(),
-            "VRAM Max Usage (MB)": result_df["vram_peak_mb"].max(),
-            "VRAM Min Usage (MB)": result_df["vram_peak_mb"].min(),
-        }
+        if "ram_peak_mb" in result_df.columns and "vram_peak_mb" in result_df.columns:
+            additional_report = {
+                "RAM Mean Usage (MB)": result_df["ram_peak_mb"].mean(),
+                "RAM STD Usage (MB)": result_df["ram_peak_mb"].std(),
+                "RAM Max Usage (MB)": result_df["ram_peak_mb"].max(),
+                "RAM Min Usage (MB)": result_df["ram_peak_mb"].min(),
+                "VRAM Mean Usage (MB)": result_df["vram_peak_mb"].mean(),
+                "VRAM STD Usage (MB)": result_df["vram_peak_mb"].std(),
+                "VRAM Max Usage (MB)": result_df["vram_peak_mb"].max(),
+                "VRAM Min Usage (MB)": result_df["vram_peak_mb"].min(),
+            }
+        else:
+            additional_report = {}
 
         logger.msg(
             f"Best params combination: {best_params} with a score of "
@@ -266,6 +285,7 @@ class Trainer:
         metrics: List[str],
         topk: List[int],
         validation_score: str,
+        storage_path: str,
         device: str = "cpu",
         evaluation_strategy: str = "full",
         num_negatives: int = 99,
@@ -273,7 +293,7 @@ class Trainer:
         pop_ratio: float = 0.8,
         desired_training_it: str = "median",
         ray_verbose: int = 1,
-    ) -> Tuple[Dict, Dict]:
+    ) -> Tuple[Optional[Dict], Dict]:
         """Main method of the Trainer class for cross-validation.
 
         Args:
@@ -283,6 +303,7 @@ class Trainer:
             metrics (List[str]): List of metrics to compute on each report.
             topk (List[int]): List of cutoffs for metrics.
             validation_score (str): The metric to monitor during training.
+            storage_path (str): Path to store Ray results.
             device (str): The device that will be used for tensor operations.
             evaluation_strategy (str): Evaluation strategy, either "full" or "sampled".
             num_negatives (int): Number of negative samples to use in "sampled" strategy.
@@ -295,7 +316,7 @@ class Trainer:
             ray_verbose (int): The Ray level of verbosity.
 
         Returns:
-            Tuple[Dict, Dict]:
+            Tuple[Optional[Dict], Dict]:
                 - Dict: The best hyperparameters found.
                 - Dict: Summary report of the training.
         """
@@ -310,6 +331,7 @@ class Trainer:
             metrics=metrics,
             topk=topk,
             validation_score=validation_score,
+            storage_path=storage_path,
             device=device,
             evaluation_strategy=evaluation_strategy,
             num_negatives=num_negatives,
@@ -326,6 +348,20 @@ class Trainer:
             filter_metric=validation_score,
             filter_mode=mode,
         )
+
+        # Early check for no successful trials
+        if (
+            mode == "max"
+            and result_df[validation_score].max() == -torch.inf
+            or mode == "min"
+            and result_df[validation_score].min() == torch.inf
+        ):
+            logger.negative(
+                f"All trials failed during training for {model_name}. Shutting down the Trainer."
+            )
+            ray.shutdown()
+            return None, {}
+
         hyperparam_cols = [
             col
             for col in result_df.columns
@@ -460,6 +496,7 @@ class Trainer:
         metrics: List[str],
         topk: List[int],
         validation_score: str,
+        storage_path: str,
         device: str = "cpu",
         evaluation_strategy: str = "full",
         num_negatives: int = 99,
@@ -533,6 +570,7 @@ class Trainer:
             stop=early_stopping,
             callbacks=self._callbacks,
             verbose=ray_verbose,
+            storage_path=storage_path,
             checkpoint_config=CheckpointConfig(
                 num_to_keep=optimization.checkpoint_to_keep,
                 checkpoint_score_attribute=validation_score,

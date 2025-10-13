@@ -38,7 +38,6 @@ class Pop(Recommender):
         super().__init__(
             params, interactions, device=device, seed=seed, info=info, *args, **kwargs
         )
-        self._name = "Pop"
 
         X = interactions.get_sparse()
 
@@ -54,7 +53,6 @@ class Pop(Recommender):
     @torch.no_grad()
     def predict_full(
         self,
-        train_batch: Tensor,
         user_indices: Tensor,
         *args: Any,
         **kwargs: Any,
@@ -62,7 +60,6 @@ class Pop(Recommender):
         """Prediction using a normalized popularity value.
 
         Args:
-            train_batch (Tensor): The train batch of user interactions.
             user_indices (Tensor): The batch of user indices.
             *args (Any): List of arguments.
             **kwargs (Any): The dictionary of keyword arguments.
@@ -78,15 +75,11 @@ class Pop(Recommender):
 
         # Repeat the popularity scores for each user in the batch
         predictions = normalized_popularity.repeat(batch_size, 1).to(self._device)
-
-        # Mask seen items from the training data
-        predictions[train_batch != 0] = -torch.inf
         return predictions
 
     @torch.no_grad()
     def predict_sampled(
         self,
-        train_batch: Tensor,
         user_indices: Tensor,
         item_indices: Tensor,
         *args: Any,
@@ -95,7 +88,6 @@ class Pop(Recommender):
         """Prediction using a random number generator.
 
         Args:
-            train_batch (Tensor): The train batch of user interactions.
             user_indices (Tensor): The batch of user indices.
             item_indices (Tensor): The batch of item indices.
             *args (Any): List of arguments.
@@ -111,7 +103,4 @@ class Pop(Recommender):
         # Retrieve the popularity scores for the sampled items
         # Clamp item_indices to avoid out-of-bounds indexing with -1
         predictions = normalized_popularity[item_indices.clamp(min=0)]
-
-        # Mask padded indices
-        predictions[item_indices == -1] = -torch.inf
         return predictions.to(self._device)

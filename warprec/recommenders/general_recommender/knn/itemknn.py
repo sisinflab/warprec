@@ -2,7 +2,6 @@
 from typing import Any
 
 import torch
-from torch import nn
 from warprec.data.dataset import Interactions
 from warprec.recommenders.base_recommender import ItemSimRecommender
 from warprec.utils.registry import model_registry, similarities_registry
@@ -45,7 +44,6 @@ class ItemKNN(ItemSimRecommender):
         super().__init__(
             params, interactions, device=device, seed=seed, info=info, *args, **kwargs
         )
-        self._name = "ItemKNN"
 
         X = interactions.get_sparse()
         similarity = similarities_registry.get(self.similarity)
@@ -56,5 +54,5 @@ class ItemKNN(ItemSimRecommender):
         # Compute top_k filtering
         filtered_sim_matrix = self._apply_topk_filtering(sim_matrix, self.k)
 
-        # Update item_similarity with a new nn.Parameter
-        self.item_similarity = nn.Parameter(filtered_sim_matrix)
+        # Update item_similarity
+        self.item_similarity = filtered_sim_matrix.numpy()

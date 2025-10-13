@@ -1,9 +1,7 @@
 # pylint: disable = R0801, E1102
 from typing import Any
 
-import torch
 import scipy.sparse as sp
-from torch import nn
 from sklearn.linear_model import ElasticNet
 from warprec.recommenders.base_recommender import ItemSimRecommender
 from warprec.data.dataset import Interactions
@@ -47,7 +45,6 @@ class Slim(ItemSimRecommender):
         super().__init__(
             params, interactions, device=device, seed=seed, info=info, *args, **kwargs
         )
-        self._name = "Slim"
 
         # Predefine the number of items, similarity matrix and ElasticNet
         X = interactions.get_sparse()
@@ -80,8 +77,5 @@ class Slim(ItemSimRecommender):
             # Add them to list
             item_coeffs.append(coeffs)
 
-        # Stack the coefficients, make the matrix dense and
-        # convert to tensor
-        self.item_similarity = nn.Parameter(
-            torch.from_numpy(sp.vstack(item_coeffs).T.todense())
-        )
+        # Stack the coefficients and make the matrix dense
+        self.item_similarity = sp.vstack(item_coeffs).T.todense()

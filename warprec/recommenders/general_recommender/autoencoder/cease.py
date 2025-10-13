@@ -2,8 +2,6 @@
 from typing import Any
 
 import numpy as np
-import torch
-from torch import nn
 from scipy.sparse import vstack
 from warprec.recommenders.base_recommender import ItemSimRecommender
 from warprec.data.dataset import Interactions
@@ -47,7 +45,6 @@ class CEASE(ItemSimRecommender):
         super().__init__(
             params, interactions, device=device, seed=seed, info=info, *args, **kwargs
         )
-        self._name = "CEASE"
 
         X = interactions.get_sparse()
         item_profile = interactions.get_side_sparse()
@@ -60,4 +57,4 @@ class CEASE(ItemSimRecommender):
         B /= -np.diag(B)
         np.fill_diagonal(B, 0.0)
 
-        self.item_similarity = nn.Parameter(torch.tensor(B, dtype=torch.float32))
+        self.item_similarity = B

@@ -21,7 +21,7 @@ from warprec.utils.config import (
     EvaluationConfig,
 )
 from warprec.utils.callback import WarpRecCallback
-from warprec.utils.enums import ReadingMethods
+from warprec.utils.enums import ReadingMethods, WritingMethods
 from warprec.utils.registry import model_registry, params_registry, filter_registry
 from warprec.utils.logger import logger
 
@@ -35,7 +35,7 @@ class WarpRecConfiguration(BaseModel):
             information in the format {filter_name: dict{param_1: value, param_2: value, ...}, ...}
         models (Dict[str, dict]): The dictionary containing model information
             in the format {model_name: dict{param_1: value, param_2: value, ...}, ...}
-        general (GeneralConfig): General configuration of the experiment
+        general (GeneralConfig): General configuration of the experiment.
         sparse_np_dtype (ClassVar[dict]): The mapping between the string dtype
             and their numpy sparse counterpart.
         sparse_torch_dtype (ClassVar[dict]): The mapping between the string dtype
@@ -71,7 +71,7 @@ class WarpRecConfiguration(BaseModel):
             ValueError: If any information between parts of the configuration file is inconsistent.
         """
 
-        # Check if the local file exists
+        # Reading method specific checks
         if self.reader.reading_method == ReadingMethods.LOCAL:
             local_path: str = None
             if self.reader.local_path is not None:
@@ -84,6 +84,20 @@ class WarpRecConfiguration(BaseModel):
 
             if not os.path.exists(local_path):
                 raise FileNotFoundError(f"Training file not at {local_path}")
+
+        elif self.reader.reading_method == ReadingMethods.AZURE_BLOB:
+            # Check if the Azure configuration is complete
+            if self.general.azure is None:
+                raise ValueError(
+                    "Azure configuration must be provided for Azure Blob reading method."
+                )
+            if (
+                not self.general.azure.storage_account_name
+                or not self.general.azure.container_name
+            ):
+                raise ValueError(
+                    "Both storage_account_name and container_name must be provided in Azure configuration."
+                )
 
         # Load custom modules if specified
         load_custom_modules(self.general.custom_models)
@@ -160,17 +174,12 @@ class TrainConfiguration(WarpRecConfiguration):
         splitter (SplittingConfig): Configuration of the splitting process.
         dashboard (DashboardConfig): Configuration of the dashboard process.
         evaluation (EvaluationConfig): Configuration of the evaluation process.
-        need_session_based_information (ClassVar[bool]): Wether or not the experiments
-            will be conducted on session data.
     """
 
     writer: WriterConfig
     splitter: SplittingConfig
     dashboard: DashboardConfig = Field(default_factory=DashboardConfig)
     evaluation: EvaluationConfig
-
-    # Track if session-based information is needed
-    need_session_based_information: ClassVar[bool] = False
 
     @model_validator(mode="after")
     def train_validation(self) -> "TrainConfiguration":
@@ -182,23 +191,20 @@ class TrainConfiguration(WarpRecConfiguration):
         Raises:
             ValueError: If any information between parts of the configuration file is inconsistent.
         """
-        # Check if experiment has been set up correctly
-        if not self.writer.setup_experiment:
-            for model_name, model_data in self.models.items():
-                if model_data["meta"]["save_model"]:
-                    raise ValueError(
-                        f"You are trying to save the model state for {model_name} model but "
-                        "experiment must be setup first. Set setup_experiment to True."
-                    )
-            if self.writer.save_split:
+
+        # Writing method specific checks
+        if self.writer.writing_method == WritingMethods.AZURE_BLOB:
+            # Check if the Azure configuration is complete
+            if self.general.azure is None:
                 raise ValueError(
-                    "You are trying to save the splits but experiment must be "
-                    "setup first. Set setup_experiment to True."
+                    "Azure configuration must be provided for Azure Blob writing method."
                 )
-            if self.evaluation.save_evaluation:
+            if (
+                not self.general.azure.storage_account_name
+                or not self.general.azure.container_name
+            ):
                 raise ValueError(
-                    "You are trying to save the evaluation but experiment must be "
-                    "setup first. Set setup_experiment to True."
+                    "Both storage_account_name and container_name must be provided in Azure configuration."
                 )
 
         # Check if evaluation has been set up correctly
@@ -275,11 +281,6 @@ class TrainConfiguration(WarpRecConfiguration):
                         "be sure that your dataset contains them."
                     )
 
-                # If at least one model is a sequential model, then
-                # we set the flag for session-based information
-                if model_class.need_timestamp:
-                    TrainConfiguration.need_session_based_information = True
-
                 # Extract model train parameters, removing the meta infos
                 model_data = {
                     k: (
@@ -293,6 +294,33 @@ class TrainConfiguration(WarpRecConfiguration):
                 parsed_models[model_name] = model_class.model_dump()
 
         return parsed_models
+
+    def get_storage_path(self) -> str:
+        """Returns the storage path for the ray results.
+
+        Returns:
+            str: The storage path.
+        """
+        match self.writer.writing_method:
+            case WritingMethods.LOCAL:
+                # The local path will be ~/experiment_path/dataset_name/ray_results
+                return os.path.join(
+                    os.getcwd(),
+                    self.writer.local_experiment_path,
+                    self.writer.dataset_name,
+                    "ray_results",
+                )
+            case WritingMethods.AZURE_BLOB:
+                # The azure blob path will be az://<container_name>/<blob_experiment_container>/dataset_name/ray_results
+                return os.path.join(
+                    "az://",
+                    self.general.azure.container_name,
+                    self.writer.azure_blob_experiment_container,
+                    self.writer.dataset_name,
+                    "ray_results",
+                )
+
+        return os.path.join(os.getcwd(), "ray_results")
 
 
 class DesignConfiguration(WarpRecConfiguration):

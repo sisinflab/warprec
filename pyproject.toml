@@ -35,10 +35,25 @@ pylint = "^3.3.3"
 bandit = "^1.8.2"
 nvitop = "^1.4.2"
 matplotlib = "^3.10.3"
+sphinx = "^8.2.3"
+pydata-sphinx-theme = "^0.16.1"
+furo = "^2025.7.19"
+
+
+[tool.poetry.group.remote-io.dependencies]
+azure-storage-blob = "^12.26.0"
+azure-identity = "^1.25.1"
 
 
 [tool.poetry.requires-plugins]
 poetry-plugin-export = ">=1.8"
+
+
+[tool.poetry.extras]
+remote-io = [
+    "azure-storage-blob",
+    "azure-identity"
+]
 
 
 [build-system]

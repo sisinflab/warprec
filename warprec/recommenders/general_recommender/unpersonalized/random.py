@@ -3,6 +3,8 @@ from typing import Any
 
 import torch
 from torch import Tensor
+from scipy.sparse import csr_matrix
+
 from warprec.recommenders.base_recommender import Recommender
 from warprec.utils.registry import model_registry
 
@@ -32,19 +34,21 @@ class Random(Recommender):
         **kwargs: Any,
     ):
         super().__init__(params, device=device, seed=seed, info=info, *args, **kwargs)
-        self._name = "Random"
 
     @torch.no_grad()
     def predict_full(
         self,
-        train_batch: Tensor,
+        user_indices: Tensor,
+        train_batch: csr_matrix,
         *args: Any,
         **kwargs: Any,
     ) -> Tensor:
         """Prediction using a random number generator.
 
         Args:
-            train_batch (Tensor): The train batch of user interactions.
+            user_indices (Tensor): The batch of user indices.
+            train_batch (csr_matrix): The batch of train sparse
+                interaction matrix.
             *args (Any): List of arguments.
             **kwargs (Any): The dictionary of keyword arguments.
 
@@ -52,16 +56,12 @@ class Random(Recommender):
             Tensor: The score matrix {user x item}.
         """
         # Generate random predictions
-        predictions = torch.rand(train_batch.size())
-
-        # Mask seen items from the training data
-        predictions[train_batch != 0] = -torch.inf
+        predictions = torch.rand(train_batch.shape)
         return predictions.to(self._device)
 
     @torch.no_grad()
     def predict_sampled(
         self,
-        train_batch: Tensor,
         user_indices: Tensor,
         item_indices: Tensor,
         *args: Any,
@@ -70,7 +70,6 @@ class Random(Recommender):
         """Prediction using a random number generator.
 
         Args:
-            train_batch (Tensor): The train batch of user interactions.
             user_indices (Tensor): The batch of user indices.
             item_indices (Tensor): The batch of item indices.
             *args (Any): List of arguments.
@@ -81,7 +80,4 @@ class Random(Recommender):
         """
         # Generate random predictions
         predictions = torch.rand(item_indices.size())
-
-        # Mask padded indices
-        predictions[item_indices == -1] = -torch.inf
         return predictions.to(self._device)

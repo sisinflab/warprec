@@ -4,7 +4,7 @@ from argparse import Namespace
 
 from pandas import DataFrame
 
-from warprec.data.reader import LocalReader
+from warprec.data.reader import ReaderFactory
 from warprec.data.splitting import Splitter
 from warprec.data.dataset import Dataset
 from warprec.data.filtering import apply_filtering
@@ -37,7 +37,7 @@ def main(args: Namespace):
     )
 
     # Initialize I/O modules
-    reader = LocalReader(config)
+    reader = ReaderFactory.get_reader(config=config)
 
     # Dataset loading
     main_dataset: Dataset = None
@@ -104,6 +104,7 @@ def main(args: Namespace):
     # Callback on dataset creation
     callback.on_dataset_creation(
         main_dataset=main_dataset,
+        val_dataset=None,
         validation_folds=[],
     )
 
@@ -149,6 +150,8 @@ def main(args: Namespace):
         evaluator.evaluate(
             model,
             main_dataset,
+            strategy=config.evaluation.strategy,
+            num_negatives=config.evaluation.num_negatives,
             device=str(model._device),
             verbose=True,
         )

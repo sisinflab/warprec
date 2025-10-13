@@ -1,9 +1,7 @@
 # pylint: disable = R0801, E1102
 from typing import Union, Any
 
-import torch
 import numpy as np
-from torch import nn
 from scipy.sparse import csr_matrix, coo_matrix, lil_matrix
 from sklearn.preprocessing import normalize
 from warprec.data.dataset import Interactions
@@ -52,7 +50,6 @@ class RP3Beta(ItemSimRecommender):
         super().__init__(
             params, interactions, device=device, seed=seed, info=info, *args, **kwargs
         )
-        self._name = "RP3Beta"
 
         X = interactions.get_sparse()
 
@@ -87,8 +84,8 @@ class RP3Beta(ItemSimRecommender):
         if self.normalize:
             filtered_matrix = normalize(filtered_matrix, norm="l1", axis=1)
 
-        # Update item_similarity with a new nn.Parameter, doing the proper casting
-        self.item_similarity = nn.Parameter(torch.from_numpy(filtered_matrix.toarray()))
+        # Update item_similarity
+        self.item_similarity = filtered_matrix.toarray()
 
     def _compute_blockwise_similarity(
         self,

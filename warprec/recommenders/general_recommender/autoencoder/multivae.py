@@ -4,6 +4,8 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch import Tensor
 from torch.nn.init import xavier_normal_, constant_
+from scipy.sparse import csr_matrix
+
 from warprec.data.dataset import Interactions, Sessions
 from warprec.recommenders.base_recommender import IterativeRecommender
 from warprec.recommenders.losses import MultiVAELoss
@@ -139,7 +141,6 @@ class MultiVAE(IterativeRecommender):
         **kwargs: Any,
     ):
         super().__init__(params, device=device, seed=seed, *args, **kwargs)
-        self._name = "MultiVAE"
 
         # Get dataset information
         self.items = info.get("items")
@@ -213,14 +214,17 @@ class MultiVAE(IterativeRecommender):
     @torch.no_grad()
     def predict_full(
         self,
-        train_batch: Tensor,
+        user_indices: Tensor,
+        train_batch: csr_matrix,
         *args: Any,
         **kwargs: Any,
     ) -> Tensor:
         """Prediction using the the encoder and decoder modules.
 
         Args:
-            train_batch (Tensor): The train batch of user interactions.
+            user_indices (Tensor): The batch of user indices.
+            train_batch (csr_matrix): The batch of train sparse
+                interaction matrix.
             *args (Any): List of arguments.
             **kwargs (Any): The dictionary of keyword arguments.
 
@@ -228,18 +232,16 @@ class MultiVAE(IterativeRecommender):
             Tensor: The score matrix {user x item}.
         """
         # Forward pass
+        train_batch = torch.from_numpy(train_batch.toarray()).to(self._device)
         predictions, _ = self.forward(train_batch)
-
-        # Masking interaction already seen in train
-        predictions[train_batch != 0] = -torch.inf
         return predictions.to(self._device)
 
     @torch.no_grad()
     def predict_sampled(
         self,
-        train_batch: Tensor,
         user_indices: Tensor,
         item_indices: Tensor,
+        train_batch: csr_matrix,
         *args: Any,
         **kwargs: Any,
     ) -> Tensor:
@@ -248,9 +250,10 @@ class MultiVAE(IterativeRecommender):
         This method will produce predictions only for given item indices.
 
         Args:
-            train_batch (Tensor): The train batch of user interactions.
             user_indices (Tensor): The batch of user indices.
             item_indices (Tensor): The batch of item indices to sample.
+            train_batch (csr_matrix): The batch of train sparse
+                interaction matrix.
             *args (Any): List of arguments.
             **kwargs (Any): The dictionary of keyword arguments.
 
@@ -258,11 +261,9 @@ class MultiVAE(IterativeRecommender):
             Tensor: The score matrix {user x pad_seq}.
         """
         # Compute predictions and gather only sampled items
+        train_batch = torch.from_numpy(train_batch.toarray()).to(self._device)
         predictions, _ = self.forward(train_batch)
         predictions = predictions.gather(
             1, item_indices.clamp(min=0)
         )  # [batch_size, pad_seq]
-
-        # Mask padded indices
-        predictions[item_indices == -1] = -torch.inf
         return predictions.to(self._device)

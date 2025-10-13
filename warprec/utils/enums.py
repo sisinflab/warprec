@@ -46,9 +46,11 @@ class ReadingMethods(str, Enum):
 
     This enum is used to track the possible reading methods:
         - LOCAL: Read data locally.
+        - AZURE_BLOB: Read data from an Azure Blob Storage.
     """
 
     LOCAL = "local"
+    AZURE_BLOB = "azure_blob"
 
 
 class WritingMethods(str, Enum):
@@ -56,9 +58,11 @@ class WritingMethods(str, Enum):
 
     This enum is used to track the possible writing methods:
         - LOCAL: Writes results locally.
+        - AZURE_BLOB: Writes results to an Azure Blob Storage.
     """
 
     LOCAL = "local"
+    AZURE_BLOB = "azure_blob"
 
 
 class Similarities(str, Enum):

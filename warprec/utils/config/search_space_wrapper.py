@@ -26,7 +26,7 @@ class ChoiceSpaceWrapper(SearchSpaceWrapper):
     """The Choice Search Space Wrapper."""
 
     def __call__(self, *args: Any) -> Callable:
-        return tune.choice(*args)
+        return tune.choice(args)
 
 
 @search_space_registry.register(SearchSpace.UNIFORM)

@@ -55,7 +55,6 @@ class BPR(IterativeRecommender):
         **kwargs: Any,
     ):
         super().__init__(params, device=device, seed=seed, *args, **kwargs)
-        self._name = "BPR"
 
         # Get information from dataset info
         users = info.get("users", None)
@@ -119,7 +118,6 @@ class BPR(IterativeRecommender):
     @torch.no_grad()
     def predict_full(
         self,
-        train_batch: Tensor,
         user_indices: Tensor,
         *args: Any,
         **kwargs: Any,
@@ -127,7 +125,6 @@ class BPR(IterativeRecommender):
         """Prediction using the learned embeddings.
 
         Args:
-            train_batch (Tensor): The train batch of user interactions.
             user_indices (Tensor): The batch of user indices.
             *args (Any): List of arguments.
             **kwargs (Any): The dictionary of keyword arguments.
@@ -144,15 +141,11 @@ class BPR(IterativeRecommender):
         predictions = torch.matmul(
             u_embeddings_batch, item_e_all.transpose(0, 1)
         )  # [batch_size, n_items]
-
-        # Masking interaction already seen in train
-        predictions[train_batch != 0] = -torch.inf
         return predictions.to(self._device)
 
     @torch.no_grad()
     def predict_sampled(
         self,
-        train_batch: Tensor,
         user_indices: Tensor,
         item_indices: Tensor,
         *args: Any,
@@ -161,7 +154,6 @@ class BPR(IterativeRecommender):
         """Prediction of given items using the learned embeddings.
 
         Args:
-            train_batch (Tensor): The train batch of user interactions.
             user_indices (Tensor): The batch of user indices.
             item_indices (Tensor): The batch of item indices.
             *args (Any): List of arguments.
@@ -183,7 +175,4 @@ class BPR(IterativeRecommender):
         predictions = torch.einsum(
             "bi,bji->bj", user_embeddings, candidate_item_embeddings
         )
-
-        # Mask padded indices
-        predictions[item_indices == -1] = -torch.inf
         return predictions.to(self._device)
