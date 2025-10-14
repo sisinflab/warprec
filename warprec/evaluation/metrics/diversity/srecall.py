@@ -93,6 +93,7 @@ class SRecall(TopKMetric):
     For further details, please refer to the `paper <https://dl.acm.org/doi/abs/10.1145/2795403.2795405>`_.
 
     Attributes:
+        feature_lookup (Tensor): The item feature lookup tensor.
         ratio_feature_retrieved (Tensor): Sum, across all processed users, of the ratio between
             the number of unique relevant features retrieved in the top-k and the total number of unique relevant features.
         users (Tensor): The total number of processed users who have at least one relevant item.
@@ -117,6 +118,7 @@ class SRecall(TopKMetric):
     }
     _CAN_COMPUTE_PER_USER: bool = True
 
+    feature_lookup: Tensor
     ratio_feature_retrieved: Tensor
     users: Tensor
     compute_per_user: bool
@@ -132,7 +134,6 @@ class SRecall(TopKMetric):
         **kwargs: Any,
     ):
         super().__init__(k, dist_sync_on_step=dist_sync_on_step)
-        self.feature_lookup = feature_lookup
         self.compute_per_user = compute_per_user
 
         if self.compute_per_user:
@@ -148,6 +149,9 @@ class SRecall(TopKMetric):
                 dist_reduce_fx="sum",
             )  # Initialize a scalar to store global value
         self.add_state("users", torch.tensor(0.0), dist_reduce_fx="sum")
+
+        # Add feature lookup as buffer
+        self.register_buffer("feature_lookup", feature_lookup)
 
     def update(self, preds: Tensor, user_indices: Tensor, **kwargs: Any):
         """Computes the final value of the metric."""
