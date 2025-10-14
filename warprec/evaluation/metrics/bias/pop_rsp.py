@@ -57,6 +57,10 @@ class PopRSP(TopKMetric):
     For further details, please refer to this `paper <https://dl.acm.org/doi/abs/10.1145/3397271.3401177>`_.
 
     Attributes:
+        short_head (Tensor): The lookup tensor of short head items.
+        long_tail (Tensor): The lookup tensor of long tail items.
+        total_short (Tensor): The total number of short head items.
+        total_long (Tensor): The total number of long tail items.
         short_recs (Tensor): The short head recommendations.
         long_recs (Tensor): The long tail recommendations.
 
@@ -74,6 +78,10 @@ class PopRSP(TopKMetric):
         MetricBlock.TOP_K_INDICES,
     }
 
+    short_head: Tensor
+    long_tail: Tensor
+    total_short: Tensor
+    total_long: Tensor
     short_recs: Tensor
     long_recs: Tensor
 
@@ -87,15 +95,17 @@ class PopRSP(TopKMetric):
         **kwargs: Any,
     ):
         super().__init__(k, dist_sync_on_step)
-        sh, lt = self.compute_head_tail(item_interactions, pop_ratio)
-        self.short_head = sh
-        self.long_tail = lt
         self.add_state("short_recs", default=torch.tensor(0.0), dist_reduce_fx="sum")
         self.add_state("long_recs", default=torch.tensor(0.0), dist_reduce_fx="sum")
 
+        # Add short head and long tail items as buffer
+        sh, lt = self.compute_head_tail(item_interactions, pop_ratio)
+        self.register_buffer("short_head", sh)
+        self.register_buffer("long_tail", lt)
+
         # Store the total number of items in each group
-        self.total_short = torch.tensor(len(self.short_head), dtype=torch.float32)
-        self.total_long = torch.tensor(len(self.long_tail), dtype=torch.float32)
+        self.register_buffer("total_short", torch.tensor(len(sh)))
+        self.register_buffer("total_long", torch.tensor(len(lt)))
 
     def update(self, preds: Tensor, **kwargs: Any):
         """Updates the metric state with the new batch of predictions."""
