@@ -114,7 +114,8 @@ class Interactions:
             self._inter_dict = (
                 self._inter_df.groupby(self._user_label)
                 .apply(
-                    lambda df: dict(zip(df[self._item_label], df[self._rating_label]))
+                    lambda df: dict(zip(df[self._item_label], df[self._rating_label])),
+                    include_groups=False,
                 )
                 .to_dict()
             )
