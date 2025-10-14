@@ -127,6 +127,7 @@ class LAUC(TopKMetric):
         """Updates the metric state with the new batch of predictions."""
         target = kwargs.get("binary_relevance", torch.zeros_like(preds))
         users = kwargs.get("valid_users", self.valid_users(target))
+        device = preds.device
 
         # Negative samples
         train_set = torch.isinf(preds).logical_and(preds < 0).sum(dim=1)  # [batch_size]
@@ -142,11 +143,11 @@ class LAUC(TopKMetric):
         sorted_target = sorted_target[:, : self.k]  # [batch_size x top_k]
 
         # Effective rank
-        col_indices = torch.arange(sorted_target.shape[1]).repeat(
+        col_indices = torch.arange(sorted_target.shape[1], device=device).repeat(
             sorted_target.shape[0], 1
         )
         effective_rank = torch.where(
-            sorted_target == 1, col_indices, torch.tensor(0.0)
+            sorted_target == 1, col_indices, torch.tensor(0.0, device=device)
         )  # [batch_size x top_k]
 
         # Progressive position
