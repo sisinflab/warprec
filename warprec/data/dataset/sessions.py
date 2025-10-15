@@ -232,25 +232,45 @@ class Sessions:
                 - Tensor: Positive item tensor.
                 - Optional[Tensor]: Negative item tensor.
         """
-        mapped_df = pd.DataFrame(
-            {
-                self._user_label: self._inter_df[self._user_label].map(self._umap),
-                self._item_label: self._inter_df[self._item_label].map(self._imap),
-                self._timestamp_label: self._inter_df[self._timestamp_label],
-            }
-        ).dropna()  # Drop any interactions if user/item not in map
+        if self._timestamp_label in self._inter_df.columns:
+            # Sort the transaction using the timestamp
+            mapped_df = pd.DataFrame(
+                {
+                    self._user_label: self._inter_df[self._user_label].map(self._umap),
+                    self._item_label: self._inter_df[self._item_label].map(self._imap),
+                    self._timestamp_label: self._inter_df[self._timestamp_label],
+                }
+            ).dropna()  # Drop any interactions if user/item not in map
 
-        # Convert to integer types
-        mapped_df[[self._user_label, self._item_label]] = mapped_df[
-            [self._user_label, self._item_label]
-        ].astype(int)
+            # Convert to integer types
+            mapped_df[[self._user_label, self._item_label]] = mapped_df[
+                [self._user_label, self._item_label]
+            ].astype(int)
 
-        # Group interactions based on timestamp
-        user_sessions = (
-            mapped_df.sort_values(by=[self._user_label, self._timestamp_label])
-            .groupby(self._user_label)[self._item_label]
-            .agg(list)
-        )
+            # Group interactions based on timestamp
+            user_sessions = (
+                mapped_df.sort_values(by=[self._user_label, self._timestamp_label])
+                .groupby(self._user_label)[self._item_label]
+                .agg(list)
+            )
+        else:
+            # Keep the order as-is
+            mapped_df = pd.DataFrame(
+                {
+                    self._user_label: self._inter_df[self._user_label].map(self._umap),
+                    self._item_label: self._inter_df[self._item_label].map(self._imap),
+                }
+            ).dropna()  # Drop any interactions if user/item not in map
+
+            # Convert to integer types
+            mapped_df[[self._user_label, self._item_label]] = mapped_df[
+                [self._user_label, self._item_label]
+            ].astype(int)
+
+            # Group interactions based using original order
+            user_sessions = mapped_df.groupby(self._user_label)[self._item_label].agg(
+                list
+            )
 
         # Filter out sessions with less than 2 interactions
         user_sessions = user_sessions[user_sessions.str.len() >= 2]
@@ -442,21 +462,33 @@ class Sessions:
 
     def _compute_cache_user_history(self):
         # First call or cache cleared: pre-process all user histories
-        mapped_df_for_history = pd.DataFrame(
-            {
-                self._user_label: self._inter_df[self._user_label].map(self._umap),
-                self._item_label: self._inter_df[self._item_label].map(self._imap),
-                self._timestamp_label: self._inter_df[self._timestamp_label],
-            }
-        ).dropna()  # Ensure user/item are mapped
+        if self._timestamp_label in self._inter_df.columns:
+            mapped_df_for_history = pd.DataFrame(
+                {
+                    self._user_label: self._inter_df[self._user_label].map(self._umap),
+                    self._item_label: self._inter_df[self._item_label].map(self._imap),
+                    self._timestamp_label: self._inter_df[self._timestamp_label],
+                }
+            ).dropna()  # Drop any interactions if user/item not in map
 
-        mapped_df_for_history[[self._user_label, self._item_label]] = (
-            mapped_df_for_history[[self._user_label, self._item_label]].astype(int)
-        )
+            mapped_df_for_history[[self._user_label, self._item_label]] = (
+                mapped_df_for_history[[self._user_label, self._item_label]].astype(int)
+            )
 
-        mapped_df_for_history = mapped_df_for_history.sort_values(
-            by=[self._user_label, self._timestamp_label]
-        )
+            mapped_df_for_history = mapped_df_for_history.sort_values(
+                by=[self._user_label, self._timestamp_label]
+            )
+        else:
+            mapped_df_for_history = pd.DataFrame(
+                {
+                    self._user_label: self._inter_df[self._user_label].map(self._umap),
+                    self._item_label: self._inter_df[self._item_label].map(self._imap),
+                }
+            ).dropna()  # Drop any interactions if user/item not in map
+
+            mapped_df_for_history[[self._user_label, self._item_label]] = (
+                mapped_df_for_history[[self._user_label, self._item_label]].astype(int)
+            )
 
         # Store 1-indexed sequences
         self._cached_user_histories = (
@@ -530,24 +562,45 @@ class Sessions:
                 - Tensor: Positive sample.
                 - Tensor: Negative sample.
         """
-        # Retrieve mapped and ordered DataFrame
-        mapped_df = pd.DataFrame(
-            {
-                self._user_label: self._inter_df[self._user_label].map(self._umap),
-                self._item_label: self._inter_df[self._item_label].map(self._imap),
-                self._timestamp_label: self._inter_df[self._timestamp_label],
-            }
-        ).dropna()
-        mapped_df[[self._user_label, self._item_label]] = mapped_df[
-            [self._user_label, self._item_label]
-        ].astype(int)
+        if self._timestamp_label in self._inter_df.columns:
+            # Sort the transaction using the timestamp
+            mapped_df = pd.DataFrame(
+                {
+                    self._user_label: self._inter_df[self._user_label].map(self._umap),
+                    self._item_label: self._inter_df[self._item_label].map(self._imap),
+                    self._timestamp_label: self._inter_df[self._timestamp_label],
+                }
+            ).dropna()  # Drop any interactions if user/item not in map
 
-        # Group-by user session
-        user_sessions = (
-            mapped_df.sort_values(by=[self._user_label, self._timestamp_label])
-            .groupby(self._user_label)[self._item_label]
-            .apply(list)
-        )
+            # Convert to integer types
+            mapped_df[[self._user_label, self._item_label]] = mapped_df[
+                [self._user_label, self._item_label]
+            ].astype(int)
+
+            # Group interactions based on timestamp
+            user_sessions = (
+                mapped_df.sort_values(by=[self._user_label, self._timestamp_label])
+                .groupby(self._user_label)[self._item_label]
+                .agg(list)
+            )
+        else:
+            # Keep the order as-is
+            mapped_df = pd.DataFrame(
+                {
+                    self._user_label: self._inter_df[self._user_label].map(self._umap),
+                    self._item_label: self._inter_df[self._item_label].map(self._imap),
+                }
+            ).dropna()  # Drop any interactions if user/item not in map
+
+            # Convert to integer types
+            mapped_df[[self._user_label, self._item_label]] = mapped_df[
+                [self._user_label, self._item_label]
+            ].astype(int)
+
+            # Group interactions based using original order
+            user_sessions = mapped_df.groupby(self._user_label)[self._item_label].agg(
+                list
+            )
 
         # Filter out user with less than 2 interactions (only one interaction
         # can't be considered a sequence). Truncate sequences to max_seq_len

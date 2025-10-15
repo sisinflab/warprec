@@ -27,7 +27,6 @@ class Interactions:
             iterate over the interactions.
         rating_type (RatingType): The type of rating to be used.
         rating_label (str): The label of the rating column.
-        timestamp_label (str): The label of the timestamp column.
         precision (Any): The precision of the internal representation of the data.
 
     Raises:
@@ -57,7 +56,6 @@ class Interactions:
         batch_size: int = 1024,
         rating_type: RatingType = RatingType.IMPLICIT,
         rating_label: str = None,
-        timestamp_label: str = None,
         precision: Any = np.float32,
     ) -> None:
         # Setup the variables
@@ -75,7 +73,6 @@ class Interactions:
         self._rating_label = (
             rating_label if rating_type == RatingType.EXPLICIT else None
         )
-        self._timestamp_label = timestamp_label
 
         # Filter side information (if present)
         if self._inter_side is not None:
