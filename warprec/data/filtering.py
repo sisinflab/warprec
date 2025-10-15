@@ -47,10 +47,15 @@ class MinRating(Filter):
     Args:
         min_rating (float): The minimum rating threshold.
         **kwargs (Any): Additional keyword arguments.
+
+    Raises:
+        ValueError: If the provided argument is invalid.
     """
 
     def __init__(self, min_rating: float, **kwargs: Any):
         super().__init__(**kwargs)
+        if min_rating <= 0:
+            raise ValueError("min_rating must be a positive float.")
         self.min_rating = min_rating
 
     def __call__(self, dataset: DataFrame) -> DataFrame:
@@ -120,10 +125,15 @@ class UserMin(Filter):
     Args:
         min_interactions (int): Minimum number of interactions per user.
         **kwargs (Any): Additional keyword arguments.
+
+    Raises:
+        ValueError: If the provided argument is invalid.
     """
 
     def __init__(self, min_interactions: int, **kwargs: Any):
         super().__init__(**kwargs)
+        if min_interactions <= 0:
+            raise ValueError("min_interactions must be a positive integer.")
         self.min_interactions = min_interactions
 
     def __call__(self, dataset: DataFrame) -> DataFrame:
@@ -147,10 +157,15 @@ class UserMax(Filter):
     Args:
         max_interactions (int): Maximum number of interactions per user.
         **kwargs (Any): Additional keyword arguments.
+
+    Raises:
+        ValueError: If the provided argument is invalid.
     """
 
     def __init__(self, max_interactions: int, **kwargs: Any):
         super().__init__(**kwargs)
+        if max_interactions <= 0:
+            raise ValueError("max_interactions must be a positive integer.")
         self.max_interactions = max_interactions
 
     def __call__(self, dataset: DataFrame) -> DataFrame:
@@ -174,10 +189,15 @@ class ItemMin(Filter):
     Args:
         min_interactions (int): Minimum number of interactions per item.
         **kwargs (Any): Additional keyword arguments.
+
+    Raises:
+        ValueError: If the provided argument is invalid.
     """
 
     def __init__(self, min_interactions: int, **kwargs: Any):
         super().__init__(**kwargs)
+        if min_interactions <= 0:
+            raise ValueError("min_interactions must be a positive integer.")
         self.min_interactions = min_interactions
 
     def __call__(self, dataset: DataFrame) -> DataFrame:
@@ -201,10 +221,15 @@ class ItemMax(Filter):
     Args:
         max_interactions (int): Maximum number of interactions per item.
         **kwargs (Any): Additional keyword arguments.
+
+    Raises:
+        ValueError: If the provided argument is invalid.
     """
 
     def __init__(self, max_interactions: int, **kwargs: Any):
         super().__init__(**kwargs)
+        if max_interactions <= 0:
+            raise ValueError("max_interactions must be a positive integer.")
         self.max_interactions = max_interactions
 
     def __call__(self, dataset: DataFrame) -> DataFrame:
@@ -228,9 +253,14 @@ class IterativeKCore(Filter):
     Args:
         min_interactions (int): Minimum number of interactions for users/items.
         **kwargs (Any): Additional keyword arguments.
+
+    Raises:
+        ValueError: If the provided argument is invalid.
     """
 
     def __init__(self, min_interactions: int, **kwargs: Any):
+        if min_interactions <= 0:
+            raise ValueError("min_interactions must be a positive integer.")
         self.user_core = UserMin(min_interactions, **kwargs)
         self.item_core = ItemMin(min_interactions, **kwargs)
 
@@ -262,9 +292,16 @@ class NRoundsKCore(Filter):
         rounds (int): Number of rounds to apply k-core filtering.
         min_interactions (int): Minimum number of interactions for users/items.
         **kwargs (Any): Additional keyword arguments.
+
+    Raises:
+        ValueError: If the provided argument is invalid.
     """
 
     def __init__(self, rounds: int, min_interactions: int, **kwargs: Any):
+        if rounds <= 0:
+            raise ValueError("rounds must be a positive integer.")
+        if min_interactions <= 0:
+            raise ValueError("min_interactions must be a positive integer.")
         self.user_core = UserMin(min_interactions, **kwargs)
         self.item_core = ItemMin(min_interactions, **kwargs)
         self.rounds = rounds
