@@ -264,6 +264,77 @@ class NRoundsKCore(Filter):
         return dataset
 
 
+@filter_registry.register("UserHeadN")
+class UserHeadN(Filter):
+    """Filter to keep only the first N interactions for each user,
+    based on the timestamp.
+
+    Args:
+        num_interactions (int): Number of first interactions to keep for each user.
+        **kwargs (Any): Additional keyword arguments.
+
+    Raises:
+        ValueError: If the provided argument is invalid.
+    """
+
+    def __init__(self, num_interactions: int, **kwargs: Any):
+        super().__init__(**kwargs)
+        if num_interactions <= 0:
+            raise ValueError("num_interactions must be a positive integer.")
+        self.num_interactions = num_interactions
+
+    def __call__(self, dataset: DataFrame) -> DataFrame:
+        """Select the first num_interactions for each user.
+
+        Args:
+            dataset (DataFrame): The dataset to filter.
+
+        Returns:
+            DataFrame: Filtered dataset containing only the first num_interactions for each user.
+        """
+        sorted_dataset = dataset.sort_values(
+            by=[self.user_label, self.timestamp_label], ascending=[True, True]
+        )
+
+        return sorted_dataset.groupby(self.user_label).head(self.num_interactions)
+
+
+@filter_registry.register("UserTailN")
+class UserTailN(Filter):
+    """Filter to keep only the last N interactions for each user,
+    based on the timestamp.
+
+    Args:
+        num_interactions (int): Number of last interactions to keep for each user.
+        **kwargs (Any): Additional keyword arguments.
+
+    Raises:
+        ValueError: If the provided argument is invalid.
+    """
+
+    def __init__(self, num_interactions: int, **kwargs: Any):
+        super().__init__(**kwargs)
+        if num_interactions <= 0:
+            raise ValueError("num_interactions must be a positive integer.")
+        self.num_interactions = num_interactions
+
+    def __call__(self, dataset: DataFrame) -> DataFrame:
+        """Select the last num_interactions for each user.
+
+        Args:
+            dataset (DataFrame): The dataset to filter.
+
+        Returns:
+            DataFrame: Filtered dataset containing only the last
+                       num_interactions for each user.
+        """
+        sorted_dataset = dataset.sort_values(
+            by=[self.user_label, self.timestamp_label], ascending=[True, True]
+        )
+
+        return sorted_dataset.groupby(self.user_label).tail(self.num_interactions)
+
+
 def apply_filtering(dataset: DataFrame, filters: List[Filter]) -> DataFrame:
     """Apply a list of filters to the dataset.
 
