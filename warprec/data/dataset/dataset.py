@@ -393,7 +393,8 @@ class Dataset:
             train_data,
             self._umap,
             self._imap,
-            batch_size=batch_size,
+            user_id_label=user_label,
+            item_id_label=item_label,
             timestamp_label=timestamp_label,
         )
 
