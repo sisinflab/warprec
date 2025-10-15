@@ -353,11 +353,27 @@ class UserHeadN(Filter):
         Returns:
             DataFrame: Filtered dataset containing only the first num_interactions for each user.
         """
+        # Check if timestamp is available
+        sorting_column = self.timestamp_label
+        is_timestamp_available = self.timestamp_label in dataset.columns
+
+        if not is_timestamp_available:
+            # Fallback: Use original ordering
+            sorting_column = "__ORIGINAL_ROW_ORDER__"
+            dataset[sorting_column] = dataset.index
+
         sorted_dataset = dataset.sort_values(
-            by=[self.user_label, self.timestamp_label], ascending=[True, True]
+            by=[self.user_label, sorting_column], ascending=[True, True]
+        )
+        filtered_dataset = sorted_dataset.groupby(self.user_label).head(
+            self.num_interactions
         )
 
-        return sorted_dataset.groupby(self.user_label).head(self.num_interactions)
+        # Remove temporary column if used
+        if not is_timestamp_available:
+            filtered_dataset.drop(columns=[sorting_column], inplace=True)
+
+        return filtered_dataset
 
 
 @filter_registry.register("UserTailN")
@@ -389,11 +405,27 @@ class UserTailN(Filter):
             DataFrame: Filtered dataset containing only the last
                        num_interactions for each user.
         """
+        # Check if timestamp is available
+        sorting_column = self.timestamp_label
+        is_timestamp_available = self.timestamp_label in dataset.columns
+
+        if not is_timestamp_available:
+            # Fallback: Use original ordering
+            sorting_column = "__ORIGINAL_ROW_ORDER__"
+            dataset[sorting_column] = dataset.index
+
         sorted_dataset = dataset.sort_values(
-            by=[self.user_label, self.timestamp_label], ascending=[True, True]
+            by=[self.user_label, sorting_column], ascending=[True, True]
+        )
+        filtered_dataset = sorted_dataset.groupby(self.user_label).tail(
+            self.num_interactions
         )
 
-        return sorted_dataset.groupby(self.user_label).tail(self.num_interactions)
+        # Remove temporary column if used
+        if not is_timestamp_available:
+            filtered_dataset.drop(columns=[sorting_column], inplace=True)
+
+        return filtered_dataset
 
 
 def apply_filtering(dataset: DataFrame, filters: List[Filter]) -> DataFrame:
