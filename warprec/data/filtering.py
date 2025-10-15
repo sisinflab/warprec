@@ -89,6 +89,30 @@ class UserAverage(Filter):
         return dataset[dataset[self.rating_label] > user_avg]
 
 
+@filter_registry.register("ItemAverage")
+class ItemAverage(Filter):
+    """Filter to select interactions for an item based on the item's average rating.
+
+    Args:
+        **kwargs (Any): Additional keyword arguments.
+    """
+
+    def __init__(self, **kwargs: Any):
+        super().__init__(**kwargs)
+
+    def __call__(self, dataset: DataFrame) -> DataFrame:
+        """Select rows where the 'rating' column is greater than the item average.
+
+        Args:
+            dataset (DataFrame): The dataset to filter.
+
+        Returns:
+            DataFrame: Filtered dataset containing only rows with 'rating' > item average.
+        """
+        item_avg = dataset.groupby(self.item_label)[self.rating_label].transform("mean")
+        return dataset[dataset[self.rating_label] > item_avg]
+
+
 @filter_registry.register("UserMin")
 class UserMin(Filter):
     """Filter to select users based on a minimum number of interactions.
