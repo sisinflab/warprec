@@ -32,7 +32,6 @@ class Caser(RecomModel):
         learning_rate (FLOAT_FIELD): List of values for learning rate.
         neg_samples (INT_FIELD): List of values for neg_samples.
         max_seq_len (INT_FIELD): List of values for max_seq_len.
-        need_timestamp (ClassVar[bool]): Wether or not the model needs the timestamp.
     """
 
     embedding_size: INT_FIELD
@@ -45,7 +44,6 @@ class Caser(RecomModel):
     learning_rate: FLOAT_FIELD
     neg_samples: INT_FIELD
     max_seq_len: INT_FIELD
-    need_timestamp: ClassVar[bool] = True
 
     @field_validator("embedding_size")
     @classmethod
@@ -123,7 +121,6 @@ class FOSSIL(RecomModel):
         learning_rate (FLOAT_FIELD): List of values for learning rate.
         neg_samples (INT_FIELD): List of values for neg_samples.
         max_seq_len (INT_FIELD): List of values for max_seq_len.
-        need_timestamp (ClassVar[bool]): Wether or not the model needs the timestamp.
     """
 
     embedding_size: INT_FIELD
@@ -136,7 +133,6 @@ class FOSSIL(RecomModel):
     learning_rate: FLOAT_FIELD
     neg_samples: INT_FIELD
     max_seq_len: INT_FIELD
-    need_timestamp: ClassVar[bool] = True
 
     @field_validator("embedding_size")
     @classmethod
@@ -267,7 +263,6 @@ class GRU4Rec(RecomModel):
         learning_rate (FLOAT_FIELD): List of values for learning rate.
         neg_samples (INT_FIELD): List of values for neg_samples.
         max_seq_len (INT_FIELD): List of values for max_seq_len.
-        need_timestamp (ClassVar[bool]): Wether or not the model needs the timestamp.
     """
 
     embedding_size: INT_FIELD
@@ -280,7 +275,6 @@ class GRU4Rec(RecomModel):
     learning_rate: FLOAT_FIELD
     neg_samples: INT_FIELD
     max_seq_len: INT_FIELD
-    need_timestamp: ClassVar[bool] = True
 
     @field_validator("embedding_size")
     @classmethod
@@ -362,7 +356,6 @@ class gSASRec(RecomModel):
         neg_samples (INT_FIELD): List of values for neg_samples.
         max_seq_len (INT_FIELD): List of values for max_seq_len.
         reuse_item_embeddings (BOOL_FIELD): List of values for reuse_item_embeddings.
-        need_timestamp (ClassVar[bool]): Wether or not the model needs the timestamp.
         need_single_trial_validation (ClassVar[bool]): Whether or not to check if a Ray Tune
             trial parameter are valid.
     """
@@ -381,7 +374,6 @@ class gSASRec(RecomModel):
     neg_samples: INT_FIELD
     max_seq_len: INT_FIELD
     reuse_item_embeddings: BOOL_FIELD
-    need_timestamp: ClassVar[bool] = True
     need_single_trial_validation: ClassVar[bool] = True
 
     @field_validator("embedding_size")
@@ -540,7 +532,6 @@ class SASRec(RecomModel):
         learning_rate (FLOAT_FIELD): List of values for learning rate.
         neg_samples (INT_FIELD): List of values for neg_samples.
         max_seq_len (INT_FIELD): List of values for max_seq_len.
-        need_timestamp (ClassVar[bool]): Wether or not the model needs the timestamp.
         need_single_trial_validation (ClassVar[bool]): Whether or not to check if a Ray Tune
             trial parameter are valid.
     """
@@ -557,7 +548,6 @@ class SASRec(RecomModel):
     learning_rate: FLOAT_FIELD
     neg_samples: INT_FIELD
     max_seq_len: INT_FIELD
-    need_timestamp: ClassVar[bool] = True
     need_single_trial_validation: ClassVar[bool] = True
 
     @field_validator("embedding_size")
