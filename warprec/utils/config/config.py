@@ -274,13 +274,6 @@ class TrainConfiguration(WarpRecConfiguration):
                 # Check if there is at least one valid combination
                 model_class.validate_all_combinations()
 
-                # Check if the model requires timestamp
-                if model_class.need_timestamp:
-                    logger.attention(
-                        f"The model {model_name} requires timestamps to work properly, "
-                        "be sure that your dataset contains them."
-                    )
-
                 # Extract model train parameters, removing the meta infos
                 model_data = {
                     k: (
