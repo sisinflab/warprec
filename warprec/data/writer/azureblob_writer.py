@@ -447,7 +447,7 @@ class AzureBlobWriter(Writer):
                 train_blob_name = posixpath.join(
                     path_prefix, f"train{writing_params.ext}"
                 )
-                df_train = dataset.train_set.get_df().copy()[validated_column_names]
+                df_train = dataset.train_set.get_df().copy()
                 output_train = df_train.to_csv(
                     sep=writing_params.sep, header=writing_params.header, index=None
                 )
@@ -459,7 +459,7 @@ class AzureBlobWriter(Writer):
                 eval_blob_name = posixpath.join(
                     path_prefix, f"{eval_set}{writing_params.ext}"
                 )
-                df_eval = dataset.eval_set.get_df().copy()[validated_column_names]
+                df_eval = dataset.eval_set.get_df().copy()
                 output_eval = df_eval.to_csv(
                     sep=writing_params.sep, header=writing_params.header, index=None
                 )
@@ -477,16 +477,6 @@ class AzureBlobWriter(Writer):
             writing_params = SplitWriting(
                 sep=sep, ext=ext, header=header, labels=Labels.from_list(column_names)
             )
-
-        infos = main_dataset.info()
-        validated_column_names = [
-            writing_params.labels.user_id_label,
-            writing_params.labels.item_id_label,
-        ]
-        if infos["has_explicit_ratings"]:
-            validated_column_names.append(writing_params.labels.rating_label)
-        if infos["has_timestamp"]:
-            validated_column_names.append(writing_params.labels.timestamp_label)
 
         # Write the dataset to blobs
         write_dataset_to_blob(main_dataset, self.experiment_split_dir, "test")

@@ -404,7 +404,6 @@ class LocalWriter(Writer):
             path_eval = path.joinpath(eval_set + writing_params.ext)
 
             df = dataset.train_set.get_df().copy()
-            df = df[validated_column_names]
             df.to_csv(
                 path_train,
                 sep=writing_params.sep,
@@ -413,7 +412,6 @@ class LocalWriter(Writer):
             )
 
             df = dataset.eval_set.get_df().copy()
-            df = df[validated_column_names]
             df.to_csv(
                 path_eval,
                 sep=writing_params.sep,
@@ -431,17 +429,6 @@ class LocalWriter(Writer):
             )
 
         main_split_path = self.experiment_split_dir
-
-        # Check the column to use
-        infos = main_dataset.info()
-        validated_column_names = [
-            writing_params.labels.user_id_label,
-            writing_params.labels.item_id_label,
-        ]
-        if infos["has_explicit_ratings"]:
-            validated_column_names.append(writing_params.labels.rating_label)
-        if infos["has_timestamp"]:
-            validated_column_names.append(writing_params.labels.timestamp_label)
 
         write_dataset(main_dataset, main_split_path, "test")
 
