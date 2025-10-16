@@ -6,6 +6,7 @@ import numpy as np
 from pandas import DataFrame
 from torch import Tensor
 from torch.utils.data import DataLoader, Dataset
+from torch.nn.utils.rnn import pad_sequence
 
 from warprec.utils.logger import logger
 
@@ -342,7 +343,7 @@ class Sessions:
         sequences_tensors_1_indexed = [
             torch.tensor(s, dtype=torch.long) + 1 for s in sequences_list_0_indexed
         ]
-        padded_item_seq = torch.nn.utils.rnn.pad_sequence(
+        padded_item_seq = pad_sequence(
             sequences_tensors_1_indexed, batch_first=True, padding_value=0
         )
         tensor_item_seq_len = torch.tensor(
@@ -375,7 +376,7 @@ class Sessions:
             sequences_to_process.append(torch.tensor(recent_history, dtype=torch.long))
             lengths_to_process.append(len(recent_history))
 
-        padded_sequences = torch.nn.utils.rnn.pad_sequence(
+        padded_sequences = pad_sequence(
             sequences_to_process, batch_first=True, padding_value=0
         )
         sequence_lengths = torch.tensor(lengths_to_process, dtype=torch.long)
@@ -454,11 +455,11 @@ class Sessions:
         pos_sequences_1_indexed = [
             torch.tensor(s, dtype=torch.long) + 1 for s in processed_sessions
         ]
-        padded_pos_sequences = torch.nn.utils.rnn.pad_sequence(
+        padded_pos_sequences = pad_sequence(
             pos_sequences_1_indexed, batch_first=True, padding_value=0
         )
         neg_samples_1_indexed = [neg + 1 for neg in all_negative_samples]
-        padded_neg_samples = torch.nn.utils.rnn.pad_sequence(
+        padded_neg_samples = pad_sequence(
             neg_samples_1_indexed, batch_first=True, padding_value=0
         )
 
