@@ -373,14 +373,21 @@ Not applicable to implicit feedback scenarios.</p>
 <span class="w">    </span><span class="nt">UserAverage</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">{}</span><span class="w">   </span><span class="c1"># No parameters required</span>
 </pre></div>
 </div>
-<p><strong>3. UserMin</strong></p>
+<p><strong>3. ItemAverage</strong></p>
+<p>Removes all interactions for which the rating is below the corresponding item’s average rating.
+Not applicable to implicit feedback scenarios.</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">filtering</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">ItemAverage</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">{}</span><span class="w">   </span><span class="c1"># No parameters required</span>
+</pre></div>
+</div>
+<p><strong>4. UserMin</strong></p>
 <p>Removes all interactions involving users with fewer interactions than the given threshold.</p>
 <div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">filtering</span><span class="p">:</span>
 <span class="w">    </span><span class="nt">UserMin</span><span class="p">:</span>
 <span class="w">        </span><span class="nt">min_interactions</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">5</span>
 </pre></div>
 </div>
-<p><strong>4. UserMax</strong></p>
+<p><strong>5. UserMax</strong></p>
 <p>Removes all interactions involving users with more interactions than the given threshold.
 This is particularly useful for <strong>cold-start user analysis</strong>.</p>
 <div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">filtering</span><span class="p">:</span>
@@ -388,14 +395,14 @@ This is particularly useful for <strong>cold-start user analysis</strong>.</p>
 <span class="w">        </span><span class="nt">max_interactions</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">2</span>
 </pre></div>
 </div>
-<p><strong>5. ItemMin</strong></p>
+<p><strong>6. ItemMin</strong></p>
 <p>Removes all interactions involving items with fewer interactions than the given threshold.</p>
 <div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">filtering</span><span class="p">:</span>
 <span class="w">    </span><span class="nt">ItemMin</span><span class="p">:</span>
 <span class="w">        </span><span class="nt">min_interactions</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">5</span>
 </pre></div>
 </div>
-<p><strong>6. ItemMax</strong></p>
+<p><strong>7. ItemMax</strong></p>
 <p>Removes all interactions involving items with more interactions than the given threshold.
 Useful for analyzing <strong>cold-start item scenarios</strong>.</p>
 <div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">filtering</span><span class="p">:</span>
@@ -403,7 +410,7 @@ Useful for analyzing <strong>cold-start item scenarios</strong>.</p>
 <span class="w">        </span><span class="nt">max_interactions</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">2</span>
 </pre></div>
 </div>
-<p><strong>7. IterativeKCore</strong></p>
+<p><strong>8. IterativeKCore</strong></p>
 <p>Applies <code class="docutils literal notranslate"><span class="pre">UserMin</span></code> and <code class="docutils literal notranslate"><span class="pre">ItemMin</span></code> iteratively until no further interactions can be removed
 (i.e., until a stable state is reached).</p>
 <div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">filtering</span><span class="p">:</span>
@@ -411,7 +418,7 @@ Useful for analyzing <strong>cold-start item scenarios</strong>.</p>
 <span class="w">        </span><span class="nt">min_interactions</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">5</span>
 </pre></div>
 </div>
-<p><strong>8. NRoundsKCore</strong></p>
+<p><strong>9. NRoundsKCore</strong></p>
 <p>Applies <code class="docutils literal notranslate"><span class="pre">UserMin</span></code> and <code class="docutils literal notranslate"><span class="pre">ItemMin</span></code> for a fixed number of iterations.
 This is a simplified variant of <code class="docutils literal notranslate"><span class="pre">IterativeKCore</span></code> that does not require full convergence.</p>
 <div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">filtering</span><span class="p">:</span>
@@ -424,6 +431,24 @@ This is a simplified variant of <code class="docutils literal notranslate"><span
 <p class="admonition-title">Tip</p>
 <p><code class="docutils literal notranslate"><span class="pre">IterativeKCore</span></code> ensures dataset stability, but may be computationally expensive.
 <code class="docutils literal notranslate"><span class="pre">NRoundsKCore</span></code> is recommended when deterministic runtime is preferred over convergence.</p>
+</div>
+<p><strong>10. UserHeadN</strong></p>
+<p>Selects and retains the first N interactions for each user.
+If timestamps are available, interactions are sorted chronologically before selection.
+If no timestamps are provided, the original ordering of interactions is preserved.</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">filtering</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">UserHeadN</span><span class="p">:</span>
+<span class="w">        </span><span class="nt">num_interactions</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">30</span>
+</pre></div>
+</div>
+<p><strong>11. UserTailN</strong></p>
+<p>Selects and retains the last N interactions for each user.
+If timestamps are available, interactions are sorted chronologically before selection.
+If no timestamps are provided, the original ordering of interactions is preserved.</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">filtering</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">UserTailN</span><span class="p">:</span>
+<span class="w">        </span><span class="nt">num_interactions</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">30</span>
+</pre></div>
 </div>
 </section>
 <section id="example-filtering-pipeline">
