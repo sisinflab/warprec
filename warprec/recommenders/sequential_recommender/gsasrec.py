@@ -150,7 +150,7 @@ class gSASRec(IterativeRecommender, SequentialRecommenderUtils):
             module.bias.data.zero_()
 
     def get_dataloader(self, interactions, sessions: Sessions, **kwargs):
-        return sessions.get_group_sequential_dataloader(
+        return sessions.get_user_history_dataloader(
             max_seq_len=self.max_seq_len,
             num_negatives=self.neg_samples,
             batch_size=self.batch_size,
