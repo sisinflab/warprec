@@ -276,35 +276,64 @@ class Sessions:
                 training_data[self._user_label].values, dtype=torch.long
             )
 
+        # Handle Negative Sampling if requested
         neg_tensor = None
         if num_negatives > 0:
             num_samples = len(training_data)
+            targets_np = training_data["targets"].values
             interacted_sets = training_data["sequences"].apply(set)
+
+            # Sample candidates
             neg_candidates = np.random.randint(
                 0, self._niid, size=(num_samples, num_negatives), dtype=np.int64
             )
-            is_target = neg_candidates == training_data["targets"].values[:, None]
-            in_history = np.zeros_like(neg_candidates, dtype=bool)
-            for i, interacted_set in enumerate(interacted_sets):
-                for j in range(num_negatives):
-                    if neg_candidates[i, j] in interacted_set:
-                        in_history[i, j] = True
+
+            # Collision check
+            is_target = neg_candidates == targets_np[:, None]
+
+            # Define the 'in_history' mask
+            in_history = np.array(
+                [
+                    [neg in hist for neg in negs]  # type: ignore[attr-defined]
+                    for negs, hist in zip(neg_candidates, interacted_sets)
+                ]
+            )
+
             invalid_mask = is_target | in_history
+
+            # If invalid indices have been sampled, repeat the process
             while np.any(invalid_mask):
                 num_invalid = np.sum(invalid_mask)
+
+                # Sample only non valid candidates
                 new_candidates = np.random.randint(
                     0, self._niid, size=num_invalid, dtype=np.int64
                 )
                 neg_candidates[invalid_mask] = new_candidates
-                is_target_new = (
-                    neg_candidates == training_data["targets"].values[:, None]
+
+                # Find the indexes that need updating
+                rows_to_recheck, _ = np.where(invalid_mask)
+                updated_candidates = neg_candidates[invalid_mask]
+
+                # Check is_target only on updated candidates
+                is_target_new = updated_candidates == targets_np[rows_to_recheck]
+
+                # Check in_history only on updated candidates
+                in_history_new = np.array(
+                    [
+                        cand in interacted_sets.iloc[row]
+                        for cand, row in zip(updated_candidates, rows_to_recheck)
+                    ]
                 )
-                in_history_new = np.zeros_like(neg_candidates, dtype=bool)
-                rows, cols = np.where(invalid_mask)
-                for row, col in zip(rows, cols):
-                    if neg_candidates[row, col] in interacted_sets.iloc[i]:
-                        in_history_new[row, col] = True
-                invalid_mask = is_target_new | in_history_new
+
+                # Combine results
+                still_invalid = is_target_new | in_history_new
+
+                # Update invalid mask
+                new_invalid_mask = np.zeros_like(invalid_mask)
+                new_invalid_mask[invalid_mask] = still_invalid
+                invalid_mask = new_invalid_mask
+
             neg_tensor = torch.tensor(neg_candidates + 1, dtype=torch.long)
 
         sequences_list_0_indexed = training_data["sequences"].tolist()
