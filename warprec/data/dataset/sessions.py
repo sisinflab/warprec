@@ -108,6 +108,8 @@ class Sessions:
         item_id_label (str): The name of the item ID column in the DataFrame.
         timestamp_label (str): The name of the timestamp column.
             If provided, interactions will be sorted by this column.
+        seed (int): The seed for Numpy number generator used for
+            reproducibility of negative sampling.
 
     Raises:
         ValueError: If the user or item label are not found in the DataFrame.
@@ -125,6 +127,7 @@ class Sessions:
         user_id_label: str = "user_id",
         item_id_label: str = "item_id",
         timestamp_label: str = "timestamp",
+        seed: int = 42,
     ):
         if user_id_label not in data.columns:
             raise ValueError(f"User column '{user_id_label}' not found in DataFrame.")
@@ -138,6 +141,9 @@ class Sessions:
         self._umap = user_mapping
         self._imap = item_mapping
         self._niid = len(self._imap)
+
+        # Set the random seed
+        np.random.seed(seed)
 
     def clear_history_cache(self):
         """Clears all cached data to free up memory."""
