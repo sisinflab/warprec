@@ -80,16 +80,56 @@ class LocalReader(Reader):
         logger.msg(
             f"Starting reading process from local source in: {read_config.local_path}"
         )
+
+        # Common params
+        desired_cols = read_config.column_names()
+        desired_dtypes = read_config.column_dtype()
+        cols_to_use = []
+        dtype_to_use = {}
+
         if read_config.header:
-            data = pd.read_csv(
-                read_config.local_path,
-                sep=read_config.sep,
-                usecols=read_config.column_names(),
-                dtype=read_config.column_dtype(),
-            )
+            # Read the header of the file
+            try:
+                file_cols = pd.read_csv(
+                    read_config.local_path, sep=read_config.sep, nrows=0
+                ).columns.tolist()
+            except pd.errors.EmptyDataError:
+                file_cols = []
+
+            # Filter out the correct columns
+            cols_to_use = [col for col in desired_cols if col in file_cols]
+            dtype_to_use = {col: desired_dtypes[col] for col in cols_to_use}
+
+            # Read the file using correct information
+            if cols_to_use:
+                data = pd.read_csv(
+                    read_config.local_path,
+                    sep=read_config.sep,
+                    usecols=cols_to_use,
+                    dtype=dtype_to_use,
+                )
+            else:
+                # Fallback to empty dataset
+                data = pd.DataFrame()
+
         else:
+            # Read the data without the header
             data = pd.read_csv(read_config.local_path, sep=read_config.sep, header=None)
-            data.columns = read_config.column_names()
+            num_cols_in_file = len(data.columns)
+
+            # Define the number of correct columns and map the names
+            num_cols_to_rename = min(num_cols_in_file, len(desired_cols))
+            cols_to_use = desired_cols[:num_cols_to_rename]
+            col_mapping = dict(zip(data.columns[:num_cols_to_rename], cols_to_use))
+
+            # Rename and use only the required columns
+            data.rename(columns=col_mapping, inplace=True)
+            data = data[cols_to_use]
+
+            # Correct the dtypes oc the columns
+            dtype_to_use = {col: desired_dtypes[col] for col in cols_to_use}
+            data = data.astype(dtype_to_use)
+
         logger.msg("Data loaded correctly from local source.")
 
         return data
