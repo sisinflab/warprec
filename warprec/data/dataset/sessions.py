@@ -240,35 +240,37 @@ class Sessions:
                 None if num_negatives == 0 else torch.empty(0, dtype=torch.long),
             )
 
-        session_df = pd.DataFrame(
-            {
-                "sequences": user_sessions.apply(
-                    lambda s: [s[: i + 1] for i in range(len(s) - 1)]
-                ),
-                "targets": user_sessions.apply(lambda s: s[1:]),
-            }
-        )
+        # Pre-allocate lists
+        all_sequences = []
+        all_targets = []
+        all_user_ids = []
 
-        def truncate_user_sequences(sequences_for_user, targets_for_user, max_len):
-            truncated_sequences = []
-            truncated_targets = []
-            for seq, target in zip(sequences_for_user, targets_for_user):
-                current_truncated_seq = seq[-max_len:] if max_len > 0 else []
-                if current_truncated_seq:
-                    truncated_sequences.append(current_truncated_seq)
-                    truncated_targets.append(target)
-            return truncated_sequences, truncated_targets
+        # Iterate over the Pandas Series
+        for user_id, items in user_sessions.items():
+            # Generate all the pairs seq, target for each user
+            for i in range(len(items) - 1):
+                sequence = items[: i + 1]
+                target = items[i + 1]
 
-        session_df[["sequences", "targets"]] = session_df.apply(
-            lambda row: truncate_user_sequences(
-                row["sequences"], row["targets"], max_seq_len
-            ),
-            axis=1,
-            result_type="expand",
-        )
+                # Truncate the sequence at the max_seq_len
+                truncated_sequence = sequence[-max_seq_len:]
 
-        session_df = session_df[session_df["sequences"].apply(lambda x: len(x) > 0)]
-        training_data = session_df.explode(["sequences", "targets"]).reset_index()
+                # Add the sequence only if not empty
+                if truncated_sequence:
+                    all_sequences.append(truncated_sequence)
+                    all_targets.append(target)
+                    if include_user_id:
+                        all_user_ids.append(user_id)
+
+        # Create the final dataset
+        training_data_dict = {
+            "sequences": all_sequences,
+            "targets": all_targets,
+        }
+        if include_user_id:
+            training_data_dict[self._user_label] = all_user_ids
+
+        training_data = pd.DataFrame(training_data_dict)
 
         tensor_user_id = None
         if include_user_id:
