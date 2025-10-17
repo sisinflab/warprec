@@ -119,8 +119,8 @@ class Reader(ABC):
     def read_tabular_split(
         self,
         base_location: str,
-        column_names: List[str],
-        dtypes: List[str],
+        column_names: Optional[List[str]] = None,
+        dtypes: Optional[List[str]] = None,
         sep: str = "\t",
         ext: str = ".tsv",
         header: bool = True,
@@ -137,8 +137,8 @@ class Reader(ABC):
 
         Args:
             base_location (str): The base path or URI where the split files are located.
-            column_names (List[str]): A list of expected column names.
-            dtypes (List[str]): A list of data types corresponding to `column_names`.
+            column_names (Optional[List[str]]): A list of expected column names.
+            dtypes (Optional[List[str]]): A list of data types corresponding to `column_names`.
             sep (str): The delimiter character used in the files. Defaults to tab `\t`.
             ext (str): The file extension. Defaults to `.tsv`.
             header (bool): A boolean indicating if the files have a header row. Defaults to `True`.

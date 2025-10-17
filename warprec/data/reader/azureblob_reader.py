@@ -74,8 +74,8 @@ class AzureBlobReader(Reader):
     def read_tabular(
         self,
         blob_name: str,
-        column_names: List[str],
-        dtypes: List[str],
+        column_names: Optional[List[str]],
+        dtypes: Optional[List[str]],
         sep: str = "\t",
         header: bool = True,
     ) -> DataFrame:
@@ -86,8 +86,8 @@ class AzureBlobReader(Reader):
 
         Args:
             blob_name (str): The path/name of the blob containing the tabular data.
-            column_names (List[str]): A list of expected column names.
-            dtypes (List[str]): A list of data types corresponding to `column_names`.
+            column_names (Optional[List[str]]): A list of expected column names.
+            dtypes (Optional[List[str]]): A list of data types corresponding to `column_names`.
             sep (str): The delimiter character used in the file. Defaults to tab `\t`.
             header (bool): A boolean indicating if the file has a header row. Defaults to `True`.
 
@@ -101,7 +101,11 @@ class AzureBlobReader(Reader):
             return pd.DataFrame()
 
         stream = StringIO(content)  # type: ignore[arg-type]
-        dtypes_map = dict(zip(column_names, dtypes))
+
+        # Create mapping only if values are not None
+        dtypes_map = None
+        if column_names and dtypes:
+            dtypes_map = dict(zip(column_names, dtypes))
 
         return self._process_csv_stream(
             stream=stream,
@@ -114,8 +118,8 @@ class AzureBlobReader(Reader):
     def read_tabular_split(  # type: ignore[override]
         self,
         blob_prefix: str,
-        column_names: List[str],
-        dtypes: List[str],
+        column_names: Optional[List[str]],
+        dtypes: Optional[List[str]],
         sep: str = "\t",
         ext: str = ".tsv",
         header: bool = True,
