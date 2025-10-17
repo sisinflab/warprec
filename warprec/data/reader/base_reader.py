@@ -15,7 +15,7 @@ from warprec.utils.logger import logger
 class Reader(ABC):
     """The abstract definition of a reader. All readers must extend this class."""
 
-    def _process_csv_stream(
+    def _process_tabular_stream(
         self,
         stream: StringIO,
         sep: str,
@@ -23,13 +23,13 @@ class Reader(ABC):
         desired_cols: Optional[List[str]] = None,
         desired_dtypes: Dict[str, str] = {},
     ) -> DataFrame:
-        """Processes a CSV from an in-memory text stream robustly, handling variations
+        """Processes tabular data from an in-memory text stream robustly, handling variations
         in columns and data types. This is the shared logic moved from child classes.
 
         Args:
-            stream (StringIO): The in-memory text stream (StringIO) containing the CSV data.
+            stream (StringIO): The in-memory text stream (StringIO) containing the tabular data.
             sep (str): The delimiter character.
-            header (bool): A boolean indicating if the CSV file has a header row.
+            header (bool): A boolean indicating if the data file has a header row.
             desired_cols (Optional[List[str]]): An optional list of column names to select and return.
             desired_dtypes (Dict[str, str]): A dictionary mapping column names to desired data types.
 
@@ -37,7 +37,7 @@ class Reader(ABC):
             DataFrame: A Pandas DataFrame containing the processed data, adhering to
             `desired_cols` and `desired_dtypes` where possible.
         """
-        # Case 1: The CSV file has a header row
+        # Case 1: The tabular file has a header row
         if header:
             try:
                 # First, read only the header to get the column names.
@@ -71,7 +71,7 @@ class Reader(ABC):
                 dtype=dtype_to_use if dtype_to_use else None,
             )
 
-        # Case 2: The CSV file does not have a header row
+        # Case 2: The tabular file does not have a header row
         else:
             try:
                 data = pd.read_csv(stream, sep=sep, header=None)
@@ -115,7 +115,7 @@ class Reader(ABC):
     def read_tabular(self, *args: Any, **kwargs: Any) -> DataFrame:
         """This method will read the tabular data from the source."""
 
-    def read_tabular_split(
+    def _process_tabular_split(
         self,
         base_location: str,
         column_names: Optional[List[str]] = None,
@@ -124,6 +124,8 @@ class Reader(ABC):
         ext: str = ".tsv",
         header: bool = True,
         is_remote: bool = False,  # Flag to handle path joining
+        *args: Any,
+        **kwargs: Any,
     ) -> Tuple[
         DataFrame, Optional[List[Tuple[DataFrame, DataFrame]] | DataFrame], DataFrame
     ]:
@@ -143,6 +145,8 @@ class Reader(ABC):
             header (bool): A boolean indicating if the files have a header row. Defaults to `True`.
             is_remote (bool): If `True`, uses POSIX path joining (for remote URIs/blobs).
                 Otherwise, uses `pathlib.Path` for local paths. Defaults to `False`.
+            *args (Any): The additional arguments.
+            **kwargs (Any): The additional keyword arguments.
 
         Returns:
             Tuple[DataFrame, Optional[List[Tuple[DataFrame, DataFrame]] | DataFrame], DataFrame]:

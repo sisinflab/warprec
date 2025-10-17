@@ -1,5 +1,5 @@
 from io import StringIO, BytesIO
-from typing import List, Dict, Tuple, Optional
+from typing import List, Dict, Tuple, Optional, Any
 
 import pandas as pd
 import joblib
@@ -53,7 +53,8 @@ class AzureBlobReader(Reader):
 
         Args:
             blob_name (str): The full path/name of the blob within the container.
-            as_bytes (bool): If True, returns content as raw bytes; otherwise, decodes to UTF-8 string.
+            as_bytes (bool): If True, returns content as raw bytes; otherwise,
+                decodes to UTF-8 string.
 
         Returns:
             str | bytes | None: The blob content as a string or bytes,
@@ -78,11 +79,13 @@ class AzureBlobReader(Reader):
         dtypes: Optional[Dict[str, str]],
         sep: str = "\t",
         header: bool = True,
+        *args: Any,
+        **kwargs: Any,
     ) -> DataFrame:
         """Reads tabular data from a blob by feeding it to the parent stream processor.
 
-        Downloads the blob content as a string and uses the inherited `_process_csv_stream`
-        for robust CSV parsing.
+        Downloads the blob content as a string and uses the inherited `_process_tabular_stream`
+        for robust tabular parsing.
 
         Args:
             blob_name (str): The path/name of the blob containing the tabular data.
@@ -90,6 +93,8 @@ class AzureBlobReader(Reader):
             dtypes (Optional[Dict[str, str]]): A dict of data types corresponding to `column_names`.
             sep (str): The delimiter character used in the file. Defaults to tab `\t`.
             header (bool): A boolean indicating if the file has a header row. Defaults to `True`.
+            *args (Any): The additional arguments.
+            **kwargs (Any): The additional keyword arguments.
 
         Returns:
             DataFrame: A Pandas DataFrame containing the tabular data. Returns an empty DataFrame
@@ -102,7 +107,7 @@ class AzureBlobReader(Reader):
 
         stream = StringIO(content)  # type: ignore[arg-type]
 
-        return self._process_csv_stream(
+        return self._process_tabular_stream(
             stream=stream,
             sep=sep,
             header=header,
@@ -118,10 +123,12 @@ class AzureBlobReader(Reader):
         sep: str = "\t",
         ext: str = ".tsv",
         header: bool = True,
+        *args: Any,
+        **kwargs: Any,
     ) -> Tuple[
         DataFrame, Optional[List[Tuple[DataFrame, DataFrame]] | DataFrame], DataFrame
     ]:
-        return super().read_tabular_split(
+        return super()._process_tabular_split(
             base_location=blob_prefix,
             column_names=column_names,
             dtypes=dtypes,

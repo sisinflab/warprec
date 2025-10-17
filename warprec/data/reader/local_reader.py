@@ -1,4 +1,4 @@
-from typing import List, Dict, Tuple, Optional
+from typing import List, Dict, Tuple, Optional, Any
 from pathlib import Path
 from io import StringIO
 
@@ -19,6 +19,8 @@ class LocalReader(Reader):
         dtypes: Optional[Dict[str, str]] = {},
         sep: str = "\t",
         header: bool = True,
+        *args: Any,
+        **kwargs: Any,
     ) -> DataFrame:
         """Reads tabular data (e.g., CSV, TSV) from a local file.
 
@@ -31,6 +33,8 @@ class LocalReader(Reader):
             dtypes (Optional[Dict[str, str]]): A dict of data types corresponding to `column_names`.
             sep (str): The delimiter character used in the file. Defaults to tab `\t`.
             header (bool): A boolean indicating if the file has a header row. Defaults to `True`.
+            *args (Any): The additional arguments.
+            **kwargs (Any): The additional keyword arguments.
 
         Returns:
             DataFrame: A pandas DataFrame containing the tabular data. Returns an empty DataFrame
@@ -46,7 +50,7 @@ class LocalReader(Reader):
 
         stream = StringIO(content)
 
-        return self._process_csv_stream(
+        return self._process_tabular_stream(
             stream=stream,
             sep=sep,
             header=header,
@@ -62,10 +66,12 @@ class LocalReader(Reader):
         sep: str = "\t",
         ext: str = ".tsv",
         header: bool = True,
+        *args: Any,
+        **kwargs: Any,
     ) -> Tuple[
         DataFrame, Optional[List[Tuple[DataFrame, DataFrame]] | DataFrame], DataFrame
     ]:
-        return super().read_tabular_split(
+        return super()._process_tabular_split(
             base_location=split_dir,
             column_names=column_names,
             dtypes=dtypes,
