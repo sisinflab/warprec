@@ -277,15 +277,15 @@ class LocalReader(Reader):
         # Read the main train and test data
         train_data = self._robust_read_csv(
             path=path_main_train,
-            sep=read_config.side.sep,
-            header=read_config.side.header,
+            sep=read_config.split.sep,
+            header=read_config.split.header,
             desired_cols=read_config.column_names(),
             desired_dtypes=read_config.column_dtype(),
         )
         test_data = self._robust_read_csv(
             path=path_main_test,
-            sep=read_config.side.sep,
-            header=read_config.side.header,
+            sep=read_config.split.sep,
+            header=read_config.split.header,
             desired_cols=read_config.column_names(),
             desired_dtypes=read_config.column_dtype(),
         )
@@ -294,8 +294,8 @@ class LocalReader(Reader):
         if path_main_val.exists():
             val_data = self._robust_read_csv(
                 path=path_main_val,
-                sep=read_config.side.sep,
-                header=read_config.side.header,
+                sep=read_config.split.sep,
+                header=read_config.split.header,
                 desired_cols=read_config.column_names(),
                 desired_dtypes=read_config.column_dtype(),
             )
@@ -317,15 +317,15 @@ class LocalReader(Reader):
                 if path_fold_train.is_file() and path_fold_val.is_file():
                     fold_train = self._robust_read_csv(
                         path=path_fold_train,
-                        sep=read_config.side.sep,
-                        header=read_config.side.header,
+                        sep=read_config.split.sep,
+                        header=read_config.split.header,
                         desired_cols=read_config.column_names(),
                         desired_dtypes=read_config.column_dtype(),
                     )
                     fold_val = self._robust_read_csv(
                         path=path_fold_val,
-                        sep=read_config.side.sep,
-                        header=read_config.side.header,
+                        sep=read_config.split.sep,
+                        header=read_config.split.header,
                         desired_cols=read_config.column_names(),
                         desired_dtypes=read_config.column_dtype(),
                     )
