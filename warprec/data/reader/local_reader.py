@@ -1,4 +1,4 @@
-from typing import List, Tuple, Optional
+from typing import List, Dict, Tuple, Optional
 from pathlib import Path
 from io import StringIO
 
@@ -16,7 +16,7 @@ class LocalReader(Reader):
         self,
         local_path: str,
         column_names: Optional[List[str]] = None,
-        dtypes: Optional[List[str]] = None,
+        dtypes: Optional[Dict[str, str]] = {},
         sep: str = "\t",
         header: bool = True,
     ) -> DataFrame:
@@ -28,7 +28,7 @@ class LocalReader(Reader):
         Args:
             local_path (str): The local file path to the tabular data.
             column_names (Optional[List[str]]): A list of expected column names.
-            dtypes (Optional[List[str]]): A list of data types corresponding to `column_names`.
+            dtypes (Optional[Dict[str, str]]): A dict of data types corresponding to `column_names`.
             sep (str): The delimiter character used in the file. Defaults to tab `\t`.
             header (bool): A boolean indicating if the file has a header row. Defaults to `True`.
 
@@ -46,24 +46,19 @@ class LocalReader(Reader):
 
         stream = StringIO(content)
 
-        # Create mapping only if values are not None
-        dtypes_map = None
-        if column_names and dtypes:
-            dtypes_map = dict(zip(column_names, dtypes))
-
         return self._process_csv_stream(
             stream=stream,
             sep=sep,
             header=header,
             desired_cols=column_names,
-            desired_dtypes=dtypes_map,
+            desired_dtypes=dtypes,
         )
 
     def read_tabular_split(  # type: ignore[override]
         self,
         split_dir: str,
         column_names: Optional[List[str]],
-        dtypes: Optional[List[str]],
+        dtypes: Optional[Dict[str, str]],
         sep: str = "\t",
         ext: str = ".tsv",
         header: bool = True,

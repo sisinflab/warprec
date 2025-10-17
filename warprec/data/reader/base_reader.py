@@ -119,7 +119,7 @@ class Reader(ABC):
         self,
         base_location: str,
         column_names: Optional[List[str]] = None,
-        dtypes: Optional[List[str]] = None,
+        dtypes: Optional[Dict[str, str]] = {},
         sep: str = "\t",
         ext: str = ".tsv",
         header: bool = True,
@@ -137,7 +137,7 @@ class Reader(ABC):
         Args:
             base_location (str): The base path or URI where the split files are located.
             column_names (Optional[List[str]]): A list of expected column names.
-            dtypes (Optional[List[str]]): A list of data types corresponding to `column_names`.
+            dtypes (Optional[Dict[str, str]]): A dict of data types corresponding to `column_names`.
             sep (str): The delimiter character used in the files. Defaults to tab `\t`.
             ext (str): The file extension. Defaults to `.tsv`.
             header (bool): A boolean indicating if the files have a header row. Defaults to `True`.
