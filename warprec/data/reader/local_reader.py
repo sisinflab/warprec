@@ -33,7 +33,7 @@ class LocalReader(Reader):
 
     def _robust_read_csv(
         self,
-        path: str,
+        path: str | Path,
         sep: str,
         header: bool,
         desired_cols: List[str],
@@ -42,7 +42,7 @@ class LocalReader(Reader):
         """Reads a CSV file robustly, handling missing columns and mismatched headers.
 
         Args:
-            path (str): The path to the local file.
+            path (str | Path): The path to the local file.
             sep (str): The separator used in the file.
             header (bool): Whether the file has a header row.
             desired_cols (List[str]): The desired column names.
@@ -258,25 +258,6 @@ class LocalReader(Reader):
                 ),
             )
 
-        # Helper function to read a single file
-        def read_file(
-            path: Path,
-            read_config: ReaderConfig,
-        ) -> DataFrame:
-            if header:
-                return pd.read_csv(
-                    path,
-                    sep=read_config.split.sep,
-                    usecols=read_config.column_names(),
-                    dtype=read_config.column_dtype(),
-                )
-            else:
-                df = pd.read_csv(path, sep=read_config.split.sep, header=None)
-                df.columns = read_config.column_names()
-                # Use dictionary for dtypes and handle cases where column_names and dtypes don't match
-                df = df.astype(read_config.dtypes)
-                return df
-
         path_split_dir = Path(read_config.split.local_path)
 
         # Define paths for the main split files
@@ -294,12 +275,30 @@ class LocalReader(Reader):
         logger.msg(f"Starting reading process from local source in: {path_split_dir}")
 
         # Read the main train and test data
-        train_data = read_file(path_main_train, read_config)
-        test_data = read_file(path_main_test, read_config)
+        train_data = self._robust_read_csv(
+            path=path_main_train,
+            sep=read_config.side.sep,
+            header=read_config.side.header,
+            desired_cols=read_config.column_names(),
+            desired_dtypes=read_config.column_dtype(),
+        )
+        test_data = self._robust_read_csv(
+            path=path_main_test,
+            sep=read_config.side.sep,
+            header=read_config.side.header,
+            desired_cols=read_config.column_names(),
+            desired_dtypes=read_config.column_dtype(),
+        )
 
         # Check if validation is in the main directory
         if path_main_val.exists():
-            val_data = read_file(path_main_val, read_config)
+            val_data = self._robust_read_csv(
+                path=path_main_val,
+                sep=read_config.side.sep,
+                header=read_config.side.header,
+                desired_cols=read_config.column_names(),
+                desired_dtypes=read_config.column_dtype(),
+            )
             return (train_data, val_data, test_data)
 
         # Iterate through subdirectories for folds
@@ -316,8 +315,20 @@ class LocalReader(Reader):
 
                 # Check if the required files exist inside the fold directory
                 if path_fold_train.is_file() and path_fold_val.is_file():
-                    fold_train = read_file(path_fold_train, read_config)
-                    fold_val = read_file(path_fold_val, read_config)
+                    fold_train = self._robust_read_csv(
+                        path=path_fold_train,
+                        sep=read_config.side.sep,
+                        header=read_config.side.header,
+                        desired_cols=read_config.column_names(),
+                        desired_dtypes=read_config.column_dtype(),
+                    )
+                    fold_val = self._robust_read_csv(
+                        path=path_fold_val,
+                        sep=read_config.side.sep,
+                        header=read_config.side.header,
+                        desired_cols=read_config.column_names(),
+                        desired_dtypes=read_config.column_dtype(),
+                    )
                     fold_data.append((fold_train, fold_val))
                     fold_number += 1  # Move to the next fold number
                 else:
