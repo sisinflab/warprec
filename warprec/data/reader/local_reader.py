@@ -31,6 +31,94 @@ class LocalReader(Reader):
         if config:
             self.config = config
 
+    def _robust_read_csv(
+        self,
+        path: str,
+        sep: str,
+        header: bool,
+        desired_cols: List[str],
+        desired_dtypes: dict,
+    ) -> DataFrame:
+        """Reads a CSV file robustly, handling missing columns and mismatched headers.
+
+        Args:
+            path (str): The path to the local file.
+            sep (str): The separator used in the file.
+            header (bool): Whether the file has a header row.
+            desired_cols (List[str]): The desired column names.
+            desired_dtypes (dict): A dictionary mapping column names to their dtypes.
+
+        Returns:
+            DataFrame: The data read from the local source.
+
+        Raises:
+            FileNotFoundError: If the local path does not exists.
+        """
+        if not Path(path).exists():
+            raise FileNotFoundError(f"File not found at the specified path: {path}")
+
+        cols_to_use = []
+        dtype_to_use = {}
+
+        if header:
+            # Safe file reading
+            try:
+                file_cols = pd.read_csv(path, sep=sep, nrows=0).columns.tolist()
+            except pd.errors.EmptyDataError:
+                logger.attention(f"File {path} is empty. Returning an empty DataFrame.")
+                return pd.DataFrame(columns=desired_cols).astype(desired_dtypes)
+
+            # Filter out the correct columns that exist in the file
+            cols_to_use = [col for col in desired_cols if col in file_cols]
+            dtype_to_use = {
+                col: desired_dtypes[col] for col in cols_to_use if col in desired_dtypes
+            }
+
+            if not cols_to_use:
+                logger.attention(
+                    "None of the desired columns were found in the file header. Returning an empty DataFrame."
+                )
+                return pd.DataFrame()
+
+            # Read local file using correct information
+            data = pd.read_csv(
+                path,
+                sep=sep,
+                usecols=cols_to_use,
+                dtype=dtype_to_use,
+            )
+        else:
+            # Safe file reading
+            try:
+                data = pd.read_csv(path, sep=sep, header=None)
+                if data.empty:
+                    logger.attention(
+                        f"File {path} is empty. Returning an empty DataFrame."
+                    )
+                    return pd.DataFrame(columns=desired_cols).astype(desired_dtypes)
+
+            except pd.errors.EmptyDataError:
+                logger.attention(f"File {path} is empty. Returning an empty DataFrame.")
+                return pd.DataFrame(columns=desired_cols).astype(desired_dtypes)
+
+            # Define the columns to use from local file
+            num_cols_in_file = len(data.columns)
+            num_cols_to_rename = min(num_cols_in_file, len(desired_cols))
+            cols_to_use = desired_cols[:num_cols_to_rename]
+            col_mapping = dict(zip(data.columns[:num_cols_to_rename], cols_to_use))
+
+            # Rename and select the correct columns
+            data.rename(columns=col_mapping, inplace=True)
+            data = data[cols_to_use]
+
+            # Cast the columns to the correct type
+            dtype_to_use = {
+                col: desired_dtypes[col] for col in cols_to_use if col in desired_dtypes
+            }
+            data = data.astype(dtype_to_use)
+
+        return data
+
     def read(
         self,
         local_path: str = None,
@@ -81,54 +169,13 @@ class LocalReader(Reader):
             f"Starting reading process from local source in: {read_config.local_path}"
         )
 
-        # Common params
-        desired_cols = read_config.column_names()
-        desired_dtypes = read_config.column_dtype()
-        cols_to_use = []
-        dtype_to_use = {}
-
-        if read_config.header:
-            # Read the header of the file
-            try:
-                file_cols = pd.read_csv(
-                    read_config.local_path, sep=read_config.sep, nrows=0
-                ).columns.tolist()
-            except pd.errors.EmptyDataError:
-                file_cols = []
-
-            # Filter out the correct columns
-            cols_to_use = [col for col in desired_cols if col in file_cols]
-            dtype_to_use = {col: desired_dtypes[col] for col in cols_to_use}
-
-            # Read the file using correct information
-            if cols_to_use:
-                data = pd.read_csv(
-                    read_config.local_path,
-                    sep=read_config.sep,
-                    usecols=cols_to_use,
-                    dtype=dtype_to_use,
-                )
-            else:
-                # Fallback to empty dataset
-                data = pd.DataFrame()
-
-        else:
-            # Read the data without the header
-            data = pd.read_csv(read_config.local_path, sep=read_config.sep, header=None)
-            num_cols_in_file = len(data.columns)
-
-            # Define the number of correct columns and map the names
-            num_cols_to_rename = min(num_cols_in_file, len(desired_cols))
-            cols_to_use = desired_cols[:num_cols_to_rename]
-            col_mapping = dict(zip(data.columns[:num_cols_to_rename], cols_to_use))
-
-            # Rename and use only the required columns
-            data.rename(columns=col_mapping, inplace=True)
-            data = data[cols_to_use]
-
-            # Correct the dtypes oc the columns
-            dtype_to_use = {col: desired_dtypes[col] for col in cols_to_use}
-            data = data.astype(dtype_to_use)
+        data = self._robust_read_csv(
+            path=read_config.local_path,
+            sep=read_config.sep,
+            header=read_config.header,
+            desired_cols=read_config.column_names(),
+            desired_dtypes=read_config.column_dtype(),
+        )
 
         logger.msg("Data loaded correctly from local source.")
 
