@@ -105,10 +105,9 @@ class Reader(ABC):
 
         # Final step for both cases
         if desired_cols is not None:
-            missing_cols = set(desired_cols) - set(data.columns)
-            for col in missing_cols:
-                data[col] = pd.Series(dtype=desired_dtypes.get(col))
-            return data[desired_cols]
+            # Return only requested columns if found
+            cols_to_return = [col for col in desired_cols if col in data.columns]
+            return data[cols_to_return]
 
         return data
 
