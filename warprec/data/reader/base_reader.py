@@ -115,6 +115,10 @@ class Reader(ABC):
     def read_tabular(self, *args: Any, **kwargs: Any) -> DataFrame:
         """This method will read the tabular data from the source."""
 
+    @abstractmethod
+    def read_tabular_split(self, *args: Any, **kwargs: Any) -> DataFrame:
+        """This method will read the tabular split data from the source."""
+
     def _process_tabular_split(
         self,
         base_location: str,
