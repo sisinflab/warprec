@@ -286,7 +286,6 @@ class RecomModel(BaseModel, ABC):
         early_stopping (Optional[EarlyStopping]): The early stopping information that
             will be used during training.
         need_side_information (ClassVar[bool]): Wether or not the model needs side information.
-        need_timestamp (ClassVar[bool]): Wether or not the model needs the timestamp.
         need_single_trial_validation (ClassVar[bool]): Wether or not the model needs to be
             validated during training.
     """
@@ -297,7 +296,6 @@ class RecomModel(BaseModel, ABC):
     optimization: Optimization = Field(default_factory=Optimization)
     early_stopping: Optional[EarlyStopping] = None
     need_side_information: ClassVar[bool] = False
-    need_timestamp: ClassVar[bool] = False
     need_single_trial_validation: ClassVar[bool] = False
 
     @model_validator(mode="after")

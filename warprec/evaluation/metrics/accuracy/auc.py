@@ -96,6 +96,7 @@ class AUC(BaseMetric):
     def update(self, preds: Tensor, **kwargs: Any):
         """Updates the metric state with the new batch of predictions."""
         target: Tensor = kwargs.get("binary_relevance", torch.zeros_like(preds))
+        device = preds.device
 
         # Negative samples
         train_set = torch.isinf(preds).logical_and(preds < 0).sum(dim=1)  # [batch_size]
@@ -110,11 +111,11 @@ class AUC(BaseMetric):
         sorted_target = torch.gather(target, 1, sorted_preds)
 
         # Effective rank
-        col_indices = torch.arange(sorted_target.shape[1]).repeat(
+        col_indices = torch.arange(sorted_target.shape[1], device=device).repeat(
             sorted_target.shape[0], 1
         )
         effective_rank = torch.where(
-            sorted_target == 1, col_indices, torch.tensor(0.0)
+            sorted_target == 1, col_indices, torch.tensor(0.0, device=device)
         )  # [batch_size x items]
 
         # Progressive position

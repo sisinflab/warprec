@@ -51,6 +51,7 @@ class ACLT(TopKMetric):
     For further details, please refer to this `paper <https://arxiv.org/abs/1901.07555>`_.
 
     Attributes:
+        long_tail (Tensor): The lookup tensor of long tail items.
         long_hits (Tensor): The long tail recommendation hits.
         users (Tensor): The number of users evaluated.
         compute_per_user (bool): Wether or not to compute the metric
@@ -75,6 +76,7 @@ class ACLT(TopKMetric):
     }
     _CAN_COMPUTE_PER_USER: bool = True
 
+    long_tail: Tensor
     long_hits: Tensor
     users: Tensor
     compute_per_user: bool
@@ -91,8 +93,6 @@ class ACLT(TopKMetric):
         **kwargs: Any,
     ):
         super().__init__(k, dist_sync_on_step)
-        _, lt = self.compute_head_tail(item_interactions, pop_ratio)
-        self.long_tail = lt
         self.compute_per_user = compute_per_user
 
         if self.compute_per_user:
@@ -104,6 +104,10 @@ class ACLT(TopKMetric):
                 "long_hits", default=torch.tensor(0.0), dist_reduce_fx="sum"
             )  # Initialize a scalar to store global value
         self.add_state("users", default=torch.tensor(0.0), dist_reduce_fx="sum")
+
+        # Add long tail items as buffer
+        _, lt = self.compute_head_tail(item_interactions, pop_ratio)
+        self.register_buffer("long_tail", lt)
 
     def update(self, preds: Tensor, user_indices: Tensor, **kwargs: Any):
         """Updates the metric state with the new batch of predictions."""

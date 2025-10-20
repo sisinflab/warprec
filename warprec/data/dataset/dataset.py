@@ -262,8 +262,6 @@ class Dataset:
             raise ValueError("Evaluation set must be either 'Test' or 'Validation'.")
 
         # Initializing variables
-        self._has_explicit_ratings: bool = False
-        self._has_timestamp: bool = False
         self._nuid: int = 0
         self._niid: int = 0
         self._nfeat: int = 0
@@ -297,6 +295,7 @@ class Dataset:
         self._nuid = train_data[user_label].nunique()
         self._niid = train_data[item_label].nunique()
         self._nfeat = len(side_data.columns) - 1 if side_data is not None else 0
+        self._batch_size = batch_size
 
         # Values that will be used to calculate mappings
         _uid = train_data[user_label].unique()
@@ -305,20 +304,6 @@ class Dataset:
         # Calculate mapping for users and items
         self._umap = {user: i for i, user in enumerate(_uid)}
         self._imap = {item: i for i, item in enumerate(_iid)}
-
-        # Save other information about the data
-        self._has_explicit_ratings = (
-            True if rating_type == RatingType.EXPLICIT else False
-        )
-        self._has_timestamp = (
-            True
-            if self._has_explicit_ratings
-            and len(train_data.columns) == 4
-            or not self._has_explicit_ratings
-            and len(train_data.columns) == 3
-            else False
-        )
-        self._batch_size = batch_size
 
         # Save user and item cluster information inside the dataset
         self.user_cluster = (
@@ -377,7 +362,6 @@ class Dataset:
             batch_size=batch_size,
             rating_type=rating_type,
             rating_label=rating_label,
-            timestamp_label=timestamp_label,
             precision=precision,
         )
 
@@ -391,7 +375,6 @@ class Dataset:
                 batch_size=batch_size,
                 rating_type=rating_type,
                 rating_label=rating_label,
-                timestamp_label=timestamp_label,
                 precision=precision,
             )
 
@@ -410,7 +393,8 @@ class Dataset:
             train_data,
             self._umap,
             self._imap,
-            batch_size=batch_size,
+            user_id_label=user_label,
+            item_id_label=item_label,
             timestamp_label=timestamp_label,
         )
 
@@ -466,7 +450,6 @@ class Dataset:
         batch_size: int = 1024,
         rating_type: RatingType = RatingType.IMPLICIT,
         rating_label: str = None,
-        timestamp_label: str = None,
         precision: Any = np.float32,
     ) -> Interactions:
         """Functionality to create Interaction data from DataFrame.
@@ -480,7 +463,6 @@ class Dataset:
             batch_size (int): The batch size of the interaction.
             rating_type (RatingType): The type of rating used.
             rating_label (str): The label of the rating column.
-            timestamp_label (str): The label of the timestamp column.
             precision (Any): The precision that will be used to store interactions.
 
         Returns:
@@ -497,7 +479,6 @@ class Dataset:
             batch_size=batch_size,
             rating_type=rating_type,
             rating_label=rating_label,
-            timestamp_label=timestamp_label,
             precision=precision,
         )
         nuid, niid = inter_set.get_dims()
@@ -636,8 +617,6 @@ class Dataset:
                 the dataset.
         """
         return {
-            "has_explicit_ratings": self._has_explicit_ratings,
-            "has_timestamp": self._has_timestamp,
             "items": self._niid,
             "users": self._nuid,
             "features": self._nfeat,

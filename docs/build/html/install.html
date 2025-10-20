@@ -322,44 +322,36 @@
 <li><p>Python 3.12</p></li>
 <li><p><a class="reference external" href="https://python-poetry.org/">Poetry 2.1.2</a> for dependency management. Poetry is required only for development.</p></li>
 </ul>
-<section id="install-with-makefile">
-<h2>Install with MakeFile<a class="headerlink" href="#install-with-makefile" title="Link to this heading">¶</a></h2>
-<p>WarpRec provides a <strong>Makefile</strong> to simplify common setup and development tasks.
-Using these commands is <strong>highly recommended for newcomers</strong>, as they perform all the necessary checks to ensure a clean and consistent installation of the development environment:</p>
-<ul class="simple">
-<li><p>Install dependencies with Poetry:</p></li>
-</ul>
-<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>make<span class="w"> </span>install-poetry
-</pre></div>
+<p>WarpRec is designed with a <strong>modular dependency structure</strong> leveraging Poetry. This allows you to install a lean <strong>core</strong> and selectively add optional <em>extras</em> for advanced functionalities (like experiment tracking or cloud I/O).</p>
+<div class="table-wrapper colwidths-given docutils container" id="id1">
+<table class="docutils align-default" id="id1">
+<caption><span class="caption-text"><strong>Dependency Groups</strong></span><a class="headerlink" href="#id1" title="Link to this table">¶</a></caption>
+<colgroup>
+<col style="width: 25.0%" />
+<col style="width: 75.0%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>Group</p></th>
+<th class="head"><p>Description</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">core</span></code> (main)</p></td>
+<td><p>Essential functionalities, including base models (ItemKNN, EASE, MultiDAE), data handling, and evaluation metrics.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">dashboard</span></code></p></td>
+<td><p>Remote logging and experiment tracking tools (<cite>Weights &amp; Biases</cite>, <cite>MLflow</cite>, <cite>CodeCarbon</cite>).</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">remote-io</span></code></p></td>
+<td><p>Functionality for reading and writing data to/from cloud storage (e.g., Azure Blob Storage).</p></td>
+</tr>
+</tbody>
+</table>
 </div>
-<ul class="simple">
-<li><p>Install dependencies with venv:</p></li>
-</ul>
-<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>make<span class="w"> </span>install-venv
-</pre></div>
-</div>
-<ul class="simple">
-<li><p>Install dependencies with Conda/Mamba:</p></li>
-</ul>
-<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>make<span class="w"> </span>install-conda
-</pre></div>
-</div>
-<ul class="simple">
-<li><p>Run linting:</p></li>
-</ul>
-<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>make<span class="w"> </span>lint
-</pre></div>
-</div>
-<ul class="simple">
-<li><p>Run tests:</p></li>
-</ul>
-<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>make<span class="w"> </span><span class="nb">test</span>
-</pre></div>
-</div>
-</section>
-<section id="manual-installation">
-<h2>Manual Installation<a class="headerlink" href="#manual-installation" title="Link to this heading">¶</a></h2>
-<p>While WarpRec supports quick setup via <cite>make install-*</cite> commands, you may want to manually create and customize your environment using your preferred tool. Here are three supported approaches, depending on your workflow.</p>
+<p>Also the core of WarpRec supports a wide variety of recommendation models, Graph-based models requires manual installation of <strong>PyTorch Geometric (PyG)</strong> due to strict CUDA/PyTorch version constraints. It enables the use of Graph Neural Network (GNN) models.</p>
+<section id="installation-guide">
+<span id="install-guide"></span><h2>Installation guide<a class="headerlink" href="#installation-guide" title="Link to this heading">¶</a></h2>
+<p>In the following sections you will be guided on how to install WarpRec. Here are three supported approaches, depending on your workflow.</p>
 <div class="admonition note">
 <p class="admonition-title">Note</p>
 <p>PyG (PyTorch Geometric) is highly sensitive to the version of PyTorch and CUDA. Incorrect combinations may lead to runtime errors or failed builds.</p>
@@ -381,25 +373,38 @@ Using these commands is <strong>highly recommended for newcomers</strong>, as th
 </div>
 <section id="using-poetry-pyproject-toml">
 <h3>Using Poetry (<cite>pyproject.toml</cite>)<a class="headerlink" href="#using-poetry-pyproject-toml" title="Link to this heading">¶</a></h3>
+<p>Poetry is the recommended tool, as it allows you to selectively install dependencies.</p>
 <ol class="arabic">
 <li><p><strong>Create and activate the environment:</strong></p>
 <div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>poetry<span class="w"> </span>env<span class="w"> </span>use<span class="w"> </span>python3.12
-poetry<span class="w"> </span>install
 </pre></div>
 </div>
 </li>
-<li><p><strong>Install PyTorch and PyG manually:</strong></p>
-<p>Due to compatibility constraints, PyG must be installed with the correct PyTorch and CUDA version. Refer to the official guides for the latest instructions:</p>
+<li><p><strong>Install core and optional extras:</strong></p>
+<p>To install only the <strong>core</strong> dependencies (<code class="docutils literal notranslate"><span class="pre">main</span></code>):</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>poetry<span class="w"> </span>install<span class="w"> </span>--only<span class="w"> </span>main
+</pre></div>
+</div>
+<p>To install the <strong>core plus specific extras</strong> (e.g., <code class="docutils literal notranslate"><span class="pre">remote-io</span></code>):</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>poetry<span class="w"> </span>install<span class="w"> </span>--only<span class="w"> </span>main<span class="w"> </span>remote-io
+</pre></div>
+</div>
+<p>To install the <strong>core plus ALL extras</strong> (<code class="docutils literal notranslate"><span class="pre">dashboard</span></code>, <code class="docutils literal notranslate"><span class="pre">remote-io</span></code>, etc.):</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>poetry<span class="w"> </span>install
+</pre></div>
+</div>
+</li>
+<li><p><strong>Install PyTorch Geometric (PyG) - Optional for Graph Models:</strong></p>
+<p><strong>PyG is only required if you intend to use or develop Graph-based recommendation models.</strong> It must be installed manually with the correct PyTorch and CUDA version. Refer to the official guides for the latest instructions:</p>
 <ul class="simple">
 <li><p><a class="reference external" href="https://pytorch.org/get-started/locally/">PyTorch Installation Guide</a></p></li>
 <li><p><a class="reference external" href="https://pytorch-geometric.readthedocs.io/en/latest/install/installation.html">PyG Installation Guide</a></p></li>
 </ul>
 <p>Example (replace with your CUDA version):</p>
-<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="c1"># Example for CUDA 12.1</span>
-poetry<span class="w"> </span>run<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </span><span class="nv">torch</span><span class="o">==</span><span class="m">2</span>.5.1+cu121<span class="w"> </span>--index-url<span class="w"> </span>https://download.pytorch.org/whl/cu121
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="c1"># Example for CUDA 11.8</span>
 poetry<span class="w"> </span>run<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </span>torch-scatter<span class="w"> </span>torch-sparse<span class="w"> </span>torch-cluster<span class="w"> </span>torch-spline-conv<span class="w"> </span><span class="se">\</span>
--f<span class="w"> </span>https://data.pyg.org/whl/torch-2.5.1+cu121.html
-poetry<span class="w"> </span>run<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </span>torch-geometric<span class="w"> </span>torchmetrics
+-f<span class="w"> </span>https://data.pyg.org/whl/torch-2.7.0+cu118.html
+poetry<span class="w"> </span>run<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </span>torch-geometric
 </pre></div>
 </div>
 </li>
@@ -407,6 +412,7 @@ poetry<span class="w"> </span>run<span class="w"> </span>pip<span class="w"> </s
 </section>
 <section id="using-venv-requirements-txt">
 <h3>Using venv (<cite>requirements.txt</cite>)<a class="headerlink" href="#using-venv-requirements-txt" title="Link to this heading">¶</a></h3>
+<p>When installing via <cite>pip</cite> and <cite>requirements.txt</cite>, <strong>all dependencies (core and all extras) are installed simultaneously</strong> for maximum functionality.</p>
 <ol class="arabic">
 <li><p><strong>Create and activate a virtual environment:</strong></p>
 <div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>python3.12<span class="w"> </span>-m<span class="w"> </span>venv<span class="w"> </span>.venv
@@ -414,18 +420,17 @@ poetry<span class="w"> </span>run<span class="w"> </span>pip<span class="w"> </s
 </pre></div>
 </div>
 </li>
-<li><p><strong>Install base dependencies:</strong></p>
+<li><p><strong>Install all dependencies:</strong></p>
 <div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>pip<span class="w"> </span>install<span class="w"> </span>--upgrade<span class="w"> </span>pip
 pip<span class="w"> </span>install<span class="w"> </span>-r<span class="w"> </span>requirements.txt
 </pre></div>
 </div>
 </li>
-<li><p><strong>Install compatible versions of PyTorch and PyG:</strong></p>
+<li><p><strong>Install compatible versions of PyTorch and PyG (if needed):</strong></p>
 <div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="c1"># Make sure to install the correct versions matching your CUDA setup</span>
-pip<span class="w"> </span>install<span class="w"> </span><span class="nv">torch</span><span class="o">==</span><span class="m">2</span>.5.1+cu121<span class="w"> </span>--index-url<span class="w"> </span>https://download.pytorch.org/whl/cu121
 pip<span class="w"> </span>install<span class="w"> </span>torch-scatter<span class="w"> </span>torch-sparse<span class="w"> </span>torch-cluster<span class="w"> </span>torch-spline-conv<span class="w"> </span><span class="se">\</span>
--f<span class="w"> </span>https://data.pyg.org/whl/torch-2.5.1+cu121.html
-pip<span class="w"> </span>install<span class="w"> </span>torch-geometric<span class="w"> </span>torchmetrics
+-f<span class="w"> </span>https://data.pyg.org/whl/torch-2.7.0+cu118.html
+pip<span class="w"> </span>install<span class="w"> </span>torch-geometric
 </pre></div>
 </div>
 </li>
@@ -433,6 +438,7 @@ pip<span class="w"> </span>install<span class="w"> </span>torch-geometric<span c
 </section>
 <section id="using-conda-mamba-environment-yml">
 <h3>Using Conda/Mamba (<cite>environment.yml</cite>)<a class="headerlink" href="#using-conda-mamba-environment-yml" title="Link to this heading">¶</a></h3>
+<p>Similar to <code class="docutils literal notranslate"><span class="pre">venv</span></code>, the Conda environment file typically includes <strong>all dependencies (core and extras)</strong>.</p>
 <ol class="arabic">
 <li><p><strong>Create or update the environment:</strong></p>
 <div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>conda<span class="w"> </span>env<span class="w"> </span>create<span class="w"> </span>--file<span class="w"> </span>environment.yml<span class="w"> </span>--name<span class="w"> </span>warprec
@@ -446,15 +452,15 @@ conda<span class="w"> </span>env<span class="w"> </span>update<span class="w"> <
 </pre></div>
 </div>
 </li>
-<li><p><strong>Manually install compatible PyTorch and PyG:</strong></p>
+<li><p><strong>Manually install compatible PyTorch and PyG (if needed):</strong></p>
 <p>Conda may not always provide the latest compatible versions. For full compatibility, refer to the installation links above and install with <cite>pip</cite> inside the Conda environment.</p>
 </li>
 </ol>
 <div class="admonition note">
 <p class="admonition-title">Note</p>
-<p>On some Linux systems, it has been observed that the <cite>grpcio</cite> library may need to be upgraded manually.
+<p>On some Linux systems, it has been observed that the <code class="docutils literal notranslate"><span class="pre">grpcio</span></code> library may need to be upgraded manually.
 This is typically required if you encounter errors related to gRPC during installation or runtime.</p>
-<p>You can upgrade <cite>grpcio</cite> using <cite>pip</cite> as follows:</p>
+<p>You can upgrade <code class="docutils literal notranslate"><span class="pre">grpcio</span></code> using <code class="docutils literal notranslate"><span class="pre">pip</span></code> as follows:</p>
 <div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="c1"># Upgrade grpcio to the latest version</span>
 pip<span class="w"> </span>install<span class="w"> </span>--upgrade<span class="w"> </span>grpcio
 </pre></div>
@@ -521,8 +527,7 @@ pip<span class="w"> </span>install<span class="w"> </span>--upgrade<span class="
           <div class="toc-tree">
             <ul>
 <li><a class="reference internal" href="#">Install WarpRec</a><ul>
-<li><a class="reference internal" href="#install-with-makefile">Install with MakeFile</a></li>
-<li><a class="reference internal" href="#manual-installation">Manual Installation</a><ul>
+<li><a class="reference internal" href="#installation-guide">Installation guide</a><ul>
 <li><a class="reference internal" href="#using-poetry-pyproject-toml">Using Poetry (<cite>pyproject.toml</cite>)</a></li>
 <li><a class="reference internal" href="#using-venv-requirements-txt">Using venv (<cite>requirements.txt</cite>)</a></li>
 <li><a class="reference internal" href="#using-conda-mamba-environment-yml">Using Conda/Mamba (<cite>environment.yml</cite>)</a></li>

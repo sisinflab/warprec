@@ -68,7 +68,17 @@ Not applicable to implicit feedback scenarios.
    filtering:
        UserAverage: {}   # No parameters required
 
-**3. UserMin**
+**3. ItemAverage**
+
+Removes all interactions for which the rating is below the corresponding item's average rating.
+Not applicable to implicit feedback scenarios.
+
+.. code-block:: yaml
+
+   filtering:
+       ItemAverage: {}   # No parameters required
+
+**4. UserMin**
 
 Removes all interactions involving users with fewer interactions than the given threshold.
 
@@ -78,7 +88,7 @@ Removes all interactions involving users with fewer interactions than the given 
        UserMin:
            min_interactions: 5
 
-**4. UserMax**
+**5. UserMax**
 
 Removes all interactions involving users with more interactions than the given threshold.
 This is particularly useful for **cold-start user analysis**.
@@ -89,7 +99,7 @@ This is particularly useful for **cold-start user analysis**.
        UserMax:
            max_interactions: 2
 
-**5. ItemMin**
+**6. ItemMin**
 
 Removes all interactions involving items with fewer interactions than the given threshold.
 
@@ -99,7 +109,7 @@ Removes all interactions involving items with fewer interactions than the given 
        ItemMin:
            min_interactions: 5
 
-**6. ItemMax**
+**7. ItemMax**
 
 Removes all interactions involving items with more interactions than the given threshold.
 Useful for analyzing **cold-start item scenarios**.
@@ -110,7 +120,7 @@ Useful for analyzing **cold-start item scenarios**.
        ItemMax:
            max_interactions: 2
 
-**7. IterativeKCore**
+**8. IterativeKCore**
 
 Applies ``UserMin`` and ``ItemMin`` iteratively until no further interactions can be removed
 (i.e., until a stable state is reached).
@@ -121,7 +131,7 @@ Applies ``UserMin`` and ``ItemMin`` iteratively until no further interactions ca
        IterativeKCore:
            min_interactions: 5
 
-**8. NRoundsKCore**
+**9. NRoundsKCore**
 
 Applies ``UserMin`` and ``ItemMin`` for a fixed number of iterations.
 This is a simplified variant of ``IterativeKCore`` that does not require full convergence.
@@ -136,6 +146,30 @@ This is a simplified variant of ``IterativeKCore`` that does not require full co
 .. tip::
    ``IterativeKCore`` ensures dataset stability, but may be computationally expensive.
    ``NRoundsKCore`` is recommended when deterministic runtime is preferred over convergence.
+
+**10. UserHeadN**
+
+Selects and retains the first N interactions for each user.
+If timestamps are available, interactions are sorted chronologically before selection.
+If no timestamps are provided, the original ordering of interactions is preserved.
+
+.. code-block:: yaml
+
+   filtering:
+       UserHeadN:
+           num_interactions: 30
+
+**11. UserTailN**
+
+Selects and retains the last N interactions for each user.
+If timestamps are available, interactions are sorted chronologically before selection.
+If no timestamps are provided, the original ordering of interactions is preserved.
+
+.. code-block:: yaml
+
+   filtering:
+       UserTailN:
+           num_interactions: 30
 
 -----------------------------
 Example Filtering Pipeline

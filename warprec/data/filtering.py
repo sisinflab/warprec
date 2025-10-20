@@ -47,10 +47,15 @@ class MinRating(Filter):
     Args:
         min_rating (float): The minimum rating threshold.
         **kwargs (Any): Additional keyword arguments.
+
+    Raises:
+        ValueError: If the provided argument is invalid.
     """
 
     def __init__(self, min_rating: float, **kwargs: Any):
         super().__init__(**kwargs)
+        if min_rating <= 0:
+            raise ValueError("min_rating must be a positive float.")
         self.min_rating = min_rating
 
     def __call__(self, dataset: DataFrame) -> DataFrame:
@@ -89,6 +94,30 @@ class UserAverage(Filter):
         return dataset[dataset[self.rating_label] > user_avg]
 
 
+@filter_registry.register("ItemAverage")
+class ItemAverage(Filter):
+    """Filter to select interactions for an item based on the item's average rating.
+
+    Args:
+        **kwargs (Any): Additional keyword arguments.
+    """
+
+    def __init__(self, **kwargs: Any):
+        super().__init__(**kwargs)
+
+    def __call__(self, dataset: DataFrame) -> DataFrame:
+        """Select rows where the 'rating' column is greater than the item average.
+
+        Args:
+            dataset (DataFrame): The dataset to filter.
+
+        Returns:
+            DataFrame: Filtered dataset containing only rows with 'rating' > item average.
+        """
+        item_avg = dataset.groupby(self.item_label)[self.rating_label].transform("mean")
+        return dataset[dataset[self.rating_label] > item_avg]
+
+
 @filter_registry.register("UserMin")
 class UserMin(Filter):
     """Filter to select users based on a minimum number of interactions.
@@ -96,10 +125,15 @@ class UserMin(Filter):
     Args:
         min_interactions (int): Minimum number of interactions per user.
         **kwargs (Any): Additional keyword arguments.
+
+    Raises:
+        ValueError: If the provided argument is invalid.
     """
 
     def __init__(self, min_interactions: int, **kwargs: Any):
         super().__init__(**kwargs)
+        if min_interactions <= 0:
+            raise ValueError("min_interactions must be a positive integer.")
         self.min_interactions = min_interactions
 
     def __call__(self, dataset: DataFrame) -> DataFrame:
@@ -123,10 +157,15 @@ class UserMax(Filter):
     Args:
         max_interactions (int): Maximum number of interactions per user.
         **kwargs (Any): Additional keyword arguments.
+
+    Raises:
+        ValueError: If the provided argument is invalid.
     """
 
     def __init__(self, max_interactions: int, **kwargs: Any):
         super().__init__(**kwargs)
+        if max_interactions <= 0:
+            raise ValueError("max_interactions must be a positive integer.")
         self.max_interactions = max_interactions
 
     def __call__(self, dataset: DataFrame) -> DataFrame:
@@ -150,10 +189,15 @@ class ItemMin(Filter):
     Args:
         min_interactions (int): Minimum number of interactions per item.
         **kwargs (Any): Additional keyword arguments.
+
+    Raises:
+        ValueError: If the provided argument is invalid.
     """
 
     def __init__(self, min_interactions: int, **kwargs: Any):
         super().__init__(**kwargs)
+        if min_interactions <= 0:
+            raise ValueError("min_interactions must be a positive integer.")
         self.min_interactions = min_interactions
 
     def __call__(self, dataset: DataFrame) -> DataFrame:
@@ -177,10 +221,15 @@ class ItemMax(Filter):
     Args:
         max_interactions (int): Maximum number of interactions per item.
         **kwargs (Any): Additional keyword arguments.
+
+    Raises:
+        ValueError: If the provided argument is invalid.
     """
 
     def __init__(self, max_interactions: int, **kwargs: Any):
         super().__init__(**kwargs)
+        if max_interactions <= 0:
+            raise ValueError("max_interactions must be a positive integer.")
         self.max_interactions = max_interactions
 
     def __call__(self, dataset: DataFrame) -> DataFrame:
@@ -204,9 +253,14 @@ class IterativeKCore(Filter):
     Args:
         min_interactions (int): Minimum number of interactions for users/items.
         **kwargs (Any): Additional keyword arguments.
+
+    Raises:
+        ValueError: If the provided argument is invalid.
     """
 
     def __init__(self, min_interactions: int, **kwargs: Any):
+        if min_interactions <= 0:
+            raise ValueError("min_interactions must be a positive integer.")
         self.user_core = UserMin(min_interactions, **kwargs)
         self.item_core = ItemMin(min_interactions, **kwargs)
 
@@ -238,9 +292,16 @@ class NRoundsKCore(Filter):
         rounds (int): Number of rounds to apply k-core filtering.
         min_interactions (int): Minimum number of interactions for users/items.
         **kwargs (Any): Additional keyword arguments.
+
+    Raises:
+        ValueError: If the provided argument is invalid.
     """
 
     def __init__(self, rounds: int, min_interactions: int, **kwargs: Any):
+        if rounds <= 0:
+            raise ValueError("rounds must be a positive integer.")
+        if min_interactions <= 0:
+            raise ValueError("min_interactions must be a positive integer.")
         self.user_core = UserMin(min_interactions, **kwargs)
         self.item_core = ItemMin(min_interactions, **kwargs)
         self.rounds = rounds
@@ -262,6 +323,109 @@ class NRoundsKCore(Filter):
                 break
             dataset = filtered_dataset
         return dataset
+
+
+@filter_registry.register("UserHeadN")
+class UserHeadN(Filter):
+    """Filter to keep only the first N interactions for each user,
+    based on the timestamp.
+
+    Args:
+        num_interactions (int): Number of first interactions to keep for each user.
+        **kwargs (Any): Additional keyword arguments.
+
+    Raises:
+        ValueError: If the provided argument is invalid.
+    """
+
+    def __init__(self, num_interactions: int, **kwargs: Any):
+        super().__init__(**kwargs)
+        if num_interactions <= 0:
+            raise ValueError("num_interactions must be a positive integer.")
+        self.num_interactions = num_interactions
+
+    def __call__(self, dataset: DataFrame) -> DataFrame:
+        """Select the first num_interactions for each user.
+
+        Args:
+            dataset (DataFrame): The dataset to filter.
+
+        Returns:
+            DataFrame: Filtered dataset containing only the first num_interactions for each user.
+        """
+        # Check if timestamp is available
+        sorting_column = self.timestamp_label
+        is_timestamp_available = self.timestamp_label in dataset.columns
+
+        if not is_timestamp_available:
+            # Fallback: Use original ordering
+            sorting_column = "__ORIGINAL_ROW_ORDER__"
+            dataset[sorting_column] = dataset.index
+
+        sorted_dataset = dataset.sort_values(
+            by=[self.user_label, sorting_column], ascending=[True, True]
+        )
+        filtered_dataset = sorted_dataset.groupby(self.user_label).head(
+            self.num_interactions
+        )
+
+        # Remove temporary column if used
+        if not is_timestamp_available:
+            filtered_dataset.drop(columns=[sorting_column], inplace=True)
+
+        return filtered_dataset
+
+
+@filter_registry.register("UserTailN")
+class UserTailN(Filter):
+    """Filter to keep only the last N interactions for each user,
+    based on the timestamp.
+
+    Args:
+        num_interactions (int): Number of last interactions to keep for each user.
+        **kwargs (Any): Additional keyword arguments.
+
+    Raises:
+        ValueError: If the provided argument is invalid.
+    """
+
+    def __init__(self, num_interactions: int, **kwargs: Any):
+        super().__init__(**kwargs)
+        if num_interactions <= 0:
+            raise ValueError("num_interactions must be a positive integer.")
+        self.num_interactions = num_interactions
+
+    def __call__(self, dataset: DataFrame) -> DataFrame:
+        """Select the last num_interactions for each user.
+
+        Args:
+            dataset (DataFrame): The dataset to filter.
+
+        Returns:
+            DataFrame: Filtered dataset containing only the last
+                       num_interactions for each user.
+        """
+        # Check if timestamp is available
+        sorting_column = self.timestamp_label
+        is_timestamp_available = self.timestamp_label in dataset.columns
+
+        if not is_timestamp_available:
+            # Fallback: Use original ordering
+            sorting_column = "__ORIGINAL_ROW_ORDER__"
+            dataset[sorting_column] = dataset.index
+
+        sorted_dataset = dataset.sort_values(
+            by=[self.user_label, sorting_column], ascending=[True, True]
+        )
+        filtered_dataset = sorted_dataset.groupby(self.user_label).tail(
+            self.num_interactions
+        )
+
+        # Remove temporary column if used
+        if not is_timestamp_available:
+            filtered_dataset.drop(columns=[sorting_column], inplace=True)
+
+        return filtered_dataset
 
 
 def apply_filtering(dataset: DataFrame, filters: List[Filter]) -> DataFrame:

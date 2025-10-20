@@ -11,9 +11,6 @@ from ray import tune
 from ray.tune import Tuner, TuneConfig, RunConfig, CheckpointConfig
 from ray.tune.stopper import Stopper
 from ray.tune.experiment import Trial
-from ray.air.integrations.wandb import WandbLoggerCallback
-from ray.air.integrations.mlflow import MLflowLoggerCallback
-from codecarbon import EmissionsTracker
 from warprec.recommenders.base_recommender import Recommender
 from warprec.data.dataset import Dataset
 from warprec.recommenders.trainer.objectives import objective_function
@@ -41,6 +38,16 @@ from warprec.utils.registry import (
     scheduler_registry,
     search_space_registry,
 )
+
+try:
+    from ray.air.integrations.wandb import WandbLoggerCallback
+    from ray.air.integrations.mlflow import MLflowLoggerCallback
+    from codecarbon import EmissionsTracker
+
+    DASHBOARD_AVAILABLE = True
+
+except Exception:
+    DASHBOARD_AVAILABLE = False
 
 
 class Trainer:
@@ -609,40 +616,51 @@ class Trainer:
     ) -> List[tune.Callback]:
         callbacks: List[tune.Callback] = [custom_callback]
 
-        if dashboard.wandb.enabled:
-            callbacks.append(
-                WandbLoggerCallback(
-                    project=dashboard.wandb.project,
-                    group=dashboard.wandb.group,
-                    api_key_file=dashboard.wandb.api_key_file,
-                    api_key=dashboard.wandb.api_key,
-                    excludes=dashboard.wandb.excludes,
-                    log_config=dashboard.wandb.log_config,
-                    upload_checkpoints=dashboard.wandb.upload_checkpoints,
-                    entity=dashboard.wandb.team,  # Will be passed to wandb.init()
+        if DASHBOARD_AVAILABLE:
+            if dashboard.wandb.enabled:
+                callbacks.append(
+                    WandbLoggerCallback(
+                        project=dashboard.wandb.project,
+                        group=dashboard.wandb.group,
+                        api_key_file=dashboard.wandb.api_key_file,
+                        api_key=dashboard.wandb.api_key,
+                        excludes=dashboard.wandb.excludes,
+                        log_config=dashboard.wandb.log_config,
+                        upload_checkpoints=dashboard.wandb.upload_checkpoints,
+                        entity=dashboard.wandb.team,  # Will be passed to wandb.init()
+                    )
                 )
-            )
-        if dashboard.codecarbon.enabled:
-            callbacks.append(
-                CodeCarbonCallback(
-                    save_to_api=dashboard.codecarbon.save_to_api,
-                    save_to_file=dashboard.codecarbon.save_to_file,
-                    output_dir=dashboard.codecarbon.output_dir,
-                    tracking_mode=dashboard.codecarbon.tracking_mode,
+            if dashboard.codecarbon.enabled:
+                callbacks.append(
+                    CodeCarbonCallback(
+                        save_to_api=dashboard.codecarbon.save_to_api,
+                        save_to_file=dashboard.codecarbon.save_to_file,
+                        output_dir=dashboard.codecarbon.output_dir,
+                        tracking_mode=dashboard.codecarbon.tracking_mode,
+                    )
                 )
-            )
-        if dashboard.mlflow.enabled:
-            callbacks.append(
-                MLflowLoggerCallback(
-                    tracking_uri=dashboard.mlflow.tracking_uri,
-                    registry_uri=dashboard.mlflow.registry_uri,
-                    experiment_name=dashboard.mlflow.experiment_name,
-                    tags=dashboard.mlflow.tags,
-                    tracking_token=dashboard.mlflow.tracking_token,
-                    save_artifact=dashboard.mlflow.save_artifacts,
+            if dashboard.mlflow.enabled:
+                callbacks.append(
+                    MLflowLoggerCallback(
+                        tracking_uri=dashboard.mlflow.tracking_uri,
+                        registry_uri=dashboard.mlflow.registry_uri,
+                        experiment_name=dashboard.mlflow.experiment_name,
+                        tags=dashboard.mlflow.tags,
+                        tracking_token=dashboard.mlflow.tracking_token,
+                        save_artifact=dashboard.mlflow.save_artifacts,
+                    )
                 )
+        elif any(
+            [
+                dashboard.wandb.enabled,
+                dashboard.codecarbon.enabled,
+                dashboard.mlflow.enabled,
+            ]
+        ):
+            logger.attention(
+                "WarpRec dashboard extra has not been installed. "
+                "Dashboards will not be available during training."
             )
-
         return callbacks
 
     def _create_report(

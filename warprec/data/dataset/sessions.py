@@ -6,6 +6,7 @@ import numpy as np
 from pandas import DataFrame
 from torch import Tensor
 from torch.utils.data import DataLoader, Dataset
+from torch.nn.utils.rnn import pad_sequence
 
 from warprec.utils.logger import logger
 
@@ -71,11 +72,11 @@ class SessionDataset(Dataset):
         )
 
 
-class GroupSessionDataset(Dataset):
-    """Personalized dataset for grouped session based data.
+class UserHistoryDataset(Dataset):
+    """Personalized dataset for user history-based data.
 
-    Used by sequential models to capture temporal information from
-    entire user interaction history.
+    Used by sequential models that process the entire user interaction history
+    as a single sequence.
 
     Args:
         positive_sequences (Tensor): The sequences of positive interactions.
@@ -94,16 +95,25 @@ class GroupSessionDataset(Dataset):
 
 
 class Sessions:
-    """Sessions class will handle the data of the sessions for
-    session-based recommendations.
+    """Handles session-based data preparation for sequential recommenders.
+
+    This class transforms a DataFrame of user-item interactions into padded
+    sequences suitable for training models in PyTorch. It supports negative
+    sampling and caching for efficiency.
 
     Args:
-        data (DataFrame): Transaction data in DataFrame format.
-        user_mapping (dict): Mapping of user ID -> user idx.
-        item_mapping (dict): Mapping of item ID -> item idx.
-        batch_size (int): The batch size that will be used to
-            iterate over the interactions.
-        timestamp_label (str): The label of the timestamp column.
+        data (DataFrame): Transaction data.
+        user_mapping (dict): Mapping of original user ID -> integer index.
+        item_mapping (dict): Mapping of original item ID -> integer index.
+        user_id_label (str): The name of the user ID column in the DataFrame.
+        item_id_label (str): The name of the item ID column in the DataFrame.
+        timestamp_label (str): The name of the timestamp column.
+            If provided, interactions will be sorted by this column.
+        seed (int): The seed for Numpy number generator used for
+            reproducibility of negative sampling.
+
+    Raises:
+        ValueError: If the user or item label are not found in the DataFrame.
     """
 
     _cached_sequential_data: dict = {}
@@ -115,64 +125,72 @@ class Sessions:
         data: DataFrame,
         user_mapping: dict,
         item_mapping: dict,
-        batch_size: int = 1024,
-        timestamp_label: str = None,
+        user_id_label: str = "user_id",
+        item_id_label: str = "item_id",
+        timestamp_label: str = "timestamp",
+        seed: int = 42,
     ):
-        # Setup the variables
+        if user_id_label not in data.columns:
+            raise ValueError(f"User column '{user_id_label}' not found in DataFrame.")
+        if item_id_label not in data.columns:
+            raise ValueError(f"Item column '{item_id_label}' not found in DataFrame.")
+
         self._inter_df = data
-        self.batch_size = batch_size
-
-        # Set DataFrame labels
-        self._user_label = data.columns[0]
-        self._item_label = data.columns[1]
+        self._user_label = user_id_label
+        self._item_label = item_id_label
         self._timestamp_label = timestamp_label
-
-        # Definition of dimensions
-        self._niid = self._inter_df[self._item_label].nunique()
-
-        # Set mappings
         self._umap = user_mapping
         self._imap = item_mapping
+        self._niid = len(self._imap)
+
+        # Set the random seed
+        np.random.seed(seed)
 
     def clear_history_cache(self):
-        """This method will can be used to clear the
-        cached sequential data if not used anymore.
-        """
+        """Clears all cached data to free up memory."""
         self._cached_sequential_data = {}
         self._cached_grouped_sequential_data = {}
         self._cached_user_histories = {}
+
+    def _get_user_sessions(self) -> pd.Series:
+        """
+        Maps, sorts (if timestamp is available), and groups interactions by user.
+        This centralized helper method prevents code duplication.
+        """
+        cols_to_map = {
+            self._user_label: self._inter_df[self._user_label].map(self._umap),
+            self._item_label: self._inter_df[self._item_label].map(self._imap),
+        }
+        if self._timestamp_label and self._timestamp_label in self._inter_df.columns:
+            cols_to_map[self._timestamp_label] = self._inter_df[self._timestamp_label]
+
+        mapped_df = pd.DataFrame(cols_to_map).dropna()
+        mapped_df[[self._user_label, self._item_label]] = mapped_df[
+            [self._user_label, self._item_label]
+        ].astype(int)
+
+        if self._timestamp_label and self._timestamp_label in self._inter_df.columns:
+            mapped_df = mapped_df.sort_values(
+                by=[self._user_label, self._timestamp_label]
+            )
+
+        return mapped_df.groupby(self._user_label)[self._item_label].agg(list)
 
     def get_sequential_dataloader(
         self,
         max_seq_len: int,
         num_negatives: int = 0,
-        user_id: bool = False,
+        include_user_id: bool = False,
         batch_size: int = 1024,
         shuffle: bool = True,
     ) -> DataLoader:
-        """Create a dataloader for sequential data.
-
-        Args:
-            max_seq_len (int): Maximum length of sequences produced.
-            num_negatives (int): Number of negative samples per user.
-            user_id (bool): Wether or not to return also the user_id.
-            batch_size (int): The batch size that will be used to
-                iterate over the sessions.
-            shuffle (bool): Whether to shuffle the data.
-
-        Returns:
-            DataLoader: Yields (item_seq, item_seq_len, pos_item_id) if num_negatives = 0.
-                Yields (item_seq, item_seq_len, pos_item_id, neg_item_id) if num_negatives > 0.
-        """
-        # Check if sequential data has already been computed
-        # and is stored in cache
-        cache_key = (max_seq_len, num_negatives, user_id)
+        """Creates a DataLoader for sequential data."""
+        cache_key = (max_seq_len, num_negatives, include_user_id)
         if cache_key in self._cached_sequential_data:
             cached_tensors = self._cached_sequential_data[cache_key]
             dataset = SessionDataset(**cached_tensors)
             return DataLoader(dataset, batch_size=batch_size, shuffle=shuffle)
 
-        # Call the optimized processing function
         (
             tensor_user_id,
             padded_item_seq,
@@ -182,17 +200,14 @@ class Sessions:
         ) = self._create_sequences_and_targets(
             num_negatives=num_negatives,
             max_seq_len=max_seq_len,
-            user_id=user_id,
+            include_user_id=include_user_id,
         )
 
-        # Check for empty results
         if padded_item_seq.shape[0] == 0:
             logger.attention(
-                "No valid sequential samples generated for DataLoader. "
-                "Check your data or session definition (min length 2)."
+                "No valid sequential samples generated. Ensure sessions have at least 2 interactions."
             )
 
-        # Cache the results inside a dictionary
         dataset_args = {
             "sequences": padded_item_seq,
             "sequence_lengths": tensor_item_seq_len,
@@ -200,12 +215,10 @@ class Sessions:
         }
         if tensor_user_id is not None:
             dataset_args["users"] = tensor_user_id
-
         if tensor_neg_item_id is not None:
             dataset_args["negative_items"] = tensor_neg_item_id
         self._cached_sequential_data[cache_key] = dataset_args
 
-        # Create instance of the dataset
         dataset = SessionDataset(**dataset_args)
         return DataLoader(dataset, batch_size=batch_size, shuffle=shuffle)
 
@@ -213,103 +226,55 @@ class Sessions:
         self,
         num_negatives: int,
         max_seq_len: int,
-        user_id: bool = False,
+        include_user_id: bool = False,
     ) -> Tuple[Optional[Tensor], Tensor, Tensor, Tensor, Optional[Tensor]]:
-        """Core logic for transforming interaction data into sequential training samples.
-
-        This function uses pandas and numpy for efficient processing.
-
-        Args:
-            num_negatives (int): Number of negative samples per user.
-            max_seq_len (int): Maximum length of sequences produced.
-            user_id (bool): Wether or not to return also the user_id.
-
-        Returns:
-            Tuple[Optional[Tensor], Tensor, Tensor, Tensor, Optional[Tensor]]: A tuple containing:
-                - Optional[Tensor]: User ID.
-                - Tensor: Padded item sequence.
-                - Tensor: Item sequence length.
-                - Tensor: Positive item tensor.
-                - Optional[Tensor]: Negative item tensor.
-        """
-        mapped_df = pd.DataFrame(
-            {
-                self._user_label: self._inter_df[self._user_label].map(self._umap),
-                self._item_label: self._inter_df[self._item_label].map(self._imap),
-                self._timestamp_label: self._inter_df[self._timestamp_label],
-            }
-        ).dropna()  # Drop any interactions if user/item not in map
-
-        # Convert to integer types
-        mapped_df[[self._user_label, self._item_label]] = mapped_df[
-            [self._user_label, self._item_label]
-        ].astype(int)
-
-        # Group interactions based on timestamp
-        user_sessions = (
-            mapped_df.sort_values(by=[self._user_label, self._timestamp_label])
-            .groupby(self._user_label)[self._item_label]
-            .agg(list)
-        )
-
-        # Filter out sessions with less than 2 interactions
+        """Core logic for transforming interaction data into sequential training samples."""
+        user_sessions = self._get_user_sessions()
         user_sessions = user_sessions[user_sessions.str.len() >= 2]
 
-        # Edge case: No user has at least 2 interactions in sequence
         if user_sessions.empty:
             return (
-                None if not user_id else torch.empty(0, dtype=torch.long),
+                None if not include_user_id else torch.empty(0, dtype=torch.long),
                 torch.empty((0, 0), dtype=torch.long),
                 torch.empty(0, dtype=torch.long),
                 torch.empty(0, dtype=torch.long),
                 None if num_negatives == 0 else torch.empty(0, dtype=torch.long),
             )
 
-        # Create sequence-target pairs using explode
-        # For a session [i1, i2, i3, i4], this generates:
-        #   - seq: [i1], target: i2
-        #   - seq: [i1, i2], target: i3
-        #   - seq: [i1, i2, i3], target: i4
-        session_df = pd.DataFrame(
-            {
-                "sequences": user_sessions.apply(
-                    lambda s: [s[: i + 1] for i in range(len(s) - 1)]
-                ),
-                "targets": user_sessions.apply(lambda s: s[1:]),
-            }
-        )
+        # Pre-allocate lists
+        all_sequences = []
+        all_targets = []
+        all_user_ids = []
 
-        def truncate_user_sequences(sequences_for_user, targets_for_user, max_len):
-            """Helper function to truncate sequences to max_len."""
-            truncated_sequences = []
-            truncated_targets = []
-            for seq, target in zip(sequences_for_user, targets_for_user):
-                # Truncate sequences taking only the last max_len elements
-                current_truncated_seq = seq[-max_len:] if max_len > 0 else []
-                if current_truncated_seq:
-                    truncated_sequences.append(current_truncated_seq)
-                    truncated_targets.append(target)
-            return truncated_sequences, truncated_targets
+        # Iterate over the Pandas Series
+        for user_id, items in user_sessions.items():
+            # Generate all the pairs seq, target for each user
+            for i in range(len(items) - 1):
+                sequence = items[: i + 1]
+                target = items[i + 1]
 
-        # Truncate each row
-        session_df[["sequences", "targets"]] = session_df.apply(
-            lambda row: truncate_user_sequences(
-                row["sequences"], row["targets"], max_seq_len
-            ),
-            axis=1,
-            result_type="expand",
-        )
+                # Truncate the sequence at the max_seq_len
+                truncated_sequence = sequence[-max_seq_len:]
 
-        # Remove empty rows
-        session_df = session_df[session_df["sequences"].apply(lambda x: len(x) > 0)]
+                # Add the sequence only if not empty
+                if truncated_sequence:
+                    all_sequences.append(truncated_sequence)
+                    all_targets.append(target)
+                    if include_user_id:
+                        all_user_ids.append(user_id)
 
-        # Explode the lists into separate rows
-        training_data = session_df.explode(["sequences", "targets"]).reset_index()
+        # Create the final dataset
+        training_data_dict = {
+            "sequences": all_sequences,
+            "targets": all_targets,
+        }
+        if include_user_id:
+            training_data_dict[self._user_label] = all_user_ids
 
-        # Optionally associate every sequence to a user_id
+        training_data = pd.DataFrame(training_data_dict)
+
         tensor_user_id = None
-        if user_id:
-            # The user_id is inside the correct column thanks to the reset_index
+        if include_user_id:
             tensor_user_id = torch.tensor(
                 training_data[self._user_label].values, dtype=torch.long
             )
@@ -318,68 +283,69 @@ class Sessions:
         neg_tensor = None
         if num_negatives > 0:
             num_samples = len(training_data)
-
-            # Create a set of interacted items for each sequence for fast lookups
-            # Note: items are 0-indexed here
+            targets_np = training_data["targets"].values
             interacted_sets = training_data["sequences"].apply(set)
 
-            # Generate all negative candidates at once
+            # Sample candidates
             neg_candidates = np.random.randint(
                 0, self._niid, size=(num_samples, num_negatives), dtype=np.int64
             )
 
-            # Check for collisions: a negative sample is invalid if it's the target or in the history
-            is_target = neg_candidates == training_data["targets"].values[:, None]
+            # Collision check
+            is_target = neg_candidates == targets_np[:, None]
 
-            # We iterate through rows and columns to build a boolean mask
-            in_history = np.zeros_like(neg_candidates, dtype=bool)
-            for i, interacted_set in enumerate(interacted_sets):
-                for j in range(num_negatives):
-                    if neg_candidates[i, j] in interacted_set:
-                        in_history[i, j] = True
+            # Define the 'in_history' mask
+            in_history = np.array(
+                [
+                    [neg in hist for neg in negs]  # type: ignore[attr-defined]
+                    for negs, hist in zip(neg_candidates, interacted_sets)
+                ]
+            )
 
             invalid_mask = is_target | in_history
 
-            # Iteratively replace invalid samples until all are valid
+            # If invalid indices have been sampled, repeat the process
             while np.any(invalid_mask):
                 num_invalid = np.sum(invalid_mask)
+
+                # Sample only non valid candidates
                 new_candidates = np.random.randint(
                     0, self._niid, size=num_invalid, dtype=np.int64
                 )
                 neg_candidates[invalid_mask] = new_candidates
 
-                # Re-evaluate the mask only for the newly generated candidates
-                is_target_new = (
-                    neg_candidates == training_data["targets"].values[:, None]
+                # Find the indexes that need updating
+                rows_to_recheck, _ = np.where(invalid_mask)
+                updated_candidates = neg_candidates[invalid_mask]
+
+                # Check is_target only on updated candidates
+                is_target_new = updated_candidates == targets_np[rows_to_recheck]
+
+                # Check in_history only on updated candidates
+                in_history_new = np.array(
+                    [
+                        cand in interacted_sets.iloc[row]
+                        for cand, row in zip(updated_candidates, rows_to_recheck)
+                    ]
                 )
-                in_history_new = np.zeros_like(neg_candidates, dtype=bool)
-                rows, cols = np.where(
-                    invalid_mask
-                )  # Get indices of what needs checking
-                for i, j in zip(rows, cols):  # type: ignore[assignment]
-                    if neg_candidates[i, j] in interacted_sets.iloc[i]:
-                        in_history_new[i, j] = True
 
-                invalid_mask = is_target_new | in_history_new
+                # Combine results
+                still_invalid = is_target_new | in_history_new
 
-            # Convert to 1-indexed for the model
+                # Update invalid mask
+                new_invalid_mask = np.zeros_like(invalid_mask)
+                new_invalid_mask[invalid_mask] = still_invalid
+                invalid_mask = new_invalid_mask
+
             neg_tensor = torch.tensor(neg_candidates + 1, dtype=torch.long)
 
-        # Convert DataFrame to list
         sequences_list_0_indexed = training_data["sequences"].tolist()
-
-        # Convert list to be 1-indexed, this is faster
-        # than working with DataFrames
         sequences_tensors_1_indexed = [
             torch.tensor(s, dtype=torch.long) + 1 for s in sequences_list_0_indexed
         ]
-
-        # Use torch.nn.utils to pad the sequence
-        padded_item_seq = torch.nn.utils.rnn.pad_sequence(
+        padded_item_seq = pad_sequence(
             sequences_tensors_1_indexed, batch_first=True, padding_value=0
         )
-
-        # Convert to 1-index and to Tensors
         tensor_item_seq_len = torch.tensor(
             training_data["sequences"].str.len().tolist(), dtype=torch.long
         )
@@ -398,100 +364,43 @@ class Sessions:
     def get_user_history_sequences(
         self, user_ids: List[int], max_seq_len: int
     ) -> Tuple[Tensor, Tensor]:
-        """Retrieves padded historical sequences and their lengths for a given list of user IDs.
-        Sequences are 1-indexed.
-
-        This method is intended for evaluation purposes. For each user, it returns their complete interaction history as
-        recorded in the dataset, truncated or padded to the specified maximum sequence length. It's main
-        usage is to provide the full history of interactions for each user during prediction.
-
-        Args:
-            user_ids (List[int]): A list of global user indices.
-            max_seq_len (int): Maximum length of sequences produced.
-
-        Returns:
-            Tuple[Tensor, Tensor]: A tuple containing:
-                - Padded item sequences [num_users, max_seq_len]
-                - Sequence lengths [num_users]
-        """
+        """Retrieves padded historical sequences for evaluation."""
         if not self._cached_user_histories:
             self._compute_cache_user_history()
 
         sequences_to_process = []
         lengths_to_process = []
-
         for uid in user_ids:
-            history = self._cached_user_histories.get(
-                uid, []
-            )  # Get history, empty if no interactions
-            recent_history = history[-max_seq_len:]  # Take only the most recent
-
-            # For prediction, we use the entire history available in the training set
-            # The length check can be 0 here as padding handles empty sequences.
+            history = self._cached_user_histories.get(uid, [])
+            recent_history = history[-max_seq_len:]
             sequences_to_process.append(torch.tensor(recent_history, dtype=torch.long))
             lengths_to_process.append(len(recent_history))
 
-        # Handle cases where some users in the batch might not have history (empty lists)
-        # Pad sequences (0-indexed padding value)
-        padded_sequences = torch.nn.utils.rnn.pad_sequence(
+        padded_sequences = pad_sequence(
             sequences_to_process, batch_first=True, padding_value=0
         )
         sequence_lengths = torch.tensor(lengths_to_process, dtype=torch.long)
-
         return padded_sequences, sequence_lengths
 
     def _compute_cache_user_history(self):
-        # First call or cache cleared: pre-process all user histories
-        mapped_df_for_history = pd.DataFrame(
-            {
-                self._user_label: self._inter_df[self._user_label].map(self._umap),
-                self._item_label: self._inter_df[self._item_label].map(self._imap),
-                self._timestamp_label: self._inter_df[self._timestamp_label],
-            }
-        ).dropna()  # Ensure user/item are mapped
+        """Computes and caches the complete interaction history for every user."""
+        user_sessions = self._get_user_sessions()
+        self._cached_user_histories = user_sessions.apply(
+            lambda x: (np.array(x) + 1).tolist()
+        ).to_dict()
 
-        mapped_df_for_history[[self._user_label, self._item_label]] = (
-            mapped_df_for_history[[self._user_label, self._item_label]].astype(int)
-        )
-
-        mapped_df_for_history = mapped_df_for_history.sort_values(
-            by=[self._user_label, self._timestamp_label]
-        )
-
-        # Store 1-indexed sequences
-        self._cached_user_histories = (
-            mapped_df_for_history.groupby(self._user_label)[self._item_label]
-            .apply(
-                lambda x: (x.values + 1).tolist()
-            )  # Convert to list and 1-index items
-            .to_dict()
-        )
-
-    def get_group_sequential_dataloader(
+    def get_user_history_dataloader(
         self,
         max_seq_len: int,
         num_negatives: int,
         batch_size: int = 1024,
         shuffle: bool = True,
     ) -> DataLoader:
-        """Creates a sequential DataLoader grouped by user.
-
-        Args:
-            max_seq_len (int): Maximum length of sequences produced.
-            num_negatives (int): Number of negative samples per user.
-            batch_size (int): The batch size that will be used to
-                iterate over the sessions.
-            shuffle (bool): Whether to shuffle the data.
-
-        Returns:
-            DataLoader: Yields (pos_item_id, neg_item_id).
-        """
-        # Check if grouped sequential data has already been computed
-        # and is stored in cache
+        """Creates a DataLoader where each item is a user's full history."""
         cache_key = (max_seq_len, num_negatives)
         if cache_key in self._cached_grouped_sequential_data:
             cached_tensors = self._cached_grouped_sequential_data[cache_key]
-            dataset = GroupSessionDataset(**cached_tensors)
+            dataset = UserHistoryDataset(**cached_tensors)
             return DataLoader(dataset, batch_size=batch_size, shuffle=shuffle)
 
         pos_seqs, neg_samples = self._create_grouped_sequences(
@@ -501,56 +410,23 @@ class Sessions:
 
         if pos_seqs.shape[0] == 0:
             logger.attention(
-                "No valid sequential samples generated for DataLoader. "
-                "Check your data or session definition (min length 2)."
+                "No valid user history samples generated. Ensure users have at least 2 interactions."
             )
 
-        # Cache the results inside a dictionary
         dataset_args = {
             "positive_sequences": pos_seqs,
             "negative_samples": neg_samples,
         }
         self._cached_grouped_sequential_data[cache_key] = dataset_args
-
-        dataset = GroupSessionDataset(**dataset_args)
+        dataset = UserHistoryDataset(**dataset_args)
         return DataLoader(dataset, batch_size=batch_size, shuffle=shuffle)
 
     def _create_grouped_sequences(
         self, max_seq_len: int, num_negatives: int
     ) -> Tuple[Tensor, Tensor]:
-        """Core logic to transform interaction data into
-        grouped sequences.
+        """Core logic to transform interaction data into user-history sequences."""
+        user_sessions = self._get_user_sessions()
 
-        Args:
-            max_seq_len (int): Maximum length of sequences produced.
-            num_negatives (int): Number of negative samples per user.
-
-        Returns:
-            Tuple[Tensor, Tensor]:
-                - Tensor: Positive sample.
-                - Tensor: Negative sample.
-        """
-        # Retrieve mapped and ordered DataFrame
-        mapped_df = pd.DataFrame(
-            {
-                self._user_label: self._inter_df[self._user_label].map(self._umap),
-                self._item_label: self._inter_df[self._item_label].map(self._imap),
-                self._timestamp_label: self._inter_df[self._timestamp_label],
-            }
-        ).dropna()
-        mapped_df[[self._user_label, self._item_label]] = mapped_df[
-            [self._user_label, self._item_label]
-        ].astype(int)
-
-        # Group-by user session
-        user_sessions = (
-            mapped_df.sort_values(by=[self._user_label, self._timestamp_label])
-            .groupby(self._user_label)[self._item_label]
-            .apply(list)
-        )
-
-        # Filter out user with less than 2 interactions (only one interaction
-        # can't be considered a sequence). Truncate sequences to max_seq_len
         processed_sessions = (
             user_sessions[user_sessions.str.len() >= 2]
             .apply(lambda s: s[-max_seq_len:])
@@ -560,20 +436,12 @@ class Sessions:
         if not processed_sessions:
             return torch.empty(0), torch.empty(0)
 
-        # Compute negative sampling
         all_negative_samples = []
         for session in processed_sessions:
             seq_len = len(session)
-            session_negatives = np.zeros(
-                (seq_len - 1, num_negatives), dtype=np.int64
-            )  # [L-1, num_negatives]
-
+            session_negatives = np.zeros((seq_len - 1, num_negatives), dtype=np.int64)
             for i in range(1, seq_len):
-                history = set(
-                    session[: i + 1]
-                )  # Other items in history cannot be a negative_sample
-
-                # Randomly sample until found
+                history = set(session[: i + 1])
                 step_negatives: list = []
                 while len(step_negatives) < num_negatives:
                     candidates = np.random.randint(
@@ -581,22 +449,17 @@ class Sessions:
                     )
                     valid_candidates = [c for c in candidates if c not in history]
                     step_negatives.extend(valid_candidates)
-
                 session_negatives[i - 1] = step_negatives[:num_negatives]
-
             all_negative_samples.append(torch.from_numpy(session_negatives))
 
-        # Shift sequences by 1 (0 is for padding) and add padding
         pos_sequences_1_indexed = [
             torch.tensor(s, dtype=torch.long) + 1 for s in processed_sessions
         ]
-        padded_pos_sequences = torch.nn.utils.rnn.pad_sequence(
+        padded_pos_sequences = pad_sequence(
             pos_sequences_1_indexed, batch_first=True, padding_value=0
         )
-
-        # The same applies to the negatives
         neg_samples_1_indexed = [neg + 1 for neg in all_negative_samples]
-        padded_neg_samples = torch.nn.utils.rnn.pad_sequence(
+        padded_neg_samples = pad_sequence(
             neg_samples_1_indexed, batch_first=True, padding_value=0
         )
 

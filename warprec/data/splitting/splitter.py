@@ -7,6 +7,7 @@ from warprec.utils.config import (
     DesignConfiguration,
     SplittingConfig,
     SplitStrategy,
+    Labels,
 )
 from warprec.utils.enums import SplittingStrategies
 from warprec.utils.registry import splitting_registry
@@ -32,6 +33,10 @@ class Splitter:
     def split_transaction(
         self,
         data: DataFrame,
+        user_id_label: str = "user_id",
+        item_id_label: str = "item_id",
+        rating_label: str = "rating",
+        timestamp_label: str = "timestamp",
         test_strategy: Optional[SplittingStrategies] = None,
         test_ratio: Optional[float] = None,
         test_k: Optional[int] = None,
@@ -58,6 +63,10 @@ class Splitter:
 
         Args:
             data (DataFrame): The DataFrame to be splitted.
+            user_id_label (str): The user_id label.
+            item_id_label (str): The item_id label.
+            rating_label (str): The rating label.
+            timestamp_label (str): The timestamp label.
             test_strategy (Optional[SplittingStrategies]): The splitting strategy to use for test set.
             test_ratio (Optional[float]): The ratio value for test set.
             test_k (Optional[int]): The k value for test set.
@@ -86,8 +95,15 @@ class Splitter:
                     the experiment to evaluate the model.
         """
         if self.config:
+            labels = self.config.reader.labels
             split_config = self.config.splitter
         else:
+            labels = Labels(
+                user_id_label=user_id_label,
+                item_id_label=item_id_label,
+                rating_label=rating_label,
+                timestamp_label=timestamp_label,
+            )
             split_config = SplittingConfig(
                 test_splitting=SplitStrategy(
                     strategy=test_strategy,
@@ -113,7 +129,7 @@ class Splitter:
         )
         test_split_time_start = time.time()
         original_train_set, test_set = self._process_split(
-            data, split_config.test_splitting
+            data, split_config.test_splitting, labels
         )[0]
         test_split_time = time.time() - test_split_time_start
         logger.msg(f"Test splitting completed in : {test_split_time:.2f}s")
@@ -126,7 +142,7 @@ class Splitter:
             )
             validation_split_time_start = time.time()
             folds = self._process_split(
-                original_train_set, split_config.validation_splitting
+                original_train_set, split_config.validation_splitting, labels
             )
             for train, validation in folds:
                 validation_folds.append((train, validation))
@@ -167,10 +183,10 @@ class Splitter:
         raise NotImplementedError
 
     def _process_split(
-        self, data: DataFrame, split_strategy: SplitStrategy
+        self, data: DataFrame, split_strategy: SplitStrategy, labels: Labels
     ) -> List[Tuple[DataFrame, DataFrame]]:
         strategy = splitting_registry.get(split_strategy.strategy)
-        folds = strategy(data, **split_strategy.model_dump())
+        folds = strategy(data, **split_strategy.model_dump(), **labels.model_dump())
         return folds
 
     def _filter_sets(self, train_set: DataFrame, evaluation_set: DataFrame):

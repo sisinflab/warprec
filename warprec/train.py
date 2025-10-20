@@ -8,7 +8,7 @@ import ray
 import torch
 from pandas import DataFrame
 
-from warprec.data.reader import ReaderFactory
+from warprec.data.reader import ReaderFactory, Reader
 from warprec.data.writer import WriterFactory
 from warprec.data.splitting import Splitter
 from warprec.data.dataset import Dataset
@@ -69,7 +69,14 @@ def main(args: Namespace):
     user_cluster = None
     item_cluster = None
     if config.reader.loading_strategy == "dataset":
-        data = reader.read()
+        data = reader.read_tabular(
+            local_path=config.reader.local_path,
+            blob_name=config.reader.azure_blob_name,
+            column_names=config.reader.column_names(),
+            dtypes=config.reader.column_dtype(),
+            sep=config.reader.sep,
+            header=config.reader.header,
+        )
         data = callback.on_data_reading(data)
 
         # Check for optional filtering
@@ -89,18 +96,113 @@ def main(args: Namespace):
 
     elif config.reader.loading_strategy == "split":
         if config.reader.data_type == "transaction":
-            train_data, val_data, test_data = reader.read_transaction_split()
+            train_data, val_data, test_data = reader.read_tabular_split(
+                split_dir=config.reader.split.local_path,
+                blob_prefix=config.reader.split.azure_blob_prefix,
+                column_names=config.reader.column_names(),
+                dtypes=config.reader.column_dtype(),
+                sep=config.reader.split.sep,
+                ext=config.reader.split.ext,
+                header=config.reader.split.header,
+            )
 
         else:
             raise ValueError("Data type not yet supported.")
 
     # Side information reading
     if config.reader.side:
-        side_data = reader.read_side_information()
+        side_data = reader.read_tabular(
+            local_path=config.reader.side.local_path,
+            blob_name=config.reader.side.azure_blob_name,
+            sep=config.reader.side.sep,
+            header=config.reader.side.header,
+        )
 
     # Cluster information reading
     if config.reader.clustering:
-        user_cluster, item_cluster = reader.read_cluster_information()
+
+        def _read_cluster_data_clean(
+            specific_config: dict,
+            common_cluster_label: str,
+            common_cluster_type: str,
+            reader: Reader,
+        ) -> DataFrame:
+            """Reads clustering data using a pre-prepared specific configuration (User or Item).
+
+            Args:
+                specific_config (dict): Specific configurations for user or item.
+                common_cluster_label (str): Common label for the cluster column.
+                common_cluster_type (str): Common data type for the cluster column.
+                reader (Reader): Object or module with the read_tabular method.
+
+            Returns:
+                DataFrame: A Pandas DataFrame containing the cluster data.
+            """
+
+            # Define column names
+            column_names = [
+                specific_config["id_label"],
+                common_cluster_label,
+            ]
+
+            # Define data types (and map them to column names)
+            dtypes_list = [
+                specific_config["id_type"],
+                common_cluster_type,
+            ]
+            dtype_map = zip(column_names, dtypes_list)
+
+            # Read tabular data using the custom reader
+            cluster_data = reader.read_tabular(
+                local_path=specific_config["local_path"],
+                blob_name=specific_config["blob_name"],
+                column_names=column_names,
+                dtypes=dtype_map,
+                sep=specific_config["sep"],
+                header=specific_config["header"],
+            )
+
+            return cluster_data
+
+        # Common clustering information
+        common_cluster_label = config.reader.labels.cluster_label
+        common_cluster_type = config.reader.dtypes.cluster_type
+
+        # User specific clustering information
+        user_config = {
+            "id_label": config.reader.labels.user_id_label,
+            "id_type": config.reader.dtypes.user_id_type,
+            "local_path": config.reader.clustering.user_local_path,
+            "blob_name": config.reader.clustering.user_azure_blob_name,
+            "sep": config.reader.clustering.user_sep,
+            "header": config.reader.clustering.user_header,
+        }
+
+        # Item specific clustering information
+        item_config = {
+            "id_label": config.reader.labels.item_id_label,
+            "id_type": config.reader.dtypes.item_id_type,
+            "local_path": config.reader.clustering.item_local_path,
+            "blob_name": config.reader.clustering.item_azure_blob_name,
+            "sep": config.reader.clustering.item_sep,
+            "header": config.reader.clustering.item_header,
+        }
+
+        # Read user clustering data
+        user_cluster = _read_cluster_data_clean(
+            specific_config=user_config,
+            common_cluster_label=common_cluster_label,
+            common_cluster_type=common_cluster_type,
+            reader=reader,
+        )
+
+        # Read item clustering data
+        item_cluster = _read_cluster_data_clean(
+            specific_config=item_config,
+            common_cluster_label=common_cluster_label,
+            common_cluster_type=common_cluster_type,
+            reader=reader,
+        )
 
     # Dataset common information
     common_params = {
@@ -158,7 +260,14 @@ def main(args: Namespace):
     )
 
     if config.splitter and config.writer.save_split:
-        writer.write_split(main_dataset, val_dataset, fold_dataset)
+        writer.write_split(
+            main_dataset,
+            val_dataset,
+            fold_dataset,
+            sep=config.writer.split.sep,
+            ext=config.writer.split.ext,
+            header=config.writer.split.header,
+        )
 
     # Trainer testing
     models = list(config.models.keys())
@@ -270,11 +379,17 @@ def main(args: Namespace):
         writer.write_results(
             results,
             model_name,
+            sep=config.writer.results.sep,
+            ext=config.writer.results.ext,
         )
 
         # Recommendation
         if params.meta.save_recs:
-            writer.write_recs(best_model, main_dataset, config.writer.recommendation.k)
+            writer.write_recs(
+                model=best_model,
+                dataset=main_dataset,
+                **config.writer.recommendation.model_dump(),
+            )
 
         # Save params
         model_params = {model_name: best_model.get_params()}

@@ -56,6 +56,7 @@ class ARP(TopKMetric):
     For further details, please refer to this `paper <https://arxiv.org/abs/1901.07555>`_.
 
     Attributes:
+        pop (Tensor): The lookup tensor of item popularity.
         retrieved_pop (Tensor): The number of interaction for every
             item recommended.
         users (Tensor): The number of users evaluated.
@@ -80,6 +81,7 @@ class ARP(TopKMetric):
     }
     _CAN_COMPUTE_PER_USER: bool = True
 
+    pop: Tensor
     retrieved_pop: Tensor
     users: Tensor
     compute_per_user: bool
@@ -95,7 +97,6 @@ class ARP(TopKMetric):
         **kwargs: Any,
     ):
         super().__init__(k, dist_sync_on_step)
-        self.pop = self.compute_popularity(item_interactions)
         self.compute_per_user = compute_per_user
 
         if self.compute_per_user:
@@ -107,6 +108,9 @@ class ARP(TopKMetric):
                 "retrieved_pop", default=torch.tensor(0.0), dist_reduce_fx="sum"
             )  # Initialize a scalar to store global value
         self.add_state("users", default=torch.tensor(0.0), dist_reduce_fx="sum")
+
+        # Add popularity counts as buffer
+        self.register_buffer("pop", self.compute_popularity(item_interactions))
 
     def update(self, preds: Tensor, user_indices: Tensor, **kwargs: Any):
         """Updates the metric state with the new batch of predictions."""

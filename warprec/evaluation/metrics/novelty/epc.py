@@ -65,6 +65,7 @@ class EPC(TopKMetric):
     For further details, please refer to this `link <https://dl.acm.org/doi/abs/10.1145/2043932.2043955>`_.
 
     Attributes:
+        novelty_profile (Tensor): The item novelty lookup tensor.
         epc (Tensor): The EPC value for every user.
         users (Tensor): Number of users evaluated.
         compute_per_user (bool): Wether or not to compute the metric
@@ -84,6 +85,7 @@ class EPC(TopKMetric):
 
     _CAN_COMPUTE_PER_USER: bool = True
 
+    novelty_profile: Tensor
     epc: Tensor
     users: Tensor
     compute_per_user: bool
@@ -100,12 +102,8 @@ class EPC(TopKMetric):
         **kwargs: Any,
     ):
         super().__init__(k, dist_sync_on_step)
-        self.novelty_profile = self.compute_novelty_profile(
-            item_interactions, num_users, log_discount=False
-        )
         self.relevance = relevance
         self.compute_per_user = compute_per_user
-        self.relevance = relevance
 
         if self.compute_per_user:
             self.add_state(
@@ -116,6 +114,14 @@ class EPC(TopKMetric):
                 "epc", default=torch.tensor(0.0), dist_reduce_fx="sum"
             )  # Initialize a scalar to store global value
         self.add_state("users", default=torch.tensor(0.0), dist_reduce_fx="sum")
+
+        # Add novelty profile as buffer
+        self.register_buffer(
+            "novelty_profile",
+            self.compute_novelty_profile(
+                item_interactions, num_users, log_discount=False
+            ),
+        )
 
         # Check for requirements
         self._REQUIRED_COMPONENTS = (
