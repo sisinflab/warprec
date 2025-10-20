@@ -17,6 +17,8 @@ from warprec.recommenders.base_recommender import (
     Recommender,
     SequentialRecommenderUtils,
 )
+from warprec.utils.config import TrainConfiguration
+from warprec.utils.enums import WritingMethods
 from warprec.utils.logger import logger
 
 
@@ -321,3 +323,59 @@ class Writer(ABC):
             logger.msg(f"Statistical significance test results written to {path}")
         except Exception as e:
             logger.negative(f"Error writing statistical test results to {path}: {e}")
+
+
+class WriterFactory:  # pylint: disable=C0415, R0903
+    """Factory class for creating Writer instances based on configuration.
+
+    Attributes:
+        config (TrainConfiguration): The configuration of the experiment.
+    """
+
+    config: TrainConfiguration = None
+
+    @classmethod
+    def get_writer(cls, config: TrainConfiguration) -> Writer:
+        """Factory method to get the appropriate Writer instance based on the configuration.
+
+        Args:
+            config (TrainConfiguration): The configuration of the experiment.
+
+        Returns:
+            Writer: An instance of a class that extends the Writer abstract class.
+
+        Raises:
+            ValueError: If the writing method specified in the configuration is unknown.
+        """
+        writer_type = config.writer.writing_method
+
+        # Create the appropriate Writer instance based on the writing method
+        match writer_type:
+            case WritingMethods.LOCAL:
+                from warprec.data.writer import LocalWriter
+
+                dataset_name = config.writer.dataset_name
+                local_path = config.writer.local_experiment_path
+
+                return LocalWriter(
+                    dataset_name=dataset_name,
+                    local_path=local_path,
+                )
+            case WritingMethods.AZURE_BLOB:
+                from warprec.data.writer import AzureBlobWriter
+
+                storage_account_name = config.general.azure.storage_account_name
+                container_name = config.general.azure.container_name
+                dataset_name = config.writer.dataset_name
+                blob_experiment_container = (
+                    config.writer.azure_blob_experiment_container
+                )
+
+                return AzureBlobWriter(
+                    storage_account_name=storage_account_name,
+                    container_name=container_name,
+                    dataset_name=dataset_name,
+                    blob_experiment_container=blob_experiment_container,
+                )
+
+        raise ValueError(f"Unknown writer type: {writer_type}")
