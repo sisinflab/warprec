@@ -260,7 +260,14 @@ def main(args: Namespace):
     )
 
     if config.splitter and config.writer.save_split:
-        writer.write_split(main_dataset, val_dataset, fold_dataset)
+        writer.write_split(
+            main_dataset,
+            val_dataset,
+            fold_dataset,
+            sep=config.writer.split.sep,
+            ext=config.writer.split.ext,
+            header=config.writer.split.header,
+        )
 
     # Trainer testing
     models = list(config.models.keys())
@@ -372,11 +379,17 @@ def main(args: Namespace):
         writer.write_results(
             results,
             model_name,
+            sep=config.writer.results.sep,
+            ext=config.writer.results.ext,
         )
 
         # Recommendation
         if params.meta.save_recs:
-            writer.write_recs(best_model, main_dataset, config.writer.recommendation.k)
+            writer.write_recs(
+                model=best_model,
+                dataset=main_dataset,
+                **config.writer.recommendation.model_dump(),
+            )
 
         # Save params
         model_params = {model_name: best_model.get_params()}
