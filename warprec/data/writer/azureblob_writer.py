@@ -32,7 +32,6 @@ class AzureBlobWriter(Writer):
     ):
         super().__init__()
 
-        # We assume DefaultAzureCredential is configured in the environment
         credential = DefaultAzureCredential()
         account_url = f"https://{storage_account_name}.blob.core.windows.net"
         self.blob_service_client = BlobServiceClient(
@@ -85,7 +84,6 @@ class AzureBlobWriter(Writer):
         user_label: str = "user_id",
         item_label: str = "item_id",
         rating_label: str = "rating",
-        chunk_size: int = 100_000,
     ) -> None:
         """Uploads recommendations to Azure Blob Storage in a streaming fashion."""
         path = self._path_join(
@@ -94,29 +92,26 @@ class AzureBlobWriter(Writer):
         )
         blob_client = self.container_client.get_blob_client(path)
 
-        # Generator for chunked upload
-        row_gen = self._generate_recommendation_rows(model, dataset, k)
-        chunk_gen = self._chunk_generator(row_gen, chunk_size)
+        # Get the generator that yields batches of recommendation rows
+        batch_generator = self._generate_recommendation_batches(model, dataset, k)
 
-        def csv_line_generator() -> Generator[bytes, None, None]:
-            """A generator that yields CSV lines as UTF-8 encoded bytes."""
-            # Use an in-memory buffer for just one line at a time
+        def csv_batch_generator() -> Generator[bytes, None, None]:
+            """A generator that yields CSV data in batches as UTF-8 encoded bytes."""
             string_io = StringIO()
             writer = csv.writer(string_io, delimiter=sep)
 
-            # If header is needed, write it first
             if header:
                 writer.writerow([user_label, item_label, rating_label])
                 yield string_io.getvalue().encode("utf-8")
                 string_io.seek(0)
                 string_io.truncate(0)
 
-            # Retrieve rows in chunks and write them
-            for rows_chunk in chunk_gen:
-                writer.writerows(rows_chunk)
+            # Iterate over batches of rows and write them
+            for batch in batch_generator:
+                writer.writerows(batch)
                 yield string_io.getvalue().encode("utf-8")
 
-                # Reset the StringIO for the next chunk
+                # Reset the StringIO for the next batch
                 string_io.seek(0)
                 string_io.truncate(0)
 
@@ -124,7 +119,7 @@ class AzureBlobWriter(Writer):
 
         try:
             # upload_blob can take a generator for memory-efficient streaming
-            blob_client.upload_blob(csv_line_generator(), overwrite=True)
+            blob_client.upload_blob(csv_batch_generator(), overwrite=True)
             logger.msg(f"Recommendations successfully written to blob: {path}")
         except Exception as e:
             logger.negative(f"Error writing recommendations to blob {path}: {e}")

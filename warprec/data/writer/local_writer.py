@@ -69,7 +69,6 @@ class LocalWriter(Writer):
         user_label: str = "user_id",
         item_label: str = "item_id",
         rating_label: str = "rating",
-        chunk_size: int = 100_000,
     ):
         """Writes recommendations to a local file in a streaming fashion."""
         path = self._path_join(
@@ -83,13 +82,14 @@ class LocalWriter(Writer):
                 if header:
                     writer.writerow([user_label, item_label, rating_label])
 
-                # Create the row generator and chunk generator
-                row_generator = self._generate_recommendation_rows(model, dataset, k)
-                chunk_generator = self._chunk_generator(row_generator, chunk_size)
+                # The generator now yields entire batches of rows
+                batch_generator = self._generate_recommendation_batches(
+                    model, dataset, k
+                )
 
-                # Iterate over chunks and write to file
-                for chunk in chunk_generator:
-                    writer.writerows(chunk)
+                # Iterate over batches and write them to the file
+                for batch in batch_generator:
+                    writer.writerows(batch)
             logger.msg(f"Recommendations successfully written to {path}")
         except Exception as e:
             logger.negative(f"Error writing recommendations to {path}: {e}")

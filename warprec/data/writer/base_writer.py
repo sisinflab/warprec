@@ -17,8 +17,6 @@ from warprec.recommenders.base_recommender import (
     Recommender,
     SequentialRecommenderUtils,
 )
-from warprec.utils.config import TrainConfiguration
-from warprec.utils.enums import WritingMethods
 from warprec.utils.logger import logger
 
 
@@ -64,19 +62,19 @@ class Writer(ABC):
         in a memory-efficient, streaming fashion.
         """
 
-    def _generate_recommendation_rows(
+    def _generate_recommendation_batches(
         self, model: Recommender, dataset: Dataset, k: int
-    ) -> Generator[tuple, None, None]:
-        """A generator that yields recommendation rows (user, item, score) one by one,
-        processing users in batches to keep memory usage low.
+    ) -> Generator[list[tuple], None, None]:
+        """A generator that yields batches of recommendation rows.
+        Each batch corresponds to the recommendations for a batch of users.
 
         Args:
-            model (Recommender): The trained model from which produce recommendations.
+            model (Recommender): The trained model from which to produce recommendations.
             dataset (Dataset): The dataset used to train the model.
-            k (int): The number of recommendation to produce for each user.
+            k (int): The number of recommendations to produce for each user.
 
         Yields:
-            tuple: A tuple of (user_label, item_label, score) for each recommendation.
+            list[tuple]: A list of (user_label, item_label, score) tuples.
         """
         train_sparse = dataset.train_set.get_sparse()
         umap_i, imap_i = dataset.get_inverse_mappings()
@@ -85,7 +83,7 @@ class Writer(ABC):
         batch_size = dataset._batch_size
 
         batch_iterator = range(0, num_users, batch_size)
-        for i in tqdm(batch_iterator, desc="Generating recommendation rows"):
+        for i in tqdm(batch_iterator, desc="Generating recommendation batches"):
             user_indices = all_user_indices[i : i + batch_size]
             train_batch = train_sparse[user_indices.tolist(), :]
 
@@ -112,26 +110,8 @@ class Writer(ABC):
             item_labels = [imap_i[idx.item()] for idx in top_k_items.flatten()]
             scores = top_k_scores.flatten().tolist()
 
-            # Yield each row individually
-            for row in zip(user_labels, item_labels, scores):
-                yield row
-
-    def _chunk_generator(
-        self,
-        row_generator: Generator[tuple, None, None],
-        chunk_size: int = 100_00,
-    ) -> Generator[list[tuple], None, None]:
-        """Splits the row generator into chunks of specified size."""
-        chunk_buffer = []
-        for row in row_generator:
-            chunk_buffer.append(row)
-            if len(chunk_buffer) >= chunk_size:
-                yield chunk_buffer
-                chunk_buffer = []  # Resets the buffer
-
-        # Last chunk will might be smaller than chunk size
-        if chunk_buffer:
-            yield chunk_buffer
+            # Yield the entire list of rows for the current batch
+            yield list(zip(user_labels, item_labels, scores))
 
     def write_results(
         self,
@@ -341,59 +321,3 @@ class Writer(ABC):
             logger.msg(f"Statistical significance test results written to {path}")
         except Exception as e:
             logger.negative(f"Error writing statistical test results to {path}: {e}")
-
-
-class WriterFactory:  # pylint: disable=C0415, R0903
-    """Factory class for creating Writer instances based on configuration.
-
-    Attributes:
-        config (TrainConfiguration): The configuration of the experiment.
-    """
-
-    config: TrainConfiguration = None
-
-    @classmethod
-    def get_writer(cls, config: TrainConfiguration) -> Writer:
-        """Factory method to get the appropriate Writer instance based on the configuration.
-
-        Args:
-            config (TrainConfiguration): The configuration of the experiment.
-
-        Returns:
-            Writer: An instance of a class that extends the Writer abstract class.
-
-        Raises:
-            ValueError: If the writing method specified in the configuration is unknown.
-        """
-        writer_type = config.writer.writing_method
-
-        # Create the appropriate Writer instance based on the writing method
-        match writer_type:
-            case WritingMethods.LOCAL:
-                from warprec.data.writer import LocalWriter
-
-                dataset_name = config.writer.dataset_name
-                local_path = config.writer.local_experiment_path
-
-                return LocalWriter(
-                    dataset_name=dataset_name,
-                    local_path=local_path,
-                )
-            case WritingMethods.AZURE_BLOB:
-                from warprec.data.writer import AzureBlobWriter
-
-                storage_account_name = config.general.azure.storage_account_name
-                container_name = config.general.azure.container_name
-                dataset_name = config.writer.dataset_name
-                blob_experiment_container = (
-                    config.writer.azure_blob_experiment_container
-                )
-
-                return AzureBlobWriter(
-                    storage_account_name=storage_account_name,
-                    container_name=container_name,
-                    dataset_name=dataset_name,
-                    blob_experiment_container=blob_experiment_container,
-                )
-
-        raise ValueError(f"Unknown writer type: {writer_type}")
