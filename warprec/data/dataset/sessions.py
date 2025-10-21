@@ -183,6 +183,7 @@ class Sessions:
         include_user_id: bool = False,
         batch_size: int = 1024,
         shuffle: bool = True,
+        seed: int = 42,
     ) -> DataLoader:
         """Creates a DataLoader for sequential data."""
         cache_key = (max_seq_len, num_negatives, include_user_id)
@@ -201,6 +202,7 @@ class Sessions:
             num_negatives=num_negatives,
             max_seq_len=max_seq_len,
             include_user_id=include_user_id,
+            seed=seed,
         )
 
         if padded_item_seq.shape[0] == 0:
@@ -227,6 +229,7 @@ class Sessions:
         num_negatives: int,
         max_seq_len: int,
         include_user_id: bool = False,
+        seed: int = 42,
     ) -> Tuple[Optional[Tensor], Tensor, Tensor, Tensor, Optional[Tensor]]:
         """Core logic for transforming interaction data into sequential training samples.
 
@@ -236,6 +239,7 @@ class Sessions:
             num_negatives (int): Number of negative samples per user.
             max_seq_len (int): Maximum length of sequences produced.
             include_user_id (bool): Wether or not to return also the user_id.
+            seed (int): Seed for Numpy random number generator for reproducibility.
 
         Returns:
             Tuple[Optional[Tensor], Tensor, Tensor, Tensor, Optional[Tensor]]: A tuple containing:
@@ -334,6 +338,9 @@ class Sessions:
         # with the positive target or any item in the user's history for that sample
         neg_tensor = None
         if num_negatives > 0:
+            # Set random seed for reproducibility
+            np.random.seed(seed)
+
             # Generate initial random candidates
             neg_candidates = np.random.randint(
                 0, self._niid, size=(num_total_samples, num_negatives), dtype=np.int64
