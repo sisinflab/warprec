@@ -228,130 +228,165 @@ class Sessions:
         max_seq_len: int,
         include_user_id: bool = False,
     ) -> Tuple[Optional[Tensor], Tensor, Tensor, Tensor, Optional[Tensor]]:
-        """Core logic for transforming interaction data into sequential training samples."""
-        user_sessions = self._get_user_sessions()
-        user_sessions = user_sessions[user_sessions.str.len() >= 2]
+        """Core logic for transforming interaction data into sequential training samples.
 
-        if user_sessions.empty:
+        This function uses pandas and numpy for efficient processing.
+
+        Args:
+            num_negatives (int): Number of negative samples per user.
+            max_seq_len (int): Maximum length of sequences produced.
+            include_user_id (bool): Wether or not to return also the user_id.
+
+        Returns:
+            Tuple[Optional[Tensor], Tensor, Tensor, Tensor, Optional[Tensor]]: A tuple containing:
+                - Optional[Tensor]: User ID.
+                - Tensor: Padded item sequence.
+                - Tensor: Item sequence length.
+                - Tensor: Positive item tensor.
+                - Optional[Tensor]: Negative item tensor.
+        """
+        # Map raw user/item IDs to continuous integer indices, drop any invalid interactions,
+        # and sort the data by user and timestamp. This is a prerequisite for generating
+        # sequential data
+        mapped_df = pd.DataFrame(
+            {
+                self._user_label: self._inter_df[self._user_label].map(self._umap),
+                self._item_label: self._inter_df[self._item_label].map(self._imap),
+                self._timestamp_label: self._inter_df[self._timestamp_label],
+            }
+        ).dropna()
+        mapped_df[[self._user_label, self._item_label]] = mapped_df[
+            [self._user_label, self._item_label]
+        ].astype(np.int64)
+        sorted_df = mapped_df.sort_values(
+            by=[self._user_label, self._timestamp_label]
+        ).reset_index(drop=True)
+
+        # Extract numpy arrays for efficient processing
+        all_items_0_indexed = sorted_df[self._item_label].values
+        all_users = sorted_df[self._user_label].values
+
+        # Identify user sessions by detecting changes in the user ID column
+        is_new_session = np.diff(all_users, prepend=-1) != 0
+        session_starts_idx = np.where(is_new_session)[0]
+        session_lengths = np.diff(session_starts_idx, append=len(all_users))
+
+        # Filter out sessions that are too short to form training samples
+        valid_session_mask = session_lengths >= 2
+        valid_session_starts = session_starts_idx[valid_session_mask]
+        valid_session_lengths = session_lengths[valid_session_mask]
+
+        if len(valid_session_starts) == 0:
+            # Handle edge case where no valid sessions exist
             return (
                 None if not include_user_id else torch.empty(0, dtype=torch.long),
-                torch.empty((0, 0), dtype=torch.long),
+                torch.empty((0, max_seq_len), dtype=torch.long),
                 torch.empty(0, dtype=torch.long),
                 torch.empty(0, dtype=torch.long),
                 None if num_negatives == 0 else torch.empty(0, dtype=torch.long),
             )
 
-        # Pre-allocate lists
-        all_sequences = []
-        all_targets = []
-        all_user_ids = []
+        # For each valid session of length L, we generate L-1 training samples.
+        # This block calculates the total number of samples and determines the index
+        # of the positive target item for each sample
+        num_samples_per_session = valid_session_lengths - 1
+        num_total_samples = np.sum(num_samples_per_session)
 
-        # Iterate over the Pandas Series
-        for user_id, items in user_sessions.items():
-            # Generate all the pairs seq, target for each user
-            for i in range(len(items) - 1):
-                sequence = items[: i + 1]
-                target = items[i + 1]
+        sequence_index_offsets = np.concatenate(
+            [np.arange(n) for n in num_samples_per_session]
+        ).astype(np.int64)
 
-                # Truncate the sequence at the max_seq_len
-                truncated_sequence = sequence[-max_seq_len:]
+        session_indices = np.repeat(
+            np.arange(len(valid_session_starts)), num_samples_per_session
+        ).astype(np.int64)
 
-                # Add the sequence only if not empty
-                if truncated_sequence:
-                    all_sequences.append(truncated_sequence)
-                    all_targets.append(target)
-                    if include_user_id:
-                        all_user_ids.append(user_id)
+        target_indices = (
+            valid_session_starts[session_indices] + sequence_index_offsets + 1
+        )
 
-        # Create the final dataset
-        training_data_dict = {
-            "sequences": all_sequences,
-            "targets": all_targets,
-        }
-        if include_user_id:
-            training_data_dict[self._user_label] = all_user_ids
+        # Calculate sequence start indices and final lengths
+        session_start_for_sample = valid_session_starts[session_indices]
+        truncation_start_indices = target_indices - max_seq_len
+        true_sequence_start_indices = np.maximum(
+            session_start_for_sample, truncation_start_indices
+        )
+        final_sequence_lengths_np = target_indices - true_sequence_start_indices
 
-        training_data = pd.DataFrame(training_data_dict)
+        # Gather item data to form sequences
+        item_offsets = np.arange(max_seq_len, dtype=np.int64)
+        indices_to_gather = true_sequence_start_indices[:, None] + item_offsets
 
-        tensor_user_id = None
-        if include_user_id:
-            tensor_user_id = torch.tensor(
-                training_data[self._user_label].values, dtype=torch.long
-            )
+        # Convert to PyTorch tensors for indexing
+        all_items_tensor = torch.from_numpy(all_items_0_indexed).long()
+        indices_to_gather_tensor = torch.from_numpy(indices_to_gather).long()
 
-        # Handle Negative Sampling if requested
+        # Items are gathered and converted to 1-based indexing for the model
+        padded_item_seq = all_items_tensor[indices_to_gather_tensor].add(1)
+
+        # Apply right-padding mask
+        tensor_item_seq_len = torch.from_numpy(final_sequence_lengths_np).long()
+        row_indices = torch.arange(max_seq_len, dtype=torch.long)
+        padding_mask_right = row_indices >= tensor_item_seq_len[:, None]
+        padded_item_seq.masked_fill_(padding_mask_right, 0)
+
+        # If requested, generate `num_negatives` negative samples for each positive sample.
+        # This process is vectorized and ensures that negative candidates do not collide
+        # with the positive target or any item in the user's history for that sample
         neg_tensor = None
         if num_negatives > 0:
-            num_samples = len(training_data)
-            targets_np = training_data["targets"].values
-            interacted_sets = training_data["sequences"].apply(set)
-
-            # Sample candidates
+            # Generate initial random candidates
             neg_candidates = np.random.randint(
-                0, self._niid, size=(num_samples, num_negatives), dtype=np.int64
+                0, self._niid, size=(num_total_samples, num_negatives), dtype=np.int64
             )
 
-            # Collision check
-            is_target = neg_candidates == targets_np[:, None]
+            # Prepare data for collision checks
+            target_items_0_indexed = all_items_0_indexed[target_indices]
 
-            # Define the 'in_history' mask
-            in_history = np.array(
-                [
-                    [neg in hist for neg in negs]  # type: ignore[attr-defined]
-                    for negs, hist in zip(neg_candidates, interacted_sets)
-                ]
-            )
+            # History is the padded sequence, converted back to 0-indexed.
+            # Padding (0) is set to -1 to avoid accidental matches with item 0.
+            history_0_indexed = padded_item_seq.numpy() - 1
+            history_0_indexed[history_0_indexed < 0] = -1
+            history_tensor = torch.from_numpy(history_0_indexed).long()
 
-            invalid_mask = is_target | in_history
-
-            # If invalid indices have been sampled, repeat the process
+            # Iteratively re-sample until no collisions exist
+            invalid_mask = np.ones_like(
+                neg_candidates, dtype=bool
+            )  # Start with all as potentially invalid
             while np.any(invalid_mask):
-                num_invalid = np.sum(invalid_mask)
+                # Check for collision with the positive target
+                is_target = neg_candidates == target_items_0_indexed[:, None]
 
-                # Sample only non valid candidates
+                # Check for collision with sequence history using broadcasting
+                neg_candidates_tensor = torch.from_numpy(neg_candidates).long()
+                collision_matrix = (
+                    neg_candidates_tensor[:, :, None] == history_tensor[:, None, :]
+                )
+                in_history = torch.any(collision_matrix, dim=2).numpy()
+
+                # Combine masks and find where re-sampling is needed
+                invalid_mask = is_target | in_history
+                if not np.any(invalid_mask):
+                    break
+
+                # Re-sample only the invalid candidates
+                num_invalid = np.sum(invalid_mask)
                 new_candidates = np.random.randint(
                     0, self._niid, size=num_invalid, dtype=np.int64
                 )
                 neg_candidates[invalid_mask] = new_candidates
 
-                # Find the indexes that need updating
-                rows_to_recheck, _ = np.where(invalid_mask)
-                updated_candidates = neg_candidates[invalid_mask]
+            # Convert final valid candidates to 1-based indexing
+            neg_tensor = torch.from_numpy(neg_candidates + 1).long()
 
-                # Check is_target only on updated candidates
-                is_target_new = updated_candidates == targets_np[rows_to_recheck]
+        # Convert all remaining numpy arrays to PyTorch tensors and return them.
+        tensor_pos_item_id = torch.from_numpy(
+            all_items_0_indexed[target_indices] + 1
+        ).long()
 
-                # Check in_history only on updated candidates
-                in_history_new = np.array(
-                    [
-                        cand in interacted_sets.iloc[row]
-                        for cand, row in zip(updated_candidates, rows_to_recheck)
-                    ]
-                )
-
-                # Combine results
-                still_invalid = is_target_new | in_history_new
-
-                # Update invalid mask
-                new_invalid_mask = np.zeros_like(invalid_mask)
-                new_invalid_mask[invalid_mask] = still_invalid
-                invalid_mask = new_invalid_mask
-
-            neg_tensor = torch.tensor(neg_candidates + 1, dtype=torch.long)
-
-        sequences_list_0_indexed = training_data["sequences"].tolist()
-        sequences_tensors_1_indexed = [
-            torch.tensor(s, dtype=torch.long) + 1 for s in sequences_list_0_indexed
-        ]
-        padded_item_seq = pad_sequence(
-            sequences_tensors_1_indexed, batch_first=True, padding_value=0
-        )
-        tensor_item_seq_len = torch.tensor(
-            training_data["sequences"].str.len().tolist(), dtype=torch.long
-        )
-        tensor_pos_item_id = torch.tensor(
-            training_data["targets"].values.astype(np.int64) + 1, dtype=torch.long
-        )
+        # Optionally convert user IDs if requested
+        tensor_user_id = None
+        if include_user_id:
+            tensor_user_id = torch.from_numpy(all_users[target_indices]).long()
 
         return (
             tensor_user_id,
