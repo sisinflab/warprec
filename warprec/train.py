@@ -264,9 +264,7 @@ def main(args: Namespace):
             main_dataset,
             val_dataset,
             fold_dataset,
-            sep=config.writer.split.sep,
-            ext=config.writer.split.ext,
-            header=config.writer.split.header,
+            **config.writer.split.model_dump(),
         )
 
     # Trainer testing
@@ -364,7 +362,7 @@ def main(args: Namespace):
         evaluator.print_console(results, "Test", config.evaluation.max_metric_per_row)
 
         if requires_stat_significance:
-            model_results["Test"][model_name] = (
+            model_results[model_name] = (
                 results  # Populate model_results for statistical significance
             )
 
@@ -379,8 +377,7 @@ def main(args: Namespace):
         writer.write_results(
             results,
             model_name,
-            sep=config.writer.results.sep,
-            ext=config.writer.results.ext,
+            **config.writer.results.model_dump(),
         )
 
         # Recommendation
@@ -464,23 +461,30 @@ def main(args: Namespace):
             writer.write_time_report(model_timing_report)
 
     if requires_stat_significance:
-        logger.msg(
-            f"Computing statistical significance tests for {len(models)} models."
-        )
+        # Check if enough models have been evaluated
+        if len(model_results) >= 2:
+            logger.msg(
+                f"Computing statistical significance tests for {len(models)} models."
+            )
 
-        stat_significance = config.evaluation.stat_significance.model_dump(
-            exclude=["corrections"]  # type: ignore[arg-type]
-        )
-        corrections = config.evaluation.stat_significance.corrections.model_dump()
+            stat_significance = config.evaluation.stat_significance.model_dump(
+                exclude=["corrections"]  # type: ignore[arg-type]
+            )
+            corrections = config.evaluation.stat_significance.corrections.model_dump()
 
-        for stat_name, enabled in stat_significance.items():
-            if enabled:
-                test_results = compute_paired_statistical_test(
-                    model_results, stat_name, **corrections
-                )
-                writer.write_statistical_significance_test(test_results, stat_name)
+            for stat_name, enabled in stat_significance.items():
+                if enabled:
+                    test_results = compute_paired_statistical_test(
+                        model_results, stat_name, **corrections
+                    )
+                    writer.write_statistical_significance_test(test_results, stat_name)
 
-        logger.positive("Statistical significance tests completed successfully.")
+            logger.positive("Statistical significance tests completed successfully.")
+        else:
+            logger.attention(
+                "Statistical significance tests require at least two evaluated models. "
+                "Skipping statistical significance computation."
+            )
     logger.positive("All experiments concluded. WarpRec is shutting down.")
 
 
