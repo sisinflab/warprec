@@ -69,23 +69,7 @@ The ``split`` nested section configures how **data split files** are saved:
 - **sep**: Column separator for split files. Default: ``\t``.
 - **ext**: Extension for split files. Default: ``.tsv``.
 - **header**: Boolean flag indicating whether the first row should contain column names. Defaults to ``True``.
-- **labels**: A nested section for specifying **custom labels**, required if non-standard column names are used during reading.
 
------------------
-Labels
------------------
-
-WarpRec writes split data in a **standard format**.
-If the dataset uses custom labels, they must be declared under the ``labels`` section to ensure alignment:
-
-- **user_id_label**: Custom label for user ID.
-- **item_id_label**: Custom label for item ID.
-- **rating_label**: Custom label for rating.
-- **timestamp_label**: Custom label for timestamp.
-
-.. important::
-   If labels are mismatched between reader and writer, WarpRec may silently produce inconsistent files.
-   Always ensure **symmetry** between the two configurations.
 
 -----------------
 Recommendation
