@@ -179,7 +179,7 @@ def apply_fdr_correction(results: DataFrame, alpha: float = 0.05) -> DataFrame:
 
 
 def compute_paired_statistical_test(
-    results: Dict[str, Dict[str, Dict[int, Dict[str, float | Tensor]]]],
+    results: Dict[str, Dict[int, Dict[str, float | Tensor]]],
     test_name: str,
     alpha: float = 0.05,
     bonferroni: bool = False,
@@ -189,14 +189,12 @@ def compute_paired_statistical_test(
     """Compute pairwise statistical significance tests on evaluation results.
 
     Args:
-        results (Dict[str, Dict[str, Dict[int, Dict[str, float | Tensor]]]]):
+        results (Dict[str, Dict[int, Dict[str, float | Tensor]]]):
             Evaluation results structured as:
             {
                 "model_name": {
-                    "set_name": {
-                        "cutoff": {
-                            "metric_name": value
-                        }
+                    "cutoff": {
+                        "metric_name": value
                     }
                 }
             }
@@ -212,62 +210,55 @@ def compute_paired_statistical_test(
     # Initialize information for pairwise statistical test
     rows = []
     model_names = list(results.keys())
-    set_names: Set[str] = set()
-    for model_data in results.values():
-        set_names.update(model_data.keys())
     stat_test: StatisticalTest = stat_significance_registry.get(test_name)
+    cutoff_values: Set[int] = set()
 
-    # Compute on all sets
-    for set_name in set_names:
-        cutoff_values: Set[int] = set()
+    # Gather all cutoff values
+    for model in model_names:
+        cutoff_values.update(results[model].keys())
+
+    # Perform pairwise statistical tests
+    for cutoff in sorted(cutoff_values):
+        metric_names: Set[str] = set()
         for model in model_names:
-            if set_name in results[model]:
-                cutoff_values.update(results[model][set_name].keys())
+            try:
+                metric_names.update(results[model][cutoff].keys())
+            except KeyError:
+                continue
 
-        for cutoff in sorted(cutoff_values):
-            metric_names: Set[str] = set()
-            for model in model_names:
+        for metric in sorted(metric_names):
+            for model_a, model_b in combinations(
+                model_names, 2
+            ):  # Find all combinations
                 try:
-                    metric_names.update(results[model][set_name][cutoff].keys())
-                except KeyError:
-                    continue
+                    values_a = results[model_a][cutoff][metric]
+                    values_b = results[model_b][cutoff][metric]
 
-            for metric in sorted(metric_names):
-                for model_a, model_b in combinations(
-                    model_names, 2
-                ):  # Find all combinations
-                    try:
-                        values_a = results[model_a][set_name][cutoff][metric]
-                        values_b = results[model_b][set_name][cutoff][metric]
+                    if isinstance(values_a, Tensor) and isinstance(values_b, Tensor):
+                        # If the metric returns a Tensor, it was computed user-wise
+                        # Convert to numpy arrays for statistical testing
+                        # NOTE: float values come from metrics that cannot be computed user-wise
+                        array_a = values_a.cpu().numpy()
+                        array_b = values_b.cpu().numpy()
 
-                        if isinstance(values_a, Tensor) and isinstance(
-                            values_b, Tensor
-                        ):
-                            # If the metric returns a Tensor, it was computed user-wise
-                            # Convert to numpy arrays for statistical testing
-                            # NOTE: float values come from metrics that cannot be computed user-wise
-                            array_a = values_a.cpu().numpy()
-                            array_b = values_b.cpu().numpy()
+                        stat, p = stat_test.compute(array_a, array_b)
+                        accepted = "Accepted" if p < alpha else "Rejected"
 
-                            stat, p = stat_test.compute(array_a, array_b)
-                            accepted = "Accepted" if p < alpha else "Rejected"
-
-                            rows.append(
-                                {
-                                    "Model A": model_a,
-                                    "Model B": model_b,
-                                    "Set": set_name,
-                                    "Cutoff": cutoff,
-                                    "Metric": metric,
-                                    "Statistic": stat,
-                                    "p-value": p,
-                                    f"Significance (α={alpha})": accepted,
-                                }
-                            )
-                    except Exception as e:
-                        logger.negative(
-                            f"Error on {model_a} vs {model_b} | {set_name} @ {cutoff} - {metric}: {e}"
+                        rows.append(
+                            {
+                                "Model A": model_a,
+                                "Model B": model_b,
+                                "Metric": metric,
+                                "Cutoff": cutoff,
+                                "Statistic": stat,
+                                "p-value": p,
+                                f"Significance (α={alpha})": accepted,
+                            }
                         )
+                except Exception as e:
+                    logger.negative(
+                        f"Error on {model_a} vs {model_b} | {metric} @ {cutoff}: {e}"
+                    )
 
     # Apply correction to statistical test results
     stat_test_df = DataFrame(rows)
