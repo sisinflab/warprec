@@ -18,6 +18,19 @@ def initialize_datasets(
 ) -> Tuple[Dataset, Dataset | None, List[Dataset]]:
     """Initialize datasets based on the configuration. This is a common operation
     used in both training and design scripts.
+
+    Args:
+        reader (Reader): The initialized reader object that will be used to read data.
+        callback (WarpRecCallback): The callback object for handling events during initialization.
+        config (TrainConfiguration | DesignConfiguration): The configuration object containing
+            all necessary settings for data loading, filtering, and splitting.
+
+    Returns:
+        Tuple[Dataset, Dataset | None, List[Dataset]]: A tuple containing the main
+            dataset, an optional validation dataset, and a list of datasets for cross-validation folds.
+
+    Raises:
+        ValueError: If the data type specified in the configuration is not supported.
     """
     # Dataset loading
     main_dataset: Dataset = None
