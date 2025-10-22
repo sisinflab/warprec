@@ -55,10 +55,28 @@ def initialize_datasets(
 
         # Splitter testing
         if config.splitter:
-            splitter = Splitter(config)
+            splitter = Splitter()
 
             if config.reader.data_type == "transaction":
-                train_data, val_data, test_data = splitter.split_transaction(data)
+                # Gather splitting configurations
+                test_configuration = config.splitter.test_splitting.model_dump()
+                val_configuration = config.splitter.validation_splitting.model_dump()
+
+                # Add tag to distinguish test and validation keys
+                test_configuration = {
+                    f"test_{key}": value for key, value in test_configuration.items()
+                }
+                val_configuration = {
+                    f"val_{key}": value for key, value in val_configuration.items()
+                }
+
+                # Compute splitting
+                train_data, val_data, test_data = splitter.split_transaction(
+                    data,
+                    **config.reader.labels.model_dump(exclude=["cluster_label"]),  # type: ignore[arg-type]
+                    **test_configuration,
+                    **val_configuration,
+                )
 
             else:
                 raise ValueError("Data type not yet supported.")
