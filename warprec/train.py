@@ -70,12 +70,9 @@ def main(args: Namespace):
     item_cluster = None
     if config.reader.loading_strategy == "dataset":
         data = reader.read_tabular(
-            local_path=config.reader.local_path,
-            blob_name=config.reader.azure_blob_name,
+            **config.reader.model_dump(exclude=["labels", "dtypes"]),  # type: ignore[arg-type]
             column_names=config.reader.column_names(),
             dtypes=config.reader.column_dtype(),
-            sep=config.reader.sep,
-            header=config.reader.header,
         )
         data = callback.on_data_reading(data)
 
@@ -97,13 +94,9 @@ def main(args: Namespace):
     elif config.reader.loading_strategy == "split":
         if config.reader.data_type == "transaction":
             train_data, val_data, test_data = reader.read_tabular_split(
-                split_dir=config.reader.split.local_path,
-                blob_prefix=config.reader.split.azure_blob_prefix,
+                **config.reader.split.model_dump(),
                 column_names=config.reader.column_names(),
                 dtypes=config.reader.column_dtype(),
-                sep=config.reader.split.sep,
-                ext=config.reader.split.ext,
-                header=config.reader.split.header,
             )
 
         else:
@@ -112,10 +105,7 @@ def main(args: Namespace):
     # Side information reading
     if config.reader.side:
         side_data = reader.read_tabular(
-            local_path=config.reader.side.local_path,
-            blob_name=config.reader.side.azure_blob_name,
-            sep=config.reader.side.sep,
-            header=config.reader.side.header,
+            **config.reader.side.model_dump(),
         )
 
     # Cluster information reading
