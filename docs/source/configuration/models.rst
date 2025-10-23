@@ -211,7 +211,7 @@ Let's now use the sampling spaces to create a more complex HPO and have more con
                grace_period: 10
             embedding_size: [qrandint, 64, 320, 64]
             n_layers: [1, 2, 3]
-            weight_decay: [uniform, 1e-6, 0.0]
+            weight_decay: [uniform, 0.0, 1e-6]
             batch_size: [qrandint, 512, 10240, 512]
             epochs: 200
             learning_rate: [uniform, 1e-6, 1e-3]
