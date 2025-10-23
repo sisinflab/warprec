@@ -71,8 +71,6 @@ You should:
             **kwargs: Any,
         ):
             super().__init__(params, device=device, seed=seed, *args, **kwargs)
-            self._name = "MyBPR"
-
             users = info.get("users", None)
             if not users:
                 raise ValueError("Users value must be provided to correctly initialize the model.")

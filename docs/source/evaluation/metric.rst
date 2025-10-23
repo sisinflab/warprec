@@ -22,11 +22,11 @@ Evaluation Modes
 
 WarpRec supports multiple evaluation modes to provide flexibility in assessing recommender system performance:
 
-1. **Full Evaluation**
+1. **Full Evaluation:**
    In this mode, metrics are computed using all available items in the candidate set for each user.
    Full evaluation is suitable when the item catalog is small or when exhaustive evaluation is required for rigorous analysis.
 
-2. **Sampled Evaluation**
+2. **Sampled Evaluation:**
    To improve efficiency on large item sets, WarpRec allows **sampled evaluation**, where each user is evaluated against a subset of negative items.
    The number of negative samples per user is configurable, enabling trade-offs between computational cost and statistical fidelity.
 

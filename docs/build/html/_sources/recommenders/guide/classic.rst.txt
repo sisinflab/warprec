@@ -56,7 +56,6 @@ Start by creating a new Python class that inherits from **ItemSimRecommender** (
             super().__init__(
                 params, interactions, device=device, seed=seed, info=info, *args, **kwargs
             )
-            self._name = "MyEASE"
 
 Step 2: Access Dataset Information
 ----------------------------------
@@ -82,7 +81,7 @@ EASE computes its item similarity matrix B directly using a closed-form solution
 
 1. Compute the Gram matrix of interactions: ``G = X.T @ X + l2 * I``.
 2. Invert the Gram matrix: ``B = np.linalg.inv(G)``.
-3. Normalize by the diagonal and zero out the diagonal: ``B /= -np.diag(B)``.
+3. Normalize by the diagonal: ``B /= -np.diag(B)``.
 4. Set the diagonal to zero: ``np.fill_diagonal(B, 0)``.
 
 In code, this is how your Implementation should look like:

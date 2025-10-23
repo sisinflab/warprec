@@ -366,7 +366,6 @@ learning step directly.</p></li>
         <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span>
             <span class="n">params</span><span class="p">,</span> <span class="n">interactions</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="n">device</span><span class="p">,</span> <span class="n">seed</span><span class="o">=</span><span class="n">seed</span><span class="p">,</span> <span class="n">info</span><span class="o">=</span><span class="n">info</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span>
         <span class="p">)</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">_name</span> <span class="o">=</span> <span class="s2">&quot;MyEASE&quot;</span>
 </pre></div>
 </div>
 </section>
@@ -390,7 +389,7 @@ learning step directly.</p></li>
 <ol class="arabic simple">
 <li><p>Compute the Gram matrix of interactions: <code class="docutils literal notranslate"><span class="pre">G</span> <span class="pre">=</span> <span class="pre">X.T</span> <span class="pre">&#64;</span> <span class="pre">X</span> <span class="pre">+</span> <span class="pre">l2</span> <span class="pre">*</span> <span class="pre">I</span></code>.</p></li>
 <li><p>Invert the Gram matrix: <code class="docutils literal notranslate"><span class="pre">B</span> <span class="pre">=</span> <span class="pre">np.linalg.inv(G)</span></code>.</p></li>
-<li><p>Normalize by the diagonal and zero out the diagonal: <code class="docutils literal notranslate"><span class="pre">B</span> <span class="pre">/=</span> <span class="pre">-np.diag(B)</span></code>.</p></li>
+<li><p>Normalize by the diagonal: <code class="docutils literal notranslate"><span class="pre">B</span> <span class="pre">/=</span> <span class="pre">-np.diag(B)</span></code>.</p></li>
 <li><p>Set the diagonal to zero: <code class="docutils literal notranslate"><span class="pre">np.fill_diagonal(B,</span> <span class="pre">0)</span></code>.</p></li>
 </ol>
 <p>In code, this is how your Implementation should look like:</p>
