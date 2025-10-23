@@ -194,7 +194,7 @@ version = "1.15.2"
 description = "A database migration tool for SQLAlchemy."
 optional = false
 python-versions = ">=3.9"
-groups = ["dashboard"]
+groups = ["main", "dashboard"]
 files = [
     {file = "alembic-1.15.2-py3-none-any.whl", hash = "sha256:2e76bd916d547f6900ec4bb5a90aeac1485d2c92536923d0b138c02b126edc53"},
     {file = "alembic-1.15.2.tar.gz", hash = "sha256:1c72391bbdeffccfe317eefba686cb9a3c078005478885413b95c3b26c57a8a7"},
@@ -734,6 +734,24 @@ files = [
 
 [package.dependencies]
 colorama = {version = "*", markers = "platform_system == \"Windows\""}
+
+[[package]]
+name = "colorlog"
+version = "6.10.1"
+description = "Add colours to the output of Python's logging module."
+optional = false
+python-versions = ">=3.6"
+groups = ["main"]
+files = [
+    {file = "colorlog-6.10.1-py3-none-any.whl", hash = "sha256:2d7e8348291948af66122cff006c9f8da6255d224e7cf8e37d8de2df3bad8c9c"},
+    {file = "colorlog-6.10.1.tar.gz", hash = "sha256:eb4ae5cb65fe7fec7773c2306061a8e63e02efc2c72eba9d27b0fa23c94f1321"},
+]
+
+[package.dependencies]
+colorama = {version = "*", markers = "sys_platform == \"win32\""}
+
+[package.extras]
+development = ["black", "flake8", "mypy", "pytest", "types-colorama"]
 
 [[package]]
 name = "contourpy"
@@ -1518,7 +1536,7 @@ version = "3.2.1"
 description = "Lightweight in-process concurrent programming"
 optional = false
 python-versions = ">=3.9"
-groups = ["dashboard"]
+groups = ["main", "dashboard"]
 markers = "platform_machine == \"aarch64\" or platform_machine == \"ppc64le\" or platform_machine == \"x86_64\" or platform_machine == \"amd64\" or platform_machine == \"AMD64\" or platform_machine == \"win32\" or platform_machine == \"WIN32\""
 files = [
     {file = "greenlet-3.2.1-cp310-cp310-macosx_11_0_universal2.whl", hash = "sha256:777c1281aa7c786738683e302db0f55eb4b0077c20f1dc53db8852ffaea0a6b0"},
@@ -2151,7 +2169,7 @@ version = "1.3.10"
 description = "A super-fast templating language that borrows the best ideas from the existing templating languages."
 optional = false
 python-versions = ">=3.8"
-groups = ["dashboard"]
+groups = ["main", "dashboard"]
 files = [
     {file = "mako-1.3.10-py3-none-any.whl", hash = "sha256:baef24a52fc4fc514a0887ac600f9f1cff3d82c61d4d700a1fa84d597b88db59"},
     {file = "mako-1.3.10.tar.gz", hash = "sha256:99579a6f39583fa7e5630a28c3c1f440e4e97a414b80372649c0ce338da2ea28"},
@@ -3211,6 +3229,34 @@ files = [
 [package.dependencies]
 deprecated = ">=1.2.6"
 opentelemetry-api = "1.32.1"
+
+[[package]]
+name = "optuna"
+version = "4.5.0"
+description = "A hyperparameter optimization framework"
+optional = false
+python-versions = ">=3.8"
+groups = ["main"]
+files = [
+    {file = "optuna-4.5.0-py3-none-any.whl", hash = "sha256:5b8a783e84e448b0742501bc27195344a28d2c77bd2feef5b558544d954851b0"},
+    {file = "optuna-4.5.0.tar.gz", hash = "sha256:264844da16dad744dea295057d8bc218646129c47567d52c35a201d9f99942ba"},
+]
+
+[package.dependencies]
+alembic = ">=1.5.0"
+colorlog = "*"
+numpy = "*"
+packaging = ">=20.0"
+PyYAML = "*"
+sqlalchemy = ">=1.4.2"
+tqdm = "*"
+
+[package.extras]
+benchmark = ["asv (>=0.5.0)", "cma", "virtualenv"]
+checking = ["black", "blackdoc", "flake8", "isort", "mypy", "mypy_boto3_s3", "scipy-stubs ; python_version >= \"3.10\"", "types-PyYAML", "types-redis", "types-setuptools", "types-tqdm", "typing_extensions (>=3.10.0.0)"]
+document = ["ase", "cmaes (>=0.12.0)", "fvcore", "kaleido (<0.4)", "lightgbm", "matplotlib (!=3.6.0)", "pandas", "pillow", "plotly (>=4.9.0)", "scikit-learn", "sphinx", "sphinx-copybutton", "sphinx-gallery", "sphinx-notfound-page", "sphinx_rtd_theme (>=1.2.0)", "torch", "torchvision"]
+optional = ["boto3", "cmaes (>=0.12.0)", "google-cloud-storage", "grpcio", "matplotlib (!=3.6.0)", "pandas", "plotly (>=4.9.0)", "protobuf (>=5.28.1)", "redis", "scikit-learn (>=0.24.2)", "scipy", "torch"]
+test = ["coverage", "fakeredis[lua]", "grpcio", "kaleido (<0.4)", "moto", "protobuf (>=5.28.1)", "pytest", "pytest-xdist", "scipy (>=1.9.2)", "torch"]
 
 [[package]]
 name = "packaging"
@@ -5304,7 +5350,7 @@ version = "2.0.40"
 description = "Database Abstraction Library"
 optional = false
 python-versions = ">=3.7"
-groups = ["dashboard"]
+groups = ["main", "dashboard"]
 files = [
     {file = "SQLAlchemy-2.0.40-cp37-cp37m-macosx_10_9_x86_64.whl", hash = "sha256:ae9597cab738e7cc823f04a704fb754a9249f0b6695a6aeb63b74055cd417a96"},
     {file = "SQLAlchemy-2.0.40-cp37-cp37m-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:37a5c21ab099a83d669ebb251fddf8f5cee4d75ea40a5a1653d9c43d60e20867"},
@@ -6471,4 +6517,4 @@ remote-io = []
 [metadata]
 lock-version = "2.1"
 python-versions = "~3.12"
-content-hash = "aab69c810f846626ff0b6e29919ad4b4b5399e22040934dad224b5644109d4de"
+content-hash = "fc65b1828d56eec875d877f7331fdd86edbfeb080f95f16436b4846b6dd58c5e"
