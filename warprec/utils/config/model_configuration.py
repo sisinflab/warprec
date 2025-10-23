@@ -14,6 +14,7 @@ from warprec.utils.registry import (
     params_registry,
     search_algorithm_registry,
 )
+from warprec.utils.config.common import _scientific_notation_conversion
 from warprec.utils.logger import logger
 
 # Accepted field formats for model parameters
@@ -311,10 +312,20 @@ class RecomModel(BaseModel, ABC):
                     self.model_extra[field] = [value]
 
                 current_list = self.model_extra[field]
+
+                # Clean scientific notation if present
+                current_list = _scientific_notation_conversion(current_list)
+                self.model_extra[field] = current_list
+
+                # Check if a search space has been provided
                 if current_list and not any(
                     current_list[0] == ss for ss in SearchSpace
                 ):
-                    current_list.insert(0, SearchSpace.GRID)
+                    # If no search space has been provided, use default
+                    if self.optimization.strategy == SearchAlgorithms.GRID:
+                        current_list.insert(0, SearchSpace.GRID)
+                    else:
+                        current_list.insert(0, SearchSpace.CHOICE.value)
                     self.model_extra[field] = current_list
 
             return self
