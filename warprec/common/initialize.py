@@ -191,6 +191,8 @@ def initialize_datasets(
         "item_cluster": item_cluster,
         "batch_size": config.evaluation.batch_size,
         "rating_type": config.reader.rating_type,
+        "user_id_label": config.reader.labels.user_id_label,
+        "item_id_label": config.reader.labels.item_id_label,
         "rating_label": config.reader.labels.rating_label,
         "timestamp_label": config.reader.labels.timestamp_label,
         "cluster_label": config.reader.labels.cluster_label,

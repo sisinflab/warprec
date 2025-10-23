@@ -218,6 +218,8 @@ class Dataset:
         item_cluster (Optional[DataFrame]): The item cluster data.
         batch_size (int): The batch size that will be used evaluation.
         rating_type (RatingType): The type of rating used.
+        user_id_label (str): The label of the user id column.
+        item_id_label (str): The label of the item id column.
         rating_label (str): The label of the rating column.
         timestamp_label (str): The label of the timestamp column.
         cluster_label (str): The label of the cluster column.
@@ -251,6 +253,8 @@ class Dataset:
         item_cluster: Optional[DataFrame] = None,
         batch_size: int = 1024,
         rating_type: RatingType = RatingType.IMPLICIT,
+        user_id_label: str = "user_id",
+        item_id_label: str = "item_id",
         rating_label: str = None,
         timestamp_label: str = None,
         cluster_label: str = None,
@@ -278,28 +282,24 @@ class Dataset:
         # Initialize the dataset dataloader
         self._precomputed_dataloader: Dict[str, Any] = {}
 
-        # Set user and item label
-        user_label = train_data.columns[0]
-        item_label = train_data.columns[1]
-
         # If side information data has been provided, we filter the main dataset
         if side_data is not None:
             train_data, eval_data = self._filter_data(
                 train=train_data,
                 eval=eval_data,
                 filter_data=side_data,
-                label=item_label,
+                label=item_id_label,
             )
 
         # Define dimensions that will lead the experiment
-        self._nuid = train_data[user_label].nunique()
-        self._niid = train_data[item_label].nunique()
+        self._nuid = train_data[user_id_label].nunique()
+        self._niid = train_data[item_id_label].nunique()
         self._nfeat = len(side_data.columns) - 1 if side_data is not None else 0
         self._batch_size = batch_size
 
         # Values that will be used to calculate mappings
-        _uid = train_data[user_label].unique()
-        _iid = train_data[item_label].unique()
+        _uid = train_data[user_id_label].unique()
+        _iid = train_data[item_id_label].unique()
 
         # Calculate mapping for users and items
         self._umap = {user: i for i, user in enumerate(_uid)}
@@ -310,7 +310,7 @@ class Dataset:
             {
                 self._umap[user_id]: cluster
                 for user_id, cluster in zip(
-                    user_cluster[user_label], user_cluster[cluster_label]
+                    user_cluster[user_id_label], user_cluster[cluster_label]
                 )
                 if user_id in self._umap
             }
@@ -321,7 +321,7 @@ class Dataset:
             {
                 self._imap[item_id]: cluster
                 for item_id, cluster in zip(
-                    item_cluster[item_label], item_cluster[cluster_label]
+                    item_cluster[item_id_label], item_cluster[cluster_label]
                 )
                 if item_id in self._imap
             }
@@ -393,8 +393,8 @@ class Dataset:
             train_data,
             self._umap,
             self._imap,
-            user_id_label=user_label,
-            item_id_label=item_label,
+            user_id_label=user_id_label,
+            item_id_label=item_id_label,
             timestamp_label=timestamp_label,
         )
 
