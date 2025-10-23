@@ -437,9 +437,22 @@ class Sessions:
         num_negatives: int,
         batch_size: int = 1024,
         shuffle: bool = True,
+        seed: int = 42,
     ) -> DataLoader:
-        """Creates a DataLoader where each item is a user's full history."""
-        cache_key = (max_seq_len, num_negatives)
+        """Creates a DataLoader where each item is a user's full history.
+
+        Args:
+            max_seq_len (int): Maximum length of the user history sequence.
+            num_negatives (int): Number of negative samples for each positive item.
+            batch_size (int): Batch size for the DataLoader.
+            shuffle (bool): Whether to shuffle the data.
+            seed (int): Seed for reproducibility of negative sampling.
+
+        Returns:
+            DataLoader: A DataLoader yielding user history sequences with negative samples.
+        """
+        # Il seed DEVE far parte della cache key per garantire la riproducibilità
+        cache_key = (max_seq_len, num_negatives, seed)
         if cache_key in self._cached_grouped_sequential_data:
             cached_tensors = self._cached_grouped_sequential_data[cache_key]
             dataset = UserHistoryDataset(**cached_tensors)
@@ -448,6 +461,7 @@ class Sessions:
         pos_seqs, neg_samples = self._create_grouped_sequences(
             max_seq_len=max_seq_len,
             num_negatives=num_negatives,
+            seed=seed,
         )
 
         if pos_seqs.shape[0] == 0:
@@ -464,45 +478,116 @@ class Sessions:
         return DataLoader(dataset, batch_size=batch_size, shuffle=shuffle)
 
     def _create_grouped_sequences(
-        self, max_seq_len: int, num_negatives: int
+        self, max_seq_len: int, num_negatives: int, seed: int
     ) -> Tuple[Tensor, Tensor]:
-        """Core logic to transform interaction data into user-history sequences."""
+        """
+        Core logic to transform interaction data into user-history sequences
+        using a vectorized approach.
+        """
+        # Get user sessions as lists of item indices
         user_sessions = self._get_user_sessions()
-
-        processed_sessions = (
-            user_sessions[user_sessions.str.len() >= 2]
-            .apply(lambda s: s[-max_seq_len:])
-            .tolist()
+        valid_sessions = user_sessions[user_sessions.str.len() >= 2].apply(
+            lambda s: s[-max_seq_len:]
         )
 
-        if not processed_sessions:
+        if valid_sessions.empty:
+            logger.attention(
+                "No valid user history samples generated. Ensure users have at least 2 interactions."
+            )
             return torch.empty(0), torch.empty(0)
 
-        all_negative_samples = []
-        for session in processed_sessions:
-            seq_len = len(session)
-            session_negatives = np.zeros((seq_len - 1, num_negatives), dtype=np.int64)
-            for i in range(1, seq_len):
-                history = set(session[: i + 1])
-                step_negatives: list = []
-                while len(step_negatives) < num_negatives:
-                    candidates = np.random.randint(
-                        0, self._niid, size=num_negatives * 2
-                    )
-                    valid_candidates = [c for c in candidates if c not in history]
-                    step_negatives.extend(valid_candidates)
-                session_negatives[i - 1] = step_negatives[:num_negatives]
-            all_negative_samples.append(torch.from_numpy(session_negatives))
-
-        pos_sequences_1_indexed = [
-            torch.tensor(s, dtype=torch.long) + 1 for s in processed_sessions
+        # Convert sessions to padded tensors
+        pos_seqs_0_indexed_lists = valid_sessions.tolist()
+        pos_seqs_tensors = [
+            torch.tensor(s, dtype=torch.long) for s in pos_seqs_0_indexed_lists
         ]
-        padded_pos_sequences = pad_sequence(
-            pos_sequences_1_indexed, batch_first=True, padding_value=0
-        )
-        neg_samples_1_indexed = [neg + 1 for neg in all_negative_samples]
-        padded_neg_samples = pad_sequence(
-            neg_samples_1_indexed, batch_first=True, padding_value=0
+        padded_pos_seqs_0_idx = pad_sequence(
+            pos_seqs_tensors, batch_first=True, padding_value=-1
         )
 
-        return padded_pos_sequences, padded_neg_samples
+        # Retrieve shape information
+        num_users, current_max_len = padded_pos_seqs_0_idx.shape
+
+        # Edge case: if all valid sessions have length < 2
+        if current_max_len < 2:
+            logger.attention(
+                "All valid sessions have length < 2. No negative samples can be generated."
+            )
+            padded_pos_seqs_1_idx = padded_pos_seqs_0_idx.clone().add_(1)
+            padded_pos_seqs_1_idx[padded_pos_seqs_0_idx == -1] = 0  # padding 0
+            return padded_pos_seqs_1_idx, torch.empty(0)
+
+        # Set the seed for negative sampling
+        np.random.seed(seed)
+
+        # Generate initial negative candidates
+        # Shape: (N, L-1, K)
+        neg_candidates_shape = (num_users, current_max_len - 1, num_negatives)
+        neg_candidates = np.random.randint(
+            0, self._niid, size=neg_candidates_shape, dtype=np.int64
+        )
+        history_tensor = padded_pos_seqs_0_idx
+
+        # Prepare masks for collision detection
+        j_indices = torch.arange(
+            current_max_len - 1, dtype=torch.long
+        )  # (L-1): [0, 1, ..., L-2]
+        h_indices = torch.arange(
+            current_max_len, dtype=torch.long
+        )  # (L): [0, 1, ..., L-1]
+
+        # Create masks
+        valid_history_mask = (
+            h_indices.unsqueeze(0) <= j_indices.unsqueeze(1) + 1
+        )  # (L-1, L)
+        broadcast_mask = valid_history_mask.unsqueeze(0).unsqueeze(2)  # (1, L-1, 1, L)
+
+        # Calculate sequence lengths and valid target masks
+        seq_lengths = (history_tensor != -1).sum(dim=1)  # (N,)
+        valid_target_mask = j_indices.unsqueeze(0) < (seq_lengths.unsqueeze(1) - 1)
+        valid_target_broadcast_mask = valid_target_mask.unsqueeze(-1)  # (N, L-1, K)
+
+        # Check if there are any invalid candidates
+        invalid_mask_np = np.ones(neg_candidates_shape, dtype=bool)
+
+        # Iteratively re-sample until no collisions exist
+        while np.any(invalid_mask_np):
+            neg_candidates_tensor = torch.from_numpy(neg_candidates).long()
+
+            # Collision with positive target
+            # N, L-1, K, L)
+            collision_matrix = (
+                neg_candidates_tensor.unsqueeze(-1)  # (N, L-1, K, 1)
+                == history_tensor.unsqueeze(1).unsqueeze(2)  # (N, 1, 1, L)
+            )
+
+            # Invalid candidates are those that collide with any item in the history
+            relevant_collisions = collision_matrix & broadcast_mask  # (N, L-1, K, L)
+            invalid_mask_torch = torch.any(relevant_collisions, dim=3)  # (N, L-1, K)
+            invalid_mask_torch = invalid_mask_torch & valid_target_broadcast_mask
+            invalid_mask_np = invalid_mask_torch.numpy()
+
+            if not np.any(invalid_mask_np):
+                break  # No collisions, continue
+
+            # Re-sample only the invalid candidates
+            num_invalid = np.sum(invalid_mask_np)
+            new_candidates = np.random.randint(
+                0, self._niid, size=num_invalid, dtype=np.int64
+            )
+            neg_candidates[invalid_mask_np] = new_candidates
+
+        # Convert positive sequences to 1-based indexing
+        padded_pos_seqs_1_idx = padded_pos_seqs_0_idx.clone().add_(1)
+        padded_pos_seqs_1_idx[padded_pos_seqs_0_idx == -1] = 0  # (N, L)
+
+        # Convert negative samples to 1-based indexing and apply padding mask
+        padded_neg_samples_0_idx_tensor = torch.from_numpy(neg_candidates).long()
+        padded_neg_samples_1_idx_tensor = padded_neg_samples_0_idx_tensor.add(
+            1
+        )  # (N, L-1, K)
+
+        # Apply padding mask
+        padded_neg_samples_1_idx_tensor.masked_fill_(~valid_target_broadcast_mask, 0)
+
+        return padded_pos_seqs_1_idx, padded_neg_samples_1_idx_tensor
