@@ -119,6 +119,7 @@ class Sessions:
     _cached_sequential_data: dict = {}
     _cached_grouped_sequential_data: dict = {}
     _cached_user_histories: Dict[int, List[int]] = {}
+    _processed_df: Optional[DataFrame] = None
 
     def __init__(
         self,
@@ -142,6 +143,7 @@ class Sessions:
         self._umap = user_mapping
         self._imap = item_mapping
         self._niid = len(self._imap)
+        self._processed_df = None
 
         # Set the random seed
         np.random.seed(seed)
@@ -151,30 +153,67 @@ class Sessions:
         self._cached_sequential_data = {}
         self._cached_grouped_sequential_data = {}
         self._cached_user_histories = {}
+        self._processed_df = None
 
-    def _get_user_sessions(self) -> pd.Series:
+    def _get_processed_data(self) -> DataFrame:
         """
-        Maps, sorts (if timestamp is available), and groups interactions by user.
-        This centralized helper method prevents code duplication.
+        Centralized method to map, clean, and sort interaction data.
+
+        This method maps user and item IDs to their integer indices,
+        drops any rows with missing values (e.g., unseen users/items),
+        and sorts the interactions by user and timestamp (if available).
+        The result is cached in self._processed_df to avoid redundant processing.
+
+        Returns:
+            DataFrame: The processed and sorted interaction data.
         """
+        # Return from cache if already processed
+        if self._processed_df is not None:
+            return self._processed_df
+
+        # Prepare columns for the new DataFrame
         cols_to_map = {
             self._user_label: self._inter_df[self._user_label].map(self._umap),
             self._item_label: self._inter_df[self._item_label].map(self._imap),
         }
-        if self._timestamp_label and self._timestamp_label in self._inter_df.columns:
+
+        # Include timestamp if it's relevant and exists
+        has_timestamp = (
+            self._timestamp_label and self._timestamp_label in self._inter_df.columns
+        )
+        if has_timestamp:
             cols_to_map[self._timestamp_label] = self._inter_df[self._timestamp_label]
 
+        # Create, clean, and cast types
         mapped_df = pd.DataFrame(cols_to_map).dropna()
         mapped_df[[self._user_label, self._item_label]] = mapped_df[
             [self._user_label, self._item_label]
-        ].astype(int)
+        ].astype(np.int64)
 
-        if self._timestamp_label and self._timestamp_label in self._inter_df.columns:
-            mapped_df = mapped_df.sort_values(
+        # Sort the data. If timestamp is available, use it for sorting
+        if has_timestamp:
+            sorted_df = mapped_df.sort_values(
                 by=[self._user_label, self._timestamp_label]
+            ).reset_index(drop=True)
+        else:
+            # Fallback sort if no timestamp
+            sorted_df = mapped_df.sort_values(by=self._user_label).reset_index(
+                drop=True
             )
 
-        return mapped_df.groupby(self._user_label)[self._item_label].agg(list)
+        # Cache and return
+        self._processed_df = sorted_df
+        return self._processed_df
+
+    def _get_user_sessions(self) -> pd.Series:
+        """Maps, sorts (if timestamp is available), and groups interactions by user.
+        This centralized helper method prevents code duplication.
+        """
+        # Get the centralized, processed, and sorted data
+        processed_df = self._get_processed_data()
+
+        # Group by user and aggregate item interactions into a list
+        return processed_df.groupby(self._user_label)[self._item_label].agg(list)
 
     def get_sequential_dataloader(
         self,
@@ -249,22 +288,18 @@ class Sessions:
                 - Tensor: Positive item tensor.
                 - Optional[Tensor]: Negative item tensor.
         """
-        # Map raw user/item IDs to continuous integer indices, drop any invalid interactions,
-        # and sort the data by user and timestamp. This is a prerequisite for generating
-        # sequential data
-        mapped_df = pd.DataFrame(
-            {
-                self._user_label: self._inter_df[self._user_label].map(self._umap),
-                self._item_label: self._inter_df[self._item_label].map(self._imap),
-                self._timestamp_label: self._inter_df[self._timestamp_label],
-            }
-        ).dropna()
-        mapped_df[[self._user_label, self._item_label]] = mapped_df[
-            [self._user_label, self._item_label]
-        ].astype(np.int64)
-        sorted_df = mapped_df.sort_values(
-            by=[self._user_label, self._timestamp_label]
-        ).reset_index(drop=True)
+        # Retrieve the processed and sorted DataFrame
+        sorted_df = self._get_processed_data()
+
+        # Handle edge case where no data exists after processing
+        if sorted_df.empty:
+            return (
+                None if not include_user_id else torch.empty(0, dtype=torch.long),
+                torch.empty((0, max_seq_len), dtype=torch.long),
+                torch.empty(0, dtype=torch.long),
+                torch.empty(0, dtype=torch.long),
+                None if num_negatives == 0 else torch.empty(0, dtype=torch.long),
+            )
 
         # Extract numpy arrays for efficient processing
         all_items_0_indexed = sorted_df[self._item_label].values
