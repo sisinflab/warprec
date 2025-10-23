@@ -186,7 +186,7 @@ class Sessions:
         seed: int = 42,
     ) -> DataLoader:
         """Creates a DataLoader for sequential data."""
-        cache_key = (max_seq_len, num_negatives, include_user_id)
+        cache_key = (max_seq_len, num_negatives, include_user_id, seed)
         if cache_key in self._cached_sequential_data:
             cached_tensors = self._cached_sequential_data[cache_key]
             dataset = SessionDataset(**cached_tensors)
@@ -451,7 +451,6 @@ class Sessions:
         Returns:
             DataLoader: A DataLoader yielding user history sequences with negative samples.
         """
-        # Il seed DEVE far parte della cache key per garantire la riproducibilità
         cache_key = (max_seq_len, num_negatives, seed)
         if cache_key in self._cached_grouped_sequential_data:
             cached_tensors = self._cached_grouped_sequential_data[cache_key]
