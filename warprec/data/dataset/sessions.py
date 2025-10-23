@@ -128,11 +128,13 @@ class Sessions:
         item_id_label: str = "item_id",
         timestamp_label: str = "timestamp",
     ):
+        # Validate presence of required columns
         if user_id_label not in data.columns:
             raise ValueError(f"User column '{user_id_label}' not found in DataFrame.")
         if item_id_label not in data.columns:
             raise ValueError(f"Item column '{item_id_label}' not found in DataFrame.")
 
+        # Initialize attributes
         self._inter_df = data
         self._user_label = user_id_label
         self._item_label = item_id_label
@@ -150,8 +152,7 @@ class Sessions:
         self._processed_df = None
 
     def _get_processed_data(self) -> DataFrame:
-        """
-        Centralized method to map, clean, and sort interaction data.
+        """Centralized method to map, clean, and sort interaction data.
 
         This method maps user and item IDs to their integer indices,
         drops any rows with missing values (e.g., unseen users/items),
@@ -202,6 +203,10 @@ class Sessions:
     def _get_user_sessions(self) -> pd.Series:
         """Maps, sorts (if timestamp is available), and groups interactions by user.
         This centralized helper method prevents code duplication.
+
+        Returns:
+            pd.Series: A Series where the index is user IDs and the values are lists of item
+                interactions in chronological order.
         """
         # Get the centralized, processed, and sorted data
         processed_df = self._get_processed_data()
@@ -218,7 +223,24 @@ class Sessions:
         shuffle: bool = True,
         seed: int = 42,
     ) -> DataLoader:
-        """Creates a DataLoader for sequential data."""
+        """Creates a DataLoader for sequential data.
+
+        This method generates padded sequences of user interactions
+        along with positive and negative samples for training sequential
+        recommendation models.
+
+        Args:
+            max_seq_len (int): Maximum length of sequences produced.
+            num_negatives (int): Number of negative samples per user.
+            include_user_id (bool): Whether to include user IDs in the output.
+            batch_size (int): Batch size for the DataLoader.
+            shuffle (bool): Whether to shuffle the data.
+            seed (int): Seed for Numpy random number generator for reproducibility.
+
+        Returns:
+            DataLoader: A DataLoader yielding sequential training samples.
+        """
+        # Check cache first
         cache_key = (max_seq_len, num_negatives, include_user_id, seed)
         if cache_key in self._cached_sequential_data:
             cached_tensors = self._cached_sequential_data[cache_key]
@@ -238,11 +260,13 @@ class Sessions:
             seed=seed,
         )
 
+        # Edge case: no valid samples
         if padded_item_seq.shape[0] == 0:
             logger.attention(
                 "No valid sequential samples generated. Ensure sessions have at least 2 interactions."
             )
 
+        # Cache the generated tensors for future use
         dataset_args = {
             "sequences": padded_item_seq,
             "sequence_lengths": tensor_item_seq_len,
@@ -254,6 +278,7 @@ class Sessions:
             dataset_args["negative_items"] = tensor_neg_item_id
         self._cached_sequential_data[cache_key] = dataset_args
 
+        # Create dataset and DataLoader
         dataset = SessionDataset(**dataset_args)
         return DataLoader(dataset, batch_size=batch_size, shuffle=shuffle)
 
@@ -435,10 +460,22 @@ class Sessions:
     def get_user_history_sequences(
         self, user_ids: List[int], max_seq_len: int
     ) -> Tuple[Tensor, Tensor]:
-        """Retrieves padded historical sequences for evaluation."""
+        """Retrieves padded historical sequences for evaluation.
+
+        Args:
+            user_ids (List[int]): List of user IDs to retrieve histories for.
+            max_seq_len (int): Maximum length of the returned sequences.
+
+        Returns:
+            Tuple[Tensor, Tensor]: A tuple containing:
+                - Tensor: Padded item sequences for the users.
+                - Tensor: Lengths of each user's sequence before padding.
+        """
+        # Ensure user histories are cached
         if not self._cached_user_histories:
             self._compute_cache_user_history()
 
+        # Gather sequences and lengths
         sequences_to_process = []
         lengths_to_process = []
         for uid in user_ids:
@@ -447,6 +484,7 @@ class Sessions:
             sequences_to_process.append(torch.tensor(recent_history, dtype=torch.long))
             lengths_to_process.append(len(recent_history))
 
+        # Pad sequences and convert lengths to tensor
         padded_sequences = pad_sequence(
             sequences_to_process, batch_first=True, padding_value=0
         )
@@ -480,37 +518,52 @@ class Sessions:
         Returns:
             DataLoader: A DataLoader yielding user history sequences with negative samples.
         """
+        # Check cache first
         cache_key = (max_seq_len, num_negatives, seed)
         if cache_key in self._cached_grouped_sequential_data:
             cached_tensors = self._cached_grouped_sequential_data[cache_key]
             dataset = UserHistoryDataset(**cached_tensors)
             return DataLoader(dataset, batch_size=batch_size, shuffle=shuffle)
 
+        # Generate sequences and negative samples
         pos_seqs, neg_samples = self._create_grouped_sequences(
             max_seq_len=max_seq_len,
             num_negatives=num_negatives,
             seed=seed,
         )
 
+        # Edge case: no valid samples
         if pos_seqs.shape[0] == 0:
             logger.attention(
                 "No valid user history samples generated. Ensure users have at least 2 interactions."
             )
 
+        # Cache the generated tensors for future use
         dataset_args = {
             "positive_sequences": pos_seqs,
             "negative_samples": neg_samples,
         }
         self._cached_grouped_sequential_data[cache_key] = dataset_args
+
+        # Create dataset and DataLoader
         dataset = UserHistoryDataset(**dataset_args)
         return DataLoader(dataset, batch_size=batch_size, shuffle=shuffle)
 
     def _create_grouped_sequences(
         self, max_seq_len: int, num_negatives: int, seed: int
     ) -> Tuple[Tensor, Tensor]:
-        """
-        Core logic to transform interaction data into user-history sequences
+        """Core logic to transform interaction data into user-history sequences
         using a vectorized approach.
+
+        Args:
+            max_seq_len (int): Maximum length of the user history sequence.
+            num_negatives (int): Number of negative samples for each positive item.
+            seed (int): Seed for reproducibility of negative sampling.
+
+        Returns:
+            Tuple[Tensor, Tensor]: A tuple containing:
+                - Tensor: Padded positive item sequences.
+                - Tensor: Padded negative item samples.
         """
         # Get user sessions as lists of item indices
         user_sessions = self._get_user_sessions()
@@ -518,6 +571,7 @@ class Sessions:
             lambda s: s[-max_seq_len:]
         )
 
+        # Edge case: no valid sessions
         if valid_sessions.empty:
             logger.attention(
                 "No valid user history samples generated. Ensure users have at least 2 interactions."
