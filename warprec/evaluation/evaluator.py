@@ -7,6 +7,7 @@ import torch
 from torch import Tensor
 from scipy.sparse import csr_matrix
 from tabulate import tabulate
+
 from warprec.data.dataset import (
     Dataset,
     EvaluationDataLoader,
@@ -120,21 +121,19 @@ class Evaluator:
     def evaluate(
         self,
         model: Recommender,
+        dataloader: EvaluationDataLoader | NegativeEvaluationDataLoader,
         dataset: Dataset,
         device: str = "cpu",
-        strategy: str = "full",
-        num_negatives: int = 99,
         verbose: bool = False,
     ):
         """The main method to evaluate a list of metrics on the prediction of a model.
 
         Args:
             model (Recommender): The trained model.
+            dataloader (EvaluationDataLoader | NegativeEvaluationDataLoader):
+                The dataloader used for the evaluation.
             dataset (Dataset): The dataset used for the evaluation.
             device (str): The device on which the metrics will be calculated.
-            strategy (str): The strategy to use during evaluation. Defaults to 'full'.
-            num_negatives (int): The number of negative samples to
-                use during the sampled evaluation. Defaults to 99.
             verbose (bool): Wether of not the method should write with logger.
 
         Raises:
@@ -150,17 +149,14 @@ class Evaluator:
         self.metrics_to(device)
         model.eval()
 
-        # Retrieve evaluation dataloader
-        dataloader: EvaluationDataLoader | NegativeEvaluationDataLoader
-        match strategy:
-            case "full":
-                dataloader = dataset.get_evaluation_dataloader()
-            case "sampled":
-                dataloader = dataset.get_neg_evaluation_dataloader(
-                    num_negatives=num_negatives
-                )
-            case _:
-                raise ValueError(f"Evaluation strategy {strategy} not supported.")
+        # Correctly infer the strategy
+        strategy: str
+        if isinstance(dataloader, EvaluationDataLoader):
+            strategy = "full"
+        elif isinstance(dataloader, NegativeEvaluationDataLoader):
+            strategy = "sampled"
+        else:
+            raise ValueError("The provided dataloader is not supported for evaluation.")
 
         # Set the train interactions
         train_sparse = dataset.train_set.get_sparse()

@@ -1,10 +1,17 @@
 import importlib
-from typing import List, Tuple
+from typing import List, Tuple, TYPE_CHECKING
 from pathlib import Path
 
 from warprec.utils.config.model_configuration import RecomModel
 from warprec.utils.registry import params_registry
 from warprec.utils.logger import logger
+
+if TYPE_CHECKING:
+    from warprec.data.dataset import (
+        Dataset,
+        EvaluationDataLoader,
+        NegativeEvaluationDataLoader,
+    )
 
 
 def load_custom_modules(custom_modules: str | List[str] | None):
@@ -79,3 +86,37 @@ def model_param_from_dict(model_name: str, params: dict) -> "RecomModel":
         else RecomModel(**params)
     )
     return model_params
+
+
+def retrieve_evaluation_dataloader(
+    dataset: "Dataset",
+    strategy: str,
+    num_negatives: int = 99,
+    seed: int = 42,
+) -> "EvaluationDataLoader" | "NegativeEvaluationDataLoader":
+    """Retrieve the appropriate evaluation dataloader based on the strategy.
+
+    Args:
+        dataset (Dataset): The dataset containing train, val, and test sets.
+        strategy (str): The evaluation strategy ('full' or 'sampled').
+        num_negatives (int): The number of negative samples per positive instance.
+        seed (int): Random seed for negative sampling.
+
+    Returns:
+        EvaluationDataLoader | NegativeEvaluationDataLoader: The appropriate evaluation dataloader.
+
+    Raises:
+        ValueError: If an unknown evaluation strategy is provided.
+    """
+    dataloader: "EvaluationDataLoader" | "NegativeEvaluationDataLoader"
+    if strategy == "full":
+        dataloader = dataset.get_evaluation_dataloader()
+    elif strategy == "sampled":
+        dataloader = dataset.get_neg_evaluation_dataloader(
+            num_negatives=num_negatives,
+            seed=seed,
+        )
+    else:
+        raise ValueError(f"Unknown evaluation strategy: {strategy}")
+
+    return dataloader

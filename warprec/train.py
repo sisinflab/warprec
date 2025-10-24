@@ -18,7 +18,11 @@ from warprec.utils.config import (
     TrainConfiguration,
     RecomModel,
 )
-from warprec.utils.helpers import model_param_from_dict, validation_metric
+from warprec.utils.helpers import (
+    model_param_from_dict,
+    validation_metric,
+    retrieve_evaluation_dataloader,
+)
 from warprec.utils.logger import logger
 from warprec.recommenders.trainer import Trainer
 from warprec.recommenders.loops import train_loop
@@ -154,14 +158,20 @@ def main(args: Namespace):
         # Callback on training complete
         callback.on_training_complete(model=best_model)
 
+        # Retrieve appropriate evaluation dataloader
+        dataloader = retrieve_evaluation_dataloader(
+            dataset=main_dataset,
+            strategy=config.evaluation.strategy,
+            num_negatives=config.evaluation.num_negatives,
+        )
+
         # Evaluation testing
         model_evaluation_start_time = time.time()
         evaluator.evaluate(
             best_model,
+            dataloader,
             main_dataset,
             device=str(best_model._device),
-            strategy=config.evaluation.strategy,
-            num_negatives=config.evaluation.num_negatives,
             verbose=True,
         )
         results = evaluator.compute_results()

@@ -12,7 +12,7 @@ from warprec.data.dataset import Dataset
 from warprec.evaluation.evaluator import Evaluator
 from warprec.recommenders.base_recommender import Recommender, IterativeRecommender
 from warprec.utils.config import RecomModel
-from warprec.utils.helpers import load_custom_modules
+from warprec.utils.helpers import load_custom_modules, retrieve_evaluation_dataloader
 from warprec.utils.registry import model_registry, params_registry
 from warprec.utils.logger import logger
 
@@ -75,6 +75,13 @@ def objective_function(
         dataset = dataset_folds[fold_index]
     else:
         dataset = dataset_folds
+
+    # Retrieve appropriate evaluation dataloader
+    dataloader = retrieve_evaluation_dataloader(
+        dataset=dataset,
+        strategy=strategy,
+        num_negatives=num_negatives,
+    )
 
     # Initialize the Evaluator for current Trial
     evaluator = Evaluator(
@@ -151,10 +158,9 @@ def objective_function(
                 # Evaluation at the end of each training epoch
                 evaluator.evaluate(
                     model,
+                    dataloader,
                     dataset,
                     device=device,
-                    strategy=strategy,
-                    num_negatives=num_negatives,
                 )
                 results = evaluator.compute_results()
                 metric_report = {
@@ -178,10 +184,9 @@ def objective_function(
             # Model is trained in the __init__ we can directly evaluate it
             evaluator.evaluate(
                 model,
+                dataloader,
                 dataset,
                 device=device,
-                strategy=strategy,
-                num_negatives=num_negatives,
             )
             results = evaluator.compute_results()
             metric_report = {
