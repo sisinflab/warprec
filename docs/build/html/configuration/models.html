@@ -353,6 +353,8 @@ WarpRec allows flexible configuration of <strong>training settings</strong>, inc
 <li><p><strong>max_cpu_count</strong>: Maximum number of CPU cores to use. Defaults to available cores.</p></li>
 <li><p><strong>num_samples</strong>: Number of samples to generate. For grid search, must be <code class="docutils literal notranslate"><span class="pre">1</span></code>. Defaults to <code class="docutils literal notranslate"><span class="pre">1</span></code>.</p></li>
 <li><p><strong>parallel_trials</strong>: Number of trials to run simultaneously. Defaults to <code class="docutils literal notranslate"><span class="pre">1</span></code>.</p></li>
+<li><p><strong>multi_gpu</strong>: Wether to use multiple gpus for each trial. Defaults to <code class="docutils literal notranslate"><span class="pre">False</span></code>.</p></li>
+<li><p><strong>num_gpus</strong>: The number of gpus to assign for each trial. This value must be used only in case of multi-GPU train. Defaults to <code class="docutils literal notranslate"><span class="pre">None</span></code>.</p></li>
 <li><p><strong>block_size</strong>: Number of items to predict at once for efficiency. Defaults to <code class="docutils literal notranslate"><span class="pre">50</span></code>.</p></li>
 <li><p><strong>checkpoint_to_keep</strong>: Number of checkpoints to retain in Ray. Defaults to <code class="docutils literal notranslate"><span class="pre">5</span></code>.</p></li>
 </ul>
