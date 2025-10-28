@@ -2,18 +2,23 @@ import os
 import torch
 import uuid
 import math
-from typing import List, Tuple, Optional, Dict, Any
+from typing import List, Tuple, Optional, Dict, Any, Callable
 from copy import deepcopy
 
 import ray
 import numpy as np
 from ray import tune
-from ray.tune import Tuner, TuneConfig, RunConfig, CheckpointConfig
+from ray.tune import Tuner, TuneConfig, CheckpointConfig
+from ray.tune import RunConfig
 from ray.tune.stopper import Stopper
 from ray.tune.experiment import Trial
+
 from warprec.recommenders.base_recommender import Recommender
 from warprec.data.dataset import Dataset
-from warprec.recommenders.trainer.objectives import objective_function
+from warprec.recommenders.trainer.objectives import (
+    objective_function,
+    driver_function_ddp,
+)
 from warprec.recommenders.trainer.search_algorithm_wrapper import (
     BaseSearchWrapper,
 )
@@ -163,6 +168,7 @@ class Trainer:
         topk: List[int],
         validation_score: str,
         storage_path: str,
+        num_gpus: Optional[int] = None,
         device: str = "cpu",
         evaluation_strategy: str = "full",
         num_negatives: int = 99,
@@ -183,6 +189,7 @@ class Trainer:
             topk (List[int]): List of cutoffs for metrics.
             validation_score (str): The metric to monitor during training.
             storage_path (str): Path to store Ray results.
+            num_gpus (Optional[int]): The number of gpus per trial.
             device (str): The device that will be used for tensor operations.
             evaluation_strategy (str): Evaluation strategy, either "full" or "sampled".
             num_negatives (int): Number of negative samples to use in "sampled" strategy.
@@ -208,6 +215,7 @@ class Trainer:
             topk=topk,
             validation_score=validation_score,
             storage_path=storage_path,
+            num_gpus=num_gpus,
             device=device,
             evaluation_strategy=evaluation_strategy,
             num_negatives=num_negatives,
@@ -237,7 +245,6 @@ class Trainer:
         best_params = best_result.config
         best_score = best_result.metrics[validation_score]
         best_iter = best_result.metrics["training_iteration"]
-        best_checkpoint = best_result.checkpoint
 
         # Memory report
         result_df = results.get_dataframe()
@@ -263,7 +270,16 @@ class Trainer:
         logger.positive(f"Hyperparameter tuning for {model_name} ended successfully.")
 
         # Retrieve best model from checkpoint
-        checkpoint_path = os.path.join(best_checkpoint.to_directory(), "checkpoint.pt")
+        if best_result.checkpoint is not None:
+            checkpoint_path = os.path.join(
+                best_result.checkpoint.to_directory(), "checkpoint.pt"
+            )
+        else:
+            # In this case we are interfacing with the Trainer API
+            checkpoint_path = os.path.join(
+                best_result.metrics["checkpoint_path"], "checkpoint.pt"
+            )
+
         checkpoint_data = torch.load(checkpoint_path, weights_only=True)
         model_state = checkpoint_data["model_state"]
 
@@ -293,6 +309,7 @@ class Trainer:
         topk: List[int],
         validation_score: str,
         storage_path: str,
+        num_gpus: Optional[int] = None,
         device: str = "cpu",
         evaluation_strategy: str = "full",
         num_negatives: int = 99,
@@ -311,6 +328,7 @@ class Trainer:
             topk (List[int]): List of cutoffs for metrics.
             validation_score (str): The metric to monitor during training.
             storage_path (str): Path to store Ray results.
+            num_gpus (Optional[int]): The number of gpus per trial.
             device (str): The device that will be used for tensor operations.
             evaluation_strategy (str): Evaluation strategy, either "full" or "sampled".
             num_negatives (int): Number of negative samples to use in "sampled" strategy.
@@ -339,6 +357,7 @@ class Trainer:
             topk=topk,
             validation_score=validation_score,
             storage_path=storage_path,
+            num_gpus=num_gpus,
             device=device,
             evaluation_strategy=evaluation_strategy,
             num_negatives=num_negatives,
@@ -504,6 +523,7 @@ class Trainer:
         topk: List[int],
         validation_score: str,
         storage_path: str,
+        num_gpus: Optional[int] = None,
         device: str = "cpu",
         evaluation_strategy: str = "full",
         num_negatives: int = 99,
@@ -535,25 +555,65 @@ class Trainer:
                 f"and with {optimization.scheduler.name} scheduler."
             )
 
-        # Ray Tune parameters
-        obj_function = tune.with_parameters(
-            objective_function,
-            model_name=model_name,
-            dataset_folds=ray.put(dataset),
-            metrics=metrics,
-            topk=topk,
-            validation_top_k=validation_top_k,
-            validation_metric_name=validation_metric_name,
-            mode=mode,
-            device=device,
-            strategy=evaluation_strategy,
-            num_negatives=num_negatives,
-            seed=optimization.properties.seed,
-            block_size=optimization.block_size,
-            beta=beta,
-            pop_ratio=pop_ratio,
-            custom_models=self._custom_models,
-        )
+        # Check for multi-gpu scenario
+        trainable: Callable
+        if num_gpus is not None and num_gpus > 1:
+            logger.msg(
+                f"Detected multi-GPU scenario with {num_gpus} GPUs. "
+                f"Using Distributed Data Parallel training."
+            )
+            obj_function = tune.with_parameters(
+                driver_function_ddp,
+                model_name=model_name,
+                dataset_folds=ray.put(dataset),
+                metrics=metrics,
+                topk=topk,
+                validation_top_k=validation_top_k,
+                validation_metric_name=validation_metric_name,
+                mode=mode,
+                num_gpus=num_gpus,
+                storage_path=storage_path,
+                num_to_keep=optimization.checkpoint_to_keep,
+                strategy=evaluation_strategy,
+                num_negatives=num_negatives,
+                seed=optimization.properties.seed,
+                block_size=optimization.block_size,
+                beta=beta,
+                pop_ratio=pop_ratio,
+                custom_models=self._custom_models,
+            )
+            trainable = tune.with_resources(
+                obj_function,
+                resources={"cpu": optimization.max_cpu_count},
+            )
+        else:
+            obj_function = tune.with_parameters(
+                objective_function,
+                model_name=model_name,
+                dataset_folds=ray.put(dataset),
+                metrics=metrics,
+                topk=topk,
+                validation_top_k=validation_top_k,
+                validation_metric_name=validation_metric_name,
+                mode=mode,
+                device=device,
+                strategy=evaluation_strategy,
+                num_negatives=num_negatives,
+                seed=optimization.properties.seed,
+                block_size=optimization.block_size,
+                beta=beta,
+                pop_ratio=pop_ratio,
+                custom_models=self._custom_models,
+            )
+            trainable = tune.with_resources(
+                obj_function,
+                resources={
+                    "cpu": optimization.max_cpu_count // optimization.parallel_trials,
+                    "gpu": min(
+                        torch.cuda.device_count() / optimization.parallel_trials, 1.0
+                    ),
+                },
+            )
 
         search_alg: BaseSearchWrapper = search_algorithm_registry.get(
             optimization.strategy, **properties
@@ -595,15 +655,7 @@ class Trainer:
         )
 
         tuner = Tuner(
-            tune.with_resources(
-                obj_function,
-                resources={
-                    "cpu": optimization.max_cpu_count // optimization.parallel_trials,
-                    "gpu": min(
-                        torch.cuda.device_count() / optimization.parallel_trials, 1.0
-                    ),
-                },
-            ),
+            trainable,
             param_space=self.parse_params(params, num_folds),
             tune_config=tune_config,
             run_config=run_config,

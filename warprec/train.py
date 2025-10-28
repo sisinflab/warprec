@@ -50,6 +50,7 @@ def main(args: Namespace):
     # Setup visible devices
     visible_devices = config.general.cuda_visible_devices
     os.environ["CUDA_VISIBLE_DEVICES"] = ",".join(map(str, visible_devices))  # type: ignore[arg-type]
+    os.environ["RAY_TRAIN_V2_ENABLED"] = "1"
 
     # Load custom callback if specified
     callback: WarpRecCallback = load_callback(
@@ -168,9 +169,10 @@ def main(args: Namespace):
         # Evaluation testing
         model_evaluation_start_time = time.time()
         evaluator.evaluate(
-            best_model,
-            dataloader,
-            main_dataset,
+            model=best_model,
+            dataloader=dataloader,
+            strategy=config.evaluation.strategy,
+            dataset=main_dataset,
             device=str(best_model._device),
             verbose=True,
         )
@@ -334,6 +336,11 @@ def single_split_flow(
     model_device = params.optimization.device
     device = general_device if model_device is None else model_device
 
+    # Check for multi-gpu scenario
+    num_gpus = None
+    if params.optimization.multi_gpu:
+        num_gpus = params.optimization.num_gpus
+
     # Evaluation on report
     eval_config = config.evaluation
     val_metric, val_k = validation_metric(config.evaluation.validation_metric)
@@ -358,6 +365,7 @@ def single_split_flow(
         topk=topk,
         validation_score=config.evaluation.validation_metric,
         storage_path=storage_path,
+        num_gpus=num_gpus,
         device=device,
         evaluation_strategy=config.evaluation.strategy,
         num_negatives=config.evaluation.num_negatives,
@@ -399,6 +407,11 @@ def multiple_fold_validation_flow(
     model_device = params.optimization.device
     device = general_device if model_device is None else model_device
 
+    # Check for multi-gpu scenario
+    num_gpus = None
+    if params.optimization.multi_gpu:
+        num_gpus = params.optimization.num_gpus
+
     # Retrieve common params
     block_size = params.optimization.block_size
     validation_score = config.evaluation.validation_metric
@@ -428,6 +441,7 @@ def multiple_fold_validation_flow(
         topk=topk,
         validation_score=validation_score,
         storage_path=storage_path,
+        num_gpus=num_gpus,
         device=device,
         evaluation_strategy=config.evaluation.strategy,
         num_negatives=config.evaluation.num_negatives,

@@ -90,9 +90,10 @@ def main(args: Namespace):
 
         # Evaluation on main dataset
         evaluator.evaluate(
-            model,
-            dataloader,
-            main_dataset,
+            model=model,
+            dataloader=dataloader,
+            strategy=config.evaluation.strategy,
+            dataset=main_dataset,
             device=str(model._device),
             verbose=True,
         )
