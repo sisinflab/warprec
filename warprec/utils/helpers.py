@@ -1,5 +1,5 @@
 import importlib
-from typing import List, Tuple, TYPE_CHECKING
+from typing import List, Tuple, Union, TYPE_CHECKING
 from pathlib import Path
 
 from warprec.utils.config.model_configuration import RecomModel
@@ -93,7 +93,7 @@ def retrieve_evaluation_dataloader(
     strategy: str,
     num_negatives: int = 99,
     seed: int = 42,
-) -> "EvaluationDataLoader" | "NegativeEvaluationDataLoader":
+) -> Union["EvaluationDataLoader", "NegativeEvaluationDataLoader"]:
     """Retrieve the appropriate evaluation dataloader based on the strategy.
 
     Args:
@@ -103,12 +103,12 @@ def retrieve_evaluation_dataloader(
         seed (int): Random seed for negative sampling.
 
     Returns:
-        EvaluationDataLoader | NegativeEvaluationDataLoader: The appropriate evaluation dataloader.
+        Union["EvaluationDataLoader", "NegativeEvaluationDataLoader"]: The appropriate evaluation dataloader.
 
     Raises:
         ValueError: If an unknown evaluation strategy is provided.
     """
-    dataloader: "EvaluationDataLoader" | "NegativeEvaluationDataLoader"
+    dataloader: Union["EvaluationDataLoader", "NegativeEvaluationDataLoader"]
     if strategy == "full":
         dataloader = dataset.get_evaluation_dataloader()
     elif strategy == "sampled":
