@@ -122,6 +122,7 @@ class Evaluator:
         self,
         model: Recommender,
         dataloader: EvaluationDataLoader | NegativeEvaluationDataLoader,
+        strategy: str,
         dataset: Dataset,
         device: str = "cpu",
         verbose: bool = False,
@@ -132,6 +133,7 @@ class Evaluator:
             model (Recommender): The trained model.
             dataloader (EvaluationDataLoader | NegativeEvaluationDataLoader):
                 The dataloader used for the evaluation.
+            strategy (str): The evaluation strategy to use.
             dataset (Dataset): The dataset used for the evaluation.
             device (str): The device on which the metrics will be calculated.
             verbose (bool): Wether of not the method should write with logger.
@@ -139,6 +141,14 @@ class Evaluator:
         Raises:
             ValueError: If the strategy is not supported.
         """
+        # Check if the strategy is correct
+        if strategy not in ["full", "sampled"]:
+            raise ValueError(
+                "The strategy passed is not correct. "
+                "Accepted strategies are 'full' and 'sampled'. "
+                f"Strategy received: {strategy}"
+            )
+
         eval_start_time: float
         if verbose:
             logger.msg(f"Starting evaluation process for model {model.name}.")
@@ -148,15 +158,6 @@ class Evaluator:
         self.reset_metrics()
         self.metrics_to(device)
         model.eval()
-
-        # Correctly infer the strategy
-        strategy: str
-        if isinstance(dataloader, EvaluationDataLoader):
-            strategy = "full"
-        elif isinstance(dataloader, NegativeEvaluationDataLoader):
-            strategy = "sampled"
-        else:
-            raise ValueError("The provided dataloader is not supported for evaluation.")
 
         # Set the train interactions
         train_sparse = dataset.train_set.get_sparse()
