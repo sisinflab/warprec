@@ -261,13 +261,12 @@ def dataset_preparation(
         config (TrainConfiguration): The configuration file used for the experiment.
     """
 
-    def prepare_evaluation_loaders(dataset: Dataset, device: str):
+    def prepare_evaluation_loaders(dataset: Dataset):
         """utility function to prepare the evaluation dataloaders
         for a given dataset based on the evaluation strategy.
 
         Args:
             dataset (Dataset): The dataset to prepare.
-            device (str): The device to use.
         """
         if config.evaluation.strategy == "full":
             dataset.get_evaluation_dataloader()
@@ -277,15 +276,14 @@ def dataset_preparation(
                 seed=config.evaluation.seed,
             )
 
-    logger.msg("Preparing main dataset inner structures for training and evaluation.")
+    logger.msg("Preparing main dataset inner structures for evaluation.")
 
-    device = config.general.device
-    prepare_evaluation_loaders(main_dataset, device)
+    prepare_evaluation_loaders(main_dataset)
     if fold_dataset is not None and isinstance(fold_dataset, list):
         for i, dataset in enumerate(fold_dataset):
             logger.msg(
-                f"Preparing fold dataset {i + 1}/{len(fold_dataset)} inner structures for training and evaluation."
+                f"Preparing fold dataset {i + 1}/{len(fold_dataset)} inner structures for evaluation."
             )
-            prepare_evaluation_loaders(dataset, device)
+            prepare_evaluation_loaders(dataset)
 
     logger.positive("All dataset inner structures ready.")
