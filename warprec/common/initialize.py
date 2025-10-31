@@ -1,4 +1,4 @@
-from typing import Tuple, List
+from typing import Tuple, List, Optional
 
 from pandas import DataFrame
 
@@ -242,3 +242,50 @@ def initialize_datasets(
     )
 
     return main_dataset, val_dataset, fold_dataset
+
+
+def dataset_preparation(
+    main_dataset: Dataset,
+    fold_dataset: Optional[List[Dataset]],
+    config: TrainConfiguration,
+):
+    """This method prepares the dataloaders inside the dataset
+    that will be passed to Ray during HPO. It is important to
+    precompute these dataloaders before starting the optimization to
+    avoid multiple computations of the same dataloader.
+
+    Args:
+        main_dataset (Dataset): The main dataset of train/test split.
+        fold_dataset (Optional[List[Dataset]]): The list of validation datasets
+            of train/val splits.
+        config (TrainConfiguration): The configuration file used for the experiment.
+    """
+
+    def prepare_evaluation_loaders(dataset: Dataset, device: str):
+        """utility function to prepare the evaluation dataloaders
+        for a given dataset based on the evaluation strategy.
+
+        Args:
+            dataset (Dataset): The dataset to prepare.
+            device (str): The device to use.
+        """
+        if config.evaluation.strategy == "full":
+            dataset.get_evaluation_dataloader()
+        elif config.evaluation.strategy == "sampled":
+            dataset.get_neg_evaluation_dataloader(
+                num_negatives=config.evaluation.num_negatives,
+                seed=config.evaluation.seed,
+            )
+
+    logger.msg("Preparing main dataset inner structures for training and evaluation.")
+
+    device = config.general.device
+    prepare_evaluation_loaders(main_dataset, device)
+    if fold_dataset is not None and isinstance(fold_dataset, list):
+        for i, dataset in enumerate(fold_dataset):
+            logger.msg(
+                f"Preparing fold dataset {i + 1}/{len(fold_dataset)} inner structures for training and evaluation."
+            )
+            prepare_evaluation_loaders(dataset, device)
+
+    logger.positive("All dataset inner structures ready.")
