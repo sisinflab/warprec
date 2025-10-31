@@ -118,7 +118,7 @@ class FOSSIL(IterativeRecommender, SequentialRecommenderUtils):
             max_seq_len=self.max_seq_len,
             num_negatives=self.neg_samples,
             batch_size=self.batch_size,
-            user_id=True,
+            include_user_id=True,
         )
 
     def _inverse_seq_item_embedding(
