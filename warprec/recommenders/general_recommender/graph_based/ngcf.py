@@ -44,7 +44,7 @@ class NGCF(IterativeRecommender, GraphRecommenderUtils):
         ValueError: If the items or users value was not passed through the info dict.
 
     Attributes:
-        DATALOADER_TYPE (DataLoaderType): The type of dataloader used.
+        DATALOADER_TYPE: The type of dataloader used.
         embedding_size (int): The embedding size of user and item.
         weight_decay (float): The value of weight decay used in the optimizer.
         batch_size (int): The batch size used for training.
@@ -56,7 +56,7 @@ class NGCF(IterativeRecommender, GraphRecommenderUtils):
     """
 
     # Dataloader definition
-    DATALOADER_TYPE: DataLoaderType = DataLoaderType.POS_NEG_LOADER
+    DATALOADER_TYPE = DataLoaderType.POS_NEG_LOADER
 
     # Model hyperparameters
     embedding_size: int

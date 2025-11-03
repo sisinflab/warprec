@@ -35,7 +35,7 @@ class gSASRec(IterativeRecommender, SequentialRecommenderUtils):
                     through the info dict.
 
     Attributes:
-        DATALOADER_TYPE (DataLoaderType): The type of dataloader used.
+        DATALOADER_TYPE: The type of dataloader used.
         embedding_size (int): The dimension of the item embeddings (hidden_size).
         n_layers (int): The number of transformer encoder layers.
         n_heads (int): The number of attention heads in the transformer.
@@ -53,7 +53,7 @@ class gSASRec(IterativeRecommender, SequentialRecommenderUtils):
     """
 
     # Dataloader definition
-    DATALOADER_TYPE: DataLoaderType = DataLoaderType.USER_HISTORY_LOADER
+    DATALOADER_TYPE = DataLoaderType.USER_HISTORY_LOADER
 
     # Model hyperparameters
     embedding_size: int

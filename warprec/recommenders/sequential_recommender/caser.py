@@ -38,7 +38,7 @@ class Caser(IterativeRecommender, SequentialRecommenderUtils):
                     are not passed through the info dict.
 
     Attributes:
-        DATALOADER_TYPE (DataLoaderType): The type of dataloader used.
+        DATALOADER_TYPE: The type of dataloader used.
         embedding_size (int): The dimension of the item and user embeddings.
         n_h (int): The number of horizontal filters.
         n_v (int): The number of vertical filters.
@@ -52,7 +52,7 @@ class Caser(IterativeRecommender, SequentialRecommenderUtils):
     """
 
     # Dataloader definition
-    DATALOADER_TYPE: DataLoaderType = DataLoaderType.SEQUENTIAL_LOADER_WITH_USER_ID
+    DATALOADER_TYPE = DataLoaderType.SEQUENTIAL_LOADER_WITH_USER_ID
 
     # Model hyperparameters
     embedding_size: int

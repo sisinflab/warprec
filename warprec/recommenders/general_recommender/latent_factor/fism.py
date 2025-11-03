@@ -32,7 +32,7 @@ class FISM(IterativeRecommender):
         ValueError: If the items or users value was not passed through the info dict.
 
     Attributes:
-        DATALOADER_TYPE (DataLoaderType): The type of dataloader used.
+        DATALOADER_TYPE: The type of dataloader used.
         embedding_size (int): The number of factors for item feature embeddings.
         alpha (float): The alpha parameter, a value between 0 and 1, used in the similarity calculation.
         split_to (int): Parameter for splitting items into chunks during prediction (for memory management).
@@ -43,7 +43,7 @@ class FISM(IterativeRecommender):
     """
 
     # Dataloader definition
-    DATALOADER_TYPE: DataLoaderType = DataLoaderType.HISTORY
+    DATALOADER_TYPE = DataLoaderType.HISTORY
 
     # Model specific parameters
     embedding_size: int

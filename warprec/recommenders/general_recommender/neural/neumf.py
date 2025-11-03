@@ -33,7 +33,7 @@ class NeuMF(IterativeRecommender):
         ValueError: If the items or users value was not passed through the info dict.
 
     Attributes:
-        DATALOADER_TYPE (DataLoaderType): The type of dataloader used.
+        DATALOADER_TYPE: The type of dataloader used.
         mf_embedding_size (int): The MF embedding size.
         mlp_embedding_size (int): The MLP embedding size.
         mlp_hidden_size (List[int]): The MLP hidden layer size list.
@@ -48,7 +48,7 @@ class NeuMF(IterativeRecommender):
     """
 
     # Dataloader definition
-    DATALOADER_TYPE: DataLoaderType = DataLoaderType.ITEM_RATING_LOADER
+    DATALOADER_TYPE = DataLoaderType.ITEM_RATING_LOADER
 
     # Model hyperparameters
     mf_embedding_size: int

@@ -92,7 +92,7 @@ class MultiDAE(IterativeRecommender):
         ValueError: If the items value was not passed through the info dict.
 
     Attributes:
-        DATALOADER_TYPE (DataLoaderType): The type of dataloader used.
+        DATALOADER_TYPE: The type of dataloader used.
         intermediate_dim (int): Intermediate dimension size.
         latent_dim (int): Latent dimension size.
         dropout (float): Dropout probability.
@@ -103,7 +103,7 @@ class MultiDAE(IterativeRecommender):
     """
 
     # Dataloader definition
-    DATALOADER_TYPE: DataLoaderType = DataLoaderType.INTERACTION_LOADER
+    DATALOADER_TYPE = DataLoaderType.INTERACTION_LOADER
 
     intermediate_dim: int
     latent_dim: int

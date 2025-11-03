@@ -36,7 +36,7 @@ class SASRec(IterativeRecommender, SequentialRecommenderUtils):
         ValueError: If the items value was not passed through the info dict.
 
     Attributes:
-        DATALOADER_TYPE (DataLoaderType): The type of dataloader used.
+        DATALOADER_TYPE: The type of dataloader used.
         embedding_size (int): The dimension of the item embeddings (hidden_size).
         n_layers (int): The number of transformer encoder layers.
         n_heads (int): The number of attention heads in the transformer.
@@ -52,7 +52,7 @@ class SASRec(IterativeRecommender, SequentialRecommenderUtils):
     """
 
     # Dataloader definition
-    DATALOADER_TYPE: DataLoaderType = DataLoaderType.SEQUENTIAL_LOADER
+    DATALOADER_TYPE = DataLoaderType.SEQUENTIAL_LOADER
 
     # Model hyperparameters
     embedding_size: int

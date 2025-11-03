@@ -37,7 +37,7 @@ class FOSSIL(IterativeRecommender, SequentialRecommenderUtils):
                     through the info dict.
 
     Attributes:
-        DATALOADER_TYPE (DataLoaderType): The type of dataloader used.
+        DATALOADER_TYPE: The type of dataloader used.
         embedding_size (int): The dimension of the item embeddings.
         order_len (int): The number of last items to consider for high-order Markov chains.
         reg_weight (float): The L2 regularization weight.
@@ -51,7 +51,7 @@ class FOSSIL(IterativeRecommender, SequentialRecommenderUtils):
     """
 
     # Dataloader definition
-    DATALOADER_TYPE: DataLoaderType = DataLoaderType.SEQUENTIAL_LOADER_WITH_USER_ID
+    DATALOADER_TYPE = DataLoaderType.SEQUENTIAL_LOADER_WITH_USER_ID
 
     # Model hyperparameters
     embedding_size: int

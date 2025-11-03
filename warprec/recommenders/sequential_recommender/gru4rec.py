@@ -33,7 +33,7 @@ class GRU4Rec(IterativeRecommender, SequentialRecommenderUtils):
         ValueError: If the items value was not passed through the info dict.
 
     Attributes:
-        DATALOADER_TYPE (DataLoaderType): The type of dataloader used.
+        DATALOADER_TYPE: The type of dataloader used.
         embedding_size (int): The dimension of the item embeddings.
         hidden_size (int): The number of features in the hidden state of the GRU.
         num_layers (int): The number of recurrent layers.
@@ -47,7 +47,7 @@ class GRU4Rec(IterativeRecommender, SequentialRecommenderUtils):
     """
 
     # Dataloader definition
-    DATALOADER_TYPE: DataLoaderType = DataLoaderType.SEQUENTIAL_LOADER
+    DATALOADER_TYPE = DataLoaderType.SEQUENTIAL_LOADER
 
     # Model hyperparameters
     embedding_size: int

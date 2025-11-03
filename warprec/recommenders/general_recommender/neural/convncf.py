@@ -34,7 +34,7 @@ class ConvNCF(IterativeRecommender):
         ValueError: If the items or users value was not passed through the info dict.
 
     Attributes:
-        DATALOADER_TYPE (DataLoaderType): The type of dataloader used.
+        DATALOADER_TYPE: The type of dataloader used.
         embedding_size (int): The embedding size for users and items.
         cnn_channels (List[int]): The list of output channels for each CNN layer.
         cnn_kernels (List[int]): The list of kernel sizes for each CNN layer.
@@ -47,7 +47,7 @@ class ConvNCF(IterativeRecommender):
     """
 
     # Dataloader definition
-    DATALOADER_TYPE: DataLoaderType = DataLoaderType.POS_NEG_LOADER
+    DATALOADER_TYPE = DataLoaderType.POS_NEG_LOADER
 
     # Model hyperparameters
     embedding_size: int
