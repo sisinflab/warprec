@@ -7,7 +7,11 @@ from argparse import Namespace
 import ray
 import torch
 
-from warprec.common import initialize_datasets, dataset_preparation
+from warprec.common import (
+    initialize_datasets,
+    prepare_train_loaders,
+    dataset_preparation,
+)
 from warprec.data.reader import ReaderFactory
 from warprec.data.writer import WriterFactory
 from warprec.data.dataset import Dataset
@@ -115,6 +119,14 @@ def main(args: Namespace):
 
     for model_name in models:
         model_exploration_start_time = time.time()
+
+        # Check if dataloader requirements is in 'model' mode
+        if preparation_strategy == "model":
+            model_dict = {model_name: config.models[model_name]}
+            prepare_train_loaders(main_dataset, model_dict)
+
+            for fold in fold_dataset:
+                prepare_train_loaders(fold, model_dict)
 
         params = model_param_from_dict(model_name, config.models[model_name])
         trainer = Trainer(
@@ -267,6 +279,13 @@ def main(args: Namespace):
 
             # Update time report
             writer.write_time_report(model_timing_report)
+
+            # Clear out the dataset cache if in 'model' mode
+            if preparation_strategy == "model":
+                main_dataset.clear_cache()
+
+                for fold in fold_dataset:
+                    fold.clear_cache()
 
     if requires_stat_significance:
         # Check if enough models have been evaluated
