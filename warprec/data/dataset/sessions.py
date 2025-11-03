@@ -114,11 +114,6 @@ class Sessions:
         ValueError: If the user or item label are not found in the DataFrame.
     """
 
-    _cached_sequential_data: dict = {}
-    _cached_grouped_sequential_data: dict = {}
-    _cached_user_histories: Dict[int, List[int]] = {}
-    _processed_df: Optional[DataFrame] = None
-
     def __init__(
         self,
         data: DataFrame,
@@ -144,12 +139,17 @@ class Sessions:
         self._niid = len(self._imap)
         self._processed_df = None
 
+        # Initialize the cache
+        self._cached_dataset: Dict[str, Dataset] = {}
+        self._cached_user_histories: Dict[int, List[int]] = {}
+
     def clear_history_cache(self):
         """Clears all cached data to free up memory."""
-        self._cached_sequential_data = {}
-        self._cached_grouped_sequential_data = {}
+        del self._cached_dataset
+        self._cached_dataset = {}
+
+        del self._cached_user_histories
         self._cached_user_histories = {}
-        self._processed_df = None
 
     def _get_processed_data(self) -> DataFrame:
         """Centralized method to map, clean, and sort interaction data.
@@ -217,7 +217,7 @@ class Sessions:
     def get_sequential_dataloader(
         self,
         max_seq_len: int,
-        num_negatives: int = 0,
+        neg_samples: int = 0,
         include_user_id: bool = False,
         batch_size: int = 1024,
         shuffle: bool = True,
@@ -231,7 +231,7 @@ class Sessions:
 
         Args:
             max_seq_len (int): Maximum length of sequences produced.
-            num_negatives (int): Number of negative samples per user.
+            neg_samples (int): Number of negative samples per user.
             include_user_id (bool): Whether to include user IDs in the output.
             batch_size (int): Batch size for the DataLoader.
             shuffle (bool): Whether to shuffle the data.
@@ -241,10 +241,11 @@ class Sessions:
             DataLoader: A DataLoader yielding sequential training samples.
         """
         # Check cache first
-        cache_key = (max_seq_len, num_negatives, include_user_id, seed)
-        if cache_key in self._cached_sequential_data:
-            cached_tensors = self._cached_sequential_data[cache_key]
-            dataset = SessionDataset(**cached_tensors)
+        cache_key = (
+            f"sequence_len_{max_seq_len}_neg_{neg_samples}_user_{include_user_id}"
+        )
+        if cache_key in self._cached_dataset:
+            dataset = self._cached_dataset[cache_key]
             return DataLoader(dataset, batch_size=batch_size, shuffle=shuffle)
 
         (
@@ -254,7 +255,7 @@ class Sessions:
             tensor_pos_item_id,
             tensor_neg_item_id,
         ) = self._create_sequences_and_targets(
-            num_negatives=num_negatives,
+            neg_samples=neg_samples,
             max_seq_len=max_seq_len,
             include_user_id=include_user_id,
             seed=seed,
@@ -276,15 +277,15 @@ class Sessions:
             dataset_args["users"] = tensor_user_id
         if tensor_neg_item_id is not None:
             dataset_args["negative_items"] = tensor_neg_item_id
-        self._cached_sequential_data[cache_key] = dataset_args
 
         # Create dataset and DataLoader
         dataset = SessionDataset(**dataset_args)
+        self._cached_dataset[cache_key] = dataset
         return DataLoader(dataset, batch_size=batch_size, shuffle=shuffle)
 
     def _create_sequences_and_targets(
         self,
-        num_negatives: int,
+        neg_samples: int,
         max_seq_len: int,
         include_user_id: bool = False,
         seed: int = 42,
@@ -294,7 +295,7 @@ class Sessions:
         This function uses pandas and numpy for efficient processing.
 
         Args:
-            num_negatives (int): Number of negative samples per user.
+            neg_samples (int): Number of negative samples per user.
             max_seq_len (int): Maximum length of sequences produced.
             include_user_id (bool): Wether or not to return also the user_id.
             seed (int): Seed for Numpy random number generator for reproducibility.
@@ -317,7 +318,7 @@ class Sessions:
                 torch.empty((0, max_seq_len), dtype=torch.long),
                 torch.empty(0, dtype=torch.long),
                 torch.empty(0, dtype=torch.long),
-                None if num_negatives == 0 else torch.empty(0, dtype=torch.long),
+                None if neg_samples == 0 else torch.empty(0, dtype=torch.long),
             )
 
         # Extract numpy arrays for efficient processing
@@ -341,7 +342,7 @@ class Sessions:
                 torch.empty((0, max_seq_len), dtype=torch.long),
                 torch.empty(0, dtype=torch.long),
                 torch.empty(0, dtype=torch.long),
-                None if num_negatives == 0 else torch.empty(0, dtype=torch.long),
+                None if neg_samples == 0 else torch.empty(0, dtype=torch.long),
             )
 
         # For each valid session of length L, we generate L-1 training samples.
@@ -387,17 +388,17 @@ class Sessions:
         padding_mask_right = row_indices >= tensor_item_seq_len[:, None]
         padded_item_seq.masked_fill_(padding_mask_right, 0)
 
-        # If requested, generate `num_negatives` negative samples for each positive sample.
+        # If requested, generate `neg_samples` negative samples for each positive sample.
         # This process is vectorized and ensures that negative candidates do not collide
         # with the positive target or any item in the user's history for that sample
         neg_tensor = None
-        if num_negatives > 0:
+        if neg_samples > 0:
             # Set random seed for reproducibility
             np.random.seed(seed)
 
             # Generate initial random candidates
             neg_candidates = np.random.randint(
-                0, self._niid, size=(num_total_samples, num_negatives), dtype=np.int64
+                0, self._niid, size=(num_total_samples, neg_samples), dtype=np.int64
             )
 
             # Prepare data for collision checks
@@ -501,7 +502,7 @@ class Sessions:
     def get_user_history_dataloader(
         self,
         max_seq_len: int,
-        num_negatives: int,
+        neg_samples: int,
         batch_size: int = 1024,
         shuffle: bool = True,
         seed: int = 42,
@@ -510,7 +511,7 @@ class Sessions:
 
         Args:
             max_seq_len (int): Maximum length of the user history sequence.
-            num_negatives (int): Number of negative samples for each positive item.
+            neg_samples (int): Number of negative samples for each positive item.
             batch_size (int): Batch size for the DataLoader.
             shuffle (bool): Whether to shuffle the data.
             seed (int): Seed for reproducibility of negative sampling.
@@ -519,16 +520,15 @@ class Sessions:
             DataLoader: A DataLoader yielding user history sequences with negative samples.
         """
         # Check cache first
-        cache_key = (max_seq_len, num_negatives, seed)
-        if cache_key in self._cached_grouped_sequential_data:
-            cached_tensors = self._cached_grouped_sequential_data[cache_key]
-            dataset = UserHistoryDataset(**cached_tensors)
+        cache_key = f"history_len_{max_seq_len}_neg_{neg_samples}"
+        if cache_key in self._cached_dataset:
+            dataset = self._cached_dataset[cache_key]
             return DataLoader(dataset, batch_size=batch_size, shuffle=shuffle)
 
         # Generate sequences and negative samples
-        pos_seqs, neg_samples = self._create_grouped_sequences(
+        pos_seqs, neg_seqs = self._create_grouped_sequences(
             max_seq_len=max_seq_len,
-            num_negatives=num_negatives,
+            neg_samples=neg_samples,
             seed=seed,
         )
 
@@ -541,23 +541,23 @@ class Sessions:
         # Cache the generated tensors for future use
         dataset_args = {
             "positive_sequences": pos_seqs,
-            "negative_samples": neg_samples,
+            "negative_samples": neg_seqs,
         }
-        self._cached_grouped_sequential_data[cache_key] = dataset_args
 
         # Create dataset and DataLoader
         dataset = UserHistoryDataset(**dataset_args)
+        self._cached_dataset[cache_key] = dataset
         return DataLoader(dataset, batch_size=batch_size, shuffle=shuffle)
 
     def _create_grouped_sequences(
-        self, max_seq_len: int, num_negatives: int, seed: int
+        self, max_seq_len: int, neg_samples: int, seed: int
     ) -> Tuple[Tensor, Tensor]:
         """Core logic to transform interaction data into user-history sequences
         using a vectorized approach.
 
         Args:
             max_seq_len (int): Maximum length of the user history sequence.
-            num_negatives (int): Number of negative samples for each positive item.
+            neg_samples (int): Number of negative samples for each positive item.
             seed (int): Seed for reproducibility of negative sampling.
 
         Returns:
@@ -604,7 +604,7 @@ class Sessions:
 
         # Generate initial negative candidates
         # Shape: (N, L-1, K)
-        neg_candidates_shape = (num_users, current_max_len - 1, num_negatives)
+        neg_candidates_shape = (num_users, current_max_len - 1, neg_samples)
         neg_candidates = np.random.randint(
             0, self._niid, size=neg_candidates_shape, dtype=np.int64
         )
