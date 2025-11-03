@@ -161,7 +161,7 @@ class MetricBlock(str, Enum):
         - TOP_K_INDICES: The indices of the top k predictions of the model.
         - TOP_K_VALUES: The values of the top k predictions of the model.
         - TOP_K_BINARY_RELEVANCE: The relevance of the top k predictions as a binary tensor [0, 1].
-        - TIO_K_DISCOUNTED_RELEVANCE: The relevance of the top k predictions as a discounted tensor.
+        - TOP_K_DISCOUNTED_RELEVANCE: The relevance of the top k predictions as a discounted tensor.
     """
 
     BINARY_RELEVANCE = "binary_relevance"
