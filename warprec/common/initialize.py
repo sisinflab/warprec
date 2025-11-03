@@ -250,6 +250,7 @@ def initialize_datasets(
 def dataset_preparation(
     main_dataset: Dataset,
     fold_dataset: Optional[List[Dataset]],
+    preparation_strategy: Optional[str],
     config: TrainConfiguration,
 ):
     """This method prepares the dataloaders inside the dataset
@@ -261,6 +262,7 @@ def dataset_preparation(
         main_dataset (Dataset): The main dataset of train/test split.
         fold_dataset (Optional[List[Dataset]]): The list of validation datasets
             of train/val splits.
+        preparation_strategy (Optional[str]): The strategy to use to prepare the dataset.
         config (TrainConfiguration): The configuration file used for the experiment.
     """
 
@@ -358,14 +360,15 @@ def dataset_preparation(
                     # No specific parameters to pass to the method
                     loader_method(**fixed_params)
 
-    logger.msg("Preparing main dataset inner structures for training.")
+    if preparation_strategy is not None and preparation_strategy == "experiment":
+        logger.msg("Preparing main dataset inner structures for training.")
 
-    prepare_train_loaders(main_dataset)
-    if fold_dataset is not None and isinstance(fold_dataset, list):
-        for i, dataset in enumerate(fold_dataset):
-            logger.msg(
-                f"Preparing fold dataset {i + 1}/{len(fold_dataset)} inner structures for training."
-            )
-            prepare_train_loaders(dataset)
+        prepare_train_loaders(main_dataset)
+        if fold_dataset is not None and isinstance(fold_dataset, list):
+            for i, dataset in enumerate(fold_dataset):
+                logger.msg(
+                    f"Preparing fold dataset {i + 1}/{len(fold_dataset)} inner structures for training."
+                )
+                prepare_train_loaders(dataset)
 
-    logger.positive("All dataset inner structures ready.")
+        logger.positive("All dataset inner structures ready.")

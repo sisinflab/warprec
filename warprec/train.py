@@ -102,7 +102,8 @@ def main(args: Namespace):
     )
 
     # Prepare dataloaders for evaluation
-    dataset_preparation(main_dataset, fold_dataset, config)
+    preparation_strategy = config.general.train_data_preparation
+    dataset_preparation(main_dataset, fold_dataset, preparation_strategy, config)
 
     data_preparation_time = time.time() - experiment_start_time
     logger.positive(

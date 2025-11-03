@@ -143,6 +143,13 @@ class GeneralConfig(BaseModel):
         device (Optional[str]): The device that will be used for tensor operations.
         ray_verbose (Optional[int]): The Ray level of verbosity.
         time_report (Optional[bool]): Whether to report the time taken by each step.
+        train_data_preparation (Optional[str]): Defines how to prepare training data structures.
+            Can either be:
+            - None: No preparation will be executed.
+            - "model": Data structures will be prepared only for the current model, then
+                the cache will be cleared.
+            - "experiment": Data structures will be prepared for the whole experiment.
+                Will require more memory.
         cuda_visible_devices (Optional[List[int] | int]): The list of visible CUDA devices.
             Defaults to all visible devices.
         custom_models (Optional[str | List[str]]): List of custom model paths to load.
@@ -156,6 +163,7 @@ class GeneralConfig(BaseModel):
     device: Optional[str] = "cpu"
     ray_verbose: Optional[int] = 1
     time_report: Optional[bool] = True
+    train_data_preparation: Optional[str] = None
     cuda_visible_devices: Optional[List[int] | int] = list(
         range(torch.cuda.device_count())
     )
@@ -176,6 +184,19 @@ class GeneralConfig(BaseModel):
                 )
             return v
         raise ValueError(f'Device {v} is not supported. Use "cpu" or "cuda".')
+
+    @field_validator("train_data_preparation")
+    @classmethod
+    def check_train_data_preparation(cls, v: str):
+        """Validate train_data_preparation."""
+        if v is None:
+            return v
+        if v in ["model", "experiment"]:
+            return v
+        raise ValueError(
+            f"Train data preparation value can either be: None, 'model' or 'experiment'. "
+            f"Value received: {v}"
+        )
 
     @field_validator("cuda_visible_devices")
     @classmethod
