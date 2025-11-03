@@ -19,6 +19,10 @@ Available Keywords
     - *None*: Leaving the field empty will result in the framework not pre-computing data structures needed for train. Each trial will compute the needed data.
     - *conservative*: In 'conservative' mode the framework will pre-compute all data structures needed only for the current model in exam, clearing the cache when passing to the next one.
     - *experiment*: In 'experiment' mode the framework will pre-compute all data structures needed for all the models in the configuration.
+
+.. important::
+    The **train_data_preparation** parameter affects how memory is managed during the experiment. The default mode uses the least memory, conservative requires more, and experiment is the most memory-intensive option. Choosing the latter modes can lead to faster training times, as key results are cached directly within the dataset.
+
 - **cuda_visible_devices**: Indexes of CUDA devices that WarpRec can use. Defaults to all available devices.
 - **custom_models**: Python modules to import custom models into WarpRec. Can be a string or a list of strings.
 - **callback**: Nested section to configure a custom callback.
