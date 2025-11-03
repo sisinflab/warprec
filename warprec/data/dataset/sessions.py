@@ -143,7 +143,7 @@ class Sessions:
         self._cached_dataset: Dict[str, Dataset] = {}
         self._cached_user_histories: Dict[int, List[int]] = {}
 
-    def clear_history_cache(self):
+    def clear_dataset_cache(self):
         """Clears all cached data to free up memory."""
         del self._cached_dataset
         self._cached_dataset = {}
