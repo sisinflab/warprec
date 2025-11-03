@@ -642,3 +642,8 @@ class Dataset:
         """
         self.umap = user_mapping
         self.imap = item_mapping
+
+    def clear_cache(self):
+        """Clear the cache of inner data structures."""
+        self.train_set.clear_dataset_cache()
+        self.train_session.clear_dataset_cache()
