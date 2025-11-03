@@ -1,5 +1,5 @@
 import random
-from typing import Any
+from typing import Any, Optional
 from abc import ABC, abstractmethod
 
 import torch
@@ -10,6 +10,7 @@ from torch.utils.data import DataLoader
 from scipy.sparse import csr_matrix
 
 from warprec.data.dataset import Interactions, Sessions
+from warprec.utils.enums import DataLoaderType
 
 
 class Recommender(nn.Module, ABC):
@@ -23,7 +24,14 @@ class Recommender(nn.Module, ABC):
         seed (int): The seed to use for reproducibility.
         info (dict): The dictionary containing dataset information.
         **kwargs (Any): Keyword argument for PyTorch nn.Module.
+
+    Attributes:
+        DATALOADER_TYPE (Optional[DataLoaderType]): The type of dataloader used
+            by this model. This value will be used to pre-compute the required
+            data structure before starting the training process.
     """
+
+    DATALOADER_TYPE: Optional[DataLoaderType] = None
 
     def __init__(
         self,
