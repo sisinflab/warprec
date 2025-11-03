@@ -121,7 +121,7 @@ def main(args: Namespace):
         model_exploration_start_time = time.time()
 
         # Check if dataloader requirements is in 'model' mode
-        if preparation_strategy == "model":
+        if preparation_strategy == "conservative":
             model_dict = {model_name: config.models[model_name]}
             prepare_train_loaders(main_dataset, model_dict)
 
@@ -280,8 +280,8 @@ def main(args: Namespace):
             # Update time report
             writer.write_time_report(model_timing_report)
 
-            # Clear out the dataset cache if in 'model' mode
-            if preparation_strategy == "model":
+            # Clear out the dataset cache if in 'conservative' mode
+            if preparation_strategy == "conservative":
                 main_dataset.clear_cache()
 
                 for fold in fold_dataset:

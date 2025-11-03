@@ -146,7 +146,7 @@ class GeneralConfig(BaseModel):
         train_data_preparation (Optional[str]): Defines how to prepare training data structures.
             Can either be:
             - None: No preparation will be executed.
-            - "model": Data structures will be prepared only for the current model, then
+            - "conservative": Data structures will be prepared only for the current model, then
                 the cache will be cleared.
             - "experiment": Data structures will be prepared for the whole experiment.
                 Will require more memory.
@@ -191,10 +191,10 @@ class GeneralConfig(BaseModel):
         """Validate train_data_preparation."""
         if v is None:
             return v
-        if v in ["model", "experiment"]:
+        if v in ["conservative", "experiment"]:
             return v
         raise ValueError(
-            f"Train data preparation value can either be: None, 'model' or 'experiment'. "
+            f"Train data preparation value can either be: None, 'conservative' or 'experiment'. "
             f"Value received: {v}"
         )
 
