@@ -287,6 +287,8 @@ def main(args: Namespace):
                 for fold in fold_dataset:
                     fold.clear_cache()
 
+                logger.positive("Dataset cache cleared.")
+
     if requires_stat_significance:
         # Check if enough models have been evaluated
         if len(model_results) >= 2:
