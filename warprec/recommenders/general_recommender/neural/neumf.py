@@ -10,6 +10,7 @@ from scipy.sparse import csr_matrix
 from warprec.recommenders.layers import MLP
 from warprec.data.dataset import Interactions, Sessions
 from warprec.recommenders.base_recommender import IterativeRecommender
+from warprec.utils.enums import DataLoaderType
 from warprec.utils.registry import model_registry
 
 
@@ -32,6 +33,7 @@ class NeuMF(IterativeRecommender):
         ValueError: If the items or users value was not passed through the info dict.
 
     Attributes:
+        DATALOADER_TYPE (DataLoaderType): The type of dataloader used.
         mf_embedding_size (int): The MF embedding size.
         mlp_embedding_size (int): The MLP embedding size.
         mlp_hidden_size (List[int]): The MLP hidden layer size list.
@@ -44,6 +46,9 @@ class NeuMF(IterativeRecommender):
         learning_rate (float): The learning rate value.
         neg_samples (int): The number of negative samples per positive interaction.
     """
+
+    # Dataloader definition
+    DATALOADER_TYPE: DataLoaderType = DataLoaderType.ITEM_RATING_LOADER
 
     # Model hyperparameters
     mf_embedding_size: int

@@ -13,6 +13,7 @@ from warprec.recommenders.base_recommender import (
 )
 from warprec.recommenders.losses import BPRLoss
 from warprec.data.dataset import Interactions, Sessions
+from warprec.utils.enums import DataLoaderType
 from warprec.utils.registry import model_registry
 
 
@@ -37,6 +38,7 @@ class Caser(IterativeRecommender, SequentialRecommenderUtils):
                     are not passed through the info dict.
 
     Attributes:
+        DATALOADER_TYPE (DataLoaderType): The type of dataloader used.
         embedding_size (int): The dimension of the item and user embeddings.
         n_h (int): The number of horizontal filters.
         n_v (int): The number of vertical filters.
@@ -48,6 +50,9 @@ class Caser(IterativeRecommender, SequentialRecommenderUtils):
         neg_samples (int): The number of negative samples.
         max_seq_len (int): The maximum length of sequences.
     """
+
+    # Dataloader definition
+    DATALOADER_TYPE: DataLoaderType = DataLoaderType.SEQUENTIAL_LOADER_WITH_USER_ID
 
     # Model hyperparameters
     embedding_size: int
@@ -149,9 +154,9 @@ class Caser(IterativeRecommender, SequentialRecommenderUtils):
     def get_dataloader(self, interactions: Interactions, sessions: Sessions, **kwargs):
         return sessions.get_sequential_dataloader(
             max_seq_len=self.max_seq_len,
-            num_negatives=self.neg_samples,
+            neg_samples=self.neg_samples,
             batch_size=self.batch_size,
-            user_id=True,
+            include_user_id=True,
         )
 
     def train_step(self, batch: Any, *args, **kwargs):

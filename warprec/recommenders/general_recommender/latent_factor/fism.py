@@ -8,6 +8,7 @@ from torch.nn.init import normal_
 
 from warprec.data.dataset import Interactions, Sessions
 from warprec.recommenders.base_recommender import IterativeRecommender
+from warprec.utils.enums import DataLoaderType
 from warprec.utils.registry import model_registry
 
 
@@ -31,6 +32,7 @@ class FISM(IterativeRecommender):
         ValueError: If the items or users value was not passed through the info dict.
 
     Attributes:
+        DATALOADER_TYPE (DataLoaderType): The type of dataloader used.
         embedding_size (int): The number of factors for item feature embeddings.
         alpha (float): The alpha parameter, a value between 0 and 1, used in the similarity calculation.
         split_to (int): Parameter for splitting items into chunks during prediction (for memory management).
@@ -39,6 +41,9 @@ class FISM(IterativeRecommender):
         epochs (int): The number of training epochs.
         learning_rate (float): The learning rate for the optimizer.
     """
+
+    # Dataloader definition
+    DATALOADER_TYPE: DataLoaderType = DataLoaderType.HISTORY
 
     # Model specific parameters
     embedding_size: int

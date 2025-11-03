@@ -12,6 +12,7 @@ from warprec.recommenders.base_recommender import (
 )
 from warprec.recommenders.losses import BPRLoss
 from warprec.data.dataset import Interactions, Sessions
+from warprec.utils.enums import DataLoaderType
 from warprec.utils.registry import model_registry
 
 
@@ -36,6 +37,7 @@ class FOSSIL(IterativeRecommender, SequentialRecommenderUtils):
                     through the info dict.
 
     Attributes:
+        DATALOADER_TYPE (DataLoaderType): The type of dataloader used.
         embedding_size (int): The dimension of the item embeddings.
         order_len (int): The number of last items to consider for high-order Markov chains.
         reg_weight (float): The L2 regularization weight.
@@ -47,6 +49,9 @@ class FOSSIL(IterativeRecommender, SequentialRecommenderUtils):
         neg_samples (int): The number of negative samples.
         max_seq_len (int): The maximum length of sequences.
     """
+
+    # Dataloader definition
+    DATALOADER_TYPE: DataLoaderType = DataLoaderType.SEQUENTIAL_LOADER_WITH_USER_ID
 
     # Model hyperparameters
     embedding_size: int
@@ -116,7 +121,7 @@ class FOSSIL(IterativeRecommender, SequentialRecommenderUtils):
     def get_dataloader(self, interactions: Interactions, sessions: Sessions, **kwargs):
         return sessions.get_sequential_dataloader(
             max_seq_len=self.max_seq_len,
-            num_negatives=self.neg_samples,
+            neg_samples=self.neg_samples,
             batch_size=self.batch_size,
             include_user_id=True,
         )
