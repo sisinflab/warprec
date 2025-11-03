@@ -1,6 +1,7 @@
 from typing import Tuple, List, Optional
 
 from pandas import DataFrame
+from itertools import product
 
 from warprec.data.dataset import Dataset
 from warprec.data.reader import Reader
@@ -8,6 +9,8 @@ from warprec.data.splitting import Splitter
 from warprec.data.filtering import apply_filtering
 from warprec.utils.config import TrainConfiguration, DesignConfiguration
 from warprec.utils.callback import WarpRecCallback
+from warprec.utils.enums import SearchSpace
+from warprec.utils.registry import model_registry
 from warprec.utils.logger import logger
 
 
@@ -285,5 +288,84 @@ def dataset_preparation(
                 f"Preparing fold dataset {i + 1}/{len(fold_dataset)} inner structures for evaluation."
             )
             prepare_evaluation_loaders(dataset)
+
+    def prepare_train_loaders(dataset: Dataset):
+        models_configuration = config.models
+
+        # Check each model requirements
+        for model_name, params in models_configuration.items():
+            model_class = model_registry.get_class(model_name)
+            dataloader_requirement = model_class.DATALOADER_TYPE
+
+            if dataloader_requirement is not None:
+                loader_source = getattr(dataset, dataloader_requirement.source)
+                loader_method = getattr(loader_source, dataloader_requirement.method)
+
+                # Retrieve fixed parameters
+                fixed_params = dataloader_requirement.fixed_params
+
+                # Retrieve specific method parameter required
+                construction_params = {}
+                if len(dataloader_requirement.construction_params) > 0:
+                    for con_param in dataloader_requirement.construction_params:
+                        param_list = params[con_param]
+
+                        # If the parameter is a grid or a choice, add it to the dict
+                        if (
+                            param_list[0] == SearchSpace.GRID
+                            or param_list[0] == SearchSpace.CHOICE
+                        ):
+                            param_list = param_list[1:]
+
+                        # If sampling from a specific search space, skip
+                        if any(
+                            param_list[0] == space
+                            for space in [
+                                SearchSpace.LOGRANDINT,
+                                SearchSpace.LOGUNIFORM,
+                                SearchSpace.QLOGRANDINT,
+                                SearchSpace.QLOGUNIFORM,
+                                SearchSpace.QRANDINT,
+                                SearchSpace.QRANDN,
+                                SearchSpace.QUNIFORM,
+                                SearchSpace.RANDINT,
+                                SearchSpace.RANDN,
+                                SearchSpace.UNIFORM,
+                            ]
+                        ):
+                            continue
+                        construction_params[con_param] = param_list
+
+                if construction_params:
+                    # Create the product of all combinations
+                    keys = list(construction_params.keys())
+                    values = list(construction_params.values())
+
+                    all_combination = product(*values)
+
+                    # For each combination, call the constructor method
+                    for combination in all_combination:
+                        call_params = dict(zip(keys, combination))
+
+                        # Try to call the method, ignore possible errors
+                        try:
+                            loader_method(**call_params, **fixed_params)
+                        except Exception as e:
+                            raise ValueError(
+                                f"During dataset initialization a method failed with the following error: {e}"
+                            )
+                else:
+                    # No specific parameters to pass to the method
+                    loader_method(**fixed_params)
+
+    logger.msg("Preparing main dataset inner structures for training.")
+
+    prepare_train_loaders(main_dataset)
+    if fold_dataset is not None and isinstance(fold_dataset, list):
+        for i, dataset in enumerate(fold_dataset):
+            logger.msg(
+                f"Preparing fold dataset {i + 1}/{len(fold_dataset)} inner structures for training."
+            )
+            prepare_train_loaders(dataset)
 
     logger.positive("All dataset inner structures ready.")
