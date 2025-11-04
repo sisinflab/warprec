@@ -135,7 +135,7 @@ class NeuMF(IterativeRecommender):
 
     def get_dataloader(self, interactions: Interactions, sessions: Sessions, **kwargs):
         return interactions.get_item_rating_dataloader(
-            num_negatives=self.neg_samples, batch_size=self.batch_size
+            neg_samples=self.neg_samples, batch_size=self.batch_size
         )
 
     def train_step(self, batch: Any, *args, **kwargs):
