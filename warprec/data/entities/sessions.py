@@ -8,7 +8,11 @@ from torch import Tensor
 from torch.utils.data import DataLoader, Dataset
 from torch.nn.utils.rnn import pad_sequence
 
-from warprec.data.entities.train_structures import SessionDataset, UserHistoryDataset
+from warprec.data.entities.train_structures import (
+    SessionDataset,
+    LazySessionDataset,
+    UserHistoryDataset,
+)
 from warprec.utils.logger import logger
 
 
@@ -140,6 +144,7 @@ class Sessions:
         batch_size: int = 1024,
         shuffle: bool = True,
         seed: int = 42,
+        low_memory: bool = False,
     ) -> DataLoader:
         """Creates a DataLoader for sequential data.
 
@@ -154,10 +159,36 @@ class Sessions:
             batch_size (int): Batch size for the DataLoader.
             shuffle (bool): Whether to shuffle the data.
             seed (int): Seed for Numpy random number generator for reproducibility.
+            low_memory (bool): Whether to create the dataloader with a lazy approach.
 
         Returns:
             DataLoader: A DataLoader yielding sequential training samples.
         """
+        if low_memory:
+            sorted_df = self._get_processed_data()
+
+            # Edge case: No valid session
+            if sorted_df.empty:
+                logger.negative("No valid session found in the data.")
+                return DataLoader(torch.utils.data.TensorDataset(torch.empty(0)))
+
+            lazy_dataset = LazySessionDataset(
+                sorted_df=sorted_df,
+                user_label=self._user_label,
+                item_label=self._item_label,
+                max_seq_len=max_seq_len,
+                neg_samples=neg_samples,
+                niid=self._niid,
+                include_user_id=include_user_id,
+                seed=seed,
+            )
+
+            # Edge case: The dataset contains no data
+            if len(lazy_dataset) == 0:
+                logger.negative("Session dataset is empty. No valid session found.")
+
+            return DataLoader(lazy_dataset, batch_size=batch_size, shuffle=shuffle)
+
         # Check cache first
         cache_key = (
             f"sequence_len_{max_seq_len}_neg_{neg_samples}_user_{include_user_id}"
