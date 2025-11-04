@@ -84,7 +84,7 @@ class LazySessionDataset(Dataset):
         user_label (str): The column name for user IDs in `sorted_df`.
         item_label (str): The column name for item IDs in `sorted_df`.
         max_seq_len (int): The maximum length of the input sequence for the model.
-        num_negatives (int): The number of negative items to sample for each positive item.
+        neg_samples (int): The number of negative items to sample for each positive item.
         niid (int): The total number of unique items in the dataset. This is required
             for the upper bound of the random negative sampler.
         include_user_id (bool): If True, the user ID will be included in each sample.
@@ -97,14 +97,14 @@ class LazySessionDataset(Dataset):
         user_label: str,
         item_label: str,
         max_seq_len: int,
-        num_negatives: int,
+        neg_samples: int,
         niid: int,
         include_user_id: bool = False,
         seed: int = 42,
     ):
         # Store configuration parameters
         self.max_seq_len = max_seq_len
-        self.num_negatives = num_negatives
+        self.neg_samples = neg_samples
         self.niid = niid  # Number of unique items
         self.include_user_id = include_user_id
         self.seed = seed
@@ -191,7 +191,7 @@ class LazySessionDataset(Dataset):
 
         # Perform negative sampling
         neg_items_1_based = None
-        if self.num_negatives > 0:
+        if self.neg_samples > 0:
             # Use a unique, deterministic random number generator for each sample.
             # Seeding with a tuple `(global_seed, sample_index)` ensures that
             # `__getitem__(i)` will always produce the same negative samples
@@ -201,10 +201,10 @@ class LazySessionDataset(Dataset):
             history_set = set(input_seq_0_indexed)
             history_set.add(pos_item_0_indexed)
 
-            neg_candidates = np.zeros(self.num_negatives, dtype=np.int64)
+            neg_candidates = np.zeros(self.neg_samples, dtype=np.int64)
 
             # Keep sampling until a valid negative item (not in history) is found
-            for i in range(self.num_negatives):
+            for i in range(self.neg_samples):
                 candidate = rng.integers(0, self.niid)
                 while candidate in history_set:
                     candidate = rng.integers(0, self.niid)

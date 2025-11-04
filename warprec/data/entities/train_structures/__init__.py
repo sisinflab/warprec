@@ -1,3 +1,3 @@
-from .session_structures import SessionDataset, UserHistoryDataset
+from .session_structures import SessionDataset, LazySessionDataset, UserHistoryDataset
 
-__all__ = ["SessionDataset", "UserHistoryDataset"]
+__all__ = ["SessionDataset", "LazySessionDataset", "UserHistoryDataset"]
