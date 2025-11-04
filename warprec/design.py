@@ -6,6 +6,7 @@ from warprec.common import initialize_datasets
 from warprec.data.reader import ReaderFactory
 from warprec.utils.callback import WarpRecCallback
 from warprec.utils.config import load_design_configuration, load_callback
+from warprec.utils.helpers import retrieve_evaluation_dataloader
 from warprec.utils.logger import logger
 from warprec.utils.registry import model_registry
 from warprec.recommenders.loops import train_loop
@@ -80,12 +81,19 @@ def main(args: Namespace):
         # Callback on training complete
         callback.on_training_complete(model=model)
 
-        # Evaluation on main dataset
-        evaluator.evaluate(
-            model,
-            main_dataset,
+        # Retrieve appropriate evaluation dataloader
+        dataloader = retrieve_evaluation_dataloader(
+            dataset=main_dataset,
             strategy=config.evaluation.strategy,
             num_negatives=config.evaluation.num_negatives,
+        )
+
+        # Evaluation on main dataset
+        evaluator.evaluate(
+            model=model,
+            dataloader=dataloader,
+            strategy=config.evaluation.strategy,
+            dataset=main_dataset,
             device=str(model._device),
             verbose=True,
         )

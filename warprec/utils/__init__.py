@@ -13,7 +13,11 @@ from .enums import (
     MetricBlock,
     DataLoaderType,
 )
-from .helpers import load_custom_modules, is_python_module
+from .helpers import (
+    load_custom_modules,
+    is_python_module,
+    retrieve_evaluation_dataloader,
+)
 from .registry import (
     splitting_registry,
     metric_registry,
@@ -44,6 +48,7 @@ __all__ = [
     "DataLoaderType",
     "load_custom_modules",
     "is_python_module",
+    "retrieve_evaluation_dataloader",
     "splitting_registry",
     "metric_registry",
     "params_registry",

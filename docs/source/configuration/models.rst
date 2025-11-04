@@ -44,6 +44,8 @@ The **optimization** section defines how hyperparameter optimization is performe
 - **max_cpu_count**: Maximum number of CPU cores to use. Defaults to available cores.
 - **num_samples**: Number of samples to generate. For grid search, must be ``1``. Defaults to ``1``.
 - **parallel_trials**: Number of trials to run simultaneously. Defaults to ``1``.
+- **multi_gpu**: Wether to use multiple gpus for each trial. Defaults to ``False``.
+- **num_gpus**: The number of gpus to assign for each trial. This value must be used only in case of multi-GPU train. Defaults to ``None``.
 - **block_size**: Number of items to predict at once for efficiency. Defaults to ``50``.
 - **checkpoint_to_keep**: Number of checkpoints to retain in Ray. Defaults to ``5``.
 
