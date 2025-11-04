@@ -33,17 +33,6 @@ class Interactions:
         ValueError: If the rating type is not supported.
     """
 
-    _inter_dict: dict = {}
-    _inter_df: DataFrame = None
-    _inter_sparse: csr_matrix = None
-    _inter_side_sparse: csr_matrix = None
-    _history_matrix: Tensor = None
-    _history_lens: Tensor = None
-    _history_mask: Tensor = None
-
-    # Cached loader for easier access
-    _cached_dataloaders: Dict[Tuple, DataLoader] = {}
-
     def __init__(
         self,
         data: DataFrame,
@@ -66,6 +55,16 @@ class Interactions:
         self.batch_size = batch_size
         self.rating_type = rating_type
         self.precision = precision
+
+        # Setup the training variables
+        self._cached_dataset: Dict[str, TensorDataset] = {}
+        self._cached_tensor: Dict[str, Tensor] = {}
+        self._inter_dict: dict = {}
+        self._inter_sparse: csr_matrix = None
+        self._inter_side_sparse: csr_matrix = None
+        self._history_matrix: Tensor = None
+        self._history_lens: Tensor = None
+        self._history_mask: Tensor = None
 
         # Set DataFrame labels
         self._user_label = data.columns[0]
@@ -126,9 +125,13 @@ class Interactions:
         else:
             raise ValueError(f"Rating type {rating_type} not supported.")
 
-    def clear_dataloader_cache(self):
-        """This method will clear the cached DataLoader objects."""
-        self._cached_dataloaders = {}
+    def clear_dataset_cache(self):
+        """This method will clear the cached Dataset objects."""
+        del self._cached_dataset
+        self._cached_dataset = {}
+
+        del self._cached_tensor
+        self._cached_tensor = {}
 
     def get_dict(self) -> dict:
         """This method will return the transaction information in dict format.
@@ -194,10 +197,11 @@ class Interactions:
         Returns:
             DataLoader: A DataLoader that yields batches of dense interaction tensors.
         """
-        # Check if a DataLoader with the same batch_size is already cached
-        cache_key = (batch_size, "interaction_loader", shuffle)
-        if cache_key in self._cached_dataloaders:
-            return self._cached_dataloaders[cache_key]
+        # Check if interactions have been cached
+        cache_key = "interaction"
+        if cache_key in self._cached_dataset:
+            dataset = self._cached_dataset[cache_key]
+            return DataLoader(dataset, batch_size=batch_size, shuffle=shuffle)
 
         # Get the sparse interaction matrix. This ensures it's created if it doesn't exist.
         sparse_matrix = self.get_sparse()
@@ -210,33 +214,37 @@ class Interactions:
         # the interactions of a single user.
         dataset = TensorDataset(dense_tensor)
 
+        # Cache the dataset
+        self._cached_dataset[cache_key] = dataset
+
         # Wrap the dataset in a DataLoader.
         # The DataLoader will handle batching and shuffling.
-        dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=shuffle)
-
-        # Cache the created dataloader before returning it.
-        self._cached_dataloaders[cache_key] = dataloader
-
-        return dataloader
+        return DataLoader(dataset, batch_size=batch_size, shuffle=shuffle)
 
     @typing.no_type_check
     def get_item_rating_dataloader(
-        self, num_negatives: int = 0, batch_size: int = 1024, shuffle: bool = True
+        self,
+        neg_samples: int = 0,
+        batch_size: int = 1024,
+        shuffle: bool = True,
+        seed: int = 42,
     ) -> DataLoader:
         """Create a PyTorch DataLoader with implicit feedback and negative sampling.
 
         Args:
-            num_negatives (int): Number of negative samples per user.
+            neg_samples (int): Number of negative samples per user.
             batch_size (int): The batch size that will be used to
             shuffle (bool): Whether to shuffle the data.
+            seed (int): Seed for Numpy random number generator for reproducibility.
 
         Returns:
             DataLoader: Yields (user, item, rating) with negative samples.
         """
         # Check if dataloader has been cached
-        cache_key = (num_negatives, "item_rating")
-        if cache_key in self._cached_dataloaders:
-            return self._cached_dataloaders[cache_key]
+        cache_key = f"item_rating_neg_{neg_samples}"
+        if cache_key in self._cached_dataset:
+            dataset = self._cached_dataset[cache_key]
+            return DataLoader(dataset, batch_size=batch_size, shuffle=shuffle)
 
         # Define main variables
         sparse_matrix = self.get_sparse()
@@ -247,17 +255,32 @@ class Interactions:
         # Single call of module for efficiency
         rint = np.random.randint  # Storing the module call is ever so slightly faster
 
-        # Create positive interactions tensor (implicit feedback)
-        pos_users = torch.LongTensor(sparse_matrix_coo.row)
-        pos_items = torch.LongTensor(sparse_matrix_coo.col)
-        num_positives = len(pos_users)
+        # Check if positive tensors have been already computed
+        positive_cache_key = "item_rating_pos_tensor"
+        if positive_cache_key in self._cached_tensor:
+            pos_users_tensor, pos_items_tensor, pos_ratings_tensor = (
+                self._cached_tensor[positive_cache_key]
+            )
+            num_positives = len(pos_users_tensor)
+        else:
+            # Create positive interactions tensor (implicit feedback)
+            pos_users = torch.LongTensor(sparse_matrix_coo.row)
+            pos_items = torch.LongTensor(sparse_matrix_coo.col)
+            num_positives = len(pos_users)
 
-        # Create tensors of positives
-        pos_users_tensor = torch.LongTensor(pos_users)
-        pos_items_tensor = torch.LongTensor(pos_items)
-        pos_ratings_tensor = torch.ones(num_positives, dtype=torch.float)
+            # Create tensors of positives
+            pos_users_tensor = torch.LongTensor(pos_users)
+            pos_items_tensor = torch.LongTensor(pos_items)
+            pos_ratings_tensor = torch.ones(num_positives, dtype=torch.float)
 
-        if num_negatives == 0:  # Check if negative samples are required
+            # Cache the results
+            self._cached_tensor[positive_cache_key] = (
+                pos_users_tensor,
+                pos_items_tensor,
+                pos_ratings_tensor,
+            )
+
+        if neg_samples == 0:  # Check if negative samples are required
             if num_positives == 0:  # Edge case: No interactions
                 dataset = TensorDataset(
                     torch.LongTensor([]), torch.LongTensor([]), torch.FloatTensor([])
@@ -266,6 +289,7 @@ class Interactions:
                 dataset = TensorDataset(
                     pos_users_tensor, pos_items_tensor, pos_ratings_tensor
                 )  # Only positive dataset
+                self._cached_dataset[cache_key] = dataset
             return DataLoader(dataset, batch_size=batch_size, shuffle=shuffle)
 
         # Other edge case: No positive interactions
@@ -276,11 +300,14 @@ class Interactions:
             return DataLoader(dataset, batch_size=batch_size, shuffle=shuffle)
 
         total_samples = (
-            num_positives * num_negatives
+            num_positives * neg_samples
         )  # At this point this will be a positive number
 
         neg_users = np.empty(total_samples, dtype=np.int64)
         neg_items = np.empty(total_samples, dtype=np.int64)
+
+        # Set random seed for reproducibility
+        np.random.seed(seed)
 
         current_neg_idx = 0
         for u in range(num_users):
@@ -296,7 +323,7 @@ class Interactions:
                 continue
 
             # Number of user negative samples
-            user_neg = user_count * num_negatives
+            user_neg = user_count * neg_samples
             user_pos_set = set(user_pos)  # Efficient control using sets
 
             # Edge case: the user interacted with all the items
@@ -331,13 +358,12 @@ class Interactions:
 
         # Create final dataset
         dataset = TensorDataset(all_users, all_items, all_ratings)
-        dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=shuffle)
-        self._cached_dataloaders[cache_key] = dataloader
-        return dataloader
+        self._cached_dataset[cache_key] = dataset
+        return DataLoader(dataset, batch_size=batch_size, shuffle=shuffle)
 
     @typing.no_type_check
     def get_pos_neg_dataloader(
-        self, batch_size: int = 1024, shuffle: bool = True
+        self, batch_size: int = 1024, shuffle: bool = True, seed: int = 42
     ) -> DataLoader:
         """Create a PyTorch DataLoader with triplets for implicit feedback.
 
@@ -345,14 +371,16 @@ class Interactions:
             batch_size (int): The batch size that will be used to
                 iterate over the interactions.
             shuffle (bool): Whether to shuffle the data.
+            seed (int): Seed for Numpy random number generator for reproducibility.
 
         Returns:
             DataLoader: Yields triplets of (user, positive_item, negative_item).
         """
         # Check if dataloader has been cached
         cache_key = "pos_neg"
-        if cache_key in self._cached_dataloaders:
-            return self._cached_dataloaders[cache_key]
+        if cache_key in self._cached_dataset:
+            dataset = self._cached_dataset[cache_key]
+            return DataLoader(dataset, batch_size=batch_size, shuffle=shuffle)
 
         # Define main variables
         sparse_matrix = self.get_sparse()
@@ -366,6 +394,7 @@ class Interactions:
         negatives_triplet = np.empty_like(users_triplet)
 
         # Single call of module for efficiency
+        np.random.seed(seed)  # Set the seed for reproducibility
         rint = np.random.randint  # Storing the module call is ever so slightly faster
 
         current_idx = 0
@@ -417,8 +446,8 @@ class Interactions:
 
         # Create final dataset
         dataset = TensorDataset(users_tensor, positives_tensor, negatives_tensor)
+        self._cached_dataset[cache_key] = dataset
         dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=shuffle)
-        self._cached_dataloaders[cache_key] = dataloader
         return dataloader
 
     def get_history(self) -> Tuple[Tensor, Tensor, Tensor]:

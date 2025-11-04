@@ -228,23 +228,44 @@ class Trainer:
         results = tuner.fit()
 
         # Retrieve results
-        best_result = results.get_best_result(metric=validation_score, mode=mode)
+        result_df = results.get_dataframe(
+            filter_metric=validation_score, filter_mode=mode
+        )
+        analysis = results._experiment_analysis
+
+        # Retrieve the correct DF row
+        if mode == "max":
+            best_iteration_row = result_df.loc[result_df[validation_score].idxmax()]
+        else:
+            best_iteration_row = result_df.loc[result_df[validation_score].idxmin()]
+
+        # Extract best trial information
+        best_trial_id = best_iteration_row["trial_id"]
+        best_iter = best_iteration_row["training_iteration"]
+        best_params = best_iteration_row.filter(regex="^config/").to_dict()
+        best_params = {k.replace("config/", ""): v for k, v in best_params.items()}
+        best_score = best_iteration_row[validation_score]
+
+        # Find the best checkpoint through ExperimentAnalysis object
+        for trial in analysis.trials:
+            if trial.trial_id == best_trial_id:
+                checkpoints = analysis._get_trial_checkpoints_with_metric(trial)
+                best_checkpoint, _ = max(checkpoints, key=lambda item: item[1])  # type: ignore[arg-type, return-value]
+
+                break  # Nothing more to do
 
         # Early check for no successful trials
         if (
             mode == "max"
-            and best_result.metrics[validation_score] == -torch.inf
+            and best_score == -torch.inf
             or mode == "min"
-            and best_result.metrics[validation_score] == torch.inf
+            and best_score == torch.inf
         ):
             logger.negative(
                 f"All trials failed during training for {model_name}. Shutting down the Trainer."
             )
             ray.shutdown()
             return None, {}
-        best_params = best_result.config
-        best_score = best_result.metrics[validation_score]
-        best_iter = best_result.metrics["training_iteration"]
 
         # Memory report
         result_df = results.get_dataframe()
@@ -270,14 +291,17 @@ class Trainer:
         logger.positive(f"Hyperparameter tuning for {model_name} ended successfully.")
 
         # Retrieve best model from checkpoint
-        if best_result.checkpoint is not None:
+        if best_checkpoint is not None:
             checkpoint_path = os.path.join(
-                best_result.checkpoint.to_directory(), "checkpoint.pt"
+                best_checkpoint.to_directory(), "checkpoint.pt"
             )
         else:
             # In this case we are interfacing with the Trainer API
             checkpoint_path = os.path.join(
-                best_result.metrics["checkpoint_path"], "checkpoint.pt"
+                results.get_best_result(metric=validation_score, mode=mode).metrics[
+                    "checkpoint_path"
+                ],
+                "checkpoint.pt",
             )
 
         checkpoint_data = torch.load(checkpoint_path, weights_only=True)

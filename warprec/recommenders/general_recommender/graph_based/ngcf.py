@@ -20,6 +20,7 @@ from warprec.recommenders.general_recommender.graph_based import (
     NGCFLayer,
 )
 from warprec.recommenders.losses import BPRLoss
+from warprec.utils.enums import DataLoaderType
 from warprec.utils.registry import model_registry
 
 
@@ -43,6 +44,7 @@ class NGCF(IterativeRecommender, GraphRecommenderUtils):
         ValueError: If the items or users value was not passed through the info dict.
 
     Attributes:
+        DATALOADER_TYPE: The type of dataloader used.
         embedding_size (int): The embedding size of user and item.
         weight_decay (float): The value of weight decay used in the optimizer.
         batch_size (int): The batch size used for training.
@@ -52,6 +54,9 @@ class NGCF(IterativeRecommender, GraphRecommenderUtils):
         node_dropout (float): Dropout rate for nodes in the adjacency matrix.
         message_dropout (float): Dropout rate for messages/embeddings during propagation.
     """
+
+    # Dataloader definition
+    DATALOADER_TYPE = DataLoaderType.POS_NEG_LOADER
 
     # Model hyperparameters
     embedding_size: int

@@ -1,13 +1,17 @@
 import os
 import argparse
 import time
-from typing import List, Tuple, Dict, Any, Optional
+from typing import List, Tuple, Dict, Any
 from argparse import Namespace
 
 import ray
 import torch
 
-from warprec.common import initialize_datasets
+from warprec.common import (
+    initialize_datasets,
+    prepare_train_loaders,
+    dataset_preparation,
+)
 from warprec.data.reader import ReaderFactory
 from warprec.data.writer import WriterFactory
 from warprec.data.dataset import Dataset
@@ -107,7 +111,8 @@ def main(args: Namespace):
     )
 
     # Prepare dataloaders for evaluation
-    dataset_preparation(main_dataset, fold_dataset, config)
+    preparation_strategy = config.general.train_data_preparation
+    dataset_preparation(main_dataset, fold_dataset, preparation_strategy, config)
 
     data_preparation_time = time.time() - experiment_start_time
     logger.positive(
@@ -119,6 +124,14 @@ def main(args: Namespace):
 
     for model_name in models:
         model_exploration_start_time = time.time()
+
+        # Check if dataloader requirements is in 'model' mode
+        if preparation_strategy == "conservative":
+            model_dict = {model_name: config.models[model_name]}
+            prepare_train_loaders(main_dataset, model_dict)
+
+            for fold in fold_dataset:
+                prepare_train_loaders(fold, model_dict)
 
         params = model_param_from_dict(model_name, config.models[model_name])
         trainer = Trainer(
@@ -278,6 +291,15 @@ def main(args: Namespace):
 
             # Update time report
             writer.write_time_report(model_timing_report)
+
+            # Clear out the dataset cache if in 'conservative' mode
+            if preparation_strategy == "conservative":
+                main_dataset.clear_cache()
+
+                for fold in fold_dataset:
+                    fold.clear_cache()
+
+                logger.positive("Dataset cache cleared.")
 
     if requires_stat_significance:
         # Check if enough models have been evaluated
@@ -486,53 +508,6 @@ def multiple_fold_validation_flow(
     )
 
     return best_model, report
-
-
-def dataset_preparation(
-    main_dataset: Dataset,
-    fold_dataset: Optional[List[Dataset]],
-    config: TrainConfiguration,
-):
-    """This method prepares the dataloaders inside the dataset
-    that will be passed to Ray during HPO. It is important to
-    precompute these dataloaders before starting the optimization to
-    avoid multiple computations of the same dataloader.
-
-    Args:
-        main_dataset (Dataset): The main dataset of train/test split.
-        fold_dataset (Optional[List[Dataset]]): The list of validation datasets
-            of train/val splits.
-        config (TrainConfiguration): The configuration file used for the experiment.
-    """
-
-    def prepare_evaluation_loaders(dataset: Dataset, device: str):
-        """utility function to prepare the evaluation dataloaders
-        for a given dataset based on the evaluation strategy.
-
-        Args:
-            dataset (Dataset): The dataset to prepare.
-            device (str): The device to use.
-        """
-        if config.evaluation.strategy == "full":
-            dataset.get_evaluation_dataloader()
-        elif config.evaluation.strategy == "sampled":
-            dataset.get_neg_evaluation_dataloader(
-                num_negatives=config.evaluation.num_negatives,
-                seed=config.evaluation.seed,
-            )
-
-    logger.msg("Preparing main dataset inner structures for training and evaluation.")
-
-    device = config.general.device
-    prepare_evaluation_loaders(main_dataset, device)
-    if fold_dataset is not None and isinstance(fold_dataset, list):
-        for i, dataset in enumerate(fold_dataset):
-            logger.msg(
-                f"Preparing fold dataset {i + 1}/{len(fold_dataset)} inner structures for training and evaluation."
-            )
-            prepare_evaluation_loaders(dataset, device)
-
-    logger.positive("All dataset inner structures ready.")
 
 
 if __name__ == "__main__":

@@ -9,6 +9,7 @@ from torch.nn.init import xavier_normal_
 from warprec.data.dataset import Interactions, Sessions
 from warprec.recommenders.base_recommender import IterativeRecommender
 from warprec.recommenders.losses import BPRLoss
+from warprec.utils.enums import DataLoaderType
 from warprec.utils.registry import model_registry
 
 
@@ -31,12 +32,16 @@ class BPR(IterativeRecommender):
         ValueError: If the items or users value was not passed through the info dict.
 
     Attributes:
+        DATALOADER_TYPE: The type of dataloader used.
         embedding_size (int): The embedding size of user and item.
         weight_decay (float): The value of weight decay used in the optimizer.
         batch_size (int): The batch size used for training.
         epochs (int): The number of epochs.
         learning_rate (float): The learning rate value.
     """
+
+    # Dataloader definition
+    DATALOADER_TYPE = DataLoaderType.POS_NEG_LOADER
 
     # Model hyperparameters
     embedding_size: int
