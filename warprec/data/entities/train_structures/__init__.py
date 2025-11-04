@@ -1,3 +1,4 @@
+from .interaction_structures import LazyInteractionDataset
 from .session_structures import (
     SessionDataset,
     LazySessionDataset,
@@ -6,6 +7,7 @@ from .session_structures import (
 )
 
 __all__ = [
+    "LazyInteractionDataset",
     "SessionDataset",
     "LazySessionDataset",
     "UserHistoryDataset",

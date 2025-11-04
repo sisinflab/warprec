@@ -7,6 +7,8 @@ from torch import Tensor
 from pandas import DataFrame
 from torch.utils.data import DataLoader, TensorDataset
 from scipy.sparse import csr_matrix, coo_matrix
+
+from warprec.data.entities.train_structures import LazyInteractionDataset
 from warprec.utils.enums import RatingType
 
 
@@ -182,7 +184,10 @@ class Interactions:
         return self._inter_side_sparse
 
     def get_interaction_loader(
-        self, batch_size: int = 1024, shuffle: bool = True
+        self,
+        batch_size: int = 1024,
+        shuffle: bool = True,
+        low_memory: bool = False,
     ) -> DataLoader:
         """Create a PyTorch DataLoader that yields dense tensors of interaction batches.
 
@@ -193,10 +198,19 @@ class Interactions:
         Args:
             batch_size (int): The batch size to be used for the DataLoader.
             shuffle (bool): Whether to shuffle the data when loading.
+            low_memory (bool): Whether to create the dataloader with a lazy approach.
 
         Returns:
             DataLoader: A DataLoader that yields batches of dense interaction tensors.
         """
+        if low_memory:
+            # Get the sparse matrix, which is memory-efficient.
+            sparse_matrix = self.get_sparse()
+
+            # Create the lazy dataset which just holds a reference to the sparse matrix.
+            lazy_dataset = LazyInteractionDataset(sparse_matrix)
+            return DataLoader(lazy_dataset, batch_size=batch_size, shuffle=shuffle)
+
         # Check if interactions have been cached
         cache_key = "interaction"
         if cache_key in self._cached_dataset:
