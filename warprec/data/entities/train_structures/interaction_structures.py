@@ -1,6 +1,7 @@
 from typing import Tuple
 
 import torch
+import numpy as np
 from torch import Tensor
 from torch.utils.data import Dataset
 from scipy.sparse import csr_matrix
@@ -49,3 +50,96 @@ class LazyInteractionDataset(Dataset):
         )
 
         return (user_tensor,)  # To mimic the behavior of a TensorDataset
+
+
+class LazyItemRatingDataset(Dataset):
+    """A PyTorch Dataset for (user, item, rating) triplets that generates samples on-the-fly.
+
+    This dataset is a low-memory alternative to pre-computing all positive and negative
+    interactions. It calculates the total number of samples (positives + negatives)
+    and maps any given index `idx` to either a positive interaction (rating=1.0) or a
+    newly sampled negative interaction (rating=0.0).
+
+    Args:
+        sparse_matrix (csr_matrix): The user-item interaction matrix in CSR format.
+        neg_samples (int): The number of negative samples to generate for each
+            positive interaction.
+        niid (int): The total number of unique items for negative sampling.
+        seed (int): A random seed to ensure reproducibility of negative sampling.
+    """
+
+    def __init__(
+        self,
+        sparse_matrix: csr_matrix,
+        neg_samples: int,
+        niid: int,
+        seed: int = 42,
+    ):
+        self.sparse_matrix = sparse_matrix
+        self.neg_samples = neg_samples
+        self.niid = niid
+        self.seed = seed
+
+        # The COO format is ideal for getting a flat list of all positive interactions
+        sparse_matrix_coo = self.sparse_matrix.tocoo()
+        self.pos_users = sparse_matrix_coo.row
+        self.pos_items = sparse_matrix_coo.col
+        self.num_positives = self.sparse_matrix.nnz
+
+    def __len__(self) -> int:
+        """Returns the total number of samples (positive + negative)."""
+        # For each positive sample, we have 1 positive + neg_samples negatives
+        return self.num_positives * (1 + self.neg_samples)
+
+    def __getitem__(self, idx: int) -> Tuple[Tensor, Tensor, Tensor]:
+        """Generates and returns a single (user, item, rating) triplet.
+
+        Args:
+            idx (int): The index of the sample to generate.
+
+        Returns:
+            Tuple[Tensor, Tensor, Tensor]: A tuple containing (user_id, item_id, rating).
+        """
+        if self.neg_samples == 0:
+            # If no negative sampling, idx directly maps to a positive interaction.
+            user = self.pos_users[idx]
+            item = self.pos_items[idx]
+            rating = 1.0
+        else:
+            # Determine if this index corresponds to a positive or negative sample.
+            # Each positive interaction is the head of a "block" of size (1 + neg_samples)
+            pos_interaction_idx = idx // (1 + self.neg_samples)
+            sample_offset = idx % (1 + self.neg_samples)
+
+            user = self.pos_users[pos_interaction_idx]
+
+            if sample_offset == 0:
+                # This is the positive sample
+                item = self.pos_items[pos_interaction_idx]
+                rating = 1.0
+            else:
+                # This is a negative sample. We need to generate one
+                rating = 0.0
+
+                # Get the set of items this user has interacted with for efficient collision checking
+                user_pos_set = set(self.sparse_matrix[user].indices)
+
+                # Use a unique, deterministic RNG for this specific negative sample slot
+                # to ensure perfect reproducibility
+                rng = np.random.default_rng(
+                    seed=(self.seed, pos_interaction_idx, sample_offset)
+                )
+
+                # Keep sampling until a valid negative item is found
+                while True:
+                    candidate_item = rng.integers(0, self.niid)
+                    if candidate_item not in user_pos_set:
+                        item = candidate_item
+                        break
+
+        # Convert to tensors for the DataLoader
+        user_tensor = torch.tensor(user, dtype=torch.long)
+        item_tensor = torch.tensor(item, dtype=torch.long)
+        rating_tensor = torch.tensor(rating, dtype=torch.float)
+
+        return user_tensor, item_tensor, rating_tensor

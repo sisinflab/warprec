@@ -8,7 +8,10 @@ from pandas import DataFrame
 from torch.utils.data import DataLoader, TensorDataset
 from scipy.sparse import csr_matrix, coo_matrix
 
-from warprec.data.entities.train_structures import LazyInteractionDataset
+from warprec.data.entities.train_structures import (
+    LazyInteractionDataset,
+    LazyItemRatingDataset,
+)
 from warprec.utils.enums import RatingType
 
 
@@ -242,6 +245,7 @@ class Interactions:
         batch_size: int = 1024,
         shuffle: bool = True,
         seed: int = 42,
+        low_memory: bool = False,
     ) -> DataLoader:
         """Create a PyTorch DataLoader with implicit feedback and negative sampling.
 
@@ -250,10 +254,33 @@ class Interactions:
             batch_size (int): The batch size that will be used to
             shuffle (bool): Whether to shuffle the data.
             seed (int): Seed for Numpy random number generator for reproducibility.
+            low_memory (bool): Whether to create the dataloader with a lazy approach.
 
         Returns:
             DataLoader: Yields (user, item, rating) with negative samples.
         """
+        if low_memory:
+            sparse_matrix = self.get_sparse()
+
+            lazy_dataset = LazyItemRatingDataset(
+                sparse_matrix=sparse_matrix,
+                neg_samples=neg_samples,
+                niid=self._niid,
+                seed=seed,
+            )
+
+            # Edge case: No interactions
+            if len(lazy_dataset) == 0:
+                return DataLoader(
+                    TensorDataset(
+                        torch.LongTensor([]),
+                        torch.LongTensor([]),
+                        torch.FloatTensor([]),
+                    )
+                )
+
+            return DataLoader(lazy_dataset, batch_size=batch_size, shuffle=shuffle)
+
         # Check if dataloader has been cached
         cache_key = f"item_rating_neg_{neg_samples}"
         if cache_key in self._cached_dataset:
