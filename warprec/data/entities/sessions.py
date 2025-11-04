@@ -12,6 +12,7 @@ from warprec.data.entities.train_structures import (
     SessionDataset,
     LazySessionDataset,
     UserHistoryDataset,
+    LazyUserHistoryDataset,
 )
 from warprec.utils.logger import logger
 
@@ -455,6 +456,7 @@ class Sessions:
         batch_size: int = 1024,
         shuffle: bool = True,
         seed: int = 42,
+        low_memory: bool = False,
     ) -> DataLoader:
         """Creates a DataLoader where each item is a user's full history.
 
@@ -464,10 +466,30 @@ class Sessions:
             batch_size (int): Batch size for the DataLoader.
             shuffle (bool): Whether to shuffle the data.
             seed (int): Seed for reproducibility of negative sampling.
+            low_memory (bool): Whether to create the dataloader with a lazy approach.
 
         Returns:
             DataLoader: A DataLoader yielding user history sequences with negative samples.
         """
+        if low_memory:
+            user_sessions = self._get_user_sessions()
+
+            lazy_dataset = LazyUserHistoryDataset(
+                user_sessions=user_sessions,
+                max_seq_len=max_seq_len,
+                neg_samples=neg_samples,
+                niid=self._niid,
+                seed=seed,
+            )
+
+            # Edge case: No valid history
+            if len(lazy_dataset) == 0:
+                logger.negative(
+                    "No valid user history samples generated. Ensure users have at least 2 interactions."
+                )
+
+            return DataLoader(lazy_dataset, batch_size=batch_size, shuffle=shuffle)
+
         # Check cache first
         cache_key = f"history_len_{max_seq_len}_neg_{neg_samples}"
         if cache_key in self._cached_dataset:

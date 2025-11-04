@@ -4,7 +4,7 @@ import numpy as np
 import torch
 from torch import Tensor
 from torch.utils.data import Dataset
-from pandas import DataFrame
+from pandas import DataFrame, Series
 
 
 class SessionDataset(Dataset):
@@ -251,3 +251,103 @@ class UserHistoryDataset(Dataset):
 
     def __getitem__(self, idx: int) -> Tuple[Tensor, Tensor]:
         return self.positive_sequences[idx], self.negative_samples[idx]
+
+
+class LazyUserHistoryDataset(Dataset):
+    """A PyTorch Dataset for user history data that generates samples on-the-fly.
+
+    This dataset is the low-memory alternative for UserHistoryDataset. Instead of
+    pre-computing and storing all positive sequences and their corresponding negative
+    samples, it generates them individually when `__getitem__` is called.
+
+    This is particularly useful for models that require negative samples for every
+    timestamp in a user's history, which can lead to very large tensors.
+
+    Args:
+        user_sessions (Series): A Series where the index is the user ID and the
+            value is a list of their 0-indexed item interactions.
+        max_seq_len (int): The maximum length of the user history sequence.
+        neg_samples (int): The number of negative items to sample for each positive item
+            in the sequence.
+        niid (int): The total number of unique items for negative sampling.
+        seed (int): A random seed to ensure reproducibility.
+    """
+
+    def __init__(
+        self,
+        user_sessions: Series,
+        max_seq_len: int,
+        neg_samples: int,
+        niid: int,
+        seed: int = 42,
+    ):
+        self.max_seq_len = max_seq_len
+        self.neg_samples = neg_samples
+        self.niid = niid
+        self.seed = seed
+
+        # Filter for sessions long enough to have at least one target item (len >= 2)
+        # and store them as a list for efficient indexing
+        self.sessions = user_sessions[user_sessions.str.len() >= 2].tolist()
+
+    def __len__(self) -> int:
+        """Returns the total number of users with valid histories."""
+        return len(self.sessions)
+
+    def __getitem__(self, idx: int) -> Tuple[Tensor, Tensor]:
+        """Generates and returns a single user's history and negative samples.
+
+        Args:
+            idx (int): The index of the user session to process.
+
+        Returns:
+            Tuple[Tensor, Tensor]: A tuple containing
+            - Tensor: The padded positive item sequence (1-based).
+            - Tensor: The padded negative item samples (1-based).
+        """
+        # Get the user's full session and truncate it
+        session_0_indexed = self.sessions[idx][-self.max_seq_len :]
+        current_len = len(session_0_indexed)
+
+        # Generate negative samples for each step in the sequence
+        # The shape will be (current_len - 1, neg_samples)
+        neg_candidates = np.zeros((current_len - 1, self.neg_samples), dtype=np.int64)
+
+        # Iterate from the second item onwards, as the first item has no history
+        for j in range(1, current_len):
+            # Create a unique, deterministic RNG for this specific user and timestamp
+            # to ensure reproducibility
+            rng = np.random.default_rng(seed=(self.seed, idx, j))
+
+            # The forbidden set includes all items in the history up to the current positive item
+            forbidden_set = set(session_0_indexed[: j + 1])
+
+            for k in range(self.neg_samples):
+                candidate = rng.integers(0, self.niid)
+                while candidate in forbidden_set:
+                    candidate = rng.integers(0, self.niid)
+                neg_candidates[j - 1, k] = candidate
+
+        # Pad positive sequence
+        padded_pos_seq = np.zeros(self.max_seq_len, dtype=np.int64)
+        padded_pos_seq[:current_len] = session_0_indexed
+
+        # Pad negative sequences
+        # The target shape is (max_seq_len - 1, neg_samples)
+        padded_neg_seqs = np.zeros(
+            (self.max_seq_len - 1, self.neg_samples), dtype=np.int64
+        )
+        if current_len > 1:
+            padded_neg_seqs[: current_len - 1, :] = neg_candidates
+
+        # Convert to 1-based PyTorch tensors
+        # Positive sequence: add 1, but keep padding as 0
+        pos_tensor = torch.from_numpy(padded_pos_seq + 1).long()
+        pos_tensor[current_len:] = 0
+
+        # Negative sequences: add 1, padding remains 0
+        neg_tensor = torch.from_numpy(padded_neg_seqs + 1).long()
+        if current_len > 1:
+            neg_tensor[current_len - 1 :, :] = 0
+
+        return pos_tensor, neg_tensor
