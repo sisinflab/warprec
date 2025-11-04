@@ -143,3 +143,69 @@ class LazyItemRatingDataset(Dataset):
         rating_tensor = torch.tensor(rating, dtype=torch.float)
 
         return user_tensor, item_tensor, rating_tensor
+
+
+class LazyTripletDataset(Dataset):
+    """A PyTorch Dataset for (user, positive_item, negative_item) triplets.
+
+    This dataset generates samples on-the-fly to serve as a low-memory alternative
+    to pre-computing all possible triplets for BPR-style loss functions.
+
+    For any given index `idx`, it identifies the `idx`-th positive interaction in the
+    dataset and samples a corresponding negative item that the user has not
+    interacted with.
+
+    Args:
+        sparse_matrix (csr_matrix): The user-item interaction matrix in CSR format.
+        niid (int): The total number of unique items for negative sampling.
+        seed (int): A random seed to ensure reproducibility of negative sampling.
+    """
+
+    def __init__(self, sparse_matrix: csr_matrix, niid: int, seed: int = 42):
+        self.sparse_matrix = sparse_matrix
+        self.niid = niid
+        self.seed = seed
+
+        # The COO format is the most efficient way to get a flat list of all
+        # positive (user, item) pairs
+        sparse_matrix_coo = self.sparse_matrix.tocoo()
+        self.pos_users = sparse_matrix_coo.row
+        self.pos_items = sparse_matrix_coo.col
+        self.num_positives = self.sparse_matrix.nnz
+
+    def __len__(self) -> int:
+        """Returns the total number of positive interactions."""
+        return self.num_positives
+
+    def __getitem__(self, idx: int) -> Tuple[Tensor, Tensor, Tensor]:
+        """Generates and returns a single (user, positive, negative) triplet.
+
+        Args:
+            idx (int): The index of the positive interaction to use for the triplet.
+
+        Returns:
+            Tuple[Tensor, Tensor, Tensor]: A tuple containing (user_id, positive_item_id, negative_item_id).
+        """
+        # Get the positive (user, item) pair for the given index
+        user = self.pos_users[idx]
+        positive_item = self.pos_items[idx]
+
+        # Sample a negative item.
+        # Get the set of all items this user has interacted with for efficient collision checking
+        user_pos_set = set(self.sparse_matrix[user].indices)
+
+        # Use a unique, deterministic RNG for this specific triplet to ensure reproducibility
+        rng = np.random.default_rng(seed=(self.seed, idx))
+
+        # Keep sampling until a valid negative item (one not in the user's history) is found
+        while True:
+            negative_item = rng.integers(0, self.niid)
+            if negative_item not in user_pos_set:
+                break
+
+        # Convert to tensors for the DataLoader
+        user_tensor = torch.tensor(user, dtype=torch.long)
+        positive_tensor = torch.tensor(positive_item, dtype=torch.long)
+        negative_tensor = torch.tensor(negative_item, dtype=torch.long)
+
+        return user_tensor, positive_tensor, negative_tensor

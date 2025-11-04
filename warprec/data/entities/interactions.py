@@ -11,6 +11,7 @@ from scipy.sparse import csr_matrix, coo_matrix
 from warprec.data.entities.train_structures import (
     LazyInteractionDataset,
     LazyItemRatingDataset,
+    LazyTripletDataset,
 )
 from warprec.utils.enums import RatingType
 
@@ -404,7 +405,11 @@ class Interactions:
 
     @typing.no_type_check
     def get_pos_neg_dataloader(
-        self, batch_size: int = 1024, shuffle: bool = True, seed: int = 42
+        self,
+        batch_size: int = 1024,
+        shuffle: bool = True,
+        seed: int = 42,
+        low_memory: bool = False,
     ) -> DataLoader:
         """Create a PyTorch DataLoader with triplets for implicit feedback.
 
@@ -413,10 +418,30 @@ class Interactions:
                 iterate over the interactions.
             shuffle (bool): Whether to shuffle the data.
             seed (int): Seed for Numpy random number generator for reproducibility.
+            low_memory (bool): Whether to create the dataloader with a lazy approach.
 
         Returns:
             DataLoader: Yields triplets of (user, positive_item, negative_item).
         """
+        if low_memory:
+            sparse_matrix = self.get_sparse()
+
+            lazy_dataset = LazyTripletDataset(
+                sparse_matrix=sparse_matrix,
+                niid=self._niid,
+                seed=seed,
+            )
+
+            # Edge case: No interactions
+            if len(lazy_dataset) == 0:
+                return DataLoader(
+                    TensorDataset(
+                        torch.LongTensor([]), torch.LongTensor([]), torch.LongTensor([])
+                    )
+                )
+
+            return DataLoader(lazy_dataset, batch_size=batch_size, shuffle=shuffle)
+
         # Check if dataloader has been cached
         cache_key = "pos_neg"
         if cache_key in self._cached_dataset:
