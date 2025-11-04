@@ -2,7 +2,7 @@ from tqdm.auto import tqdm
 
 import torch
 
-from warprec.data.dataset import Dataset
+from warprec.data import Dataset
 from warprec.recommenders.base_recommender import IterativeRecommender
 from warprec.utils.logger import logger
 

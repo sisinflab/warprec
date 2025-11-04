@@ -8,7 +8,7 @@ from torch.nn import Module
 from torch.nn.init import xavier_normal_
 from torch_geometric.nn import LGConv
 
-from warprec.data.dataset import Interactions, Sessions
+from warprec.data.entities import Interactions, Sessions
 from warprec.recommenders.base_recommender import (
     IterativeRecommender,
 )

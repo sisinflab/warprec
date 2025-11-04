@@ -8,7 +8,7 @@ from torch import Tensor
 from ray import tune
 from ray.tune import Checkpoint
 
-from warprec.data.dataset import Dataset
+from warprec.data import Dataset
 from warprec.evaluation.evaluator import Evaluator
 from warprec.recommenders.base_recommender import Recommender, IterativeRecommender
 from warprec.utils.config import RecomModel

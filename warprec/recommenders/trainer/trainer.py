@@ -12,7 +12,7 @@ from ray.tune import Tuner, TuneConfig, RunConfig, CheckpointConfig
 from ray.tune.stopper import Stopper
 from ray.tune.experiment import Trial
 from warprec.recommenders.base_recommender import Recommender
-from warprec.data.dataset import Dataset
+from warprec.data import Dataset
 from warprec.recommenders.trainer.objectives import objective_function
 from warprec.recommenders.trainer.search_algorithm_wrapper import (
     BaseSearchWrapper,

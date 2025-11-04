@@ -10,7 +10,7 @@ from warprec.recommenders.base_recommender import (
     IterativeRecommender,
     SequentialRecommenderUtils,
 )
-from warprec.data.dataset import Sessions
+from warprec.data.entities import Sessions
 from warprec.utils.enums import DataLoaderType
 from warprec.utils.registry import model_registry
 

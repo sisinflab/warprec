@@ -8,7 +8,7 @@ from torch.nn.init import normal_
 from scipy.sparse import csr_matrix
 
 from warprec.recommenders.layers import MLP
-from warprec.data.dataset import Interactions, Sessions
+from warprec.data.entities import Interactions, Sessions
 from warprec.recommenders.base_recommender import IterativeRecommender
 from warprec.utils.enums import DataLoaderType
 from warprec.utils.registry import model_registry

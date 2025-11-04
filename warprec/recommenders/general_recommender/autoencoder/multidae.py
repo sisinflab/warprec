@@ -6,7 +6,7 @@ from torch import nn, Tensor
 from torch.nn.init import xavier_normal_, constant_
 from scipy.sparse import csr_matrix
 
-from warprec.data.dataset import Interactions, Sessions
+from warprec.data.entities import Interactions, Sessions
 from warprec.recommenders.base_recommender import IterativeRecommender
 from warprec.recommenders.losses import MultiDAELoss
 from warprec.utils.enums import DataLoaderType

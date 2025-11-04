@@ -12,7 +12,7 @@ from torch import Tensor
 from pandas import DataFrame
 from tqdm import tqdm
 
-from warprec.data.dataset import Dataset
+from warprec.data import Dataset
 from warprec.recommenders.base_recommender import (
     Recommender,
     SequentialRecommenderUtils,

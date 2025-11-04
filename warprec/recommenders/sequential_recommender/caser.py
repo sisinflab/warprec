@@ -12,7 +12,7 @@ from warprec.recommenders.base_recommender import (
     SequentialRecommenderUtils,
 )
 from warprec.recommenders.losses import BPRLoss
-from warprec.data.dataset import Interactions, Sessions
+from warprec.data.entities import Interactions, Sessions
 from warprec.utils.enums import DataLoaderType
 from warprec.utils.registry import model_registry
 

@@ -10,7 +10,7 @@ from torch.nn.init import xavier_normal_
 from torch_sparse import SparseTensor
 from scipy.sparse import coo_matrix
 
-from warprec.data.dataset import Interactions, Sessions
+from warprec.data.entities import Interactions, Sessions
 from warprec.recommenders.base_recommender import (
     IterativeRecommender,
 )
