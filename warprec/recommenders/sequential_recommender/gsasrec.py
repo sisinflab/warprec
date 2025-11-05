@@ -154,11 +154,14 @@ class gSASRec(IterativeRecommender, SequentialRecommenderUtils):
         if isinstance(module, nn.Linear) and module.bias is not None:
             module.bias.data.zero_()
 
-    def get_dataloader(self, interactions, sessions: Sessions, **kwargs):
+    def get_dataloader(
+        self, interactions, sessions: Sessions, low_memory: bool = False, **kwargs
+    ):
         return sessions.get_user_history_dataloader(
             max_seq_len=self.max_seq_len,
             neg_samples=self.neg_samples,
             batch_size=self.batch_size,
+            low_memory=low_memory,
         )
 
     def get_output_embeddings(self) -> nn.Embedding:

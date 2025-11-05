@@ -133,11 +133,18 @@ class GRU4Rec(IterativeRecommender, SequentialRecommenderUtils):
             if module.bias is not None:
                 module.bias.data.zero_()
 
-    def get_dataloader(self, interactions: Interactions, sessions: Sessions, **kwargs):
+    def get_dataloader(
+        self,
+        interactions: Interactions,
+        sessions: Sessions,
+        low_memory: bool = False,
+        **kwargs,
+    ):
         return sessions.get_sequential_dataloader(
             max_seq_len=self.max_seq_len,
             neg_samples=self.neg_samples,
             batch_size=self.batch_size,
+            low_memory=low_memory,
         )
 
     def train_step(self, batch: Any, *args, **kwargs):

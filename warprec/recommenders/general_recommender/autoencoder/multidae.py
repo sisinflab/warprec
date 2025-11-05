@@ -157,8 +157,16 @@ class MultiDAE(IterativeRecommender):
             if module.bias is not None:
                 constant_(module.bias.data, 0)
 
-    def get_dataloader(self, interactions: Interactions, sessions: Sessions, **kwargs):
-        return interactions.get_interaction_loader(batch_size=self.batch_size)
+    def get_dataloader(
+        self,
+        interactions: Interactions,
+        sessions: Sessions,
+        low_memory: bool = False,
+        **kwargs,
+    ):
+        return interactions.get_interaction_loader(
+            batch_size=self.batch_size, low_memory=low_memory
+        )
 
     def train_step(self, batch: Any, *args: Any, **kwargs: Any):
         rating_matrix = [x.to(self._device) for x in batch][0]

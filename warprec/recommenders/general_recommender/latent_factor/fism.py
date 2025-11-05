@@ -114,9 +114,17 @@ class FISM(IterativeRecommender):
         if isinstance(module, nn.Embedding):
             normal_(module.weight.data, 0, 0.01)  # Standard deviation
 
-    def get_dataloader(self, interactions: Interactions, sessions: Sessions, **kwargs):
+    def get_dataloader(
+        self,
+        interactions: Interactions,
+        sessions: Sessions,
+        low_memory: bool = False,
+        **kwargs,
+    ):
         return interactions.get_item_rating_dataloader(
-            neg_samples=0, batch_size=self.batch_size
+            neg_samples=0,
+            batch_size=self.batch_size,
+            low_memory=low_memory,
         )
 
     def train_step(self, batch: Any, *args, **kwargs):
