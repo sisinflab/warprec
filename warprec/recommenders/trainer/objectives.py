@@ -102,6 +102,7 @@ def objective_function(
 
     # Validation metric in the correct format
     validation_score = f"{validation_metric_name}@{validation_top_k}"
+    best_validation_score = -torch.inf if mode == "max" else torch.inf
 
     # Load custom modules if provided
     load_custom_modules(custom_models)
@@ -204,6 +205,27 @@ def objective_function(
                     for metric_name, value in metrics_results.items()
                 }
                 metric_report["loss"] = epoch_loss / len(train_dataloader)
+
+                # Check for best validation score
+                current_validation_score = metric_report[validation_score]
+
+                # Maximize case
+                if mode == "max" and current_validation_score > best_validation_score:
+                    best_validation_score = (
+                        current_validation_score.mean().item()
+                        if isinstance(current_validation_score, Tensor)
+                        else current_validation_score
+                    )
+
+                # Minimize case
+                if mode == "min" and current_validation_score < best_validation_score:
+                    best_validation_score = (
+                        current_validation_score.mean().item()
+                        if isinstance(current_validation_score, Tensor)
+                        else current_validation_score
+                    )
+
+                metric_report[f"best_{validation_score}"] = current_validation_score
 
                 memory_report = _get_memory_report(process, initial_ram_mb, device)
 
