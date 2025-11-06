@@ -291,6 +291,7 @@ def objective_function_ddp(config: dict) -> None:
 
     # Validation metric in the correct format
     validation_score = f"{validation_metric_name}@{validation_top_k}"
+    best_validation_score = -torch.inf if mode == "max" else torch.inf
 
     # Define world size for metric reporting
     world_size = dist.get_world_size() if dist.is_initialized() else 1
@@ -417,6 +418,27 @@ def objective_function_ddp(config: dict) -> None:
 
         # Add the loss averaged over the train sample size
         metric_report["loss"] = epoch_loss / (len(train_dataloader) * world_size)
+
+        # Check for best validation score
+        current_validation_score = metric_report[validation_score]
+
+        # Maximize case
+        if mode == "max" and current_validation_score > best_validation_score:
+            best_validation_score = (
+                current_validation_score.mean().item()
+                if isinstance(current_validation_score, Tensor)
+                else current_validation_score
+            )
+
+        # Minimize case
+        if mode == "min" and current_validation_score < best_validation_score:
+            best_validation_score = (
+                current_validation_score.mean().item()
+                if isinstance(current_validation_score, Tensor)
+                else current_validation_score
+            )
+
+        metric_report[f"best_{validation_score}"] = current_validation_score
 
         # Memory reporting on rank 0
         if train.get_context().get_world_rank() == 0:
