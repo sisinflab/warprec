@@ -30,8 +30,7 @@ class BasicRegistry(Generic[T]):
         self.registry_name = registry_name
 
     def register(self, name: Optional[str] = None) -> Callable:
-        """
-        Decorator to register a class in the registry.
+        """Decorator to register a class in the registry.
 
         Args:
             name (Optional[str]): Name for registration. If None, uses class name.
@@ -57,8 +56,8 @@ class BasicRegistry(Generic[T]):
         return decorator
 
     def get(self, name: str, *args, **kwargs) -> T:
-        """
-        Get an instance from the registry by name.
+        """Get an instance from the registry by name.
+
         Args:
             name (str): Name of the registered class.
             *args: Arguments to pass to the class constructor.
@@ -77,6 +76,26 @@ class BasicRegistry(Generic[T]):
                 f"Available options: {list(self._registry.keys())}"
             )
         return cls(*args, **kwargs)
+
+    def get_class(self, name: str) -> Type[T]:
+        """Get the class from the registry by name.
+
+        Args:
+            name (str): Name of the registered class.
+
+        Returns:
+            Type[T]: Any type of object stored previously.
+
+        Raises:
+            ValueError: If name is not to be found in registry.
+        """
+        cls = self._registry.get(name.upper())
+        if cls is None:
+            raise ValueError(
+                f"'{name}' not found in {self.registry_name} registry. "
+                f"Available options: {list(self._registry.keys())}"
+            )
+        return cls
 
     def list_registered(self) -> List[str]:
         """List all registered names.

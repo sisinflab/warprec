@@ -326,6 +326,21 @@ It allows customization of numerical precision, device usage, logging verbosity,
 <li><p><strong>device</strong>: Device used for training and evaluation. Supports <code class="docutils literal notranslate"><span class="pre">cpu</span></code> or <code class="docutils literal notranslate"><span class="pre">cuda</span></code> devices. Defaults to <code class="docutils literal notranslate"><span class="pre">cpu</span></code>.</p></li>
 <li><p><strong>ray_verbose</strong>: Verbosity level of Ray Tune. Acceptable values are integers from 0 (silent) to 3 (very verbose). Defaults to <code class="docutils literal notranslate"><span class="pre">1</span></code>.</p></li>
 <li><p><strong>time_report</strong>: Whether to report the time taken by each step. Defaults to <code class="docutils literal notranslate"><span class="pre">True</span></code>.</p></li>
+<li><dl class="simple">
+<dt><strong>train_data_preparation</strong>: Which mode to use to prepare data for the experiment. This field supports the following values:</dt><dd><ul>
+<li><p><em>None</em>: Leaving the field empty will result in the framework not pre-computing data structures needed for train. Each trial will compute the needed data.</p></li>
+<li><p><em>conservative</em>: In ‘conservative’ mode the framework will pre-compute all data structures needed only for the current model in exam, clearing the cache when passing to the next one.</p></li>
+<li><p><em>experiment</em>: In ‘experiment’ mode the framework will pre-compute all data structures needed for all the models in the configuration.</p></li>
+</ul>
+</dd>
+</dl>
+</li>
+</ul>
+<div class="admonition important">
+<p class="admonition-title">Important</p>
+<p>The <strong>train_data_preparation</strong> parameter affects how memory is managed during the experiment. The default mode uses the least memory, conservative requires more, and experiment is the most memory-intensive option. Choosing the latter modes can lead to faster training times, as key results are cached directly within the dataset.</p>
+</div>
+<ul class="simple">
 <li><p><strong>cuda_visible_devices</strong>: Indexes of CUDA devices that WarpRec can use. Defaults to all available devices.</p></li>
 <li><p><strong>custom_models</strong>: Python modules to import custom models into WarpRec. Can be a string or a list of strings.</p></li>
 <li><p><strong>callback</strong>: Nested section to configure a custom callback.</p></li>

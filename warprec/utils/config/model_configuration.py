@@ -119,6 +119,10 @@ class Optimization(BaseModel):
             the experiments. Defaults to the maximum number of cores.
         parallel_trials (Optional[int]): The number of trials to execute in parallel.
             Defaults to 1. Increasing this number will require more computational resources.
+        multi_gpu (Optional[bool]): Wether or not to train models on multi-gpu.
+            Defaults to False.
+        num_gpus (Optional[int]): The number of gpus to assign to each trial.
+            Defaults to None. If multi_gpu is set to False, this value will be ignored.
         block_size (Optional[int]): The number of items to process during prediction.
             Used by some neural models, increasing this value will affect memory usage.
         num_samples (Optional[int]): The number of trials that Ray Tune will try.
@@ -133,6 +137,8 @@ class Optimization(BaseModel):
     device: Optional[str] = None
     max_cpu_count: Optional[int] = os.cpu_count()
     parallel_trials: Optional[int] = 1
+    multi_gpu: Optional[bool] = False
+    num_gpus: Optional[int] = None
     block_size: Optional[int] = 50
     num_samples: Optional[int] = 1
     checkpoint_to_keep: Optional[int] = 5

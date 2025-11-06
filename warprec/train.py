@@ -1,18 +1,20 @@
 import os
 import argparse
 import time
-from typing import List, Tuple, Dict, Any, Optional
+from typing import List, Tuple, Dict, Any
 from argparse import Namespace
 
 import ray
 import torch
-from pandas import DataFrame
 
-from warprec.data.reader import ReaderFactory, Reader
+from warprec.common import (
+    initialize_datasets,
+    prepare_train_loaders,
+    dataset_preparation,
+)
+from warprec.data.reader import ReaderFactory
 from warprec.data.writer import WriterFactory
-from warprec.data.splitting import Splitter
 from warprec.data.dataset import Dataset
-from warprec.data.filtering import apply_filtering
 from warprec.utils.callback import WarpRecCallback
 from warprec.utils.config import (
     load_train_configuration,
@@ -20,7 +22,11 @@ from warprec.utils.config import (
     TrainConfiguration,
     RecomModel,
 )
-from warprec.utils.helpers import model_param_from_dict, validation_metric
+from warprec.utils.helpers import (
+    model_param_from_dict,
+    validation_metric,
+    retrieve_evaluation_dataloader,
+)
 from warprec.utils.logger import logger
 from warprec.recommenders.trainer import Trainer
 from warprec.recommenders.loops import train_loop
@@ -48,6 +54,7 @@ def main(args: Namespace):
     # Setup visible devices
     visible_devices = config.general.cuda_visible_devices
     os.environ["CUDA_VISIBLE_DEVICES"] = ",".join(map(str, visible_devices))  # type: ignore[arg-type]
+    os.environ["RAY_TRAIN_V2_ENABLED"] = "1"
 
     # Load custom callback if specified
     callback: WarpRecCallback = load_callback(
@@ -60,213 +67,20 @@ def main(args: Namespace):
     reader = ReaderFactory.get_reader(config=config)
     writer = WriterFactory.get_writer(config=config)
 
-    # Dataset loading
-    main_dataset: Dataset = None
-    val_data: List[Tuple[DataFrame, DataFrame]] | DataFrame = None
-    train_data: DataFrame = None
-    test_data: DataFrame = None
-    side_data = None
-    user_cluster = None
-    item_cluster = None
-    if config.reader.loading_strategy == "dataset":
-        data = reader.read_tabular(
-            local_path=config.reader.local_path,
-            blob_name=config.reader.azure_blob_name,
-            column_names=config.reader.column_names(),
-            dtypes=config.reader.column_dtype(),
-            sep=config.reader.sep,
-            header=config.reader.header,
-        )
-        data = callback.on_data_reading(data)
-
-        # Check for optional filtering
-        if config.filtering is not None:
-            filters = config.get_filters()
-            data = apply_filtering(data, filters)
-
-        # Splitter testing
-        if config.splitter:
-            splitter = Splitter(config)
-
-            if config.reader.data_type == "transaction":
-                train_data, val_data, test_data = splitter.split_transaction(data)
-
-            else:
-                raise ValueError("Data type not yet supported.")
-
-    elif config.reader.loading_strategy == "split":
-        if config.reader.data_type == "transaction":
-            train_data, val_data, test_data = reader.read_tabular_split(
-                split_dir=config.reader.split.local_path,
-                blob_prefix=config.reader.split.azure_blob_prefix,
-                column_names=config.reader.column_names(),
-                dtypes=config.reader.column_dtype(),
-                sep=config.reader.split.sep,
-                ext=config.reader.split.ext,
-                header=config.reader.split.header,
-            )
-
-        else:
-            raise ValueError("Data type not yet supported.")
-
-    # Side information reading
-    if config.reader.side:
-        side_data = reader.read_tabular(
-            local_path=config.reader.side.local_path,
-            blob_name=config.reader.side.azure_blob_name,
-            sep=config.reader.side.sep,
-            header=config.reader.side.header,
-        )
-
-    # Cluster information reading
-    if config.reader.clustering:
-
-        def _read_cluster_data_clean(
-            specific_config: dict,
-            common_cluster_label: str,
-            common_cluster_type: str,
-            reader: Reader,
-        ) -> DataFrame:
-            """Reads clustering data using a pre-prepared specific configuration (User or Item).
-
-            Args:
-                specific_config (dict): Specific configurations for user or item.
-                common_cluster_label (str): Common label for the cluster column.
-                common_cluster_type (str): Common data type for the cluster column.
-                reader (Reader): Object or module with the read_tabular method.
-
-            Returns:
-                DataFrame: A Pandas DataFrame containing the cluster data.
-            """
-
-            # Define column names
-            column_names = [
-                specific_config["id_label"],
-                common_cluster_label,
-            ]
-
-            # Define data types (and map them to column names)
-            dtypes_list = [
-                specific_config["id_type"],
-                common_cluster_type,
-            ]
-            dtype_map = zip(column_names, dtypes_list)
-
-            # Read tabular data using the custom reader
-            cluster_data = reader.read_tabular(
-                local_path=specific_config["local_path"],
-                blob_name=specific_config["blob_name"],
-                column_names=column_names,
-                dtypes=dtype_map,
-                sep=specific_config["sep"],
-                header=specific_config["header"],
-            )
-
-            return cluster_data
-
-        # Common clustering information
-        common_cluster_label = config.reader.labels.cluster_label
-        common_cluster_type = config.reader.dtypes.cluster_type
-
-        # User specific clustering information
-        user_config = {
-            "id_label": config.reader.labels.user_id_label,
-            "id_type": config.reader.dtypes.user_id_type,
-            "local_path": config.reader.clustering.user_local_path,
-            "blob_name": config.reader.clustering.user_azure_blob_name,
-            "sep": config.reader.clustering.user_sep,
-            "header": config.reader.clustering.user_header,
-        }
-
-        # Item specific clustering information
-        item_config = {
-            "id_label": config.reader.labels.item_id_label,
-            "id_type": config.reader.dtypes.item_id_type,
-            "local_path": config.reader.clustering.item_local_path,
-            "blob_name": config.reader.clustering.item_azure_blob_name,
-            "sep": config.reader.clustering.item_sep,
-            "header": config.reader.clustering.item_header,
-        }
-
-        # Read user clustering data
-        user_cluster = _read_cluster_data_clean(
-            specific_config=user_config,
-            common_cluster_label=common_cluster_label,
-            common_cluster_type=common_cluster_type,
-            reader=reader,
-        )
-
-        # Read item clustering data
-        item_cluster = _read_cluster_data_clean(
-            specific_config=item_config,
-            common_cluster_label=common_cluster_label,
-            common_cluster_type=common_cluster_type,
-            reader=reader,
-        )
-
-    # Dataset common information
-    common_params = {
-        "side_data": side_data,
-        "user_cluster": user_cluster,
-        "item_cluster": item_cluster,
-        "batch_size": config.evaluation.batch_size,
-        "rating_type": config.reader.rating_type,
-        "rating_label": config.reader.labels.rating_label,
-        "timestamp_label": config.reader.labels.timestamp_label,
-        "cluster_label": config.reader.labels.cluster_label,
-        "precision": config.general.precision,
-    }
-
-    logger.msg("Creating main dataset")
-    main_dataset = Dataset(
-        train_data,
-        test_data,
-        **common_params,
+    # Load datasets using common utility
+    main_dataset, val_dataset, fold_dataset = initialize_datasets(
+        reader=reader,
+        callback=callback,
+        config=config,
     )
 
-    # Handle validation data
-    val_dataset = None
-    fold_dataset = []
-    if val_data is not None:
-        if not isinstance(val_data, list):
-            # CASE 2: Train/Validation/Test
-            logger.msg("Creating validation dataset")
-            val_dataset = Dataset(
-                train_data,
-                val_data,
-                evaluation_set="Validation",
-                **common_params,
-            )
-        else:
-            # CASE 3: Cross-Validation
-            n_folds = len(val_data)
-            for idx, fold in enumerate(val_data):
-                logger.msg(f"Creating fold dataset {idx + 1}/{n_folds}")
-                val_train, val_set = fold
-                fold_dataset.append(
-                    Dataset(
-                        val_train,
-                        val_set,
-                        evaluation_set="Validation",
-                        **common_params,
-                    )
-                )
-
-    # Callback on dataset creation
-    callback.on_dataset_creation(
-        main_dataset=main_dataset,
-        val_dataset=val_dataset,
-        validation_folds=fold_dataset,
-    )
-
+    # Write split information if required
     if config.splitter and config.writer.save_split:
         writer.write_split(
             main_dataset,
             val_dataset,
             fold_dataset,
-            sep=config.writer.split.sep,
-            ext=config.writer.split.ext,
-            header=config.writer.split.header,
+            **config.writer.split.model_dump(),
         )
 
     # Trainer testing
@@ -297,7 +111,8 @@ def main(args: Namespace):
     )
 
     # Prepare dataloaders for evaluation
-    dataset_preparation(main_dataset, fold_dataset, config)
+    preparation_strategy = config.general.train_data_preparation
+    dataset_preparation(main_dataset, fold_dataset, preparation_strategy, config)
 
     data_preparation_time = time.time() - experiment_start_time
     logger.positive(
@@ -309,6 +124,14 @@ def main(args: Namespace):
 
     for model_name in models:
         model_exploration_start_time = time.time()
+
+        # Check if dataloader requirements is in 'model' mode
+        if preparation_strategy == "conservative":
+            model_dict = {model_name: config.models[model_name]}
+            prepare_train_loaders(main_dataset, model_dict)
+
+            for fold in fold_dataset:
+                prepare_train_loaders(fold, model_dict)
 
         params = model_param_from_dict(model_name, config.models[model_name])
         trainer = Trainer(
@@ -349,14 +172,21 @@ def main(args: Namespace):
         # Callback on training complete
         callback.on_training_complete(model=best_model)
 
+        # Retrieve appropriate evaluation dataloader
+        dataloader = retrieve_evaluation_dataloader(
+            dataset=main_dataset,
+            strategy=config.evaluation.strategy,
+            num_negatives=config.evaluation.num_negatives,
+        )
+
         # Evaluation testing
         model_evaluation_start_time = time.time()
         evaluator.evaluate(
-            best_model,
-            main_dataset,
-            device=str(best_model._device),
+            model=best_model,
+            dataloader=dataloader,
             strategy=config.evaluation.strategy,
-            num_negatives=config.evaluation.num_negatives,
+            dataset=main_dataset,
+            device=str(best_model._device),
             verbose=True,
         )
         results = evaluator.compute_results()
@@ -364,7 +194,7 @@ def main(args: Namespace):
         evaluator.print_console(results, "Test", config.evaluation.max_metric_per_row)
 
         if requires_stat_significance:
-            model_results["Test"][model_name] = (
+            model_results[model_name] = (
                 results  # Populate model_results for statistical significance
             )
 
@@ -379,8 +209,7 @@ def main(args: Namespace):
         writer.write_results(
             results,
             model_name,
-            sep=config.writer.results.sep,
-            ext=config.writer.results.ext,
+            **config.writer.results.model_dump(),
         )
 
         # Recommendation
@@ -463,24 +292,40 @@ def main(args: Namespace):
             # Update time report
             writer.write_time_report(model_timing_report)
 
+            # Clear out the dataset cache if in 'conservative' mode
+            if preparation_strategy == "conservative":
+                main_dataset.clear_cache()
+
+                for fold in fold_dataset:
+                    fold.clear_cache()
+
+                logger.positive("Dataset cache cleared.")
+
     if requires_stat_significance:
-        logger.msg(
-            f"Computing statistical significance tests for {len(models)} models."
-        )
+        # Check if enough models have been evaluated
+        if len(model_results) >= 2:
+            logger.msg(
+                f"Computing statistical significance tests for {len(models)} models."
+            )
 
-        stat_significance = config.evaluation.stat_significance.model_dump(
-            exclude=["corrections"]  # type: ignore[arg-type]
-        )
-        corrections = config.evaluation.stat_significance.corrections.model_dump()
+            stat_significance = config.evaluation.stat_significance.model_dump(
+                exclude=["corrections"]  # type: ignore[arg-type]
+            )
+            corrections = config.evaluation.stat_significance.corrections.model_dump()
 
-        for stat_name, enabled in stat_significance.items():
-            if enabled:
-                test_results = compute_paired_statistical_test(
-                    model_results, stat_name, **corrections
-                )
-                writer.write_statistical_significance_test(test_results, stat_name)
+            for stat_name, enabled in stat_significance.items():
+                if enabled:
+                    test_results = compute_paired_statistical_test(
+                        model_results, stat_name, **corrections
+                    )
+                    writer.write_statistical_significance_test(test_results, stat_name)
 
-        logger.positive("Statistical significance tests completed successfully.")
+            logger.positive("Statistical significance tests completed successfully.")
+        else:
+            logger.attention(
+                "Statistical significance tests require at least two evaluated models. "
+                "Skipping statistical significance computation."
+            )
     logger.positive("All experiments concluded. WarpRec is shutting down.")
 
 
@@ -513,6 +358,11 @@ def single_split_flow(
     model_device = params.optimization.device
     device = general_device if model_device is None else model_device
 
+    # Check for multi-gpu scenario
+    num_gpus = None
+    if params.optimization.multi_gpu:
+        num_gpus = params.optimization.num_gpus
+
     # Evaluation on report
     eval_config = config.evaluation
     val_metric, val_k = validation_metric(config.evaluation.validation_metric)
@@ -537,6 +387,7 @@ def single_split_flow(
         topk=topk,
         validation_score=config.evaluation.validation_metric,
         storage_path=storage_path,
+        num_gpus=num_gpus,
         device=device,
         evaluation_strategy=config.evaluation.strategy,
         num_negatives=config.evaluation.num_negatives,
@@ -578,6 +429,11 @@ def multiple_fold_validation_flow(
     model_device = params.optimization.device
     device = general_device if model_device is None else model_device
 
+    # Check for multi-gpu scenario
+    num_gpus = None
+    if params.optimization.multi_gpu:
+        num_gpus = params.optimization.num_gpus
+
     # Retrieve common params
     block_size = params.optimization.block_size
     validation_score = config.evaluation.validation_metric
@@ -607,6 +463,7 @@ def multiple_fold_validation_flow(
         topk=topk,
         validation_score=validation_score,
         storage_path=storage_path,
+        num_gpus=num_gpus,
         device=device,
         evaluation_strategy=config.evaluation.strategy,
         num_negatives=config.evaluation.num_negatives,
@@ -651,53 +508,6 @@ def multiple_fold_validation_flow(
     )
 
     return best_model, report
-
-
-def dataset_preparation(
-    main_dataset: Dataset,
-    fold_dataset: Optional[List[Dataset]],
-    config: TrainConfiguration,
-):
-    """This method prepares the dataloaders inside the dataset
-    that will be passed to Ray during HPO. It is important to
-    precompute these dataloaders before starting the optimization to
-    avoid multiple computations of the same dataloader.
-
-    Args:
-        main_dataset (Dataset): The main dataset of train/test split.
-        fold_dataset (Optional[List[Dataset]]): The list of validation datasets
-            of train/val splits.
-        config (TrainConfiguration): The configuration file used for the experiment.
-    """
-
-    def prepare_evaluation_loaders(dataset: Dataset, device: str):
-        """utility function to prepare the evaluation dataloaders
-        for a given dataset based on the evaluation strategy.
-
-        Args:
-            dataset (Dataset): The dataset to prepare.
-            device (str): The device to use.
-        """
-        if config.evaluation.strategy == "full":
-            dataset.get_evaluation_dataloader()
-        elif config.evaluation.strategy == "sampled":
-            dataset.get_neg_evaluation_dataloader(
-                num_negatives=config.evaluation.num_negatives,
-                seed=config.evaluation.seed,
-            )
-
-    logger.msg("Preparing main dataset inner structures for training and evaluation.")
-
-    device = config.general.device
-    prepare_evaluation_loaders(main_dataset, device)
-    if fold_dataset is not None and isinstance(fold_dataset, list):
-        for i, dataset in enumerate(fold_dataset):
-            logger.msg(
-                f"Preparing fold dataset {i + 1}/{len(fold_dataset)} inner structures for training and evaluation."
-            )
-            prepare_evaluation_loaders(dataset, device)
-
-    logger.positive("All dataset inner structures ready.")
 
 
 if __name__ == "__main__":

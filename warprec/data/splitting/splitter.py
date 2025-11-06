@@ -2,33 +2,13 @@ import time
 from typing import Tuple, Optional, Union, List
 
 from pandas import DataFrame
-from warprec.utils.config import (
-    TrainConfiguration,
-    DesignConfiguration,
-    SplittingConfig,
-    SplitStrategy,
-    Labels,
-)
 from warprec.utils.enums import SplittingStrategies
 from warprec.utils.registry import splitting_registry
 from warprec.utils.logger import logger
 
 
 class Splitter:
-    """Splitter class will handle the splitting of the data.
-
-    Args:
-        config (TrainConfiguration | DesignConfiguration): The configuration file.
-
-    Attributes:
-        config (TrainConfiguration | DesignConfiguration): The configuration file.
-    """
-
-    config: TrainConfiguration | DesignConfiguration = None
-
-    def __init__(self, config: TrainConfiguration | DesignConfiguration = None):
-        if config:
-            self.config = config
+    """Splitter class will handle the splitting of the data."""
 
     def split_transaction(
         self,
@@ -94,55 +74,47 @@ class Splitter:
                 - DataFrame: The unique test data, used at the end of
                     the experiment to evaluate the model.
         """
-        if self.config:
-            labels = self.config.reader.labels
-            split_config = self.config.splitter
-        else:
-            labels = Labels(
-                user_id_label=user_id_label,
-                item_id_label=item_id_label,
-                rating_label=rating_label,
-                timestamp_label=timestamp_label,
-            )
-            split_config = SplittingConfig(
-                test_splitting=SplitStrategy(
-                    strategy=test_strategy,
-                    ratio=test_ratio,
-                    k=test_k,
-                    folds=test_folds,
-                    timestamp=test_timestamp,
-                    seed=test_seed,
-                ),
-                validation_splitting=SplitStrategy(
-                    strategy=val_strategy,
-                    ratio=val_ratio,
-                    k=val_k,
-                    folds=val_folds,
-                    timestamp=val_timestamp,
-                    seed=val_seed,
-                ),
-            )
         # Test set
         split_process_start_time = time.time()
         logger.msg(
-            f"Starting test splitting process with {split_config.test_splitting.strategy.value} splitting strategy."
+            f"Starting test splitting process with {test_strategy.value} splitting strategy."
         )
         test_split_time_start = time.time()
-        original_train_set, test_set = self._process_split(
-            data, split_config.test_splitting, labels
+        original_train_set, test_set = self.process_split(
+            data,
+            test_strategy,
+            user_id_label=user_id_label,
+            item_id_label=item_id_label,
+            rating_label=rating_label,
+            timestamp_label=timestamp_label,
+            ratio=test_ratio,
+            k=test_k,
+            folds=test_folds,
+            timestamp=test_timestamp,
+            seed=test_seed,
         )[0]
         test_split_time = time.time() - test_split_time_start
         logger.msg(f"Test splitting completed in : {test_split_time:.2f}s")
 
         # Optional validation folding
         validation_folds: List[Tuple[DataFrame, Optional[DataFrame]]] = []
-        if split_config.validation_splitting.strategy is not None:
+        if val_strategy is not None:
             logger.msg(
-                f"Starting validation splitting process with {split_config.validation_splitting.strategy.value} splitting strategy."
+                f"Starting validation splitting process with {val_strategy.value} splitting strategy."
             )
             validation_split_time_start = time.time()
-            folds = self._process_split(
-                original_train_set, split_config.validation_splitting, labels
+            folds = self.process_split(
+                original_train_set,
+                val_strategy,
+                user_id_label=user_id_label,
+                item_id_label=item_id_label,
+                rating_label=rating_label,
+                timestamp_label=timestamp_label,
+                ratio=val_ratio,
+                k=val_k,
+                folds=val_folds,
+                timestamp=val_timestamp,
+                seed=val_seed,
             )
             for train, validation in folds:
                 validation_folds.append((train, validation))
@@ -156,7 +128,7 @@ class Splitter:
         logger.positive(f"Splitting process over in {split_process_time:.2f}s.")
 
         # Filter out the test set
-        self._filter_sets(original_train_set, test_set)
+        self.filter_sets(original_train_set, test_set)
 
         if len(validation_folds) == 0:
             # CASE 1: Only train and test set
@@ -165,31 +137,72 @@ class Splitter:
         if len(validation_folds) == 1:
             # CASE 2: Train/Validation/Test
             train_set, validation_set = validation_folds[0]
-            self._filter_sets(train, test_set)
+            self.filter_sets(train_set, test_set)
             return (train_set, validation_set, test_set)
 
         # Filter out each validation set based on
         # corresponding train set
         for train, validation in validation_folds:
-            self._filter_sets(train, validation)
+            self.filter_sets(train, validation)
 
         # CASE 3: N folds of train and validation + the test set
         return (original_train_set, validation_folds, test_set)
 
-    def split_context(
-        self, data: DataFrame
-    ) -> Tuple[DataFrame, DataFrame, Optional[DataFrame]]:
-        """This function will be used to split context data."""
-        raise NotImplementedError
-
-    def _process_split(
-        self, data: DataFrame, split_strategy: SplitStrategy, labels: Labels
+    def process_split(
+        self,
+        data: DataFrame,
+        strategy: SplittingStrategies,
+        user_id_label: str = "user_id",
+        item_id_label: str = "item_id",
+        rating_label: str = "rating",
+        timestamp_label: str = "timestamp",
+        ratio: Optional[float] = None,
+        k: Optional[int] = None,
+        folds: Optional[int] = None,
+        timestamp: Optional[Union[int, str]] = None,
+        seed: int = 42,
     ) -> List[Tuple[DataFrame, DataFrame]]:
-        strategy = splitting_registry.get(split_strategy.strategy)
-        folds = strategy(data, **split_strategy.model_dump(), **labels.model_dump())
-        return folds
+        """Process the splitting based on the selected strategy.
 
-    def _filter_sets(self, train_set: DataFrame, evaluation_set: DataFrame):
+        Args:
+            data (DataFrame): The DataFrame to be splitted.
+            strategy (SplittingStrategies): The splitting strategy to use.
+            user_id_label (str): The user_id label.
+            item_id_label (str): The item_id label.
+            rating_label (str): The rating label.
+            timestamp_label (str): The timestamp label.
+            ratio (Optional[float]): The ratio value.
+            k (Optional[int]): The k value.
+            folds (Optional[int]): The folds value.
+            timestamp (Optional[Union[int, str]]): The timestamp to be used for the splitting.
+                Either an integer or 'best'.
+            seed (int): The seed value. Defaults to 42.
+
+        Returns:
+            List[Tuple[DataFrame, DataFrame]]: A list of tuples containing the train and evaluation sets.
+        """
+        splitting_strategy = splitting_registry.get(strategy.value)
+        split = splitting_strategy(
+            data,
+            user_id_label=user_id_label,
+            item_id_label=item_id_label,
+            rating_label=rating_label,
+            timestamp_label=timestamp_label,
+            ratio=ratio,
+            k=k,
+            folds=folds,
+            timestamp=timestamp,
+            seed=seed,
+        )
+        return split
+
+    def filter_sets(self, train_set: DataFrame, evaluation_set: DataFrame):
+        """Filter the evaluation set based on the train set.
+
+        Args:
+            train_set (DataFrame): The training set.
+            evaluation_set (DataFrame): The evaluation set to be filtered.
+        """
         mask = evaluation_set.iloc[:, 0].isin(
             train_set.iloc[:, 0]
         ) & evaluation_set.iloc[:, 1].isin(train_set.iloc[:, 1])

@@ -11,8 +11,13 @@ from .enums import (
     Schedulers,
     SearchSpace,
     MetricBlock,
+    DataLoaderType,
 )
-from .helpers import load_custom_modules, is_python_module
+from .helpers import (
+    load_custom_modules,
+    is_python_module,
+    retrieve_evaluation_dataloader,
+)
 from .registry import (
     splitting_registry,
     metric_registry,
@@ -40,8 +45,10 @@ __all__ = [
     "Schedulers",
     "SearchSpace",
     "MetricBlock",
+    "DataLoaderType",
     "load_custom_modules",
     "is_python_module",
+    "retrieve_evaluation_dataloader",
     "splitting_registry",
     "metric_registry",
     "params_registry",

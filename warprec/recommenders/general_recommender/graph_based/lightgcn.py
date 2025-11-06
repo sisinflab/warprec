@@ -14,6 +14,7 @@ from warprec.recommenders.base_recommender import (
 )
 from warprec.recommenders.general_recommender.graph_based import GraphRecommenderUtils
 from warprec.recommenders.losses import BPRLoss
+from warprec.utils.enums import DataLoaderType
 from warprec.utils.registry import model_registry
 
 
@@ -37,6 +38,7 @@ class LightGCN(IterativeRecommender, GraphRecommenderUtils):
         ValueError: If the items or users value was not passed through the info dict.
 
     Attributes:
+        DATALOADER_TYPE: The type of dataloader used.
         embedding_size (int): The embedding size of user and item.
         n_layers (int): The number of graph convolution layers.
         weight_decay (float): The value of weight decay used in the optimizer.
@@ -44,6 +46,9 @@ class LightGCN(IterativeRecommender, GraphRecommenderUtils):
         epochs (int): The number of epochs.
         learning_rate (float): The learning rate value.
     """
+
+    # Dataloader definition
+    DATALOADER_TYPE = DataLoaderType.POS_NEG_LOADER
 
     # Model hyperparameters
     embedding_size: int

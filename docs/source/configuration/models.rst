@@ -44,6 +44,8 @@ The **optimization** section defines how hyperparameter optimization is performe
 - **max_cpu_count**: Maximum number of CPU cores to use. Defaults to available cores.
 - **num_samples**: Number of samples to generate. For grid search, must be ``1``. Defaults to ``1``.
 - **parallel_trials**: Number of trials to run simultaneously. Defaults to ``1``.
+- **multi_gpu**: Wether to use multiple gpus for each trial. Defaults to ``False``.
+- **num_gpus**: The number of gpus to assign for each trial. This value must be used only in case of multi-GPU train. Defaults to ``None``.
 - **block_size**: Number of items to predict at once for efficiency. Defaults to ``50``.
 - **checkpoint_to_keep**: Number of checkpoints to retain in Ray. Defaults to ``5``.
 
@@ -211,7 +213,7 @@ Let's now use the sampling spaces to create a more complex HPO and have more con
                grace_period: 10
             embedding_size: [qrandint, 64, 320, 64]
             n_layers: [1, 2, 3]
-            weight_decay: [uniform, 1e-6, 0.0]
+            weight_decay: [uniform, 0.0, 1e-6]
             batch_size: [qrandint, 512, 10240, 512]
             epochs: 200
             learning_rate: [uniform, 1e-6, 1e-3]

@@ -377,24 +377,7 @@ For example, if custom labels are defined in the reader, they must be mirrored i
 <li><p><strong>sep</strong>: Column separator for split files. Default: <code class="docutils literal notranslate"><span class="pre">\t</span></code>.</p></li>
 <li><p><strong>ext</strong>: Extension for split files. Default: <code class="docutils literal notranslate"><span class="pre">.tsv</span></code>.</p></li>
 <li><p><strong>header</strong>: Boolean flag indicating whether the first row should contain column names. Defaults to <code class="docutils literal notranslate"><span class="pre">True</span></code>.</p></li>
-<li><p><strong>labels</strong>: A nested section for specifying <strong>custom labels</strong>, required if non-standard column names are used during reading.</p></li>
 </ul>
-</section>
-<section id="labels">
-<h2>Labels<a class="headerlink" href="#labels" title="Link to this heading">¶</a></h2>
-<p>WarpRec writes split data in a <strong>standard format</strong>.
-If the dataset uses custom labels, they must be declared under the <code class="docutils literal notranslate"><span class="pre">labels</span></code> section to ensure alignment:</p>
-<ul class="simple">
-<li><p><strong>user_id_label</strong>: Custom label for user ID.</p></li>
-<li><p><strong>item_id_label</strong>: Custom label for item ID.</p></li>
-<li><p><strong>rating_label</strong>: Custom label for rating.</p></li>
-<li><p><strong>timestamp_label</strong>: Custom label for timestamp.</p></li>
-</ul>
-<div class="admonition important">
-<p class="admonition-title">Important</p>
-<p>If labels are mismatched between reader and writer, WarpRec may silently produce inconsistent files.
-Always ensure <strong>symmetry</strong> between the two configurations.</p>
-</div>
 </section>
 <section id="recommendation">
 <h2>Recommendation<a class="headerlink" href="#recommendation" title="Link to this heading">¶</a></h2>
@@ -496,7 +479,6 @@ Increasing this value may lead to larger files and slower post-processing.</p>
 <li><a class="reference internal" href="#available-keywords">Available Keywords</a></li>
 <li><a class="reference internal" href="#results">Results</a></li>
 <li><a class="reference internal" href="#split">Split</a></li>
-<li><a class="reference internal" href="#labels">Labels</a></li>
 <li><a class="reference internal" href="#recommendation">Recommendation</a></li>
 <li><a class="reference internal" href="#example-configuration">Example Configuration</a></li>
 </ul>

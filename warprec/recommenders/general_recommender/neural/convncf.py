@@ -11,6 +11,7 @@ from warprec.recommenders.layers import MLP, CNN
 from warprec.recommenders.losses import BPRLoss
 from warprec.data.dataset import Interactions, Sessions
 from warprec.recommenders.base_recommender import IterativeRecommender
+from warprec.utils.enums import DataLoaderType
 from warprec.utils.registry import model_registry
 
 
@@ -33,6 +34,7 @@ class ConvNCF(IterativeRecommender):
         ValueError: If the items or users value was not passed through the info dict.
 
     Attributes:
+        DATALOADER_TYPE: The type of dataloader used.
         embedding_size (int): The embedding size for users and items.
         cnn_channels (List[int]): The list of output channels for each CNN layer.
         cnn_kernels (List[int]): The list of kernel sizes for each CNN layer.
@@ -43,6 +45,9 @@ class ConvNCF(IterativeRecommender):
         epochs (int): The number of epochs.
         learning_rate (float): The learning rate value.
     """
+
+    # Dataloader definition
+    DATALOADER_TYPE = DataLoaderType.POS_NEG_LOADER
 
     # Model hyperparameters
     embedding_size: int
