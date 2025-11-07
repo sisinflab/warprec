@@ -39,6 +39,7 @@ The **optimization** section defines how hyperparameter optimization is performe
   - ``fifo``: First In First Out.
   - ``asha``: ASHA scheduler for optimized early stopping and trial pruning.
 
+- **lr_scheduler**: Scheduling algorithm to adjust the learning rate at run time. Defaults to ``None``.
 - **properties**: Nested section for strategy and scheduler parameters.
 - **device**: Training device, e.g., ``cpu`` or ``cuda``. Overrides global device.
 - **max_cpu_count**: Maximum number of CPU cores to use. Defaults to available cores.
@@ -48,6 +49,29 @@ The **optimization** section defines how hyperparameter optimization is performe
 - **num_gpus**: The number of gpus to assign for each trial. This value must be used only in case of multi-GPU train. Defaults to ``None``.
 - **block_size**: Number of items to predict at once for efficiency. Defaults to ``50``.
 - **checkpoint_to_keep**: Number of checkpoints to retain in Ray. Defaults to ``5``.
+
+LR Scheduler Section
+^^^^^^^^^^^^^^^^^^
+
+Within WarpRec standard pipelines, you can use a learning rate scheduler to increase your model performance. To do so, you can pass the following parameters under the lr_scheduler configuration block:
+
+- **name**: Name of the scheduler (e.g., StepLR, ReduceLROnPlateau).
+- **params**: A dictionary of parameters expected by the specific scheduler.
+
+An example of this configuration could be something like this:
+
+.. code-block:: yaml
+
+   models:
+        MyModel:
+            optimization:
+                lr_scheduler:
+                    name: StepLR
+                    params:
+                        step_size: 10
+                        gamma: 0.2
+
+For further details about the scheduling algorithms and their parameters, you can check the original `PyTorch Guide <https://docs.pytorch.org/docs/stable/optim.html#how-to-adjust-learning-rate>`_
 
 Properties Section
 ^^^^^^^^^^^^^^^^^^

@@ -348,6 +348,7 @@ WarpRec allows flexible configuration of <strong>training settings</strong>, inc
 <li><p><strong>scheduler</strong>: Scheduling algorithm for trials. Defaults to <code class="docutils literal notranslate"><span class="pre">fifo</span></code>. Supported schedulers:
 - <code class="docutils literal notranslate"><span class="pre">fifo</span></code>: First In First Out.
 - <code class="docutils literal notranslate"><span class="pre">asha</span></code>: ASHA scheduler for optimized early stopping and trial pruning.</p></li>
+<li><p><strong>lr_scheduler</strong>: Scheduling algorithm to adjust the learning rate at run time. Defaults to <code class="docutils literal notranslate"><span class="pre">None</span></code>.</p></li>
 <li><p><strong>properties</strong>: Nested section for strategy and scheduler parameters.</p></li>
 <li><p><strong>device</strong>: Training device, e.g., <code class="docutils literal notranslate"><span class="pre">cpu</span></code> or <code class="docutils literal notranslate"><span class="pre">cuda</span></code>. Overrides global device.</p></li>
 <li><p><strong>max_cpu_count</strong>: Maximum number of CPU cores to use. Defaults to available cores.</p></li>
@@ -358,6 +359,26 @@ WarpRec allows flexible configuration of <strong>training settings</strong>, inc
 <li><p><strong>block_size</strong>: Number of items to predict at once for efficiency. Defaults to <code class="docutils literal notranslate"><span class="pre">50</span></code>.</p></li>
 <li><p><strong>checkpoint_to_keep</strong>: Number of checkpoints to retain in Ray. Defaults to <code class="docutils literal notranslate"><span class="pre">5</span></code>.</p></li>
 </ul>
+<section id="lr-scheduler-section">
+<h3>LR Scheduler Section<a class="headerlink" href="#lr-scheduler-section" title="Link to this heading">¶</a></h3>
+<p>Within WarpRec standard pipelines, you can use a learning rate scheduler to increase your model performance. To do so, you can pass the following parameters under the lr_scheduler configuration block:</p>
+<ul class="simple">
+<li><p><strong>name</strong>: Name of the scheduler (e.g., StepLR, ReduceLROnPlateau).</p></li>
+<li><p><strong>params</strong>: A dictionary of parameters expected by the specific scheduler.</p></li>
+</ul>
+<p>An example of this configuration could be something like this:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">models</span><span class="p">:</span>
+<span class="w">     </span><span class="nt">MyModel</span><span class="p">:</span>
+<span class="w">         </span><span class="nt">optimization</span><span class="p">:</span>
+<span class="w">             </span><span class="nt">lr_scheduler</span><span class="p">:</span>
+<span class="w">                 </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">StepLR</span>
+<span class="w">                 </span><span class="nt">params</span><span class="p">:</span>
+<span class="w">                     </span><span class="nt">step_size</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">10</span>
+<span class="w">                     </span><span class="nt">gamma</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0.2</span>
+</pre></div>
+</div>
+<p>For further details about the scheduling algorithms and their parameters, you can check the original <a class="reference external" href="https://docs.pytorch.org/docs/stable/optim.html#how-to-adjust-learning-rate">PyTorch Guide</a></p>
+</section>
 <section id="properties-section">
 <h3>Properties Section<a class="headerlink" href="#properties-section" title="Link to this heading">¶</a></h3>
 <p>The <strong>properties</strong> subsection provides additional parameters to the optimization strategy or scheduler:</p>
@@ -571,6 +592,7 @@ WarpRec allows flexible configuration of <strong>training settings</strong>, inc
 <li><a class="reference internal" href="#">Models Configuration</a><ul>
 <li><a class="reference internal" href="#meta-parameters">Meta Parameters</a></li>
 <li><a class="reference internal" href="#optimization-configuration">Optimization Configuration</a><ul>
+<li><a class="reference internal" href="#lr-scheduler-section">LR Scheduler Section</a></li>
 <li><a class="reference internal" href="#properties-section">Properties Section</a></li>
 </ul>
 </li>
