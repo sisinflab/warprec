@@ -5,7 +5,7 @@ from argparse import Namespace
 from warprec.common import initialize_datasets
 from warprec.data.reader import ReaderFactory
 from warprec.utils.callback import WarpRecCallback
-from warprec.utils.config import load_design_configuration, load_callback
+from warprec.utils.config import LRScheduler, load_design_configuration, load_callback
 from warprec.utils.helpers import retrieve_evaluation_dataloader
 from warprec.utils.logger import logger
 from warprec.utils.registry import model_registry
@@ -76,7 +76,15 @@ def main(args: Namespace):
         )
 
         if isinstance(model, IterativeRecommender):
-            train_loop(model, main_dataset, model.epochs)
+            lr_scheduler_params = params.get("optimization", {}).get(
+                "lr_scheduler", None
+            )
+            lr_scheduler = (
+                LRScheduler(**lr_scheduler_params)
+                if lr_scheduler_params is not None
+                else None
+            )
+            train_loop(model, main_dataset, model.epochs, lr_scheduler)
 
         # Callback on training complete
         callback.on_training_complete(model=model)
