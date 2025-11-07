@@ -32,6 +32,7 @@ from warprec.utils.config import (
     Wandb,
     CodeCarbon,
     MLflow,
+    LRScheduler,
 )
 from warprec.utils.helpers import validation_metric
 from warprec.utils.callback import WarpRecCallback
@@ -206,6 +207,9 @@ class Trainer:
         mode = params.optimization.properties.mode
         seed = params.optimization.properties.seed
 
+        # Retrieve lr scheduling
+        lr_scheduler = params.optimization.lr_scheduler
+
         # Prepare the Tuner
         tuner = self._prepare_trainable(
             model_name=model_name,
@@ -219,6 +223,7 @@ class Trainer:
             device=device,
             evaluation_strategy=evaluation_strategy,
             num_negatives=num_negatives,
+            lr_scheduler=lr_scheduler,
             beta=beta,
             pop_ratio=pop_ratio,
             ray_verbose=ray_verbose,
@@ -372,6 +377,9 @@ class Trainer:
         # Retrieve common parameters
         mode = params.optimization.properties.mode
 
+        # Retrieve lr scheduling
+        lr_scheduler = params.optimization.lr_scheduler
+
         # Prepare the Tuner
         tuner = self._prepare_trainable(
             model_name=model_name,
@@ -385,6 +393,7 @@ class Trainer:
             device=device,
             evaluation_strategy=evaluation_strategy,
             num_negatives=num_negatives,
+            lr_scheduler=lr_scheduler,
             beta=beta,
             pop_ratio=pop_ratio,
             ray_verbose=ray_verbose,
@@ -551,6 +560,7 @@ class Trainer:
         device: str = "cpu",
         evaluation_strategy: str = "full",
         num_negatives: int = 99,
+        lr_scheduler: Optional[LRScheduler] = None,
         beta: float = 1.0,
         pop_ratio: float = 0.8,
         ray_verbose: int = 1,
@@ -600,6 +610,7 @@ class Trainer:
                 num_to_keep=optimization.checkpoint_to_keep,
                 strategy=evaluation_strategy,
                 num_negatives=num_negatives,
+                lr_scheduler=lr_scheduler,
                 seed=optimization.properties.seed,
                 block_size=optimization.block_size,
                 beta=beta,
@@ -623,6 +634,7 @@ class Trainer:
                 device=device,
                 strategy=evaluation_strategy,
                 num_negatives=num_negatives,
+                lr_scheduler=lr_scheduler,
                 seed=optimization.properties.seed,
                 block_size=optimization.block_size,
                 beta=beta,
