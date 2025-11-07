@@ -1,5 +1,7 @@
 from typing import TypeVar, Dict, Type, Optional, Callable, List, Generic, TYPE_CHECKING
 
+from torch.optim.lr_scheduler import LRScheduler
+
 if TYPE_CHECKING:
     from warprec.recommenders.base_recommender import Recommender
     from warprec.utils.config import RecomModel, SearchSpaceWrapper
@@ -123,3 +125,4 @@ filter_registry: BasicRegistry["Filter"] = BasicRegistry("Filter")
 stat_significance_registry: BasicRegistry["StatisticalTest"] = BasicRegistry(
     "StatisticalSignificance"
 )
+lr_scheduler_registry: BasicRegistry[LRScheduler] = BasicRegistry("LRScheduler")
