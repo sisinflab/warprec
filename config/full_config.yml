@@ -121,6 +121,9 @@ models:
     optimization:
       strategy: [grid, random, hopt, optuna, bohb]
       scheduler: [fifo, asha]
+      lr_scheduler:
+        name: [StepLR, MultiStepLR, LinearLR, ExponentialLR, PolynomialLR, CosineAnnealingLR, ReduceLROnPlateau, CosineAnnealingWarmRestarts]
+        params: {...}
       properties:
         mode: [max, min]
         desired_training_it: [median, mean, min, max]
