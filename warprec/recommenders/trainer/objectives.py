@@ -225,7 +225,7 @@ def objective_function(
                         else current_validation_score
                     )
 
-                metric_report[f"best_{validation_score}"] = current_validation_score
+                metric_report[f"best_{validation_score}"] = best_validation_score
 
                 memory_report = _get_memory_report(process, initial_ram_mb, device)
 
@@ -438,7 +438,7 @@ def objective_function_ddp(config: dict) -> None:
                 else current_validation_score
             )
 
-        metric_report[f"best_{validation_score}"] = current_validation_score
+        metric_report[f"best_{validation_score}"] = best_validation_score
 
         # Memory reporting on rank 0
         if train.get_context().get_world_rank() == 0:
