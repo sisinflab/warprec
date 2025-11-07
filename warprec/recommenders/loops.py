@@ -1,19 +1,30 @@
+from typing import Optional
 from tqdm.auto import tqdm
 
 import torch
+from torch.optim.lr_scheduler import ReduceLROnPlateau
+from torch.optim.lr_scheduler import LRScheduler as LRSchedulerBaseClass
 
 from warprec.data.dataset import Dataset
 from warprec.recommenders.base_recommender import IterativeRecommender
+from warprec.utils.config import LRScheduler
+from warprec.utils.registry import lr_scheduler_registry
 from warprec.utils.logger import logger
 
 
-def train_loop(model: IterativeRecommender, dataset: Dataset, epochs: int):
+def train_loop(
+    model: IterativeRecommender,
+    dataset: Dataset,
+    epochs: int,
+    lr_scheduler: Optional[LRScheduler] = None,
+):
     """Simple training loop decorated with tqdm.
 
     Args:
         model (IterativeRecommender): The model to train.
         dataset (Dataset): The dataset used to train the model.
         epochs (int): The number of epochs of the training.
+        lr_scheduler (Optional[LRScheduler]): The learning rate scheduler configuration.
     """
     logger.msg(f"Starting the training of model {model.name}")
 
@@ -23,6 +34,14 @@ def train_loop(model: IterativeRecommender, dataset: Dataset, epochs: int):
     optimizer = torch.optim.Adam(
         model.parameters(), lr=model.learning_rate, weight_decay=model.weight_decay
     )
+
+    # Check for learning rate scheduler
+    scheduler = None
+    if lr_scheduler is not None:
+        # Initialize the lr scheduler
+        scheduler = lr_scheduler_registry.get(
+            lr_scheduler.name, optimizer=optimizer, **lr_scheduler.params
+        )
 
     model.train()
     for epoch in tqdm(range(epochs), desc="Training Model"):
@@ -40,6 +59,13 @@ def train_loop(model: IterativeRecommender, dataset: Dataset, epochs: int):
 
             optimizer.step()
             epoch_loss += loss.item()
+
+        if scheduler is not None and isinstance(scheduler, LRSchedulerBaseClass):
+            if isinstance(scheduler, ReduceLROnPlateau):
+                scheduler.step(epoch_loss)
+            else:
+                scheduler.step()
+
         tqdm.write(f"Epoch {epoch + 1}, Loss: {epoch_loss:.4f}")
 
     logger.positive(f"Training of {model.name} completed successfully.")
