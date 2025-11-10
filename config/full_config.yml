@@ -3,21 +3,26 @@ reader:
   data_type: transaction
   reading_method: local
   local_path: path/to/dataset.csv
+  azure_blob_name: path/to/dataset/blob.csv
   sep: ','
   header: [True, False]
   rating_type: [implicit, explicit]
   split:
     local_path: path/to/split/dir/
+    azure_blob_prefix: path/to/split/blob/
     ext: .csv
     sep: ','
     header: [True, False]
   side:
     local_path: path/to/side_information.csv
+    azure_blob_name: path/to/side/blob.csv
     sep: ','
     header: [True, False]
   clustering:
     user_local_path: path/to/user_clustering.csv
     item_local_path: path/to/item_clustering.csv
+    user_azure_blob_name: path/to/user/cluster/blob.csv
+    item_azure_blob_name: path/to/item/cluster/blob.csv
     user_sep: ','
     item_sep: ','
     user_header: [True, False]
@@ -36,6 +41,7 @@ writer:
   dataset_name: MyDataset
   writing_method: local
   local_experiment_path: path/to/experiment/dir/
+  azure_blob_experiment_container: container-name
   setup_experiment: [True, False]
   save_split: [True, False]
   results:
@@ -62,6 +68,7 @@ filtering:
   MinRating:
     min_rating: 3.0
   UserAverage: {}
+  ItemAverage: {}
   UserMin:
     min_interactions: 5
   UserMax:
@@ -75,6 +82,10 @@ filtering:
   NRoundsKCore:
     rounds: 3
     min_interactions: 5
+  UserHeadN:
+    num_interactions: 10
+  UserTailN:
+    num_interactions: 10
 splitter:
   test_splitting:
     strategy: [temporal_holdout, temporal_leave_k_out, random_holdout, random_leave_k_out, timestamp_slicing]
@@ -134,9 +145,11 @@ models:
         reduction_factor: 2.0
       device: [cpu, cuda]
       max_cpu_count: 32
-      num_samples: 10
       parallel_trials: 5
+      multi_gpu: [False, True]
+      num_gpus: 1
       block_size: 50
+      num_samples: 10
       checkpoint_to_keep: 5
     early_stopping:
       monitor: [score, loss]
@@ -178,6 +191,7 @@ general:
   device: [cpu, cuda]
   ray_verbose: [0, 1, 2, 3]
   time_report: [True, False]
+  train_data_preparation: [conservative, experiment]
   cuda_visible_devices: [0, 1]
   custom_models: [path/to/python/module, path/to/python/script.py]
   callback:
@@ -187,3 +201,6 @@ general:
     kwargs:
       kwarg_1: 10
       kwarg_2: string
+  azure:
+    storage_account_name: storage-account-name
+    container_name: container-name
