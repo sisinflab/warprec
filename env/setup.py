@@ -50,6 +50,13 @@ def initialize_environment(
             if isinstance(visible_devices, int):
                 visible_devices = [visible_devices]
 
+            # Check that every item in list is an integer
+            if any(not isinstance(device, int) for device in visible_devices):
+                raise ValueError(
+                    "Cuda visible devices must be an integer or a list of integers. "
+                    f"Value received: {visible_devices}"
+                )
+
             # Correctly set the environment variable
             os.environ["CUDA_VISIBLE_DEVICES"] = ",".join(map(str, visible_devices))
 
