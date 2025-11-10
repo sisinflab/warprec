@@ -8,90 +8,13 @@ from torch import Tensor
 from torch.utils.data import DataLoader, Dataset
 from torch.nn.utils.rnn import pad_sequence
 
+from warprec.data.entities.train_structures import (
+    SessionDataset,
+    LazySessionDataset,
+    UserHistoryDataset,
+    LazyUserHistoryDataset,
+)
 from warprec.utils.logger import logger
-
-
-class SessionDataset(Dataset):
-    """Personalized dataset for session based data.
-
-    Used by sequential models to capture temporal information from
-    user interaction history.
-
-    Args:
-        sequences (Tensor): The sequence of interactions.
-        sequence_lengths (Tensor): The length of the sequence (before padding).
-        positive_items (Tensor): The positive items.
-        negative_items (Optional[Tensor]): The negative items.
-        users (Optional[Tensor]): The user IDs associated with the sequences.
-    """
-
-    def __init__(
-        self,
-        sequences: Tensor,
-        sequence_lengths: Tensor,
-        positive_items: Tensor,
-        negative_items: Optional[Tensor] = None,
-        users: Optional[Tensor] = None,
-    ):
-        self.sequences = sequences
-        self.sequence_lengths = sequence_lengths
-        self.positive_items = positive_items
-        self.negative_items = negative_items
-        self.users = users
-
-    def __len__(self):
-        return len(self.sequences)
-
-    def __getitem__(self, idx):
-        if self.users is not None:
-            if self.negative_items is not None:
-                return (
-                    self.users[idx],
-                    self.sequences[idx],
-                    self.sequence_lengths[idx],
-                    self.positive_items[idx],
-                    self.negative_items[idx],
-                )
-            return (
-                self.users[idx],
-                self.sequences[idx],
-                self.sequence_lengths[idx],
-                self.positive_items[idx],
-            )
-        if self.negative_items is not None:
-            return (
-                self.sequences[idx],
-                self.sequence_lengths[idx],
-                self.positive_items[idx],
-                self.negative_items[idx],
-            )
-        return (
-            self.sequences[idx],
-            self.sequence_lengths[idx],
-            self.positive_items[idx],
-        )
-
-
-class UserHistoryDataset(Dataset):
-    """Personalized dataset for user history-based data.
-
-    Used by sequential models that process the entire user interaction history
-    as a single sequence.
-
-    Args:
-        positive_sequences (Tensor): The sequences of positive interactions.
-        negative_samples (Tensor): The sequences of negative interactions.
-    """
-
-    def __init__(self, positive_sequences: Tensor, negative_samples: Tensor):
-        self.positive_sequences = positive_sequences
-        self.negative_samples = negative_samples
-
-    def __len__(self) -> int:
-        return len(self.positive_sequences)
-
-    def __getitem__(self, idx: int) -> Tuple[Tensor, Tensor]:
-        return self.positive_sequences[idx], self.negative_samples[idx]
 
 
 class Sessions:
@@ -222,6 +145,7 @@ class Sessions:
         batch_size: int = 1024,
         shuffle: bool = True,
         seed: int = 42,
+        low_memory: bool = False,
     ) -> DataLoader:
         """Creates a DataLoader for sequential data.
 
@@ -236,10 +160,36 @@ class Sessions:
             batch_size (int): Batch size for the DataLoader.
             shuffle (bool): Whether to shuffle the data.
             seed (int): Seed for Numpy random number generator for reproducibility.
+            low_memory (bool): Whether to create the dataloader with a lazy approach.
 
         Returns:
             DataLoader: A DataLoader yielding sequential training samples.
         """
+        if low_memory:
+            sorted_df = self._get_processed_data()
+
+            # Edge case: No valid session
+            if sorted_df.empty:
+                logger.negative("No valid session found in the data.")
+                return DataLoader(torch.utils.data.TensorDataset(torch.empty(0)))
+
+            lazy_dataset = LazySessionDataset(
+                sorted_df=sorted_df,
+                user_label=self._user_label,
+                item_label=self._item_label,
+                max_seq_len=max_seq_len,
+                neg_samples=neg_samples,
+                niid=self._niid,
+                include_user_id=include_user_id,
+                seed=seed,
+            )
+
+            # Edge case: The dataset contains no data
+            if len(lazy_dataset) == 0:
+                logger.negative("Session dataset is empty. No valid session found.")
+
+            return DataLoader(lazy_dataset, batch_size=batch_size, shuffle=shuffle)
+
         # Check cache first
         cache_key = (
             f"sequence_len_{max_seq_len}_neg_{neg_samples}_user_{include_user_id}"
@@ -506,6 +456,7 @@ class Sessions:
         batch_size: int = 1024,
         shuffle: bool = True,
         seed: int = 42,
+        low_memory: bool = False,
     ) -> DataLoader:
         """Creates a DataLoader where each item is a user's full history.
 
@@ -515,10 +466,30 @@ class Sessions:
             batch_size (int): Batch size for the DataLoader.
             shuffle (bool): Whether to shuffle the data.
             seed (int): Seed for reproducibility of negative sampling.
+            low_memory (bool): Whether to create the dataloader with a lazy approach.
 
         Returns:
             DataLoader: A DataLoader yielding user history sequences with negative samples.
         """
+        if low_memory:
+            user_sessions = self._get_user_sessions()
+
+            lazy_dataset = LazyUserHistoryDataset(
+                user_sessions=user_sessions,
+                max_seq_len=max_seq_len,
+                neg_samples=neg_samples,
+                niid=self._niid,
+                seed=seed,
+            )
+
+            # Edge case: No valid history
+            if len(lazy_dataset) == 0:
+                logger.negative(
+                    "No valid user history samples generated. Ensure users have at least 2 interactions."
+                )
+
+            return DataLoader(lazy_dataset, batch_size=batch_size, shuffle=shuffle)
+
         # Check cache first
         cache_key = f"history_len_{max_seq_len}_neg_{neg_samples}"
         if cache_key in self._cached_dataset:

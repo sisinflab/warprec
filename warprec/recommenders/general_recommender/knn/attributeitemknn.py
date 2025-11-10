@@ -2,7 +2,7 @@
 from typing import Any
 
 import torch
-from warprec.data.dataset import Interactions
+from warprec.data.entities import Interactions
 from warprec.recommenders.base_recommender import ItemSimRecommender
 from warprec.utils.registry import model_registry, similarities_registry
 

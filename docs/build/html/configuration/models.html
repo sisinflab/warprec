@@ -333,7 +333,12 @@ WarpRec allows flexible configuration of <strong>training settings</strong>, inc
 <li><p><strong>save_model</strong>: Whether to save the model in the experiment directory. Defaults to <code class="docutils literal notranslate"><span class="pre">False</span></code>.</p></li>
 <li><p><strong>save_recs</strong>: Whether to save generated recommendations. Defaults to <code class="docutils literal notranslate"><span class="pre">False</span></code>.</p></li>
 <li><p><strong>load_from</strong>: Path to pre-trained model weights to load. Defaults to <code class="docutils literal notranslate"><span class="pre">None</span></code>.</p></li>
+<li><p><strong>low_memory</strong>: Whether to run the train using a lazy dataloader. Defaults to <code class="docutils literal notranslate"><span class="pre">False</span></code>.</p></li>
 </ul>
+<div class="admonition warning">
+<p class="admonition-title">Warning</p>
+<p>The <code class="docutils literal notranslate"><span class="pre">low_memory</span></code> option can be beneficial in environments with limited computational resources, such as when training a model on a laptop. However, its use is generally discouraged in other contexts, as it significantly increases training time.</p>
+</div>
 </section>
 <section id="optimization-configuration">
 <h2>Optimization Configuration<a class="headerlink" href="#optimization-configuration" title="Link to this heading">¶</a></h2>

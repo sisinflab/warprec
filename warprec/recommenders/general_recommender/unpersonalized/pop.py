@@ -4,7 +4,7 @@ from typing import Any
 import torch
 from torch import Tensor
 from warprec.recommenders.base_recommender import Recommender
-from warprec.data.dataset import Interactions
+from warprec.data.entities import Interactions
 from warprec.utils.registry import model_registry
 
 

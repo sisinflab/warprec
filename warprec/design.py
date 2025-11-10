@@ -84,7 +84,8 @@ def main(args: Namespace):
                 if lr_scheduler_params is not None
                 else None
             )
-            train_loop(model, main_dataset, model.epochs, lr_scheduler)
+            low_memory = params.get("meta", {}).get("low_memory", False)
+            train_loop(model, main_dataset, model.epochs, lr_scheduler, low_memory)
 
         # Callback on training complete
         callback.on_training_complete(model=model)

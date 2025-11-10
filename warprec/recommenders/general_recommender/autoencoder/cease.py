@@ -4,7 +4,7 @@ from typing import Any
 import numpy as np
 from scipy.sparse import vstack
 from warprec.recommenders.base_recommender import ItemSimRecommender
-from warprec.data.dataset import Interactions
+from warprec.data.entities import Interactions
 from warprec.utils.registry import model_registry
 
 

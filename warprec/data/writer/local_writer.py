@@ -4,7 +4,7 @@ from typing import Optional
 import csv
 
 from warprec.data.writer.base_writer import Writer
-from warprec.data.dataset import Dataset
+from warprec.data import Dataset
 from warprec.recommenders.base_recommender import Recommender
 from warprec.utils.logger import logger
 
