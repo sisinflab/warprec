@@ -76,7 +76,8 @@ def main(args: Namespace):
         )
 
         if isinstance(model, IterativeRecommender):
-            train_loop(model, main_dataset, model.epochs)
+            low_memory = params.get("meta", {}).get("low_memory", False)
+            train_loop(model, main_dataset, model.epochs, low_memory)
 
         # Callback on training complete
         callback.on_training_complete(model=model)

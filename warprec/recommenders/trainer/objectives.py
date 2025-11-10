@@ -15,7 +15,7 @@ from ray.tune.integration.ray_train import TuneReportCallback
 from ray.train import ScalingConfig, RunConfig, CheckpointConfig
 from ray.train.torch import TorchTrainer, get_device
 
-from warprec.data.dataset import Dataset
+from warprec.data import Dataset
 from warprec.evaluation.evaluator import Evaluator
 from warprec.recommenders.base_recommender import Recommender, IterativeRecommender
 from warprec.utils.config import RecomModel
@@ -57,6 +57,7 @@ def objective_function(
     validation_metric_name: str,
     mode: str,
     device: str,
+    low_memory: bool = False,
     strategy: str = "full",
     num_negatives: int = 99,
     seed: int = 42,
@@ -78,6 +79,8 @@ def objective_function(
         validation_metric_name (str): The name of the metric to optimize.
         mode (str): Whether or not to maximize or minimize the metric.
         device (str): The device used for tensor operations.
+        low_memory (bool): Whether or not to train model on
+            lazy dataloader.
         strategy (str): Evaluation strategy, either "full" or "sampled".
             Defaults to "full".
         num_negatives (int): Number of negative samples to use in "sampled" strategy.
@@ -163,7 +166,9 @@ def objective_function(
         if isinstance(model, IterativeRecommender):
             # Proceed with standard training loop
             train_dataloader = model.get_dataloader(
-                interactions=dataset.train_set, sessions=dataset.train_session
+                interactions=dataset.train_set,
+                sessions=dataset.train_session,
+                low_memory=low_memory,
             )
             optimizer = torch.optim.Adam(
                 model.parameters(),
@@ -285,6 +290,7 @@ def objective_function_ddp(config: dict) -> None:
     params = config["params"]
     dataset_folds = config["dataset_folds"]
     mode = config["mode"]
+    low_memory = config["low_memory"]
     validation_metric_name = config["validation_metric_name"]
     validation_top_k = config["validation_top_k"]
     device = get_device()
@@ -346,7 +352,9 @@ def objective_function_ddp(config: dict) -> None:
 
     # Prepare the distributed train dataloader
     train_dataloader = unwrapped_model.get_dataloader(
-        interactions=dataset.train_set, sessions=dataset.train_session
+        interactions=dataset.train_set,
+        sessions=dataset.train_session,
+        low_memory=low_memory,
     )
     train_dataloader = train.torch.prepare_data_loader(train_dataloader)
 

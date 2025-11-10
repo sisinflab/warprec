@@ -4,7 +4,7 @@ from typing import Union, Any
 import numpy as np
 from scipy.sparse import csr_matrix, coo_matrix, lil_matrix
 from sklearn.preprocessing import normalize
-from warprec.data.dataset import Interactions
+from warprec.data.entities import Interactions
 from warprec.recommenders.base_recommender import ItemSimRecommender
 from warprec.utils.registry import model_registry
 

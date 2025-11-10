@@ -21,6 +21,10 @@ The **meta** section allows controlling aspects of the model that do not directl
 - **save_model**: Whether to save the model in the experiment directory. Defaults to ``False``.
 - **save_recs**: Whether to save generated recommendations. Defaults to ``False``.
 - **load_from**: Path to pre-trained model weights to load. Defaults to ``None``.
+- **low_memory**: Whether to run the train using a lazy dataloader. Defaults to ``False``.
+
+.. warning::
+    The ``low_memory`` option can be beneficial in environments with limited computational resources, such as when training a model on a laptop. However, its use is generally discouraged in other contexts, as it significantly increases training time.
 
 -----------------------------
 Optimization Configuration

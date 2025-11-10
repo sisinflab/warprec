@@ -14,7 +14,7 @@ from warprec.common import (
 )
 from warprec.data.reader import ReaderFactory
 from warprec.data.writer import WriterFactory
-from warprec.data.dataset import Dataset
+from warprec.data import Dataset
 from warprec.utils.callback import WarpRecCallback
 from warprec.utils.config import (
     load_train_configuration,

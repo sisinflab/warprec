@@ -8,7 +8,7 @@ from azure.core.exceptions import ResourceNotFoundError, ResourceExistsError
 from azure.storage.blob import BlobServiceClient
 
 from warprec.data.writer import Writer
-from warprec.data.dataset import Dataset
+from warprec.data import Dataset
 from warprec.recommenders.base_recommender import Recommender
 from warprec.utils.logger import logger
 

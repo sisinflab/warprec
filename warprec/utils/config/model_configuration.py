@@ -32,11 +32,14 @@ class Meta(BaseModel):
         save_model (Optional[bool]): Whether save or not the model state after training.
         save_recs (Optional[bool]): Whether save or not the recommendations after training.
         load_from (Optional[str]): The path where a previous model state has been saved.
+        low_memory (Optional[bool]): Wether or not to compute data needed for the model to
+            train in lazy mode. Defaults to False.
     """
 
     save_model: Optional[bool] = False
     save_recs: Optional[bool] = False
     load_from: Optional[str] = None
+    low_memory: Optional[bool] = False
 
 
 class Properties(BaseModel):

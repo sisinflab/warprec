@@ -2,23 +2,29 @@ from tqdm.auto import tqdm
 
 import torch
 
-from warprec.data.dataset import Dataset
+from warprec.data import Dataset
 from warprec.recommenders.base_recommender import IterativeRecommender
 from warprec.utils.logger import logger
 
 
-def train_loop(model: IterativeRecommender, dataset: Dataset, epochs: int):
+def train_loop(
+    model: IterativeRecommender, dataset: Dataset, epochs: int, low_memory: bool = False
+):
     """Simple training loop decorated with tqdm.
 
     Args:
         model (IterativeRecommender): The model to train.
         dataset (Dataset): The dataset used to train the model.
         epochs (int): The number of epochs of the training.
+        low_memory (bool): Wether or not to compute dataloader in
+            lazy mode.
     """
     logger.msg(f"Starting the training of model {model.name}")
 
     train_dataloader = model.get_dataloader(
-        interactions=dataset.train_set, sessions=dataset.train_session
+        interactions=dataset.train_set,
+        sessions=dataset.train_session,
+        low_memory=low_memory,
     )
     optimizer = torch.optim.Adam(
         model.parameters(), lr=model.learning_rate, weight_decay=model.weight_decay
@@ -40,6 +46,8 @@ def train_loop(model: IterativeRecommender, dataset: Dataset, epochs: int):
 
             optimizer.step()
             epoch_loss += loss.item()
-        tqdm.write(f"Epoch {epoch + 1}, Loss: {epoch_loss:.4f}")
+        tqdm.write(
+            f"Epoch {epoch + 1}, Loss: {(epoch_loss / len(train_dataloader)):.4f}"
+        )
 
     logger.positive(f"Training of {model.name} completed successfully.")

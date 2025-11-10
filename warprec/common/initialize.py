@@ -3,7 +3,7 @@ from typing import Tuple, List, Optional, Dict
 from pandas import DataFrame
 from itertools import product
 
-from warprec.data.dataset import Dataset
+from warprec.data import Dataset
 from warprec.data.reader import Reader
 from warprec.data.splitting import Splitter
 from warprec.data.filtering import apply_filtering

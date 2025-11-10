@@ -7,8 +7,7 @@ import torch
 from torch import Tensor
 from scipy.sparse import csr_matrix
 from tabulate import tabulate
-
-from warprec.data.dataset import (
+from warprec.data import (
     Dataset,
     EvaluationDataLoader,
     NegativeEvaluationDataLoader,

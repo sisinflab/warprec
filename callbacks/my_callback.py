@@ -1,7 +1,7 @@
 import torch
 import matplotlib.pyplot as plt
 
-from warprec.data.dataset import Dataset
+from warprec.data import Dataset
 from warprec.utils.callback import WarpRecCallback
 
 

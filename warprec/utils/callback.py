@@ -4,7 +4,7 @@ from pandas import DataFrame
 from ray.tune import Callback
 
 if TYPE_CHECKING:
-    from warprec.data.dataset import Dataset
+    from warprec.data import Dataset
     from warprec.recommenders.base_recommender import Recommender
 
 

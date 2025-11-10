@@ -6,7 +6,7 @@ from torch import nn, Tensor
 from torch.nn.init import xavier_normal_, constant_
 from scipy.sparse import csr_matrix
 
-from warprec.data.dataset import Interactions, Sessions
+from warprec.data.entities import Interactions, Sessions
 from warprec.recommenders.base_recommender import IterativeRecommender
 from warprec.recommenders.losses import MultiDAELoss
 from warprec.utils.enums import DataLoaderType
@@ -157,8 +157,16 @@ class MultiDAE(IterativeRecommender):
             if module.bias is not None:
                 constant_(module.bias.data, 0)
 
-    def get_dataloader(self, interactions: Interactions, sessions: Sessions, **kwargs):
-        return interactions.get_interaction_loader(batch_size=self.batch_size)
+    def get_dataloader(
+        self,
+        interactions: Interactions,
+        sessions: Sessions,
+        low_memory: bool = False,
+        **kwargs,
+    ):
+        return interactions.get_interaction_loader(
+            batch_size=self.batch_size, low_memory=low_memory
+        )
 
     def train_step(self, batch: Any, *args: Any, **kwargs: Any):
         rating_matrix = [x.to(self._device) for x in batch][0]

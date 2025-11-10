@@ -9,7 +9,7 @@ from torch.optim.optimizer import Optimizer
 from torch.utils.data import DataLoader
 from scipy.sparse import csr_matrix
 
-from warprec.data.dataset import Interactions, Sessions
+from warprec.data.entities import Interactions, Sessions
 from warprec.utils.enums import DataLoaderType
 
 
