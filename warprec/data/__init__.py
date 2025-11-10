@@ -1,11 +1,15 @@
-from . import dataset
+from .dataset import Dataset, EvaluationDataLoader, NegativeEvaluationDataLoader
+from . import entities
 from . import reader
 from . import splitting
 from . import writer
 from .filtering import Filter, apply_filtering
 
 __all__ = [
-    "dataset",
+    "Dataset",
+    "EvaluationDataLoader",
+    "NegativeEvaluationDataLoader",
+    "entities",
     "reader",
     "splitting",
     "writer",

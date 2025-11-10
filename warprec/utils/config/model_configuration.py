@@ -1,5 +1,5 @@
 import os
-from typing import List, Optional, Union, ClassVar, Any
+from typing import List, Optional, Union, ClassVar, Any, Dict
 from abc import ABC
 
 import torch
@@ -13,6 +13,7 @@ from warprec.utils.registry import (
     model_registry,
     params_registry,
     search_algorithm_registry,
+    lr_scheduler_registry,
 )
 from warprec.utils.config.common import _scientific_notation_conversion
 from warprec.utils.logger import logger
@@ -32,11 +33,14 @@ class Meta(BaseModel):
         save_model (Optional[bool]): Whether save or not the model state after training.
         save_recs (Optional[bool]): Whether save or not the recommendations after training.
         load_from (Optional[str]): The path where a previous model state has been saved.
+        low_memory (Optional[bool]): Wether or not to compute data needed for the model to
+            train in lazy mode. Defaults to False.
     """
 
     save_model: Optional[bool] = False
     save_recs: Optional[bool] = False
     load_from: Optional[str] = None
+    low_memory: Optional[bool] = False
 
 
 class Properties(BaseModel):
@@ -96,6 +100,29 @@ class Properties(BaseModel):
         return v.lower()
 
 
+class LRScheduler(BaseModel):
+    """Definition of the learning rate scheduling configuration.
+
+    Attributes:
+        name (Optional[str]): The name of the scheduler.
+        params (Optional[Dict[str, Any]]): The parameters of the scheduler.
+    """
+
+    name: Optional[str]
+    params: Optional[Dict[str, Any]]
+
+    @field_validator("name")
+    @classmethod
+    def check_name(cls, v: str):
+        """Validate name."""
+        if v.upper() not in lr_scheduler_registry.list_registered():
+            raise ValueError(
+                "The learning rate scheduler name provided is not supported. These are the "
+                f"supported strategies: {lr_scheduler_registry.list_registered()}"
+            )
+        return v
+
+
 class Optimization(BaseModel):
     """Definition of the Optimization sub-configuration of a RecommenderModel.
 
@@ -112,6 +139,7 @@ class Optimization(BaseModel):
             - fifo: Classic First In First Out trial optimization.
             - asha: ASHA Scheduler, more information can be found at:
                 https://docs.ray.io/en/latest/tune/api/doc/ray.tune.schedulers.ASHAScheduler.html.
+        lr_scheduler (Optional[LRScheduler]): The learning rate scheduling options.
         properties (Optional[Properties]): The attributes required for Ray Tune to work.
         device (Optional[str]): The device that will be used for tensor operations.
             Overrides general device.
@@ -133,6 +161,7 @@ class Optimization(BaseModel):
 
     strategy: Optional[SearchAlgorithms] = SearchAlgorithms.GRID
     scheduler: Optional[Schedulers] = Schedulers.FIFO
+    lr_scheduler: Optional[LRScheduler] = None
     properties: Optional[Properties] = Field(default_factory=Properties)
     device: Optional[str] = None
     max_cpu_count: Optional[int] = os.cpu_count()

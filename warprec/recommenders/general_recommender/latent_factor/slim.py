@@ -4,7 +4,7 @@ from typing import Any
 import scipy.sparse as sp
 from sklearn.linear_model import ElasticNet
 from warprec.recommenders.base_recommender import ItemSimRecommender
-from warprec.data.dataset import Interactions
+from warprec.data.entities import Interactions
 from warprec.utils.registry import model_registry
 
 

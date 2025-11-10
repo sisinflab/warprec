@@ -14,7 +14,7 @@ from ray.tune.stopper import Stopper
 from ray.tune.experiment import Trial
 
 from warprec.recommenders.base_recommender import Recommender
-from warprec.data.dataset import Dataset
+from warprec.data import Dataset
 from warprec.recommenders.trainer.objectives import (
     objective_function,
     driver_function_ddp,
@@ -32,6 +32,7 @@ from warprec.utils.config import (
     Wandb,
     CodeCarbon,
     MLflow,
+    LRScheduler,
 )
 from warprec.utils.helpers import validation_metric
 from warprec.utils.callback import WarpRecCallback
@@ -205,6 +206,10 @@ class Trainer:
         # Retrieve common parameters
         mode = params.optimization.properties.mode
         seed = params.optimization.properties.seed
+        low_memory = params.meta.low_memory
+
+        # Retrieve lr scheduling
+        lr_scheduler = params.optimization.lr_scheduler
 
         # Prepare the Tuner
         tuner = self._prepare_trainable(
@@ -215,10 +220,12 @@ class Trainer:
             topk=topk,
             validation_score=validation_score,
             storage_path=storage_path,
+            low_memory=low_memory,
             num_gpus=num_gpus,
             device=device,
             evaluation_strategy=evaluation_strategy,
             num_negatives=num_negatives,
+            lr_scheduler=lr_scheduler,
             beta=beta,
             pop_ratio=pop_ratio,
             ray_verbose=ray_verbose,
@@ -371,6 +378,10 @@ class Trainer:
         """
         # Retrieve common parameters
         mode = params.optimization.properties.mode
+        low_memory = params.meta.low_memory
+
+        # Retrieve lr scheduling
+        lr_scheduler = params.optimization.lr_scheduler
 
         # Prepare the Tuner
         tuner = self._prepare_trainable(
@@ -381,10 +392,12 @@ class Trainer:
             topk=topk,
             validation_score=validation_score,
             storage_path=storage_path,
+            low_memory=low_memory,
             num_gpus=num_gpus,
             device=device,
             evaluation_strategy=evaluation_strategy,
             num_negatives=num_negatives,
+            lr_scheduler=lr_scheduler,
             beta=beta,
             pop_ratio=pop_ratio,
             ray_verbose=ray_verbose,
@@ -547,10 +560,12 @@ class Trainer:
         topk: List[int],
         validation_score: str,
         storage_path: str,
+        low_memory: bool = False,
         num_gpus: Optional[int] = None,
         device: str = "cpu",
         evaluation_strategy: str = "full",
         num_negatives: int = 99,
+        lr_scheduler: Optional[LRScheduler] = None,
         beta: float = 1.0,
         pop_ratio: float = 0.8,
         ray_verbose: int = 1,
@@ -595,11 +610,13 @@ class Trainer:
                 validation_top_k=validation_top_k,
                 validation_metric_name=validation_metric_name,
                 mode=mode,
+                low_memory=low_memory,
                 num_gpus=num_gpus,
                 storage_path=storage_path,
                 num_to_keep=optimization.checkpoint_to_keep,
                 strategy=evaluation_strategy,
                 num_negatives=num_negatives,
+                lr_scheduler=lr_scheduler,
                 seed=optimization.properties.seed,
                 block_size=optimization.block_size,
                 beta=beta,
@@ -621,8 +638,10 @@ class Trainer:
                 validation_metric_name=validation_metric_name,
                 mode=mode,
                 device=device,
+                low_memory=low_memory,
                 strategy=evaluation_strategy,
                 num_negatives=num_negatives,
+                lr_scheduler=lr_scheduler,
                 seed=optimization.properties.seed,
                 block_size=optimization.block_size,
                 beta=beta,

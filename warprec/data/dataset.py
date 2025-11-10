@@ -8,7 +8,7 @@ from torch.nn.utils.rnn import pad_sequence
 from pandas import DataFrame
 from scipy.sparse import csr_matrix
 
-from warprec.data.dataset import Interactions, Sessions
+from warprec.data.entities import Interactions, Sessions
 from warprec.utils.enums import RatingType
 from warprec.utils.logger import logger
 

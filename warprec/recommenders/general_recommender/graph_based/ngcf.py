@@ -10,7 +10,7 @@ from torch.nn.init import xavier_normal_
 from torch_sparse import SparseTensor
 from scipy.sparse import coo_matrix
 
-from warprec.data.dataset import Interactions, Sessions
+from warprec.data.entities import Interactions, Sessions
 from warprec.recommenders.base_recommender import (
     IterativeRecommender,
 )
@@ -138,8 +138,16 @@ class NGCF(IterativeRecommender, GraphRecommenderUtils):
         if isinstance(module, nn.Embedding):
             xavier_normal_(module.weight.data)
 
-    def get_dataloader(self, interactions: Interactions, sessions: Sessions, **kwargs):
-        return interactions.get_pos_neg_dataloader(self.batch_size)
+    def get_dataloader(
+        self,
+        interactions: Interactions,
+        sessions: Sessions,
+        low_memory: bool = False,
+        **kwargs,
+    ):
+        return interactions.get_pos_neg_dataloader(
+            batch_size=self.batch_size, low_memory=low_memory
+        )
 
     def train_step(self, batch: Any, *args, **kwargs):
         user, pos_item, neg_item = [x.to(self._device) for x in batch]
