@@ -307,7 +307,9 @@ class Dataset:
         self._imap = {item: i for i, item in enumerate(_iid)}
 
         # Process the side information data and filter not valid columns
-        self._process_side_data(side_data, item_id_label)
+        self.side = None
+        if side_data is not None:
+            self._process_side_data(side_data, item_id_label)
 
         # Save user and item cluster information inside the dataset
         self.user_cluster = (
@@ -549,8 +551,9 @@ class Dataset:
 
         # Update the inner DataFrame with valid data
         valid_columns = [item_id_label] + numeric_cols
-        self.side = side_data[valid_columns].copy()
-        self.side.fillna(0, inplace=True)  # Missing values will be filled with zeros
+        self.side = (
+            side_data[valid_columns].copy().fillna(0, inplace=True)
+        )  # Missing values will be filled with zeros
 
     def get_evaluation_dataloader(self) -> EvaluationDataLoader:
         """Retrieve the EvaluationDataLoader for the dataset.
