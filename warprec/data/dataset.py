@@ -2,6 +2,7 @@ from typing import Tuple, Optional, List, Set, Any, Dict
 
 import torch
 import numpy as np
+import pandas as pd
 from torch import Tensor
 from torch.utils.data import DataLoader, Dataset as TorchDataset
 from torch.nn.utils.rnn import pad_sequence
@@ -305,6 +306,9 @@ class Dataset:
         self._umap = {user: i for i, user in enumerate(_uid)}
         self._imap = {item: i for i, item in enumerate(_iid)}
 
+        # Process the side information data and filter not valid columns
+        self._process_side_data(side_data, item_id_label)
+
         # Save user and item cluster information inside the dataset
         self.user_cluster = (
             {
@@ -356,7 +360,7 @@ class Dataset:
         # Create the main data structures
         self.train_set = self._create_inner_set(
             train_data,
-            side_data=side_data,
+            side_data=self.side,
             user_cluster=self.user_cluster,
             item_cluster=self.item_cluster,
             batch_size=batch_size,
@@ -368,7 +372,7 @@ class Dataset:
         if eval_data is not None:
             self.eval_set = self._create_inner_set(
                 eval_data,
-                side_data=side_data,
+                side_data=self.side,
                 user_cluster=self.user_cluster,
                 item_cluster=self.item_cluster,
                 header_msg=evaluation_set,
@@ -379,10 +383,7 @@ class Dataset:
             )
 
         # Save side information inside the dataset
-        self.side = side_data if side_data is not None else None
-        if side_data is not None:
-            self.side = side_data
-
+        if self.side is not None:
             # Create the lookup tensor for side information features
             self._feat_lookup = torch.tensor(
                 self.train_set._inter_side.iloc[:, 1:].values
@@ -493,6 +494,63 @@ class Dataset:
         )
 
         return inter_set
+
+    def _process_side_data(self, side_data: DataFrame, item_id_label: str) -> None:
+        """Process side information data and filter out invalid columns
+
+        Args:
+            side_data (DataFrame): The side data DataFrame.
+            item_id_label (str): The label of the item ID.
+
+        Returns:
+            None: In case the method fails in advance.
+
+        Raises:
+            ValueError: When the item ID is not found in side data.
+        """
+        # Check for item ID label
+        if item_id_label not in side_data.columns:
+            raise ValueError("Item ID label not found inside side information data.")
+
+        # View only the needed columns
+        feature_cols = side_data.drop(columns=[item_id_label])
+
+        # Find all the numeric columns
+        numeric_cols = []
+        filtered_cols = []
+        for col in feature_cols.columns:
+            series_with_nan = feature_cols[col].replace("", np.nan).copy()
+
+            # Count NaNs before and after conversion
+            nulls_before = series_with_nan.isnull().sum()
+            coerced_series = pd.to_numeric(series_with_nan, errors="coerce")
+            nulls_after = coerced_series.isnull().sum()
+
+            # If the number of nulls remain un-changed, this will be considered
+            # a numeric column, else we filter it
+            if nulls_after > nulls_before:
+                filtered_cols.append(col)
+            else:
+                numeric_cols.append(col)
+
+        # Check if there are valid columns
+        if not numeric_cols:
+            logger.negative(
+                "No valid columns found. Side information will not be available."
+            )
+            return
+
+        # Log the filtered out columns
+        if filtered_cols:
+            logger.attention(
+                "Side information contains non-numeric values. "
+                f"The following columns will be ignored: {filtered_cols}"
+            )
+
+        # Update the inner DataFrame with valid data
+        valid_columns = [item_id_label] + numeric_cols
+        self.side = side_data[valid_columns].copy()
+        self.side.fillna(0, inplace=True)  # Missing values will be filled with zeros
 
     def get_evaluation_dataloader(self) -> EvaluationDataLoader:
         """Retrieve the EvaluationDataLoader for the dataset.
