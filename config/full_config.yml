@@ -129,6 +129,7 @@ models:
       save_model: [True, False]
       save_recs: [True, False]
       load_from: path/to/model/checkpoint
+      low_memory: [False, True]
     optimization:
       strategy: [grid, random, hopt, optuna, bohb]
       scheduler: [fifo, asha]
