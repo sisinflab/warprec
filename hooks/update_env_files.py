@@ -18,19 +18,45 @@ PIP_PACKAGES = {
     "pydata-sphinx-theme",
     "pydoclint",
     "ruff",
+    "codecarbon",
+    "ray",
+    "torch",
 }
 
 
-def caret_to_range(version: str) -> str:
-    """Converts Poetry's caret (^) syntax to a compatible version range string (>=X.Y.Z,<A.B.C)."""
-    # Handles only the ^X.Y.Z syntax
-    match = re.match(r"\^(\d+)\.(\d+)\.(\d+)", version)
-    if not match:
-        return version  # Leave unchanged (~, >=, <, etc.)
-    major, minor, patch = map(int, match.groups())
-    next_major = major + 1
-    # Standard format for a major-compatible range in Conda/Pip
-    return f">={major}.{minor}.{patch},<{next_major}.0.0"
+def convert_poetry_specifier(version: str) -> str:
+    """Converts Poetry's caret (^) and tilde (~) syntax to a compatible
+    version range string (e.g., >=X.Y.Z,<A.B.C).
+    """
+    # --- Handle caret (^) specifier ---
+    caret_match = re.match(r"\^(\d+)\.(\d+)\.(\d+)", version)
+    if caret_match:
+        major, minor, patch = map(int, caret_match.groups())
+        # For ^X.Y.Z, the range is >=X.Y.Z, <(X+1).0.0
+        next_major = major + 1
+        return f">={major}.{minor}.{patch},<{next_major}.0.0"
+
+    # --- Handle tilde (~) specifier ---
+    # Handles ~X.Y.Z and ~X.Y
+    tilde_match = re.match(r"~(\d+)\.(\d+)(?:\.(\d+))?", version)
+    if tilde_match:
+        major, minor, patch_str = tilde_match.groups()
+        major, minor = int(major), int(minor)
+
+        # For ~X.Y, the range is >=X.Y, <X.(Y+1)
+        # For ~X.Y.Z, the range is >=X.Y.Z, <X.(Y+1).0
+        next_minor = minor + 1
+
+        if patch_str:
+            # Case: ~X.Y.Z -> >=X.Y.Z,<X.(Y+1).0
+            patch = int(patch_str)
+            return f">={major}.{minor}.{patch},<{major}.{next_minor}.0"
+        else:
+            # Case: ~X.Y -> >=X.Y,<X.(Y+1)
+            return f">={major}.{minor},<{major}.{next_minor}"
+
+    # If no special character is matched, return the original string
+    return version
 
 
 def parse_dependencies(dep_block: Dict[str, str | dict]) -> list[str]:
@@ -45,10 +71,12 @@ def parse_dependencies(dep_block: Dict[str, str | dict]) -> list[str]:
         version = ""
 
         if isinstance(value, str):
-            version = caret_to_range(value)
+            # Use the new conversion function
+            version = convert_poetry_specifier(value)
         elif isinstance(value, dict):
             raw_version = value.get("version", "")
-            version = caret_to_range(raw_version)
+            # Use the new conversion function
+            version = convert_poetry_specifier(raw_version)
 
             if "extras" in value:
                 extras_list = value["extras"]
@@ -63,8 +91,7 @@ def parse_dependencies(dep_block: Dict[str, str | dict]) -> list[str]:
 
 
 def get_all_groups_dependencies(pyproject: Dict[str, Any]) -> list[str]:
-    """
-    Extracts and parses dependencies from all Poetry groups defined in the
+    """Extracts and parses dependencies from all Poetry groups defined in the
     [tool.poetry.group.<name>.dependencies] section.
     """
     all_group_deps = []
@@ -72,7 +99,7 @@ def get_all_groups_dependencies(pyproject: Dict[str, Any]) -> list[str]:
     # Access the [tool.poetry.group] section
     tool_poetry_groups = pyproject.get("tool", {}).get("poetry", {}).get("group", {})
 
-    for group_name, group_data in tool_poetry_groups.items():
+    for _, group_data in tool_poetry_groups.items():
         # Check if the group has a 'dependencies' key
         dependencies = group_data.get("dependencies", {})
         if dependencies:
