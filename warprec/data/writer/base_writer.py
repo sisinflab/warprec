@@ -165,6 +165,76 @@ class Writer(ABC):
         except Exception as e:
             logger.negative(f"Error writing results to {path}: {e}")
 
+    def write_results_per_user(
+        self,
+        result_data: Dict[int, Dict[str, float | Tensor]],
+        model_name: str,
+        user_mapping: Dict[int, Any],
+        sep: str = "\t",
+        ext: str = ".tsv",
+        user_label: str = "user_id",
+    ):
+        """Processes and writes per-user evaluation metrics.
+
+        This method handles the data transformation logic and delegates the actual
+        I/O to the `_write_text` method, which must be implemented by a subclass.
+
+        Args:
+            result_data (Dict[int, Dict[str, float | Tensor]]): Dictionary containing per-user
+                result data.
+            model_name (str): The name of the model used.
+            user_mapping (Dict[int, Any]): The dictionary that maps the idx -> ID.
+            sep (str): The separator of the output file.
+            ext (str): The extension of the output file.
+            user_label (str): The label to use for the user ID.
+        """
+        for k, metrics in result_data.items():
+            path = self._path_join(
+                self.experiment_evaluation_path,
+                f"{model_name}_k_{k}_per_user_{self._timestamp}{ext}",
+            )
+
+            try:
+                # Filter out possible non Tensor metrics
+                metric_tensors = {
+                    name: tensor
+                    for name, tensor in metrics.items()
+                    if isinstance(tensor, Tensor)
+                }
+
+                if not metric_tensors:
+                    logger.attention(
+                        f"No per-user tensor metrics found for model {model_name} at k={k}. Skipping."
+                    )
+                    continue
+
+                # Determine number of users by tensor length
+                num_users = len(next(iter(metric_tensors.values())))
+
+                # Pre-compute the user column
+                user_ids = [user_mapping[i] for i in range(num_users)]
+
+                # Prepare data
+                data_for_df: Dict[str, Any] = {user_label: user_ids}
+                for name, tensor in metric_tensors.items():
+                    data_for_df[name] = tensor.cpu().numpy()
+
+                # Create result DataFrame
+                df = pd.DataFrame(data_for_df)
+                output_csv = df.to_csv(sep=sep, index=False)
+
+                # Finalize the writing
+                self._write_text(path, output_csv)
+
+                logger.msg(
+                    f"Per-user results for {model_name} (k={k}) written to {path}"
+                )
+
+            except Exception as e:
+                logger.negative(
+                    f"Error writing per-user results for {model_name} (k={k}) to {path}: {e}"
+                )
+
     def write_model(self, model: Recommender):
         """Saves the model's state dictionary.
 

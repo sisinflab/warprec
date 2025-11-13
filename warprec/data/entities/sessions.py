@@ -325,6 +325,11 @@ class Sessions:
         item_offsets = np.arange(max_seq_len, dtype=np.int64)
         indices_to_gather = true_sequence_start_indices[:, None] + item_offsets
 
+        # Clip the indices before indexing the array
+        # NOTE: This is important in scenarios where users have very long sessions
+        max_valid_index = len(all_items_0_indexed) - 1
+        np.clip(indices_to_gather, 0, max_valid_index, out=indices_to_gather)
+
         # Convert to PyTorch tensors for indexing
         all_items_tensor = torch.from_numpy(all_items_0_indexed).long()
         indices_to_gather_tensor = torch.from_numpy(indices_to_gather).long()
