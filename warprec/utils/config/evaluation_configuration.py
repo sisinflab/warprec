@@ -68,6 +68,8 @@ class EvaluationConfig(BaseModel):
         strategy (Optional[str]): Evaluation strategy, either "full" or "sampled".
         num_negatives (Optional[int]): Number of negative samples to use in "sampled" strategy.
         seed (Optional[int]): Random seed for reproducibility. Used in negative sampling.
+        compute_per_user (Optional[bool]): Wether or not to save the metric computation for
+            each user.
         stat_significance (Optional[StatSignificance]): Statistical significance configuration.
         full_evaluation_on_report (Optional[bool]): Wether or not to compute all metric
             for each report produced.
@@ -85,6 +87,7 @@ class EvaluationConfig(BaseModel):
     strategy: Optional[str] = "full"  # or "sampled"
     num_negatives: Optional[int] = 99
     seed: Optional[int] = 42
+    compute_per_user: Optional[bool] = False
     stat_significance: Optional[StatSignificance] = Field(
         default_factory=StatSignificance
     )
