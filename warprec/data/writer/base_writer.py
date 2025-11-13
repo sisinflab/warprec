@@ -167,7 +167,7 @@ class Writer(ABC):
 
     def write_results_per_user(
         self,
-        result_data: Dict[int, Dict[str, Tensor]],
+        result_data: Dict[int, Dict[str, float | Tensor]],
         model_name: str,
         user_mapping: Dict[int, Any],
         sep: str = "\t",
@@ -180,7 +180,7 @@ class Writer(ABC):
         I/O to the `_write_text` method, which must be implemented by a subclass.
 
         Args:
-            result_data (Dict[int, Dict[str, Tensor]]): Dictionary containing per-user
+            result_data (Dict[int, Dict[str, float | Tensor]]): Dictionary containing per-user
                 result data.
             model_name (str): The name of the model used.
             user_mapping (Dict[int, Any]): The dictionary that maps the idx -> ID.
