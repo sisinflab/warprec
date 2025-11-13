@@ -97,7 +97,7 @@ def main(args: Namespace):
     models = list(config.models.keys())
 
     # If statistical significance is required, metrics will
-    # be computed user_wise
+    # be computed user-wise
     requires_stat_significance = (
         config.evaluation.stat_significance.requires_stat_significance()
     )
@@ -107,6 +107,10 @@ def main(args: Namespace):
         )
         model_results: Dict[str, Any] = {}
 
+    # General check for user-wise computation
+    compute_per_user = config.evaluation.compute_per_user
+    requires_per_user_evaluation = requires_stat_significance or compute_per_user
+
     # Create instance of main evaluator used to evaluate the main dataset
     evaluator = Evaluator(
         list(config.evaluation.metrics),
@@ -114,7 +118,7 @@ def main(args: Namespace):
         train_set=main_dataset.train_set.get_sparse(),
         beta=config.evaluation.beta,
         pop_ratio=config.evaluation.pop_ratio,
-        compute_per_user=requires_stat_significance,
+        compute_per_user=requires_per_user_evaluation,
         feature_lookup=main_dataset.get_features_lookup(),
         user_cluster=main_dataset.get_user_cluster(),
         item_cluster=main_dataset.get_item_cluster(),
@@ -221,6 +225,16 @@ def main(args: Namespace):
             model_name,
             **config.writer.results.model_dump(),
         )
+
+        # Check if per-user results are needed
+        if compute_per_user:
+            i_umap, _ = main_dataset.get_inverse_mappings()
+            writer.write_results_per_user(
+                results,
+                model_name,
+                i_umap,
+                **config.writer.results.model_dump(),
+            )
 
         # Recommendation
         if params.meta.save_recs:
