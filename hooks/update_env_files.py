@@ -71,11 +71,9 @@ def parse_dependencies(dep_block: Dict[str, str | dict]) -> list[str]:
         version = ""
 
         if isinstance(value, str):
-            # Use the new conversion function
             version = convert_poetry_specifier(value)
         elif isinstance(value, dict):
             raw_version = value.get("version", "")
-            # Use the new conversion function
             version = convert_poetry_specifier(raw_version)
 
             if "extras" in value:
