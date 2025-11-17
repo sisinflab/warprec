@@ -202,17 +202,16 @@ class GeneralConfig(BaseModel):
     @classmethod
     def check_cuda_visible_devices(cls, v: List[int] | int):
         """Validate cuda_visible_devices."""
-        available_gpu_indexes = list(range(torch.cuda.device_count()))
+        available_gpus = torch.cuda.device_count()
 
         if isinstance(v, int):
             v = [v]
 
         if v is not None:
-            for index in v:
-                if index not in available_gpu_indexes:
-                    raise ValueError(
-                        f"Indexes specified not available. Available indexes: {available_gpu_indexes}"
-                    )
+            if len(v) != available_gpus:
+                raise ValueError(
+                    "Something went wrong during CUDA devices initialization."
+                )
         return v
 
     @field_validator("custom_models")
