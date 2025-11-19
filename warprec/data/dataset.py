@@ -167,6 +167,8 @@ class NegativeEvaluationDataLoader(DataLoader):
         batch_size: int = 1024,
         **kwargs,
     ):
+        self.num_items = train_interactions.shape[1]  # Used as padding index
+
         dataset = NegativeEvaluationDataset(
             train_interactions=train_interactions,
             eval_interactions=eval_interactions,
@@ -182,8 +184,8 @@ class NegativeEvaluationDataLoader(DataLoader):
             **kwargs,
         )
 
-    @staticmethod
     def _collate_fn(
+        self,
         batch: List[Tuple[Tensor, Tensor, int]],
     ) -> Tuple[Tensor, Tensor, Tensor]:
         """Custom collate_fn to handle negative sampling in evaluation."""
@@ -197,12 +199,12 @@ class NegativeEvaluationDataLoader(DataLoader):
         positives_padded = pad_sequence(
             positive_tensors,  # type: ignore[arg-type]
             batch_first=True,
-            padding_value=-1,
+            padding_value=self.num_items,
         )
         negatives_padded = pad_sequence(
             negative_tensors,  # type: ignore[arg-type]
             batch_first=True,
-            padding_value=-1,
+            padding_value=self.num_items,
         )
 
         return positives_padded, negatives_padded, user_indices_tensor

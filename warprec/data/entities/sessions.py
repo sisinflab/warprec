@@ -337,14 +337,14 @@ class Sessions:
         all_items_tensor = torch.from_numpy(all_items_0_indexed).long()
         indices_to_gather_tensor = torch.from_numpy(indices_to_gather).long()
 
-        # Items are gathered and converted to 1-based indexing for the model
-        padded_item_seq = all_items_tensor[indices_to_gather_tensor].add(1)
+        # Items are gathered using the computed indices
+        padded_item_seq = all_items_tensor[indices_to_gather_tensor]
 
         # Apply right-padding mask
         tensor_item_seq_len = torch.from_numpy(final_sequence_lengths_np).long()
         row_indices = torch.arange(max_seq_len, dtype=torch.long)
         padding_mask_right = row_indices >= tensor_item_seq_len[:, None]
-        padded_item_seq.masked_fill_(padding_mask_right, 0)
+        padded_item_seq.masked_fill_(padding_mask_right, self._niid)
 
         # If requested, generate `neg_samples` negative samples for each positive sample.
         # This process is vectorized and ensures that negative candidates do not collide
@@ -364,8 +364,8 @@ class Sessions:
 
             # History is the padded sequence, converted back to 0-indexed.
             # Padding (0) is set to -1 to avoid accidental matches with item 0.
-            history_0_indexed = padded_item_seq.numpy() - 1
-            history_0_indexed[history_0_indexed < 0] = -1
+            history_0_indexed = padded_item_seq.numpy().copy()
+            history_0_indexed[history_0_indexed == self._niid] = -1
             history_tensor = torch.from_numpy(history_0_indexed).long()
 
             # Iteratively re-sample until no collisions exist
@@ -396,11 +396,11 @@ class Sessions:
                 neg_candidates[invalid_mask] = new_candidates
 
             # Convert final valid candidates to 1-based indexing
-            neg_tensor = torch.from_numpy(neg_candidates + 1).long()
+            neg_tensor = torch.from_numpy(neg_candidates).long()
 
         # Convert all remaining numpy arrays to PyTorch tensors and return them.
         tensor_pos_item_id = torch.from_numpy(
-            all_items_0_indexed[target_indices] + 1
+            all_items_0_indexed[target_indices]
         ).long()
 
         # Optionally convert user IDs if requested
@@ -445,7 +445,7 @@ class Sessions:
 
         # Pad sequences and convert lengths to tensor
         padded_sequences = pad_sequence(
-            sequences_to_process, batch_first=True, padding_value=0
+            sequences_to_process, batch_first=True, padding_value=self._niid
         )
         sequence_lengths = torch.tensor(lengths_to_process, dtype=torch.long)
         return padded_sequences, sequence_lengths
@@ -454,7 +454,7 @@ class Sessions:
         """Computes and caches the complete interaction history for every user."""
         user_sessions = self._get_user_sessions()
         self._cached_user_histories = user_sessions.apply(
-            lambda x: (np.array(x) + 1).tolist()
+            lambda x: np.array(x).tolist()
         ).to_dict()
 
     def get_user_history_dataloader(
@@ -562,21 +562,19 @@ class Sessions:
         pos_seqs_tensors = [
             torch.tensor(s, dtype=torch.long) for s in pos_seqs_0_indexed_lists
         ]
-        padded_pos_seqs_0_idx = pad_sequence(
-            pos_seqs_tensors, batch_first=True, padding_value=-1
+        padded_pos_seqs = pad_sequence(
+            pos_seqs_tensors, batch_first=True, padding_value=self._niid
         )
 
         # Retrieve shape information
-        num_users, current_max_len = padded_pos_seqs_0_idx.shape
+        num_users, current_max_len = padded_pos_seqs.shape
 
         # Edge case: if all valid sessions have length < 2
         if current_max_len < 2:
             logger.attention(
                 "All valid sessions have length < 2. No negative samples can be generated."
             )
-            padded_pos_seqs_1_idx = padded_pos_seqs_0_idx.clone().add_(1)
-            padded_pos_seqs_1_idx[padded_pos_seqs_0_idx == -1] = 0  # padding 0
-            return padded_pos_seqs_1_idx, torch.empty(0)
+            return padded_pos_seqs, torch.empty(0)
 
         # Set the seed for negative sampling
         np.random.seed(seed)
@@ -587,7 +585,7 @@ class Sessions:
         neg_candidates = np.random.randint(
             0, self._niid, size=neg_candidates_shape, dtype=np.int64
         )
-        history_tensor = padded_pos_seqs_0_idx
+        history_tensor = padded_pos_seqs
 
         # Prepare masks for collision detection
         j_indices = torch.arange(
@@ -604,7 +602,7 @@ class Sessions:
         broadcast_mask = valid_history_mask.unsqueeze(0).unsqueeze(2)  # (1, L-1, 1, L)
 
         # Calculate sequence lengths and valid target masks
-        seq_lengths = (history_tensor != -1).sum(dim=1)  # (N,)
+        seq_lengths = (history_tensor != self._niid).sum(dim=1)  # (N,)
         valid_target_mask = j_indices.unsqueeze(0) < (seq_lengths.unsqueeze(1) - 1)
         valid_target_broadcast_mask = valid_target_mask.unsqueeze(-1)  # (N, L-1, K)
 
@@ -638,17 +636,12 @@ class Sessions:
             )
             neg_candidates[invalid_mask_np] = new_candidates
 
-        # Convert positive sequences to 1-based indexing
-        padded_pos_seqs_1_idx = padded_pos_seqs_0_idx.clone().add_(1)
-        padded_pos_seqs_1_idx[padded_pos_seqs_0_idx == -1] = 0  # (N, L)
-
         # Convert negative samples to 1-based indexing and apply padding mask
-        padded_neg_samples_0_idx_tensor = torch.from_numpy(neg_candidates).long()
-        padded_neg_samples_1_idx_tensor = padded_neg_samples_0_idx_tensor.add(
-            1
-        )  # (N, L-1, K)
+        padded_neg_samples_tensor = torch.from_numpy(
+            neg_candidates
+        ).long()  # (N, L-1, K)
 
         # Apply padding mask
-        padded_neg_samples_1_idx_tensor.masked_fill_(~valid_target_broadcast_mask, 0)
+        padded_neg_samples_tensor.masked_fill_(~valid_target_broadcast_mask, self._niid)
 
-        return padded_pos_seqs_1_idx, padded_neg_samples_1_idx_tensor
+        return padded_pos_seqs, padded_neg_samples_tensor
