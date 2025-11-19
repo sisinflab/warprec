@@ -160,6 +160,7 @@ class Evaluator:
 
         # Set the train interactions
         train_sparse = dataset.train_set.get_sparse()
+        padding_idx = train_sparse.shape[1]
 
         # Main evaluation loop
         for batch in dataloader:
@@ -224,10 +225,10 @@ class Evaluator:
                     ).to(device)  # Get ratings tensor [batch_size, pad_seq]
 
                     # Mask padded indices
-                    predictions[candidates_local == -1] = -torch.inf
+                    predictions[candidates_local == padding_idx] = -torch.inf
 
                     # Create the local GT
-                    num_positives_per_user = (pos_batch != -1).sum(dim=1)
+                    num_positives_per_user = (pos_batch != padding_idx).sum(dim=1)
                     col_indices = torch.arange(candidates_local.shape[1], device=device)
                     eval_batch = (
                         col_indices < num_positives_per_user.unsqueeze(1)
