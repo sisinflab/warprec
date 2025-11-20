@@ -145,9 +145,6 @@ class FISM(IterativeRecommender):
         Returns:
             Tensor: Predicted scores.
         """
-        # Adjust item indices for embedding (0 is padding, so items are 1-indexed)
-        item_emb_idx = item + 1
-
         user_inter = self.history_matrix[user]
         item_num = self.history_lens[user].unsqueeze(1)
         batch_mask_mat = self.history_mask[user]
@@ -155,10 +152,10 @@ class FISM(IterativeRecommender):
         user_history = self.item_src_embedding(
             user_inter
         )  # batch_size x max_len x embedding_size
-        target = self.item_dst_embedding(item_emb_idx)  # batch_size x embedding_size
+        target = self.item_dst_embedding(item)  # batch_size x embedding_size
 
         user_bias = self.user_bias[user]  # batch_size
-        item_bias = self.item_bias[item_emb_idx]  # batch_size
+        item_bias = self.item_bias[item]  # batch_size
 
         # (batch_size, max_len, embedding_size) @ (batch_size, embedding_size, 1) -> (batch_size, max_len, 1)
         similarity = torch.bmm(user_history, target.unsqueeze(2)).squeeze(
@@ -195,9 +192,9 @@ class FISM(IterativeRecommender):
         """
         # Retrieve embeddings + biases
         all_item_src_emb = self.item_src_embedding.weight
-        all_item_dst_emb = self.item_dst_embedding.weight
+        all_item_dst_emb = self.item_dst_embedding.weight[:-1, :]
         all_user_bias = self.user_bias
-        all_item_bias = self.item_bias
+        all_item_bias = self.item_bias[:-1]
 
         # Select data for current batch
         batch_history_matrix = self.history_matrix[user_indices]
@@ -223,14 +220,13 @@ class FISM(IterativeRecommender):
         user_final_emb = user_aggregated_emb * coeff  # [batch_size, emb_size]
 
         # Compute the final matrix multiplication.
-        # NOTE: We use [1:] to ignore padding
         predictions = torch.matmul(
-            user_final_emb, all_item_dst_emb[1:].transpose(0, 1)
+            user_final_emb, all_item_dst_emb.transpose(0, 1)
         )  # [batch_size, n_items]
 
         # Add the bias
         predictions += batch_user_bias.unsqueeze(1)
-        predictions += all_item_bias[1:].unsqueeze(0)
+        predictions += all_item_bias.unsqueeze(0)
         return predictions.to(self._device)
 
     @torch.no_grad()

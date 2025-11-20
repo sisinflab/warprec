@@ -149,7 +149,7 @@ class BPR(IterativeRecommender):
         """
         # Retrieve embeddings
         user_e_all = self.user_embedding.weight  # [n_users, embedding_size]
-        item_e_all = self.item_embedding.weight  # [n_items, embedding_size]
+        item_e_all = self.item_embedding.weight[:-1, :]  # [n_items, embedding_size]
 
         # Select only the embeddings in the current batch
         u_embeddings_batch = user_e_all[user_indices]  # [batch_size, embedding_size]

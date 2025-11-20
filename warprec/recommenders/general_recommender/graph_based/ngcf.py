@@ -284,7 +284,7 @@ class NGCF(IterativeRecommender, GraphRecommenderUtils):
 
         # Compute all item scores for the current user batch
         predictions = torch.matmul(
-            u_embeddings_batch, item_e.transpose(0, 1)
+            u_embeddings_batch, item_e[:-1, :].transpose(0, 1)
         )  # [batch_size, n_items]
         return predictions.to(self._device)
 

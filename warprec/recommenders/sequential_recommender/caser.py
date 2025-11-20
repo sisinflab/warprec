@@ -273,7 +273,9 @@ class Caser(IterativeRecommender, SequentialRecommenderUtils):
 
         seq_output = self.forward(user_indices, user_seq)
 
-        all_item_embeddings = self.item_embedding.weight
+        all_item_embeddings = self.item_embedding.weight[
+            :-1, :
+        ]  # [n_items, embedding_size]
         predictions = torch.matmul(seq_output, all_item_embeddings.transpose(0, 1))
         return predictions.to(self._device)
 
