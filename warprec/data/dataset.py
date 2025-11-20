@@ -311,7 +311,7 @@ class Dataset:
         # Process the side information data and filter not valid columns
         self.side = None
         if side_data is not None:
-            self._process_side_data(side_data, item_id_label)
+            self.side = self._process_side_data(side_data, item_id_label)
 
         # Save user and item cluster information inside the dataset
         self.user_cluster = (
@@ -499,7 +499,9 @@ class Dataset:
 
         return inter_set
 
-    def _process_side_data(self, side_data: DataFrame, item_id_label: str) -> None:
+    def _process_side_data(
+        self, side_data: DataFrame, item_id_label: str
+    ) -> Optional[DataFrame]:
         """Process side information data and filter out invalid columns
 
         Args:
@@ -507,7 +509,8 @@ class Dataset:
             item_id_label (str): The label of the item ID.
 
         Returns:
-            None: In case the method fails in advance.
+            Optional[DataFrame]: In case the method fails in advance or
+                cleaned DataFrame with valid columns.
 
         Raises:
             ValueError: When the item ID is not found in side data.
@@ -542,7 +545,7 @@ class Dataset:
             logger.negative(
                 "No valid columns found. Side information will not be available."
             )
-            return
+            return None
 
         # Log the filtered out columns
         if filtered_cols:
@@ -553,8 +556,8 @@ class Dataset:
 
         # Update the inner DataFrame with valid data
         valid_columns = [item_id_label] + numeric_cols
-        self.side = (
-            side_data[valid_columns].copy().fillna(0, inplace=True)
+        return (
+            side_data[valid_columns].copy().fillna(0)
         )  # Missing values will be filled with zeros
 
     def get_evaluation_dataloader(self) -> EvaluationDataLoader:
