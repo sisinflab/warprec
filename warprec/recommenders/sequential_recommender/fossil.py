@@ -345,7 +345,7 @@ class FOSSIL(IterativeRecommender, SequentialRecommenderUtils):
 
         seq_output = self.forward(user_indices, user_seq, seq_len)
 
-        all_item_embeddings = self.item_embedding.weight[:-1, :]
+        all_item_embeddings = self.item_embedding.weight
         predictions = torch.matmul(seq_output, all_item_embeddings.transpose(0, 1))
         return predictions.to(self._device)
 

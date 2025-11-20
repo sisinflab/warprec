@@ -309,7 +309,7 @@ class gSASRec(IterativeRecommender, SequentialRecommenderUtils):
         transformer_output = self.forward(user_seq)
         seq_output = self._gather_indexes(transformer_output, seq_len - 1)
 
-        all_item_embeddings = self._get_output_embeddings().weight[:-1, :]
+        all_item_embeddings = self._get_output_embeddings().weight
         predictions = torch.matmul(seq_output, all_item_embeddings.transpose(0, 1))
         return predictions.to(self._device)
 

@@ -262,7 +262,7 @@ class SASRec(IterativeRecommender, SequentialRecommenderUtils):
         seq_output = self.forward(user_seq, seq_len)
 
         # Get embeddings for all items
-        all_item_embeddings = self.item_embedding.weight[:-1, :]
+        all_item_embeddings = self.item_embedding.weight
 
         # Calculate scores for all items
         predictions = torch.matmul(seq_output, all_item_embeddings.transpose(0, 1))
