@@ -607,6 +607,7 @@ class Interactions:
         """
         # Get sparse interaction matrix
         sparse_matrix = self.get_sparse()
+        n_items = sparse_matrix.shape[1]
 
         # Get user_ids and item_ids from interactions
         user_ids, item_ids = sparse_matrix.nonzero()
@@ -616,9 +617,7 @@ class Interactions:
         for u, i in zip(user_ids, item_ids):
             if u not in user_history_dict:
                 user_history_dict[u] = []
-            user_history_dict[u].append(
-                i + 1
-            )  # Add 1 to item_id to reserve 0 for padding
+            user_history_dict[u].append(i)
 
         # Determine max history length for padding
         max_history_len = 0
@@ -627,8 +626,8 @@ class Interactions:
                 max_history_len = max(max_history_len, len(user_history_dict[user_id]))
 
         # Initialize matrices
-        self._history_matrix = torch.zeros(
-            self._nuid, max_history_len, dtype=torch.long
+        self._history_matrix = torch.full(
+            (self._nuid, max_history_len), fill_value=n_items, dtype=torch.long
         )
         self._history_lens = torch.zeros(self._nuid, dtype=torch.long)
         self._history_mask = torch.zeros(self._nuid, max_history_len, dtype=torch.float)
