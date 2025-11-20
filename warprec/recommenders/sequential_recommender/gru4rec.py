@@ -72,16 +72,16 @@ class GRU4Rec(IterativeRecommender, SequentialRecommenderUtils):
     ):
         super().__init__(params, device=device, seed=seed, *args, **kwargs)
 
-        items = info.get("items", None)
-        if not items:
+        self.items = info.get("items", None)
+        if not self.items:
             raise ValueError(
                 "Items value must be provided to correctly initialize the model."
             )
 
         self.item_embedding = nn.Embedding(
-            items + 1,
+            self.items + 1,
             self.embedding_size,
-            padding_idx=0,  # Taking into account the extra "item" for padding
+            padding_idx=self.items,
         )
         self.emb_dropout = nn.Dropout(self.dropout_prob)
         self.gru_layers = nn.GRU(
@@ -238,7 +238,7 @@ class GRU4Rec(IterativeRecommender, SequentialRecommenderUtils):
         seq_output = self.forward(user_seq, seq_len)
 
         # Get embeddings for all items
-        all_item_embeddings = self.item_embedding.weight[1:]
+        all_item_embeddings = self.item_embedding.weight[:-1, :]
 
         # Calculate scores for all items
         predictions = torch.matmul(seq_output, all_item_embeddings.transpose(0, 1))
@@ -275,10 +275,9 @@ class GRU4Rec(IterativeRecommender, SequentialRecommenderUtils):
         # Calculate the sequential output embedding for each user in the batch
         seq_output = self.forward(user_seq, seq_len)  # [batch_size, embedding_size]
 
-        # Get embeddings for candidate items. We clamp the indices to avoid
-        # out-of-bounds errors with the padding value (-1)
+        # Get embeddings for candidate items
         candidate_item_embeddings = self.item_embedding(
-            item_indices.clamp(min=0)
+            item_indices
         )  # [batch_size, pad_seq, embedding_size]
 
         # Compute scores using a batch matrix multiplication or einsum

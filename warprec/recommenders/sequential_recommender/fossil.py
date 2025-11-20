@@ -86,7 +86,7 @@ class FOSSIL(IterativeRecommender, SequentialRecommenderUtils):
 
         # Define the layers
         self.item_embedding = nn.Embedding(
-            self.n_items + 1, self.embedding_size, padding_idx=0
+            self.n_items + 1, self.embedding_size, padding_idx=self.n_items
         )
         self.user_lambda = nn.Embedding(
             self.n_users, self.order_len
@@ -345,7 +345,7 @@ class FOSSIL(IterativeRecommender, SequentialRecommenderUtils):
 
         seq_output = self.forward(user_indices, user_seq, seq_len)
 
-        all_item_embeddings = self.item_embedding.weight[1:]
+        all_item_embeddings = self.item_embedding.weight[:-1, :]
         predictions = torch.matmul(seq_output, all_item_embeddings.transpose(0, 1))
         return predictions.to(self._device)
 
@@ -383,10 +383,9 @@ class FOSSIL(IterativeRecommender, SequentialRecommenderUtils):
             user_indices, user_seq, seq_len
         )  # [batch_size, embedding_size]
 
-        # Get embeddings for candidate items. We clamp the indices to avoid
-        # out-of-bounds errors with the padding value (-1)
+        # Get embeddings for candidate items
         candidate_item_embeddings = self.item_embedding(
-            item_indices.clamp(min=0)
+            item_indices
         )  # [batch_size, pad_seq, embedding_size]
 
         # Compute scores using a batch matrix multiplication or einsum
