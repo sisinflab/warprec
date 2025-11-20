@@ -95,15 +95,18 @@ class Sessions:
             self._item_label: self._inter_df[self._item_label].map(self._imap),
         }
 
+        # Remove not mapped users/items
+        mapped_df = pd.DataFrame(cols_to_map).dropna()
+
         # Include timestamp if it's relevant and exists
         has_timestamp = (
             self._timestamp_label and self._timestamp_label in self._inter_df.columns
         )
         if has_timestamp:
-            cols_to_map[self._timestamp_label] = self._inter_df[self._timestamp_label]
+            timestamp_col = self._inter_df.loc[mapped_df.index, self._timestamp_label]
+            mapped_df[self._timestamp_label] = timestamp_col
 
         # Create, clean, and cast types
-        mapped_df = pd.DataFrame(cols_to_map).dropna()
         mapped_df[[self._user_label, self._item_label]] = mapped_df[
             [self._user_label, self._item_label]
         ].astype(np.int64)

@@ -1,8 +1,23 @@
-import os
+# pylint: disable=wrong-import-position, wrong-import-order
 import argparse
 import time
 from typing import List, Tuple, Dict, Any
 from argparse import Namespace
+
+# Correctly initialize environment variables
+from env import initialize_environment
+
+parser = argparse.ArgumentParser()
+parser.add_argument(
+    "-c",
+    "--config",
+    type=str,
+    action="store",
+    required=True,
+    help="Config file local path",
+)
+args = parser.parse_args()
+initialize_environment(args.config)
 
 import ray
 import torch
@@ -50,11 +65,6 @@ def main(args: Namespace):
 
     # Config parser testing
     config = load_train_configuration(args.config)
-
-    # Setup visible devices
-    visible_devices = config.general.cuda_visible_devices
-    os.environ["CUDA_VISIBLE_DEVICES"] = ",".join(map(str, visible_devices))  # type: ignore[arg-type]
-    os.environ["RAY_TRAIN_V2_ENABLED"] = "1"
 
     # Load custom callback if specified
     callback: WarpRecCallback = load_callback(
@@ -525,14 +535,4 @@ def multiple_fold_validation_flow(
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser()
-    parser.add_argument(
-        "-c",
-        "--config",
-        type=str,
-        action="store",
-        required=True,
-        help="Config file local path",
-    )
-    args = parser.parse_args()
     main(args)

@@ -35,7 +35,7 @@ class Writer(ABC):
     experiment_split_path: str | Path
 
     def __init__(self):
-        self._timestamp = datetime.now().strftime("%d.%m.%Y_%H:%M:%S")
+        self._timestamp = datetime.now().strftime("%d.%m.%Y_%H-%M-%S")
 
     @abstractmethod
     def setup_experiment(self):
