@@ -277,6 +277,6 @@ class MultiVAE(IterativeRecommender):
         train_batch = torch.from_numpy(train_batch.toarray()).to(self._device)
         predictions, _ = self.forward(train_batch)
         predictions = predictions.gather(
-            1, item_indices.clamp(min=0)
+            1, item_indices.clamp(max=self.items - 1)
         )  # [batch_size, pad_seq]
         return predictions.to(self._device)

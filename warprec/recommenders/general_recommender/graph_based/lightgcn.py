@@ -85,11 +85,13 @@ class LightGCN(IterativeRecommender, GraphRecommenderUtils):
             )
 
         self.user_embedding = nn.Embedding(self.n_users, self.embedding_size)
-        self.item_embedding = nn.Embedding(self.n_items, self.embedding_size)
+        self.item_embedding = nn.Embedding(
+            self.n_items + 1, self.embedding_size, padding_idx=self.n_items
+        )
         self.adj = self.get_adj_mat(
             interactions.get_sparse().tocoo(),
             self.n_users,
-            self.n_items,
+            self.n_items + 1,  # Adjust for padding idx
             self._device,
         )
 
@@ -177,7 +179,8 @@ class LightGCN(IterativeRecommender, GraphRecommenderUtils):
 
         # Split into user and item embeddings
         user_all_embeddings, item_all_embeddings = torch.split(
-            lightgcn_all_embeddings, [self.n_users, self.n_items]
+            lightgcn_all_embeddings,
+            [self.n_users, self.n_items + 1],  # Adjust for padding idx
         )
         return user_all_embeddings, item_all_embeddings
 
@@ -207,7 +210,7 @@ class LightGCN(IterativeRecommender, GraphRecommenderUtils):
 
         # Compute all item scores for the current user batch
         predictions = torch.matmul(
-            u_embeddings_batch, item_e.transpose(0, 1)
+            u_embeddings_batch, item_e[:-1, :].transpose(0, 1)
         )  # [batch_size, n_items]
         return predictions.to(self._device)
 
@@ -240,7 +243,7 @@ class LightGCN(IterativeRecommender, GraphRecommenderUtils):
         # and items sampled
         u_embeddings_batch = user_e[user_indices]  # [batch_size, embedding_size]
         i_embeddings_sampled = item_e[
-            item_indices.clamp(min=0)
+            item_indices
         ]  # [batch_size, pad_seq, embedding_size]
 
         # Compute all item scores for the current user batch

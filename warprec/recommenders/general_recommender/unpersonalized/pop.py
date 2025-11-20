@@ -23,6 +23,9 @@ class Pop(Recommender):
         seed (int): The seed to use for reproducibility.
         info (dict): The dictionary containing dataset information.
         **kwargs (Any): Keyword argument for PyTorch nn.Module.
+
+    Raises:
+        ValueError: If the items value was not passed through the info dict.
     """
 
     def __init__(
@@ -38,17 +41,24 @@ class Pop(Recommender):
         super().__init__(
             params, interactions, device=device, seed=seed, info=info, *args, **kwargs
         )
+        self.items = info.get("items", None)
+        if not self.items:
+            raise ValueError(
+                "Items value must be provided to correctly initialize the model."
+            )
 
         X = interactions.get_sparse()
 
         # Count the number of items to define the popularity
-        self.popularity = torch.tensor(
+        popularity = torch.tensor(
             X.sum(axis=0).A1, device=self._device, dtype=torch.float32
         )
         # Count the total number of interactions
-        self.item_count = torch.tensor(
-            X.sum(), device=self._device, dtype=torch.float32
-        )
+        item_count = torch.tensor(X.sum(), device=self._device, dtype=torch.float32)
+
+        # Normalize popularity by the total number of interactions
+        # Add epsilon to avoid division by zero if there are no interactions
+        self.normalized_popularity = popularity / (item_count + 1e-6)
 
     @torch.no_grad()
     def predict_full(
@@ -69,13 +79,9 @@ class Pop(Recommender):
         """
         batch_size = user_indices.size(0)
 
-        # Normalize popularity by the total number of interactions
-        # Add epsilon to avoid division by zero if there are no interactions
-        normalized_popularity = self.popularity / (self.item_count + 1e-6)
-
         # Repeat the popularity scores for each user in the batch
-        predictions = normalized_popularity.repeat(batch_size, 1).to(self._device)
-        return predictions
+        predictions = self.normalized_popularity.repeat(batch_size, 1)
+        return predictions.to(self._device)
 
     @torch.no_grad()
     def predict_sampled(
@@ -96,11 +102,7 @@ class Pop(Recommender):
         Returns:
             Tensor: The score matrix {user x pad_seq}.
         """
-        # Normalize popularity by the total number of interactions
-        # Add epsilon to avoid division by zero if there are no interactions
-        normalized_popularity = self.popularity / (self.item_count + 1e-6)
-
         # Retrieve the popularity scores for the sampled items
         # Clamp item_indices to avoid out-of-bounds indexing with -1
-        predictions = normalized_popularity[item_indices.clamp(min=0)]
+        predictions = self.normalized_popularity[item_indices.clamp(max=self.items - 1)]
         return predictions.to(self._device)

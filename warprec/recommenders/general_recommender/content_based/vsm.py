@@ -27,6 +27,9 @@ class VSM(Recommender):
         info (dict): The dictionary containing dataset information.
         **kwargs (Any): Arbitrary keyword arguments.
 
+    Raises:
+        ValueError: If the items value was not passed through the info dict.
+
     Attributes:
         similarity (str): Similarity measure.
         user_profile (str): The computation of the user profile.
@@ -50,6 +53,11 @@ class VSM(Recommender):
         super().__init__(
             params, interactions, device=device, seed=seed, info=info, *args, **kwargs
         )
+        self.items = info.get("items", None)
+        if not self.items:
+            raise ValueError(
+                "Items value must be provided to correctly initialize the model."
+            )
 
         # Get data from interactions
         X = interactions.get_sparse()  # [user x item]
@@ -79,7 +87,7 @@ class VSM(Recommender):
         Returns:
             csr_matrix: The computed TF-IDF for items.
         """
-        n_items, _ = item_profile.shape
+        n_items = item_profile.shape[0]
 
         # Document Frequency (per feature)
         df = np.diff(item_profile.tocsc().indptr)
@@ -165,6 +173,6 @@ class VSM(Recommender):
         )
         predictions = torch.from_numpy(predictions_numpy)
         predictions = predictions.gather(
-            1, item_indices.clamp(min=0)
+            1, item_indices.clamp(max=self.items - 1)
         )  # [batch_size, pad_seq]
         return predictions.to(self._device)

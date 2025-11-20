@@ -90,7 +90,9 @@ class ConvNCF(IterativeRecommender):
         self.cnn_strides = list(self.cnn_strides)
 
         self.user_embedding = nn.Embedding(users, self.embedding_size)
-        self.item_embedding = nn.Embedding(items, self.embedding_size)
+        self.item_embedding = nn.Embedding(
+            items + 1, self.embedding_size, padding_idx=items
+        )
         self.cnn_layers = CNN(
             self.cnn_channels,
             self.cnn_kernels,
@@ -260,8 +262,8 @@ class ConvNCF(IterativeRecommender):
         # to be evaluated.
         users_expanded = user_indices.unsqueeze(1).expand(-1, pad_seq).reshape(-1)
 
-        # Clamp item indices to handle padding (-1)
-        items_expanded = item_indices.clamp(min=0).reshape(-1)
+        # Expand item indices similarly
+        items_expanded = item_indices.reshape(-1)
 
         # Use the forward pass to compute scores for all pairs at once.
         # This is a more concise and reusable way to get the predictions.

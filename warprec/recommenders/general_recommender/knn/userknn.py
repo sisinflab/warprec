@@ -25,6 +25,9 @@ class UserKNN(Recommender):
         info (dict): The dictionary containing dataset information.
         **kwargs (Any): Arbitrary keyword arguments.
 
+    Raises:
+        ValueError: If the items value was not passed through the info dict.
+
     Attributes:
         k (int): Number of nearest neighbors.
         similarity (str): Similarity measure.
@@ -46,6 +49,11 @@ class UserKNN(Recommender):
         super().__init__(
             params, interactions, device=device, seed=seed, *args, **kwargs
         )
+        self.items = info.get("items", None)
+        if not self.items:
+            raise ValueError(
+                "Items value must be provided to correctly initialize the model."
+            )
 
         X = interactions.get_sparse()
         similarity = similarities_registry.get(self.similarity)
@@ -114,6 +122,6 @@ class UserKNN(Recommender):
         # Convert to Tensor and gather only required indices
         predictions = torch.from_numpy(predictions).to(self._device)
         predictions = predictions.gather(
-            1, item_indices.clamp(min=0)
+            1, item_indices.clamp(max=self.items - 1)
         )  # [batch_size, pad_seq]
         return predictions

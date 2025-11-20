@@ -418,6 +418,6 @@ class ItemSimRecommender(Recommender):
         # Convert to Tensor and gather only required indices
         predictions = torch.from_numpy(predictions).to(self._device)
         predictions = predictions.gather(
-            1, item_indices.clamp(min=0)
+            1, item_indices.clamp(max=self.items - 1)
         )  # [batch_size, pad_seq]
         return predictions

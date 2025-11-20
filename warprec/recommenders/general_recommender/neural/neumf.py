@@ -95,11 +95,15 @@ class NeuMF(IterativeRecommender):
 
         # MF embeddings
         self.user_mf_embedding = nn.Embedding(users, self.mf_embedding_size)
-        self.item_mf_embedding = nn.Embedding(items, self.mf_embedding_size)
+        self.item_mf_embedding = nn.Embedding(
+            items + 1, self.mf_embedding_size, padding_idx=items
+        )
 
         # MLP embeddings
         self.user_mlp_embedding = nn.Embedding(users, self.mlp_embedding_size)
-        self.item_mlp_embedding = nn.Embedding(items, self.mlp_embedding_size)
+        self.item_mlp_embedding = nn.Embedding(
+            items + 1, self.mlp_embedding_size, padding_idx=items
+        )
 
         # MLP layers
         self.mlp_layers = MLP(
@@ -254,9 +258,9 @@ class NeuMF(IterativeRecommender):
         # Prepare user and item indices for forward pass
         # Reshape user_indices to [batch_size * pad_seq]
         users_expanded = user_indices.unsqueeze(1).expand(-1, pad_seq).reshape(-1)
-        # Reshape item_indices, handling padding (-1)
-        # We need to clamp to avoid out-of-bounds indexing. The forward pass will handle index 0
-        items_expanded = item_indices.clamp(min=0).reshape(-1)
+
+        # Reshape item_indices
+        items_expanded = item_indices.reshape(-1)
 
         # Compute predictions using the forward pass
         predictions_flat = self.forward(users_expanded, items_expanded)

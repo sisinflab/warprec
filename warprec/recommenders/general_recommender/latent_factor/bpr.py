@@ -75,7 +75,9 @@ class BPR(IterativeRecommender):
 
         # Embeddings
         self.user_embedding = nn.Embedding(users, self.embedding_size)
-        self.item_embedding = nn.Embedding(items, self.embedding_size)
+        self.item_embedding = nn.Embedding(
+            items + 1, self.embedding_size, padding_idx=items
+        )
 
         # Init embedding weights
         self.apply(self._init_weights)
@@ -181,7 +183,7 @@ class BPR(IterativeRecommender):
             user_indices
         )  # [batch_size, embedding_size]
         candidate_item_embeddings = self.item_embedding(
-            item_indices.clamp(min=0)
+            item_indices
         )  # [batch_size, pad_seq, embedding_size]
 
         # Compute predictions efficiently

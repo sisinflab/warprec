@@ -82,11 +82,11 @@ class FISM(IterativeRecommender):
 
         # Embeddings and biases
         self.item_src_embedding = nn.Embedding(
-            items + 1, self.embedding_size, padding_idx=0
-        )  # +1 for padding
+            items + 1, self.embedding_size, padding_idx=items
+        )
         self.item_dst_embedding = nn.Embedding(
-            items + 1, self.embedding_size, padding_idx=0
-        )  # +1 for padding
+            items + 1, self.embedding_size, padding_idx=items
+        )
         self.user_bias = nn.Parameter(torch.zeros(users))
         self.item_bias = nn.Parameter(torch.zeros(items + 1))  # +1 for padding
 
@@ -278,11 +278,9 @@ class FISM(IterativeRecommender):
         # Retrieve embeddings for candidate items, handling padding (-1)
         # We need to add 1 to the item indices because 0 is the padding index
         candidate_item_embeddings = self.item_dst_embedding(
-            item_indices.clamp(min=0)
+            item_indices
         )  # [batch_size, pad_seq, embedding_size]
-        candidate_item_biases = self.item_bias[
-            item_indices.clamp(min=0)
-        ]  # [batch_size, pad_seq]
+        candidate_item_biases = self.item_bias[item_indices]  # [batch_size, pad_seq]
 
         # Compute the final matrix multiplication using einsum
         predictions = torch.einsum(
