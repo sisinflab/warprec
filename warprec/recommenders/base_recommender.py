@@ -344,7 +344,7 @@ class ItemSimRecommender(Recommender):
         train_batch: Optional[csr_matrix] = kwargs.get("train_batch")
         if train_batch is None:
             raise ValueError(
-                "predict() for ItemSimRecommender requires 'train_batch' as a keyword argument."
+                f"predict() for {self.name} requires 'train_batch' as a keyword argument."
             )
 
         # Compute predictions and convert to Tensor
