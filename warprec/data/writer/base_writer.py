@@ -97,7 +97,7 @@ class Writer(ABC):
                 else (None, None)
             )
 
-            predictions = model.predict_full(
+            predictions = model.predict(
                 user_indices=user_indices,
                 user_seq=user_seq,
                 seq_len=seq_len,

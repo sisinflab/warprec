@@ -289,7 +289,7 @@ def main(args: Namespace):
 
             # Test inference time
             inference_time_start = time.time()
-            best_model.predict_sampled(
+            best_model.predict(
                 user_indices=user_indices,
                 item_indices=item_indices,
                 user_seq=user_seq,

@@ -184,7 +184,7 @@ class Evaluator:
                             model.max_seq_len,
                         )
 
-                    predictions = model.predict_full(
+                    predictions = model.predict(
                         user_indices=user_indices,
                         user_seq=user_seq,
                         seq_len=seq_len,
@@ -215,7 +215,7 @@ class Evaluator:
                     # This method will rate only sampled items
                     # Output tensor size will depend on longest sampled
                     # list in current batch
-                    predictions = model.predict_sampled(
+                    predictions = model.predict(
                         user_indices=user_indices,
                         item_indices=candidates_local,
                         user_seq=user_seq,
