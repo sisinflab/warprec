@@ -49,10 +49,11 @@ class Recommender(nn.Module, ABC):
         self._device = torch.device(device)
 
     @abstractmethod
-    def predict_full(
+    def predict(
         self,
         user_indices: Tensor,
         *args: Any,
+        item_indices: Optional[Tensor] = None,
         **kwargs: Any,
     ) -> Tensor:
         """This method will produce the final predictions in the form of
@@ -61,35 +62,13 @@ class Recommender(nn.Module, ABC):
         Args:
             user_indices (Tensor): The batch of user indices.
             *args (Any): List of arguments.
+            item_indices (Optional[Tensor]): The batch of item indices. If None,
+                full prediction will be produced.
             **kwargs (Any): The dictionary of keyword arguments.
 
         Returns:
             Tensor: The score matrix {user x item}.
         """
-
-    def predict_sampled(
-        self,
-        user_indices: Tensor,
-        item_indices: Tensor,
-        *args: Any,
-        **kwargs: Any,
-    ) -> Tensor:
-        """This method will produce predictions only of given item
-        indices.
-
-        Args:
-            user_indices (Tensor): The batch of user indices.
-            item_indices (Tensor): The batch of item indices.
-            *args (Any): List of arguments.
-            **kwargs (Any): The dictionary of keyword arguments.
-
-        Returns:
-            Tensor: The score matrix {user x pad_seq}.
-
-        Raises:
-            NotImplementedError: If the model does not support sampled prediction.
-        """
-        raise NotImplementedError("This model does not support sampled prediction.")
 
     def init_params(self, params: dict):
         """This method sets up the model with the correct parameters.
@@ -247,12 +226,13 @@ class SequentialRecommenderUtils(ABC):
     max_seq_len: int = 0
 
     @abstractmethod
-    def predict_full(
+    def predict(
         self,
         user_indices: Tensor,
         user_seq: Tensor,
         seq_len: Tensor,
         *args: Any,
+        item_indices: Optional[Tensor] = None,
         **kwargs: Any,
     ) -> Tensor:
         """This method will produce the final predictions in the form of
@@ -263,39 +243,13 @@ class SequentialRecommenderUtils(ABC):
             user_seq (Tensor): Padded sequences of item IDs for users to predict for.
             seq_len (Tensor): Actual lengths of these sequences, before padding.
             *args (Any): List of arguments.
+            item_indices (Optional[Tensor]): The batch of item indices. If None,
+                full prediction will be produced.
             **kwargs (Any): The dictionary of keyword arguments.
 
         Returns:
             Tensor: The score matrix {user x item}.
         """
-
-    def predict_sampled(
-        self,
-        user_indices: Tensor,
-        item_indices: Tensor,
-        user_seq: Tensor,
-        seq_len: Tensor,
-        *args: Any,
-        **kwargs: Any,
-    ) -> Tensor:
-        """This method will produce predictions only of given item
-        indices.
-
-        Args:
-            user_indices (Tensor): The batch of user indices.
-            item_indices (Tensor): The batch of item indices.
-            user_seq (Tensor): Padded sequences of item IDs for users to predict for.
-            seq_len (Tensor): Actual lengths of these sequences, before padding.
-            *args (Any): List of arguments.
-            **kwargs (Any): The dictionary of keyword arguments.
-
-        Returns:
-            Tensor: The score matrix {user x pad_seq}.
-
-        Raises:
-            NotImplementedError: If the model does not support sampled prediction.
-        """
-        raise NotImplementedError("This model does not support sampled prediction.")
 
     def _gather_indexes(self, output: Tensor, gather_index: Tensor) -> Tensor:
         """Gathers the output from specific indexes for each batch.
@@ -364,60 +318,47 @@ class ItemSimRecommender(Recommender):
         self.item_similarity = np.zeros(self.items)
 
     @torch.no_grad()
-    def predict_full(
+    def predict(
         self,
         user_indices: Tensor,
-        train_batch: csr_matrix,
         *args: Any,
+        item_indices: Optional[Tensor] = None,
         **kwargs: Any,
     ) -> Tensor:
         """Prediction in the form of X@B where B is a {item x item} similarity matrix.
 
         Args:
             user_indices (Tensor): The batch of user indices.
-            train_batch (csr_matrix): The batch of train sparse
-                interaction matrix.
             *args (Any): List of arguments.
+            item_indices (Optional[Tensor]): The batch of item indices. If None,
+                full prediction will be produced.
             **kwargs (Any): The dictionary of keyword arguments.
 
         Returns:
             Tensor: The score matrix {user x item}.
+
+        Raises:
+            ValueError: If 'train_batch' is not provided in kwargs.
         """
+        # Get train batch from kwargs
+        train_batch: Optional[csr_matrix] = kwargs.get("train_batch")
+        if train_batch is None:
+            raise ValueError(
+                "predict() for ItemSimRecommender requires 'train_batch' as a keyword argument."
+            )
+
         # Compute predictions and convert to Tensor
         predictions = train_batch @ self.item_similarity  # pylint: disable=not-callable
         predictions = torch.from_numpy(predictions)
-        return predictions.to(self._device)
 
-    @torch.no_grad()
-    def predict_sampled(
-        self,
-        user_indices: Tensor,
-        item_indices: Tensor,
-        train_batch: csr_matrix,
-        *args: Any,
-        **kwargs: Any,
-    ) -> Tensor:
-        """Prediction in the form of X@B where B is a {item x item} similarity matrix.
-
-        This method will produce predictions only for given item indices.
-
-        Args:
-            user_indices (Tensor): The batch of user indices.
-            item_indices (Tensor): The batch of item indices to sample.
-            train_batch (csr_matrix): The batch of train sparse
-                interaction matrix.
-            *args (Any): List of arguments.
-            **kwargs (Any): The dictionary of keyword arguments.
-
-        Returns:
-            Tensor: The score matrix {user x pad_seq}.
-        """
-        # Compute predictions
-        predictions = train_batch @ self.item_similarity  # pylint: disable=not-callable
-
-        # Convert to Tensor and gather only required indices
-        predictions = torch.from_numpy(predictions).to(self._device)
-        predictions = predictions.gather(
-            1, item_indices.clamp(max=self.items - 1)
-        )  # [batch_size, pad_seq]
-        return predictions
+        if item_indices is None:
+            # Case 'full': prediction on all items
+            return predictions  # [batch_size, num_items]
+        else:
+            # Case 'sampled': prediction on a sampled set of items
+            return predictions.gather(
+                1,
+                item_indices.to(predictions.device).clamp(
+                    max=self.items - 1
+                ),  # [batch_size, pad_seq]
+            )
