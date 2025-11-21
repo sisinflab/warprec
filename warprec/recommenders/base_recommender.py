@@ -351,6 +351,7 @@ class ItemSimRecommender(Recommender):
         predictions = train_batch @ self.item_similarity  # pylint: disable=not-callable
         predictions = torch.from_numpy(predictions)
 
+        # Return full or sampled predictions
         if item_indices is None:
             # Case 'full': prediction on all items
             return predictions  # [batch_size, num_items]
