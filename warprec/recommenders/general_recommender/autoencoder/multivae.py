@@ -255,7 +255,10 @@ class MultiVAE(IterativeRecommender):
             )
 
         # Compute predictions and convert to Tensor
-        train_batch = torch.from_numpy(train_sparse.toarray()).float().to(self._device)
+        train_sparse_batch = train_sparse[user_indices.cpu().numpy()]
+        train_batch = (
+            torch.from_numpy(train_sparse_batch.toarray()).float().to(self._device)
+        )
         predictions, _ = self.forward(train_batch)
 
         if item_indices is None:
