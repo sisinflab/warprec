@@ -87,7 +87,7 @@ class Pop(Recommender):
             # Expand the popularity scores for each user in the batch
             return self.normalized_popularity.expand(
                 batch_size, -1
-            )  # [batch_size, num_items]
+            ).clone()  # [batch_size, num_items]
 
         # Case 'sampled': prediction on a sampled set of items
         return self.normalized_popularity[
