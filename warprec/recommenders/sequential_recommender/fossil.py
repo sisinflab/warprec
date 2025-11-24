@@ -1,5 +1,5 @@
-# pylint: disable = R0801, E1102, W0221, C0103, W0613, W0235
-from typing import Any
+# pylint: disable = R0801, E1102, W0221, C0103, C0301, W0613, W0235
+from typing import Any, Optional
 
 import torch
 from torch import nn, Tensor
@@ -318,12 +318,13 @@ class FOSSIL(IterativeRecommender, SequentialRecommenderUtils):
         return high_order + similarity
 
     @torch.no_grad()
-    def predict_full(
+    def predict(
         self,
         user_indices: Tensor,
-        user_seq: Tensor,
-        seq_len: Tensor,
         *args: Any,
+        item_indices: Optional[Tensor] = None,
+        user_seq: Optional[Tensor] = None,
+        seq_len: Optional[Tensor] = None,
         **kwargs: Any,
     ) -> Tensor:
         """
@@ -331,67 +332,35 @@ class FOSSIL(IterativeRecommender, SequentialRecommenderUtils):
 
         Args:
             user_indices (Tensor): The batch of user indices.
-            user_seq (Tensor): Padded sequences of item IDs for users to predict for.
-            seq_len (Tensor): Actual lengths of these sequences, before padding.
             *args (Any): List of arguments.
+            item_indices (Optional[Tensor]): The batch of item indices. If None,
+                full prediction will be produced.
+            user_seq (Optional[Tensor]): Padded sequences of item IDs for users to predict for.
+            seq_len (Optional[Tensor]): Actual lengths of these sequences, before padding.
             **kwargs (Any): The dictionary of keyword arguments.
 
         Returns:
             Tensor: The score matrix {user x item}.
         """
-        user_indices = user_indices.to(self._device)
-        user_seq = user_seq.to(self._device)
-        seq_len = seq_len.to(self._device)
-
-        seq_output = self.forward(user_indices, user_seq, seq_len)
-
-        all_item_embeddings = self.item_embedding.weight[
-            :-1, :
-        ]  # [n_items, embedding_size]
-        predictions = torch.matmul(seq_output, all_item_embeddings.transpose(0, 1))
-        return predictions.to(self._device)
-
-    @torch.no_grad()
-    def predict_sampled(
-        self,
-        user_indices: Tensor,
-        item_indices: Tensor,
-        user_seq: Tensor,
-        seq_len: Tensor,
-        *args: Any,
-        **kwargs: Any,
-    ) -> Tensor:
-        """Prediction of given items using the learned embeddings.
-
-        Args:
-            user_indices (Tensor): The batch of user indices.
-            item_indices (Tensor): The batch of item indices to predict for.
-            user_seq (Tensor): Padded sequences of item IDs for users to predict for.
-            seq_len (Tensor): Actual lengths of these sequences, before padding.
-            *args (Any): List of arguments.
-            **kwargs (Any): The dictionary of keyword arguments.
-
-        Returns:
-            Tensor: The score matrix {user x pad_seq}.
-        """
-        # Move inputs to the correct device
-        user_indices = user_indices.to(self._device)
-        user_seq = user_seq.to(self._device)
-        seq_len = seq_len.to(self._device)
-        item_indices = item_indices.to(self._device)
-
-        # Calculate the sequential output embedding for each user in the batch
+        # Get sequence output embeddings
         seq_output = self.forward(
             user_indices, user_seq, seq_len
         )  # [batch_size, embedding_size]
 
-        # Get embeddings for candidate items
-        candidate_item_embeddings = self.item_embedding(
-            item_indices
-        )  # [batch_size, pad_seq, embedding_size]
+        if item_indices is None:
+            # Case 'full': prediction on all items
+            item_embeddings = self.item_embedding.weight[
+                :-1, :
+            ]  # [num_items, embedding_size]
+            einsum_string = "be,ie->bi"  # b: batch, e: embedding, i: item
+        else:
+            # Case 'sampled': prediction on a sampled set of items
+            item_embeddings = self.item_embedding(
+                item_indices
+            )  # [batch_size, pad_seq, embedding_size]
+            einsum_string = "be,bse->bs"  # b: batch, e: embedding, s: sample
 
-        # Compute scores using a batch matrix multiplication or einsum
         predictions = torch.einsum(
-            "bi,bji->bj", seq_output, candidate_item_embeddings
-        )  # [batch_size, pad_seq]
-        return predictions.to(self._device)
+            einsum_string, seq_output, item_embeddings
+        )  # [batch_size, num_items] or [batch_size, pad_seq]
+        return predictions

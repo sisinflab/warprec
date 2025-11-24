@@ -1,5 +1,5 @@
 # pylint: disable = R0801, E1102
-from typing import Any
+from typing import Any, Optional
 
 import torch
 from torch import nn, Tensor
@@ -34,8 +34,10 @@ class FISM(IterativeRecommender):
     Attributes:
         DATALOADER_TYPE: The type of dataloader used.
         embedding_size (int): The number of factors for item feature embeddings.
-        alpha (float): The alpha parameter, a value between 0 and 1, used in the similarity calculation.
-        split_to (int): Parameter for splitting items into chunks during prediction (for memory management).
+        alpha (float): The alpha parameter, a value between 0 and 1,
+            used in the similarity calculation.
+        split_to (int): Parameter for splitting items into chunks
+            during prediction (for memory management).
         weight_decay (float): The value of weight decay used in the optimizer.
         batch_size (int): The size of the batches used during training.
         epochs (int): The number of training epochs.
@@ -174,10 +176,11 @@ class FISM(IterativeRecommender):
         return scores
 
     @torch.no_grad()
-    def predict_full(
+    def predict(
         self,
         user_indices: Tensor,
         *args: Any,
+        item_indices: Optional[Tensor] = None,
         **kwargs: Any,
     ) -> Tensor:
         """Prediction using the learned embeddings.
@@ -185,68 +188,12 @@ class FISM(IterativeRecommender):
         Args:
             user_indices (Tensor): The batch of user indices.
             *args (Any): List of arguments.
+            item_indices (Optional[Tensor]): The batch of item indices. If None,
+                full prediction will be produced.
             **kwargs (Any): The dictionary of keyword arguments.
 
         Returns:
             Tensor: The score matrix {user x item}.
-        """
-        # Retrieve embeddings + biases
-        all_item_src_emb = self.item_src_embedding.weight
-        all_item_dst_emb = self.item_dst_embedding.weight[:-1, :]
-        all_user_bias = self.user_bias
-        all_item_bias = self.item_bias[:-1]
-
-        # Select data for current batch
-        batch_history_matrix = self.history_matrix[user_indices]
-        batch_history_lens = self.history_lens[user_indices]
-        batch_history_mask = self.history_mask[user_indices]
-        batch_user_bias = all_user_bias[user_indices]
-
-        # Compute aggregated embedding for user in batch
-        user_history_emb = all_item_src_emb[
-            batch_history_matrix
-        ]  # [batch_size, max_len, emb_size]
-
-        # Apply masking
-        masked_user_history_emb = (
-            user_history_emb * batch_history_mask.unsqueeze(2).float()
-        )
-        user_aggregated_emb = masked_user_history_emb.sum(
-            dim=1
-        )  # [batch_size, emb_size]
-
-        # Normalization coefficient (N_u ^ -alpha)
-        coeff = torch.pow(batch_history_lens.float() + 1e-6, -self.alpha).unsqueeze(1)
-        user_final_emb = user_aggregated_emb * coeff  # [batch_size, emb_size]
-
-        # Compute the final matrix multiplication.
-        predictions = torch.matmul(
-            user_final_emb, all_item_dst_emb.transpose(0, 1)
-        )  # [batch_size, n_items]
-
-        # Add the bias
-        predictions += batch_user_bias.unsqueeze(1)
-        predictions += all_item_bias.unsqueeze(0)
-        return predictions.to(self._device)
-
-    @torch.no_grad()
-    def predict_sampled(
-        self,
-        user_indices: Tensor,
-        item_indices: Tensor,
-        *args: Any,
-        **kwargs: Any,
-    ) -> Tensor:
-        """Prediction of given items using the learned embeddings.
-
-        Args:
-            user_indices (Tensor): The batch of user indices.
-            item_indices (Tensor): The batch of item indices.
-            *args (Any): List of arguments.
-            **kwargs (Any): The dictionary of keyword arguments.
-
-        Returns:
-            Tensor: The score matrix {user x pad_seq}.
         """
         # Select data for current batch
         batch_history_matrix = self.history_matrix[user_indices]
@@ -257,7 +204,7 @@ class FISM(IterativeRecommender):
         # Compute aggregated embedding for user in batch
         user_history_emb = self.item_src_embedding(
             batch_history_matrix
-        )  # [batch_size, max_len, emb_size]
+        )  # [batch_size, max_len, embedding_size]
 
         # Apply masking
         masked_user_history_emb = (
@@ -265,25 +212,33 @@ class FISM(IterativeRecommender):
         )
         user_aggregated_emb = masked_user_history_emb.sum(
             dim=1
-        )  # [batch_size, emb_size]
+        )  # [batch_size, embedding_size]
 
         # Normalization coefficient (N_u ^ -alpha)
         coeff = torch.pow(batch_history_lens.float() + 1e-6, -self.alpha).unsqueeze(1)
-        user_final_emb = user_aggregated_emb * coeff  # [batch_size, emb_size]
+        user_final_emb = user_aggregated_emb * coeff  # [batch_size, embedding_size]
 
-        # Retrieve embeddings for candidate items, handling padding (-1)
-        # We need to add 1 to the item indices because 0 is the padding index
-        candidate_item_embeddings = self.item_dst_embedding(
-            item_indices
-        )  # [batch_size, pad_seq, embedding_size]
-        candidate_item_biases = self.item_bias[item_indices]  # [batch_size, pad_seq]
+        if item_indices is None:
+            # Case 'full': prediction on all items
+            item_dst_embeddings = self.item_dst_embedding.weight[
+                :-1, :
+            ]  # [num_items, embedding_size]
+            item_biases = self.item_bias[:-1]  # [num_items]
+            einsum_string = "be,ie->bi"  # b: batch, e: embedding, i: item
+        else:
+            # Case 'sampled': prediction on a sampled set of items
+            item_dst_embeddings = self.item_dst_embedding(
+                item_indices
+            )  # [batch_size, pad_seq, embedding_size]
+            item_biases = self.item_bias[item_indices]  # [batch_size, pad_seq]
+            einsum_string = "be,bse->bs"  # b: batch, e: embedding, s: sample
 
-        # Compute the final matrix multiplication using einsum
+        # Compute prediction step
         predictions = torch.einsum(
-            "bi,bji->bj", user_final_emb, candidate_item_embeddings
-        )
+            einsum_string, user_final_emb, item_dst_embeddings
+        )  # [batch_size, num_items] or [batch_size, pad_seq]
 
         # Add the biases
         predictions += batch_user_bias.unsqueeze(1)
-        predictions += candidate_item_biases
-        return predictions.to(self._device)
+        predictions += item_biases
+        return predictions

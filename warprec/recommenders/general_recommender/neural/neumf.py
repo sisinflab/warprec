@@ -1,11 +1,10 @@
 # pylint: disable = R0801, E1102
-from typing import List, Any
+from typing import List, Any, Optional
 
 import torch
 from torch import nn, Tensor
 from torch.nn import Module
 from torch.nn.init import normal_
-from scipy.sparse import csr_matrix
 
 from warprec.recommenders.layers import MLP
 from warprec.data.entities import Interactions, Sessions
@@ -75,13 +74,13 @@ class NeuMF(IterativeRecommender):
         super().__init__(params, device=device, seed=seed, *args, **kwargs)
 
         # Get information from dataset info
-        users = info.get("users", None)
-        if not users:
+        self.users = info.get("users", None)
+        if not self.users:
             raise ValueError(
                 "Users value must be provided to correctly initialize the model."
             )
-        items = info.get("items", None)
-        if not items:
+        self.items = info.get("items", None)
+        if not self.items:
             raise ValueError(
                 "Items value must be provided to correctly initialize the model."
             )
@@ -94,15 +93,15 @@ class NeuMF(IterativeRecommender):
         self.mlp_hidden_size = list(self.mlp_hidden_size)
 
         # MF embeddings
-        self.user_mf_embedding = nn.Embedding(users, self.mf_embedding_size)
+        self.user_mf_embedding = nn.Embedding(self.users, self.mf_embedding_size)
         self.item_mf_embedding = nn.Embedding(
-            items + 1, self.mf_embedding_size, padding_idx=items
+            self.items + 1, self.mf_embedding_size, padding_idx=self.items
         )
 
         # MLP embeddings
-        self.user_mlp_embedding = nn.Embedding(users, self.mlp_embedding_size)
+        self.user_mlp_embedding = nn.Embedding(self.users, self.mlp_embedding_size)
         self.item_mlp_embedding = nn.Embedding(
-            items + 1, self.mlp_embedding_size, padding_idx=items
+            self.items + 1, self.mlp_embedding_size, padding_idx=self.items
         )
 
         # MLP layers
@@ -193,80 +192,61 @@ class NeuMF(IterativeRecommender):
         return output.squeeze(-1)
 
     @torch.no_grad()
-    def predict_full(
+    def predict(
         self,
         user_indices: Tensor,
-        train_batch: csr_matrix,
         *args: Any,
+        item_indices: Optional[Tensor] = None,
         **kwargs: Any,
     ) -> Tensor:
         """Prediction using the learned embeddings.
 
         Args:
             user_indices (Tensor): The batch of user indices.
-            train_batch (csr_matrix): The batch of train sparse
-                interaction matrix.
             *args (Any): List of arguments.
+            item_indices (Optional[Tensor]): The batch of item indices. If None,
+                full prediction will be produced.
             **kwargs (Any): The dictionary of keyword arguments.
 
         Returns:
             Tensor: The score matrix {user x item}.
         """
-        batch_size, num_items = train_batch.shape
+        # Retrieve batch size from user batch
+        batch_size = user_indices.size(0)
 
-        preds = []
-        for start in range(0, num_items, self.block_size):
-            end = min(start + self.block_size, num_items)
-            items_block = torch.arange(start, end, device=self._device)  # [block_size]
+        if item_indices is None:
+            # Case 'full': iterate through all items in memory-safe blocks
+            preds_logits = []
+            for start in range(0, self.items, self.block_size):
+                end = min(start + self.block_size, self.items)
+                items_block = torch.arange(start, end, device=self._device)
 
-            # Expand user_indices and items_block to create all user-item pairs
-            # within this block.
-            users_block = (
-                user_indices.unsqueeze(1).expand(-1, end - start).reshape(-1)
-            )  # [batch_size * block_size]
-            items_block_expanded = (
-                items_block.unsqueeze(0).expand(batch_size, -1).reshape(-1)
-            )  # [batch_size * block_size]
+                # Expand user and item indices to create all pairs for the block
+                users_block = (
+                    user_indices.unsqueeze(1).expand(-1, end - start).reshape(-1)
+                )
+                items_block_expanded = (
+                    items_block.unsqueeze(0).expand(batch_size, -1).reshape(-1)
+                )
 
-            preds_block = self.sigmoid(self.forward(users_block, items_block_expanded))
-            preds.append(preds_block.view(batch_size, end - start))
+                # Get raw logits from the forward pass
+                logits_block = self.forward(users_block, items_block_expanded)
+                preds_logits.append(logits_block.view(batch_size, -1))
 
-        predictions = torch.cat(preds, dim=1)  # [batch_size x num_items]
-        return predictions.to(self._device)
+            predictions_logits = torch.cat(preds_logits, dim=1)
 
-    @torch.no_grad()
-    def predict_sampled(
-        self,
-        user_indices: Tensor,
-        item_indices: Tensor,
-        *args: Any,
-        **kwargs: Any,
-    ) -> Tensor:
-        """Prediction of given items using the learned embeddings.
+        else:
+            # Case 'sampled': process all given item_indices at once
+            pad_seq = item_indices.size(1)
 
-        Args:
-            user_indices (Tensor): The batch of user indices.
-            item_indices (Tensor): The batch of item indices.
-            *args (Any): List of arguments.
-            **kwargs (Any): The dictionary of keyword arguments.
+            # Expand user and item indices to create all pairs
+            users_expanded = user_indices.unsqueeze(1).expand(-1, pad_seq).reshape(-1)
+            items_expanded = item_indices.reshape(-1)
 
-        Returns:
-            Tensor: The score matrix {user x pad_seq}.
-        """
-        batch_size, pad_seq = item_indices.size()
+            # Get raw logits from the forward pass
+            predictions_flat_logits = self.forward(users_expanded, items_expanded)
+            predictions_logits = predictions_flat_logits.view(batch_size, pad_seq)
 
-        # Prepare user and item indices for forward pass
-        # Reshape user_indices to [batch_size * pad_seq]
-        users_expanded = user_indices.unsqueeze(1).expand(-1, pad_seq).reshape(-1)
-
-        # Reshape item_indices
-        items_expanded = item_indices.reshape(-1)
-
-        # Compute predictions using the forward pass
-        predictions_flat = self.forward(users_expanded, items_expanded)
-        # Reshape the predictions back to the original batch shape
-        predictions = predictions_flat.view(batch_size, pad_seq)
-
-        # Apply sigmoid to get scores between 0 and 1
-        predictions = self.sigmoid(predictions)
-        return predictions.to(self._device)
+        # Apply sigmoid once to the final logits tensor
+        predictions = self.sigmoid(predictions_logits)
+        return predictions

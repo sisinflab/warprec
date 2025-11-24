@@ -1,9 +1,8 @@
 # pylint: disable = R0801, E1102
-from typing import Any
+from typing import Any, Optional
 
 import torch
 from torch import Tensor
-from scipy.sparse import csr_matrix
 
 from warprec.recommenders.base_recommender import Recommender
 from warprec.utils.registry import model_registry
@@ -22,6 +21,9 @@ class Random(Recommender):
         seed (int): The seed to use for reproducibility.
         info (dict): The dictionary containing dataset information.
         **kwargs (Any): Keyword argument for PyTorch nn.Module.
+
+    Raises:
+        ValueError: If the items value was not passed through the info dict.
     """
 
     def __init__(
@@ -34,50 +36,39 @@ class Random(Recommender):
         **kwargs: Any,
     ):
         super().__init__(params, device=device, seed=seed, info=info, *args, **kwargs)
+        self.items = info.get("items", None)
+        if not self.items:
+            raise ValueError(
+                "Items value must be provided to correctly initialize the model."
+            )
 
     @torch.no_grad()
-    def predict_full(
+    def predict(
         self,
         user_indices: Tensor,
-        train_batch: csr_matrix,
         *args: Any,
+        item_indices: Optional[Tensor] = None,
         **kwargs: Any,
     ) -> Tensor:
-        """Prediction using a random number generator.
+        """Prediction using a normalized popularity value.
 
         Args:
             user_indices (Tensor): The batch of user indices.
-            train_batch (csr_matrix): The batch of train sparse
-                interaction matrix.
             *args (Any): List of arguments.
+            item_indices (Optional[Tensor]): The batch of item indices. If None,
+                full prediction will be produced.
             **kwargs (Any): The dictionary of keyword arguments.
 
         Returns:
             Tensor: The score matrix {user x item}.
         """
-        # Generate random predictions
-        predictions = torch.rand(train_batch.shape)
-        return predictions.to(self._device)
+        if item_indices is None:
+            # Case 'full': prediction on all items
+            batch_size = user_indices.size(0)
+            shape = (batch_size, self.items)
 
-    @torch.no_grad()
-    def predict_sampled(
-        self,
-        user_indices: Tensor,
-        item_indices: Tensor,
-        *args: Any,
-        **kwargs: Any,
-    ) -> Tensor:
-        """Prediction using a random number generator.
+            # Generate random scores
+            return torch.rand(shape)  # [batch_size, num_items]
 
-        Args:
-            user_indices (Tensor): The batch of user indices.
-            item_indices (Tensor): The batch of item indices.
-            *args (Any): List of arguments.
-            **kwargs (Any): The dictionary of keyword arguments.
-
-        Returns:
-            Tensor: The score matrix {user x pad_seq}.
-        """
-        # Generate random predictions
-        predictions = torch.rand(item_indices.size())
-        return predictions.to(self._device)
+        # Case 'sampled': prediction on a sampled set of items
+        return torch.rand(item_indices.size())  # [batch_size, pad_seq]

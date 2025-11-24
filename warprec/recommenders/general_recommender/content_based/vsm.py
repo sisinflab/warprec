@@ -1,5 +1,5 @@
 # pylint: disable = R0801, E1102
-from typing import Any
+from typing import Any, Optional
 
 import torch
 import numpy as np
@@ -123,56 +123,39 @@ class VSM(Recommender):
         return normalize(user_profile, norm="l2", axis=1)
 
     @torch.no_grad()
-    def predict_full(
+    def predict(
         self,
         user_indices: Tensor,
         *args: Any,
+        item_indices: Optional[Tensor] = None,
         **kwargs: Any,
     ) -> Tensor:
-        """Prediction in the form of X@B where B is a {item x item} similarity matrix.
+        """Prediction using the learned embeddings.
 
         Args:
             user_indices (Tensor): The batch of user indices.
             *args (Any): List of arguments.
+            item_indices (Optional[Tensor]): The batch of item indices. If None,
+                full prediction will be produced.
             **kwargs (Any): The dictionary of keyword arguments.
 
         Returns:
             Tensor: The score matrix {user x item}.
         """
-        # Compute similarity
+        # Compute predictions and convert to Tensor
         predictions_numpy = self.sim_function.compute(
             self.u_profile[user_indices.tolist()], self.i_profile
         )
         predictions = torch.from_numpy(predictions_numpy)
-        return predictions.to(self._device)
 
-    @torch.no_grad()
-    def predict_sampled(
-        self,
-        user_indices: Tensor,
-        item_indices: Tensor,
-        *args: Any,
-        **kwargs: Any,
-    ) -> Tensor:
-        """Prediction in the form of X@B where B is a {item x item} similarity matrix.
+        if item_indices is None:
+            # Case 'full': prediction on all items
+            return predictions  # [batch_size, num_items]
 
-        This method will produce predictions only for given item indices.
-
-        Args:
-            user_indices (Tensor): The batch of user indices.
-            item_indices (Tensor): The batch of item indices to sample.
-            *args (Any): List of arguments.
-            **kwargs (Any): The dictionary of keyword arguments.
-
-        Returns:
-            Tensor: The score matrix {user x pad_seq}.
-        """
-        # Compute similarity
-        predictions_numpy = self.sim_function.compute(
-            self.u_profile[user_indices.tolist()], self.i_profile
+        # Case 'sampled': prediction on a sampled set of items
+        return predictions.gather(
+            1,
+            item_indices.to(predictions.device).clamp(
+                max=self.items - 1
+            ),  # [batch_size, pad_seq]
         )
-        predictions = torch.from_numpy(predictions_numpy)
-        predictions = predictions.gather(
-            1, item_indices.clamp(max=self.items - 1)
-        )  # [batch_size, pad_seq]
-        return predictions.to(self._device)

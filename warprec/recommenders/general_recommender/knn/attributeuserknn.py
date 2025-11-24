@@ -1,5 +1,5 @@
-# pylint: disable = R0801, E1102
-from typing import Any
+# pylint: disable = R0801, E1102, C0301
+from typing import Any, Optional
 
 import torch
 import numpy as np
@@ -97,60 +97,47 @@ class AttributeUserKNN(Recommender):
         return normalize(user_profile, norm="l2", axis=1)
 
     @torch.no_grad()
-    def predict_full(
+    def predict(
         self,
         user_indices: Tensor,
-        train_sparse: csr_matrix,
         *args: Any,
+        item_indices: Optional[Tensor] = None,
         **kwargs: Any,
     ) -> Tensor:
         """Prediction in the form of B@X where B is a {user x user} similarity matrix.
 
         Args:
             user_indices (Tensor): The batch of user indices.
-            train_sparse (csr_matrix): The full of train sparse
-                interaction matrix.
             *args (Any): List of arguments.
+            item_indices (Optional[Tensor]): The batch of item indices. If None,
+                full prediction will be produced.
             **kwargs (Any): The dictionary of keyword arguments.
 
         Returns:
             Tensor: The score matrix {user x item}.
+
+        Raises:
+            ValueError: If the 'train_sparse' keyword argument is not provided.
         """
+        # Get train batch from kwargs
+        train_sparse: Optional[csr_matrix] = kwargs.get("train_sparse")
+        if train_sparse is None:
+            raise ValueError(
+                "predict() for AttributeUserKNN requires 'train_sparse' as a keyword argument."
+            )
+
         # Compute predictions and convert to Tensor
         predictions = self.user_similarity[user_indices.cpu(), :] @ train_sparse
         predictions = torch.from_numpy(predictions)
-        return predictions.to(self._device)
 
-    @torch.no_grad()
-    def predict_sampled(
-        self,
-        user_indices: Tensor,
-        item_indices: Tensor,
-        train_sparse: csr_matrix,
-        *args: Any,
-        **kwargs: Any,
-    ) -> Tensor:
-        """Prediction in the form of B@X where B is a {user x user} similarity matrix.
+        if item_indices is None:
+            # Case 'full': prediction on all items
+            return predictions  # [batch_size, num_items]
 
-        This method will produce predictions only for given item indices.
-
-        Args:
-            user_indices (Tensor): The batch of user indices.
-            item_indices (Tensor): The batch of item indices to sample.
-            train_sparse (csr_matrix): The full train sparse
-                interaction matrix.
-            *args (Any): List of arguments.
-            **kwargs (Any): The dictionary of keyword arguments.
-
-        Returns:
-            Tensor: The score matrix {user x pad_seq}.
-        """
-        # Compute predictions
-        predictions = self.user_similarity[user_indices.cpu(), :] @ train_sparse
-
-        # Convert to Tensor and gather only required indices
-        predictions = torch.from_numpy(predictions).to(self._device)
-        predictions = predictions.gather(
-            1, item_indices.clamp(max=self.items - 1)
-        )  # [batch_size, pad_seq]
-        return predictions
+        # Case 'sampled': prediction on a sampled set of items
+        return predictions.gather(
+            1,
+            item_indices.to(predictions.device).clamp(
+                max=self.items - 1
+            ),  # [batch_size, pad_seq]
+        )

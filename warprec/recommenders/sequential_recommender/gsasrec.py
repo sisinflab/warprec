@@ -1,5 +1,5 @@
 # pylint: disable = R0801, E1102, W0221, C0103, W0613, W0235, R0902
-from typing import Callable, Any
+from typing import Callable, Any, Optional
 
 import torch
 from torch import nn, Tensor
@@ -164,17 +164,6 @@ class gSASRec(IterativeRecommender, SequentialRecommenderUtils):
             low_memory=low_memory,
         )
 
-    def get_output_embeddings(self) -> nn.Embedding:
-        """Return embeddings based on the flag value reuse_item_embeddings.
-
-        Returns:
-            nn.Embedding: The item embedding if reuse_item_embeddings is True,
-                else the output embedding.
-        """
-        if self.reuse_item_embeddings:
-            return self.item_embedding
-        return self.output_embedding
-
     def forward(self, item_seq: Tensor) -> Tensor:
         """Forward pass of gSASRec. Returns the output of the Transformer
         for each token in the input sequence.
@@ -186,7 +175,7 @@ class gSASRec(IterativeRecommender, SequentialRecommenderUtils):
             Tensor: Output of the Transformer encoder [batch_size, seq_len, embedding_size].
         """
         seq_len = item_seq.size(1)
-        padding_mask = item_seq == 0
+        padding_mask = item_seq == self.n_items
         causal_mask = self._generate_square_subsequent_mask(seq_len)
 
         position_ids = torch.arange(seq_len, dtype=torch.long, device=self._device)
@@ -219,7 +208,7 @@ class gSASRec(IterativeRecommender, SequentialRecommenderUtils):
             model_input: Tensor,
         ):
             pos_neg_concat = torch.cat([labels.unsqueeze(-1), negatives], dim=-1)
-            pos_neg_embeddings = self.get_output_embeddings()(pos_neg_concat)
+            pos_neg_embeddings = self._get_output_embeddings()(pos_neg_concat)
 
             logits = torch.einsum(
                 "bse, bsne -> bsn", sequence_hidden_states, pos_neg_embeddings
@@ -282,12 +271,13 @@ class gSASRec(IterativeRecommender, SequentialRecommenderUtils):
         return total_loss
 
     @torch.no_grad()
-    def predict_full(
+    def predict(
         self,
         user_indices: Tensor,
-        user_seq: Tensor,
-        seq_len: Tensor,
         *args: Any,
+        item_indices: Optional[Tensor] = None,
+        user_seq: Optional[Tensor] = None,
+        seq_len: Optional[Tensor] = None,
         **kwargs: Any,
     ) -> Tensor:
         """
@@ -295,73 +285,39 @@ class gSASRec(IterativeRecommender, SequentialRecommenderUtils):
 
         Args:
             user_indices (Tensor): The batch of user indices.
-            user_seq (Tensor): Padded sequences of item IDs for users to predict for.
-            seq_len (Tensor): Actual lengths of these sequences, before padding.
             *args (Any): List of arguments.
+            item_indices (Optional[Tensor]): The batch of item indices. If None,
+                full prediction will be produced.
+            user_seq (Optional[Tensor]): Padded sequences of item IDs for users to predict for.
+            seq_len (Optional[Tensor]): Actual lengths of these sequences, before padding.
             **kwargs (Any): The dictionary of keyword arguments.
 
         Returns:
             Tensor: The score matrix {user x item}.
         """
-        user_seq = user_seq.to(self._device)
-        seq_len = seq_len.to(self._device)
-
+        # Get the transformer output for all tokens in the sequence
         transformer_output = self.forward(user_seq)
-        seq_output = self._gather_indexes(transformer_output, seq_len - 1)
 
-        all_item_embeddings = self._get_output_embeddings().weight[
-            :-1, :
-        ]  # [n_items, embedding_size]
-        predictions = torch.matmul(seq_output, all_item_embeddings.transpose(0, 1))
-        return predictions.to(self._device)
-
-    @torch.no_grad()
-    def predict_sampled(
-        self,
-        user_indices: Tensor,
-        item_indices: Tensor,
-        user_seq: Tensor,
-        seq_len: Tensor,
-        *args: Any,
-        **kwargs: Any,
-    ) -> Tensor:
-        """Prediction of given items using the learned embeddings.
-
-        Args:
-            user_indices (Tensor): The batch of user indices.
-            item_indices (Tensor): The batch of item indices to predict for.
-            user_seq (Tensor): Padded sequences of item IDs for users to predict for.
-            seq_len (Tensor): Actual lengths of these sequences, before padding.
-            *args (Any): List of arguments.
-            **kwargs (Any): The dictionary of keyword arguments.
-
-        Returns:
-            Tensor: The score matrix {user x pad_seq}.
-        """
-        # Move inputs to the correct device
-        user_seq = user_seq.to(self._device)
-        seq_len = seq_len.to(self._device)
-        item_indices = item_indices.to(self._device)
-
-        # The forward pass of gSASRec returns the output for all items in the sequence
-        transformer_output = self.forward(
-            user_seq
-        )  # [batch_size, max_seq_len, embedding_size]
-
-        # Get the output embedding corresponding to the last item in each sequence,
-        # as this is the one used for the next-item prediction.
+        # Get the embedding of the LAST relevant item for prediction
         seq_output = self._gather_indexes(
             transformer_output, seq_len - 1
         )  # [batch_size, embedding_size]
 
-        # Get embeddings for candidate items
-        candidate_item_embeddings = self._get_output_embeddings()(
-            item_indices
-        )  # [batch_size, pad_seq, embedding_size]
+        target_item_embeddings = self._get_output_embeddings()
+        if item_indices is None:
+            # Case 'full': prediction on all items
+            item_embeddings = target_item_embeddings.weight[
+                :-1, :
+            ]  # [num_items, embedding_size]
+            einsum_string = "be,ie->bi"  # b: batch, e: embedding, i: item
+        else:
+            # Case 'sampled': prediction on a sampled set of items
+            item_embeddings = target_item_embeddings(
+                item_indices
+            )  # [batch_size, pad_seq, embedding_size]
+            einsum_string = "be,bse->bs"  # b: batch, e: embedding, s: sample
 
-        # Compute scores using the dot product between the user's final session
-        # embedding and the embeddings of all candidate items.
         predictions = torch.einsum(
-            "bi,bji->bj", seq_output, candidate_item_embeddings
-        )  # [batch_size, pad_seq]
-        return predictions.to(self._device)
+            einsum_string, seq_output, item_embeddings
+        )  # [batch_size, num_items] or [batch_size, pad_seq]
+        return predictions

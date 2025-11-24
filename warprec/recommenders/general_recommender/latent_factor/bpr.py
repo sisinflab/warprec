@@ -1,5 +1,5 @@
 # pylint: disable = R0801, E1102
-from typing import Any
+from typing import Any, Optional
 
 import torch
 from torch import nn, Tensor
@@ -131,10 +131,11 @@ class BPR(IterativeRecommender):
         return torch.mul(user_e, item_e).sum(dim=1)
 
     @torch.no_grad()
-    def predict_full(
+    def predict(
         self,
         user_indices: Tensor,
         *args: Any,
+        item_indices: Optional[Tensor] = None,
         **kwargs: Any,
     ) -> Tensor:
         """Prediction using the learned embeddings.
@@ -142,52 +143,33 @@ class BPR(IterativeRecommender):
         Args:
             user_indices (Tensor): The batch of user indices.
             *args (Any): List of arguments.
+            item_indices (Optional[Tensor]): The batch of item indices. If None,
+                full prediction will be produced.
             **kwargs (Any): The dictionary of keyword arguments.
 
         Returns:
             Tensor: The score matrix {user x item}.
         """
-        # Retrieve embeddings
-        user_e_all = self.user_embedding.weight  # [n_users, embedding_size]
-        item_e_all = self.item_embedding.weight[:-1, :]  # [n_items, embedding_size]
-
-        # Select only the embeddings in the current batch
-        u_embeddings_batch = user_e_all[user_indices]  # [batch_size, embedding_size]
-        predictions = torch.matmul(
-            u_embeddings_batch, item_e_all.transpose(0, 1)
-        )  # [batch_size, n_items]
-        return predictions.to(self._device)
-
-    @torch.no_grad()
-    def predict_sampled(
-        self,
-        user_indices: Tensor,
-        item_indices: Tensor,
-        *args: Any,
-        **kwargs: Any,
-    ) -> Tensor:
-        """Prediction of given items using the learned embeddings.
-
-        Args:
-            user_indices (Tensor): The batch of user indices.
-            item_indices (Tensor): The batch of item indices.
-            *args (Any): List of arguments.
-            **kwargs (Any): The dictionary of keyword arguments.
-
-        Returns:
-            Tensor: The score matrix {user x pad_seq}.
-        """
-        # Retrieve embeddings
-        # NOTE: .clamp() is used for padded item_indices
+        # Retrieve user embeddings
         user_embeddings = self.user_embedding(
             user_indices
         )  # [batch_size, embedding_size]
-        candidate_item_embeddings = self.item_embedding(
-            item_indices
-        )  # [batch_size, pad_seq, embedding_size]
 
-        # Compute predictions efficiently
+        if item_indices is None:
+            # Case 'full': prediction on all items
+            item_embeddings = self.item_embedding.weight[
+                :-1, :
+            ]  # [num_items, embedding_size]
+            einsum_string = "be,ie->bi"  # b: batch, e: embedding, i: item
+        else:
+            # Case 'sampled': prediction on a sampled set of items
+            item_embeddings = self.item_embedding(
+                item_indices
+            )  # [batch_size, pad_seq, embedding_size]
+            einsum_string = "be,bse->bs"  # b: batch, e: embedding, s: sample
+
+        # Common prediction step
         predictions = torch.einsum(
-            "bi,bji->bj", user_embeddings, candidate_item_embeddings
-        )
-        return predictions.to(self._device)
+            einsum_string, user_embeddings, item_embeddings
+        )  # [batch_size, num_items] or [batch_size, pad_seq]
+        return predictions

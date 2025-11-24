@@ -1,8 +1,8 @@
-from typing import Any, Tuple
+from typing import Any, Tuple, Optional
 import torch
-import torch.nn as nn
 import torch.nn.functional as F
 from torch import Tensor
+from torch import nn
 from torch.nn.init import xavier_normal_, constant_
 from scipy.sparse import csr_matrix
 
@@ -225,58 +225,47 @@ class MultiVAE(IterativeRecommender):
         return reconstructed, kl_loss
 
     @torch.no_grad()
-    def predict_full(
+    def predict(
         self,
         user_indices: Tensor,
-        train_batch: csr_matrix,
         *args: Any,
+        item_indices: Optional[Tensor] = None,
         **kwargs: Any,
     ) -> Tensor:
         """Prediction using the the encoder and decoder modules.
 
         Args:
             user_indices (Tensor): The batch of user indices.
-            train_batch (csr_matrix): The batch of train sparse
-                interaction matrix.
             *args (Any): List of arguments.
+            item_indices (Optional[Tensor]): The batch of item indices. If None,
+                full prediction will be produced.
             **kwargs (Any): The dictionary of keyword arguments.
 
         Returns:
             Tensor: The score matrix {user x item}.
+
+        Raises:
+            ValueError: If the 'train_sparse' keyword argument is not provided.
         """
-        # Forward pass
-        train_batch = torch.from_numpy(train_batch.toarray()).to(self._device)
+        # Get train batch from kwargs
+        train_sparse: Optional[csr_matrix] = kwargs.get("train_sparse")
+        if train_sparse is None:
+            raise ValueError(
+                "predict() for MultiVAE requires 'train_sparse' as a keyword argument."
+            )
+
+        # Compute predictions and convert to Tensor
+        train_batch = torch.from_numpy(train_sparse.toarray()).float().to(self._device)
         predictions, _ = self.forward(train_batch)
-        return predictions.to(self._device)
 
-    @torch.no_grad()
-    def predict_sampled(
-        self,
-        user_indices: Tensor,
-        item_indices: Tensor,
-        train_batch: csr_matrix,
-        *args: Any,
-        **kwargs: Any,
-    ) -> Tensor:
-        """Prediction using the the encoder and decoder modules.
+        if item_indices is None:
+            # Case 'full': prediction on all items
+            return predictions  # [batch_size, num_items]
 
-        This method will produce predictions only for given item indices.
-
-        Args:
-            user_indices (Tensor): The batch of user indices.
-            item_indices (Tensor): The batch of item indices to sample.
-            train_batch (csr_matrix): The batch of train sparse
-                interaction matrix.
-            *args (Any): List of arguments.
-            **kwargs (Any): The dictionary of keyword arguments.
-
-        Returns:
-            Tensor: The score matrix {user x pad_seq}.
-        """
-        # Compute predictions and gather only sampled items
-        train_batch = torch.from_numpy(train_batch.toarray()).to(self._device)
-        predictions, _ = self.forward(train_batch)
-        predictions = predictions.gather(
-            1, item_indices.clamp(max=self.items - 1)
-        )  # [batch_size, pad_seq]
-        return predictions.to(self._device)
+        # Case 'sampled': prediction on a sampled set of items
+        return predictions.gather(
+            1,
+            item_indices.to(predictions.device).clamp(
+                max=self.items - 1
+            ),  # [batch_size, pad_seq]
+        )

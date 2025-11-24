@@ -1,11 +1,10 @@
 # pylint: disable = R0801, E1102
-from typing import List, Any
+from typing import List, Any, Optional
 
 import torch
 from torch import nn, Tensor
 from torch.nn import Module
 from torch.nn.init import normal_
-from scipy.sparse import csr_matrix
 
 from warprec.recommenders.layers import MLP, CNN
 from warprec.recommenders.losses import BPRLoss
@@ -72,13 +71,13 @@ class ConvNCF(IterativeRecommender):
         super().__init__(params, device=device, seed=seed, *args, **kwargs)
 
         # Get information from dataset info
-        users = info.get("users", None)
-        if not users:
+        self.users = info.get("users", None)
+        if not self.users:
             raise ValueError(
                 "Users value must be provided to correctly initialize the model."
             )
-        items = info.get("items", None)
-        if not items:
+        self.items = info.get("items", None)
+        if not self.items:
             raise ValueError(
                 "Items value must be provided to correctly initialize the model."
             )
@@ -89,9 +88,9 @@ class ConvNCF(IterativeRecommender):
         self.cnn_kernels = list(self.cnn_kernels)
         self.cnn_strides = list(self.cnn_strides)
 
-        self.user_embedding = nn.Embedding(users, self.embedding_size)
+        self.user_embedding = nn.Embedding(self.users, self.embedding_size)
         self.item_embedding = nn.Embedding(
-            items + 1, self.embedding_size, padding_idx=items
+            self.items + 1, self.embedding_size, padding_idx=self.items
         )
         self.cnn_layers = CNN(
             self.cnn_channels,
@@ -179,96 +178,65 @@ class ConvNCF(IterativeRecommender):
         return prediction.squeeze(-1)  # [batch_size]
 
     @torch.no_grad()
-    def predict_full(
+    def predict(
         self,
         user_indices: Tensor,
-        train_batch: csr_matrix,
         *args: Any,
+        item_indices: Optional[Tensor] = None,
         **kwargs: Any,
     ) -> Tensor:
-        """
-        Prediction using the learned embeddings.
+        """Prediction using the learned embeddings.
 
         Args:
             user_indices (Tensor): The batch of user indices.
-            train_batch (csr_matrix): The batch of train sparse
-                interaction matrix.
             *args (Any): List of arguments.
+            item_indices (Optional[Tensor]): The batch of item indices. If None,
+                full prediction will be produced.
             **kwargs (Any): The dictionary of keyword arguments.
 
         Returns:
             Tensor: The score matrix {user x item}.
         """
-        batch_size, num_items = train_batch.shape
-        user_e_batch = self.user_embedding(user_indices)
+        # Retrieve batch size from user batch
+        batch_size = user_indices.size(0)
 
-        all_scores = []
-        # We must iterate over items in blocks due to memory constraints
-        for item_start_idx in range(0, num_items, self.block_size):
-            item_end_idx = min(item_start_idx + self.block_size, num_items)
+        if item_indices is None:
+            # Case 'full': iterate through all items in memory-safe blocks
+            all_scores = []
+            for start in range(0, self.items, self.block_size):
+                end = min(start + self.block_size, self.items)
+                items_block_indices = torch.arange(start, end, device=self._device)
 
-            item_indices_block = torch.arange(
-                item_start_idx, item_end_idx, device=self._device
-            )
-            item_e_block = self.item_embedding(item_indices_block)
-            num_items_in_block = len(item_indices_block)
+                # Expand user and item indices to create all pairs for the block
+                num_items_in_block = end - start
+                users_expanded = (
+                    user_indices.unsqueeze(1).expand(-1, num_items_in_block).reshape(-1)
+                )
+                items_expanded = (
+                    items_block_indices.unsqueeze(0).expand(batch_size, -1).reshape(-1)
+                )
 
-            # Expand embeddings to create all user-item pairs in the block
-            user_e_exp = user_e_batch.unsqueeze(1).expand(-1, num_items_in_block, -1)
-            item_e_exp = item_e_block.unsqueeze(0).expand(batch_size, -1, -1)
+                # Call forward on the flattened batch of pairs for the current block
+                scores_flat = self.forward(users_expanded, items_expanded)
 
-            # Compute outer product for the entire block
-            interaction_map = torch.bmm(
-                user_e_exp.reshape(-1, self.embedding_size, 1),
-                item_e_exp.reshape(-1, 1, self.embedding_size),
-            )
-            interaction_map = interaction_map.unsqueeze(1)
+                # Reshape the result and append
+                scores_block = scores_flat.view(batch_size, num_items_in_block)
+                all_scores.append(scores_block)
 
-            # Pass through layers
-            cnn_output = self.cnn_layers(interaction_map)
-            cnn_output = cnn_output.sum(axis=(2, 3))
-            prediction = self.predict_layers(cnn_output)
+            # Concatenate the results from all blocks
+            predictions = torch.cat(all_scores, dim=1)
+            return predictions
 
-            # Reshape scores to [num_users_in_batch, num_items_in_block]
-            scores_block = prediction.reshape(batch_size, num_items_in_block)
-            all_scores.append(scores_block)
+        # Case 'sampled': process all given item_indices at once
+        pad_seq = item_indices.size(1)
 
-        predictions = torch.cat(all_scores, dim=1)
-        return predictions.to(self._device)
-
-    @torch.no_grad()
-    def predict_sampled(
-        self,
-        user_indices: Tensor,
-        item_indices: Tensor,
-        *args: Any,
-        **kwargs: Any,
-    ) -> Tensor:
-        """Prediction of given items using the learned embeddings.
-
-        Args:
-            user_indices (Tensor): The batch of user indices.
-            item_indices (Tensor): The batch of item indices.
-            *args (Any): List of arguments.
-            **kwargs (Any): The dictionary of keyword arguments.
-
-        Returns:
-            Tensor: The score matrix {user x pad_seq}.
-        """
-        batch_size, pad_seq = item_indices.size()
-
-        # Prepare user and item indices for a single forward pass
-        # This flattens the tensors to create a list of all user-item pairs
-        # to be evaluated.
+        # Expand user and item indices to create all pairs
         users_expanded = user_indices.unsqueeze(1).expand(-1, pad_seq).reshape(-1)
-
-        # Expand item indices similarly
         items_expanded = item_indices.reshape(-1)
 
-        # Use the forward pass to compute scores for all pairs at once.
-        # This is a more concise and reusable way to get the predictions.
+        # Call forward on the flattened batch of pairs
         predictions_flat = self.forward(users_expanded, items_expanded)
 
         # Reshape the flat predictions back to the original batch shape
         predictions = predictions_flat.view(batch_size, pad_seq)
-        return predictions.to(self._device)
+        return predictions

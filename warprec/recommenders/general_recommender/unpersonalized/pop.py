@@ -1,5 +1,5 @@
 # pylint: disable = R0801, E1102
-from typing import Any
+from typing import Any, Optional
 
 import torch
 from torch import Tensor
@@ -61,10 +61,11 @@ class Pop(Recommender):
         self.normalized_popularity = popularity / (item_count + 1e-6)
 
     @torch.no_grad()
-    def predict_full(
+    def predict(
         self,
         user_indices: Tensor,
         *args: Any,
+        item_indices: Optional[Tensor] = None,
         **kwargs: Any,
     ) -> Tensor:
         """Prediction using a normalized popularity value.
@@ -72,37 +73,23 @@ class Pop(Recommender):
         Args:
             user_indices (Tensor): The batch of user indices.
             *args (Any): List of arguments.
+            item_indices (Optional[Tensor]): The batch of item indices. If None,
+                full prediction will be produced.
             **kwargs (Any): The dictionary of keyword arguments.
 
         Returns:
             Tensor: The score matrix {user x item}.
         """
-        batch_size = user_indices.size(0)
+        if item_indices is None:
+            # Case 'full': prediction on all items
+            batch_size = user_indices.size(0)
 
-        # Repeat the popularity scores for each user in the batch
-        predictions = self.normalized_popularity.repeat(batch_size, 1)
-        return predictions.to(self._device)
+            # Expand the popularity scores for each user in the batch
+            return self.normalized_popularity.expand(
+                batch_size, -1
+            )  # [batch_size, num_items]
 
-    @torch.no_grad()
-    def predict_sampled(
-        self,
-        user_indices: Tensor,
-        item_indices: Tensor,
-        *args: Any,
-        **kwargs: Any,
-    ) -> Tensor:
-        """Prediction using a random number generator.
-
-        Args:
-            user_indices (Tensor): The batch of user indices.
-            item_indices (Tensor): The batch of item indices.
-            *args (Any): List of arguments.
-            **kwargs (Any): The dictionary of keyword arguments.
-
-        Returns:
-            Tensor: The score matrix {user x pad_seq}.
-        """
-        # Retrieve the popularity scores for the sampled items
-        # Clamp item_indices to avoid out-of-bounds indexing with -1
-        predictions = self.normalized_popularity[item_indices.clamp(max=self.items - 1)]
-        return predictions.to(self._device)
+        # Case 'sampled': prediction on a sampled set of items
+        return self.normalized_popularity[
+            item_indices.clamp(max=self.items - 1)
+        ]  # [batch_size, pad_seq]
