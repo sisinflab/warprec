@@ -79,10 +79,15 @@ You should:
                 raise ValueError("Items value must be provided to correctly initialize the model.")
 
             self.user_embedding = nn.Embedding(users, self.embedding_size)
-            self.item_embedding = nn.Embedding(items, self.embedding_size)
+            self.item_embedding = nn.Embedding(items + 1, self.embedding_size, padding_idx=items)
             self.apply(self._init_weights)  # See Step 2 for details
             self.loss = BPRLoss()
             self.to(self._device)
+
+.. important::
+
+    The item_embedding uses `padding_idx=items` to handle potential padding in the item indices.
+    Inside WarpRec, items are indexed from `0` to `num_items - 1`, with `num_items` reserved for padding.
 
 Step 2: Initialize Weights
 --------------------------
@@ -104,8 +109,16 @@ Iterative models rely on batches of samples to update the parameters. To ease th
 
 .. code-block:: python
 
-    def get_dataloader(self, interactions: Interactions, sessions: Sessions, **kwargs):
-        return interactions.get_pos_neg_dataloader(self.batch_size)
+    def get_dataloader(
+        self,
+        interactions: Interactions,
+        sessions: Sessions,
+        low_memory: bool = False,
+        **kwargs,
+    ):
+        return interactions.get_pos_neg_dataloader(
+            batch_size=self.batch_size, low_memory=low_memory
+        )
 
 .. important::
 
@@ -144,28 +157,24 @@ Iterative models rely on batches of samples to update the parameters. To ease th
 Step 4: Implement Prediction Methods
 -----------------------------------
 
-Recommendation models should implement `predict_full` and optionally `predict_sampled`.
-In case of the full prediction, the method should return scores for all items for a batch of users.
-In case of sampled prediction, the method should return scores only for a subset of candidate items.
-These methods use the learned embeddings to compute scores:
+Recommendation models must implement a prediction method to generate scores for user-item pairs. You can override the `predict` method to define how predictions are made.
+Normal behavior is to compute a full prediction over the batch of users if item_indices is None, or compute predictions only for the provided item indices:
 
 .. code-block:: python
 
     @torch.no_grad()
-    def predict_full(self, user_indices: Tensor, *args, **kwargs):
-        user_e_all = self.user_embedding.weight
-        item_e_all = self.item_embedding.weight
-        u_embeddings_batch = user_e_all[user_indices]
-        predictions = torch.matmul(u_embeddings_batch, item_e_all.transpose(0, 1))
-        return predictions.to(self._device)
-
-    @torch.no_grad()
-    def predict_sampled(self, user_indices: Tensor, item_indices: Tensor, *args, **kwargs):
+    def predict(self, user_indices: Tensor, item_indices: Optional[Tensor], *args, **kwargs):
         user_embeddings = self.user_embedding(user_indices)
-        candidate_item_embeddings = self.item_embedding(item_indices.clamp(min=0))
-        predictions = torch.einsum("bi,bji->bj", user_embeddings, candidate_item_embeddings)
-        return predictions.to(self._device)
-
+        if item_indices is None:
+            # Case 'full': prediction on all items
+            item_embeddings = self.item_embedding.weight[:-1, :]
+            einsum_string = "be,ie->bi"
+        else:
+            # Case 'sampled': prediction on a sampled set of items
+            item_embeddings = self.item_embedding(item_indices)
+            einsum_string = "be,bse->bs"
+        predictions = torch.einsum(einsum_string, user_embeddings, item_embeddings)
+        return predictions
 
 .. important::
 
