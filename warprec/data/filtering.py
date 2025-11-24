@@ -428,6 +428,62 @@ class UserTailN(Filter):
         return filtered_dataset
 
 
+@filter_registry.register("DropUser")
+class DropUser(Filter):
+    """Filter to exclude one or a list of user IDs from the dataset.
+
+    Args:
+        user_ids_to_filter (Any | List[Any]): A single user ID or a list of user IDs to filter out.
+        **kwargs (Any): Additional keyword arguments.
+    """
+
+    def __init__(self, user_ids_to_filter: Any | List[Any], **kwargs: Any):
+        super().__init__(**kwargs)
+        # Convert to list if a single user ID is provided
+        if not isinstance(user_ids_to_filter, list):
+            user_ids_to_filter = [user_ids_to_filter]
+        self.user_ids_to_filter = user_ids_to_filter
+
+    def __call__(self, dataset: DataFrame) -> DataFrame:
+        """Exclude rows corresponding to the specified user IDs.
+
+        Args:
+            dataset (DataFrame): The dataset to filter.
+
+        Returns:
+            DataFrame: Filtered dataset without the specified users.
+        """
+        return dataset[~dataset[self.user_label].isin(self.user_ids_to_filter)]
+
+
+@filter_registry.register("DropItem")
+class DropItem(Filter):
+    """Filter to exclude one or a list of item IDs from the dataset.
+
+    Args:
+        item_ids_to_filter (Any | List[Any]): A single item ID or a list of item IDs to filter out.
+        **kwargs (Any): Additional keyword arguments.
+    """
+
+    def __init__(self, item_ids_to_filter: Any | List[Any], **kwargs: Any):
+        super().__init__(**kwargs)
+        # Convert to list if a single item ID is provided
+        if not isinstance(item_ids_to_filter, list):
+            item_ids_to_filter = [item_ids_to_filter]
+        self.item_ids_to_filter = item_ids_to_filter
+
+    def __call__(self, dataset: DataFrame) -> DataFrame:
+        """Exclude rows corresponding to the specified item IDs.
+
+        Args:
+            dataset (DataFrame): The dataset to filter.
+
+        Returns:
+            DataFrame: Filtered dataset without the specified items.
+        """
+        return dataset[~dataset[self.item_label].isin(self.item_ids_to_filter)]
+
+
 def apply_filtering(dataset: DataFrame, filters: List[Filter]) -> DataFrame:
     """Apply a list of filters to the dataset.
 
