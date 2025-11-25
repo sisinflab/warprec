@@ -101,7 +101,9 @@ def main(args: Namespace):
                 else None
             )
             low_memory = params.get("meta", {}).get("low_memory", False)
-            train_loop(model, main_dataset, model.epochs, lr_scheduler, low_memory)
+            train_loop(
+                model, main_dataset, model.epochs, lr_scheduler, low_memory, device
+            )
 
         # Callback on training complete
         callback.on_training_complete(model=model)
@@ -119,7 +121,7 @@ def main(args: Namespace):
             dataloader=dataloader,
             strategy=config.evaluation.strategy,
             dataset=main_dataset,
-            device=str(model._device),
+            device=device,
             verbose=True,
         )
         results = evaluator.compute_results()

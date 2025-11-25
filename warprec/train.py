@@ -193,6 +193,9 @@ def main(args: Namespace):
             num_negatives=config.evaluation.num_negatives,
         )
 
+        # Retrieve best model device
+        best_model_device = best_model.device
+
         # Evaluation testing
         model_evaluation_start_time = time.time()
         evaluator.evaluate(
@@ -200,7 +203,7 @@ def main(args: Namespace):
             dataloader=dataloader,
             strategy=config.evaluation.strategy,
             dataset=main_dataset,
-            device=str(best_model._device),
+            device=str(best_model_device),
             verbose=True,
         )
         results = evaluator.compute_results()
@@ -267,9 +270,6 @@ def main(args: Namespace):
                 max_seq_len = best_model.max_seq_len
             else:
                 max_seq_len = 10
-
-            # Retrieve best model device
-            best_model_device = best_model._device
 
             # Create mock data to test prediction time
             user_indices = torch.arange(num_users_to_predict).to(
@@ -510,18 +510,18 @@ def multiple_fold_validation_flow(
         name=model_name,
         params=best_params,
         interactions=main_dataset.train_set,
-        device=device,
         seed=seed,
         info=main_dataset.info(),
         **main_dataset.get_stash(),
         block_size=block_size,
     )
+    best_model.to(device)
 
     # Train the model using backpropagation if the model
     # is iterative
     if isinstance(best_model, IterativeRecommender):
         # Training loop decorated with tqdm for a better visualization
-        train_loop(best_model, main_dataset, iterations)
+        train_loop(best_model, main_dataset, iterations, device=device)
 
     # Final reporting
     report["Total Params (Best Model)"] = sum(
