@@ -142,6 +142,15 @@ class Recommender(nn.Module, ABC):
                 name += f"_{ann}={value}"
         return name
 
+    @property
+    def device(self) -> torch.device:
+        """Get the device where the model is located.
+
+        Returns:
+            torch.device: The device of the model.
+        """
+        return next(self.parameters()).device
+
 
 class IterativeRecommender(Recommender):
     """Interface for recommendation model that use
