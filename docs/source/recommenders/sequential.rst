@@ -48,7 +48,6 @@ These models are especially suited to scenarios where user behavior exhibits bot
         FOSSIL:
             embedding_size: 64
             order_len: 8
-            reg_weight: 0.001
             alpha: 0.001
             weight_decay: 0.0
             batch_size: 512

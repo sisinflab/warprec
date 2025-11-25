@@ -39,7 +39,6 @@ class FOSSIL(IterativeRecommender, SequentialRecommenderUtils):
         DATALOADER_TYPE: The type of dataloader used.
         embedding_size (int): The dimension of the item embeddings.
         order_len (int): The number of last items to consider for high-order Markov chains.
-        reg_weight (float): The L2 regularization weight.
         alpha (float): The parameter for calculating similarity.
         weight_decay (float): The value of weight decay used in the optimizer.
         batch_size (int): The batch size used for training.
@@ -55,7 +54,6 @@ class FOSSIL(IterativeRecommender, SequentialRecommenderUtils):
     # Model hyperparameters
     embedding_size: int
     order_len: int
-    reg_weight: float
     alpha: float
     weight_decay: float
     batch_size: int

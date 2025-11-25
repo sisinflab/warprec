@@ -113,7 +113,6 @@ class FOSSIL(RecomModel):
     Attributes:
         embedding_size (INT_FIELD): List of values for embedding_size.
         order_len (INT_FIELD):  List of values for order_len.
-        reg_weight (FLOAT_FIELD): List of values for reg_weight.
         alpha (FLOAT_FIELD): List of values for alpha.
         weight_decay (FLOAT_FIELD): List of values for weight_decay.
         batch_size (INT_FIELD): List of values for batch_size.
@@ -125,7 +124,6 @@ class FOSSIL(RecomModel):
 
     embedding_size: INT_FIELD
     order_len: INT_FIELD
-    reg_weight: FLOAT_FIELD
     alpha: FLOAT_FIELD
     weight_decay: FLOAT_FIELD
     batch_size: INT_FIELD
@@ -145,12 +143,6 @@ class FOSSIL(RecomModel):
     def check_order_len(cls, v: list):
         """Validate order_len."""
         return validate_greater_than_zero(cls, v, "order_len")
-
-    @field_validator("reg_weight")
-    @classmethod
-    def check_reg_weight(cls, v: list):
-        """Validate reg_weight."""
-        return validate_greater_equal_than_zero(cls, v, "reg_weight")
 
     @field_validator("alpha")
     @classmethod
