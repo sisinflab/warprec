@@ -5,6 +5,7 @@ from abc import ABC, abstractmethod
 import torch
 import numpy as np
 from torch import nn, Tensor
+from torch.nn.init import xavier_normal_, xavier_uniform_, constant_
 from torch.optim.optimizer import Optimizer
 from torch.utils.data import DataLoader
 from scipy.sparse import csr_matrix
@@ -171,6 +172,45 @@ class IterativeRecommender(Recommender):
     epochs: int
     learning_rate: float
     weight_decay: float
+
+    def _init_weights(self, module: nn.Module):
+        """A comprehensive default weight initialization method.
+        This method is called recursively by `self.apply(self._init_weights)`
+        and handles the most common layer types found in recommendation models.
+
+        It can be overridden by subclasses for model-specific initialization.
+
+        The default strategies are:
+        - Xavier Normal for Linear, Embedding, and Convolutional layers.
+        - Xavier Uniform for Recurrent layers (GRU, LSTM).
+        - Identity-like initialization for LayerNorm.
+        - Zeros for all biases.
+
+        Args:
+            module (nn.Module): The module to initialize.
+        """
+        # --- Layers with standard weight matrices ---
+        if isinstance(module, (nn.Linear, nn.Conv1d, nn.Conv2d)):
+            xavier_normal_(module.weight.data)
+            if hasattr(module, "bias") and module.bias is not None:
+                constant_(module.bias.data, 0)
+
+        # --- Embedding Layer ---
+        elif isinstance(module, nn.Embedding):
+            xavier_normal_(module.weight.data)
+
+        # --- Recurrent Layers ---
+        elif isinstance(module, (nn.GRU, nn.LSTM, nn.RNN)):
+            for name, param in module.named_parameters():
+                if "weight_ih" in name or "weight_hh" in name:
+                    xavier_uniform_(param.data)
+                elif "bias" in name:
+                    constant_(param.data, 0)
+
+        # --- Normalization Layers ---
+        elif isinstance(module, nn.LayerNorm):
+            constant_(module.bias.data, 0)
+            constant_(module.weight.data, 1.0)
 
     @abstractmethod
     def forward(self, *args: Any, **kwargs: Any):
