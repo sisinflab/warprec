@@ -113,6 +113,10 @@ class gSASRec(IterativeRecommender, SequentialRecommenderUtils):
             num_layers=self.n_layers,
         )
 
+        # Precompute causal mask
+        causal_mask = self._generate_square_subsequent_mask(self.max_seq_len)
+        self.register_buffer("causal_mask", causal_mask)
+
         # Initialize weights
         self.apply(self._init_weights)
         self.loss = self._gbce_loss_function()
@@ -172,7 +176,6 @@ class gSASRec(IterativeRecommender, SequentialRecommenderUtils):
         """
         seq_len = item_seq.size(1)
         padding_mask = item_seq == self.n_items
-        causal_mask = self._generate_square_subsequent_mask(seq_len)
 
         position_ids = torch.arange(seq_len, dtype=torch.long).to(item_seq.device)
         position_ids = position_ids.unsqueeze(0).expand_as(item_seq)
@@ -185,7 +188,7 @@ class gSASRec(IterativeRecommender, SequentialRecommenderUtils):
 
         transformer_output = self.transformer_encoder(
             src=seq_emb,
-            mask=causal_mask.to(item_seq.device),
+            mask=self.causal_mask,
             src_key_padding_mask=padding_mask,
         )
         return transformer_output

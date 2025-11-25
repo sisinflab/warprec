@@ -103,6 +103,10 @@ class SASRec(IterativeRecommender, SequentialRecommenderUtils):
             num_layers=self.n_layers,
         )
 
+        # Precompute causal mask
+        causal_mask = self._generate_square_subsequent_mask(self.max_seq_len)
+        self.register_buffer("causal_mask", causal_mask)
+
         # Initialize weights
         self.apply(self._init_weights)
 
@@ -198,9 +202,6 @@ class SASRec(IterativeRecommender, SequentialRecommenderUtils):
         # Padding mask to ignore padding tokens
         padding_mask = item_seq == self.items  # [batch_size, seq_len]
 
-        # Causal mask to prevent attending to future tokens
-        causal_mask = self._generate_square_subsequent_mask(seq_len)
-
         # Create position IDs
         position_ids = torch.arange(seq_len, dtype=torch.long).to(item_seq.device)
         position_ids = position_ids.unsqueeze(0).expand_as(item_seq)
@@ -216,7 +217,7 @@ class SASRec(IterativeRecommender, SequentialRecommenderUtils):
         # Pass through Transformer Encoder
         transformer_output = self.transformer_encoder(
             src=seq_emb,
-            mask=causal_mask.to(item_seq.device),
+            mask=self.causal_mask,
             src_key_padding_mask=padding_mask,
         )  # [batch_size, max_seq_len, embedding_size]
 
