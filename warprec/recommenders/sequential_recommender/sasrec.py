@@ -135,11 +135,6 @@ class SASRec(IterativeRecommender, SequentialRecommenderUtils):
         if isinstance(module, nn.Linear) and module.bias is not None:
             module.bias.data.zero_()
 
-    def _generate_square_subsequent_mask(self, seq_len: int) -> Tensor:
-        """Generates a causal mask for the transformer."""
-        mask = torch.triu(torch.ones(seq_len, seq_len), diagonal=1)
-        return mask.bool()  # True values will be masked
-
     def get_dataloader(
         self,
         interactions: Interactions,

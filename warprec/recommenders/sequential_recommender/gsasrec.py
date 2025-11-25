@@ -121,19 +121,6 @@ class gSASRec(IterativeRecommender, SequentialRecommenderUtils):
         self.apply(self._init_weights)
         self.loss = self._gbce_loss_function()
 
-    def _generate_square_subsequent_mask(self, seq_len: int) -> Tensor:
-        """Generate a square mask for the sequence.
-
-        Args:
-            seq_len (int): Length of the sequence.
-
-        Returns:
-            Tensor: A square mask of shape [seq_len, seq_len] with True for positions
-                    that should not be attended to.
-        """
-        mask = torch.triu(torch.ones(seq_len, seq_len), diagonal=1)
-        return mask.bool()
-
     def _get_output_embeddings(self) -> nn.Embedding:
         """Return embeddings based on the flag value reuse_item_embeddings.
 

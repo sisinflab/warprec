@@ -249,6 +249,19 @@ class SequentialRecommenderUtils(ABC):
         output_flatten = output.gather(dim=1, index=gather_index)
         return output_flatten.squeeze(1)
 
+    def _generate_square_subsequent_mask(self, seq_len: int) -> Tensor:
+        """Generate a square mask for the sequence.
+
+        Args:
+            seq_len (int): Length of the sequence.
+
+        Returns:
+            Tensor: A square mask of shape [seq_len, seq_len] with True for positions
+                    that should not be attended to.
+        """
+        mask = torch.triu(torch.ones(seq_len, seq_len), diagonal=1)
+        return mask.bool()
+
 
 def generate_model_name(model_name: str, params: dict) -> str:
     """
