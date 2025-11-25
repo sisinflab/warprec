@@ -84,11 +84,12 @@ class LightGCN(IterativeRecommender, GraphRecommenderUtils):
         self.item_embedding = nn.Embedding(
             self.n_items + 1, self.embedding_size, padding_idx=self.n_items
         )
-        self.adj = self.get_adj_mat(
+        adj_matrix = self.get_adj_mat(
             interactions.get_sparse().tocoo(),
             self.n_users,
             self.n_items + 1,  # Adjust for padding idx
         )
+        self.register_buffer("adj", adj_matrix)
 
         # Initialization of the propagation network
         propagation_network_list = []
@@ -99,7 +100,8 @@ class LightGCN(IterativeRecommender, GraphRecommenderUtils):
         )
 
         # Vectorized normalization for embedding
-        self.alpha = torch.tensor([1 / (k + 1) for k in range(self.n_layers + 1)])
+        alpha_tensor = torch.tensor([1 / (k + 1) for k in range(self.n_layers + 1)])
+        self.register_buffer("alpha", alpha_tensor)
 
         # Init embedding weights
         self.apply(self._init_weights)
@@ -163,10 +165,11 @@ class LightGCN(IterativeRecommender, GraphRecommenderUtils):
             embeddings_list.append(current_embeddings)
 
         # Aggregate embeddings using the alpha value
-        lightgcn_all_embeddings = torch.zeros_like(ego_embeddings)
-        lightgcn_all_embeddings.to(embeddings_list[0].device)  # Move to correct device
+        lightgcn_all_embeddings = torch.zeros_like(
+            ego_embeddings, device=ego_embeddings.device
+        )
         for k, embedding in enumerate(embeddings_list):
-            lightgcn_all_embeddings += embedding * self.alpha[k]
+            lightgcn_all_embeddings += embedding * self.alpha[k]  # type: ignore[index]
 
         # Split into user and item embeddings
         user_all_embeddings, item_all_embeddings = torch.split(

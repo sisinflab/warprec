@@ -99,11 +99,12 @@ class NGCF(IterativeRecommender, GraphRecommenderUtils):
         self.item_embedding = nn.Embedding(
             self.n_items + 1, self.embedding_size, padding_idx=self.n_items
         )
-        self.adj_matrix = self._get_norm_adj_mat_ngcf(
+        adj_matrix = self._get_norm_adj_mat_ngcf(
             interactions.get_sparse().tocoo(),
             self.n_users,
             self.n_items + 1,  # Adjust for padding idx
         )
+        self.register_buffer("adj", adj_matrix)
 
         # Optionally define a dropout layer (optimized for sparse data)
         self.sparse_dropout = (
@@ -129,8 +130,10 @@ class NGCF(IterativeRecommender, GraphRecommenderUtils):
         Args:
             module (Module): The module to initialize.
         """
-        if isinstance(module, nn.Embedding):
+        if isinstance(module, (nn.Embedding, nn.Linear)):
             xavier_normal_(module.weight.data)
+            if isinstance(module, nn.Linear) and module.bias is not None:
+                module.bias.data.zero_()
 
     def get_dataloader(
         self,
@@ -174,9 +177,9 @@ class NGCF(IterativeRecommender, GraphRecommenderUtils):
         embeddings_list = [ego_embeddings]
 
         # Apply dropout if required from hyperparameters
-        adj_matrix_current = self.adj_matrix
+        adj_matrix_current = self.adj
         if self.sparse_dropout is not None:
-            adj_matrix_current = self.sparse_dropout(self.adj_matrix)
+            adj_matrix_current = self.sparse_dropout(self.adj)
 
         # Forward each embedding through the sequential
         # propagation network
@@ -201,7 +204,6 @@ class NGCF(IterativeRecommender, GraphRecommenderUtils):
         interaction_matrix: coo_matrix,
         n_users: int,
         n_items: int,
-        device: torch.device | str = "cpu",
     ) -> SparseTensor:
         """Get the normalized interaction matrix of users and items specific to NGCF.
         This includes constructing the full adjacency matrix and applying symmetric normalization.
@@ -210,7 +212,6 @@ class NGCF(IterativeRecommender, GraphRecommenderUtils):
             interaction_matrix (coo_matrix): The full interaction matrix in coo format.
             n_users (int): The number of users.
             n_items (int): The number of items.
-            device (torch.device | str): Device to use for the adjacency matrix.
 
         Returns:
             SparseTensor: The sparse normalized adjacency matrix (A_hat).
@@ -248,7 +249,7 @@ class NGCF(IterativeRecommender, GraphRecommenderUtils):
         values = torch.FloatTensor(L_coo.data)
         shape = torch.Size(L_coo.shape)
 
-        return torch.sparse_coo_tensor(indices, values, shape).coalesce().to(device)
+        return torch.sparse_coo_tensor(indices, values, shape).coalesce()
 
     @torch.no_grad()
     def predict(
