@@ -81,7 +81,7 @@ class Writer(ABC):
         train_sparse = dataset.train_set.get_sparse()
         umap_i, imap_i = dataset.get_inverse_mappings()
         num_users = train_sparse.shape[0]
-        all_user_indices = torch.arange(num_users, device=model._device)
+        all_user_indices = torch.arange(num_users, device=model.device)
         batch_size = dataset._batch_size
 
         batch_iterator = range(0, num_users, batch_size)
