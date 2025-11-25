@@ -20,7 +20,6 @@ class Recommender(nn.Module, ABC):
         params (dict): The dictionary with the model params.
         interactions (Interactions): The training interactions.
         *args (Any): Argument for PyTorch nn.Module.
-        device (str): The device used for tensor operations.
         seed (int): The seed to use for reproducibility.
         info (dict): The dictionary containing dataset information.
         **kwargs (Any): Keyword argument for PyTorch nn.Module.
@@ -38,7 +37,6 @@ class Recommender(nn.Module, ABC):
         params: dict,
         interactions: Interactions,
         *args: Any,
-        device: str = "cpu",
         seed: int = 42,
         info: dict = None,
         **kwargs: Any,
@@ -46,7 +44,6 @@ class Recommender(nn.Module, ABC):
         super().__init__()
         self.init_params(params)
         self.set_seed(seed)
-        self._device = torch.device(device)
 
     @abstractmethod
     def predict(
