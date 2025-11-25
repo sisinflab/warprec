@@ -240,19 +240,18 @@ class MultiVAE(IterativeRecommender):
             Tensor: The score matrix {user x item}.
 
         Raises:
-            ValueError: If the 'train_sparse' keyword argument is not provided.
+            ValueError: If the 'train_batch' keyword argument is not provided.
         """
         # Get train batch from kwargs
-        train_sparse: Optional[csr_matrix] = kwargs.get("train_sparse")
-        if train_sparse is None:
+        train_batch_sparse: Optional[csr_matrix] = kwargs.get("train_batch")
+        if train_batch_sparse is None:
             raise ValueError(
-                "predict() for MultiVAE requires 'train_sparse' as a keyword argument."
+                "predict() for MultiVAE requires 'train_batch' as a keyword argument."
             )
 
         # Compute predictions and convert to Tensor
-        train_sparse_batch = train_sparse[user_indices.cpu().numpy()]
         train_batch = (
-            torch.from_numpy(train_sparse_batch.toarray()).float().to(self.device)
+            torch.from_numpy(train_batch_sparse.toarray()).float().to(self.device)
         )
         predictions, _ = self.forward(train_batch)
 
