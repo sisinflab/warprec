@@ -102,7 +102,7 @@ class BPR(IterativeRecommender):
         )
 
     def train_step(self, batch: Any, *args, **kwargs):
-        user, pos_item, neg_item = [x for x in batch]
+        user, pos_item, neg_item = batch
 
         pos_item_score = self.forward(user, pos_item)
         neg_item_score = self.forward(user, neg_item)

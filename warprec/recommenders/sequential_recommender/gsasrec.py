@@ -250,7 +250,7 @@ class gSASRec(IterativeRecommender, SequentialRecommenderUtils):
         return gbce_loss_fn
 
     def train_step(self, batch: Any, *args, **kwargs):
-        positives, negatives = [x for x in batch]
+        positives, negatives = batch
 
         if positives.shape[0] == 0 or positives.shape[1] < 2:
             return torch.tensor(0.0, requires_grad=True).to(positives.device)

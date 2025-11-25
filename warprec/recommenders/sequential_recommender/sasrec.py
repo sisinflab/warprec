@@ -152,9 +152,9 @@ class SASRec(IterativeRecommender, SequentialRecommenderUtils):
 
     def train_step(self, batch: Any, *args, **kwargs):
         if self.neg_samples > 0:
-            item_seq, item_seq_len, pos_item, neg_item = [x for x in batch]
+            item_seq, item_seq_len, pos_item, neg_item = batch
         else:
-            item_seq, item_seq_len, pos_item = [x for x in batch]
+            item_seq, item_seq_len, pos_item = batch
             neg_item = None
 
         seq_output = self.forward(item_seq, item_seq_len)

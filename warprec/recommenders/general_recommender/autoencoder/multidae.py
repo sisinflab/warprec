@@ -164,7 +164,7 @@ class MultiDAE(IterativeRecommender):
         )
 
     def train_step(self, batch: Any, *args: Any, **kwargs: Any):
-        rating_matrix = [x for x in batch][0]
+        rating_matrix = batch[0]
 
         reconstructed = self(rating_matrix)
         loss: Tensor = self.loss(rating_matrix, reconstructed)

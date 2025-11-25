@@ -162,9 +162,9 @@ class Caser(IterativeRecommender, SequentialRecommenderUtils):
 
     def train_step(self, batch: Any, *args, **kwargs):
         if self.neg_samples > 0:
-            user, item_seq, _, pos_item, neg_item = [x for x in batch]
+            user, item_seq, _, pos_item, neg_item = batch
         else:
-            user, item_seq, _, pos_item = [x for x in batch]
+            user, item_seq, _, pos_item = batch
             neg_item = None
 
         seq_output = self.forward(user, item_seq)

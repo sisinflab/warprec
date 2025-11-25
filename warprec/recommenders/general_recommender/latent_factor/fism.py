@@ -126,7 +126,7 @@ class FISM(IterativeRecommender):
         )
 
     def train_step(self, batch: Any, *args, **kwargs):
-        user, item, rating = [x for x in batch]
+        user, item, rating = batch
 
         predictions = self(user, item)
         loss: Tensor = self.loss(predictions, rating)

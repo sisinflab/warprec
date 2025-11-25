@@ -187,7 +187,7 @@ class MultiVAE(IterativeRecommender):
         )
 
     def train_step(self, batch: Any, epoch: int, *args: Any, **kwargs: Any):
-        rating_matrix = [x for x in batch][0]
+        rating_matrix = batch[0]
 
         anneal = (
             min(self.anneal_cap * epoch / self.anneal_step, self.anneal_cap)

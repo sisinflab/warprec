@@ -144,7 +144,7 @@ class NGCF(IterativeRecommender, GraphRecommenderUtils):
         )
 
     def train_step(self, batch: Any, *args, **kwargs):
-        user, pos_item, neg_item = [x for x in batch]
+        user, pos_item, neg_item = batch
 
         # Get propagated embeddings
         user_all_embeddings, item_all_embeddings = self.forward()
