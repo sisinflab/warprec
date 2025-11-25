@@ -196,7 +196,7 @@ class SASRec(IterativeRecommender, SequentialRecommenderUtils):
         seq_len = item_seq.size(1)
 
         # Padding mask to ignore padding tokens
-        padding_mask = item_seq == 0  # [batch_size, seq_len]
+        padding_mask = item_seq == self.items  # [batch_size, seq_len]
 
         # Causal mask to prevent attending to future tokens
         causal_mask = self._generate_square_subsequent_mask(seq_len)
