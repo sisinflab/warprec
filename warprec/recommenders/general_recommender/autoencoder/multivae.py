@@ -102,7 +102,6 @@ class MultiVAE(IterativeRecommender):
     Args:
         params (dict): Model parameters.
         *args (Any): Variable length argument list.
-        device (str): The device used for tensor operations.
         seed (int): The seed to use for reproducibility.
         info (dict): The dictionary containing dataset information.
         **kwargs (Any): Arbitrary keyword arguments.
@@ -140,12 +139,11 @@ class MultiVAE(IterativeRecommender):
         self,
         params: dict,
         *args: Any,
-        device: str = "cpu",
         seed: int = 42,
         info: dict = None,
         **kwargs: Any,
     ):
-        super().__init__(params, device=device, seed=seed, *args, **kwargs)
+        super().__init__(params, seed=seed, *args, **kwargs)
 
         # Get dataset information
         self.items = info.get("items")
@@ -171,9 +169,6 @@ class MultiVAE(IterativeRecommender):
         self.apply(self._init_weights)
         self.loss = MultiVAELoss()
 
-        # Move to device
-        self.to(self._device)
-
     def _init_weights(self, module: nn.Module):
         if isinstance(module, nn.Linear):
             xavier_normal_(module.weight.data)
@@ -192,7 +187,7 @@ class MultiVAE(IterativeRecommender):
         )
 
     def train_step(self, batch: Any, epoch: int, *args: Any, **kwargs: Any):
-        rating_matrix = [x.to(self._device) for x in batch][0]
+        rating_matrix = [x for x in batch][0]
 
         anneal = (
             min(self.anneal_cap * epoch / self.anneal_step, self.anneal_cap)
@@ -256,9 +251,10 @@ class MultiVAE(IterativeRecommender):
 
         # Compute predictions and convert to Tensor
         train_sparse_batch = train_sparse[user_indices.cpu().numpy()]
-        train_batch = (
-            torch.from_numpy(train_sparse_batch.toarray()).float().to(self._device)
-        )
+        train_batch = torch.from_numpy(train_sparse_batch.toarray()).float()
+        train_batch.to(
+            next(self.parameters()).device
+        )  # Move to model first parameter device
         predictions, _ = self.forward(train_batch)
 
         if item_indices is None:

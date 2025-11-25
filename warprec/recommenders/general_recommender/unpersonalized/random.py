@@ -17,7 +17,6 @@ class Random(Recommender):
     Args:
         params (dict): The dictionary with the model params.
         *args (Any): Argument for PyTorch nn.Module.
-        device (str): The device used for tensor operations.
         seed (int): The seed to use for reproducibility.
         info (dict): The dictionary containing dataset information.
         **kwargs (Any): Keyword argument for PyTorch nn.Module.
@@ -30,12 +29,11 @@ class Random(Recommender):
         self,
         params: dict,
         *args: Any,
-        device: str = "cpu",
         seed: int = 42,
         info: dict = None,
         **kwargs: Any,
     ):
-        super().__init__(params, device=device, seed=seed, info=info, *args, **kwargs)
+        super().__init__(params, seed=seed, info=info, *args, **kwargs)
         self.items = info.get("items", None)
         if not self.items:
             raise ValueError(

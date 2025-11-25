@@ -23,7 +23,6 @@ class NeuMF(IterativeRecommender):
     Args:
         params (dict): Model parameters.
         *args (Any): Variable length argument list.
-        device (str): The device used for tensor operations.
         seed (int): The seed to use for reproducibility.
         info (dict): The dictionary containing dataset information.
         **kwargs (Any): Arbitrary keyword arguments.
@@ -66,12 +65,11 @@ class NeuMF(IterativeRecommender):
         self,
         params: dict,
         *args: Any,
-        device: str = "cpu",
         seed: int = 42,
         info: dict = None,
         **kwargs: Any,
     ):
-        super().__init__(params, device=device, seed=seed, *args, **kwargs)
+        super().__init__(params, seed=seed, *args, **kwargs)
 
         # Get information from dataset info
         self.users = info.get("users", None)
@@ -124,9 +122,6 @@ class NeuMF(IterativeRecommender):
         self.sigmoid = nn.Sigmoid()
         self.loss = nn.BCEWithLogitsLoss()
 
-        # Move to device
-        self.to(self._device)
-
     def _init_weights(self, module: Module):
         """Internal method to initialize weights.
 
@@ -150,7 +145,7 @@ class NeuMF(IterativeRecommender):
         )
 
     def train_step(self, batch: Any, *args, **kwargs):
-        user, item, rating = [x.to(self._device) for x in batch]
+        user, item, rating = [x for x in batch]
 
         predictions = self(user, item)
         loss: Tensor = self.loss(predictions, rating)
@@ -219,7 +214,7 @@ class NeuMF(IterativeRecommender):
             preds_logits = []
             for start in range(0, self.items, self.block_size):
                 end = min(start + self.block_size, self.items)
-                items_block = torch.arange(start, end, device=self._device)
+                items_block = torch.arange(start, end)
 
                 # Expand user and item indices to create all pairs for the block
                 users_block = (
@@ -227,7 +222,7 @@ class NeuMF(IterativeRecommender):
                 )
                 items_block_expanded = (
                     items_block.unsqueeze(0).expand(batch_size, -1).reshape(-1)
-                )
+                ).to(users_block.device)
 
                 # Get raw logits from the forward pass
                 logits_block = self.forward(users_block, items_block_expanded)

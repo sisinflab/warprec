@@ -27,7 +27,6 @@ class SASRec(IterativeRecommender, SequentialRecommenderUtils):
     Args:
         params (dict): Model parameters.
         *args (Any): Variable length argument list.
-        device (str): The device used for tensor operations.
         seed (int): The seed to use for reproducibility.
         info (dict): The dictionary containing dataset information.
         **kwargs (Any): Arbitrary keyword arguments.
@@ -72,12 +71,11 @@ class SASRec(IterativeRecommender, SequentialRecommenderUtils):
         self,
         params: dict,
         *args: Any,
-        device: str = "cpu",
         seed: int = 42,
         info: dict = None,
         **kwargs: Any,
     ):
-        super().__init__(params, device=device, seed=seed, *args, **kwargs)
+        super().__init__(params, seed=seed, *args, **kwargs)
 
         self.items = info.get("items", None)
         if not self.items:
@@ -116,8 +114,6 @@ class SASRec(IterativeRecommender, SequentialRecommenderUtils):
         else:
             self.loss = nn.CrossEntropyLoss()
 
-        self.to(self._device)
-
     def _init_weights(self, module: Module):
         """Internal method to initialize weights.
 
@@ -137,7 +133,7 @@ class SASRec(IterativeRecommender, SequentialRecommenderUtils):
 
     def _generate_square_subsequent_mask(self, seq_len: int) -> Tensor:
         """Generates a causal mask for the transformer."""
-        mask = torch.triu(torch.ones(seq_len, seq_len, device=self._device), diagonal=1)
+        mask = torch.triu(torch.ones(seq_len, seq_len), diagonal=1)
         return mask.bool()  # True values will be masked
 
     def get_dataloader(
@@ -156,11 +152,9 @@ class SASRec(IterativeRecommender, SequentialRecommenderUtils):
 
     def train_step(self, batch: Any, *args, **kwargs):
         if self.neg_samples > 0:
-            item_seq, item_seq_len, pos_item, neg_item = [
-                x.to(self._device) for x in batch
-            ]
+            item_seq, item_seq_len, pos_item, neg_item = [x for x in batch]
         else:
-            item_seq, item_seq_len, pos_item = [x.to(self._device) for x in batch]
+            item_seq, item_seq_len, pos_item = [x for x in batch]
             neg_item = None
 
         seq_output = self.forward(item_seq, item_seq_len)
@@ -208,7 +202,7 @@ class SASRec(IterativeRecommender, SequentialRecommenderUtils):
         causal_mask = self._generate_square_subsequent_mask(seq_len)
 
         # Create position IDs
-        position_ids = torch.arange(seq_len, dtype=torch.long, device=self._device)
+        position_ids = torch.arange(seq_len, dtype=torch.long).to(item_seq.device)
         position_ids = position_ids.unsqueeze(0).expand_as(item_seq)
 
         # Get embeddings
@@ -222,7 +216,7 @@ class SASRec(IterativeRecommender, SequentialRecommenderUtils):
         # Pass through Transformer Encoder
         transformer_output = self.transformer_encoder(
             src=seq_emb,
-            mask=causal_mask,
+            mask=causal_mask.to(item_seq.device),
             src_key_padding_mask=padding_mask,
         )  # [batch_size, max_seq_len, embedding_size]
 

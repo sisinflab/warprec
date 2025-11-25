@@ -24,7 +24,6 @@ class ConvNCF(IterativeRecommender):
     Args:
         params (dict): Model parameters.
         *args (Any): Variable length argument list.
-        device (str): The device used for tensor operations.
         seed (int): The seed to use for reproducibility.
         info (dict): The dictionary containing dataset information.
         **kwargs (Any): Arbitrary keyword arguments.
@@ -63,12 +62,11 @@ class ConvNCF(IterativeRecommender):
         self,
         params: dict,
         *args: Any,
-        device: str = "cpu",
         seed: int = 42,
         info: dict = None,
         **kwargs: Any,
     ):
-        super().__init__(params, device=device, seed=seed, *args, **kwargs)
+        super().__init__(params, seed=seed, *args, **kwargs)
 
         # Get information from dataset info
         self.users = info.get("users", None)
@@ -110,9 +108,6 @@ class ConvNCF(IterativeRecommender):
         self.apply(self._init_weights)
         self.loss = BPRLoss()
 
-        # Move to device
-        self.to(self._device)
-
     def _init_weights(self, module: Module):
         """Internal method to initialize weights.
 
@@ -134,7 +129,7 @@ class ConvNCF(IterativeRecommender):
         )
 
     def train_step(self, batch: Any, *args, **kwargs):
-        user, pos_item, neg_item = [x.to(self._device) for x in batch]
+        user, pos_item, neg_item = [x for x in batch]
 
         pos_item_score = self.forward(user, pos_item)
         neg_item_score = self.forward(user, neg_item)
@@ -205,7 +200,7 @@ class ConvNCF(IterativeRecommender):
             all_scores = []
             for start in range(0, self.items, self.block_size):
                 end = min(start + self.block_size, self.items)
-                items_block_indices = torch.arange(start, end, device=self._device)
+                items_block_indices = torch.arange(start, end)
 
                 # Expand user and item indices to create all pairs for the block
                 num_items_in_block = end - start
@@ -214,7 +209,7 @@ class ConvNCF(IterativeRecommender):
                 )
                 items_expanded = (
                     items_block_indices.unsqueeze(0).expand(batch_size, -1).reshape(-1)
-                )
+                ).to(users_expanded.device)
 
                 # Call forward on the flattened batch of pairs for the current block
                 scores_flat = self.forward(users_expanded, items_expanded)

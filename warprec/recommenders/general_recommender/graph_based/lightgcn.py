@@ -29,7 +29,6 @@ class LightGCN(IterativeRecommender, GraphRecommenderUtils):
         params (dict): Model parameters.
         interactions (Interactions): The training interactions.
         *args (Any): Variable length argument list.
-        device (str): The device used for tensor operations.
         seed (int): The seed to use for reproducibility.
         info (dict): The dictionary containing dataset information.
         **kwargs (Any): Arbitrary keyword arguments.
@@ -63,14 +62,11 @@ class LightGCN(IterativeRecommender, GraphRecommenderUtils):
         params: dict,
         interactions: Interactions,
         *args: Any,
-        device: str = "cpu",
         seed: int = 42,
         info: dict = None,
         **kwargs: Any,
     ):
-        super().__init__(
-            params, interactions, device=device, seed=seed, *args, **kwargs
-        )
+        super().__init__(params, interactions, seed=seed, *args, **kwargs)
 
         # Get information from dataset info
         self.n_users = info.get("users", None)
@@ -92,7 +88,6 @@ class LightGCN(IterativeRecommender, GraphRecommenderUtils):
             interactions.get_sparse().tocoo(),
             self.n_users,
             self.n_items + 1,  # Adjust for padding idx
-            self._device,
         )
 
         # Initialization of the propagation network
@@ -104,16 +99,11 @@ class LightGCN(IterativeRecommender, GraphRecommenderUtils):
         )
 
         # Vectorized normalization for embedding
-        self.alpha = torch.tensor(
-            [1 / (k + 1) for k in range(self.n_layers + 1)], device=self._device
-        )
+        self.alpha = torch.tensor([1 / (k + 1) for k in range(self.n_layers + 1)])
 
         # Init embedding weights
         self.apply(self._init_weights)
         self.loss = BPRLoss()
-
-        # Move to device
-        self.to(self._device)
 
     def _init_weights(self, module: Module):
         """Internal method to initialize weights.
@@ -136,7 +126,7 @@ class LightGCN(IterativeRecommender, GraphRecommenderUtils):
         )
 
     def train_step(self, batch: Any, *args, **kwargs):
-        user, pos_item, neg_item = [x.to(self._device) for x in batch]
+        user, pos_item, neg_item = [x for x in batch]
 
         # Get propagated embeddings
         user_all_embeddings, item_all_embeddings = self.forward()
@@ -173,7 +163,8 @@ class LightGCN(IterativeRecommender, GraphRecommenderUtils):
             embeddings_list.append(current_embeddings)
 
         # Aggregate embeddings using the alpha value
-        lightgcn_all_embeddings = torch.zeros_like(ego_embeddings, device=self._device)
+        lightgcn_all_embeddings = torch.zeros_like(ego_embeddings)
+        lightgcn_all_embeddings.to(embeddings_list[0].device)  # Move to correct device
         for k, embedding in enumerate(embeddings_list):
             lightgcn_all_embeddings += embedding * self.alpha[k]
 

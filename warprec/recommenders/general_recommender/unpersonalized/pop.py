@@ -19,7 +19,6 @@ class Pop(Recommender):
         params (dict): The dictionary with the model params.
         interactions (Interactions): The training interactions.
         *args (Any): Argument for PyTorch nn.Module.
-        device (str): The device used for tensor operations.
         seed (int): The seed to use for reproducibility.
         info (dict): The dictionary containing dataset information.
         **kwargs (Any): Keyword argument for PyTorch nn.Module.
@@ -33,14 +32,11 @@ class Pop(Recommender):
         params: dict,
         interactions: Interactions,
         *args: Any,
-        device: str = "cpu",
         seed: int = 42,
         info: dict = None,
         **kwargs: Any,
     ):
-        super().__init__(
-            params, interactions, device=device, seed=seed, info=info, *args, **kwargs
-        )
+        super().__init__(params, interactions, seed=seed, info=info, *args, **kwargs)
         self.items = info.get("items", None)
         if not self.items:
             raise ValueError(
@@ -50,11 +46,9 @@ class Pop(Recommender):
         X = interactions.get_sparse()
 
         # Count the number of items to define the popularity
-        popularity = torch.tensor(
-            X.sum(axis=0).A1, device=self._device, dtype=torch.float32
-        )
+        popularity = torch.tensor(X.sum(axis=0).A1, dtype=torch.float32)
         # Count the total number of interactions
-        item_count = torch.tensor(X.sum(), device=self._device, dtype=torch.float32)
+        item_count = torch.tensor(X.sum(), dtype=torch.float32)
 
         # Normalize popularity by the total number of interactions
         # Add epsilon to avoid division by zero if there are no interactions

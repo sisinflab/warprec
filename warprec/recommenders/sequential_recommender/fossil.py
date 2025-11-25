@@ -27,7 +27,6 @@ class FOSSIL(IterativeRecommender, SequentialRecommenderUtils):
     Args:
         params (dict): Model parameters.
         *args (Any): Variable length argument list.
-        device (str): The device used for tensor operations.
         seed (int): The seed to use for reproducibility.
         info (dict): The dictionary containing dataset information.
         **kwargs (Any): Arbitrary keyword arguments.
@@ -69,12 +68,11 @@ class FOSSIL(IterativeRecommender, SequentialRecommenderUtils):
         self,
         params: dict,
         *args: Any,
-        device: str = "cpu",
         seed: int = 42,
         info: dict = None,
         **kwargs: Any,
     ):
-        super().__init__(params, device=device, seed=seed, *args, **kwargs)
+        super().__init__(params, seed=seed, *args, **kwargs)
 
         # Get information from dataset info
         self.n_items = info.get("items", None)
@@ -104,8 +102,6 @@ class FOSSIL(IterativeRecommender, SequentialRecommenderUtils):
             self.loss = BPRLoss()
         else:
             self.loss = nn.CrossEntropyLoss()
-
-        self.to(self._device)
 
     def _init_weights(self, module: Module):
         """Internal method to initialize weights.
@@ -158,7 +154,7 @@ class FOSSIL(IterativeRecommender, SequentialRecommenderUtils):
         # Create a tensor of zeros with the same shape and type as seq_item_embedding
         # This will be prepended to the sequence embeddings to act as padding or initial state.
         zeros = torch.zeros_like(seq_item_embedding, dtype=torch.float).to(
-            self._device
+            seq_item_embedding.device
         )  # (batch_size, sequence_length, embedding_dim)
 
         # Concatenate zeros to the beginning of seq_item_embedding along dimension 1 (sequence_length)
@@ -263,13 +259,9 @@ class FOSSIL(IterativeRecommender, SequentialRecommenderUtils):
 
     def train_step(self, batch: Any, *args, **kwargs):
         if self.neg_samples > 0:
-            user_id, item_seq, item_seq_len, pos_item, neg_item = [
-                x.to(self._device) for x in batch
-            ]
+            user_id, item_seq, item_seq_len, pos_item, neg_item = [x for x in batch]
         else:
-            user_id, item_seq, item_seq_len, pos_item = [
-                x.to(self._device) for x in batch
-            ]
+            user_id, item_seq, item_seq_len, pos_item = [x for x in batch]
             neg_item = None
 
         seq_output = self.forward(user_id, item_seq, item_seq_len)

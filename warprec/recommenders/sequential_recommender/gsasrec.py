@@ -25,7 +25,6 @@ class gSASRec(IterativeRecommender, SequentialRecommenderUtils):
     Args:
         params (dict): Model parameters.
         *args (Any): Variable length argument list.
-        device (str): The device used for tensor operations.
         seed (int): The seed to use for reproducibility.
         info (dict): The dictionary containing dataset information.
         **kwargs (Any): Arbitrary keyword arguments.
@@ -75,12 +74,11 @@ class gSASRec(IterativeRecommender, SequentialRecommenderUtils):
         self,
         params: dict,
         *args: Any,
-        device: str = "cpu",
         seed: int = 42,
         info: dict = None,
         **kwargs: Any,
     ):
-        super().__init__(params, device=device, seed=seed, *args, **kwargs)
+        super().__init__(params, seed=seed, *args, **kwargs)
 
         # Get information from dataset info
         self.n_items = info.get("items", None)
@@ -119,8 +117,6 @@ class gSASRec(IterativeRecommender, SequentialRecommenderUtils):
         self.apply(self._init_weights)
         self.loss = self._gbce_loss_function()
 
-        self.to(self._device)
-
     def _generate_square_subsequent_mask(self, seq_len: int) -> Tensor:
         """Generate a square mask for the sequence.
 
@@ -131,7 +127,7 @@ class gSASRec(IterativeRecommender, SequentialRecommenderUtils):
             Tensor: A square mask of shape [seq_len, seq_len] with True for positions
                     that should not be attended to.
         """
-        mask = torch.triu(torch.ones(seq_len, seq_len, device=self._device), diagonal=1)
+        mask = torch.triu(torch.ones(seq_len, seq_len), diagonal=1)
         return mask.bool()
 
     def _get_output_embeddings(self) -> nn.Embedding:
@@ -178,7 +174,7 @@ class gSASRec(IterativeRecommender, SequentialRecommenderUtils):
         padding_mask = item_seq == self.n_items
         causal_mask = self._generate_square_subsequent_mask(seq_len)
 
-        position_ids = torch.arange(seq_len, dtype=torch.long, device=self._device)
+        position_ids = torch.arange(seq_len, dtype=torch.long).to(item_seq.device)
         position_ids = position_ids.unsqueeze(0).expand_as(item_seq)
 
         item_emb = self.item_embedding(item_seq)
@@ -189,7 +185,7 @@ class gSASRec(IterativeRecommender, SequentialRecommenderUtils):
 
         transformer_output = self.transformer_encoder(
             src=seq_emb,
-            mask=causal_mask,
+            mask=causal_mask.to(item_seq.device),
             src_key_padding_mask=padding_mask,
         )
         return transformer_output
@@ -214,7 +210,7 @@ class gSASRec(IterativeRecommender, SequentialRecommenderUtils):
                 "bse, bsne -> bsn", sequence_hidden_states, pos_neg_embeddings
             )
 
-            gt = torch.zeros_like(logits, device=self._device)
+            gt = torch.zeros_like(logits).to(logits.device)
             gt[:, :, 0] = 1.0
 
             alpha = self.neg_samples / (self.n_items - 1)
@@ -254,16 +250,16 @@ class gSASRec(IterativeRecommender, SequentialRecommenderUtils):
         return gbce_loss_fn
 
     def train_step(self, batch: Any, *args, **kwargs):
-        positives, negatives = [x.to(self._device) for x in batch]
+        positives, negatives = [x for x in batch]
 
         if positives.shape[0] == 0 or positives.shape[1] < 2:
-            return torch.tensor(0.0, device=self._device, requires_grad=True)
+            return torch.tensor(0.0, requires_grad=True).to(positives.device)
 
         model_input = positives[:, :-1]
         labels = positives[:, 1:]
 
         if model_input.shape[1] == 0:
-            return torch.tensor(0.0, device=self._device, requires_grad=True)
+            return torch.tensor(0.0, requires_grad=True).to(positives.device)
 
         sequence_hidden_states = self.forward(model_input)
         total_loss = self.loss(sequence_hidden_states, labels, negatives, model_input)

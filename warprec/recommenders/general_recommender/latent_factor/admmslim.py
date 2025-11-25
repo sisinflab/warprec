@@ -18,7 +18,6 @@ class ADMMSlim(ItemSimRecommender):
         params (dict): Model parameters.
         interactions (Interactions): The training interactions.
         *args (Any): Variable length argument list.
-        device (str): The device used for tensor operations.
         seed (int): The seed to use for reproducibility.
         info (dict): The dictionary containing dataset information.
         **kwargs (Any): Arbitrary keyword arguments.
@@ -46,14 +45,11 @@ class ADMMSlim(ItemSimRecommender):
         params: dict,
         interactions: Interactions,
         *args: Any,
-        device: str = "cpu",
         seed: int = 42,
         info: dict = None,
         **kwargs: Any,
     ):
-        super().__init__(
-            params, interactions, device=device, seed=seed, info=info, *args, **kwargs
-        )
+        super().__init__(params, interactions, seed=seed, info=info, *args, **kwargs)
 
         X = interactions.get_sparse()
 
