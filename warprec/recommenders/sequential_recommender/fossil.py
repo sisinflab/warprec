@@ -328,7 +328,7 @@ class FOSSIL(IterativeRecommender, SequentialRecommenderUtils):
         **kwargs: Any,
     ) -> Tensor:
         """
-        Prediction using the learned session embeddings (full sort prediction).
+        Prediction using the learned session embeddings.
 
         Args:
             user_indices (Tensor): The batch of user indices.
