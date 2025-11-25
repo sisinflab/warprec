@@ -89,9 +89,12 @@ class FISM(IterativeRecommender):
         self.item_bias = nn.Parameter(torch.zeros(items + 1))  # +1 for padding
 
         # Prepare history information
-        self.history_matrix, self.history_lens, self.history_mask = (
-            interactions.get_history()
-        )
+        history_matrix, history_lens, history_mask = interactions.get_history()
+
+        # Use buffers to store non-trainable tensors
+        self.register_buffer("history_matrix", history_matrix)
+        self.register_buffer("history_lens", history_lens)
+        self.register_buffer("history_mask", history_mask)
 
         # Handle groups
         self.group = torch.chunk(torch.arange(1, items + 1), self.split_to)
@@ -140,9 +143,9 @@ class FISM(IterativeRecommender):
         Returns:
             Tensor: Predicted scores.
         """
-        user_inter = self.history_matrix[user]
-        item_num = self.history_lens[user].unsqueeze(1)
-        batch_mask_mat = self.history_mask[user]
+        user_inter = self.history_matrix[user]  # type: ignore[index]
+        item_num = self.history_lens[user].unsqueeze(1)  # type: ignore[index]
+        batch_mask_mat = self.history_mask[user]  # type: ignore[index]
 
         user_history = self.item_src_embedding(
             user_inter
@@ -189,9 +192,9 @@ class FISM(IterativeRecommender):
             Tensor: The score matrix {user x item}.
         """
         # Select data for current batch
-        batch_history_matrix = self.history_matrix[user_indices]
-        batch_history_lens = self.history_lens[user_indices]
-        batch_history_mask = self.history_mask[user_indices]
+        batch_history_matrix = self.history_matrix[user_indices]  # type: ignore[index]
+        batch_history_lens = self.history_lens[user_indices]  # type: ignore[index]
+        batch_history_mask = self.history_mask[user_indices]  # type: ignore[index]
         batch_user_bias = self.user_bias[user_indices]
 
         # Compute aggregated embedding for user in batch
