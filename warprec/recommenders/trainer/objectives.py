@@ -172,6 +172,7 @@ def objective_function(
             **dataset.get_stash(),
             block_size=block_size,
         )
+        model.to(device)
         if isinstance(model, IterativeRecommender):
             # Proceed with standard training loop
             train_dataloader = model.get_dataloader(
@@ -199,6 +200,7 @@ def objective_function(
                 model.train()
                 epoch_loss = 0.0
                 for batch in train_dataloader:
+                    batch = [x.to(device) for x in batch]
                     optimizer.zero_grad()
 
                     loss = model.train_step(batch, epoch)
@@ -364,6 +366,7 @@ def objective_function_ddp(config: dict) -> None:
         **dataset.get_stash(),
         block_size=config["block_size"],
     )
+    model.to(device)
 
     # Only IterativeRecommender models are supported in DDP
     if not isinstance(model, IterativeRecommender):
@@ -430,6 +433,7 @@ def objective_function_ddp(config: dict) -> None:
         train_dataloader.sampler.set_epoch(epoch)  # type:ignore [attr-defined]
 
         for batch in train_dataloader:
+            batch = [x.to(device) for x in batch]
             optimizer.zero_grad()
 
             loss = unwrapped_model.train_step(batch, epoch)

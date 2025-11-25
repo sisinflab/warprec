@@ -18,6 +18,7 @@ def train_loop(
     epochs: int,
     lr_scheduler: Optional[LRScheduler] = None,
     low_memory: bool = False,
+    device: str = "cpu",
 ):
     """Simple training loop decorated with tqdm.
 
@@ -28,8 +29,11 @@ def train_loop(
         lr_scheduler (Optional[LRScheduler]): The learning rate scheduler configuration.
         low_memory (bool): Wether or not to compute dataloader in
             lazy mode.
+        device (str): The device used for training. Defaults to "cpu".
     """
     logger.msg(f"Starting the training of model {model.name}")
+
+    model.to(device)
 
     train_dataloader = model.get_dataloader(
         interactions=dataset.train_set,
@@ -57,6 +61,7 @@ def train_loop(
             leave=False,
             total=len(train_dataloader),
         ):
+            batch = [x.to(device) for x in batch]
             optimizer.zero_grad()
 
             loss = model.train_step(batch, epoch)
