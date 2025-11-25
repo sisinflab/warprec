@@ -183,6 +183,8 @@ class Evaluator:
                             user_indices.tolist(),
                             model.max_seq_len,
                         )
+                        user_seq = user_seq.to(device)
+                        seq_len = seq_len.to(device)
 
                     predictions = model.predict(
                         user_indices=user_indices,
@@ -208,6 +210,8 @@ class Evaluator:
                             user_indices.tolist(),
                             model.max_seq_len,
                         )
+                        user_seq = user_seq.to(device)
+                        seq_len = seq_len.to(device)
 
                     # Cat all the sampled items in a single tensor
                     candidates_local = torch.cat([pos_batch, neg_batch], dim=1)
