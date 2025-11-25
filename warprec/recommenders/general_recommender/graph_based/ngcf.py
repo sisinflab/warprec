@@ -5,8 +5,6 @@ import torch
 import numpy as np
 import scipy.sparse as sp
 from torch import nn, Tensor
-from torch.nn import Module
-from torch.nn.init import xavier_normal_
 from torch_sparse import SparseTensor
 from scipy.sparse import coo_matrix
 
@@ -123,17 +121,6 @@ class NGCF(IterativeRecommender, GraphRecommenderUtils):
         # Init embedding weights
         self.apply(self._init_weights)
         self.loss = BPRLoss()
-
-    def _init_weights(self, module: Module):
-        """Internal method to initialize weights.
-
-        Args:
-            module (Module): The module to initialize.
-        """
-        if isinstance(module, (nn.Embedding, nn.Linear)):
-            xavier_normal_(module.weight.data)
-            if isinstance(module, nn.Linear) and module.bias is not None:
-                module.bias.data.zero_()
 
     def get_dataloader(
         self,

@@ -4,8 +4,6 @@ from typing import Tuple, Any, Optional
 import torch
 import torch_geometric
 from torch import nn, Tensor
-from torch.nn import Module
-from torch.nn.init import xavier_normal_
 from torch_geometric.nn import LGConv
 
 from warprec.data.entities import Interactions, Sessions
@@ -106,15 +104,6 @@ class LightGCN(IterativeRecommender, GraphRecommenderUtils):
         # Init embedding weights
         self.apply(self._init_weights)
         self.loss = BPRLoss()
-
-    def _init_weights(self, module: Module):
-        """Internal method to initialize weights.
-
-        Args:
-            module (Module): The module to initialize.
-        """
-        if isinstance(module, nn.Embedding):
-            xavier_normal_(module.weight.data)
 
     def get_dataloader(
         self,

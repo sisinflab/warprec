@@ -3,8 +3,6 @@ from typing import Callable, Any, Optional
 
 import torch
 from torch import nn, Tensor
-from torch.nn import Module
-from torch.nn.init import xavier_normal_
 
 from warprec.recommenders.base_recommender import (
     IterativeRecommender,
@@ -131,15 +129,6 @@ class gSASRec(IterativeRecommender, SequentialRecommenderUtils):
         if self.reuse_item_embeddings:
             return self.item_embedding
         return self.output_embedding
-
-    def _init_weights(self, module: Module):
-        if isinstance(module, (nn.Embedding, nn.Linear)):
-            xavier_normal_(module.weight.data)
-        elif isinstance(module, nn.LayerNorm):
-            module.bias.data.zero_()
-            module.weight.data.fill_(1.0)
-        if isinstance(module, nn.Linear) and module.bias is not None:
-            module.bias.data.zero_()
 
     def get_dataloader(
         self, interactions, sessions: Sessions, low_memory: bool = False, **kwargs

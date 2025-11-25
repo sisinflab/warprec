@@ -3,8 +3,6 @@ from typing import Any, Optional
 
 import torch
 from torch import nn, Tensor
-from torch.nn import Module
-from torch.nn.init import xavier_normal_
 
 from warprec.data.entities import Interactions, Sessions
 from warprec.recommenders.base_recommender import IterativeRecommender
@@ -80,15 +78,6 @@ class BPR(IterativeRecommender):
         # Init embedding weights
         self.apply(self._init_weights)
         self.loss = BPRLoss()
-
-    def _init_weights(self, module: Module):
-        """Internal method to initialize weights.
-
-        Args:
-            module (Module): The module to initialize.
-        """
-        if isinstance(module, nn.Embedding):
-            xavier_normal_(module.weight.data)
 
     def get_dataloader(
         self,

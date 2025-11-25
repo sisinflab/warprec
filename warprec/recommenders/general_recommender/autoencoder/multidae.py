@@ -3,7 +3,6 @@ from typing import Any, Optional
 import torch
 import torch.nn.functional as F
 from torch import nn, Tensor
-from torch.nn.init import xavier_normal_, constant_
 from scipy.sparse import csr_matrix
 
 from warprec.data.entities import Interactions, Sessions
@@ -145,12 +144,6 @@ class MultiDAE(IterativeRecommender):
         # Initialize weights
         self.apply(self._init_weights)
         self.loss = MultiDAELoss()
-
-    def _init_weights(self, module: nn.Module):
-        if isinstance(module, nn.Linear):
-            xavier_normal_(module.weight.data)
-            if module.bias is not None:
-                constant_(module.bias.data, 0)
 
     def get_dataloader(
         self,

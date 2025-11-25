@@ -3,8 +3,6 @@ from typing import Any, Optional
 
 import torch
 from torch import nn, Tensor
-from torch.nn import Module
-from torch.nn.init import normal_
 
 from warprec.data.entities import Interactions, Sessions
 from warprec.recommenders.base_recommender import IterativeRecommender
@@ -102,15 +100,6 @@ class FISM(IterativeRecommender):
         # Init embedding weights
         self.apply(self._init_weights)
         self.loss = nn.BCEWithLogitsLoss()
-
-    def _init_weights(self, module: Module):
-        """Internal method to initialize weights.
-
-        Args:
-            module (Module): The module to initialize.
-        """
-        if isinstance(module, nn.Embedding):
-            normal_(module.weight.data, 0, 0.01)  # Standard deviation
 
     def get_dataloader(
         self,

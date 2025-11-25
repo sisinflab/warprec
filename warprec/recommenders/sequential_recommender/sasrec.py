@@ -3,8 +3,6 @@ from typing import Any, Optional
 
 import torch
 from torch import nn, Tensor
-from torch.nn import Module
-from torch.nn.init import xavier_normal_
 
 from warprec.recommenders.base_recommender import (
     IterativeRecommender,
@@ -117,23 +115,6 @@ class SASRec(IterativeRecommender, SequentialRecommenderUtils):
             self.loss = BPRLoss()
         else:
             self.loss = nn.CrossEntropyLoss()
-
-    def _init_weights(self, module: Module):
-        """Internal method to initialize weights.
-
-        Args:
-            module (Module): The module to initialize.
-        """
-        if isinstance(module, (nn.Embedding, nn.Linear)):
-            # Using Xavier Normal initialization for consistency with the framework
-            xavier_normal_(module.weight.data)
-        elif isinstance(module, nn.LayerNorm):
-            # Standard initialization for LayerNorm
-            module.bias.data.zero_()
-            module.weight.data.fill_(1.0)
-
-        if isinstance(module, nn.Linear) and module.bias is not None:
-            module.bias.data.zero_()
 
     def get_dataloader(
         self,

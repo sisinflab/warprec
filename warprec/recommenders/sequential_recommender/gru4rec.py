@@ -3,8 +3,6 @@ from typing import Any, Optional
 
 import torch
 from torch import nn, Tensor
-from torch.nn import Module
-from torch.nn.init import xavier_uniform_, xavier_normal_
 
 from warprec.recommenders.base_recommender import (
     IterativeRecommender,
@@ -104,29 +102,6 @@ class GRU4Rec(IterativeRecommender, SequentialRecommenderUtils):
             self.loss = BPRLoss()
         else:
             self.loss = nn.CrossEntropyLoss()
-
-    def _init_weights(self, module: Module):
-        """Internal method to initialize weights.
-
-        Args:
-            module (Module): The module to initialize.
-        """
-        if isinstance(module, nn.Embedding):
-            xavier_normal_(module.weight.data)
-        elif isinstance(module, nn.GRU):
-            # Uniform Xavier init for GRU net
-            # Weight_ih represents input-hidden layers
-            # Weight_hh represents hidden-hidden layers
-            # No bias used in this network
-            for name, param in module.named_parameters():
-                if "weight_ih" in name:
-                    xavier_uniform_(param.data)
-                elif "weight_hh" in name:
-                    xavier_uniform_(param.data)
-        elif isinstance(module, nn.Linear):
-            xavier_uniform_(module.weight.data)
-            if module.bias is not None:
-                module.bias.data.zero_()
 
     def get_dataloader(
         self,

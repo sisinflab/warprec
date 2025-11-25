@@ -3,8 +3,6 @@ from typing import Any, Optional
 
 import torch
 from torch import nn, Tensor
-from torch.nn import Module
-from torch.nn.init import xavier_normal_, constant_
 import torch.nn.functional as F
 
 from warprec.recommenders.base_recommender import (
@@ -131,19 +129,6 @@ class Caser(IterativeRecommender, SequentialRecommenderUtils):
             self.loss = BPRLoss()
         else:
             self.loss = nn.CrossEntropyLoss()
-
-    def _init_weights(self, module: Module):
-        """Internal method to initialize weights."""
-        if isinstance(module, nn.Embedding):
-            xavier_normal_(module.weight.data)
-        elif isinstance(module, nn.Linear):
-            xavier_normal_(module.weight.data)
-            if module.bias is not None:
-                constant_(module.bias.data, 0)
-        elif isinstance(module, nn.Conv2d):
-            xavier_normal_(module.weight.data)
-            if module.bias is not None:
-                constant_(module.bias.data, 0)
 
     def get_dataloader(
         self,

@@ -3,8 +3,6 @@ from typing import List, Any, Optional
 
 import torch
 from torch import nn, Tensor
-from torch.nn import Module
-from torch.nn.init import normal_
 
 from warprec.recommenders.layers import MLP
 from warprec.data.entities import Interactions, Sessions
@@ -121,15 +119,6 @@ class NeuMF(IterativeRecommender):
         self.apply(self._init_weights)
         self.sigmoid = nn.Sigmoid()
         self.loss = nn.BCEWithLogitsLoss()
-
-    def _init_weights(self, module: Module):
-        """Internal method to initialize weights.
-
-        Args:
-            module (Module): The module to initialize.
-        """
-        if isinstance(module, nn.Embedding):
-            normal_(module.weight.data, mean=0.0, std=0.01)
 
     def get_dataloader(
         self,
