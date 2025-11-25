@@ -235,9 +235,7 @@ class GRU4Rec(IterativeRecommender, SequentialRecommenderUtils):
             Tensor: The score matrix {user x item}.
         """
         # Get sequence output embeddings
-        seq_output = self.forward(
-            user_indices, user_seq
-        )  # [batch_size, embedding_size]
+        seq_output = self.forward(user_seq, seq_len)  # [batch_size, embedding_size]
 
         if item_indices is None:
             # Case 'full': prediction on all items
