@@ -226,6 +226,12 @@ class DataLoaderType(Enum):
         construction_params=["max_seq_len", "neg_samples"],
         fixed_params={},
     )
+    CLOZE_MASK_LOADER = DataLoaderRequirements(
+        dataloader_source="train_session",
+        method_name="get_cloze_mask_dataloader",
+        construction_params=["max_seq_len", "mask_prob", "neg_samples"],
+        fixed_params={},
+    )
 
     @property
     def source(self) -> str:
