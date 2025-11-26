@@ -413,6 +413,19 @@ They are well-suited for uncovering complex patterns in sparse datasets.</p>
 <p>Graph-based models require PyTorch Geometric (PyG) dependencies to be installed correctly. Check the <a class="reference internal" href="../install.html#install-guide"><span class="std std-ref">installation guide</span></a> for more information on how to install them.</p>
 </div>
 <ul class="simple">
+<li><p>GCMC (Graph Convolutional Matrix Completion):
+A graph autoencoder designed for explicit feedback. It treats different rating values as distinct edge types in the user-item graph and learns embeddings using a graph convolutional encoder. A decoder then predicts rating probabilities. <strong>This model requires explicit ratings to function properly</strong>.</p></li>
+</ul>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">models</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">GCMC</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">embedding_size</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">64</span>
+<span class="w">    </span><span class="nt">weight_decay</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0.0001</span>
+<span class="w">    </span><span class="nt">batch_size</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">512</span>
+<span class="w">    </span><span class="nt">epochs</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">50</span>
+<span class="w">    </span><span class="nt">learning_rate</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0.001</span>
+</pre></div>
+</div>
+<ul class="simple">
 <li><p>LightGCN:
 A simplified graph convolutional network designed for collaborative filtering. It eliminates feature transformations and nonlinear activations, focusing solely on neighborhood aggregation.</p></li>
 </ul>
@@ -660,62 +673,66 @@ Recommends items at random. This model defines a lower bound for performance met
 <td><p>Classical content-based model using TF-IDF and cosine similarity.</p></td>
 </tr>
 <tr class="row-even"><td><p>Graph Based</p></td>
+<td><p>GCMC</p></td>
+<td><p>Graph autoencoder for explicit feedback using multi-relational convolutions.</p></td>
+</tr>
+<tr class="row-odd"><td></td>
 <td><p>LightGCN</p></td>
 <td><p>Simplified Graph convolutional neural network.</p></td>
 </tr>
-<tr class="row-odd"><td></td>
+<tr class="row-even"><td></td>
 <td><p>NGCF</p></td>
 <td><p>Complex Graph convolutional neural network.</p></td>
 </tr>
-<tr class="row-even"><td></td>
+<tr class="row-odd"><td></td>
 <td><p>RP3Beta</p></td>
 <td><p>Random walk model with popularity penalization.</p></td>
 </tr>
-<tr class="row-odd"><td><p>KNN</p></td>
+<tr class="row-even"><td><p>KNN</p></td>
 <td><p>ItemKNN</p></td>
 <td><p>Item-based collaborative KNN using similarity metrics.</p></td>
 </tr>
-<tr class="row-even"><td></td>
+<tr class="row-odd"><td></td>
 <td><p>AttributeItemKNN</p></td>
 <td><p>Item-based KNN using content features.</p></td>
 </tr>
-<tr class="row-odd"><td></td>
+<tr class="row-even"><td></td>
 <td><p>UserKNN</p></td>
 <td><p>User-based collaborative KNN using historical interactions.</p></td>
 </tr>
-<tr class="row-even"><td></td>
+<tr class="row-odd"><td></td>
 <td><p>AttributeUserKNN</p></td>
 <td><p>User-based KNN using content-derived user profiles.</p></td>
 </tr>
-<tr class="row-odd"><td><p>Latent Factor</p></td>
+<tr class="row-even"><td><p>Latent Factor</p></td>
 <td><p>ADMMSlim</p></td>
 <td><p>Sparse item similarity model optimized via ADMM.</p></td>
 </tr>
-<tr class="row-even"><td></td>
+<tr class="row-odd"><td></td>
 <td><p>BPR</p></td>
 <td><p>Pairwise ranking model for implicit feedback.</p></td>
 </tr>
-<tr class="row-odd"><td></td>
+<tr class="row-even"><td></td>
 <td><p>FISM</p></td>
 <td><p>Efficient item similarity model using weighted average as user embeddings.</p></td>
 </tr>
-<tr class="row-even"><td></td>
+<tr class="row-odd"><td></td>
 <td><p>SLIM</p></td>
 <td><p>Interpretable item similarity model with L1/L2 regularization.</p></td>
 </tr>
-<tr class="row-odd"><td><p>Neural</p></td>
+<tr class="row-even"><td><p>Neural</p></td>
 <td><p>ConvNCF</p></td>
 <td><p>Applies CNNs to user-item embeddings outer product to capture structured interaction patterns.</p></td>
 </tr>
-<tr class="row-even"><td></td>
+<tr class="row-odd"><td></td>
 <td><p>NeuMF</p></td>
 <td><p>Hybrid neural model combining GMF and MLP layers.</p></td>
 </tr>
-<tr class="row-odd"><td><p>Unpersonalized</p></td>
+<tr class="row-even"><td><p>Unpersonalized</p></td>
 <td><p>Pop</p></td>
 <td><p>Recommends popular items to all users. Baseline model.</p></td>
 </tr>
-<tr class="row-even"><td></td>
+<tr class="row-odd"><td></td>
 <td><p>Random</p></td>
 <td><p>Recommends items at random. Defines a performance lower bound.</p></td>
 </tr>

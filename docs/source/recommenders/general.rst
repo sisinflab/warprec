@@ -105,6 +105,19 @@ They are well-suited for uncovering complex patterns in sparse datasets.
 
   Graph-based models require PyTorch Geometric (PyG) dependencies to be installed correctly. Check the :ref:`installation guide <install_guide>` for more information on how to install them.
 
+- GCMC (Graph Convolutional Matrix Completion):
+  A graph autoencoder designed for explicit feedback. It treats different rating values as distinct edge types in the user-item graph and learns embeddings using a graph convolutional encoder. A decoder then predicts rating probabilities. **This model requires explicit ratings to function properly**.
+
+.. code-block:: yaml
+
+  models:
+    GCMC:
+      embedding_size: 64
+      weight_decay: 0.0001
+      batch_size: 512
+      epochs: 50
+      learning_rate: 0.001
+
 - LightGCN:
   A simplified graph convolutional network designed for collaborative filtering. It eliminates feature transformations and nonlinear activations, focusing solely on neighborhood aggregation.
 
@@ -349,6 +362,9 @@ Summary of Available General Models
      - VSM
      - Classical content-based model using TF-IDF and cosine similarity.
    * - Graph Based
+     - GCMC
+     - Graph autoencoder for explicit feedback using multi-relational convolutions.
+   * -
      - LightGCN
      - Simplified Graph convolutional neural network.
    * -
