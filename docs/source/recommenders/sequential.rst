@@ -20,17 +20,17 @@ These models can capture both short-term dependencies and long-term patterns thr
 .. code-block:: yaml
 
     models:
-        Caser:
-            embedding_size: 64
-            n_h: 8
-            n_v: 4
-            dropout_prob: 0.5
-            weight_decay: 0.0
-            batch_size: 512
-            epochs: 30
-            learning_rate: 0.001
-            neg_samples: 1
-            max_seq_len: 20
+      Caser:
+        embedding_size: 64
+        n_h: 8
+        n_v: 4
+        dropout_prob: 0.5
+        weight_decay: 0.0
+        batch_size: 512
+        epochs: 30
+        learning_rate: 0.001
+        neg_samples: 1
+        max_seq_len: 20
 
 =============
 Markov-Chains
@@ -45,16 +45,16 @@ These models are especially suited to scenarios where user behavior exhibits bot
 .. code-block:: yaml
 
     models:
-        FOSSIL:
-            embedding_size: 64
-            order_len: 8
-            alpha: 0.001
-            weight_decay: 0.0
-            batch_size: 512
-            epochs: 100
-            learning_rate: 0.001
-            neg_samples: 1
-            max_seq_len: 100
+      FOSSIL:
+        embedding_size: 64
+        order_len: 8
+        alpha: 0.001
+        weight_decay: 0.0
+        batch_size: 512
+        epochs: 100
+        learning_rate: 0.001
+        neg_samples: 1
+        max_seq_len: 100
 
 =============
 RNN-Based
@@ -70,17 +70,17 @@ They are effective for modeling evolving user interests within sessions.
 .. code-block:: yaml
 
     models:
-        GRU4Rec:
-            embedding_size: 128
-            hidden_size: 128
-            num_layers: 1
-            dropout_prob: 0.2
-            weight_decay: 0.0001
-            batch_size: 512
-            epochs: 100
-            learning_rate: 0.001
-            neg_samples: 2
-            max_seq_len: 200
+      GRU4Rec:
+        embedding_size: 128
+        hidden_size: 128
+        num_layers: 1
+        dropout_prob: 0.2
+        weight_decay: 0.0001
+        batch_size: 512
+        epochs: 100
+        learning_rate: 0.001
+        neg_samples: 2
+        max_seq_len: 200
 
 =============
 Transformer-Based
@@ -118,19 +118,19 @@ They excel at modeling both short-term and long-term user preferences without re
 .. code-block:: yaml
 
     models:
-        SASRec:
-            embedding_size: 128
-            n_layers: 2
-            n_heads: 4
-            inner_size: 512
-            dropout_prob: 0.3
-            attn_dropout_prob: 0.3
-            learning_rate: 0.001
-            weight_decay: 0.0
-            batch_size: 512
-            epochs: 100
-            neg_samples: 1
-            max_seq_len: 200
+      SASRec:
+        embedding_size: 128
+        n_layers: 2
+        n_heads: 4
+        inner_size: 512
+        dropout_prob: 0.3
+        attn_dropout_prob: 0.3
+        learning_rate: 0.001
+        weight_decay: 0.0
+        batch_size: 512
+        epochs: 100
+        neg_samples: 1
+        max_seq_len: 200
 
 - gSASRec (General Self-Attentive Sequential Recommendation):
   Extends SASRec by introducing general self-attention.
@@ -139,21 +139,21 @@ They excel at modeling both short-term and long-term user preferences without re
 .. code-block:: yaml
 
     models:
-        gSASRec:
-            embedding_size: 128
-            n_layers: 2
-            n_heads: 4
-            inner_size: 512
-            dropout_prob: 0.3
-            attn_dropout_prob: 0.3
-            learning_rate: 0.001
-            gbce_t: 0.5
-            weight_decay: 0.0
-            batch_size: 512
-            epochs: 100
-            neg_samples: 1
-            max_seq_len: 200
-            reuse_item_embeddings: True
+      gSASRec:
+        embedding_size: 128
+        n_layers: 2
+        n_heads: 4
+        inner_size: 512
+        dropout_prob: 0.3
+        attn_dropout_prob: 0.3
+        learning_rate: 0.001
+        gbce_t: 0.5
+        weight_decay: 0.0
+        batch_size: 512
+        epochs: 100
+        neg_samples: 1
+        max_seq_len: 200
+        reuse_item_embeddings: True
 
 ===============================
 Summary of Available Sequential Models

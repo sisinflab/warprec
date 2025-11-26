@@ -19,8 +19,8 @@ These models are particularly effective in sparse recommendation settings.
 .. code-block:: yaml
 
     models:
-        EASE:
-            l2: 10
+      EASE:
+        l2: 10
 
 - AddEASE:
   An extension of the EASE model using side information. It solves two linear problems, increasing the complexity of the underlying task. **This model requires side information to function properly**.
@@ -28,9 +28,9 @@ These models are particularly effective in sparse recommendation settings.
 .. code-block:: yaml
 
     models:
-        AddEASE:
-            l2: 10
-            alpha: 0.1
+      AddEASE:
+        l2: 10
+        alpha: 0.1
 
 - CEASE:
   An extension of the EASE model using side information. Extends the EASE problem without adding more complexity. **This model requires side information to function properly**.
@@ -38,9 +38,9 @@ These models are particularly effective in sparse recommendation settings.
 .. code-block:: yaml
 
     models:
-        CEASE:
-            l2: 10
-            alpha: 0.1
+      CEASE:
+        l2: 10
+        alpha: 0.1
 
 - MultiDAE (Multinomial Denoising Autoencoder):
   A deep autoencoder trained with dropout for denoising input data. Learns robust latent representations from implicit feedback using a multinomial loss.
@@ -48,14 +48,14 @@ These models are particularly effective in sparse recommendation settings.
 .. code-block:: yaml
 
     models:
-        MultiDAE:
-            intermediate_dim: 600
-            latent_dim: 200
-            dropout: 1.0
-            weight_decay: 0.02
-            batch_size: 512
-            epochs: 10
-            learning_rate: 0.001
+      MultiDAE:
+        intermediate_dim: 600
+        latent_dim: 200
+        dropout: 1.0
+        weight_decay: 0.02
+        batch_size: 512
+        epochs: 10
+        learning_rate: 0.001
 
 - MultiVAE (Multinomial Variational Autoencoder):
   A probabilistic variant of MultiDAE that models uncertainty in user preferences via variational inference. Useful for capturing diverse user behaviors and providing more personalized recommendations.
@@ -63,16 +63,16 @@ These models are particularly effective in sparse recommendation settings.
 .. code-block:: yaml
 
     models:
-        MultiVAE:
-            intermediate_dim: 600
-            latent_dim: 200
-            dropout: 1.0
-            weight_decay: 0.02
-            batch_size: 512
-            epochs: 10
-            learning_rate: 0.001
-            anneal_cap: 0.2
-            anneal_step: 200
+      MultiVAE:
+        intermediate_dim: 600
+        latent_dim: 200
+        dropout: 1.0
+        weight_decay: 0.02
+        batch_size: 512
+        epochs: 10
+        learning_rate: 0.001
+        anneal_cap: 0.2
+        anneal_step: 200
 
 ================
 Content Based
@@ -88,10 +88,10 @@ They are particularly useful in cold-start scenarios or when collaborative signa
 .. code-block:: yaml
 
     models:
-        VSM:
-            similarity: cosine
-            user_profile: binary
-            item_profile: tfidf
+      VSM:
+        similarity: cosine
+        user_profile: binary
+        item_profile: tfidf
 
 ==============
 Graph Based
@@ -111,13 +111,13 @@ They are well-suited for uncovering complex patterns in sparse datasets.
 .. code-block:: yaml
 
     models:
-        LightGCN:
-            embedding_size: 64
-            n_layers: 2
-            weight_decay: 0.0001
-            batch_size: 512
-            epochs: 50
-            learning_rate: 0.001
+      LightGCN:
+        embedding_size: 64
+        n_layers: 2
+        weight_decay: 0.0001
+        batch_size: 512
+        epochs: 50
+        learning_rate: 0.001
 
 - NGCF (Neural Graph-based Collaborative Filtering):
   A neural graph-based collaborative filtering model that explicitly captures high-order connectivity by propagating embeddings through the user-item interaction graph.
@@ -125,15 +125,15 @@ They are well-suited for uncovering complex patterns in sparse datasets.
 .. code-block:: yaml
 
     models:
-        NGCF:
-            embedding_size: 64
-            weight_decay: 0.
-            batch_size: 512
-            epochs: 50
-            learning_rate: 0.001
-            weight_size: [64, 64]
-            node_dropout: 0.01
-            message_dropout: 0.01
+      NGCF:
+        embedding_size: 64
+        weight_decay: 0.
+        batch_size: 512
+        epochs: 50
+        learning_rate: 0.001
+        weight_size: [64, 64]
+        node_dropout: 0.01
+        message_dropout: 0.01
 
 - RP3Beta:
   A graph-based collaborative filtering model that performs a biased random walk of length 3 on the user-item bipartite graph.
@@ -141,11 +141,11 @@ They are well-suited for uncovering complex patterns in sparse datasets.
 .. code-block:: yaml
 
     models:
-        RP3Beta:
-            k: 10
-            alpha: 0.1
-            beta: 0.1
-            normalize: True
+      RP3Beta:
+        k: 10
+        alpha: 0.1
+        beta: 0.1
+        normalize: True
 
 =========================
 KNN (K Nearest Neighbor)
@@ -159,9 +159,9 @@ KNN-based models generate recommendations by identifying the most similar users 
 .. code-block:: yaml
 
     models:
-        ItemKNN:
-            k: 10
-            similarity: cosine
+      ItemKNN:
+        k: 10
+        similarity: cosine
 
 - AttributeItemKNN:
   An item-based KNN variant that incorporates item content to compute similarities.
@@ -169,9 +169,9 @@ KNN-based models generate recommendations by identifying the most similar users 
 .. code-block:: yaml
 
     models:
-        AttributeItemKNN:
-            k: 10
-            similarity: cosine
+      AttributeItemKNN:
+        k: 10
+        similarity: cosine
 
 - UserKNN:
   A collaborative user-based KNN model that recommends items liked by similar users.
@@ -179,9 +179,9 @@ KNN-based models generate recommendations by identifying the most similar users 
 .. code-block:: yaml
 
     models:
-        UserKNN:
-            k: 10
-            similarity: cosine
+      UserKNN:
+        k: 10
+        similarity: cosine
 
 - AttributeUserKNN:
   A user-based KNN model that uses content-based profiles (e.g., TF-IDF) to define user similarity.
@@ -189,10 +189,10 @@ KNN-based models generate recommendations by identifying the most similar users 
 .. code-block:: yaml
 
     models:
-        AttributeUserKNN:
-            k: 10
-            similarity: cosine
-            user_profile: tfidf
+      AttributeUserKNN:
+        k: 10
+        similarity: cosine
+        user_profile: tfidf
 
 ================
 Latent Factor
@@ -208,14 +208,14 @@ They include factorization-based approaches, pairwise ranking models, and sparse
 .. code-block:: yaml
 
     models:
-        ADMMSlim:
-            lambda_1: 0.1
-            lambda_2: 0.1
-            alpha: 0.2
-            rho: 0.35
-            it: 10
-            positive_only: False
-            center_columns: False
+      ADMMSlim:
+        lambda_1: 0.1
+        lambda_2: 0.1
+        alpha: 0.2
+        rho: 0.35
+        it: 10
+        positive_only: False
+        center_columns: False
 
 - BPR:
   A pairwise ranking model that optimizes the ordering of items for each user. BPR is particularly effective for implicit feedback and is trained to maximize the margin between positive and negative item pairs.
@@ -223,12 +223,12 @@ They include factorization-based approaches, pairwise ranking models, and sparse
 .. code-block:: yaml
 
     models:
-        BPR:
-            embedding_size: 16
-            weight_decay: 0.001
-            batch_size: 512
-            epochs: 20
-            learning_rate: 0.001
+      BPR:
+        embedding_size: 16
+        weight_decay: 0.001
+        batch_size: 512
+        epochs: 20
+        learning_rate: 0.001
 
 - FISM:
   A recommendation algorithm that models item-to-item similarity by learning latent representations of items. Instead of explicitly learning user embeddings, FISM represents each user as the weighted average of the items they have interacted with, enabling efficient and accurate personalized recommendations.
@@ -236,14 +236,14 @@ They include factorization-based approaches, pairwise ranking models, and sparse
 .. code-block:: yaml
 
     models:
-        FISM:
-            embedding_size: 16
-            alpha: 0.1
-            split_to: 5
-            weight_decay: 0.0001
-            batch_size: 512
-            epochs: 50
-            learning_rate: 0.001
+      FISM:
+        embedding_size: 16
+        alpha: 0.1
+        split_to: 5
+        weight_decay: 0.0001
+        batch_size: 512
+        epochs: 50
+        learning_rate: 0.001
 
 - Slim:
   A collaborative filtering model that learns a sparse item similarity matrix using L1 and L2 regularization. SLIM directly models the relationship between items, making it highly interpretable and effective for top-N recommendation.
@@ -251,9 +251,9 @@ They include factorization-based approaches, pairwise ranking models, and sparse
 .. code-block:: yaml
 
     models:
-        Slim:
-            l1: 0.2
-            alpha: 0.1
+      Slim:
+        l1: 0.2
+        alpha: 0.1
 
 ===========
 Neural
@@ -267,16 +267,16 @@ Neural recommenders leverage deep learning architectures to model complex, non-l
 .. code-block:: yaml
 
     models:
-        ConvNCF:
-            embedding_size: 16
-            cnn_channels: [[16, 32]]
-            cnn_kernels: [[2, 2]]
-            cnn_strides: [[1, 1]]
-            dropout_prob: 0.01
-            weight_decay: 0.0001
-            batch_size: 512
-            epochs: 20
-            learning_rate: 0.001
+      ConvNCF:
+        embedding_size: 16
+        cnn_channels: [16, 32]
+        cnn_kernels: [2, 2]
+        cnn_strides: [1, 1]
+        dropout_prob: 0.01
+        weight_decay: 0.0001
+        batch_size: 512
+        epochs: 20
+        learning_rate: 0.001
 
 - NeuMF:
   Combines Generalized Matrix Factorization (GMF) with a Multi-Layer Perceptron (MLP) to capture both linear and non-linear user-item interactions. NeuMF is a highly expressive model that can adapt to various patterns in user behavior, making it suitable for both implicit and explicit feedback scenarios.
@@ -284,18 +284,18 @@ Neural recommenders leverage deep learning architectures to model complex, non-l
 .. code-block:: yaml
 
     models:
-        NeuMF:
-            mf_embedding_size: 32
-            mlp_embedding_size: 32
-            mlp_hidden_size: [64, 32]
-            mf_train: True
-            mlp_train: True
-            dropout: 0.01
-            weight_decay: 0.0001
-            batch_size: 512
-            epochs: 20
-            learning_rate: 0.001
-            neg_samples: 1
+      NeuMF:
+        mf_embedding_size: 32
+        mlp_embedding_size: 32
+        mlp_hidden_size: [64, 32]
+        mf_train: True
+        mlp_train: True
+        dropout: 0.01
+        weight_decay: 0.0001
+        batch_size: 512
+        epochs: 20
+        learning_rate: 0.001
+        neg_samples: 1
 
 ================
 Unpersonalized
