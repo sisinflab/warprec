@@ -1,4 +1,5 @@
 from typing import Optional, Tuple, Dict, List
+from functools import partial
 
 import torch
 import pandas as pd
@@ -8,11 +9,16 @@ from torch import Tensor
 from torch.utils.data import DataLoader, Dataset
 from torch.nn.utils.rnn import pad_sequence
 
+from warprec.data.entities.train_structures.custom_collate_fn import (
+    collate_fn_cloze_mask,
+)
 from warprec.data.entities.train_structures import (
     SessionDataset,
     LazySessionDataset,
     UserHistoryDataset,
     LazyUserHistoryDataset,
+    ClozeMaskDataset,
+    LazyClozeMaskDataset,
 )
 from warprec.utils.logger import logger
 
@@ -645,3 +651,202 @@ class Sessions:
         padded_neg_samples_tensor.masked_fill_(~valid_target_broadcast_mask, self._niid)
 
         return padded_pos_seqs, padded_neg_samples_tensor
+
+    def get_cloze_mask_dataloader(
+        self,
+        max_seq_len: int,
+        mask_prob: float,
+        mask_token_id: int,
+        neg_samples: int,
+        batch_size: int = 1024,
+        shuffle: bool = True,
+        seed: int = 42,
+        low_memory: bool = False,
+    ) -> DataLoader:
+        """Creates a DataLoader for cloze mask training task.
+
+        For each user sequence, this method randomly masks some items and prepares
+        the original items as positive targets, along with negative samples.
+
+        Args:
+            max_seq_len (int): Maximum length of sequences.
+            mask_prob (float): Probability of an item being masked.
+            mask_token_id (int): The special token ID used for masking.
+            neg_samples (int): Number of negative samples per masked item.
+            batch_size (int): Batch size for the DataLoader.
+            shuffle (bool): Whether to shuffle the data.
+            seed (int): Seed for reproducibility.
+            low_memory (bool): Whether to create the dataloader with a lazy approach.
+
+        Returns:
+            DataLoader: A DataLoader yielding (masked_seq, pos_items, neg_items, masked_indices).
+        """
+        if low_memory:
+            user_sessions = self._get_user_sessions()
+
+            lazy_dataset = LazyClozeMaskDataset(
+                user_sessions=user_sessions,
+                max_seq_len=max_seq_len,
+                mask_prob=mask_prob,
+                mask_token_id=mask_token_id,
+                neg_samples=neg_samples,
+                niid=self._niid,
+                padding_token_id=self._niid,
+                seed=seed,
+            )
+
+            if len(lazy_dataset) == 0:
+                logger.negative(
+                    "LazyClozeMaskDataset is empty. No valid sessions found."
+                )
+                return DataLoader(torch.utils.data.TensorDataset(torch.empty(0)))
+
+            custom_collate_fn = partial(
+                collate_fn_cloze_mask, padding_token_id=self._niid
+            )
+
+            return DataLoader(
+                lazy_dataset,
+                batch_size=batch_size,
+                shuffle=shuffle,
+                collate_fn=custom_collate_fn,
+            )
+
+        # Caching for efficiency
+        cache_key = f"cloze_len_{max_seq_len}_prob_{mask_prob}_neg_{neg_samples}"
+        if cache_key in self._cached_dataset:
+            dataset = self._cached_dataset[cache_key]
+            return DataLoader(dataset, batch_size=batch_size, shuffle=shuffle)
+
+        # Create masked sequences and targets
+        masked_seq, pos_items, neg_items, masked_indices = (
+            self._create_cloze_mask_samples(
+                max_seq_len=max_seq_len,
+                mask_prob=mask_prob,
+                mask_token_id=mask_token_id,
+                neg_samples=neg_samples,
+                seed=seed,
+            )
+        )
+
+        # Create Dataset and DataLoader
+        dataset = ClozeMaskDataset(masked_seq, pos_items, neg_items, masked_indices)
+        self._cached_dataset[cache_key] = dataset
+        return DataLoader(dataset, batch_size=batch_size, shuffle=shuffle)
+
+    def _create_cloze_mask_samples(
+        self,
+        max_seq_len: int,
+        mask_prob: float,
+        mask_token_id: int,
+        neg_samples: int,
+        seed: int,
+    ) -> Tuple[Tensor, Tensor, Tensor, Tensor]:
+        """Core logic for creating masked sequences.
+
+        Args:
+            max_seq_len (int): Maximum length of sequences.
+            mask_prob (float): Probability of an item being masked.
+            mask_token_id (int): The special token ID used for masking.
+            neg_samples (int): Number of negative samples per masked item.
+            seed (int): Seed for reproducibility.
+
+        Returns:
+            Tuple[Tensor, Tensor, Tensor, Tensor]: A tuple containing:
+                - Tensor: Masked item sequences.
+                - Tensor: Positive item tensor.
+                - Tensor: Negative item tensor.
+                - Tensor: Indices of masked items in the sequences.
+        """
+        np.random.seed(seed)
+        user_sessions = self._get_user_sessions()
+
+        # Filter sessions with at less than 2 items
+        valid_sessions = (
+            user_sessions[user_sessions.str.len() >= 2]
+            .apply(lambda s: s[-max_seq_len:])
+            .tolist()
+        )
+
+        # Edge case: no valid sessions
+        if not valid_sessions:
+            return torch.empty(0), torch.empty(0), torch.empty(0), torch.empty(0)
+
+        # Pad sequences
+        seq_tensors = [torch.tensor(s, dtype=torch.long) for s in valid_sessions]
+        padded_seqs = pad_sequence(
+            seq_tensors, batch_first=True, padding_value=self._niid
+        )
+
+        masked_sequences = padded_seqs.clone()
+        all_pos_items: List[list] = []
+        all_masked_indices: List[list] = []
+
+        max_masked_items = 0
+
+        for i in range(len(padded_seqs)):
+            seq = padded_seqs[i]
+
+            # Find valid indices (non-padded)
+            valid_indices = (seq != self._niid).nonzero(as_tuple=True)[0]
+            if len(valid_indices) == 0:
+                all_pos_items.append([])
+                all_masked_indices.append([])
+                continue
+
+            # Determine number of items to mask
+            num_to_mask = max(1, int(np.ceil(len(valid_indices) * mask_prob)))
+
+            # Randomly select indices to mask
+            indices_to_mask = np.random.choice(
+                valid_indices.numpy(), num_to_mask, replace=False
+            )
+
+            # Save positive items and masked indices
+            pos_items = seq[indices_to_mask].tolist()
+            all_pos_items.append(pos_items)
+            all_masked_indices.append(indices_to_mask.tolist())
+
+            # Apply masking
+            masked_sequences[i, indices_to_mask] = mask_token_id
+
+            max_masked_items = max(max_masked_items, num_to_mask)
+
+        # Pad positive items and masked indices
+        # NOTE: Masked indices will use 0-padding and they will be ignored during loss computation
+        padded_pos_items = torch.tensor(
+            [p + [self._niid] * (max_masked_items - len(p)) for p in all_pos_items],
+            dtype=torch.long,
+        )
+        padded_masked_indices = torch.tensor(
+            [m + [0] * (max_masked_items - len(m)) for m in all_masked_indices],
+            dtype=torch.long,
+        )
+
+        # Generate negative samples
+        num_samples, num_masked = padded_pos_items.shape
+        neg_candidates = np.random.randint(
+            0, self._niid, size=(num_samples, num_masked, neg_samples), dtype=np.int64
+        )
+
+        # Vectorized collision check and re-sampling
+        history_sets = [set(s) for s in valid_sessions]
+        for i in range(num_samples):
+            for j in range(num_masked):
+                # If the position is padded, set negatives to padding token
+                if padded_pos_items[i, j] == self._niid:
+                    neg_candidates[i, j, :] = self._niid
+                    continue
+
+                # Check for collisions and re-sample
+                for k in range(neg_samples):
+                    while neg_candidates[i, j, k] in history_sets[i]:
+                        neg_candidates[i, j, k] = np.random.randint(0, self._niid)
+
+        neg_items_tensor = torch.from_numpy(neg_candidates).long()
+        return (
+            masked_sequences,
+            padded_pos_items,
+            neg_items_tensor,
+            padded_masked_indices,
+        )

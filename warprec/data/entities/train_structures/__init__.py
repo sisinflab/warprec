@@ -1,3 +1,4 @@
+from .custom_collate_fn import collate_fn_cloze_mask
 from .interaction_structures import (
     LazyInteractionDataset,
     LazyItemRatingDataset,
@@ -8,9 +9,12 @@ from .session_structures import (
     LazySessionDataset,
     UserHistoryDataset,
     LazyUserHistoryDataset,
+    ClozeMaskDataset,
+    LazyClozeMaskDataset,
 )
 
 __all__ = [
+    "collate_fn_cloze_mask",
     "LazyInteractionDataset",
     "LazyItemRatingDataset",
     "LazyTripletDataset",
@@ -18,4 +22,6 @@ __all__ = [
     "LazySessionDataset",
     "UserHistoryDataset",
     "LazyUserHistoryDataset",
+    "ClozeMaskDataset",
+    "LazyClozeMaskDataset",
 ]
