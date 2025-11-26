@@ -89,6 +89,28 @@ Transformer-Based
 Transformer-inspired recommenders employ self-attention to capture dependencies across an entire sequence simultaneously.
 They excel at modeling both short-term and long-term user preferences without relying on recurrence or convolution.
 
+- BERT4Rec (Bidirectional Encoder Representations from Transformers for Recommendation):
+  Applies a bidirectional Transformer architecture to sequential recommendation.
+  Instead of predicting the next item, it is trained on a "cloze" task, where it predicts randomly masked items in a sequence, allowing it to learn context from both past and future interactions.
+
+.. code-block:: yaml
+
+  models:
+    BERT4Rec:
+      embedding_size: 128
+      n_layers: 2
+      n_heads: 4
+      inner_size: 512
+      dropout_prob: 0.3
+      attn_dropout_prob: 0.3
+      mask_prob: 0.2
+      learning_rate: 0.001
+      weight_decay: 0.0
+      batch_size: 512
+      epochs: 100
+      neg_samples: 1
+      max_seq_len: 200
+
 - SASRec (Self-Attentive Sequential Recommendation):
   A Transformer-based model that uses stacked self-attention blocks to capture item dependencies in user sequences.
   SASRec effectively models dynamic user preferences in sparse datasets, learning both short- and long-term interests.
@@ -154,6 +176,9 @@ Summary of Available Sequential Models
      - GRU4Rec
      - Session-based recommender using GRUs for short-term preference modeling.
    * - Transformer-Based
+     - BERT4Rec
+     - Bidirectional Transformer model trained on a masked item prediction task.
+   * -
      - SASRec
      - Transformer-inspired model learning short- and long-term user preferences.
    * -

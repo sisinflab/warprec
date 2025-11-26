@@ -395,6 +395,28 @@ It leverages GRUs to model user interaction sequences, focusing on short-term be
 <p>Transformer-inspired recommenders employ self-attention to capture dependencies across an entire sequence simultaneously.
 They excel at modeling both short-term and long-term user preferences without relying on recurrence or convolution.</p>
 <ul class="simple">
+<li><p>BERT4Rec (Bidirectional Encoder Representations from Transformers for Recommendation):
+Applies a bidirectional Transformer architecture to sequential recommendation.
+Instead of predicting the next item, it is trained on a “cloze” task, where it predicts randomly masked items in a sequence, allowing it to learn context from both past and future interactions.</p></li>
+</ul>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">models</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">BERT4Rec</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">embedding_size</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">128</span>
+<span class="w">    </span><span class="nt">n_layers</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">2</span>
+<span class="w">    </span><span class="nt">n_heads</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">4</span>
+<span class="w">    </span><span class="nt">inner_size</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">512</span>
+<span class="w">    </span><span class="nt">dropout_prob</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0.3</span>
+<span class="w">    </span><span class="nt">attn_dropout_prob</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0.3</span>
+<span class="w">    </span><span class="nt">mask_prob</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0.2</span>
+<span class="w">    </span><span class="nt">learning_rate</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0.001</span>
+<span class="w">    </span><span class="nt">weight_decay</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0.0</span>
+<span class="w">    </span><span class="nt">batch_size</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">512</span>
+<span class="w">    </span><span class="nt">epochs</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">100</span>
+<span class="w">    </span><span class="nt">neg_samples</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">1</span>
+<span class="w">    </span><span class="nt">max_seq_len</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">200</span>
+</pre></div>
+</div>
+<ul class="simple">
 <li><p>SASRec (Self-Attentive Sequential Recommendation):
 A Transformer-based model that uses stacked self-attention blocks to capture item dependencies in user sequences.
 SASRec effectively models dynamic user preferences in sparse datasets, learning both short- and long-term interests.</p></li>
@@ -468,10 +490,14 @@ This enables better modeling of diverse or evolving user interests.</p></li>
 <td><p>Session-based recommender using GRUs for short-term preference modeling.</p></td>
 </tr>
 <tr class="row-odd"><td><p>Transformer-Based</p></td>
+<td><p>BERT4Rec</p></td>
+<td><p>Bidirectional Transformer model trained on a masked item prediction task.</p></td>
+</tr>
+<tr class="row-even"><td></td>
 <td><p>SASRec</p></td>
 <td><p>Transformer-inspired model learning short- and long-term user preferences.</p></td>
 </tr>
-<tr class="row-even"><td></td>
+<tr class="row-odd"><td></td>
 <td><p>gSASRec</p></td>
 <td><p>General self-attention model for diverse and evolving user behaviors.</p></td>
 </tr>
