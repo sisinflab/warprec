@@ -17,6 +17,158 @@ from warprec.utils.config.common import (
 from warprec.utils.registry import params_registry
 
 
+@params_registry.register("BERT4Rec")
+class BERT4Rec(RecomModel):
+    """Definition of the model BERT4Rec.
+
+    Attributes:
+        embedding_size (INT_FIELD): List of values for embedding_size.
+        n_layers (INT_FIELD):  List of values for n_layers.
+        n_heads (INT_FIELD): List of values for n_heads.
+        inner_size (INT_FIELD): List of values for inner_size.
+        dropout_prob (FLOAT_FIELD): List of values for dropout_prob.
+        attn_dropout_prob (FLOAT_FIELD): List of values for attn_dropout_prob.
+        mask_prob (FLOAT_FIELD): List of values for the masking probability.
+        weight_decay (FLOAT_FIELD): List of values for weight_decay.
+        batch_size (INT_FIELD): List of values for batch_size.
+        epochs (INT_FIELD): List of values for epochs.
+        learning_rate (FLOAT_FIELD): List of values for learning rate.
+        neg_samples (INT_FIELD): List of values for neg_samples.
+        max_seq_len (INT_FIELD): List of values for max_seq_len.
+        need_single_trial_validation (ClassVar[bool]): Flag to enable single trial validation.
+    """
+
+    embedding_size: INT_FIELD
+    n_layers: INT_FIELD
+    n_heads: INT_FIELD
+    inner_size: INT_FIELD
+    dropout_prob: FLOAT_FIELD
+    attn_dropout_prob: FLOAT_FIELD
+    mask_prob: FLOAT_FIELD
+    weight_decay: FLOAT_FIELD
+    batch_size: INT_FIELD
+    epochs: INT_FIELD
+    learning_rate: FLOAT_FIELD
+    neg_samples: INT_FIELD
+    max_seq_len: INT_FIELD
+    need_single_trial_validation: ClassVar[bool] = True
+
+    @field_validator("embedding_size")
+    @classmethod
+    def check_embedding_size(cls, v: list):
+        """Validate embedding_size."""
+        return validate_greater_than_zero(cls, v, "embedding_size")
+
+    @field_validator("n_layers")
+    @classmethod
+    def check_n_layers(cls, v: list):
+        """Validate n_layers."""
+        return validate_greater_than_zero(cls, v, "n_layers")
+
+    @field_validator("n_heads")
+    @classmethod
+    def check_n_heads(cls, v: list):
+        """Validate n_heads."""
+        return validate_greater_than_zero(cls, v, "n_heads")
+
+    @field_validator("inner_size")
+    @classmethod
+    def check_inner_size(cls, v: list):
+        """Validate inner_size."""
+        return validate_greater_than_zero(cls, v, "inner_size")
+
+    @field_validator("dropout_prob")
+    @classmethod
+    def check_dropout_prob(cls, v: list):
+        """Validate dropout_prob."""
+        return validate_between_zero_and_one(cls, v, "dropout_prob")
+
+    @field_validator("attn_dropout_prob")
+    @classmethod
+    def check_attn_dropout_prob(cls, v: list):
+        """Validate attn_dropout_prob."""
+        return validate_between_zero_and_one(cls, v, "attn_dropout_prob")
+
+    @field_validator("mask_prob")
+    @classmethod
+    def check_mask_prob(cls, v: list):
+        """Validate mask_prob."""
+        return validate_between_zero_and_one(cls, v, "mask_prob")
+
+    @field_validator("weight_decay")
+    @classmethod
+    def check_weight_decay(cls, v: list):
+        """Validate weight_decay."""
+        return validate_greater_equal_than_zero(cls, v, "weight_decay")
+
+    @field_validator("batch_size")
+    @classmethod
+    def check_batch_size(cls, v: list):
+        """Validate batch_size."""
+        return validate_greater_than_zero(cls, v, "batch_size")
+
+    @field_validator("epochs")
+    @classmethod
+    def check_epochs(cls, v: list):
+        """Validate epochs."""
+        return validate_greater_than_zero(cls, v, "epochs")
+
+    @field_validator("learning_rate")
+    @classmethod
+    def check_learning_rate(cls, v: list):
+        """Validate learning_rate."""
+        return validate_greater_than_zero(cls, v, "learning_rate")
+
+    @field_validator("neg_samples")
+    @classmethod
+    def check_neg_samples(cls, v: list):
+        """Validate neg_samples."""
+        return validate_greater_equal_than_zero(cls, v, "neg_samples")
+
+    @field_validator("max_seq_len")
+    @classmethod
+    def check_max_seq_len(cls, v: list):
+        """Validate max_seq_len."""
+        return validate_greater_than_zero(cls, v, "max_seq_len")
+
+    def validate_all_combinations(self):
+        """Validates if at least one valid combination of hyperparameters exists."""
+        embedding_sizes = self._clean_param_list(self.embedding_size)
+        num_heads = self._clean_param_list(self.n_heads)
+
+        has_valid_combination = any(
+            emb_size % n_head == 0
+            for emb_size, n_head in product(embedding_sizes, num_heads)
+        )
+
+        if not has_valid_combination:
+            raise ValueError(
+                "No valid hyperparameter combination found for BERT4Rec. "
+                "Ensure there's at least one combination where 'embedding_size' "
+                "is divisible by 'n_heads'."
+            )
+
+    def validate_single_trial_params(self):
+        """Validates the coherence of embedding_size and n_heads for a single trial."""
+        embedding_size_clean = (
+            self.embedding_size[1]
+            if self.embedding_size and isinstance(self.embedding_size[0], str)
+            else self.embedding_size[0]
+        )
+        n_heads_clean = (
+            self.n_heads[1]
+            if self.n_heads and isinstance(self.n_heads[0], str)
+            else self.n_heads[0]
+        )
+
+        if embedding_size_clean % n_heads_clean != 0:
+            raise ValueError(
+                f"Inconsistent configuration for BERT4Rec: "
+                f"embedding_size ({embedding_size_clean}) must be divisible "
+                f"by n_heads ({n_heads_clean})."
+            )
+
+
 @params_registry.register("Caser")
 class Caser(RecomModel):
     """Definition of the model Caser.
