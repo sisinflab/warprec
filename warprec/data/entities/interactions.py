@@ -169,6 +169,49 @@ class Interactions:
             return self._inter_sparse
         return self._to_sparse()
 
+    def get_sparse_by_rating(self, rating_value: float) -> coo_matrix:
+        """Returns a sparse matrix (COO format) containing only the interactions
+        that match a specific rating value.
+
+        Args:
+            rating_value (float): The rating value to filter by.
+
+        Returns:
+            coo_matrix: A sparse matrix of shape [num_users, num_items] for the given rating.
+
+        Raises:
+            ValueError: If interactions are not explicit or if
+                rating label is None.
+        """
+        if self.rating_type != RatingType.EXPLICIT or self._rating_label is None:
+            raise ValueError(
+                "Filtering by rating is only supported for explicit feedback data."
+            )
+
+        # Filter original DataFrame for the specified rating value
+        rating_df = self._inter_df[self._inter_df[self._rating_label] == rating_value]
+
+        # Edge case: No interactions with the specified rating
+        if rating_df.empty:
+            return coo_matrix((self._og_nuid, self._og_niid), dtype=self.precision)
+
+        # Map users and items to internal indices
+        users = rating_df[self._user_label].map(self._umap).values
+        items = rating_df[self._item_label].map(self._imap).values
+
+        # Filter out any NaN mappings (in case of unknown users/items)
+        mask = ~np.isnan(users) & ~np.isnan(items)
+        users, items = users[mask], items[mask]
+
+        # Values are all ones for the presence of interaction
+        values = np.ones(len(users), dtype=self.precision)
+
+        return coo_matrix(
+            (values, (users, items)),
+            shape=(self._og_nuid, self._og_niid),
+            dtype=self.precision,
+        )
+
     def get_side_sparse(self) -> csr_matrix:
         """This method retrieves the sparse representation of side data.
 
@@ -556,6 +599,18 @@ class Interactions:
             int: Number of transactions.
         """
         return self._transactions
+
+    def get_unique_ratings(self) -> np.ndarray:
+        """Returns a sorted array of unique rating values present in the dataset.
+        This is useful for models that operate on explicit feedback.
+
+        Returns:
+            np.ndarray: A sorted array of unique rating values.
+        """
+        if self.rating_type != RatingType.EXPLICIT or self._rating_label is None:
+            return np.array([])
+
+        return np.sort(self._inter_df[self._rating_label].unique())
 
     def _to_sparse(self) -> csr_matrix:
         """This method will create the sparse representation of the data contained.
