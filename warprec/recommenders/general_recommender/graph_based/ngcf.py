@@ -97,12 +97,11 @@ class NGCF(IterativeRecommender, GraphRecommenderUtils):
         self.item_embedding = nn.Embedding(
             self.n_items + 1, self.embedding_size, padding_idx=self.n_items
         )
-        adj_matrix = self._get_norm_adj_mat_ngcf(
+        self.adj = self._get_norm_adj_mat_ngcf(
             interactions.get_sparse().tocoo(),
             self.n_users,
             self.n_items + 1,  # Adjust for padding idx
         )
-        self.register_buffer("adj", adj_matrix)
 
         # Optionally define a dropout layer (optimized for sparse data)
         self.sparse_dropout = (
@@ -161,6 +160,11 @@ class NGCF(IterativeRecommender, GraphRecommenderUtils):
         ego_embeddings = self.get_ego_embeddings(
             self.user_embedding, self.item_embedding
         )
+
+        # Ensure adjacency matrix is on the same device as embeddings
+        if self.adj.device() != ego_embeddings.device:
+            self.adj = self.adj.to(ego_embeddings.device)
+
         embeddings_list = [ego_embeddings]
 
         # Apply dropout if required from hyperparameters

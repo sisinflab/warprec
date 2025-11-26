@@ -82,12 +82,11 @@ class LightGCN(IterativeRecommender, GraphRecommenderUtils):
         self.item_embedding = nn.Embedding(
             self.n_items + 1, self.embedding_size, padding_idx=self.n_items
         )
-        adj_matrix = self.get_adj_mat(
+        self.adj = self.get_adj_mat(
             interactions.get_sparse().tocoo(),
             self.n_users,
             self.n_items + 1,  # Adjust for padding idx
         )
-        self.register_buffer("adj", adj_matrix)
 
         # Initialization of the propagation network
         propagation_network_list = []
@@ -143,6 +142,11 @@ class LightGCN(IterativeRecommender, GraphRecommenderUtils):
         ego_embeddings = self.get_ego_embeddings(
             self.user_embedding, self.item_embedding
         )
+
+        # Ensure adjacency matrix is on the same device as embeddings
+        if self.adj.device() != ego_embeddings.device:
+            self.adj = self.adj.to(ego_embeddings.device)
+
         embeddings_list = [ego_embeddings]
 
         # This will handle the propagation layer by layer.
