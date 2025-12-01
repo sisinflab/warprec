@@ -188,6 +188,12 @@ class DataLoaderType(Enum):
         construction_params=[],
         fixed_params={},
     )
+    INTERACTION_LOADER_WITH_USER_ID = DataLoaderRequirements(
+        dataloader_source="train_set",
+        method_name="get_interaction_loader",
+        construction_params=[],
+        fixed_params={"include_user_id": True},
+    )
     ITEM_RATING_LOADER = DataLoaderRequirements(
         dataloader_source="train_set",
         method_name="get_item_rating_dataloader",

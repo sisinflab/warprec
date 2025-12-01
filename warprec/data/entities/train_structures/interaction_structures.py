@@ -19,24 +19,27 @@ class LazyInteractionDataset(Dataset):
 
     Args:
         sparse_matrix (csr_matrix): The user-item interaction matrix in CSR format.
+        include_user_id (bool): If True, also returns the index of the user.
     """
 
-    def __init__(self, sparse_matrix: csr_matrix):
+    def __init__(self, sparse_matrix: csr_matrix, include_user_id: bool = False):
         self.sparse_matrix = sparse_matrix
+        self.include_user_id = include_user_id
 
     def __len__(self) -> int:
         """Returns the total number of users in the matrix."""
         return self.sparse_matrix.shape[0]
 
-    def __getitem__(self, idx: int) -> Tuple[Tensor]:
+    def __getitem__(self, idx: int) -> Tuple[Tensor] | Tuple[Tensor, Tensor]:
         """Retrieves one user's interaction vector as a dense tensor.
 
         Args:
             idx (int): The index of the user (row) to retrieve.
 
         Returns:
-            Tuple[Tensor]: A Tuple containing 1D dense tensor representing
-                the user's interactions with all items.
+            Tuple[Tensor] | Tuple[Tensor, Tensor]: A Tuple containing 1D dense tensor representing
+                the user's interactions with all items. If the user_id was requested it will
+                also be returned.
         """
         # CSR format is highly optimized for row slicing. This operation is very fast.
         user_row_sparse = self.sparse_matrix[idx]
@@ -49,7 +52,12 @@ class LazyInteractionDataset(Dataset):
             torch.from_numpy(user_row_dense_np).to(dtype=torch.float32).squeeze(0)
         )
 
-        return (user_tensor,)  # To mimic the behavior of a TensorDataset
+        if self.include_user_id:
+            # Return also the user indices
+            return torch.tensor(idx, dtype=torch.long), user_tensor
+        else:
+            # Normal behavior
+            return (user_tensor,)
 
 
 class LazyItemRatingDataset(Dataset):

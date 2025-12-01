@@ -232,6 +232,7 @@ class Interactions:
 
     def get_interaction_loader(
         self,
+        include_user_id: bool = False,
         batch_size: int = 1024,
         shuffle: bool = True,
         low_memory: bool = False,
@@ -243,6 +244,7 @@ class Interactions:
         dense tensors of shape [batch_size, num_items].
 
         Args:
+            include_user_id (bool): Whether to include user IDs in the output.
             batch_size (int): The batch size to be used for the DataLoader.
             shuffle (bool): Whether to shuffle the data when loading.
             low_memory (bool): Whether to create the dataloader with a lazy approach.
@@ -255,11 +257,13 @@ class Interactions:
             sparse_matrix = self.get_sparse()
 
             # Create the lazy dataset which just holds a reference to the sparse matrix.
-            lazy_dataset = LazyInteractionDataset(sparse_matrix)
+            lazy_dataset = LazyInteractionDataset(
+                sparse_matrix, include_user_id=include_user_id
+            )
             return DataLoader(lazy_dataset, batch_size=batch_size, shuffle=shuffle)
 
         # Check if interactions have been cached
-        cache_key = "interaction"
+        cache_key = f"interaction_user_{include_user_id}"
         if cache_key in self._cached_dataset:
             dataset = self._cached_dataset[cache_key]
             return DataLoader(dataset, batch_size=batch_size, shuffle=shuffle)
@@ -271,9 +275,12 @@ class Interactions:
         dense_tensor = torch.from_numpy(sparse_matrix.todense()).to(dtype=torch.float32)
 
         # Create a TensorDataset from the dense tensor.
-        # Each item in the dataset will be a row from the dense tensor, representing
-        # the interactions of a single user.
-        dataset = TensorDataset(dense_tensor)
+        # If requested also the user indices tensor will be yielded
+        if include_user_id:
+            indices_tensor = torch.arange(sparse_matrix.shape[0], dtype=torch.long)
+            dataset = TensorDataset(indices_tensor, dense_tensor)
+        else:
+            dataset = TensorDataset(dense_tensor)
 
         # Cache the dataset
         self._cached_dataset[cache_key] = dataset
