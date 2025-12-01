@@ -150,7 +150,20 @@ class Recommender(nn.Module, ABC):
         Returns:
             torch.device: The device of the model.
         """
-        return next(self.parameters()).device
+        # Search through parameters
+        try:
+            return next(self.parameters()).device
+        except StopIteration:
+            pass
+
+        # If no parameter found, search through buffers
+        try:
+            return next(self.buffers()).device
+        except StopIteration:
+            pass
+
+        # Fallback: Device will be cpu
+        return torch.device("cpu")
 
 
 class IterativeRecommender(Recommender):
