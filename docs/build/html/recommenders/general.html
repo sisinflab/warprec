@@ -457,6 +457,23 @@ A simplified graph convolutional network designed for collaborative filtering. I
 </pre></div>
 </div>
 <ul class="simple">
+<li><p>LightGCN++:
+An enhanced version of LightGCN that introduces asymmetric normalization (controlled by alpha and beta) and a residual connection to the initial embeddings (controlled by gamma). This allows the model to better adapt to the specific structural properties of the dataset.</p></li>
+</ul>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">models</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">LightGCNpp</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">embedding_size</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">64</span>
+<span class="w">    </span><span class="nt">n_layers</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">2</span>
+<span class="w">    </span><span class="nt">alpha</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0.5</span>
+<span class="w">    </span><span class="nt">beta</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">-0.1</span>
+<span class="w">    </span><span class="nt">gamma</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0.2</span>
+<span class="w">    </span><span class="nt">weight_decay</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0.0001</span>
+<span class="w">    </span><span class="nt">batch_size</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">512</span>
+<span class="w">    </span><span class="nt">epochs</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">50</span>
+<span class="w">    </span><span class="nt">learning_rate</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0.001</span>
+</pre></div>
+</div>
+<ul class="simple">
 <li><p>NGCF (Neural Graph-based Collaborative Filtering):
 A neural graph-based collaborative filtering model that explicitly captures high-order connectivity by propagating embeddings through the user-item interaction graph.</p></li>
 </ul>
@@ -702,58 +719,62 @@ Recommends items at random. This model defines a lower bound for performance met
 <td><p>Simplified Graph convolutional neural network.</p></td>
 </tr>
 <tr class="row-odd"><td></td>
+<td><p>LightGCN++</p></td>
+<td><p>Improved LightGCN with asymmetric normalization and residual connections.</p></td>
+</tr>
+<tr class="row-even"><td></td>
 <td><p>NGCF</p></td>
 <td><p>Complex Graph convolutional neural network.</p></td>
 </tr>
-<tr class="row-even"><td></td>
+<tr class="row-odd"><td></td>
 <td><p>RP3Beta</p></td>
 <td><p>Random walk model with popularity penalization.</p></td>
 </tr>
-<tr class="row-odd"><td><p>KNN</p></td>
+<tr class="row-even"><td><p>KNN</p></td>
 <td><p>ItemKNN</p></td>
 <td><p>Item-based collaborative KNN using similarity metrics.</p></td>
 </tr>
-<tr class="row-even"><td></td>
+<tr class="row-odd"><td></td>
 <td><p>AttributeItemKNN</p></td>
 <td><p>Item-based KNN using content features.</p></td>
 </tr>
-<tr class="row-odd"><td></td>
+<tr class="row-even"><td></td>
 <td><p>UserKNN</p></td>
 <td><p>User-based collaborative KNN using historical interactions.</p></td>
 </tr>
-<tr class="row-even"><td></td>
+<tr class="row-odd"><td></td>
 <td><p>AttributeUserKNN</p></td>
 <td><p>User-based KNN using content-derived user profiles.</p></td>
 </tr>
-<tr class="row-odd"><td><p>Latent Factor</p></td>
+<tr class="row-even"><td><p>Latent Factor</p></td>
 <td><p>ADMMSlim</p></td>
 <td><p>Sparse item similarity model optimized via ADMM.</p></td>
 </tr>
-<tr class="row-even"><td></td>
+<tr class="row-odd"><td></td>
 <td><p>BPR</p></td>
 <td><p>Pairwise ranking model for implicit feedback.</p></td>
 </tr>
-<tr class="row-odd"><td></td>
+<tr class="row-even"><td></td>
 <td><p>FISM</p></td>
 <td><p>Efficient item similarity model using weighted average as user embeddings.</p></td>
 </tr>
-<tr class="row-even"><td></td>
+<tr class="row-odd"><td></td>
 <td><p>SLIM</p></td>
 <td><p>Interpretable item similarity model with L1/L2 regularization.</p></td>
 </tr>
-<tr class="row-odd"><td><p>Neural</p></td>
+<tr class="row-even"><td><p>Neural</p></td>
 <td><p>ConvNCF</p></td>
 <td><p>Applies CNNs to user-item embeddings outer product to capture structured interaction patterns.</p></td>
 </tr>
-<tr class="row-even"><td></td>
+<tr class="row-odd"><td></td>
 <td><p>NeuMF</p></td>
 <td><p>Hybrid neural model combining GMF and MLP layers.</p></td>
 </tr>
-<tr class="row-odd"><td><p>Unpersonalized</p></td>
+<tr class="row-even"><td><p>Unpersonalized</p></td>
 <td><p>Pop</p></td>
 <td><p>Recommends popular items to all users. Baseline model.</p></td>
 </tr>
-<tr class="row-even"><td></td>
+<tr class="row-odd"><td></td>
 <td><p>Random</p></td>
 <td><p>Recommends items at random. Defines a performance lower bound.</p></td>
 </tr>

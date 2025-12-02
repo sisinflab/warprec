@@ -149,6 +149,23 @@ They are well-suited for uncovering complex patterns in sparse datasets.
         epochs: 50
         learning_rate: 0.001
 
+- LightGCN++:
+  An enhanced version of LightGCN that introduces asymmetric normalization (controlled by alpha and beta) and a residual connection to the initial embeddings (controlled by gamma). This allows the model to better adapt to the specific structural properties of the dataset.
+
+.. code-block:: yaml
+
+  models:
+    LightGCNpp:
+      embedding_size: 64
+      n_layers: 2
+      alpha: 0.5
+      beta: -0.1
+      gamma: 0.2
+      weight_decay: 0.0001
+      batch_size: 512
+      epochs: 50
+      learning_rate: 0.001
+
 - NGCF (Neural Graph-based Collaborative Filtering):
   A neural graph-based collaborative filtering model that explicitly captures high-order connectivity by propagating embeddings through the user-item interaction graph.
 
@@ -387,6 +404,9 @@ Summary of Available General Models
    * -
      - LightGCN
      - Simplified Graph convolutional neural network.
+   * -
+     - LightGCN++
+     - Improved LightGCN with asymmetric normalization and residual connections.
    * -
      - NGCF
      - Complex Graph convolutional neural network.
