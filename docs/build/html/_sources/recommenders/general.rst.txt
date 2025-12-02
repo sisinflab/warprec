@@ -22,6 +22,23 @@ These models are particularly effective in sparse recommendation settings.
       EASE:
         l2: 10
 
+- CDAE (Collaborative Denoising Auto-Encoder):
+  A denoising autoencoder that specifically incorporates a user-specific latent vector (bias) into the hidden layer. This allows the model to capture user-specific patterns more effectively than standard autoencoders, making it highly effective for top-N recommendation tasks.
+
+.. code-block:: yaml
+
+    models:
+      CDAE:
+        embedding_size: 64
+        corruption_ratio: 1.0
+        hid_activation: relu
+        out_activation: sigmoid
+        loss_type: BCE
+        weight_decay: 0.0
+        batch_size: 512
+        epochs: 200
+        learning_rate: 0.001
+
 - AddEASE:
   An extension of the EASE model using side information. It solves two linear problems, increasing the complexity of the underlying task. **This model requires side information to function properly**.
 
@@ -346,6 +363,9 @@ Summary of Available General Models
    * - Autoencoders
      - EASE
      - Linear autoencoder using ridge regression for item similarity.
+   * -
+     - CDAE
+     - Denoising autoencoder with user-specific latent vectors.
    * -
      - AddEASE
      - EASE with side information for improved accuracy.

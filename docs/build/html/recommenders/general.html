@@ -334,6 +334,23 @@ A simple, closed-form linear model that uses ridge regression to learn item-item
 </pre></div>
 </div>
 <ul class="simple">
+<li><p>CDAE (Collaborative Denoising Auto-Encoder):
+A denoising autoencoder that specifically incorporates a user-specific latent vector (bias) into the hidden layer. This allows the model to capture user-specific patterns more effectively than standard autoencoders, making it highly effective for top-N recommendation tasks.</p></li>
+</ul>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">models</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">CDAE</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">embedding_size</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">64</span>
+<span class="w">    </span><span class="nt">corruption_ratio</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">1.0</span>
+<span class="w">    </span><span class="nt">hid_activation</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">relu</span>
+<span class="w">    </span><span class="nt">out_activation</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">sigmoid</span>
+<span class="w">    </span><span class="nt">loss_type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">BCE</span>
+<span class="w">    </span><span class="nt">weight_decay</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0.0</span>
+<span class="w">    </span><span class="nt">batch_size</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">512</span>
+<span class="w">    </span><span class="nt">epochs</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">200</span>
+<span class="w">    </span><span class="nt">learning_rate</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0.001</span>
+</pre></div>
+</div>
+<ul class="simple">
 <li><p>AddEASE:
 An extension of the EASE model using side information. It solves two linear problems, increasing the complexity of the underlying task. <strong>This model requires side information to function properly</strong>.</p></li>
 </ul>
@@ -653,86 +670,90 @@ Recommends items at random. This model defines a lower bound for performance met
 <td><p>Linear autoencoder using ridge regression for item similarity.</p></td>
 </tr>
 <tr class="row-odd"><td></td>
+<td><p>CDAE</p></td>
+<td><p>Denoising autoencoder with user-specific latent vectors.</p></td>
+</tr>
+<tr class="row-even"><td></td>
 <td><p>AddEASE</p></td>
 <td><p>EASE with side information for improved accuracy.</p></td>
 </tr>
-<tr class="row-even"><td></td>
+<tr class="row-odd"><td></td>
 <td><p>CEASE</p></td>
 <td><p>EASE with side information for improved accuracy.</p></td>
 </tr>
-<tr class="row-odd"><td></td>
+<tr class="row-even"><td></td>
 <td><p>MultiDAE</p></td>
 <td><p>Denoising autoencoder optimized for implicit data.</p></td>
 </tr>
-<tr class="row-even"><td></td>
+<tr class="row-odd"><td></td>
 <td><p>MultiVAE</p></td>
 <td><p>Variational autoencoder modeling uncertainty in preferences.</p></td>
 </tr>
-<tr class="row-odd"><td><p>Content Based</p></td>
+<tr class="row-even"><td><p>Content Based</p></td>
 <td><p>VSM</p></td>
 <td><p>Classical content-based model using TF-IDF and cosine similarity.</p></td>
 </tr>
-<tr class="row-even"><td><p>Graph Based</p></td>
+<tr class="row-odd"><td><p>Graph Based</p></td>
 <td><p>GCMC</p></td>
 <td><p>Graph autoencoder for explicit feedback using multi-relational convolutions.</p></td>
 </tr>
-<tr class="row-odd"><td></td>
+<tr class="row-even"><td></td>
 <td><p>LightGCN</p></td>
 <td><p>Simplified Graph convolutional neural network.</p></td>
 </tr>
-<tr class="row-even"><td></td>
+<tr class="row-odd"><td></td>
 <td><p>NGCF</p></td>
 <td><p>Complex Graph convolutional neural network.</p></td>
 </tr>
-<tr class="row-odd"><td></td>
+<tr class="row-even"><td></td>
 <td><p>RP3Beta</p></td>
 <td><p>Random walk model with popularity penalization.</p></td>
 </tr>
-<tr class="row-even"><td><p>KNN</p></td>
+<tr class="row-odd"><td><p>KNN</p></td>
 <td><p>ItemKNN</p></td>
 <td><p>Item-based collaborative KNN using similarity metrics.</p></td>
 </tr>
-<tr class="row-odd"><td></td>
+<tr class="row-even"><td></td>
 <td><p>AttributeItemKNN</p></td>
 <td><p>Item-based KNN using content features.</p></td>
 </tr>
-<tr class="row-even"><td></td>
+<tr class="row-odd"><td></td>
 <td><p>UserKNN</p></td>
 <td><p>User-based collaborative KNN using historical interactions.</p></td>
 </tr>
-<tr class="row-odd"><td></td>
+<tr class="row-even"><td></td>
 <td><p>AttributeUserKNN</p></td>
 <td><p>User-based KNN using content-derived user profiles.</p></td>
 </tr>
-<tr class="row-even"><td><p>Latent Factor</p></td>
+<tr class="row-odd"><td><p>Latent Factor</p></td>
 <td><p>ADMMSlim</p></td>
 <td><p>Sparse item similarity model optimized via ADMM.</p></td>
 </tr>
-<tr class="row-odd"><td></td>
+<tr class="row-even"><td></td>
 <td><p>BPR</p></td>
 <td><p>Pairwise ranking model for implicit feedback.</p></td>
 </tr>
-<tr class="row-even"><td></td>
+<tr class="row-odd"><td></td>
 <td><p>FISM</p></td>
 <td><p>Efficient item similarity model using weighted average as user embeddings.</p></td>
 </tr>
-<tr class="row-odd"><td></td>
+<tr class="row-even"><td></td>
 <td><p>SLIM</p></td>
 <td><p>Interpretable item similarity model with L1/L2 regularization.</p></td>
 </tr>
-<tr class="row-even"><td><p>Neural</p></td>
+<tr class="row-odd"><td><p>Neural</p></td>
 <td><p>ConvNCF</p></td>
 <td><p>Applies CNNs to user-item embeddings outer product to capture structured interaction patterns.</p></td>
 </tr>
-<tr class="row-odd"><td></td>
+<tr class="row-even"><td></td>
 <td><p>NeuMF</p></td>
 <td><p>Hybrid neural model combining GMF and MLP layers.</p></td>
 </tr>
-<tr class="row-even"><td><p>Unpersonalized</p></td>
+<tr class="row-odd"><td><p>Unpersonalized</p></td>
 <td><p>Pop</p></td>
 <td><p>Recommends popular items to all users. Baseline model.</p></td>
 </tr>
-<tr class="row-odd"><td></td>
+<tr class="row-even"><td></td>
 <td><p>Random</p></td>
 <td><p>Recommends items at random. Defines a performance lower bound.</p></td>
 </tr>
