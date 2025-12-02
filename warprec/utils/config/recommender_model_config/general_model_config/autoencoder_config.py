@@ -5,6 +5,7 @@ from warprec.utils.config.model_configuration import (
     RecomModel,
     INT_FIELD,
     FLOAT_FIELD,
+    STR_FIELD,
 )
 from warprec.utils.config.common import (
     validate_greater_than_zero,
@@ -38,6 +39,96 @@ class AddEASE(RecomModel):
     def check_alpha(cls, v: list):
         """Validate alpha."""
         return validate_greater_equal_than_zero(cls, v, "alpha")
+
+
+@params_registry.register("CDAE")
+class CDAE(RecomModel):
+    """Definition of the model CDAE.
+
+    Attributes:
+        embedding_size (INT_FIELD): List of values for embedding_size.
+        corruption_ratio (FLOAT_FIELD): List of values for corruption_ratio.
+        hid_activation (STR_FIELD): List of activation functions for hidden layer.
+        out_activation (STR_FIELD): List of activation functions for output layer.
+        loss_type (STR_FIELD): List of loss types to use.
+        weight_decay (FLOAT_FIELD): List of values for weight_decay.
+        batch_size (INT_FIELD): List of values for batch_size.
+        epochs (INT_FIELD): List of values for epochs.
+        learning_rate (FLOAT_FIELD): List of values for learning rate.
+    """
+
+    embedding_size: INT_FIELD
+    corruption_ratio: FLOAT_FIELD
+    hid_activation: STR_FIELD
+    out_activation: STR_FIELD
+    loss_type: STR_FIELD
+    weight_decay: FLOAT_FIELD
+    batch_size: INT_FIELD
+    epochs: INT_FIELD
+    learning_rate: FLOAT_FIELD
+
+    @field_validator("embedding_size")
+    @classmethod
+    def check_embedding_size(cls, v: list):
+        """Validate embedding_size."""
+        return validate_greater_than_zero(cls, v, "embedding_size")
+
+    @field_validator("corruption_ratio")
+    @classmethod
+    def check_corruption_ratio(cls, v: list):
+        """Validate corruption_ratio."""
+        return validate_greater_equal_than_zero(cls, v, "corruption_ratio")
+
+    @field_validator("hid_activation")
+    @classmethod
+    def check_hid_activation(cls, v: list):
+        """Validate hid_activation."""
+        allowed = ["relu", "tanh", "sigmoid"]
+        if not all(item in allowed for item in v):
+            raise ValueError(f"hid_activation must be in {allowed}")
+        return v
+
+    @field_validator("out_activation")
+    @classmethod
+    def check_out_activation(cls, v: list):
+        """Validate out_activation."""
+        allowed = ["relu", "sigmoid"]
+        if not all(item in allowed for item in v):
+            raise ValueError(f"out_activation must be in {allowed}")
+        return v
+
+    @field_validator("loss_type")
+    @classmethod
+    def check_loss_type(cls, v: list):
+        """Validate loss_type."""
+        allowed = ["MSE", "BCE"]
+        if not all(item in allowed for item in v):
+            raise ValueError(f"loss_type must be in {allowed}")
+        return v
+
+    @field_validator("weight_decay")
+    @classmethod
+    def check_weight_decay(cls, v: list):
+        """Validate weight_decay."""
+        return validate_greater_equal_than_zero(cls, v, "weight_decay")
+
+    @field_validator("batch_size")
+    @classmethod
+    def check_batch_size(cls, v: list):
+        """Validate batch_size."""
+        return validate_greater_than_zero(cls, v, "batch_size")
+
+    @field_validator("epochs")
+    @classmethod
+    def check_epochs(cls, v: list):
+        """Validate epochs."""
+        return validate_greater_than_zero(cls, v, "epochs")
+
+    @field_validator("learning_rate")
+    @classmethod
+    def check_learning_rate(cls, v: list):
+        """Validate learning_rate."""
+        return validate_greater_than_zero(cls, v, "learning_rate")
 
 
 @params_registry.register("CEASE")
