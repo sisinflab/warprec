@@ -6,6 +6,7 @@ try:
     from .graph_utils import GraphRecommenderUtils, SparseDropout, NGCFLayer  # noqa: F401
     from .gcmc import GCMC  # noqa: F401
     from .lightgcn import LightGCN  # noqa: F401
+    from .lightgcnpp import LightGCNpp  # noqa: F401
     from .ngcf import NGCF  # noqa: F401
 
     __all__.extend(
@@ -40,6 +41,17 @@ except ImportError:
         def __init__(self, *args, **kwargs):
             raise ImportError(
                 "LightGCN model requires PyG dependencies. "
+                "Please install following the documentation you can find here: "
+                "https://pytorch-geometric.readthedocs.io/en/latest/install/installation.html"
+            )
+
+    @model_registry.register("LightGCNpp")
+    class LightGCNpp:  # type: ignore[no-redef]
+        """Placeholder for LightGCNpp model when PyG dependencies are not installed."""
+
+        def __init__(self, *args, **kwargs):
+            raise ImportError(
+                "LightGCNpp model requires PyG dependencies. "
                 "Please install following the documentation you can find here: "
                 "https://pytorch-geometric.readthedocs.io/en/latest/install/installation.html"
             )
