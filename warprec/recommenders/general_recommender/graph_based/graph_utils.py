@@ -20,7 +20,7 @@ class GraphRecommenderUtils(ABC):
         interaction_matrix: coo_matrix,
         n_users: int,
         n_items: int,
-        device: torch.device | str = "cpu",
+        normalize: bool = False,
     ) -> SparseTensor:
         """Get the normalized interaction matrix of users and items.
 
@@ -28,7 +28,7 @@ class GraphRecommenderUtils(ABC):
             interaction_matrix (coo_matrix): The full interaction matrix in coo format.
             n_users (int): The number of users.
             n_items (int): The number of items.
-            device (torch.device | str): Device to use for the adjacency matrix.
+            normalize (bool): Wether or not to normalize the sparse adjacency matrix.
 
         Returns:
             SparseTensor: The sparse adjacency matrix.
@@ -43,20 +43,35 @@ class GraphRecommenderUtils(ABC):
 
         # Create the edge tensor
         edge_index_np = np.vstack([row, col])  # Efficient solution
+
         # Creating a tensor directly from a numpy array instead of lists
         edge_index = torch.tensor(edge_index_np, dtype=torch.int64)
 
         # Create the SparseTensor using the edge indexes.
-        # This is the format expected by LGConv
         adj = SparseTensor(
             row=edge_index[0],
             col=edge_index[1],
             sparse_sizes=(n_users + n_items, n_users + n_items),
-        ).to(device)
+        )
 
-        # LGConv will handle the normalization
-        # so there is no need to do it here
+        # Normalize the SparseTensor if requested
+        if normalize:
+            adj = self._symmetric_normalization(adj)
+
         return adj
+
+    def _symmetric_normalization(self, adj: SparseTensor) -> SparseTensor:
+        """Applies symmetric normalization: D^-0.5 * A * D^-0.5."""
+        # Calculate degree (sum of rows)
+        deg = adj.sum(dim=1)
+        deg_inv_sqrt = deg.pow(-0.5)
+        deg_inv_sqrt.masked_fill_(deg_inv_sqrt == float("inf"), 0.0)
+
+        # Apply normalization efficiently on the values
+        row, col, _ = adj.coo()
+        norm_vals = deg_inv_sqrt[row] * deg_inv_sqrt[col]
+
+        return adj.set_value(norm_vals, layout="coo")
 
     def get_ego_embeddings(
         self, user_embedding: nn.Embedding, item_embedding: nn.Embedding
