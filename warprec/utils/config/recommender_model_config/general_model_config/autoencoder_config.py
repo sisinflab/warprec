@@ -10,6 +10,7 @@ from warprec.utils.config.model_configuration import (
 from warprec.utils.config.common import (
     validate_greater_than_zero,
     validate_greater_equal_than_zero,
+    validate_str_list,
 )
 from warprec.utils.registry import params_registry
 
@@ -84,27 +85,21 @@ class CDAE(RecomModel):
     def check_hid_activation(cls, v: list):
         """Validate hid_activation."""
         allowed = ["relu", "tanh", "sigmoid"]
-        if not all(item in allowed for item in v):
-            raise ValueError(f"hid_activation must be in {allowed}")
-        return v
+        return validate_str_list(cls, v, allowed, "hid_activation")
 
     @field_validator("out_activation")
     @classmethod
     def check_out_activation(cls, v: list):
         """Validate out_activation."""
         allowed = ["relu", "sigmoid"]
-        if not all(item in allowed for item in v):
-            raise ValueError(f"out_activation must be in {allowed}")
-        return v
+        return validate_str_list(cls, v, allowed, "out_activation")
 
     @field_validator("loss_type")
     @classmethod
     def check_loss_type(cls, v: list):
         """Validate loss_type."""
         allowed = ["MSE", "BCE"]
-        if not all(item in allowed for item in v):
-            raise ValueError(f"loss_type must be in {allowed}")
-        return v
+        return validate_str_list(cls, v, allowed, "loss_type")
 
     @field_validator("weight_decay")
     @classmethod

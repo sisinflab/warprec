@@ -133,6 +133,40 @@ def _check_similarity(value: Any) -> bool:
     return value.upper() in similarities_registry.list_registered()
 
 
+def _check_str_values(value: Any, allowed: list) -> bool:
+    """Check if the field is in allowed list.
+
+    Args:
+        value (Any): The value to check.
+        allowed (list): List of allowed values.
+
+    Returns:
+        bool: True if the value is in the allowed list, False otherwise.
+
+    Raises:
+        ValueError: If the allowed list is not a list of strings.
+    """
+
+    # Check if not string
+    if not isinstance(value, str):
+        return False
+
+    # Check for search space value
+    if value.lower() in {SearchSpace.CHOICE.value, SearchSpace.GRID.value}:
+        return True
+
+    # Cast to lower all the string in the allowed list
+    lower_allowed = []
+    for v in allowed:
+        if not isinstance(v, str):
+            raise ValueError("Validate str list allowed values must be strings.")
+        lower_allowed.append(v.lower())
+    allowed = lower_allowed
+
+    # Check if supported similarity
+    return value.lower() in allowed
+
+
 def _check_profile(value: Any) -> bool:
     """Check if the field is correct string.
 
@@ -279,6 +313,34 @@ def validate_similarity(cls: Type[T], value: Any, field: str) -> list:
                 f"Values of {field} for {cls.__name__} model must be supported similarities. "
                 f"Values received as input: {value}. "
                 f"Supported similarities: {similarities_registry.list_registered()}"
+            )
+    return value
+
+
+def validate_str_list(cls: Type[T], value: Any, allowed: list, field: str) -> list:
+    """Validate a hyperparameter.
+
+    Valid values must be supported similarity.
+
+    Args:
+        cls (Type[T]): Class type of original Pydantic BaseModel.
+        value (Any): A value or a list of values to be validated.
+        allowed (list): List of allowed values.
+        field (str): The name of the field to be validated.
+
+    Returns:
+        list: A list of validated values in the correct format.
+
+    Raises:
+        ValueError: If any of the values are not a supported similarity.
+    """
+    value = _convert_to_list(value)
+    for v in value:
+        if not _check_str_values(v, allowed):
+            raise ValueError(
+                f"Values of {field} for {cls.__name__} model are not allowed. "
+                f"Values received as input: {value}. "
+                f"Supported values: {allowed}"
             )
     return value
 
