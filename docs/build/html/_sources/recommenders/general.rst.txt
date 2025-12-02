@@ -194,6 +194,25 @@ They are well-suited for uncovering complex patterns in sparse datasets.
         beta: 0.1
         normalize: True
 
+- XSimGCL:
+  A graph contrastive learning model that simplifies graph augmentations by adding uniform noise to embeddings. It achieves state-of-the-art performance by regulating the uniformity of the learned representation.
+
+.. code-block:: yaml
+
+    models:
+      XSimGCL:
+        embedding_size: 64
+        n_layers: 3
+        lambda_: 0.2
+        eps: 0.2
+        temperature: 0.2
+        layer_cl: 2
+        reg_weight: 0.0001
+        weight_decay: 0
+        batch_size: 2048
+        epochs: 50
+        learning_rate: 0.001
+
 =========================
 KNN (K Nearest Neighbor)
 =========================
@@ -413,6 +432,9 @@ Summary of Available General Models
    * -
      - RP3Beta
      - Random walk model with popularity penalization.
+   * -
+     - XSimGCL
+     - Graph contrastive learning with noise perturbation.
    * - KNN
      - ItemKNN
      - Item-based collaborative KNN using similarity metrics.
