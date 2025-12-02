@@ -445,3 +445,19 @@ def validate_bool_values(value: Any) -> list:
         list: A list of validated values in the correct format.
     """
     return _convert_to_list(value)
+
+
+def validate_numeric_values(value: Any) -> list:
+    """Validate a hyperparameter.
+
+    Valid values must be numbers.
+
+    Args:
+        value (Any): A value or a list of values to be validated.
+
+    Returns:
+        list: A list of validated values in the correct format.
+    """
+    value = _convert_to_list(value)
+    value = _scientific_notation_conversion(value)
+    return value

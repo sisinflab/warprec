@@ -12,6 +12,7 @@ from warprec.utils.config.common import (
     validate_between_zero_and_one,
     validate_layer_list,
     validate_bool_values,
+    validate_numeric_values,
 )
 from warprec.utils.registry import params_registry
 
@@ -96,6 +97,87 @@ class LightGCN(RecomModel):
     def check_k(cls, v: list):
         """Validate n_layers."""
         return validate_greater_than_zero(cls, v, "n_layers")
+
+    @field_validator("weight_decay")
+    @classmethod
+    def check_weight_decay(cls, v: list):
+        """Validate weight_decay."""
+        return validate_greater_equal_than_zero(cls, v, "weight_decay")
+
+    @field_validator("batch_size")
+    @classmethod
+    def check_batch_size(cls, v: list):
+        """Validate batch_size."""
+        return validate_greater_than_zero(cls, v, "batch_size")
+
+    @field_validator("epochs")
+    @classmethod
+    def check_epochs(cls, v: list):
+        """Validate epochs."""
+        return validate_greater_than_zero(cls, v, "epochs")
+
+    @field_validator("learning_rate")
+    @classmethod
+    def check_learning_rate(cls, v: list):
+        """Validate learning_rate."""
+        return validate_greater_than_zero(cls, v, "learning_rate")
+
+
+@params_registry.register("LightGCNpp")
+class LightGCNpp(RecomModel):
+    """Definition of the model LightGCNpp.
+
+    Attributes:
+        embedding_size (INT_FIELD): List of values for embedding_size.
+        n_layers (INT_FIELD): List of values for n_layers.
+        alpha (FLOAT_FIELD): List of values for alpha.
+        beta (FLOAT_FIELD): List of values for beta.
+        gamma (FLOAT_FIELD): List of values for gamma.
+        weight_decay (FLOAT_FIELD): List of values for weight_decay.
+        batch_size (INT_FIELD): List of values for batch_size.
+        epochs (INT_FIELD): List of values for epochs.
+        learning_rate (FLOAT_FIELD): List of values for learning rate.
+    """
+
+    embedding_size: INT_FIELD
+    n_layers: INT_FIELD
+    alpha: FLOAT_FIELD
+    beta: FLOAT_FIELD
+    gamma: FLOAT_FIELD
+    weight_decay: FLOAT_FIELD
+    batch_size: INT_FIELD
+    epochs: INT_FIELD
+    learning_rate: FLOAT_FIELD
+
+    @field_validator("embedding_size")
+    @classmethod
+    def check_embedding_size(cls, v: list):
+        """Validate embedding_size."""
+        return validate_greater_than_zero(cls, v, "embedding_size")
+
+    @field_validator("n_layers")
+    @classmethod
+    def check_n_layers(cls, v: list):
+        """Validate n_layers."""
+        return validate_greater_than_zero(cls, v, "n_layers")
+
+    @field_validator("alpha")
+    @classmethod
+    def check_alpha(cls, v: list):
+        """Validate alpha."""
+        return validate_between_zero_and_one(cls, v, "alpha")
+
+    @field_validator("beta")
+    @classmethod
+    def check_beta(cls, v: list):
+        """Validate beta."""
+        return validate_numeric_values(v)
+
+    @field_validator("gamma")
+    @classmethod
+    def check_gamma(cls, v: list):
+        """Validate gamma."""
+        return validate_between_zero_and_one(cls, v, "gamma")
 
     @field_validator("weight_decay")
     @classmethod
