@@ -6,6 +6,7 @@ from torch import nn, Tensor
 
 from warprec.data.entities import Interactions, Sessions
 from warprec.recommenders.base_recommender import IterativeRecommender
+from warprec.recommenders.losses import EmbLoss
 from warprec.utils.enums import DataLoaderType
 from warprec.utils.registry import model_registry
 
@@ -35,7 +36,7 @@ class FISM(IterativeRecommender):
             used in the similarity calculation.
         split_to (int): Parameter for splitting items into chunks
             during prediction (for memory management).
-        weight_decay (float): The value of weight decay used in the optimizer.
+        reg_weight (float): The L2 regularization weight.
         batch_size (int): The size of the batches used during training.
         epochs (int): The number of training epochs.
         learning_rate (float): The learning rate for the optimizer.
@@ -48,7 +49,7 @@ class FISM(IterativeRecommender):
     embedding_size: int
     alpha: float
     split_to: int
-    weight_decay: float
+    reg_weight: float
     batch_size: int
     epochs: int
     learning_rate: float
@@ -99,7 +100,8 @@ class FISM(IterativeRecommender):
 
         # Init embedding weights
         self.apply(self._init_weights)
-        self.loss = nn.BCEWithLogitsLoss()
+        self.bce_loss = nn.BCEWithLogitsLoss()
+        self.reg_loss = EmbLoss()
 
     def get_dataloader(
         self,
@@ -117,10 +119,17 @@ class FISM(IterativeRecommender):
     def train_step(self, batch: Any, *args, **kwargs):
         user, item, rating = batch
 
+        # Calculate BCE loss
         predictions = self(user, item)
-        loss: Tensor = self.loss(predictions, rating)
+        bce_loss = self.bce_loss(predictions, rating)
 
-        return loss
+        # Calculate L2 regularization
+        reg_loss = self.reg_weight * self.reg_loss(
+            self.item_src_embedding(item),
+            self.item_dst_embedding(item),
+        )
+
+        return bce_loss + reg_loss
 
     def forward(self, user: Tensor, item: Tensor) -> Tensor:
         """Forward pass for calculating scores for specific user-item pairs.

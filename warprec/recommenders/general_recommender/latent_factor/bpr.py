@@ -6,7 +6,7 @@ from torch import nn, Tensor
 
 from warprec.data.entities import Interactions, Sessions
 from warprec.recommenders.base_recommender import IterativeRecommender
-from warprec.recommenders.losses import BPRLoss
+from warprec.recommenders.losses import BPRLoss, EmbLoss
 from warprec.utils.enums import DataLoaderType
 from warprec.utils.registry import model_registry
 
@@ -31,7 +31,7 @@ class BPR(IterativeRecommender):
     Attributes:
         DATALOADER_TYPE: The type of dataloader used.
         embedding_size (int): The embedding size of user and item.
-        weight_decay (float): The value of weight decay used in the optimizer.
+        reg_weight (float): The L2 regularization weight.
         batch_size (int): The batch size used for training.
         epochs (int): The number of epochs.
         learning_rate (float): The learning rate value.
@@ -42,7 +42,7 @@ class BPR(IterativeRecommender):
 
     # Model hyperparameters
     embedding_size: int
-    weight_decay: float
+    reg_weight: float
     batch_size: int
     epochs: int
     learning_rate: float
@@ -77,7 +77,8 @@ class BPR(IterativeRecommender):
 
         # Init embedding weights
         self.apply(self._init_weights)
-        self.loss = BPRLoss()
+        self.bpr_loss = BPRLoss()
+        self.reg_loss = EmbLoss()
 
     def get_dataloader(
         self,
@@ -93,11 +94,19 @@ class BPR(IterativeRecommender):
     def train_step(self, batch: Any, *args, **kwargs):
         user, pos_item, neg_item = batch
 
+        # Compute BPR loss
         pos_item_score = self.forward(user, pos_item)
         neg_item_score = self.forward(user, neg_item)
-        loss: Tensor = self.loss(pos_item_score, neg_item_score)
+        bpr_loss = self.bpr_loss(pos_item_score, neg_item_score)
 
-        return loss
+        # Compute L2 regularization
+        reg_loss = self.reg_weight * self.reg_loss(
+            self.user_embedding(user),
+            self.item_embedding(pos_item),
+            self.item_embedding(neg_item),
+        )
+
+        return bpr_loss + reg_loss
 
     def forward(self, user: Tensor, item: Tensor) -> Tensor:
         """Forward pass of the BPR model.

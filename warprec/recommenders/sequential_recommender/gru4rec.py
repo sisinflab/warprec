@@ -8,7 +8,7 @@ from warprec.recommenders.base_recommender import (
     IterativeRecommender,
     SequentialRecommenderUtils,
 )
-from warprec.recommenders.losses import BPRLoss
+from warprec.recommenders.losses import BPRLoss, EmbLoss
 from warprec.data.entities import Interactions, Sessions
 from warprec.utils.enums import DataLoaderType
 from warprec.utils.registry import model_registry
@@ -35,6 +35,7 @@ class GRU4Rec(IterativeRecommender, SequentialRecommenderUtils):
         hidden_size (int): The number of features in the hidden state of the GRU.
         num_layers (int): The number of recurrent layers.
         dropout_prob (float): The probability of dropout for the embeddings.
+        reg_weight (float): The L2 regularization weight.
         weight_decay (float): The value of weight decay used in optimizer.
         batch_size (int): The batch size used for training.
         epochs (int): The number of training epochs.
@@ -51,6 +52,7 @@ class GRU4Rec(IterativeRecommender, SequentialRecommenderUtils):
     hidden_size: int
     num_layers: int
     dropout_prob: float
+    reg_weight: float
     weight_decay: float
     batch_size: int
     epochs: int
@@ -97,11 +99,12 @@ class GRU4Rec(IterativeRecommender, SequentialRecommenderUtils):
 
         # Loss function will be based on number of
         # negative samples
-        self.loss: nn.Module
+        self.main_loss: nn.Module
         if self.neg_samples > 0:
-            self.loss = BPRLoss()
+            self.main_loss = BPRLoss()
         else:
-            self.loss = nn.CrossEntropyLoss()
+            self.main_loss = nn.CrossEntropyLoss()
+        self.reg_loss = EmbLoss()
 
     def get_dataloader(
         self,
@@ -125,12 +128,10 @@ class GRU4Rec(IterativeRecommender, SequentialRecommenderUtils):
             neg_item = None
 
         seq_output = self.forward(item_seq, item_seq_len)
+        pos_items_emb = self.item_embedding(pos_item)  # [batch_size, embedding_size]
 
-        loss: Tensor
+        # Calculate main loss and L2 regularization
         if self.neg_samples > 0:
-            pos_items_emb = self.item_embedding(
-                pos_item
-            )  # [batch_size, embedding_size]
             neg_items_emb = self.item_embedding(
                 neg_item
             )  # [batch_size, embedding_size]
@@ -139,15 +140,28 @@ class GRU4Rec(IterativeRecommender, SequentialRecommenderUtils):
             neg_score = torch.sum(
                 seq_output.unsqueeze(1) * neg_items_emb, dim=-1
             )  # [batch_size]
-            loss = self.loss(pos_score, neg_score)
+            main_loss = self.main_loss(pos_score, neg_score)
+
+            # L2 regularization
+            reg_loss = self.reg_weight * self.reg_loss(
+                self.item_embedding(item_seq),
+                pos_items_emb,
+                neg_items_emb,
+            )
         else:
             test_item_emb = self.item_embedding.weight  # [num_items, embedding_size]
             logits = torch.matmul(
                 seq_output, test_item_emb.transpose(0, 1)
             )  # [batch_size, num_items]
-            loss = self.loss(logits, pos_item)
+            main_loss = self.main_loss(logits, pos_item)
 
-        return loss
+            # L2 regularization
+            reg_loss = self.reg_weight * self.reg_loss(
+                self.item_embedding(item_seq),
+                pos_items_emb,
+            )
+
+        return main_loss + reg_loss
 
     def forward(self, item_seq: Tensor, item_seq_len: Tensor) -> Tensor:
         """Forward pass of the GRU4Rec model.

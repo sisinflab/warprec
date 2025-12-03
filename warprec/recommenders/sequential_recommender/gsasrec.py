@@ -8,6 +8,7 @@ from warprec.recommenders.base_recommender import (
     IterativeRecommender,
     SequentialRecommenderUtils,
 )
+from warprec.recommenders.losses import EmbLoss
 from warprec.data.entities import Sessions
 from warprec.utils.enums import DataLoaderType
 from warprec.utils.registry import model_registry
@@ -39,6 +40,7 @@ class gSASRec(IterativeRecommender, SequentialRecommenderUtils):
         inner_size (int): The dimensionality of the feed-forward layer in the transformer.
         dropout_prob (float): The probability of dropout for embeddings and other layers.
         attn_dropout_prob (float): The probability of dropout for the attention weights.
+        reg_weight (float): The L2 regularization weight.
         weight_decay (float): The value of weight decay used in the optimizer.
         batch_size (int): The batch size used during training.
         epochs (int): The number of training epochs.
@@ -59,6 +61,7 @@ class gSASRec(IterativeRecommender, SequentialRecommenderUtils):
     inner_size: int
     dropout_prob: float
     attn_dropout_prob: float
+    reg_weight: float
     weight_decay: float
     batch_size: int
     epochs: int
@@ -117,7 +120,8 @@ class gSASRec(IterativeRecommender, SequentialRecommenderUtils):
 
         # Initialize weights
         self.apply(self._init_weights)
-        self.loss = self._gbce_loss_function()
+        self.gbce_loss = self._gbce_loss_function()
+        self.reg_loss = EmbLoss()
 
     def _get_output_embeddings(self) -> nn.Embedding:
         """Return embeddings based on the flag value reuse_item_embeddings.
@@ -164,7 +168,7 @@ class gSASRec(IterativeRecommender, SequentialRecommenderUtils):
 
         transformer_output = self.transformer_encoder(
             src=seq_emb,
-            mask=self.causal_mask,
+            mask=self.causal_mask[:seq_len, :seq_len],  # type:ignore [index]
             src_key_padding_mask=padding_mask,
         )
         return transformer_output
@@ -217,7 +221,7 @@ class gSASRec(IterativeRecommender, SequentialRecommenderUtils):
                 [positive_logits_transformed, negative_logits], -1
             ).to(torch.float32)
 
-            mask = (model_input != 0).float()
+            mask = (model_input != self.n_items).float()
             loss_per_element = nn.functional.binary_cross_entropy_with_logits(
                 final_logits, gt, reduction="none"
             )
@@ -240,10 +244,20 @@ class gSASRec(IterativeRecommender, SequentialRecommenderUtils):
         if model_input.shape[1] == 0:
             return torch.tensor(0.0, requires_grad=True).to(positives.device)
 
+        # Calculate GBCE loss
         sequence_hidden_states = self.forward(model_input)
-        total_loss = self.loss(sequence_hidden_states, labels, negatives, model_input)
+        gbce_loss = self.gbce_loss(
+            sequence_hidden_states, labels, negatives, model_input
+        )
 
-        return total_loss
+        # Calculate L2 regularization
+        reg_loss = self.reg_weight * self.reg_loss(
+            self.item_embedding(model_input),
+            self._get_output_embeddings()(labels),
+            self._get_output_embeddings()(negatives),
+        )
+
+        return gbce_loss + reg_loss
 
     @torch.no_grad()
     def predict(

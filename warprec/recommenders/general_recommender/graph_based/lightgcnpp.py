@@ -14,7 +14,7 @@ from warprec.recommenders.base_recommender import (
     IterativeRecommender,
 )
 from warprec.recommenders.general_recommender.graph_based import GraphRecommenderUtils
-from warprec.recommenders.losses import BPRLoss
+from warprec.recommenders.losses import BPRLoss, EmbLoss
 from warprec.utils.enums import DataLoaderType
 from warprec.utils.registry import model_registry
 
@@ -46,7 +46,7 @@ class LightGCNpp(IterativeRecommender, GraphRecommenderUtils):
         beta (float): The exponent for the source node degree in the normalization coefficient.
         gamma (float): The coefficient balancing the initial embeddings ($E^0$) and the
             aggregated graph embeddings ($E_{mean}$).
-        weight_decay (float): The value of weight decay used in the optimizer.
+        reg_weight (float): The L2 regularization weight.
         batch_size (int): The batch size used for training.
         epochs (int): The number of epochs.
         learning_rate (float): The learning rate value.
@@ -61,7 +61,7 @@ class LightGCNpp(IterativeRecommender, GraphRecommenderUtils):
     alpha: float
     beta: float
     gamma: float
-    weight_decay: float
+    reg_weight: float
     batch_size: int
     epochs: int
     learning_rate: float
@@ -114,7 +114,8 @@ class LightGCNpp(IterativeRecommender, GraphRecommenderUtils):
 
         # Init embedding weights
         self.apply(self._init_weights)
-        self.loss = BPRLoss()
+        self.bpr_loss = BPRLoss()
+        self.reg_loss = EmbLoss()
 
     def _get_weighted_adj_mat(
         self,
@@ -194,9 +195,16 @@ class LightGCNpp(IterativeRecommender, GraphRecommenderUtils):
         # Calculate BPR Loss
         pos_scores = torch.mul(u_embeddings, pos_embeddings).sum(dim=1)
         neg_scores = torch.mul(u_embeddings, neg_embeddings).sum(dim=1)
-        loss: Tensor = self.loss(pos_scores, neg_scores)
+        brp_loss = self.bpr_loss(pos_scores, neg_scores)
 
-        return loss
+        # Calculate L2 loss
+        reg_loss = self.reg_weight * self.reg_loss(
+            self.user_embedding(user),
+            self.item_embedding(pos_item),
+            self.item_embedding(neg_item),
+        )
+
+        return brp_loss + reg_loss
 
     def forward(self) -> Tuple[Tensor, Tensor]:
         """Forward pass of LightGCN++ with custom pooling logic"""

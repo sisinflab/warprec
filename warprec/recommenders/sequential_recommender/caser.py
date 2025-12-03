@@ -9,7 +9,7 @@ from warprec.recommenders.base_recommender import (
     IterativeRecommender,
     SequentialRecommenderUtils,
 )
-from warprec.recommenders.losses import BPRLoss
+from warprec.recommenders.losses import BPRLoss, EmbLoss
 from warprec.data.entities import Interactions, Sessions
 from warprec.utils.enums import DataLoaderType
 from warprec.utils.registry import model_registry
@@ -40,6 +40,7 @@ class Caser(IterativeRecommender, SequentialRecommenderUtils):
         n_h (int): The number of horizontal filters.
         n_v (int): The number of vertical filters.
         dropout_prob (float): The probability of dropout for the fully connected layer.
+        reg_weight (float): The L2 regularization weight.
         weight_decay (float): The value of weight decay used in the optimizer.
         batch_size (int): The batch size used during training.
         epochs (int): The number of training epochs.
@@ -56,6 +57,7 @@ class Caser(IterativeRecommender, SequentialRecommenderUtils):
     n_h: int
     n_v: int
     dropout_prob: float
+    reg_weight: float
     weight_decay: float
     batch_size: int
     epochs: int
@@ -124,11 +126,12 @@ class Caser(IterativeRecommender, SequentialRecommenderUtils):
         self.apply(self._init_weights)
 
         # Loss function
-        self.loss: nn.Module
+        self.main_loss: nn.Module
         if self.neg_samples > 0:
-            self.loss = BPRLoss()
+            self.main_loss = BPRLoss()
         else:
-            self.loss = nn.CrossEntropyLoss()
+            self.main_loss = nn.CrossEntropyLoss()
+        self.reg_loss = EmbLoss()
 
     def get_dataloader(
         self,
@@ -153,12 +156,10 @@ class Caser(IterativeRecommender, SequentialRecommenderUtils):
             neg_item = None
 
         seq_output = self.forward(user, item_seq)
+        pos_items_emb = self.item_embedding(pos_item)  # [batch_size, embedding_size]
 
-        loss: Tensor
+        # Calculate main loss and L2 regularization
         if self.neg_samples > 0:
-            pos_items_emb = self.item_embedding(
-                pos_item
-            )  # [batch_size, embedding_size]
             neg_items_emb = self.item_embedding(
                 neg_item
             )  # [batch_size, neg_samples, embedding_size]
@@ -167,13 +168,28 @@ class Caser(IterativeRecommender, SequentialRecommenderUtils):
             neg_score = torch.sum(
                 seq_output.unsqueeze(1) * neg_items_emb, dim=-1
             )  # [batch_size, neg_samples]
-            loss = self.loss(pos_score, neg_score)
+            main_loss = self.main_loss(pos_score, neg_score)
+
+            # L2 regularization
+            reg_loss = self.reg_weight * self.reg_loss(
+                self.item_embedding(item_seq),
+                self.user_embedding(user),
+                pos_items_emb,
+                neg_items_emb,
+            )
         else:
             test_item_emb = self.item_embedding.weight
             logits = torch.matmul(seq_output, test_item_emb.transpose(0, 1))
-            loss = self.loss(logits, pos_item)
+            main_loss = self.main_loss(logits, pos_item)
 
-        return loss
+            # L2 regularization
+            reg_loss = self.reg_weight * self.reg_loss(
+                self.item_embedding(item_seq),
+                self.user_embedding(user),
+                pos_items_emb,
+            )
+
+        return main_loss + reg_loss
 
     def forward(self, user: Tensor, item_seq: Tensor) -> Tensor:
         """Forward pass of the Caser model.

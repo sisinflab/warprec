@@ -8,7 +8,7 @@ from warprec.recommenders.base_recommender import (
     IterativeRecommender,
     SequentialRecommenderUtils,
 )
-from warprec.recommenders.losses import BPRLoss
+from warprec.recommenders.losses import BPRLoss, EmbLoss
 from warprec.data.entities import Interactions, Sessions
 from warprec.utils.enums import DataLoaderType
 from warprec.utils.registry import model_registry
@@ -38,7 +38,7 @@ class FOSSIL(IterativeRecommender, SequentialRecommenderUtils):
         embedding_size (int): The dimension of the item embeddings.
         order_len (int): The number of last items to consider for high-order Markov chains.
         alpha (float): The parameter for calculating similarity.
-        weight_decay (float): The value of weight decay used in the optimizer.
+        reg_weight (float): The L2 regularization weight.
         batch_size (int): The batch size used for training.
         epochs (int): The number of training epochs.
         learning_rate (float): The learning rate value.
@@ -53,7 +53,7 @@ class FOSSIL(IterativeRecommender, SequentialRecommenderUtils):
     embedding_size: int
     order_len: int
     alpha: float
-    weight_decay: float
+    reg_weight: float
     batch_size: int
     epochs: int
     learning_rate: float
@@ -93,11 +93,12 @@ class FOSSIL(IterativeRecommender, SequentialRecommenderUtils):
         self.apply(self._init_weights)
 
         # Loss function
-        self.loss: nn.Module
+        self.main_loss: nn.Module
         if self.neg_samples > 0:
-            self.loss = BPRLoss()
+            self.main_loss = BPRLoss()
         else:
-            self.loss = nn.CrossEntropyLoss()
+            self.main_loss = nn.CrossEntropyLoss()
+        self.reg_loss = EmbLoss()
 
     def get_dataloader(
         self,
@@ -253,18 +254,33 @@ class FOSSIL(IterativeRecommender, SequentialRecommenderUtils):
 
         pos_items_emb = self.item_embedding(pos_item)
 
-        loss: Tensor
+        # Calculate main loss and L2 regularization
         if self.neg_samples > 0:
             neg_items_emb = self.item_embedding(neg_item)
             pos_score = torch.sum(seq_output * pos_items_emb, dim=-1)
             neg_score = torch.sum(seq_output.unsqueeze(1) * neg_items_emb, dim=-1)
-            loss = self.loss(pos_score, neg_score)
+            main_loss = self.main_loss(pos_score, neg_score)
+
+            # L2 regularization
+            reg_loss = self.reg_weight * self.reg_loss(
+                self.item_embedding(item_seq),
+                self.user_lambda(user_id),
+                pos_items_emb,
+                neg_items_emb,
+            )
         else:
             test_item_emb = self.item_embedding.weight
             logits = torch.matmul(seq_output, test_item_emb.transpose(0, 1))
-            loss = self.loss(logits, pos_item)
+            main_loss = self.main_loss(logits, pos_item)
 
-        return loss
+            # L2 regularization
+            reg_loss = self.reg_weight * self.reg_loss(
+                self.item_embedding(item_seq),
+                self.user_lambda(user_id),
+                pos_items_emb,
+            )
+
+        return main_loss + reg_loss
 
     def forward(
         self,

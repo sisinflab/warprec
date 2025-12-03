@@ -7,6 +7,7 @@ from scipy.sparse import csr_matrix
 
 from warprec.data.entities import Interactions, Sessions
 from warprec.recommenders.base_recommender import IterativeRecommender
+from warprec.recommenders.losses import EmbLoss
 from warprec.utils.enums import DataLoaderType
 from warprec.utils.registry import model_registry
 
@@ -39,6 +40,7 @@ class CDAE(IterativeRecommender):
         hid_activation (str): The activation function for the hidden layer ('relu', 'tanh', 'sigmoid').
         out_activation (str): The activation function for the output layer ('relu', 'sigmoid').
         loss_type (str): The loss function to use for backpropagation ('bce', 'mse').
+        reg_weight (float): The L2 regularization weight.
         weight_decay (float): The value of weight decay used in the optimizer.
         batch_size (int): The batch size used during training.
         epochs (int): The number of training epochs.
@@ -54,6 +56,7 @@ class CDAE(IterativeRecommender):
     hid_activation: str
     out_activation: str
     loss_type: str
+    reg_weight: float
     weight_decay: float
     batch_size: int
     epochs: int
@@ -93,13 +96,14 @@ class CDAE(IterativeRecommender):
         self.o_act = self._get_activation(self.out_activation)
 
         # Define loss type to use
-        self.loss: nn.Module
+        self.main_loss: nn.Module
         if self.loss_type == "MSE":
-            self.loss = nn.MSELoss()
+            self.main_loss = nn.MSELoss()
         elif self.loss_type == "BCE":
-            self.loss = nn.BCEWithLogitsLoss()
+            self.main_loss = nn.BCEWithLogitsLoss()
         else:
             raise ValueError("Invalid loss_type, loss_type must be in [MSE, BCE]")
+        self.reg_loss = EmbLoss()
 
         # Initialize weights
         self.apply(self._init_weights)
@@ -163,11 +167,16 @@ class CDAE(IterativeRecommender):
         # Calculate the reconstruction loss against the original history
         if self.loss_type == "MSE":
             prediction = self.o_act(reconstructed_logits)
-            loss = self.loss(prediction, user_history)
+            main_loss = self.main_loss(prediction, user_history)
         else:
-            loss = self.loss(reconstructed_logits, user_history)
+            main_loss = self.main_loss(reconstructed_logits, user_history)
 
-        return loss
+        # Calculate L2 regularization
+        reg_loss = self.reg_weight * self.reg_loss(
+            self.user_embedding(user_indices),
+        )
+
+        return main_loss + reg_loss
 
     @torch.no_grad()
     def predict(

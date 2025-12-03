@@ -8,7 +8,7 @@ from warprec.recommenders.base_recommender import (
     IterativeRecommender,
     SequentialRecommenderUtils,
 )
-from warprec.recommenders.losses import BPRLoss
+from warprec.recommenders.losses import BPRLoss, EmbLoss
 from warprec.data.entities import Interactions, Sessions
 from warprec.utils.enums import DataLoaderType
 from warprec.utils.registry import model_registry
@@ -43,6 +43,7 @@ class BERT4Rec(IterativeRecommender, SequentialRecommenderUtils):
         dropout_prob (float): The probability of dropout for embeddings and other layers.
         attn_dropout_prob (float): The probability of dropout for the attention weights.
         mask_prob (float): The probability of an item being masked during training.
+        reg_weight (float): The L2 regularization weight.
         weight_decay (float): The value of weight decay used in the optimizer.
         batch_size (int): The batch size used during training.
         epochs (int): The number of training epochs.
@@ -62,6 +63,7 @@ class BERT4Rec(IterativeRecommender, SequentialRecommenderUtils):
     dropout_prob: float
     attn_dropout_prob: float
     mask_prob: float
+    reg_weight: float
     weight_decay: float
     batch_size: int
     epochs: int
@@ -116,7 +118,8 @@ class BERT4Rec(IterativeRecommender, SequentialRecommenderUtils):
         self.out_bias = nn.Parameter(torch.zeros(self.n_items + 1))
 
         self.apply(self._init_weights)
-        self.loss = BPRLoss()
+        self.bpr_loss = BPRLoss()
+        self.reg_loss = EmbLoss()
 
     def get_dataloader(
         self,
@@ -156,11 +159,17 @@ class BERT4Rec(IterativeRecommender, SequentialRecommenderUtils):
         neg_score = (
             torch.sum(seq_output.unsqueeze(2) * neg_items_emb, dim=-1) + neg_bias
         )
-
-        # Mask out padding from loss calculation
         loss_mask = masked_indices > 0
-        loss = self.loss(pos_score[loss_mask], neg_score[loss_mask])
-        return loss
+        bpr_loss = self.bpr_loss(pos_score[loss_mask], neg_score[loss_mask])
+
+        # Calculate L2 regularization
+        reg_loss = self.reg_weight * self.reg_loss(
+            self.item_embedding(masked_seq),
+            pos_items_emb,
+            neg_items_emb,
+        )
+
+        return bpr_loss + reg_loss
 
     def forward(self, item_seq: Tensor) -> Tensor:
         """

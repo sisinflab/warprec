@@ -11,6 +11,7 @@ from warprec.data.entities import Interactions, Sessions
 from warprec.recommenders.base_recommender import (
     IterativeRecommender,
 )
+from warprec.recommenders.losses import EmbLoss
 from warprec.recommenders.general_recommender.graph_based import GraphRecommenderUtils
 from warprec.utils.enums import DataLoaderType
 from warprec.utils.registry import model_registry
@@ -92,6 +93,7 @@ class GCMC(IterativeRecommender, GraphRecommenderUtils):
     Attributes:
         DATALOADER_TYPE: The type of dataloader used.
         embedding_size (int): The embedding size of user and item.
+        reg_weight (float): The L2 regularization weight.
         weight_decay (float): The value of weight decay used in the optimizer.
         batch_size (int): The batch size used for training.
         epochs (int): The number of training epochs.
@@ -103,6 +105,7 @@ class GCMC(IterativeRecommender, GraphRecommenderUtils):
 
     # Model hyperparameters
     embedding_size: int
+    reg_weight: float
     weight_decay: float
     batch_size: int
     epochs: int
@@ -171,7 +174,8 @@ class GCMC(IterativeRecommender, GraphRecommenderUtils):
             self.adj_tensors.append(adj_tensor)
 
         self.apply(self._init_weights)
-        self.loss = nn.CrossEntropyLoss()
+        self.ce_loss = nn.CrossEntropyLoss()
+        self.reg_loss = EmbLoss()
 
     def get_dataloader(
         self,
@@ -207,11 +211,18 @@ class GCMC(IterativeRecommender, GraphRecommenderUtils):
         diff = torch.abs(
             rating.unsqueeze(1) - self.classes_tensor.unsqueeze(0)  # type: ignore[operator]
         )  # [batch_size, num_ratings]
+
+        # Calculate CE loss
         _, target_classes = torch.min(diff, dim=1)  # [batch_size]
+        ce_loss = self.ce_loss(predictions, target_classes)
 
-        loss: Tensor = self.loss(predictions, target_classes)
+        # Calculate L2 regularization
+        reg_loss = self.reg_weight * self.reg_loss(
+            self.user_embedding(user),
+            self.item_embedding(item),
+        )
 
-        return loss
+        return ce_loss + reg_loss
 
     def forward(self, user: Tensor, item: Tensor) -> Tensor:
         """Forward pass for GCMC. Computes rating logits for given user-item pairs.

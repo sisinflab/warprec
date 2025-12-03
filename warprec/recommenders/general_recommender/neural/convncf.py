@@ -5,7 +5,7 @@ import torch
 from torch import nn, Tensor
 
 from warprec.recommenders.layers import MLP, CNN
-from warprec.recommenders.losses import BPRLoss
+from warprec.recommenders.losses import BPRLoss, EmbLoss
 from warprec.data.entities import Interactions, Sessions
 from warprec.recommenders.base_recommender import IterativeRecommender
 from warprec.utils.enums import DataLoaderType
@@ -36,6 +36,7 @@ class ConvNCF(IterativeRecommender):
         cnn_kernels (List[int]): The list of kernel sizes for each CNN layer.
         cnn_strides (List[int]): The list of stride sizes for each CNN layer.
         dropout_prob (float): The dropout probability for the prediction layer.
+        reg_weight (float): The L2 regularization weight.
         weight_decay (float): The value of weight decay used in the optimizer.
         batch_size (int): The batch size used for training.
         epochs (int): The number of epochs.
@@ -51,6 +52,7 @@ class ConvNCF(IterativeRecommender):
     cnn_kernels: List[int]
     cnn_strides: List[int]
     dropout_prob: float
+    reg_weight: float
     weight_decay: float
     batch_size: int
     epochs: int
@@ -104,7 +106,8 @@ class ConvNCF(IterativeRecommender):
 
         # Init embedding weights
         self.apply(self._init_weights)
-        self.loss = BPRLoss()
+        self.bpr_loss = BPRLoss()
+        self.reg_loss = EmbLoss()
 
     def get_dataloader(
         self,
@@ -120,11 +123,19 @@ class ConvNCF(IterativeRecommender):
     def train_step(self, batch: Any, *args, **kwargs):
         user, pos_item, neg_item = batch
 
+        # Calculate BPR loss
         pos_item_score = self.forward(user, pos_item)
         neg_item_score = self.forward(user, neg_item)
-        loss: Tensor = self.loss(pos_item_score, neg_item_score)
+        bpr_loss = self.bpr_loss(pos_item_score, neg_item_score)
 
-        return loss
+        # Calculate L2 regularization
+        reg_loss = self.reg_weight * self.reg_loss(
+            self.user_embedding(user),
+            self.item_embedding(pos_item),
+            self.item_embedding(neg_item),
+        )
+
+        return bpr_loss + reg_loss
 
     def forward(self, user: Tensor, item: Tensor) -> Tensor:
         """Forward pass of the ConvNCF model.

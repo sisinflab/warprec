@@ -7,6 +7,7 @@ from torch import nn, Tensor
 from warprec.recommenders.layers import MLP
 from warprec.data.entities import Interactions, Sessions
 from warprec.recommenders.base_recommender import IterativeRecommender
+from warprec.recommenders.losses import EmbLoss
 from warprec.utils.enums import DataLoaderType
 from warprec.utils.registry import model_registry
 
@@ -36,6 +37,7 @@ class NeuMF(IterativeRecommender):
         mf_train (bool): Wether or not to train MF embedding.
         mlp_train (bool): Wether or not to train MLP embedding.
         dropout (float): The dropout probability.
+        reg_weight (float): The L2 regularization weight.
         weight_decay (float): The value of weight decay used in the optimizer.
         batch_size (int): The batch size used for training.
         epochs (int): The number of epochs.
@@ -53,6 +55,7 @@ class NeuMF(IterativeRecommender):
     mf_train: bool
     mlp_train: bool
     dropout: float
+    reg_weight: float
     weight_decay: float
     batch_size: int
     epochs: int
@@ -118,7 +121,8 @@ class NeuMF(IterativeRecommender):
         # Init embedding weights
         self.apply(self._init_weights)
         self.sigmoid = nn.Sigmoid()
-        self.loss = nn.BCEWithLogitsLoss()
+        self.bce_loss = nn.BCEWithLogitsLoss()
+        self.reg_loss = EmbLoss()
 
     def get_dataloader(
         self,
@@ -136,10 +140,19 @@ class NeuMF(IterativeRecommender):
     def train_step(self, batch: Any, *args, **kwargs):
         user, item, rating = batch
 
+        # Calculate BCE loss
         predictions = self(user, item)
-        loss: Tensor = self.loss(predictions, rating)
+        bce_loss = self.bce_loss(predictions, rating)
 
-        return loss
+        # Calculate L2 regularization
+        reg_loss = self.reg_weight * self.reg_loss(
+            self.user_mf_embedding(user),
+            self.user_mlp_embedding(user),
+            self.item_mf_embedding(item),
+            self.item_mlp_embedding(item),
+        )
+
+        return bce_loss + reg_loss
 
     # pylint: disable = E0606
     def forward(self, user: Tensor, item: Tensor) -> Tensor:

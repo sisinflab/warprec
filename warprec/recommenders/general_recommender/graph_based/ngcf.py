@@ -17,7 +17,7 @@ from warprec.recommenders.general_recommender.graph_based import (
     SparseDropout,
     NGCFLayer,
 )
-from warprec.recommenders.losses import BPRLoss
+from warprec.recommenders.losses import BPRLoss, EmbLoss
 from warprec.utils.enums import DataLoaderType
 from warprec.utils.registry import model_registry
 
@@ -43,13 +43,13 @@ class NGCF(IterativeRecommender, GraphRecommenderUtils):
     Attributes:
         DATALOADER_TYPE: The type of dataloader used.
         embedding_size (int): The embedding size of user and item.
-        weight_decay (float): The value of weight decay used in the optimizer.
-        batch_size (int): The batch size used for training.
-        epochs (int): The number of epochs.
-        learning_rate (float): The learning rate value.
         weight_size (list[int]): List of hidden sizes for each layer.
         node_dropout (float): Dropout rate for nodes in the adjacency matrix.
         message_dropout (float): Dropout rate for messages/embeddings during propagation.
+        reg_weight (float): The L2 regularization weight.
+        batch_size (int): The batch size used for training.
+        epochs (int): The number of epochs.
+        learning_rate (float): The learning rate value.
     """
 
     # Dataloader definition
@@ -57,13 +57,13 @@ class NGCF(IterativeRecommender, GraphRecommenderUtils):
 
     # Model hyperparameters
     embedding_size: int
-    weight_decay: float
-    batch_size: int
-    epochs: int
-    learning_rate: float
     weight_size: list[int]
     node_dropout: float
     message_dropout: float
+    reg_weight: float
+    batch_size: int
+    epochs: int
+    learning_rate: float
 
     def __init__(
         self,
@@ -119,7 +119,8 @@ class NGCF(IterativeRecommender, GraphRecommenderUtils):
 
         # Init embedding weights
         self.apply(self._init_weights)
-        self.loss = BPRLoss()
+        self.bpr_loss = BPRLoss()
+        self.reg_loss = EmbLoss()
 
     def get_dataloader(
         self,
@@ -143,12 +144,19 @@ class NGCF(IterativeRecommender, GraphRecommenderUtils):
         pos_embeddings = item_all_embeddings[pos_item]
         neg_embeddings = item_all_embeddings[neg_item]
 
-        # Calculate BPR Loss
+        # Calculate BPR loss
         pos_scores = torch.mul(u_embeddings, pos_embeddings).sum(dim=1)
         neg_scores = torch.mul(u_embeddings, neg_embeddings).sum(dim=1)
-        loss: Tensor = self.loss(pos_scores, neg_scores)
+        brp_loss = self.bpr_loss(pos_scores, neg_scores)
 
-        return loss
+        # Calculate L2 regularization
+        reg_loss = self.reg_weight * self.reg_loss(
+            self.user_embedding(user),
+            self.item_embedding(pos_item),
+            self.item_embedding(neg_item),
+        )
+
+        return brp_loss + reg_loss
 
     def forward(self) -> Tuple[Tensor, Tensor]:
         """Forward pass of the NGCF model for embedding propagation.
@@ -162,7 +170,7 @@ class NGCF(IterativeRecommender, GraphRecommenderUtils):
         )
 
         # Ensure adjacency matrix is on the same device as embeddings
-        if self.adj.device() != ego_embeddings.device:
+        if self.adj.device != ego_embeddings.device:
             self.adj = self.adj.to(ego_embeddings.device)
 
         embeddings_list = [ego_embeddings]
