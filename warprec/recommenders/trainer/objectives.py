@@ -18,6 +18,7 @@ from ray.train import ScalingConfig, RunConfig, CheckpointConfig
 from ray.train.torch import TorchTrainer, get_device
 
 from warprec.data import Dataset
+from warprec.common import standard_optimizer
 from warprec.evaluation.evaluator import Evaluator
 from warprec.recommenders.base_recommender import Recommender, IterativeRecommender
 from warprec.utils.config import RecomModel, LRScheduler
@@ -180,11 +181,7 @@ def objective_function(
                 sessions=dataset.train_session,
                 low_memory=low_memory,
             )
-            optimizer = torch.optim.Adam(
-                model.parameters(),
-                lr=model.learning_rate,
-                weight_decay=model.weight_decay,
-            )
+            optimizer = standard_optimizer(model)
             epochs = model.epochs
 
             # Check for learning rate scheduler
@@ -389,11 +386,7 @@ def objective_function_ddp(config: dict) -> None:
     train_dataloader = train.torch.prepare_data_loader(train_dataloader)
 
     # Initialize the optimizer
-    optimizer = torch.optim.Adam(
-        unwrapped_model.parameters(),
-        lr=unwrapped_model.learning_rate,
-        weight_decay=unwrapped_model.weight_decay,
-    )
+    optimizer = standard_optimizer(unwrapped_model)
 
     # Check for learning rate scheduler
     scheduler = None

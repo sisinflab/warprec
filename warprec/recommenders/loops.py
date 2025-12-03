@@ -1,11 +1,11 @@
 from typing import Optional
 from tqdm.auto import tqdm
 
-import torch
 from torch.optim.lr_scheduler import ReduceLROnPlateau
 from torch.optim.lr_scheduler import LRScheduler as LRSchedulerBaseClass
 
 from warprec.data import Dataset
+from warprec.common import standard_optimizer
 from warprec.recommenders.base_recommender import IterativeRecommender
 from warprec.utils.config import LRScheduler
 from warprec.utils.registry import lr_scheduler_registry
@@ -40,9 +40,8 @@ def train_loop(
         sessions=dataset.train_session,
         low_memory=low_memory,
     )
-    optimizer = torch.optim.Adam(
-        model.parameters(), lr=model.learning_rate, weight_decay=model.weight_decay
-    )
+
+    optimizer = standard_optimizer(model)
 
     # Check for learning rate scheduler
     scheduler = None
