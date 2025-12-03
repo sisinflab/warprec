@@ -683,9 +683,9 @@ class Dataset:
                 the dataset.
         """
         return {
-            "items": self._niid,
-            "users": self._nuid,
-            "features": self._nfeat,
+            "n_items": self._niid,
+            "n_users": self._nuid,
+            "n_features": self._nfeat,
             "item_mapping": self._imap,
             "user_mapping": self._umap,
         }
