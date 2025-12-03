@@ -6,7 +6,6 @@ import torch
 import numpy as np
 from torch import nn, Tensor
 from torch.nn.init import xavier_normal_, xavier_uniform_, constant_
-from torch.optim.optimizer import Optimizer
 from torch.utils.data import DataLoader
 from scipy.sparse import csr_matrix
 
@@ -171,20 +170,14 @@ class IterativeRecommender(Recommender):
     an iterative approach to be trained.
 
     Attributes:
-        optimizer (Optimizer): The optimizer used during the
-            training process.
         epochs (int): The number of epochs used to
             train the model.
         learning_rate (float): The learning rate using
             during optimization.
-        weight_decay (float): The l2 regularization applied
-            to the model.
     """
 
-    optimizer: Optimizer
     epochs: int
     learning_rate: float
-    weight_decay: float
 
     def _init_weights(self, module: nn.Module):
         """A comprehensive default weight initialization method.
