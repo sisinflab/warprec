@@ -2,10 +2,8 @@ from abc import ABC
 
 import torch
 import numpy as np
-import torch.nn.functional as F
 from torch import nn, Tensor
 from scipy.sparse import coo_matrix
-from torch.nn.init import xavier_normal_
 from torch_sparse import SparseTensor
 
 
@@ -137,73 +135,3 @@ class SparseDropout(nn.Module):
 
         # Return the tensor as a SparseTensor in coo format
         return torch.sparse_coo_tensor(indices, out_values, X.size(), device=X.device)
-
-
-class NGCFLayer(nn.Module):
-    """Implementation of a single layer of NGCF propagation.
-    - First term: GCN-like aggregation of neighbors.
-    - Second term: Element-wise product capturing interaction between ego-embedding and aggregated neighbors.
-
-    Args:
-        in_features (int): The number of input features.
-        out_features (int): The number of output features.
-        message_dropout (float): The dropout value.
-    """
-
-    def __init__(
-        self, in_features: int, out_features: int, message_dropout: float = 0.0
-    ):
-        super().__init__()
-        self.in_features = in_features
-        self.out_features = out_features
-
-        # Weight matrices for the two terms
-        self.W1 = nn.Parameter(torch.Tensor(in_features, out_features))
-        self.W2 = nn.Parameter(torch.Tensor(in_features, out_features))
-
-        # Biases for the two terms
-        self.b1 = nn.Parameter(torch.Tensor(1, out_features))
-        self.b2 = nn.Parameter(torch.Tensor(1, out_features))
-
-        # LeakyReLU non-linearity and dropout layer
-        self.leaky_relu = nn.LeakyReLU(negative_slope=0.2)
-        self.dropout = nn.Dropout(p=message_dropout)
-
-        self.init_parameters()
-
-    def init_parameters(self):
-        xavier_normal_(self.W1.data)
-        xavier_normal_(self.W2.data)
-        nn.init.zeros_(self.b1.data)
-        nn.init.zeros_(self.b2.data)
-
-    def forward(self, ego_embeddings: Tensor, adj_matrix: SparseTensor) -> Tensor:
-        """
-        Performs a single NGCF propagation step.
-
-        Args:
-            ego_embeddings (Tensor): Current embeddings of all nodes (users + items).
-            adj_matrix (SparseTensor): Normalized adjacency matrix (A_hat).
-
-        Returns:
-            Tensor: Propagated embeddings for the next layer.
-        """
-        laplacian_embeddings = adj_matrix.matmul(ego_embeddings)
-
-        # First term: (A_hat + I) * E * W1 + b1
-        first_term = (
-            torch.matmul(ego_embeddings + laplacian_embeddings, self.W1) + self.b1
-        )
-
-        # Second term: (A_hat * E) element-wise product E * W2 + b2
-        second_term = torch.mul(ego_embeddings, laplacian_embeddings)
-        second_term = torch.matmul(second_term, self.W2) + self.b2
-
-        # Combine terms, apply activation, dropout, and normalize
-        output_embeddings = self.leaky_relu(first_term + second_term)
-        output_embeddings = self.dropout(output_embeddings)
-        output_embeddings = F.normalize(
-            output_embeddings, p=2, dim=1
-        )  # L2 Normalization
-
-        return output_embeddings

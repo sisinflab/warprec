@@ -3,7 +3,7 @@ from .rp3beta import RP3Beta
 __all__ = ["RP3Beta"]
 
 try:
-    from .graph_utils import GraphRecommenderUtils, SparseDropout, NGCFLayer  # noqa: F401
+    from .graph_utils import GraphRecommenderUtils, SparseDropout  # noqa: F401
     from .gcmc import GCMC  # noqa: F401
     from .lightgcn import LightGCN  # noqa: F401
     from .lightgcnpp import LightGCNpp  # noqa: F401
