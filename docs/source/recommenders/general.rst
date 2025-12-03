@@ -30,7 +30,7 @@ These models are particularly effective in sparse recommendation settings.
     models:
       CDAE:
         embedding_size: 64
-        corruption_ratio: 1.0
+        corruption: 1.0
         hid_activation: relu
         out_activation: sigmoid
         loss_type: BCE
@@ -69,7 +69,7 @@ These models are particularly effective in sparse recommendation settings.
       MultiDAE:
         intermediate_dim: 600
         latent_dim: 200
-        dropout: 1.0
+        corruption: 1.0
         weight_decay: 0.0001
         batch_size: 2048
         epochs: 200
@@ -84,7 +84,7 @@ These models are particularly effective in sparse recommendation settings.
       MultiVAE:
         intermediate_dim: 600
         latent_dim: 200
-        dropout: 1.0
+        corruption: 1.0
         anneal_cap: 0.2
         anneal_step: 200
         weight_decay: 0.0001
