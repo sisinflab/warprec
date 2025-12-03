@@ -2,7 +2,6 @@ from typing import List
 
 from torch import nn, Tensor
 from torch.nn import Module
-from torch.nn.init import normal_
 
 
 def get_activation(activation: str = "relu") -> Module:
@@ -30,18 +29,6 @@ def get_activation(activation: str = "relu") -> Module:
             raise ValueError("Activation function not supported.")
 
 
-def init_weights(module: Module):
-    """Initialize the weights of a module."""
-    if isinstance(module, nn.Linear):
-        normal_(module.weight.data, mean=0, std=0.01)
-        if module.bias is not None:
-            module.bias.data.fill_(0.0)
-    if isinstance(module, nn.Conv2d):
-        normal_(module.weight.data, mean=0, std=0.01)
-        if module.bias is not None:
-            module.bias.data.fill_(0.0)
-
-
 class MLP(nn.Module):
     """Simple implementation of MultiLayer Perceptron.
 
@@ -50,7 +37,6 @@ class MLP(nn.Module):
         dropout (float): The dropout probability.
         activation (str): The activation function to apply.
         batch_normalization (bool): Wether or not to apply batch normalization.
-        initialize (bool): Wether or not to initialize the weights.
         last_activation (bool): Wether or not to keep last non-linearity function.
     """
 
@@ -60,7 +46,6 @@ class MLP(nn.Module):
         dropout: float = 0.0,
         activation: str = "relu",
         batch_normalization: bool = False,
-        initialize: bool = False,
         last_activation: bool = True,
     ):
         super().__init__()
@@ -75,8 +60,6 @@ class MLP(nn.Module):
         if activation is not None and not last_activation:
             mlp_modules.pop()
         self.mlp_layers = nn.Sequential(*mlp_modules)
-        if initialize:
-            self.apply(init_weights)
 
     def forward(self, input_feature: Tensor):
         """Simple forwarding, input tensor will pass
@@ -93,7 +76,6 @@ class CNN(nn.Module):
         cnn_kernels (List[int]): The kernels of each layer.
         cnn_strides (List[int]): The strides of each layer.
         activation (str): The activation function to apply.
-        initialize (bool): Wether or not to initialize the weights.
 
     Raises:
         ValueError: If the cnn_channels, cnn_kernels and cnn_strides lists
@@ -106,7 +88,6 @@ class CNN(nn.Module):
         cnn_kernels: List[int],
         cnn_strides: List[int],
         activation: str = "relu",
-        initialize: bool = False,
     ):
         super().__init__()
         if not (len(cnn_channels) == len(cnn_kernels) == len(cnn_strides)):
@@ -134,9 +115,6 @@ class CNN(nn.Module):
             in_channel = out_channel
 
         self.cnn_layers = nn.Sequential(*cnn_modules)
-
-        if initialize:
-            self.apply(init_weights)
 
     def forward(self, input_feature: Tensor):
         """Simple forwarding, input tensor will pass
