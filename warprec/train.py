@@ -258,12 +258,12 @@ def main(args: Namespace):
         if config.general.time_report:
             # Retrieve dataset information
             info = main_dataset.info()
-            num_users = info.get("users", None)
-            num_items = info.get("items", None)
+            n_users = info.get("n_users", None)
+            n_items = info.get("n_items", None)
 
             # Define simple sample to measure prediction time
-            num_users_to_predict = min(1000, num_users)
-            num_items_to_predict = min(1000, num_items)
+            n_users_to_predict = min(1000, n_users)
+            n_items_to_predict = min(1000, n_items)
 
             # Create mock data to test model performance during inference
             if isinstance(best_model, SequentialRecommenderUtils):
@@ -272,16 +272,14 @@ def main(args: Namespace):
                 max_seq_len = 10
 
             # Create mock data to test prediction time
-            user_indices = torch.arange(num_users_to_predict).to(
+            user_indices = torch.arange(n_users_to_predict).to(device=best_model_device)
+            item_indices = torch.randint(
+                1, n_items, (n_users_to_predict, n_items_to_predict)
+            ).to(device=best_model_device)
+            user_seq = torch.randint(1, n_items, (n_users_to_predict, max_seq_len)).to(
                 device=best_model_device
             )
-            item_indices = torch.randint(
-                1, num_items, (num_users_to_predict, num_items_to_predict)
-            ).to(device=best_model_device)
-            user_seq = torch.randint(
-                1, num_items, (num_users_to_predict, max_seq_len)
-            ).to(device=best_model_device)
-            seq_len = torch.randint(1, max_seq_len + 1, (num_users_to_predict,)).to(
+            seq_len = torch.randint(1, max_seq_len + 1, (n_users_to_predict,)).to(
                 device=best_model_device
             )
             train_sparse = main_dataset.train_set.get_sparse()
