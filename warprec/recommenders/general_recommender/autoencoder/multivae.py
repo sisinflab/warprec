@@ -112,7 +112,7 @@ class MultiVAE(IterativeRecommender):
         DATALOADER_TYPE: The type of dataloader used.
         intermediate_dim (int): Intermediate dimension size.
         latent_dim (int): Latent dimension size.
-        dropout (float): Dropout probability.
+        corruption (float): The probability of dropout applied to the input layer (denoising).
         weight_decay (float): The value of weight decay used in the optimizer.
         batch_size (int): The batch size used for training.
         epochs (int): The number of epochs.
@@ -126,7 +126,7 @@ class MultiVAE(IterativeRecommender):
 
     intermediate_dim: int
     latent_dim: int
-    dropout: float
+    corruption: float
     weight_decay: float
     batch_size: int
     epochs: int
@@ -154,7 +154,7 @@ class MultiVAE(IterativeRecommender):
             original_dim=self.items,
             intermediate_dim=self.intermediate_dim,
             latent_dim=self.latent_dim,
-            dropout_rate=self.dropout,
+            dropout_rate=self.corruption,
         )
 
         # Decoder

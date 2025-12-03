@@ -36,7 +36,7 @@ class CDAE(IterativeRecommender):
     Attributes:
         DATALOADER_TYPE: The type of dataloader used.
         embedding_size (int): The dimension of the user embeddings and the hidden layer.
-        corruption_ratio (float): The probability of dropout applied to the input layer (denoising).
+        corruption (float): The probability of dropout applied to the input layer (denoising).
         hid_activation (str): The activation function for the hidden layer ('relu', 'tanh', 'sigmoid').
         out_activation (str): The activation function for the output layer ('relu', 'sigmoid').
         loss_type (str): The loss function to use for backpropagation ('bce', 'mse').
@@ -52,7 +52,7 @@ class CDAE(IterativeRecommender):
 
     # Model hyperparameters
     embedding_size: int
-    corruption_ratio: float
+    corruption: float
     hid_activation: str
     out_activation: str
     loss_type: str
@@ -89,7 +89,7 @@ class CDAE(IterativeRecommender):
         self.decoder = nn.Linear(self.embedding_size, self.n_items)
 
         # Dropout layer for the "denoising" aspect
-        self.corruption_dropout = nn.Dropout(p=self.corruption_ratio)
+        self.corruption_dropout = nn.Dropout(p=self.corruption)
 
         # Activation functions
         self.h_act = self._get_activation(self.hid_activation)
