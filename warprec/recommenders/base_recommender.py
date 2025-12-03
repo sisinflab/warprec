@@ -19,15 +19,19 @@ class Recommender(nn.Module, ABC):
     Args:
         params (dict): The dictionary with the model params.
         interactions (Interactions): The training interactions.
+        info (dict): The dictionary containing dataset information.
         *args (Any): Argument for PyTorch nn.Module.
         seed (int): The seed to use for reproducibility.
-        info (dict): The dictionary containing dataset information.
         **kwargs (Any): Keyword argument for PyTorch nn.Module.
 
     Attributes:
         DATALOADER_TYPE (Optional[DataLoaderType]): The type of dataloader used
             by this model. This value will be used to pre-compute the required
             data structure before starting the training process.
+
+    Raises:
+        ValueError: If the info dictionary does not contain the number of items
+            and users of the dataset.
     """
 
     DATALOADER_TYPE: Optional[DataLoaderType] = None
@@ -36,14 +40,23 @@ class Recommender(nn.Module, ABC):
         self,
         params: dict,
         interactions: Interactions,
+        info: dict,
         *args: Any,
         seed: int = 42,
-        info: dict = None,
         **kwargs: Any,
     ):
         super().__init__()
         self.init_params(params)
         self.set_seed(seed)
+
+        # Initialize the dataset dimensions
+        self.n_users = info.get("n_users")
+        self.n_items = info.get("n_items")
+        if not self.n_users or not self.n_items:
+            raise ValueError(
+                f"Incorrect initialization: 'n_users' ({self.n_users}) e 'n_items' ({self.n_items}) "
+                "must be present in the 'info' dictionary."
+            )
 
     @abstractmethod
     def predict(
@@ -353,12 +366,12 @@ class ItemSimRecommender(Recommender):
         super().__init__(
             params, interactions, device=device, seed=seed, *args, **kwargs
         )
-        self.items = info.get("items", None)
-        if not self.items:
+        self.n_items = info.get("n_items", None)
+        if not self.n_items:
             raise ValueError(
                 "Items value must be provided to correctly initialize the model."
             )
-        self.item_similarity = np.zeros(self.items)
+        self.item_similarity = np.zeros(self.n_items)
 
     @torch.no_grad()
     def predict(
@@ -397,12 +410,12 @@ class ItemSimRecommender(Recommender):
         # Return full or sampled predictions
         if item_indices is None:
             # Case 'full': prediction on all items
-            return predictions  # [batch_size, num_items]
+            return predictions  # [batch_size, n_items]
         else:
             # Case 'sampled': prediction on a sampled set of items
             return predictions.gather(
                 1,
                 item_indices.to(predictions.device).clamp(
-                    max=self.items - 1
+                    max=self.n_items - 1
                 ),  # [batch_size, pad_seq]
             )
