@@ -48,7 +48,7 @@ class CDAE(RecomModel):
 
     Attributes:
         embedding_size (INT_FIELD): List of values for embedding_size.
-        corruption_ratio (FLOAT_FIELD): List of values for corruption_ratio.
+        corruption (FLOAT_FIELD): List of values for corruption.
         hid_activation (STR_FIELD): List of activation functions for hidden layer.
         out_activation (STR_FIELD): List of activation functions for output layer.
         loss_type (STR_FIELD): List of loss types to use.
@@ -60,7 +60,7 @@ class CDAE(RecomModel):
     """
 
     embedding_size: INT_FIELD
-    corruption_ratio: FLOAT_FIELD
+    corruption: FLOAT_FIELD
     hid_activation: STR_FIELD
     out_activation: STR_FIELD
     loss_type: STR_FIELD
@@ -76,11 +76,11 @@ class CDAE(RecomModel):
         """Validate embedding_size."""
         return validate_greater_than_zero(cls, v, "embedding_size")
 
-    @field_validator("corruption_ratio")
+    @field_validator("corruption")
     @classmethod
-    def check_corruption_ratio(cls, v: list):
-        """Validate corruption_ratio."""
-        return validate_greater_equal_than_zero(cls, v, "corruption_ratio")
+    def check_corruption(cls, v: list):
+        """Validate corruption."""
+        return validate_greater_equal_than_zero(cls, v, "corruption")
 
     @field_validator("hid_activation")
     @classmethod
@@ -185,7 +185,7 @@ class MultiDAE(RecomModel):
     Attributes:
         intermediate_dim (INT_FIELD): List of intermediate_dim values.
         latent_dim (INT_FIELD): List of values for latent_dim values.
-        dropout (FLOAT_FIELD): List of values for dropout.
+        corruption (FLOAT_FIELD): List of values for corruption.
         weight_decay (FLOAT_FIELD): List of values for weight_decay.
         batch_size (INT_FIELD): List of values for batch_size.
         epochs (INT_FIELD): List of values for epochs.
@@ -194,7 +194,7 @@ class MultiDAE(RecomModel):
 
     intermediate_dim: INT_FIELD
     latent_dim: INT_FIELD
-    dropout: FLOAT_FIELD
+    corruption: FLOAT_FIELD
     weight_decay: FLOAT_FIELD
     batch_size: INT_FIELD
     epochs: INT_FIELD
@@ -212,11 +212,11 @@ class MultiDAE(RecomModel):
         """Validate latent_dim."""
         return validate_greater_than_zero(cls, v, "latent_dim")
 
-    @field_validator("dropout")
+    @field_validator("corruption")
     @classmethod
-    def check_dropout(cls, v: list):
-        """Validate dropout."""
-        return validate_greater_equal_than_zero(cls, v, "dropout")
+    def check_corruption(cls, v: list):
+        """Validate corruption."""
+        return validate_greater_equal_than_zero(cls, v, "corruption")
 
     @field_validator("weight_decay")
     @classmethod
@@ -250,7 +250,7 @@ class MultiVAE(RecomModel):
     Attributes:
         intermediate_dim (INT_FIELD): List of intermediate_dim values.
         latent_dim (INT_FIELD): List of values for latent_dim values.
-        dropout (FLOAT_FIELD): List of values for dropout.
+        corruption (FLOAT_FIELD): List of values for corruption.
         weight_decay (FLOAT_FIELD): List of values for weight_decay.
         batch_size (INT_FIELD): List of values for batch_size.
         epochs (INT_FIELD): List of values for epochs.
@@ -261,7 +261,7 @@ class MultiVAE(RecomModel):
 
     intermediate_dim: INT_FIELD
     latent_dim: INT_FIELD
-    dropout: FLOAT_FIELD
+    corruption: FLOAT_FIELD
     weight_decay: FLOAT_FIELD
     batch_size: INT_FIELD
     epochs: INT_FIELD
@@ -281,11 +281,11 @@ class MultiVAE(RecomModel):
         """Validate latent_dim."""
         return validate_greater_than_zero(cls, v, "latent_dim")
 
-    @field_validator("dropout")
+    @field_validator("corruption")
     @classmethod
-    def check_dropout(cls, v: list):
-        """Validate dropout."""
-        return validate_greater_equal_than_zero(cls, v, "dropout")
+    def check_corruption(cls, v: list):
+        """Validate corruption."""
+        return validate_greater_equal_than_zero(cls, v, "corruption")
 
     @field_validator("weight_decay")
     @classmethod
