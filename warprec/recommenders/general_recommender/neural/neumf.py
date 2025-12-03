@@ -21,13 +21,11 @@ class NeuMF(IterativeRecommender):
 
     Args:
         params (dict): Model parameters.
+        interactions (Interactions): The training interactions.
+        info (dict): The dictionary containing dataset information.
         *args (Any): Variable length argument list.
         seed (int): The seed to use for reproducibility.
-        info (dict): The dictionary containing dataset information.
         **kwargs (Any): Arbitrary keyword arguments.
-
-    Raises:
-        ValueError: If the items or users value was not passed through the info dict.
 
     Attributes:
         DATALOADER_TYPE: The type of dataloader used.
@@ -65,26 +63,15 @@ class NeuMF(IterativeRecommender):
     def __init__(
         self,
         params: dict,
+        interactions: Interactions,
+        info: dict,
         *args: Any,
         seed: int = 42,
-        info: dict = None,
         **kwargs: Any,
     ):
-        super().__init__(params, seed=seed, *args, **kwargs)
+        super().__init__(params, interactions, info, *args, seed=seed, **kwargs)
 
-        # Get information from dataset info
-        self.users = info.get("users", None)
-        if not self.users:
-            raise ValueError(
-                "Users value must be provided to correctly initialize the model."
-            )
-        self.items = info.get("items", None)
-        if not self.items:
-            raise ValueError(
-                "Items value must be provided to correctly initialize the model."
-            )
-
-        # Set block size
+        # Check for optional value of block size
         self.block_size = kwargs.get("block_size", 50)
 
         # Ray Tune converts lists to tuples
@@ -92,15 +79,15 @@ class NeuMF(IterativeRecommender):
         self.mlp_hidden_size = list(self.mlp_hidden_size)
 
         # MF embeddings
-        self.user_mf_embedding = nn.Embedding(self.users, self.mf_embedding_size)
+        self.user_mf_embedding = nn.Embedding(self.n_users, self.mf_embedding_size)
         self.item_mf_embedding = nn.Embedding(
-            self.items + 1, self.mf_embedding_size, padding_idx=self.items
+            self.n_items + 1, self.mf_embedding_size, padding_idx=self.n_items
         )
 
         # MLP embeddings
-        self.user_mlp_embedding = nn.Embedding(self.users, self.mlp_embedding_size)
+        self.user_mlp_embedding = nn.Embedding(self.n_users, self.mlp_embedding_size)
         self.item_mlp_embedding = nn.Embedding(
-            self.items + 1, self.mlp_embedding_size, padding_idx=self.items
+            self.n_items + 1, self.mlp_embedding_size, padding_idx=self.n_items
         )
 
         # MLP layers
@@ -214,8 +201,8 @@ class NeuMF(IterativeRecommender):
         if item_indices is None:
             # Case 'full': iterate through all items in memory-safe blocks
             preds_logits = []
-            for start in range(0, self.items, self.block_size):
-                end = min(start + self.block_size, self.items)
+            for start in range(0, self.n_items, self.block_size):
+                end = min(start + self.block_size, self.n_items)
                 items_block = torch.arange(start, end)
 
                 # Expand user and item indices to create all pairs for the block

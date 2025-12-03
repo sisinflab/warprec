@@ -18,30 +18,22 @@ class Pop(Recommender):
     Args:
         params (dict): The dictionary with the model params.
         interactions (Interactions): The training interactions.
+        info (dict): The dictionary containing dataset information.
         *args (Any): Argument for PyTorch nn.Module.
         seed (int): The seed to use for reproducibility.
-        info (dict): The dictionary containing dataset information.
         **kwargs (Any): Keyword argument for PyTorch nn.Module.
-
-    Raises:
-        ValueError: If the items value was not passed through the info dict.
     """
 
     def __init__(
         self,
         params: dict,
         interactions: Interactions,
+        info: dict,
         *args: Any,
         seed: int = 42,
-        info: dict = None,
         **kwargs: Any,
     ):
-        super().__init__(params, interactions, seed=seed, info=info, *args, **kwargs)
-        self.items = info.get("items", None)
-        if not self.items:
-            raise ValueError(
-                "Items value must be provided to correctly initialize the model."
-            )
+        super().__init__(params, interactions, info, *args, seed=seed, **kwargs)
 
         X = interactions.get_sparse()
 
@@ -81,9 +73,9 @@ class Pop(Recommender):
             # Expand the popularity scores for each user in the batch
             return self.normalized_popularity.expand(
                 batch_size, -1
-            ).clone()  # [batch_size, num_items]
+            ).clone()  # [batch_size, n_items]
 
         # Case 'sampled': prediction on a sampled set of items
         return self.normalized_popularity[
-            item_indices.clamp(max=self.items - 1)
+            item_indices.clamp(max=self.n_items - 1)
         ]  # [batch_size, pad_seq]

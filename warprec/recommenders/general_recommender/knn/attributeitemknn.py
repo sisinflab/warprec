@@ -17,9 +17,9 @@ class AttributeItemKNN(ItemSimRecommender):
     Args:
         params (dict): Model parameters.
         interactions (Interactions): The training interactions.
+        info (dict): The dictionary containing dataset information.
         *args (Any): Variable length argument list.
         seed (int): The seed to use for reproducibility.
-        info (dict): The dictionary containing dataset information.
         **kwargs (Any): Arbitrary keyword arguments.
 
     Attributes:
@@ -34,12 +34,12 @@ class AttributeItemKNN(ItemSimRecommender):
         self,
         params: dict,
         interactions: Interactions,
+        info: dict,
         *args: Any,
         seed: int = 42,
-        info: dict = None,
         **kwargs: Any,
     ):
-        super().__init__(params, interactions, seed=seed, info=info, *args, **kwargs)
+        super().__init__(params, interactions, info, *args, seed=seed, **kwargs)
 
         X_feat = interactions.get_side_sparse()
         similarity = similarities_registry.get(self.similarity)

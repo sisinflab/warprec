@@ -30,13 +30,10 @@ class LightGCNpp(IterativeRecommender, GraphRecommenderUtils):
     Args:
         params (dict): Model parameters. Requires 'alpha', 'beta', 'gamma'.
         interactions (Interactions): The training interactions.
+        info (dict): The dictionary containing dataset information.
         *args (Any): Variable length argument list.
         seed (int): The seed to use for reproducibility.
-        info (dict): The dictionary containing dataset information.
         **kwargs (Any): Arbitrary keyword arguments.
-
-    Raises:
-        ValueError: If the items or users value was not passed through the info dict.
 
     Attributes:
         DATALOADER_TYPE: The type of dataloader used.
@@ -70,24 +67,12 @@ class LightGCNpp(IterativeRecommender, GraphRecommenderUtils):
         self,
         params: dict,
         interactions: Interactions,
+        info: dict,
         *args: Any,
         seed: int = 42,
-        info: dict = None,
         **kwargs: Any,
     ):
-        super().__init__(params, interactions, seed=seed, *args, **kwargs)
-
-        # Get information from dataset info
-        self.n_users = info.get("users", None)
-        if not self.n_users:
-            raise ValueError(
-                "Users value must be provided to correctly initialize the model."
-            )
-        self.n_items = info.get("items", None)
-        if not self.n_items:
-            raise ValueError(
-                "Items value must be provided to correctly initialize the model."
-            )
+        super().__init__(params, interactions, info, *args, seed=seed, **kwargs)
 
         self.user_embedding = nn.Embedding(self.n_users, self.embedding_size)
         self.item_embedding = nn.Embedding(
@@ -279,7 +264,7 @@ class LightGCNpp(IterativeRecommender, GraphRecommenderUtils):
 
         if item_indices is None:
             # Case 'full': prediction on all items
-            item_embeddings = item_all_embeddings[:-1, :]  # [num_items, embedding_size]
+            item_embeddings = item_all_embeddings[:-1, :]  # [n_items, embedding_size]
             einsum_string = "be,ie->bi"  # b: batch, e: embedding, i: item
         else:
             # Case 'sampled': prediction on a sampled set of items
@@ -290,5 +275,5 @@ class LightGCNpp(IterativeRecommender, GraphRecommenderUtils):
 
         predictions = torch.einsum(
             einsum_string, user_embeddings, item_embeddings
-        )  # [batch_size, num_items] or [batch_size, pad_seq]
+        )  # [batch_size, n_items] or [batch_size, pad_seq]
         return predictions

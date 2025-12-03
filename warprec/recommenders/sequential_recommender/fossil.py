@@ -24,14 +24,11 @@ class FOSSIL(IterativeRecommender, SequentialRecommenderUtils):
 
     Args:
         params (dict): Model parameters.
+        interactions (Interactions): The training interactions.
+        info (dict): The dictionary containing dataset information.
         *args (Any): Variable length argument list.
         seed (int): The seed to use for reproducibility.
-        info (dict): The dictionary containing dataset information.
         **kwargs (Any): Arbitrary keyword arguments.
-
-    Raises:
-        ValueError: If essential values like 'items' or 'max_seq_len' are not passed
-                    through the info dict.
 
     Attributes:
         DATALOADER_TYPE: The type of dataloader used.
@@ -63,20 +60,13 @@ class FOSSIL(IterativeRecommender, SequentialRecommenderUtils):
     def __init__(
         self,
         params: dict,
+        interactions: Interactions,
+        info: dict,
         *args: Any,
         seed: int = 42,
-        info: dict = None,
         **kwargs: Any,
     ):
-        super().__init__(params, seed=seed, *args, **kwargs)
-
-        # Get information from dataset info
-        self.n_items = info.get("items", None)
-        self.n_users = info.get("users", None)
-        if not self.n_items or not self.n_users:
-            raise ValueError(
-                "Both 'items' and 'users' must be provided to correctly initialize the model."
-            )
+        super().__init__(params, interactions, info, *args, seed=seed, **kwargs)
 
         # Define the layers
         self.item_embedding = nn.Embedding(
@@ -180,7 +170,7 @@ class FOSSIL(IterativeRecommender, SequentialRecommenderUtils):
 
         Args:
             high_order_item_embedding (Tensor): A tensor representing the high-order embeddings of items.
-                Expected shape: (batch_size, num_items, embedding_dim).
+                Expected shape: (batch_size, n_items, embedding_dim).
             user (Tensor): A tensor representing the user embedding or features.
                 Expected shape: (batch_size, user_feature_dim).
 
@@ -198,12 +188,12 @@ class FOSSIL(IterativeRecommender, SequentialRecommenderUtils):
         )  # (1, num_lambda_weights, 1)
 
         # Add user-specific and general lambda values
-        lambda_ = torch.add(user_lambda, lambda_)  # (batch_size, num_items, 1)
+        lambda_ = torch.add(user_lambda, lambda_)  # (batch_size, n_items, 1)
 
         # Apply the combined lambda weights to the high-order item embeddings
         high_order_item_embedding = torch.mul(
             high_order_item_embedding, lambda_
-        )  # (batch_size, num_items, embedding_dim)
+        )  # (batch_size, n_items, embedding_dim)
 
         # Sum the weighted embeddings along the item dimension
         high_order_item_embedding = high_order_item_embedding.sum(
@@ -344,7 +334,7 @@ class FOSSIL(IterativeRecommender, SequentialRecommenderUtils):
             # Case 'full': prediction on all items
             item_embeddings = self.item_embedding.weight[
                 :-1, :
-            ]  # [num_items, embedding_size]
+            ]  # [n_items, embedding_size]
             einsum_string = "be,ie->bi"  # b: batch, e: embedding, i: item
         else:
             # Case 'sampled': prediction on a sampled set of items
@@ -355,5 +345,5 @@ class FOSSIL(IterativeRecommender, SequentialRecommenderUtils):
 
         predictions = torch.einsum(
             einsum_string, seq_output, item_embeddings
-        )  # [batch_size, num_items] or [batch_size, pad_seq]
+        )  # [batch_size, n_items] or [batch_size, pad_seq]
         return predictions

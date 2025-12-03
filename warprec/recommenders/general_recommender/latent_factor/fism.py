@@ -21,13 +21,10 @@ class FISM(IterativeRecommender):
     Args:
         params (dict): Model parameters.
         interactions (Interactions): The training interactions.
+        info (dict): The dictionary containing dataset information.
         *args (Any): Variable length argument list.
         seed (int): The seed to use for reproducibility.
-        info (dict): The dictionary containing dataset information.
         **kwargs (Any): Arbitrary keyword arguments.
-
-    Raises:
-        ValueError: If the items or users value was not passed through the info dict.
 
     Attributes:
         DATALOADER_TYPE: The type of dataloader used.
@@ -58,34 +55,22 @@ class FISM(IterativeRecommender):
         self,
         params: dict,
         interactions: Interactions,
+        info: dict,
         *args: Any,
         seed: int = 42,
-        info: dict = None,
         **kwargs: Any,
     ):
-        super().__init__(params, interactions, *args, seed=seed, info=info, **kwargs)
-
-        # Get information from dataset info
-        users = info.get("users", None)
-        if not users:
-            raise ValueError(
-                "Users value must be provided to correctly initialize the model."
-            )
-        items = info.get("items", None)
-        if not items:
-            raise ValueError(
-                "Items value must be provided to correctly initialize the model."
-            )
+        super().__init__(params, interactions, info, *args, seed=seed, **kwargs)
 
         # Embeddings and biases
         self.item_src_embedding = nn.Embedding(
-            items + 1, self.embedding_size, padding_idx=items
+            self.n_items + 1, self.embedding_size, padding_idx=self.n_items
         )
         self.item_dst_embedding = nn.Embedding(
-            items + 1, self.embedding_size, padding_idx=items
+            self.n_items + 1, self.embedding_size, padding_idx=self.n_items
         )
-        self.user_bias = nn.Parameter(torch.zeros(users))
-        self.item_bias = nn.Parameter(torch.zeros(items + 1))  # +1 for padding
+        self.user_bias = nn.Parameter(torch.zeros(self.n_users))
+        self.item_bias = nn.Parameter(torch.zeros(self.n_items + 1))  # +1 for padding
 
         # Prepare history information
         history_matrix, history_lens, history_mask = interactions.get_history()
@@ -96,7 +81,7 @@ class FISM(IterativeRecommender):
         self.register_buffer("history_mask", history_mask)
 
         # Handle groups
-        self.group = torch.chunk(torch.arange(1, items + 1), self.split_to)
+        self.group = torch.chunk(torch.arange(1, self.n_items + 1), self.split_to)
 
         # Init embedding weights
         self.apply(self._init_weights)
@@ -216,8 +201,8 @@ class FISM(IterativeRecommender):
             # Case 'full': prediction on all items
             item_dst_embeddings = self.item_dst_embedding.weight[
                 :-1, :
-            ]  # [num_items, embedding_size]
-            item_biases = self.item_bias[:-1]  # [num_items]
+            ]  # [n_items, embedding_size]
+            item_biases = self.item_bias[:-1]  # [n_items]
             einsum_string = "be,ie->bi"  # b: batch, e: embedding, i: item
         else:
             # Case 'sampled': prediction on a sampled set of items
@@ -230,7 +215,7 @@ class FISM(IterativeRecommender):
         # Compute prediction step
         predictions = torch.einsum(
             einsum_string, user_final_emb, item_dst_embeddings
-        )  # [batch_size, num_items] or [batch_size, pad_seq]
+        )  # [batch_size, n_items] or [batch_size, pad_seq]
 
         # Add the biases
         predictions += batch_user_bias.unsqueeze(1)

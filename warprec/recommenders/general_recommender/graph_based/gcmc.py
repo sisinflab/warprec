@@ -49,14 +49,14 @@ class GCMCEncoderLayer(Module):
             weight_r = self.weights[r]  # [in_features, out_features]
 
             # Message passing: Items -> Users
-            # adj_r is [num_users, num_items], item_features is [num_items, in_features]
+            # adj_r is [num_users, n_items], item_features is [n_items, in_features]
             # user_msg becomes [num_users, in_features]
             user_msg = adj_r.matmul(item_features, reduce="sum")
             user_outputs.append(torch.matmul(user_msg, weight_r))
 
             # Message passing: Users -> Items
-            # adj_r.t() is [num_items, num_users], user_features is [num_users, in_features]
-            # item_msg becomes [num_items, in_features]
+            # adj_r.t() is [n_items, num_users], user_features is [num_users, in_features]
+            # item_msg becomes [n_items, in_features]
             item_msg = adj_r.t().matmul(user_features, reduce="sum")
             item_outputs.append(torch.matmul(item_msg, weight_r))
 
@@ -82,13 +82,10 @@ class GCMC(IterativeRecommender, GraphRecommenderUtils):
     Args:
         params (dict): Model parameters.
         interactions (Interactions): The training interactions.
+        info (dict): The dictionary containing dataset information.
         *args (Any): Variable length argument list.
         seed (int): The seed to use for reproducibility.
-        info (dict): The dictionary containing dataset information.
         **kwargs (Any): Arbitrary keyword arguments.
-
-    Raises:
-        ValueError: If the items or users value was not passed through the info dict.
 
     Attributes:
         DATALOADER_TYPE: The type of dataloader used.
@@ -98,6 +95,9 @@ class GCMC(IterativeRecommender, GraphRecommenderUtils):
         batch_size (int): The batch size used for training.
         epochs (int): The number of training epochs.
         learning_rate (float): The learning rate value.
+
+    Raises:
+        ValueError: If the dataset does not have explicit rating.
     """
 
     # Dataloader definition for explicit feedback
@@ -115,21 +115,14 @@ class GCMC(IterativeRecommender, GraphRecommenderUtils):
         self,
         params: dict,
         interactions: Interactions,
+        info: dict,
         *args: Any,
         seed: int = 42,
-        info: dict = None,
         **kwargs: Any,
     ):
-        super().__init__(params, interactions, seed=seed, *args, **kwargs)
+        super().__init__(params, interactions, info, *args, seed=seed, **kwargs)
 
-        # Get information from dataset info
-        self.n_users = info.get("users", None)
-        if not self.n_users:
-            raise ValueError("Users value must be provided.")
-        self.n_items = info.get("items", None)
-        if not self.n_items:
-            raise ValueError("Items value must be provided.")
-
+        # Check for optional value of block size
         self.block_size = kwargs.get("block_size", 50)
 
         # Determine the unique ratings in the dataset
@@ -292,9 +285,7 @@ class GCMC(IterativeRecommender, GraphRecommenderUtils):
             valid_items_emb = item_all_embeddings[:-1]
 
             # Pre-compute the item-dependent part for ALL valid items
-            all_items_part = F.linear(
-                valid_items_emb, w_item
-            )  # [num_items, num_ratings]
+            all_items_part = F.linear(valid_items_emb, w_item)  # [n_items, num_ratings]
 
             all_scores = []
             n_items = valid_items_emb.size(0)
@@ -321,7 +312,7 @@ class GCMC(IterativeRecommender, GraphRecommenderUtils):
                 )  # [batch_size, block]
                 all_scores.append(expected_ratings)
 
-            predictions = torch.cat(all_scores, dim=1)  # [batch_size, num_items]
+            predictions = torch.cat(all_scores, dim=1)  # [batch_size, n_items]
             return predictions
 
         # Case 'sampled': process all given item_indices at once

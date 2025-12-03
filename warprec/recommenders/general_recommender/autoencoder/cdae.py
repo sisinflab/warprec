@@ -25,13 +25,11 @@ class CDAE(IterativeRecommender):
 
     Args:
         params (dict): Model parameters.
+        interactions (Interactions): The training interactions.
+        info (dict): The dictionary containing dataset information.
         *args (Any): Variable length argument list.
         seed (int): The seed to use for reproducibility.
-        info (dict): The dictionary containing dataset information.
         **kwargs (Any): Arbitrary keyword arguments.
-
-    Raises:
-        ValueError: If the items or users value was not passed through the info dict.
 
     Attributes:
         DATALOADER_TYPE: The type of dataloader used.
@@ -45,6 +43,9 @@ class CDAE(IterativeRecommender):
         batch_size (int): The batch size used during training.
         epochs (int): The number of training epochs.
         learning_rate (float): The learning rate value.
+
+    Raises:
+        ValueError: If the loss_type is not supported.
     """
 
     # Dataloader definition
@@ -65,19 +66,13 @@ class CDAE(IterativeRecommender):
     def __init__(
         self,
         params: dict,
+        interactions: Interactions,
+        info: dict,
         *args: Any,
         seed: int = 42,
-        info: dict = None,
         **kwargs: Any,
     ):
-        super().__init__(params, seed=seed, *args, **kwargs)
-
-        self.n_users = info.get("users", None)
-        if not self.n_users:
-            raise ValueError("Users value must be provided.")
-        self.n_items = info.get("items", None)
-        if not self.n_items:
-            raise ValueError("Items value must be provided.")
+        super().__init__(params, interactions, info, *args, seed=seed, **kwargs)
 
         # User-specific embedding
         self.user_embedding = nn.Embedding(self.n_users, self.embedding_size)
@@ -135,11 +130,11 @@ class CDAE(IterativeRecommender):
         """Performs the forward pass of the CDAE model.
 
         Args:
-            user_history (Tensor): The user-item interaction vector [batch_size, num_items].
+            user_history (Tensor): The user-item interaction vector [batch_size, n_items].
             user_indices (Tensor): The user indices for the batch [batch_size].
 
         Returns:
-            Tensor: The reconstructed interaction vector (logits) [batch_size, num_items].
+            Tensor: The reconstructed interaction vector (logits) [batch_size, n_items].
         """
         # Encode the item history
         item_hidden = self.item_encoder(user_history)
@@ -219,7 +214,7 @@ class CDAE(IterativeRecommender):
 
         if item_indices is None:
             # Case 'full': prediction on all items
-            return predictions  # [batch_size, num_items]
+            return predictions  # [batch_size, n_items]
 
         # Case 'sampled': prediction on a sampled set of items
         return predictions.gather(
