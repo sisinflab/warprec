@@ -34,8 +34,9 @@ These models are particularly effective in sparse recommendation settings.
         hid_activation: relu
         out_activation: sigmoid
         loss_type: BCE
-        weight_decay: 0.0
-        batch_size: 512
+        reg_weight: 0.001
+        weight_decay: 0.0001
+        batch_size: 2048
         epochs: 200
         learning_rate: 0.001
 
@@ -69,9 +70,9 @@ These models are particularly effective in sparse recommendation settings.
         intermediate_dim: 600
         latent_dim: 200
         dropout: 1.0
-        weight_decay: 0.02
-        batch_size: 512
-        epochs: 10
+        weight_decay: 0.0001
+        batch_size: 2048
+        epochs: 200
         learning_rate: 0.001
 
 - MultiVAE (Multinomial Variational Autoencoder):
@@ -84,12 +85,12 @@ These models are particularly effective in sparse recommendation settings.
         intermediate_dim: 600
         latent_dim: 200
         dropout: 1.0
-        weight_decay: 0.02
-        batch_size: 512
-        epochs: 10
-        learning_rate: 0.001
         anneal_cap: 0.2
         anneal_step: 200
+        weight_decay: 0.0001
+        batch_size: 2048
+        epochs: 200
+        learning_rate: 0.001
 
 ================
 Content Based
@@ -130,9 +131,10 @@ They are well-suited for uncovering complex patterns in sparse datasets.
   models:
     GCMC:
       embedding_size: 64
+      reg_weight: 0.001
       weight_decay: 0.0001
-      batch_size: 512
-      epochs: 50
+      batch_size: 2048
+      epochs: 200
       learning_rate: 0.001
 
 - LightGCN:
@@ -143,10 +145,10 @@ They are well-suited for uncovering complex patterns in sparse datasets.
     models:
       LightGCN:
         embedding_size: 64
-        n_layers: 2
-        weight_decay: 0.0001
-        batch_size: 512
-        epochs: 50
+        n_layers: 3
+        reg_weight: 0.001
+        batch_size: 2048
+        epochs: 200
         learning_rate: 0.001
 
 - LightGCN++:
@@ -157,13 +159,13 @@ They are well-suited for uncovering complex patterns in sparse datasets.
   models:
     LightGCNpp:
       embedding_size: 64
-      n_layers: 2
+      n_layers: 3
       alpha: 0.5
       beta: -0.1
       gamma: 0.2
-      weight_decay: 0.0001
-      batch_size: 512
-      epochs: 50
+      reg_weight: 0.001
+      batch_size: 2048
+      epochs: 200
       learning_rate: 0.001
 
 - NGCF (Neural Graph-based Collaborative Filtering):
@@ -174,13 +176,13 @@ They are well-suited for uncovering complex patterns in sparse datasets.
     models:
       NGCF:
         embedding_size: 64
-        weight_decay: 0.
-        batch_size: 512
-        epochs: 50
-        learning_rate: 0.001
         weight_size: [64, 64]
-        node_dropout: 0.01
-        message_dropout: 0.01
+        node_dropout: 0.1
+        message_dropout: 0.1
+        reg_weight: 0.001
+        batch_size: 2048
+        epochs: 200
+        learning_rate: 0.001
 
 - RP3Beta:
   A graph-based collaborative filtering model that performs a biased random walk of length 3 on the user-item bipartite graph.
@@ -207,10 +209,10 @@ They are well-suited for uncovering complex patterns in sparse datasets.
         eps: 0.2
         temperature: 0.2
         layer_cl: 2
-        reg_weight: 0.0001
-        weight_decay: 0
+        reg_weight: 0.001
+        weight_decay: 0.0001
         batch_size: 2048
-        epochs: 50
+        epochs: 200
         learning_rate: 0.001
 
 =========================
@@ -290,10 +292,10 @@ They include factorization-based approaches, pairwise ranking models, and sparse
 
     models:
       BPR:
-        embedding_size: 16
-        weight_decay: 0.001
-        batch_size: 512
-        epochs: 20
+        embedding_size: 64
+        reg_weight: 0.001
+        batch_size: 2048
+        epochs: 200
         learning_rate: 0.001
 
 - FISM:
@@ -303,12 +305,12 @@ They include factorization-based approaches, pairwise ranking models, and sparse
 
     models:
       FISM:
-        embedding_size: 16
+        embedding_size: 64
         alpha: 0.1
         split_to: 5
-        weight_decay: 0.0001
-        batch_size: 512
-        epochs: 50
+        reg_weight: 0.001
+        batch_size: 2048
+        epochs: 200
         learning_rate: 0.001
 
 - Slim:
@@ -334,14 +336,15 @@ Neural recommenders leverage deep learning architectures to model complex, non-l
 
     models:
       ConvNCF:
-        embedding_size: 16
-        cnn_channels: [16, 32]
+        embedding_size: 64
+        cnn_channels: [32, 64]
         cnn_kernels: [2, 2]
         cnn_strides: [1, 1]
-        dropout_prob: 0.01
+        dropout_prob: 0.1
+        reg_weight: 0.001
         weight_decay: 0.0001
-        batch_size: 512
-        epochs: 20
+        batch_size: 2048
+        epochs: 200
         learning_rate: 0.001
 
 - NeuMF:
@@ -351,15 +354,16 @@ Neural recommenders leverage deep learning architectures to model complex, non-l
 
     models:
       NeuMF:
-        mf_embedding_size: 32
-        mlp_embedding_size: 32
+        mf_embedding_size: 64
+        mlp_embedding_size: 64
         mlp_hidden_size: [64, 32]
         mf_train: True
         mlp_train: True
-        dropout: 0.01
+        dropout: 0.1
+        reg_weight: 0.001
         weight_decay: 0.0001
-        batch_size: 512
-        epochs: 20
+        batch_size: 2048
+        epochs: 200
         learning_rate: 0.001
         neg_samples: 1
 

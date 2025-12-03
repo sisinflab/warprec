@@ -25,9 +25,10 @@ These models can capture both short-term dependencies and long-term patterns thr
         n_h: 8
         n_v: 4
         dropout_prob: 0.5
-        weight_decay: 0.0
-        batch_size: 512
-        epochs: 30
+        reg_weight: 0.001
+        weight_decay: 0.0001
+        batch_size: 2048
+        epochs: 200
         learning_rate: 0.001
         neg_samples: 1
         max_seq_len: 20
@@ -49,12 +50,12 @@ These models are especially suited to scenarios where user behavior exhibits bot
         embedding_size: 64
         order_len: 8
         alpha: 0.001
-        weight_decay: 0.0
-        batch_size: 512
-        epochs: 100
+        reg_weight: 0.001
+        batch_size: 2048
+        epochs: 200
         learning_rate: 0.001
         neg_samples: 1
-        max_seq_len: 100
+        max_seq_len: 200
 
 =============
 RNN-Based
@@ -72,14 +73,15 @@ They are effective for modeling evolving user interests within sessions.
     models:
       GRU4Rec:
         embedding_size: 128
-        hidden_size: 128
-        num_layers: 1
-        dropout_prob: 0.2
+        hidden_size: 64
+        num_layers: 2
+        dropout_prob: 0.1
+        reg_weight: 0.001
         weight_decay: 0.0001
-        batch_size: 512
-        epochs: 100
+        batch_size: 2048
+        epochs: 200
         learning_rate: 0.001
-        neg_samples: 2
+        neg_samples: 1
         max_seq_len: 200
 
 =============
@@ -99,15 +101,16 @@ They excel at modeling both short-term and long-term user preferences without re
     BERT4Rec:
       embedding_size: 128
       n_layers: 2
-      n_heads: 4
+      n_heads: 8
       inner_size: 512
-      dropout_prob: 0.3
-      attn_dropout_prob: 0.3
+      dropout_prob: 0.1
+      attn_dropout_prob: 0.1
       mask_prob: 0.2
+      reg_weight: 0.001
+      weight_decay: 0.0001
+      batch_size: 2048
+      epochs: 200
       learning_rate: 0.001
-      weight_decay: 0.0
-      batch_size: 512
-      epochs: 100
       neg_samples: 1
       max_seq_len: 200
 
@@ -121,14 +124,15 @@ They excel at modeling both short-term and long-term user preferences without re
       SASRec:
         embedding_size: 128
         n_layers: 2
-        n_heads: 4
+        n_heads: 8
         inner_size: 512
-        dropout_prob: 0.3
-        attn_dropout_prob: 0.3
+        dropout_prob: 0.1
+        attn_dropout_prob: 0.1
+        reg_weight: 0.001
+        weight_decay: 0.0001
+        batch_size: 2048
+        epochs: 200
         learning_rate: 0.001
-        weight_decay: 0.0
-        batch_size: 512
-        epochs: 100
         neg_samples: 1
         max_seq_len: 200
 
@@ -142,18 +146,19 @@ They excel at modeling both short-term and long-term user preferences without re
       gSASRec:
         embedding_size: 128
         n_layers: 2
-        n_heads: 4
+        n_heads: 8
         inner_size: 512
-        dropout_prob: 0.3
-        attn_dropout_prob: 0.3
-        learning_rate: 0.001
+        dropout_prob: 0.1
+        attn_dropout_prob: 0.1
         gbce_t: 0.5
-        weight_decay: 0.0
-        batch_size: 512
-        epochs: 100
+        reuse_item_embeddings: True
+        reg_weight: 0.001
+        weight_decay: 0.0001
+        batch_size: 2048
+        epochs: 200
+        learning_rate: 0.001
         neg_samples: 1
         max_seq_len: 200
-        reuse_item_embeddings: True
 
 ===============================
 Summary of Available Sequential Models
