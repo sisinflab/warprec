@@ -29,6 +29,7 @@ class BERT4Rec(RecomModel):
         dropout_prob (FLOAT_FIELD): List of values for dropout_prob.
         attn_dropout_prob (FLOAT_FIELD): List of values for attn_dropout_prob.
         mask_prob (FLOAT_FIELD): List of values for the masking probability.
+        reg_weight (FLOAT_FIELD): List of values for reg_weight.
         weight_decay (FLOAT_FIELD): List of values for weight_decay.
         batch_size (INT_FIELD): List of values for batch_size.
         epochs (INT_FIELD): List of values for epochs.
@@ -45,6 +46,7 @@ class BERT4Rec(RecomModel):
     dropout_prob: FLOAT_FIELD
     attn_dropout_prob: FLOAT_FIELD
     mask_prob: FLOAT_FIELD
+    reg_weight: FLOAT_FIELD
     weight_decay: FLOAT_FIELD
     batch_size: INT_FIELD
     epochs: INT_FIELD
@@ -94,6 +96,12 @@ class BERT4Rec(RecomModel):
     def check_mask_prob(cls, v: list):
         """Validate mask_prob."""
         return validate_between_zero_and_one(cls, v, "mask_prob")
+
+    @field_validator("reg_weight")
+    @classmethod
+    def check_reg_weight(cls, v: list):
+        """Validate reg_weight"""
+        return validate_greater_equal_than_zero(cls, v, "reg_weight")
 
     @field_validator("weight_decay")
     @classmethod
@@ -178,6 +186,7 @@ class Caser(RecomModel):
         n_h (INT_FIELD):  List of values for n_h.
         n_v (INT_FIELD): List of values for n_h.
         dropout_prob (FLOAT_FIELD): List of values for dropout_prob.
+        reg_weight (FLOAT_FIELD): List of values for reg_weight.
         weight_decay (FLOAT_FIELD): List of values for weight_decay.
         batch_size (INT_FIELD): List of values for batch_size.
         epochs (INT_FIELD): List of values for epochs.
@@ -190,6 +199,7 @@ class Caser(RecomModel):
     n_h: INT_FIELD
     n_v: INT_FIELD
     dropout_prob: FLOAT_FIELD
+    reg_weight: FLOAT_FIELD
     weight_decay: FLOAT_FIELD
     batch_size: INT_FIELD
     epochs: INT_FIELD
@@ -220,6 +230,12 @@ class Caser(RecomModel):
     def check_dropout_prob(cls, v: list):
         """Validate dropout_prob."""
         return validate_between_zero_and_one(cls, v, "dropout_prob")
+
+    @field_validator("reg_weight")
+    @classmethod
+    def check_reg_weight(cls, v: list):
+        """Validate reg_weight"""
+        return validate_greater_equal_than_zero(cls, v, "reg_weight")
 
     @field_validator("weight_decay")
     @classmethod
@@ -266,7 +282,7 @@ class FOSSIL(RecomModel):
         embedding_size (INT_FIELD): List of values for embedding_size.
         order_len (INT_FIELD):  List of values for order_len.
         alpha (FLOAT_FIELD): List of values for alpha.
-        weight_decay (FLOAT_FIELD): List of values for weight_decay.
+        reg_weight (FLOAT_FIELD): List of values for reg_weight.
         batch_size (INT_FIELD): List of values for batch_size.
         epochs (INT_FIELD): List of values for epochs.
         learning_rate (FLOAT_FIELD): List of values for learning rate.
@@ -277,7 +293,7 @@ class FOSSIL(RecomModel):
     embedding_size: INT_FIELD
     order_len: INT_FIELD
     alpha: FLOAT_FIELD
-    weight_decay: FLOAT_FIELD
+    reg_weight: FLOAT_FIELD
     batch_size: INT_FIELD
     epochs: INT_FIELD
     learning_rate: FLOAT_FIELD
@@ -302,11 +318,11 @@ class FOSSIL(RecomModel):
         """Validate alpha."""
         return validate_greater_equal_than_zero(cls, v, "alpha")
 
-    @field_validator("weight_decay")
+    @field_validator("reg_weight")
     @classmethod
-    def check_weight_decay(cls, v: list):
-        """Validate weight_decay."""
-        return validate_greater_equal_than_zero(cls, v, "weight_decay")
+    def check_reg_weight(cls, v: list):
+        """Validate reg_weight"""
+        return validate_greater_equal_than_zero(cls, v, "reg_weight")
 
     @field_validator("batch_size")
     @classmethod
@@ -401,6 +417,7 @@ class GRU4Rec(RecomModel):
         hidden_size (INT_FIELD):  List of values for hidden_size.
         num_layers (INT_FIELD): List of values for num_layers.
         dropout_prob (FLOAT_FIELD): List of values for dropout_prob.
+        reg_weight (FLOAT_FIELD): List of values for reg_weight.
         weight_decay (FLOAT_FIELD): List of values for weight_decay.
         batch_size (INT_FIELD): List of values for batch_size.
         epochs (INT_FIELD): List of values for epochs.
@@ -413,6 +430,7 @@ class GRU4Rec(RecomModel):
     hidden_size: INT_FIELD
     num_layers: INT_FIELD
     dropout_prob: FLOAT_FIELD
+    reg_weight: FLOAT_FIELD
     weight_decay: FLOAT_FIELD
     batch_size: INT_FIELD
     epochs: INT_FIELD
@@ -443,6 +461,12 @@ class GRU4Rec(RecomModel):
     def check_dropout_prob(cls, v: list):
         """Validate dropout_prob."""
         return validate_between_zero_and_one(cls, v, "dropout_prob")
+
+    @field_validator("reg_weight")
+    @classmethod
+    def check_reg_weight(cls, v: list):
+        """Validate reg_weight"""
+        return validate_greater_equal_than_zero(cls, v, "reg_weight")
 
     @field_validator("weight_decay")
     @classmethod
@@ -492,6 +516,7 @@ class gSASRec(RecomModel):
         inner_size (INT_FIELD): List of values for inner_size.
         dropout_prob (FLOAT_FIELD): List of values for dropout_prob.
         attn_dropout_prob (FLOAT_FIELD): List of values for attn_dropout_prob.
+        reg_weight (FLOAT_FIELD): List of values for reg_weight.
         weight_decay (FLOAT_FIELD): List of values for weight_decay.
         batch_size (INT_FIELD): List of values for batch_size.
         epochs (INT_FIELD): List of values for epochs.
@@ -510,6 +535,7 @@ class gSASRec(RecomModel):
     inner_size: INT_FIELD
     dropout_prob: FLOAT_FIELD
     attn_dropout_prob: FLOAT_FIELD
+    reg_weight: FLOAT_FIELD
     weight_decay: FLOAT_FIELD
     batch_size: INT_FIELD
     epochs: INT_FIELD
@@ -555,6 +581,12 @@ class gSASRec(RecomModel):
     def check_attn_dropout_prob(cls, v: list):
         """Validate attn_dropout_prob."""
         return validate_between_zero_and_one(cls, v, "attn_dropout_prob")
+
+    @field_validator("reg_weight")
+    @classmethod
+    def check_reg_weight(cls, v: list):
+        """Validate reg_weight"""
+        return validate_greater_equal_than_zero(cls, v, "reg_weight")
 
     @field_validator("weight_decay")
     @classmethod
@@ -670,6 +702,7 @@ class SASRec(RecomModel):
         inner_size (INT_FIELD): List of values for inner_size.
         dropout_prob (FLOAT_FIELD): List of values for dropout_prob.
         attn_dropout_prob (FLOAT_FIELD): List of values for attn_dropout_prob.
+        reg_weight (FLOAT_FIELD): List of values for reg_weight.
         weight_decay (FLOAT_FIELD): List of values for weight_decay.
         batch_size (INT_FIELD): List of values for batch_size.
         epochs (INT_FIELD): List of values for epochs.
@@ -686,6 +719,7 @@ class SASRec(RecomModel):
     inner_size: INT_FIELD
     dropout_prob: FLOAT_FIELD
     attn_dropout_prob: FLOAT_FIELD
+    reg_weight: FLOAT_FIELD
     weight_decay: FLOAT_FIELD
     batch_size: INT_FIELD
     epochs: INT_FIELD
@@ -729,6 +763,12 @@ class SASRec(RecomModel):
     def check_attn_dropout_prob(cls, v: list):
         """Validate attn_dropout_prob."""
         return validate_between_zero_and_one(cls, v, "attn_dropout_prob")
+
+    @field_validator("reg_weight")
+    @classmethod
+    def check_reg_weight(cls, v: list):
+        """Validate reg_weight"""
+        return validate_greater_equal_than_zero(cls, v, "reg_weight")
 
     @field_validator("weight_decay")
     @classmethod

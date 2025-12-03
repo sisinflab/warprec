@@ -85,14 +85,14 @@ class BPR(RecomModel):
 
     Attributes:
         embedding_size (INT_FIELD): List of embedding size.
-        weight_decay (FLOAT_FIELD): List of values for weight_decay.
+        reg_weight (FLOAT_FIELD): List of values for reg_weight.
         batch_size (INT_FIELD): List of values for batch_size.
         epochs (INT_FIELD): List of values for epochs.
         learning_rate (FLOAT_FIELD): List of values for learning rate.
     """
 
     embedding_size: INT_FIELD
-    weight_decay: FLOAT_FIELD
+    reg_weight: FLOAT_FIELD
     batch_size: INT_FIELD
     epochs: INT_FIELD
     learning_rate: FLOAT_FIELD
@@ -103,11 +103,11 @@ class BPR(RecomModel):
         """Validate embedding_size."""
         return validate_greater_than_zero(cls, v, "embedding_size")
 
-    @field_validator("weight_decay")
+    @field_validator("reg_weight")
     @classmethod
-    def check_weight_decay(cls, v: list):
-        """Validate weight_decay"""
-        return validate_greater_equal_than_zero(cls, v, "weight_decay")
+    def check_reg_weight(cls, v: list):
+        """Validate reg_weight"""
+        return validate_greater_equal_than_zero(cls, v, "reg_weight")
 
     @field_validator("batch_size")
     @classmethod
@@ -136,7 +136,7 @@ class FISM(RecomModel):
         embedding_size (INT_FIELD): List of values for embedding_size.
         alpha (FLOAT_FIELD): List of values for alpha.
         split_to (INT_FIELD): List of values for split_to.
-        weight_decay (FLOAT_FIELD): List of values for weight_decay.
+        reg_weight (FLOAT_FIELD): List of values for reg_weight.
         batch_size (INT_FIELD): List of values for batch_size.
         epochs (INT_FIELD): List of values for epochs.
         learning_rate (FLOAT_FIELD): List of values for learning rate.
@@ -145,7 +145,7 @@ class FISM(RecomModel):
     embedding_size: INT_FIELD
     alpha: FLOAT_FIELD
     split_to: INT_FIELD
-    weight_decay: FLOAT_FIELD
+    reg_weight: FLOAT_FIELD
     batch_size: INT_FIELD
     epochs: INT_FIELD
     learning_rate: FLOAT_FIELD
@@ -168,11 +168,11 @@ class FISM(RecomModel):
         """Validate split_to."""
         return validate_greater_than_zero(cls, v, "split_to")
 
-    @field_validator("weight_decay")
+    @field_validator("reg_weight")
     @classmethod
-    def check_weight_decay(cls, v: list):
-        """Validate weight_decay."""
-        return validate_greater_equal_than_zero(cls, v, "weight_decay")
+    def check_reg_weight(cls, v: list):
+        """Validate reg_weight"""
+        return validate_greater_equal_than_zero(cls, v, "reg_weight")
 
     @field_validator("batch_size")
     @classmethod

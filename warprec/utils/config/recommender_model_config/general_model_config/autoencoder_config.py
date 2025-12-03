@@ -52,6 +52,7 @@ class CDAE(RecomModel):
         hid_activation (STR_FIELD): List of activation functions for hidden layer.
         out_activation (STR_FIELD): List of activation functions for output layer.
         loss_type (STR_FIELD): List of loss types to use.
+        reg_weight (FLOAT_FIELD): List of values for reg_weight.
         weight_decay (FLOAT_FIELD): List of values for weight_decay.
         batch_size (INT_FIELD): List of values for batch_size.
         epochs (INT_FIELD): List of values for epochs.
@@ -63,6 +64,7 @@ class CDAE(RecomModel):
     hid_activation: STR_FIELD
     out_activation: STR_FIELD
     loss_type: STR_FIELD
+    reg_weight: FLOAT_FIELD
     weight_decay: FLOAT_FIELD
     batch_size: INT_FIELD
     epochs: INT_FIELD
@@ -100,6 +102,12 @@ class CDAE(RecomModel):
         """Validate loss_type."""
         allowed = ["MSE", "BCE"]
         return validate_str_list(cls, v, allowed, "loss_type")
+
+    @field_validator("reg_weight")
+    @classmethod
+    def check_reg_weight(cls, v: list):
+        """Validate reg_weight"""
+        return validate_greater_equal_than_zero(cls, v, "reg_weight")
 
     @field_validator("weight_decay")
     @classmethod
