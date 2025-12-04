@@ -1,5 +1,6 @@
 from typing import List
 
+import torch
 from torch import nn, Tensor
 from torch.nn import Module
 
@@ -121,3 +122,39 @@ class CNN(nn.Module):
         through all the CNN layers.
         """
         return self.cnn_layers(input_feature)
+
+
+class FactorizationMachine(nn.Module):
+    """Calculates the Second-Order Interaction (FM part) over embeddings.
+
+    Equation:
+        0.5 * sum( (sum(v))^2 - sum(v^2) )
+
+    Args:
+        reduce_sum (bool): Whether to sum the result along the embedding dimension.
+            - True: Output shape (Batch, 1). Used for standard FM.
+            - False: Output shape (Batch, Embed_Dim). Used for NFM or DeepFM where
+              you might want to feed the result into a DNN.
+            Defaults to True.
+    """
+
+    def __init__(self, reduce_sum: bool = True):
+        super().__init__()
+        self.reduce_sum = reduce_sum
+
+    def forward(self, inputs: Tensor) -> Tensor:
+        """
+        Args:
+            inputs (Tensor): A 3D tensor with shape (batch_size, context_size, embedding_size).
+
+        Returns:
+            Tensor: The second-order interaction result.
+        """
+        square_of_sum = torch.sum(inputs, dim=1) ** 2  # [batch_size, embedding_size]
+        sum_of_square = torch.sum(inputs**2, dim=1)  # [batch_size, embedding_size]
+        output = 0.5 * (square_of_sum - sum_of_square)
+
+        if self.reduce_sum:
+            output = torch.sum(output, dim=1, keepdim=True)  # [batch_size, 1]
+
+        return output
