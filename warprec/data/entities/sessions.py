@@ -38,6 +38,8 @@ class Sessions:
         item_id_label (str): The name of the item ID column in the DataFrame.
         timestamp_label (str): The name of the timestamp column.
             If provided, interactions will be sorted by this column.
+        context_labels (Optional[List[str]]): The list of labels of the
+            contextual data.
 
     Raises:
         ValueError: If the user or item label are not found in the DataFrame.
@@ -51,6 +53,7 @@ class Sessions:
         user_id_label: str = "user_id",
         item_id_label: str = "item_id",
         timestamp_label: str = "timestamp",
+        context_labels: Optional[List[str]] = None,
     ):
         # Validate presence of required columns
         if user_id_label not in data.columns:
@@ -66,6 +69,7 @@ class Sessions:
         self._umap = user_mapping
         self._imap = item_mapping
         self._niid = len(self._imap)
+        self._context_labels = context_labels if context_labels else []
         self._processed_df = None
 
         # Initialize the cache
@@ -112,10 +116,16 @@ class Sessions:
             timestamp_col = self._inter_df.loc[mapped_df.index, self._timestamp_label]
             mapped_df[self._timestamp_label] = timestamp_col
 
+        # Include contextual data if provided
+        for ctx_col in self._context_labels:
+            if ctx_col in self._inter_df.columns:
+                mapped_df[ctx_col] = self._inter_df.loc[mapped_df.index, ctx_col]
+            else:
+                mapped_df[ctx_col] = 0
+
         # Create, clean, and cast types
-        mapped_df[[self._user_label, self._item_label]] = mapped_df[
-            [self._user_label, self._item_label]
-        ].astype(np.int64)
+        cols_to_cast = [self._user_label, self._item_label] + self._context_labels
+        mapped_df[cols_to_cast] = mapped_df[cols_to_cast].astype(np.int64)
 
         # Sort the data. If timestamp is available, use it for sorting
         if has_timestamp:

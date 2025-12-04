@@ -226,6 +226,8 @@ class Dataset:
         rating_label (str): The label of the rating column.
         timestamp_label (str): The label of the timestamp column.
         cluster_label (str): The label of the cluster column.
+        context_labels (Optional[List[str]]): The list of labels of the
+            contextual data.
         precision (Any): The precision of the internal representation of the data.
         evaluation_set (str): The type of evaluation set. Can either be 'Test'
             or 'Validation'.
@@ -261,6 +263,7 @@ class Dataset:
         rating_label: str = None,
         timestamp_label: str = None,
         cluster_label: str = None,
+        context_labels: Optional[List[str]] = None,
         precision: Any = np.float32,
         evaluation_set: str = "Test",
     ):
@@ -275,6 +278,8 @@ class Dataset:
         self._max_seq_len: int = 0
         self._umap: dict[Any, int] = {}
         self._imap: dict[Any, int] = {}
+        self._context_maps: dict[str, dict[Any, int]] = {}
+        self._context_dims: dict[str, int] = {}
         self._feat_lookup: Tensor = None
         self._uc: Tensor = None
         self._ic: Tensor = None
@@ -307,6 +312,17 @@ class Dataset:
         # Calculate mapping for users and items
         self._umap = {user: i for i, user in enumerate(_uid)}
         self._imap = {item: i for i, item in enumerate(_iid)}
+
+        # Process contextual data
+        if context_labels:
+            train_data = self._process_context_data(
+                train_data, context_labels, fit=True
+            )
+
+            if eval_data is not None:
+                eval_data = self._process_context_data(
+                    eval_data, context_labels, fit=False
+                )
 
         # Process the side information data and filter not valid columns
         self.side = None
@@ -401,6 +417,7 @@ class Dataset:
             user_id_label=user_id_label,
             item_id_label=item_id_label,
             timestamp_label=timestamp_label,
+            context_labels=context_labels,
         )
 
     def _filter_data(
@@ -498,6 +515,70 @@ class Dataset:
         )
 
         return inter_set
+
+    def _process_context_data(
+        self, df: DataFrame, context_labels: List[str], fit: bool = False
+    ) -> DataFrame:
+        """Processes context columns: creates mappings (if fit=True) and converts
+        values to integers.
+
+        Strategy:
+        - Index 0 is reserved for <UNK> (Unknown) or Padding.
+        - Actual values start from index 1.
+
+        Args:
+            df (DataFrame): The DataFrame containing transaction data
+                with contextual information.
+            context_labels (List[str]): The labels of the columns containing
+                the contextual information.
+            fit (bool): Wether or not to fit the dataset on the DataFrame
+                data. Usually used on the train set.
+
+        Returns:
+            DataFrame: The processed data.
+
+        Raises:
+            ValueError: If the contextual column names are not
+                present the the DataFrame.
+        """
+        df_processed = df.copy()
+
+        for col in context_labels:
+            if col not in df_processed.columns:
+                raise ValueError(f"Context label '{col}' not found in DataFrame.")
+
+            if fit:
+                # Create mapping based on unique values in this column
+                uniques = df_processed[col].unique()
+                # Start from 1, reserve 0 for Unknown
+                mapping = {val: i + 1 for i, val in enumerate(uniques)}
+
+                self._context_maps[col] = mapping
+                # Dimension is len(uniques) + 1 (for the UNK token)
+                self._context_dims[col] = len(uniques) + 1
+
+                logger.msg(f"Context '{col}': found {len(uniques)} unique values.")
+            else:
+                # Use existing mapping
+                mapping = self._context_maps.get(col)
+                if mapping is None:
+                    raise ValueError(
+                        f"Mapping for context '{col}' not found. Fit on train first."
+                    )
+
+            # Apply mapping
+            # Values not in mapping become NaN, then fill with 0 (UNK), then cast to int
+            df_processed[col] = df_processed[col].map(mapping).fillna(0).astype(int)
+
+            # Optional: Check for OOV (Out Of Vocabulary) in Eval
+            if not fit:
+                num_unk = (df_processed[col] == 0).sum()
+                if num_unk > 0:
+                    logger.attention(
+                        f"Context '{col}': found {num_unk} unknown values in Eval set (mapped to 0)."
+                    )
+
+        return df_processed
 
     def _process_side_data(
         self, side_data: DataFrame, item_id_label: str
@@ -619,6 +700,15 @@ class Dataset:
         """
         return (self._nuid, self._niid)
 
+    def get_context_dims(self) -> Dict[str, int]:
+        """Returns the dimensions (vocab size) of each context feature.
+
+        Returns:
+            Dict[str, int]: A dictionary containing the name of the
+                context feature and the vocab size.
+        """
+        return self._context_dims
+
     def get_mappings(self) -> Tuple[dict, dict]:
         """Returns the mapping used for this dataset.
 
@@ -682,13 +772,19 @@ class Dataset:
             dict: The dictionary with the main information of
                 the dataset.
         """
-        return {
+        base_info = {
             "n_items": self._niid,
             "n_users": self._nuid,
             "n_features": self._nfeat,
             "item_mapping": self._imap,
             "user_mapping": self._umap,
         }
+
+        # Optionally add contextual dimensions if present
+        if self._context_dims:
+            base_info["context_dims"] = self._context_dims
+
+        return base_info
 
     def add_to_stash(self, key: str, value: Any):
         """Add a custom structure to the stash.

@@ -1,5 +1,5 @@
 import typing
-from typing import Tuple, Any, Optional, Dict
+from typing import Tuple, Any, Optional, Dict, List
 
 import torch
 import numpy as np
@@ -33,6 +33,8 @@ class Interactions:
             iterate over the interactions.
         rating_type (RatingType): The type of rating to be used.
         rating_label (str): The label of the rating column.
+        context_labels (Optional[List[str]]): The list of labels of the
+            contextual data.
         precision (Any): The precision of the internal representation of the data.
 
     Raises:
@@ -51,6 +53,7 @@ class Interactions:
         batch_size: int = 1024,
         rating_type: RatingType = RatingType.IMPLICIT,
         rating_label: str = None,
+        context_labels: Optional[List[str]] = None,
         precision: Any = np.float32,
     ) -> None:
         # Setup the variables
@@ -78,6 +81,7 @@ class Interactions:
         self._rating_label = (
             rating_label if rating_type == RatingType.EXPLICIT else None
         )
+        self._context_labels = context_labels if context_labels else []
 
         # Filter side information (if present)
         if self._inter_side is not None:
