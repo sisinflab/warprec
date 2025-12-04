@@ -200,6 +200,12 @@ class DataLoaderType(Enum):
         construction_params=["neg_samples"],
         fixed_params={},
     )
+    ITEM_RATING_LOADER_WITH_CONTEXT = DataLoaderRequirements(
+        dataloader_source="train_set",
+        method_name="get_item_rating_dataloader",
+        construction_params=["neg_samples"],
+        fixed_params={"include_context": True},
+    )
     POS_NEG_LOADER = DataLoaderRequirements(
         dataloader_source="train_set",
         method_name="get_pos_neg_dataloader",
