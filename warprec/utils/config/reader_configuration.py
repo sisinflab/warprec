@@ -279,13 +279,9 @@ class ReaderConfig(BaseModel):
                     f"Custom dtype '{dtype_str}' not supported as a column data type."
                 )
 
+        # Optionally check for context dtypes
         if self.labels.context_labels:
             for context_name in self.labels.context_labels:
-                # if internal_name not in self.dtypes.context_types:
-                #     raise ValueError(
-                #         f"Context label '{internal_name}' is defined in Labels but missing in CustomDtype."
-                #     )
-
                 if context_name in self.dtypes.context_types:
                     dtype_str = self.dtypes.context_types[context_name]
                     if dtype_str not in self.column_map_dtype:
