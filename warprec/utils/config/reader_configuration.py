@@ -100,6 +100,8 @@ class CustomDtype(BaseModel):
         rating_type (Optional[str]): The dtype to format the rating column.
         timestamp_type (Optional[str]): The dtype to format the timestamp column.
         cluster_type (Optional[str]): The dtype to format the cluster column.
+        context_types (Optional[Dict[str, str]]): The dtypes to format the
+            contextual columns.
     """
 
     user_id_type: Optional[str] = "int32"
@@ -107,6 +109,7 @@ class CustomDtype(BaseModel):
     rating_type: Optional[str] = "float32"
     timestamp_type: Optional[str] = "int32"
     cluster_type: Optional[str] = "int32"
+    context_types: Optional[Dict[str, str]] = {}
 
 
 class ReaderConfig(BaseModel):
@@ -223,12 +226,18 @@ class ReaderConfig(BaseModel):
         Returns:
             List[str]: The list of column names.
         """
-        return [
+        names = [
             self.labels.user_id_label,
             self.labels.item_id_label,
             self.labels.rating_label,
             self.labels.timestamp_label,
         ]
+
+        # Optionally add contextual columns
+        if self.labels.context_labels:
+            names.extend(self.labels.context_labels)
+
+        return names
 
     def column_dtype(self) -> Dict[str, np.dtype]:
         """This method will parse the dtype from the string forma to their numpy counterpart.
@@ -236,17 +245,27 @@ class ReaderConfig(BaseModel):
         Returns:
             Dict[str, np.dtype]: A list containing the dtype to use for data loading.
         """
-        column_names = self.column_names()
-        column_dtypes = [
-            self.dtypes.user_id_type,
-            self.dtypes.item_id_type,
-            self.dtypes.rating_type,
-            self.dtypes.timestamp_type,
-        ]
-        return {
-            name: self.column_map_dtype[dtype]
-            for name, dtype in zip(column_names, column_dtypes)
+        # Fixed typings
+        dtype_map = {
+            self.labels.user_id_label: self.column_map_dtype[self.dtypes.user_id_type],
+            self.labels.item_id_label: self.column_map_dtype[self.dtypes.item_id_type],
+            self.labels.rating_label: self.column_map_dtype[self.dtypes.rating_type],
+            self.labels.timestamp_label: self.column_map_dtype[
+                self.dtypes.timestamp_type
+            ],
         }
+
+        # Optionally add contextual dtypes
+        if self.labels.context_labels and self.dtypes.context_types:
+            for context_name in self.labels.context_labels:
+                type_str = self.dtypes.context_types.get(context_name)
+
+                if type_str and type_str in self.column_map_dtype:
+                    dtype_map[context_name] = self.column_map_dtype[type_str]
+                else:
+                    pass
+
+        return dtype_map
 
     def check_column_dtype(self) -> None:
         """This method validates the custom dtype passed with the configuration file.
@@ -254,8 +273,22 @@ class ReaderConfig(BaseModel):
         Raises:
             ValueError: If the dtype are not supported or incorrect.
         """
-        for dtype_str in self.dtypes.model_dump().values():
+        for dtype_str in self.dtypes.model_dump(exclude="context_types").values():  # type: ignore[arg-type]
             if dtype_str not in self.column_map_dtype:
                 raise ValueError(
-                    f"Custom dtype {dtype_str} not supported as a column data type."
+                    f"Custom dtype '{dtype_str}' not supported as a column data type."
                 )
+
+        if self.labels.context_labels:
+            for context_name in self.labels.context_labels:
+                # if internal_name not in self.dtypes.context_types:
+                #     raise ValueError(
+                #         f"Context label '{internal_name}' is defined in Labels but missing in CustomDtype."
+                #     )
+
+                if context_name in self.dtypes.context_types:
+                    dtype_str = self.dtypes.context_types[context_name]
+                    if dtype_str not in self.column_map_dtype:
+                        raise ValueError(
+                            f"Context '{context_name}' has unsupported dtype '{dtype_str}'."
+                        )

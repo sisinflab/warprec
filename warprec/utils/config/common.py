@@ -19,6 +19,7 @@ class Labels(BaseModel):
         rating_label (Optional[str]): Name of the rating label. Defaults to 'rating'.
         timestamp_label (Optional[str]): Name of the timestamp label. Defaults to 'timestamp'.
         cluster_label (Optional[str]): Name of the cluster label. Defaults to 'cluster'.
+        context_labels (Optional[List[str]]): A list of names of the contextual features.
     """
 
     user_id_label: Optional[str] = "user_id"
@@ -26,6 +27,7 @@ class Labels(BaseModel):
     rating_label: Optional[str] = "rating"
     timestamp_label: Optional[str] = "timestamp"
     cluster_label: Optional[str] = "cluster"
+    context_labels: Optional[List[str]] = []
 
     @classmethod
     def from_list(cls, labels: List[str]) -> "Labels":
