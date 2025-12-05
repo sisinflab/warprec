@@ -386,6 +386,7 @@ class Dataset:
             batch_size=batch_size,
             rating_type=rating_type,
             rating_label=rating_label,
+            context_labels=context_labels,
             precision=precision,
         )
 
@@ -399,6 +400,7 @@ class Dataset:
                 batch_size=batch_size,
                 rating_type=rating_type,
                 rating_label=rating_label,
+                context_labels=context_labels,
                 precision=precision,
             )
 
@@ -472,6 +474,7 @@ class Dataset:
         batch_size: int = 1024,
         rating_type: RatingType = RatingType.IMPLICIT,
         rating_label: str = None,
+        context_labels: Optional[List[str]] = None,
         precision: Any = np.float32,
     ) -> Interactions:
         """Functionality to create Interaction data from DataFrame.
@@ -485,6 +488,8 @@ class Dataset:
             batch_size (int): The batch size of the interaction.
             rating_type (RatingType): The type of rating used.
             rating_label (str): The label of the rating column.
+            context_labels (Optional[List[str]]): The list of labels of the
+                contextual data.
             precision (Any): The precision that will be used to store interactions.
 
         Returns:
@@ -501,6 +506,7 @@ class Dataset:
             batch_size=batch_size,
             rating_type=rating_type,
             rating_label=rating_label,
+            context_labels=context_labels,
             precision=precision,
         )
         nuid, niid = inter_set.get_dims()
