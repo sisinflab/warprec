@@ -1,4 +1,5 @@
-from .dataset import Dataset, EvaluationDataLoader, NegativeEvaluationDataLoader
+from .dataset import Dataset
+from .eval_loaders import EvaluationDataLoader, NegativeEvaluationDataLoader
 from . import entities
 from . import reader
 from . import splitting
