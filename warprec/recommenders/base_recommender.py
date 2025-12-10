@@ -280,6 +280,35 @@ class IterativeRecommender(Recommender):
         """
 
 
+class ContextRecommenderUtils:
+    """Common definition for context-aware recommenders.
+
+    Collection of common method used by all context-aware recommenders.
+    """
+
+    def __init__(
+        self,
+        params: dict,
+        interactions: Interactions,
+        info: dict,
+        *args: Any,
+        **kwargs: Any,
+    ):
+        self.context_dims: dict = info.get("context_dims", None)
+
+        if self.context_dims is None:
+            raise ValueError(
+                f"The model {self.__class__.__name__} is contextual model. "
+                "Contextual dimensions are required inside the info dictionary for "
+                "proper initialization."
+            )
+
+        self.context_labels = list(self.context_dims.keys())
+
+        # Continue the initialization chain
+        super().__init__(params, interactions, info, *args, **kwargs)  # type: ignore[call-arg]
+
+
 class SequentialRecommenderUtils(ABC):
     """Common definition for sequential recommenders.
 
@@ -343,10 +372,10 @@ class ItemSimRecommender(Recommender):
     Args:
         params (dict): The dictionary with the model params.
         interactions (Interactions): The training interactions.
+        info (dict): The dictionary containing dataset information.
         *args (Any): Argument for PyTorch nn.Module.
         device (str): The device used for tensor operations.
         seed (int): The seed to use for reproducibility.
-        info (dict): The dictionary containing dataset information.
         **kwargs (Any): Keyword argument for PyTorch nn.Module.
 
     Raises:
@@ -357,14 +386,14 @@ class ItemSimRecommender(Recommender):
         self,
         params: dict,
         interactions: Interactions,
+        info: dict,
         *args: Any,
         device: str = "cpu",
         seed: int = 42,
-        info: dict = None,
         **kwargs: Any,
     ):
         super().__init__(
-            params, interactions, device=device, seed=seed, *args, **kwargs
+            params, interactions, info, device=device, seed=seed, *args, **kwargs
         )
         self.n_items = info.get("n_items", None)
         if not self.n_items:
