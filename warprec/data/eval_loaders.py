@@ -1,4 +1,4 @@
-from typing import Tuple, List, Set, Any
+from typing import Tuple, List
 
 import torch
 import numpy as np
@@ -10,42 +10,30 @@ from scipy.sparse import csr_matrix
 
 
 class EvaluationDataset(TorchDataset):
-    """PyTorch Dataset to yield (train, eval, user_idx) in batch,
-    converting sparse matrices in dense tensors.
-
-    Args:
-        eval_interactions (csr_matrix): Sparse matrix of evaluation interactions.
+    """
+    Yields: (user_idx, dense_ground_truth)
     """
 
     def __init__(
         self,
         eval_interactions: csr_matrix,
     ):
-        self.num_users, self.num_items = eval_interactions.shape
+        self.num_users = eval_interactions.shape[0]
         self.eval_interactions = eval_interactions
 
     def __len__(self) -> int:
         return self.num_users
 
-    def __getitem__(self, idx: int) -> Tuple[Tensor, int]:
+    def __getitem__(self, idx: int) -> Tuple[int, Tensor]:
         eval_row = self.eval_interactions.getrow(idx)
-        eval_batch = torch.from_numpy(eval_row.toarray()).to(torch.float32).squeeze(0)
+        ground_truth = torch.from_numpy(eval_row.toarray()).to(torch.float32).squeeze(0)
 
-        return eval_batch, idx
+        return idx, ground_truth
 
 
 class ContextualEvaluationDataset(TorchDataset):
-    """Dataset optimized for Full Contextual Evaluation.
-
-    It converts DataFrame columns directly into Tensors for fast access.
-    Each item is a single transaction: (user, item, context).
-
-    Args:
-        eval_data (DataFrame): The evaluation DataFrame.
-        user_id_label (str): The user ID label in the DataFrame.
-        item_id_label (str): The item ID label in the DataFrame.
-        context_labels (List[str]): The list of labels of context
-            information in the DataFrame.
+    """
+    Yields: (user_idx, target_item_idx, context_vector)
     """
 
     def __init__(
@@ -55,15 +43,13 @@ class ContextualEvaluationDataset(TorchDataset):
         item_id_label: str,
         context_labels: List[str],
     ):
-        # Convert DataFrame columns to Tensors immediately.
+        # Pre-convert DataFrames to torch tensor to reduce overhead
         self.user_indices = torch.from_numpy(
             eval_data[user_id_label].values.astype(np.int64)
         )
         self.item_indices = torch.from_numpy(
             eval_data[item_id_label].values.astype(np.int64)
         )
-
-        # Context is a matrix [total_interactions, context_features]
         self.context_features = torch.from_numpy(
             eval_data[context_labels].values.astype(np.int64)
         )
@@ -80,17 +66,8 @@ class ContextualEvaluationDataset(TorchDataset):
 
 
 class SampledEvaluationDataset(TorchDataset):
-    """PyTorch Dataset to yield (pos_item, neg_item, user_idx) in batch,
-    converting sparse matrices in dense tensors.
-
-    For each user, positive items are retrieve and a number of negatives
-    is sampled randomly.
-
-    Args:
-        train_interactions (csr_matrix): Sparse matrix of training interactions.
-        eval_interactions (csr_matrix): Sparse matrix of evaluation interactions.
-        num_negatives (int): Number of negatives to sample per user.
-        seed (int): Random seed for negative sampling.
+    """
+    Yields: (user_idx, pos_item, neg_items_vector)
     """
 
     def __init__(
@@ -102,94 +79,91 @@ class SampledEvaluationDataset(TorchDataset):
     ):
         super().__init__()
         self.num_users, self.num_items = train_interactions.shape
-        self.num_negatives = num_negatives
 
-        # Init lists for faster access
-        self.users_with_positives = []
+        # Pre-calculate all positives (Train + Eval) per user,
+        # we use a list of arrays for fast access
+        self.all_positives = []
+        for u in range(self.num_users):
+            train_indices = train_interactions.indices[
+                train_interactions.indptr[u] : train_interactions.indptr[u + 1]
+            ]
+            eval_indices = eval_interactions.indices[
+                eval_interactions.indptr[u] : eval_interactions.indptr[u + 1]
+            ]
+            self.all_positives.append(np.union1d(train_indices, eval_indices))
+
+        # Identify users who actually have evaluation data
+        # (We only want to iterate over these)
+        self.users_with_eval = [
+            u
+            for u in range(self.num_users)
+            if eval_interactions.indptr[u + 1] - eval_interactions.indptr[u] > 0
+        ]
+
         self.positive_items_list = []
         self.negative_items_list = []
 
-        # Get positive interactions in eval set
-        eval_positives_by_user = [
-            eval_interactions.indices[
-                eval_interactions.indptr[u] : eval_interactions.indptr[u + 1]
-            ]
-            for u in range(self.num_users)
-        ]
-
-        # Set the random seed
         np.random.seed(seed)
 
-        for u in range(self.num_users):
-            # If no pos interaction in eval set, skip
-            if len(eval_positives_by_user[u]) == 0:
+        for u in self.users_with_eval:
+            # Store positives
+            eval_pos = eval_interactions.indices[
+                eval_interactions.indptr[u] : eval_interactions.indptr[u + 1]
+            ]
+            self.positive_items_list.append(torch.tensor(eval_pos, dtype=torch.long))
+
+            # Compute seen items
+            seen_items = self.all_positives[u]
+            n_seen = len(seen_items)
+
+            # If user has seen almost everything, return empty or partial
+            if self.num_items - n_seen <= 0:
+                self.negative_items_list.append(torch.tensor([], dtype=torch.long))
                 continue
 
-            self.users_with_positives.append(u)
-            self.positive_items_list.append(
-                torch.tensor(eval_positives_by_user[u], dtype=torch.long)
+            # Sample one time 2x the number of negatives
+            # NOTE: In most cases this will skip the while loop
+            num_to_generate = num_negatives * 2
+            candidates = np.random.randint(0, self.num_items, size=num_to_generate)
+
+            # Fast filtering using numpy boolean masking
+            # Note: For very large item sets, np.isin can be slow.
+            # If num_items > 1M, consider Bloom Filters or just the 'while' loop.
+            mask = np.isin(candidates, seen_items, invert=True)
+            valid_negatives = candidates[mask]
+
+            # Remove duplicates in candidates if necessary
+            valid_negatives = np.unique(valid_negatives)
+
+            # If we don't have enough, fallback to a loop
+            if len(valid_negatives) < num_negatives:
+                final_negs = list(valid_negatives)
+                while len(final_negs) < num_negatives:
+                    cand = np.random.randint(0, self.num_items)
+                    if cand not in seen_items and cand not in final_negs:
+                        final_negs.append(cand)
+                valid_negatives = np.array(final_negs)
+
+            # Take exactly num_negatives
+            self.negative_items_list.append(
+                torch.tensor(valid_negatives[:num_negatives], dtype=torch.long)
             )
 
-            # Obtain all positive (train/eval)
-            train_positives = train_interactions[u].indices
-            user_all_positives = np.union1d(eval_positives_by_user[u], train_positives)
-
-            # Compute candidates
-            candidate_negatives_count = self.num_items - len(user_all_positives)
-            num_to_sample = min(self.num_negatives, candidate_negatives_count)
-
-            # Randomly sample negatives until correctly sampled
-            if num_to_sample > 0:
-                negatives: Set[Any] = set()
-                while len(negatives) < num_to_sample:
-                    candidate = np.random.randint(0, self.num_items)
-                    if candidate not in user_all_positives:
-                        negatives.add(candidate)
-                self.negative_items_list.append(
-                    torch.tensor(list(negatives), dtype=torch.long)
-                )
-            else:
-                self.negative_items_list.append(torch.tensor([], dtype=torch.long))
-
     def __len__(self) -> int:
-        return len(self.users_with_positives)
+        return len(self.users_with_eval)
 
-    def __getitem__(self, idx: int) -> Tuple[Tensor, Tensor, int]:
-        """Yield data for a single user.
-
-        Args:
-            idx (int): Index of the user.
-
-        Returns:
-            Tuple[Tensor, Tensor, int]:
-                - positive_items (Tensor): Tensor with positive items.
-                - negative_items (Tensor): Tensor with negative items.
-                - idx (int): User index.
-        """
-        # Fast access to pre-computed pos-neg interactions
-        positive_items = self.positive_items_list[idx]
-        negative_items = self.negative_items_list[idx]
-
-        # Retrieve valid user idxs
-        user_idx = self.users_with_positives[idx]
-
+    def __getitem__(self, idx: int) -> Tuple[int, Tensor, Tensor]:
+        user_idx = self.users_with_eval[idx]
         return (
-            positive_items,
-            negative_items,
             user_idx,
+            self.positive_items_list[idx],
+            self.negative_items_list[idx],
         )
 
 
 class SampledContextualEvaluationDataset(TorchDataset):
-    """Dataset optimized for Sampled Contextual Evaluation.
-
-    For each transaction in the test set, it provides:
-    - User ID
-    - Positive Item ID (Target)
-    - N Negative Item IDs
-    - Context Vector
-
-    Negatives are pre-computed in __init__ for maximum evaluation speed.
+    """
+    Yields: (user_idx, pos_item, neg_items_vector, context_vector)
     """
 
     def __init__(
@@ -206,7 +180,7 @@ class SampledContextualEvaluationDataset(TorchDataset):
         self.num_negatives = num_negatives
         self.num_items = num_items
 
-        # Store Context and User/Item info as Tensors
+        # Pre-convert DataFrames to torch tensor to reduce overhead
         self.user_indices = torch.from_numpy(
             eval_data[user_id_label].values.astype(np.int64)
         )
@@ -217,37 +191,52 @@ class SampledContextualEvaluationDataset(TorchDataset):
             eval_data[context_labels].values.astype(np.int64)
         )
 
-        # Group eval items by user for fast lookup
-        eval_items_per_user = (
-            eval_data.groupby(user_id_label)[item_id_label].apply(set).to_dict()
-        )
+        n_train_users = train_interactions.shape[0]
 
+        self.negatives_list: list[Tensor] = []
         np.random.seed(seed)
-        self.negatives_list = []
 
-        # Iterate over each transaction to generate specific negatives
-        for _, user_idx in enumerate(self.user_indices.numpy()):
-            u = int(user_idx)
+        for idx, user_idx_tensor in enumerate(self.user_indices):
+            u = int(user_idx_tensor.item())
+            target_item = int(self.pos_item_indices[idx].item())
 
-            # Get train interactions
-            train_items = train_interactions.indices[
-                train_interactions.indptr[u] : train_interactions.indptr[u + 1]
-            ]
+            # Retrieve training history
+            if u < n_train_users:
+                train_items = train_interactions.indices[
+                    train_interactions.indptr[u] : train_interactions.indptr[u + 1]
+                ]
+            else:
+                train_items = np.array([], dtype=np.int64)
 
-            # Get test interactions
-            test_items = eval_items_per_user.get(u, set())
+            # Compute seen items
+            seen_items = np.append(train_items, target_item)
 
-            # Combine exclusions
-            seen_items = set(train_items).union(test_items)
+            # Generate 2x candidates to avoid loops in most cases
+            num_to_generate = self.num_negatives * 2
+            candidates = np.random.randint(0, self.num_items, size=num_to_generate)
 
-            # Sample Negatives
-            negatives: list[int] = []
-            while len(negatives) < num_negatives:
-                cand = np.random.randint(0, num_items)
-                if cand not in seen_items and cand not in negatives:
-                    negatives.append(cand)
+            # Filter out seen items using optimized numpy boolean masking
+            mask = np.isin(candidates, seen_items, invert=True)
+            valid_negatives = candidates[mask]
 
-            self.negatives_list.append(torch.tensor(negatives, dtype=torch.long))
+            # Remove duplicates
+            valid_negatives = np.unique(valid_negatives)
+
+            # If we don't have enough, fallback to a loop
+            if len(valid_negatives) < self.num_negatives:
+                final_negs = list(valid_negatives)
+                while len(final_negs) < self.num_negatives:
+                    cand = np.random.randint(0, self.num_items)
+                    if cand not in final_negs:
+                        if cand != target_item:
+                            if cand not in train_items:
+                                final_negs.append(cand)  # type: ignore[arg-type]
+                valid_negatives = np.array(final_negs)
+
+            # Take exactly num_negatives
+            self.negatives_list.append(
+                torch.tensor(valid_negatives[: self.num_negatives], dtype=torch.long)
+            )
 
     def __len__(self) -> int:
         return len(self.user_indices)
@@ -262,7 +251,9 @@ class SampledContextualEvaluationDataset(TorchDataset):
 
 
 class EvaluationDataLoader(DataLoader):
-    """Custom DataLoader to yield tuple (train, eval) in batch size."""
+    """
+    Output Batch: (user_indices, ground_truths)
+    """
 
     def __init__(
         self,
@@ -277,7 +268,9 @@ class EvaluationDataLoader(DataLoader):
 
 
 class ContextualEvaluationDataLoader(DataLoader):
-    """DataLoader for Full Contextual Evaluation."""
+    """
+    Output Batch: (user_indices, target_items, contexts)
+    """
 
     def __init__(
         self,
@@ -298,7 +291,9 @@ class ContextualEvaluationDataLoader(DataLoader):
 
 
 class SampledEvaluationDataLoader(DataLoader):
-    """DataLoader for evaluation with negative sampling."""
+    """
+    Output Batch: (user_indices, pos_items, neg_items)
+    """
 
     def __init__(
         self,
@@ -309,7 +304,7 @@ class SampledEvaluationDataLoader(DataLoader):
         batch_size: int = 1024,
         **kwargs,
     ):
-        self.num_items = train_interactions.shape[1]  # Used as padding index
+        self.num_items = train_interactions.shape[1]
 
         dataset = SampledEvaluationDataset(
             train_interactions=train_interactions,
@@ -328,16 +323,13 @@ class SampledEvaluationDataLoader(DataLoader):
 
     def _collate_fn(
         self,
-        batch: List[Tuple[Tensor, Tensor, int]],
+        batch: List[Tuple[int, Tensor, Tensor]],
     ) -> Tuple[Tensor, Tensor, Tensor]:
-        """Custom collate_fn to handle negative sampling in evaluation."""
-        positive_tensors, negative_tensors, user_indices = zip(*batch)
+        user_indices, positive_tensors, negative_tensors = zip(*batch)
 
-        # User indices will be a list of ints, so we convert it
         user_indices_tensor = torch.tensor(list(user_indices), dtype=torch.long)
 
-        # We use the pad_sequence utility to pad item indices
-        # in order to have all tensor of the same size
+        # Stack sequences and pad them ensure same length
         positives_padded = pad_sequence(
             positive_tensors,  # type: ignore[arg-type]
             batch_first=True,
@@ -349,11 +341,13 @@ class SampledEvaluationDataLoader(DataLoader):
             padding_value=self.num_items,
         )
 
-        return positives_padded, negatives_padded, user_indices_tensor
+        return user_indices_tensor, positives_padded, negatives_padded
 
 
 class SampledContextualEvaluationDataLoader(DataLoader):
-    """DataLoader for Sampled Contextual Evaluation."""
+    """
+    Output Batch: (user_indices, pos_items, neg_items, contexts)
+    """
 
     def __init__(
         self,
@@ -390,17 +384,17 @@ class SampledContextualEvaluationDataLoader(DataLoader):
     def _collate_fn(
         self,
         batch: List[Tuple[Tensor, Tensor, Tensor, Tensor]],
-    ) -> Tuple[Tensor, Tensor, Tensor]:
-        """
-        Custom collate to stack negatives correctly."""
+    ) -> Tuple[Tensor, Tensor, Tensor, Tensor]:
         user_indices, pos_items, neg_items, context_features = zip(*batch)
 
         tensor_user_indices = torch.stack(user_indices)
-        tensor_pos_items = torch.stack(pos_items)
+        tensor_pos_items = torch.stack(pos_items).unsqueeze(1)
         tensor_neg_items = torch.stack(neg_items)
         tensor_context_features = torch.stack(context_features)
 
-        # Concatenate Positive and Negatives into a single Candidates tensor
-        candidates = torch.cat([tensor_pos_items.unsqueeze(1), tensor_neg_items], dim=1)
-
-        return tensor_user_indices, candidates, tensor_context_features
+        return (
+            tensor_user_indices,
+            tensor_pos_items,
+            tensor_neg_items,
+            tensor_context_features,
+        )

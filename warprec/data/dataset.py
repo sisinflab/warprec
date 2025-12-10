@@ -7,7 +7,12 @@ from torch import Tensor
 from pandas import DataFrame
 
 from warprec.data.entities import Interactions, Sessions
-from warprec.data.eval_loaders import EvaluationDataLoader, NegativeEvaluationDataLoader
+from warprec.data.eval_loaders import (
+    EvaluationDataLoader,
+    SampledEvaluationDataLoader,
+    ContextualEvaluationDataLoader,
+    SampledContextualEvaluationDataLoader,
+)
 from warprec.utils.enums import RatingType
 from warprec.utils.logger import logger
 
@@ -467,19 +472,19 @@ class Dataset:
 
         return self._precomputed_dataloader[key]
 
-    def get_neg_evaluation_dataloader(
+    def get_sampled_evaluation_dataloader(
         self,
         num_negatives: int = 99,
         seed: int = 42,
-    ) -> NegativeEvaluationDataLoader:
-        """Retrieve the NegativeEvaluationDataLoader for the dataset.
+    ) -> SampledEvaluationDataLoader:
+        """Retrieve the SampledEvaluationDataLoader for the dataset.
 
         Args:
             num_negatives (int): Number of negative samples per user.
             seed (int): Random seed for negative sampling.
 
         Returns:
-            NegativeEvaluationDataLoader: DataLoader that yields batches
+            SampledEvaluationDataLoader: DataLoader that yields batches
                 of interactions (pos_items, neg_items, user_indices)
         """
         key = f"neg_{num_negatives}_{seed}"
@@ -488,12 +493,89 @@ class Dataset:
             train_sparse = self.train_set.get_sparse()
             eval_sparse = self.eval_set.get_sparse()
 
-            self._precomputed_dataloader[key] = NegativeEvaluationDataLoader(
+            self._precomputed_dataloader[key] = SampledEvaluationDataLoader(
                 train_interactions=train_sparse,
                 eval_interactions=eval_sparse,
                 num_negatives=num_negatives,
                 batch_size=self._batch_size,
                 seed=seed,
+            )
+
+        return self._precomputed_dataloader[key]
+
+    def get_contextual_evaluation_dataloader(self) -> ContextualEvaluationDataLoader:
+        """Retrieve the ContextualEvaluationDataLoader for the dataset.
+
+        This loader is specific for Context-Aware Recommender Systems.
+        It iterates over transactions (User, Item, Context) instead of Users.
+
+        Returns:
+            ContextualEvaluationDataLoader: The contextual data loader.
+        """
+        key = "full_contextual"
+        if key not in self._precomputed_dataloader:
+            eval_data = self.eval_set.get_df()
+
+            # Retrieve labels to pre-compute eval data
+            user_label = self.eval_set._user_label
+            item_label = self.eval_set._item_label
+            context_labels = self.eval_set._context_labels
+
+            # Map the evaluation dataset to ensure consistency
+            eval_data[user_label] = eval_data[user_label].map(self._umap)
+            eval_data[item_label] = eval_data[item_label].map(self._imap)
+            eval_data = eval_data.dropna(subset=[user_label, item_label])
+
+            self._precomputed_dataloader[key] = ContextualEvaluationDataLoader(
+                eval_data=eval_data,
+                user_id_label=user_label,
+                item_id_label=item_label,
+                context_labels=context_labels,
+                batch_size=self._batch_size,
+            )
+
+        return self._precomputed_dataloader[key]
+
+    def get_sampled_contextual_evaluation_dataloader(
+        self,
+        num_negatives: int = 99,
+        seed: int = 42,
+    ) -> SampledContextualEvaluationDataLoader:
+        """Retrieve the SampledContextualEvaluationDataLoader for the dataset.
+
+        Args:
+            num_negatives (int): Number of negative samples per transaction.
+            seed (int): Random seed.
+
+        Returns:
+            SampledContextualEvaluationDataLoader: The sampled contextual loader.
+        """
+        key = f"sampled_contextual_{num_negatives}_{seed}"
+
+        if key not in self._precomputed_dataloader:
+            train_sparse = self.train_set.get_sparse()
+            eval_data = self.eval_set.get_df()
+
+            # Retrieve labels to pre-compute eval data
+            user_label = self.eval_set._user_label
+            item_label = self.eval_set._item_label
+            context_labels = self.eval_set._context_labels
+
+            # Map the evaluation dataset to ensure consistency
+            eval_data[user_label] = eval_data[user_label].map(self._umap)
+            eval_data[item_label] = eval_data[item_label].map(self._imap)
+            eval_data = eval_data.dropna(subset=[user_label, item_label])
+
+            self._precomputed_dataloader[key] = SampledContextualEvaluationDataLoader(
+                train_interactions=train_sparse,
+                eval_data=eval_data,
+                user_id_label=user_label,
+                item_id_label=item_label,
+                context_labels=context_labels,
+                num_items=self._niid,
+                num_negatives=num_negatives,
+                seed=seed,
+                batch_size=self._batch_size,
             )
 
         return self._precomputed_dataloader[key]
