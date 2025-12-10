@@ -1,5 +1,3 @@
-from typing import ClassVar
-
 from pydantic import field_validator
 from warprec.utils.config.model_configuration import (
     RecomModel,
@@ -13,33 +11,6 @@ from warprec.utils.config.common import (
     validate_str_list,
 )
 from warprec.utils.registry import params_registry
-
-
-@params_registry.register("AddEASE")
-class AddEASE(RecomModel):
-    """Definition of the model AddEASE.
-
-    Attributes:
-        l2 (FLOAT_FIELD): List of values that l2 regularization can take.
-        alpha (FLOAT_FIELD): List of values for alpha regularization.
-        need_side_information (ClassVar[bool]): Wether or not the model needs side information.
-    """
-
-    l2: FLOAT_FIELD
-    alpha: FLOAT_FIELD
-    need_side_information: ClassVar[bool] = True
-
-    @field_validator("l2")
-    @classmethod
-    def check_l2(cls, v: list):
-        """Validate l2."""
-        return validate_greater_than_zero(cls, v, "l2")
-
-    @field_validator("alpha")
-    @classmethod
-    def check_alpha(cls, v: list):
-        """Validate alpha."""
-        return validate_greater_equal_than_zero(cls, v, "alpha")
 
 
 @params_registry.register("CDAE")
@@ -132,33 +103,6 @@ class CDAE(RecomModel):
     def check_learning_rate(cls, v: list):
         """Validate learning_rate."""
         return validate_greater_than_zero(cls, v, "learning_rate")
-
-
-@params_registry.register("CEASE")
-class CEASE(RecomModel):
-    """Definition of the model CEASE.
-
-    Attributes:
-        l2 (FLOAT_FIELD): List of values that l2 regularization can take.
-        alpha (FLOAT_FIELD): List of values for alpha regularization.
-        need_side_information (ClassVar[bool]): Wether or not the model needs side information.
-    """
-
-    l2: FLOAT_FIELD
-    alpha: FLOAT_FIELD
-    need_side_information: ClassVar[bool] = True
-
-    @field_validator("l2")
-    @classmethod
-    def check_l2(cls, v: list):
-        """Validate l2."""
-        return validate_greater_than_zero(cls, v, "l2")
-
-    @field_validator("alpha")
-    @classmethod
-    def check_alpha(cls, v: list):
-        """Validate alpha."""
-        return validate_greater_equal_than_zero(cls, v, "alpha")
 
 
 @params_registry.register("EASE")

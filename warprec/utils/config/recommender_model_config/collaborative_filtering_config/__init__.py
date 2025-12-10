@@ -1,15 +1,12 @@
-from .autoencoder_config import AddEASE, CDAE, CEASE, EASE, MultiDAE
-from .content_based_config import VSM
+from .autoencoder_config import CDAE, EASE, MultiDAE
+from ..content_based_config import VSM
 from .graph_based_config import GCMC, LightGCN, NGCF, RP3Beta
-from .knn_config import AttributeItemKNN, AttributeUserKNN, ItemKNN, UserKNN
+from .knn_config import ItemKNN, UserKNN
 from .latent_factor_config import ADMMSlim, BPR, FISM, Slim
 from .neural_config import ConvNCF, NeuMF
-from .unpersonalized_config import Pop, Random
 
 __all__ = [
-    "AddEASE",
     "CDAE",
-    "CEASE",
     "EASE",
     "MultiDAE",
     "VSM",
@@ -17,8 +14,6 @@ __all__ = [
     "LightGCN",
     "NGCF",
     "RP3Beta",
-    "AttributeItemKNN",
-    "AttributeUserKNN",
     "ItemKNN",
     "UserKNN",
     "ADMMSlim",
@@ -27,6 +22,4 @@ __all__ = [
     "Slim",
     "ConvNCF",
     "NeuMF",
-    "Pop",
-    "Random",
 ]
