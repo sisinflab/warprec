@@ -60,7 +60,7 @@ class LocalReader(Reader):
 
     def read_tabular_split(  # type: ignore[override]
         self,
-        split_dir: str,
+        local_path: str,
         column_names: Optional[List[str]],
         dtypes: Optional[Dict[str, str]],
         sep: str = "\t",
@@ -72,7 +72,7 @@ class LocalReader(Reader):
         DataFrame, Optional[List[Tuple[DataFrame, DataFrame]] | DataFrame], DataFrame
     ]:
         return super()._process_tabular_split(
-            base_location=split_dir,
+            base_location=local_path,
             column_names=column_names,
             dtypes=dtypes,
             sep=sep,
