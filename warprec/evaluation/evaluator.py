@@ -7,11 +7,9 @@ import torch
 from torch import Tensor
 from scipy.sparse import csr_matrix
 from tabulate import tabulate
-from warprec.data import (
-    Dataset,
-    EvaluationDataLoader,
-    NegativeEvaluationDataLoader,
-)
+from torch.utils.data import DataLoader
+
+from warprec.data import Dataset
 from warprec.evaluation.metrics.base_metric import BaseMetric
 from warprec.recommenders.base_recommender import (
     Recommender,
@@ -26,8 +24,10 @@ class Evaluator:
     """Evaluator class will evaluate a trained model on a given
     set of metrics, taking into account the cutoff.
 
-    If a validation set has been provided in the dataset, then this
-    class will provide results on validation too.
+    Handles Full and Sampled evaluation on:
+        - Collaborative Filtering models (+ content-base, + hybrids)
+        - Context Aware models
+        - Sequential models
 
     Args:
         metric_list (List[str]): The list of metric names that will
@@ -60,6 +60,8 @@ class Evaluator:
         self.num_items = train_set.shape[1]
         self.metrics: Dict[int, List[BaseMetric]] = {}
         self.required_blocks: Dict[int, Set[MetricBlock]] = {}
+
+        # Common parameters shared across metrics
         self.common_params: Dict[str, Any] = {
             "compute_per_user": compute_per_user,
             "num_users": train_set.shape[0],
@@ -75,12 +77,7 @@ class Evaluator:
         self._init_metrics(metric_list)
 
     def _init_metrics(self, metric_list: List[str]):
-        """Utility method to initialize metrics.
-
-        Args:
-            metric_list (List[str]): The list of metric names used to initialize
-                metric classes from registry.
-        """
+        """Initializes metric instances from the registry."""
         for k in self.k_values:
             self.metrics[k] = []
             self.required_blocks[k] = set()
@@ -88,31 +85,24 @@ class Evaluator:
                 metric_name = metric_string
                 metric_params = {}
 
-                # Check for F1-extended
+                # Parsing complex metric names (e.g., F1[Precision, Recall])
                 match_f1 = re.match(r"F1\[\s*(.*?)\s*,\s*(.*?)\s*\]", metric_string)
                 match_efd_epc = re.match(r"(EFD|EPC)\[\s*(.*?)\s*\]", metric_string)
 
                 if match_f1:
-                    metric_name = "F1"  # Generic name for F1-Extended
-
-                    # Retrieve sub metric names
-                    # validation has been done inside Pydantic
+                    metric_name = "F1"
                     metric_params["metric_name_1"] = match_f1.group(1)
                     metric_params["metric_name_2"] = match_f1.group(2)
 
                 if match_efd_epc:
                     metric_name = match_efd_epc.group(1)
-
-                    # Retrieve relevance
-                    # validation has been done inside Pydantic
                     metric_params["relevance"] = match_efd_epc.group(2)
 
-                # Generic metric initialization
                 metric_instance = metric_registry.get(
                     metric_name,
                     k=k,
                     **self.common_params,
-                    **metric_params,  # Add specific params if needed
+                    **metric_params,
                 )
                 self.metrics[k].append(metric_instance)
                 self.required_blocks[k].update(metric_instance._REQUIRED_COMPONENTS)
@@ -120,232 +110,252 @@ class Evaluator:
     def evaluate(
         self,
         model: Recommender,
-        dataloader: EvaluationDataLoader | NegativeEvaluationDataLoader,
+        dataloader: DataLoader,
         strategy: str,
         dataset: Dataset,
         device: str = "cpu",
         verbose: bool = False,
     ):
-        """The main method to evaluate a list of metrics on the prediction of a model.
+        """Main evaluation loop.
 
         Args:
-            model (Recommender): The trained model.
-            dataloader (EvaluationDataLoader | NegativeEvaluationDataLoader):
-                The dataloader used for the evaluation.
-            strategy (str): The evaluation strategy to use.
-            dataset (Dataset): The dataset used for the evaluation.
-            device (str): The device on which the metrics will be calculated.
-            verbose (bool): Wether of not the method should write with logger.
+            model (Recommender): The model to evaluate.
+            dataloader (DataLoader): The evaluation dataloader that will yield
+                the eval set information.
+            strategy (str): The strategy to use during evaluation.
+            dataset (Dataset): The dataset object used for the evaluation.
+            device (str): The device of the evaluation. Defaults to "cpu".
+            verbose (bool): Wether or not to log progress during evaluation.
 
         Raises:
-            ValueError: If the strategy is not supported.
+            ValueError: If the strategy isn't either "full" or "sampled".
         """
-        # Check if the strategy is correct
         if strategy not in ["full", "sampled"]:
-            raise ValueError(
-                "The strategy passed is not correct. "
-                "Accepted strategies are 'full' and 'sampled'. "
-                f"Strategy received: {strategy}"
-            )
+            raise ValueError(f"Strategy '{strategy}' not supported.")
 
-        eval_start_time: float
         if verbose:
             logger.msg(f"Starting evaluation process for model {model.name}.")
             eval_start_time = time.time()
 
-        # Initialize evaluation process
         self.reset_metrics()
         self.metrics_to(device)
         model.eval()
 
-        # Set the train interactions
+        # Retrieve train interactions for masking (needed in full strategy)
         train_sparse = dataset.train_set.get_sparse()
         padding_idx = train_sparse.shape[1]
 
-        # Main evaluation loop
         for batch in dataloader:
-            candidates_local: Tensor = None
-            train_batch: csr_matrix = None
+            # Parse the batch
+            batch_data = self._parse_batch(batch, strategy, device)
 
-            # Based on strategy, call different predict method
-            match strategy:
-                case "full":
-                    eval_batch, user_indices = [x.to(device) for x in batch]
+            user_indices = batch_data["user_indices"]
+            context = batch_data.get("context")  # Optional (CARS only)
+            candidates = batch_data.get("candidates")  # Optional (Sampled only)
 
-                    # Index the interactions of the current users
-                    train_batch = train_sparse[user_indices.tolist(), :]
-
-                    # In case of sequential model, we need to retrieve sequences
-                    user_seq, seq_len = None, None
-                    if isinstance(model, SequentialRecommenderUtils):
-                        user_seq, seq_len = self._retrieve_sequences_for_user(
-                            dataset,
-                            user_indices.tolist(),
-                            model.max_seq_len,
-                        )
-                        user_seq = user_seq.to(device)
-                        seq_len = seq_len.to(device)
-
-                    predictions = model.predict(
-                        user_indices=user_indices,
-                        user_seq=user_seq,
-                        seq_len=seq_len,
-                        train_batch=train_batch,
-                        train_sparse=train_sparse,
-                    ).to(device)  # Get ratings tensor [batch_size, num_items]
-
-                    # Masking interaction already seen in train
-                    predictions[train_batch.nonzero()] = -torch.inf
-                case "sampled":
-                    pos_batch, neg_batch, user_indices = [x.to(device) for x in batch]
-
-                    # Index the interactions of the current users
-                    train_batch = train_sparse[user_indices.tolist(), :]
-
-                    # In case of sequential model, we need to retrieve sequences
-                    user_seq, seq_len = None, None
-                    if isinstance(model, SequentialRecommenderUtils):
-                        user_seq, seq_len = self._retrieve_sequences_for_user(
-                            dataset,
-                            user_indices.tolist(),
-                            model.max_seq_len,
-                        )
-                        user_seq = user_seq.to(device)
-                        seq_len = seq_len.to(device)
-
-                    # Cat all the sampled items in a single tensor
-                    candidates_local = torch.cat([pos_batch, neg_batch], dim=1)
-
-                    # This method will rate only sampled items
-                    # Output tensor size will depend on longest sampled
-                    # list in current batch
-                    predictions = model.predict(
-                        user_indices=user_indices,
-                        item_indices=candidates_local,
-                        user_seq=user_seq,
-                        seq_len=seq_len,
-                        train_batch=train_batch,
-                        train_sparse=train_sparse,
-                    ).to(device)  # Get ratings tensor [batch_size, pad_seq]
-
-                    # Mask padded indices
-                    predictions[candidates_local == padding_idx] = -torch.inf
-
-                    # Create the local GT
-                    num_positives_per_user = (pos_batch != padding_idx).sum(dim=1)
-                    col_indices = torch.arange(candidates_local.shape[1], device=device)
-                    eval_batch = (
-                        col_indices < num_positives_per_user.unsqueeze(1)
-                    ).float()  # [batch_size, pad_seq]
-
-            # Pre-compute metric blocks
-            precomputed_blocks: Dict[int, Dict[str, Tensor]] = {
-                k: {} for k in self.k_values
+            # Prepare the model input
+            train_batch = train_sparse[user_indices.tolist(), :]
+            predict_kwargs = {
+                "user_indices": user_indices,
+                "train_sparse": train_sparse,  # Some models might need it internally
+                "train_batch": train_batch,
             }
-            all_required_blocks = set()
-            for k in self.k_values:
-                all_required_blocks.update(self.required_blocks.get(k, set()))
 
-            # First we check for relevance
-            binary_relevance = (
-                BaseMetric.binary_relevance(eval_batch)
-                if MetricBlock.BINARY_RELEVANCE in all_required_blocks
-                else None
-            )
-            discounted_relevance = (
-                BaseMetric.discounted_relevance(eval_batch)
-                if MetricBlock.DISCOUNTED_RELEVANCE in all_required_blocks
-                else None
-            )
-
-            # We also check if the number of valid users is required
-            valid_users = (
-                BaseMetric.valid_users(eval_batch)
-                if MetricBlock.VALID_USERS in all_required_blocks
-                else None
-            )
-
-            # Efficiently compute top_k once for the maximum k
-            if self.k_values and (
-                MetricBlock.TOP_K_VALUES in all_required_blocks
-                or MetricBlock.TOP_K_INDICES in all_required_blocks
-                or MetricBlock.TOP_K_BINARY_RELEVANCE in all_required_blocks
-                or MetricBlock.TOP_K_DISCOUNTED_RELEVANCE in all_required_blocks
-            ):
-                max_k = max(self.k_values)
-                top_k_values_full, top_k_indices_full = BaseMetric.top_k_values_indices(
-                    predictions, max_k
+            # A. Sequential Models Support
+            if isinstance(model, SequentialRecommenderUtils):
+                user_seq, seq_len = self._retrieve_sequences_for_user(
+                    dataset, user_indices.tolist(), model.max_seq_len
                 )
+                predict_kwargs["user_seq"] = user_seq.to(device)
+                predict_kwargs["seq_len"] = seq_len.to(device)
 
-                # Then we check all the needed blocks that are shared
-                # between metrics so we can pre-compute by slicing
-                for k in self.k_values:
-                    required_blocks_for_k = self.required_blocks.get(k, set())
+            # B. Context Support
+            if context is not None:
+                predict_kwargs["contexts"] = context
 
-                    top_k_values = top_k_values_full[:, :k]
-                    top_k_indices = top_k_indices_full[:, :k]
+            # C. Item Indices (used in sampled evaluation)
+            if strategy == "sampled":
+                positives = batch_data["positives"]
+                negatives = batch_data["negatives"]
+                candidates = torch.cat([positives, negatives], dim=1)
 
-                    precomputed_blocks[k][f"top_{k}_values"] = top_k_values
-                    precomputed_blocks[k][f"top_{k}_indices"] = top_k_indices
+                predict_kwargs["item_indices"] = candidates
 
-                    # Then we also check for .gather() method for better optimization
-                    if MetricBlock.TOP_K_BINARY_RELEVANCE in required_blocks_for_k:
-                        precomputed_blocks[k][f"top_{k}_binary_relevance"] = (
-                            BaseMetric.top_k_relevance_from_indices(
-                                binary_relevance, top_k_indices
-                            )
-                        )
-                    if MetricBlock.TOP_K_DISCOUNTED_RELEVANCE in required_blocks_for_k:
-                        precomputed_blocks[k][f"top_{k}_discounted_relevance"] = (
-                            BaseMetric.top_k_relevance_from_indices(
-                                discounted_relevance, top_k_indices
-                            )
-                        )
+            # Model prediction
+            predictions = model.predict(**predict_kwargs).to(device)
 
-            # Update all metrics on current batches
-            for k, metric_instances in self.metrics.items():
-                for metric in metric_instances:
-                    update_kwargs = {
-                        "ground": eval_batch,
-                        "binary_relevance": binary_relevance,
-                        "discounted_relevance": discounted_relevance,
-                        "valid_users": valid_users,
-                        "user_indices": user_indices,
-                        "item_indices": candidates_local,
-                        **precomputed_blocks[k],
-                    }
-                    metric.update(
-                        predictions,
-                        **update_kwargs,
+            eval_batch = None  # This will be the Binary Ground Truth for metrics
+
+            if strategy == "full":
+                if "target_item" in batch_data:
+                    # Contextual full evaluation
+                    target_item = batch_data["target_item"]
+                    eval_batch = torch.zeros(
+                        (len(user_indices), self.num_items), device=device
                     )
+                    eval_batch.scatter_(1, target_item.unsqueeze(1), 1.0)
+                else:
+                    # Classic full evaluation
+                    eval_batch = batch_data["ground_truth"]
 
-            # Manual garbage collection for heavy data
-            del (
-                predictions,
-                candidates_local,
-                eval_batch,
-                binary_relevance,
-                discounted_relevance,
-                valid_users,
+                # Mask seen items
+                predictions[train_batch.nonzero()] = -torch.inf
+
+            elif strategy == "sampled":
+                # Mask seen items
+                predictions[candidates == padding_idx] = -torch.inf
+
+                # Initialize the GT tensor
+                eval_batch = torch.zeros_like(predictions)
+                num_pos_cols = positives.shape[1]
+
+                # Construct the GT based on the positives
+                eval_batch[:, :num_pos_cols] = 1.0
+                mask_padding = positives == padding_idx
+                eval_batch[:, :num_pos_cols][mask_padding] = 0.0
+
+            # Metric computation
+            self._compute_metrics_step(
+                predictions=predictions,
+                eval_batch=eval_batch,
+                user_indices=user_indices,
+                candidates=candidates if strategy == "sampled" else None,
             )
-            if "top_k_values_full" in locals():
-                del top_k_values_full, top_k_indices_full, top_k_values, top_k_indices
-            if "precomputed_blocks" in locals():
-                del precomputed_blocks
-            if "batch" in locals():
-                del batch
-            if torch.cuda.is_available():
-                torch.cuda.empty_cache()
 
         if verbose:
-            eval_total_time = time.time() - eval_start_time
-            frmt_eval_total_time = time.strftime(
-                "%H:%M:%S", time.gmtime(eval_total_time)
+            self._log_results(eval_start_time, model.name)
+
+    def _parse_batch(self, batch: Tuple, strategy: str, device: str) -> Dict[str, Any]:
+        """Parses the batch tuple based on strategy and dimensions.
+
+        Args:
+            batch (Tuple): The batch to parse.
+            strategy (str): The strategy used for evaluation.
+            device (str): The device of the evaluation.
+
+        Returns:
+            Dict[str, Any]: Standardized dictionary of parsed parameters.
+
+        Raises:
+            ValueError: If the batch has unexpected length.
+        """
+        data = {}
+        batch = [x.to(device) for x in batch]  # type: ignore[assignment]
+
+        # Index 0 is ALWAYS user_indices
+        data["user_indices"] = batch[0]
+
+        if strategy == "full":
+            if len(batch) == 2:
+                # Standard: (users, ground_truth)
+                data["ground_truth"] = batch[1]
+            elif len(batch) == 3:
+                # Contextual: (users, target_item, context)
+                data["target_item"] = batch[1]
+                data["context"] = batch[2]
+            else:
+                raise ValueError(
+                    f"Unexpected batch size {len(batch)} for Full strategy"
+                )
+
+        elif strategy == "sampled":
+            if len(batch) == 3:
+                # Standard Sampled: (users, positives, negatives)
+                data["positives"] = batch[1]
+                data["negatives"] = batch[2]
+
+            elif len(batch) == 4:
+                # Contextual Sampled: (users, positives, negatives, context)
+                data["positives"] = batch[1]
+                data["negatives"] = batch[2]
+                data["context"] = batch[3]
+            else:
+                raise ValueError(
+                    f"Unexpected batch size {len(batch)} for Sampled strategy"
+                )
+
+        return data
+
+    def _compute_metrics_step(self, predictions, eval_batch, user_indices, candidates):
+        """Helper to isolate metric update logic."""
+
+        # Pre-compute metric blocks (Optimization)
+        precomputed_blocks: Dict[int, Dict[str, Tensor]] = {
+            k: {} for k in self.k_values
+        }
+        all_required_blocks = set()
+        for k in self.k_values:
+            all_required_blocks.update(self.required_blocks.get(k, set()))
+
+        # Relevance Computation
+        binary_relevance = (
+            BaseMetric.binary_relevance(eval_batch)
+            if MetricBlock.BINARY_RELEVANCE in all_required_blocks
+            else None
+        )
+        discounted_relevance = (
+            BaseMetric.discounted_relevance(eval_batch)
+            if MetricBlock.DISCOUNTED_RELEVANCE in all_required_blocks
+            else None
+        )
+
+        # Top-K Computation (Once for max K)
+        if self.k_values and any(
+            b in all_required_blocks
+            for b in [
+                MetricBlock.TOP_K_VALUES,
+                MetricBlock.TOP_K_INDICES,
+                MetricBlock.TOP_K_BINARY_RELEVANCE,
+                MetricBlock.TOP_K_DISCOUNTED_RELEVANCE,
+            ]
+        ):
+            max_k = max(self.k_values)
+            top_k_values_full, top_k_indices_full = BaseMetric.top_k_values_indices(
+                predictions, max_k
             )
-            logger.positive(
-                f"Evaluation completed for model {model.name}. "
-                f"Evaluation process took: {frmt_eval_total_time}"
-            )
+
+            for k in self.k_values:
+                required = self.required_blocks.get(k, set())
+
+                # Slicing
+                top_k_indices = top_k_indices_full[:, :k]
+                precomputed_blocks[k][f"top_{k}_values"] = top_k_values_full[:, :k]
+                precomputed_blocks[k][f"top_{k}_indices"] = top_k_indices
+
+                # Gathering Relevance
+                if MetricBlock.TOP_K_BINARY_RELEVANCE in required:
+                    precomputed_blocks[k][f"top_{k}_binary_relevance"] = (
+                        BaseMetric.top_k_relevance_from_indices(
+                            binary_relevance, top_k_indices
+                        )
+                    )
+
+                if MetricBlock.TOP_K_DISCOUNTED_RELEVANCE in required:
+                    precomputed_blocks[k][f"top_{k}_discounted_relevance"] = (
+                        BaseMetric.top_k_relevance_from_indices(
+                            discounted_relevance, top_k_indices
+                        )
+                    )
+
+        # Update Metrics
+        for k, metric_instances in self.metrics.items():
+            for metric in metric_instances:
+                update_kwargs = {
+                    "ground": eval_batch,
+                    "binary_relevance": binary_relevance,
+                    "discounted_relevance": discounted_relevance,
+                    "user_indices": user_indices,
+                    "item_indices": candidates,  # None for Full, Tensor for Sampled
+                    **precomputed_blocks[k],
+                }
+                metric.update(predictions, **update_kwargs)
+
+    def _log_results(self, start_time, model_name):
+        eval_total_time = time.time() - start_time
+        frmt_time = time.strftime("%H:%M:%S", time.gmtime(eval_total_time))
+        logger.positive(
+            f"Evaluation completed for model {model_name}. Time: {frmt_time}"
+        )
 
     def reset_metrics(self):
         """Reset all metrics accumulated values."""
