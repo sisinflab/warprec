@@ -9,6 +9,7 @@ Recommenders
    :maxdepth: 2
 
    general
+   context
    sequential
    proxy
    guide/index
