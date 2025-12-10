@@ -189,6 +189,7 @@ def main(args: Namespace):
         # Retrieve appropriate evaluation dataloader
         dataloader = retrieve_evaluation_dataloader(
             dataset=main_dataset,
+            model=best_model,
             strategy=config.evaluation.strategy,
             num_negatives=config.evaluation.num_negatives,
         )

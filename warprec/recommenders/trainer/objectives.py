@@ -127,13 +127,6 @@ def objective_function(
     else:
         dataset = dataset_folds
 
-    # Retrieve appropriate evaluation dataloader
-    dataloader = retrieve_evaluation_dataloader(
-        dataset=dataset,
-        strategy=strategy,
-        num_negatives=num_negatives,
-    )
-
     # Initialize the Evaluator for current Trial
     evaluator = Evaluator(
         metrics,
@@ -174,6 +167,15 @@ def objective_function(
             block_size=block_size,
         )
         model.to(device)
+
+        # Retrieve appropriate evaluation dataloader
+        dataloader = retrieve_evaluation_dataloader(
+            dataset=dataset,
+            model=model,
+            strategy=strategy,
+            num_negatives=num_negatives,
+        )
+
         if isinstance(model, IterativeRecommender):
             # Proceed with standard training loop
             train_dataloader = model.get_dataloader(
@@ -399,6 +401,7 @@ def objective_function_ddp(config: dict) -> None:
     # Prepare the evaluation dataloader
     eval_dataloader = retrieve_evaluation_dataloader(
         dataset=dataset,
+        model=unwrapped_model,
         strategy=config["strategy"],
         num_negatives=config["num_negatives"],
     )
