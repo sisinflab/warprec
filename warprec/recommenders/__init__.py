@@ -1,6 +1,9 @@
+from . import collaborative_filtering_recommender
+from . import content_based_recommender
 from . import context_aware_recommender
-from . import general_recommender
+from . import hybrid_recommender
 from . import sequential_recommender
+from . import unpersonalized_recommender
 from . import trainer
 from . import lr_scheduler_wrapper
 from .base_recommender import (
@@ -16,9 +19,12 @@ from .similarities import Similarity
 from .loops import train_loop
 
 __all__ = [
+    "collaborative_filtering_recommender",
+    "content_based_recommender",
     "context_aware_recommender",
-    "general_recommender",
+    "hybrid_recommender",
     "sequential_recommender",
+    "unpersonalized_recommender",
     "trainer",
     "lr_scheduler_wrapper",
     "Recommender",

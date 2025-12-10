@@ -12,7 +12,9 @@ from warprec.recommenders.base_recommender import (
     IterativeRecommender,
 )
 from warprec.recommenders.losses import EmbLoss
-from warprec.recommenders.general_recommender.graph_based import GraphRecommenderUtils
+from warprec.recommenders.collaborative_filtering_recommender.graph_based import (
+    GraphRecommenderUtils,
+)
 from warprec.utils.enums import DataLoaderType
 from warprec.utils.registry import model_registry
 

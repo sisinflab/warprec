@@ -7,7 +7,9 @@ from torch import nn, Tensor
 
 from warprec.data.entities import Interactions, Sessions
 from warprec.recommenders.base_recommender import IterativeRecommender
-from warprec.recommenders.general_recommender.graph_based import GraphRecommenderUtils
+from warprec.recommenders.collaborative_filtering_recommender.graph_based import (
+    GraphRecommenderUtils,
+)
 from warprec.recommenders.losses import BPRLoss, EmbLoss
 from warprec.utils.enums import DataLoaderType
 from warprec.utils.registry import model_registry

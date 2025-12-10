@@ -101,7 +101,7 @@ class SparseDropout(nn.Module):
 
     def __init__(self, p: float):
         super().__init__()
-        if not (0 <= p <= 1):
+        if not 0 <= p <= 1:
             raise ValueError(
                 f"Dropout probability has to be between 0 and 1, but got {p}"
             )
