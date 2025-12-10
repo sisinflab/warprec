@@ -29,6 +29,24 @@ Factorization-Based context models extend standard matrix factorization techniqu
         learning_rate: 0.001
         neg_samples: 2
 
+- NFM (Neural Factorization Machines):
+    An extension of Factorization Machines that seamlessly combines the linearity of FM in modeling second-order feature interactions and the non-linearity of neural networks in modeling higher-order feature interactions.
+    It replaces the standard second-order interaction term of FM with a "Bi-Interaction Pooling" layer followed by a Multi-Layer Perceptron (MLP).
+    This allows the model to capture more complex and non-linear dependencies between users, items, and context features. **This model requires contextual information to function properly.**
+
+.. code-block:: yaml
+
+    models:
+      NFM:
+        embedding_size: 64
+        mlp_hidden_size: [64, 32]
+        dropout: 0.3
+        reg_weight: 0.001
+        batch_size: 2048
+        epochs: 200
+        learning_rate: 0.001
+        neg_samples: 2
+
 ===============================
 Summary of Available Context-Aware Models
 ===============================
@@ -43,3 +61,6 @@ Summary of Available Context-Aware Models
    * - Factorization-Based
      - FM
      - Factorization Machine modeling second-order interactions between user, item, and context.
+   * - Factorization-Based
+     - NFM
+     - Neural Factorization Machine using MLP to model higher-order interactions between features.

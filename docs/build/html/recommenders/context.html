@@ -345,6 +345,27 @@ It is particularly effective for sparse datasets with many categorical context f
 <span class="w">    </span><span class="nt">neg_samples</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">2</span>
 </pre></div>
 </div>
+<ul class="simple">
+<li><dl class="simple">
+<dt>NFM (Neural Factorization Machines):</dt><dd><p>An extension of Factorization Machines that seamlessly combines the linearity of FM in modeling second-order feature interactions and the non-linearity of neural networks in modeling higher-order feature interactions.
+It replaces the standard second-order interaction term of FM with a “Bi-Interaction Pooling” layer followed by a Multi-Layer Perceptron (MLP).
+This allows the model to capture more complex and non-linear dependencies between users, items, and context features. <strong>This model requires contextual information to function properly.</strong></p>
+</dd>
+</dl>
+</li>
+</ul>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">models</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">NFM</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">embedding_size</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">64</span>
+<span class="w">    </span><span class="nt">mlp_hidden_size</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">64</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">32</span><span class="p p-Indicator">]</span>
+<span class="w">    </span><span class="nt">dropout</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0.3</span>
+<span class="w">    </span><span class="nt">reg_weight</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0.001</span>
+<span class="w">    </span><span class="nt">batch_size</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">2048</span>
+<span class="w">    </span><span class="nt">epochs</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">200</span>
+<span class="w">    </span><span class="nt">learning_rate</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0.001</span>
+<span class="w">    </span><span class="nt">neg_samples</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">2</span>
+</pre></div>
+</div>
 </section>
 <section id="summary-of-available-context-aware-models">
 <h2>Summary of Available Context-Aware Models<a class="headerlink" href="#summary-of-available-context-aware-models" title="Link to this heading">¶</a></h2>
@@ -365,6 +386,10 @@ It is particularly effective for sparse datasets with many categorical context f
 <tr class="row-even"><td><p>Factorization-Based</p></td>
 <td><p>FM</p></td>
 <td><p>Factorization Machine modeling second-order interactions between user, item, and context.</p></td>
+</tr>
+<tr class="row-odd"><td><p>Factorization-Based</p></td>
+<td><p>NFM</p></td>
+<td><p>Neural Factorization Machine using MLP to model higher-order interactions between features.</p></td>
 </tr>
 </tbody>
 </table>
