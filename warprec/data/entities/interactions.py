@@ -359,13 +359,7 @@ class Interactions:
 
         pos_users = torch.from_numpy(pos_users_np)
         pos_items = torch.from_numpy(pos_items_np)
-
-        if self.rating_type == RatingType.EXPLICIT:
-            pos_ratings = torch.tensor(
-                self._inter_df[self._rating_label].values, dtype=torch.float
-            )
-        else:
-            pos_ratings = torch.ones(len(pos_users), dtype=torch.float)
+        pos_ratings = torch.ones(len(pos_users), dtype=torch.float)
 
         # Extract positive context data if flagged
         pos_contexts = None
