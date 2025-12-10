@@ -167,7 +167,7 @@ class LAUC(TopKMetric):
         )  # [batch_size]
         auc_tensor = auc_matrix.sum(dim=1)  # [batch_size]
 
-        # Safe division in case of 0 in
+        # Safe division in case of 0 in normalization
         users_score = (auc_tensor / normalization).nan_to_num(0)
 
         if self.compute_per_user:
