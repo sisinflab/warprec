@@ -250,11 +250,7 @@ class SampledContextualEvaluationDataset(TorchDataset):
         )
 
 
-class BaseEvaluationDataLoader(DataLoader):
-    """Base evaluation dataloader interface used in WarpRec evaluation."""
-
-
-class EvaluationDataLoader(BaseEvaluationDataLoader):
+class EvaluationDataLoader(DataLoader):
     """
     Output Batch: (user_indices, ground_truths)
     """
@@ -271,7 +267,7 @@ class EvaluationDataLoader(BaseEvaluationDataLoader):
         super().__init__(dataset, batch_size=batch_size, shuffle=False, **kwargs)
 
 
-class ContextualEvaluationDataLoader(BaseEvaluationDataLoader):
+class ContextualEvaluationDataLoader(DataLoader):
     """
     Output Batch: (user_indices, target_items, contexts)
     """
@@ -294,7 +290,7 @@ class ContextualEvaluationDataLoader(BaseEvaluationDataLoader):
         super().__init__(dataset, batch_size=batch_size, shuffle=False, **kwargs)
 
 
-class SampledEvaluationDataLoader(BaseEvaluationDataLoader):
+class SampledEvaluationDataLoader(DataLoader):
     """
     Output Batch: (user_indices, pos_items, neg_items)
     """
@@ -348,7 +344,7 @@ class SampledEvaluationDataLoader(BaseEvaluationDataLoader):
         return user_indices_tensor, positives_padded, negatives_padded
 
 
-class SampledContextualEvaluationDataLoader(BaseEvaluationDataLoader):
+class SampledContextualEvaluationDataLoader(DataLoader):
     """
     Output Batch: (user_indices, pos_items, neg_items, contexts)
     """

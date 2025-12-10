@@ -1,6 +1,5 @@
 from .dataset import Dataset
 from .eval_loaders import (
-    BaseEvaluationDataLoader,
     EvaluationDataLoader,
     ContextualEvaluationDataLoader,
     SampledEvaluationDataLoader,
@@ -14,7 +13,6 @@ from .filtering import Filter, apply_filtering
 
 __all__ = [
     "Dataset",
-    "BaseEvaluationDataLoader",
     "EvaluationDataLoader",
     "ContextualEvaluationDataLoader",
     "SampledEvaluationDataLoader",
