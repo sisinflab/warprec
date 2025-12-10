@@ -3,10 +3,10 @@
   <head><meta charset="utf-8"/>
     <meta name="viewport" content="width=device-width,initial-scale=1"/>
     <meta name="color-scheme" content="light dark"><meta name="viewport" content="width=device-width, initial-scale=1" />
-<link rel="index" title="Index" href="../genindex.html" /><link rel="search" title="Search" href="../search.html" /><link rel="next" title="Implementation Guide" href="guide/index.html" /><link rel="prev" title="Sequential Recommenders" href="sequential.html" />
+<link rel="index" title="Index" href="../genindex.html" /><link rel="search" title="Search" href="../search.html" /><link rel="next" title="Context-Aware Recommenders" href="context.html" /><link rel="prev" title="Content Based Recommenders" href="content.html" />
 
     <!-- Generated with Sphinx 8.2.3 and Furo 2025.07.19 -->
-        <title>Proxy Recommender - WarpRec</title>
+        <title>Hybrid Recommenders - WarpRec</title>
       <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=d111a655" />
     <link rel="stylesheet" type="text/css" href="../_static/styles/furo.css?v=25af2a20" />
     <link rel="stylesheet" type="text/css" href="../_static/styles/furo-extensions.css?v=8dab3a3b" />
@@ -178,7 +178,7 @@
           <svg class="theme-icon-when-light"><use href="#svg-sun"></use></svg>
         </button>
       </div>
-      <label class="toc-overlay-icon toc-header-icon no-toc" for="__toc">
+      <label class="toc-overlay-icon toc-header-icon" for="__toc">
         <div class="visually-hidden">Toggle table of contents sidebar</div>
         <i class="icon"><svg><use href="#svg-toc"></use></svg></i>
       </label>
@@ -221,10 +221,10 @@
 <li class="toctree-l1 current has-children"><a class="reference internal" href="index.html">Recommenders</a><input checked="" class="toctree-checkbox" id="toctree-checkbox-3" name="toctree-checkbox-3" role="switch" type="checkbox"/><label for="toctree-checkbox-3"><div class="visually-hidden">Toggle navigation of Recommenders</div><i class="icon"><svg><use href="#svg-arrow-right"></use></svg></i></label><ul class="current">
 <li class="toctree-l2"><a class="reference internal" href="collaborative.html">General Recommenders</a></li>
 <li class="toctree-l2"><a class="reference internal" href="content.html">Content Based Recommenders</a></li>
-<li class="toctree-l2"><a class="reference internal" href="hybrid.html">Hybrid Recommenders</a></li>
+<li class="toctree-l2 current current-page"><a class="current reference internal" href="#">Hybrid Recommenders</a></li>
 <li class="toctree-l2"><a class="reference internal" href="context.html">Context-Aware Recommenders</a></li>
 <li class="toctree-l2"><a class="reference internal" href="sequential.html">Sequential Recommenders</a></li>
-<li class="toctree-l2 current current-page"><a class="current reference internal" href="#">Proxy Recommender</a></li>
+<li class="toctree-l2"><a class="reference internal" href="proxy.html">Proxy Recommender</a></li>
 <li class="toctree-l2 has-children"><a class="reference internal" href="guide/index.html">Implementation Guide</a><input class="toctree-checkbox" id="toctree-checkbox-4" name="toctree-checkbox-4" role="switch" type="checkbox"/><label for="toctree-checkbox-4"><div class="visually-hidden">Toggle navigation of Implementation Guide</div><i class="icon"><svg><use href="#svg-arrow-right"></use></svg></i></label><ul>
 <li class="toctree-l3"><a class="reference internal" href="guide/classic.html">Classic Recommender Guide</a></li>
 <li class="toctree-l3"><a class="reference internal" href="guide/iterative.html">Iterative Recommender Guide</a></li>
@@ -298,7 +298,7 @@
         </a>
         <div class="content-icon-container">
           <div class="view-this-page">
-  <a class="muted-link" href="../_sources/recommenders/proxy.rst.txt" title="View this page">
+  <a class="muted-link" href="../_sources/recommenders/hybrid.rst.txt" title="View this page">
     <svg><use href="#svg-eye"></use></svg>
     <span class="visually-hidden">View this page</span>
   </a>
@@ -312,21 +312,102 @@
               <svg class="theme-icon-when-light"><use href="#svg-sun"></use></svg>
             </button>
           </div>
-          <label class="toc-overlay-icon toc-content-icon no-toc" for="__toc">
+          <label class="toc-overlay-icon toc-content-icon" for="__toc">
             <div class="visually-hidden">Toggle table of contents sidebar</div>
             <i class="icon"><svg><use href="#svg-toc"></use></svg></i>
           </label>
         </div>
         <article role="main" id="furo-main-content">
-          <section id="proxy-recommender">
-<h1>Proxy Recommender<a class="headerlink" href="#proxy-recommender" title="Link to this heading">¶</a></h1>
-<p>The <strong>Proxy Recommender</strong> is a flexible evaluation component designed to assess recommendation outputs produced by external frameworks.
-It operates exclusively in a <strong>local context</strong> and is <strong>incompatible with the Ray-based training module</strong>, requiring execution within a <strong>custom evaluation pipeline</strong>.</p>
-<p>Users can either run the provided sample script or implement their own evaluation logic by directly interfacing with the Proxy Recommender.
-This design enables seamless integration of third-party recommendation results into the framework’s evaluation workflow.</p>
-<p>To implement your custom script you can follow the documentation regarding <a class="reference internal" href="../scripting/index.html#scripting"><span class="std std-ref">Scripting</span></a>.
-WarpRec also provides a sample script located at <em>sample_pipelines/proxy_evaluation.py</em> that the user can use as-is or modify to fit their needs.</p>
-<p>Work in progress.</p>
+          <section id="hybrid-recommenders">
+<h1>Hybrid Recommenders<a class="headerlink" href="#hybrid-recommenders" title="Link to this heading">¶</a></h1>
+<p>The <strong>Hybrid Recommenders</strong> module of WarpRec contains models that combine collaborative filtering signals with side information (content).
+By leveraging both user-item interactions and item/user attributes, these models aim to overcome limitations such as data sparsity and the cold-start problem, providing more robust recommendations than pure collaborative or pure content-based approaches.</p>
+<p>In the following sections, you will find the list of available hybrid models within WarpRec, together with their respective parameters.</p>
+<section id="hybrid-autoencoders">
+<h2>Hybrid Autoencoders<a class="headerlink" href="#hybrid-autoencoders" title="Link to this heading">¶</a></h2>
+<p>Hybrid Autoencoders extend standard autoencoder architectures by injecting side information into the learning process. This allows the model to reconstruct interactions not just based on historical data, but also influenced by item or user features.</p>
+<ul class="simple">
+<li><p>AddEASE:
+An extension of the EASE model using side information. It solves two linear problems, increasing the complexity of the underlying task. <strong>This model requires side information to function properly</strong>.</p></li>
+</ul>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">models</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">AddEASE</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">l2</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">10</span>
+<span class="w">    </span><span class="nt">alpha</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0.1</span>
+</pre></div>
+</div>
+<ul class="simple">
+<li><p>CEASE:
+An extension of the EASE model using side information. Extends the EASE problem without adding more complexity. <strong>This model requires side information to function properly</strong>.</p></li>
+</ul>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">models</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">CEASE</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">l2</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">10</span>
+<span class="w">    </span><span class="nt">alpha</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0.1</span>
+</pre></div>
+</div>
+</section>
+<section id="hybrid-knn">
+<h2>Hybrid KNN<a class="headerlink" href="#hybrid-knn" title="Link to this heading">¶</a></h2>
+<p>Hybrid KNN models enhance standard Nearest Neighbor approaches by incorporating content data into the similarity computation. Instead of relying solely on interaction overlap, these models use attributes to find similar items or users.</p>
+<ul class="simple">
+<li><p>AttributeItemKNN:
+An item-based KNN variant that incorporates item content to compute similarities. <strong>This model requires side information to function properly</strong>.</p></li>
+</ul>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">models</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">AttributeItemKNN</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">k</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">10</span>
+<span class="w">    </span><span class="nt">similarity</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">cosine</span>
+</pre></div>
+</div>
+<ul class="simple">
+<li><p>AttributeUserKNN:
+A user-based KNN model that uses content-based profiles (e.g., TF-IDF) to define user similarity. <strong>This model requires side information to function properly</strong>.</p></li>
+</ul>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">models</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">AttributeUserKNN</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">k</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">10</span>
+<span class="w">    </span><span class="nt">similarity</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">cosine</span>
+<span class="w">    </span><span class="nt">user_profile</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">tfidf</span>
+</pre></div>
+</div>
+</section>
+<section id="summary-of-available-hybrid-models">
+<h2>Summary of Available Hybrid Models<a class="headerlink" href="#summary-of-available-hybrid-models" title="Link to this heading">¶</a></h2>
+<div class="table-wrapper colwidths-given docutils container">
+<table class="docutils align-default">
+<colgroup>
+<col style="width: 20.0%" />
+<col style="width: 20.0%" />
+<col style="width: 60.0%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>Category</p></th>
+<th class="head"><p>Model</p></th>
+<th class="head"><p>Description</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>Hybrid Autoencoders</p></td>
+<td><p>AddEASE</p></td>
+<td><p>EASE extension solving two linear problems to incorporate side info.</p></td>
+</tr>
+<tr class="row-odd"><td></td>
+<td><p>CEASE</p></td>
+<td><p>EASE extension incorporating side info without added complexity.</p></td>
+</tr>
+<tr class="row-even"><td><p>Hybrid KNN</p></td>
+<td><p>AttributeItemKNN</p></td>
+<td><p>Item-based KNN using content features for similarity.</p></td>
+</tr>
+<tr class="row-odd"><td></td>
+<td><p>AttributeUserKNN</p></td>
+<td><p>User-based KNN using content-derived user profiles.</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+</section>
 </section>
 
         </article>
@@ -334,23 +415,23 @@ WarpRec also provides a sample script located at <em>sample_pipelines/proxy_eval
       <footer>
 
         <div class="related-pages">
-          <a class="next-page" href="guide/index.html">
+          <a class="next-page" href="context.html">
               <div class="page-info">
                 <div class="context">
                   <span>Next</span>
                 </div>
-                <div class="title">Implementation Guide</div>
+                <div class="title">Context-Aware Recommenders</div>
               </div>
               <svg class="furo-related-icon"><use href="#svg-arrow-right"></use></svg>
             </a>
-          <a class="prev-page" href="sequential.html">
+          <a class="prev-page" href="content.html">
               <svg class="furo-related-icon"><use href="#svg-arrow-right"></use></svg>
               <div class="page-info">
                 <div class="context">
                   <span>Previous</span>
                 </div>
 
-                <div class="title">Sequential Recommenders</div>
+                <div class="title">Content Based Recommenders</div>
 
               </div>
             </a>
@@ -372,8 +453,29 @@ WarpRec also provides a sample script located at <em>sample_pipelines/proxy_eval
 
       </footer>
     </div>
-    <aside class="toc-drawer no-toc">
+    <aside class="toc-drawer">
 
+
+      <div class="toc-sticky toc-scroll">
+        <div class="toc-title-container">
+          <span class="toc-title">
+            On this page
+          </span>
+        </div>
+        <div class="toc-tree-container">
+          <div class="toc-tree">
+            <ul>
+<li><a class="reference internal" href="#">Hybrid Recommenders</a><ul>
+<li><a class="reference internal" href="#hybrid-autoencoders">Hybrid Autoencoders</a></li>
+<li><a class="reference internal" href="#hybrid-knn">Hybrid KNN</a></li>
+<li><a class="reference internal" href="#summary-of-available-hybrid-models">Summary of Available Hybrid Models</a></li>
+</ul>
+</li>
+</ul>
+
+          </div>
+        </div>
+      </div>
 
 
     </aside>

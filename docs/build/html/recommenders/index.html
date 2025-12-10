@@ -3,7 +3,7 @@
   <head><meta charset="utf-8"/>
     <meta name="viewport" content="width=device-width,initial-scale=1"/>
     <meta name="color-scheme" content="light dark"><meta name="viewport" content="width=device-width, initial-scale=1" />
-<link rel="index" title="Index" href="../genindex.html" /><link rel="search" title="Search" href="../search.html" /><link rel="next" title="General Recommenders" href="general.html" /><link rel="prev" title="General Configuration" href="../configuration/general.html" />
+<link rel="index" title="Index" href="../genindex.html" /><link rel="search" title="Search" href="../search.html" /><link rel="next" title="General Recommenders" href="collaborative.html" /><link rel="prev" title="General Configuration" href="../configuration/general.html" />
 
     <!-- Generated with Sphinx 8.2.3 and Furo 2025.07.19 -->
         <title>Recommenders - WarpRec</title>
@@ -219,7 +219,9 @@
 <p class="caption" role="heading"><span class="caption-text">CORE</span></p>
 <ul class="current">
 <li class="toctree-l1 current has-children current-page"><a class="current reference internal" href="#">Recommenders</a><input checked="" class="toctree-checkbox" id="toctree-checkbox-3" name="toctree-checkbox-3" role="switch" type="checkbox"/><label for="toctree-checkbox-3"><div class="visually-hidden">Toggle navigation of Recommenders</div><i class="icon"><svg><use href="#svg-arrow-right"></use></svg></i></label><ul>
-<li class="toctree-l2"><a class="reference internal" href="general.html">General Recommenders</a></li>
+<li class="toctree-l2"><a class="reference internal" href="collaborative.html">General Recommenders</a></li>
+<li class="toctree-l2"><a class="reference internal" href="content.html">Content Based Recommenders</a></li>
+<li class="toctree-l2"><a class="reference internal" href="hybrid.html">Hybrid Recommenders</a></li>
 <li class="toctree-l2"><a class="reference internal" href="context.html">Context-Aware Recommenders</a></li>
 <li class="toctree-l2"><a class="reference internal" href="sequential.html">Sequential Recommenders</a></li>
 <li class="toctree-l2"><a class="reference internal" href="proxy.html">Proxy Recommender</a></li>
@@ -322,11 +324,6 @@
 </div>
 <p>WarpRec provides a comprehensive collection of <strong>built-in recommender algorithms</strong>, covering both classical and state-of-the-art approaches widely used in the recommendation systems domain.
 These models are designed to be <strong>ready-to-use</strong>, serving as a strong baseline for experimentation, benchmarking, and real-world deployment.</p>
-<p>The available recommenders are organized into two main categories, reflecting different modeling paradigms:</p>
-<ul class="simple">
-<li><p><strong>General Recommenders</strong>: These models are versatile and can be applied to a wide range of recommendation tasks. They include algorithms like Matrix Factorization, Neural Collaborative Filtering, and more.</p></li>
-<li><p><strong>Sequential Recommenders</strong>: Designed to capture the temporal dynamics of user behavior, these models focus on the order of interactions. Examples include Recurrent Neural Networks (RNNs) and Transformer-based architectures.</p></li>
-</ul>
 <p>All built-in models are implemented with a focus on <strong>efficiency and scalability</strong>, leveraging <strong>WarpRec’s optimized training backend</strong> to support large-scale datasets and high-performance execution.
 Users can flexibly configure architectures and hyperparameters, making it straightforward to adapt each model to specific recommendation scenarios.</p>
 <p>Furthermore, WarpRec’s <strong>modular design</strong> makes it easy to extend the framework with <strong>custom recommenders</strong>. By inheriting from the provided base classes and reusing existing components (e.g., interaction handlers, loss modules, evaluation pipelines), researchers and practitioners can rapidly prototype new algorithms while maintaining integration with the training and evaluation ecosystem.</p>
@@ -338,7 +335,7 @@ Users can flexibly configure architectures and hyperparameters, making it straig
       <footer>
 
         <div class="related-pages">
-          <a class="next-page" href="general.html">
+          <a class="next-page" href="collaborative.html">
               <div class="page-info">
                 <div class="context">
                   <span>Next</span>

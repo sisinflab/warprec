@@ -3,10 +3,10 @@
   <head><meta charset="utf-8"/>
     <meta name="viewport" content="width=device-width,initial-scale=1"/>
     <meta name="color-scheme" content="light dark"><meta name="viewport" content="width=device-width, initial-scale=1" />
-<link rel="index" title="Index" href="../genindex.html" /><link rel="search" title="Search" href="../search.html" /><link rel="next" title="Implementation Guide" href="guide/index.html" /><link rel="prev" title="Sequential Recommenders" href="sequential.html" />
+<link rel="index" title="Index" href="../genindex.html" /><link rel="search" title="Search" href="../search.html" /><link rel="next" title="Hybrid Recommenders" href="hybrid.html" /><link rel="prev" title="General Recommenders" href="collaborative.html" />
 
     <!-- Generated with Sphinx 8.2.3 and Furo 2025.07.19 -->
-        <title>Proxy Recommender - WarpRec</title>
+        <title>Content Based Recommenders - WarpRec</title>
       <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=d111a655" />
     <link rel="stylesheet" type="text/css" href="../_static/styles/furo.css?v=25af2a20" />
     <link rel="stylesheet" type="text/css" href="../_static/styles/furo-extensions.css?v=8dab3a3b" />
@@ -178,7 +178,7 @@
           <svg class="theme-icon-when-light"><use href="#svg-sun"></use></svg>
         </button>
       </div>
-      <label class="toc-overlay-icon toc-header-icon no-toc" for="__toc">
+      <label class="toc-overlay-icon toc-header-icon" for="__toc">
         <div class="visually-hidden">Toggle table of contents sidebar</div>
         <i class="icon"><svg><use href="#svg-toc"></use></svg></i>
       </label>
@@ -220,11 +220,11 @@
 <ul class="current">
 <li class="toctree-l1 current has-children"><a class="reference internal" href="index.html">Recommenders</a><input checked="" class="toctree-checkbox" id="toctree-checkbox-3" name="toctree-checkbox-3" role="switch" type="checkbox"/><label for="toctree-checkbox-3"><div class="visually-hidden">Toggle navigation of Recommenders</div><i class="icon"><svg><use href="#svg-arrow-right"></use></svg></i></label><ul class="current">
 <li class="toctree-l2"><a class="reference internal" href="collaborative.html">General Recommenders</a></li>
-<li class="toctree-l2"><a class="reference internal" href="content.html">Content Based Recommenders</a></li>
+<li class="toctree-l2 current current-page"><a class="current reference internal" href="#">Content Based Recommenders</a></li>
 <li class="toctree-l2"><a class="reference internal" href="hybrid.html">Hybrid Recommenders</a></li>
 <li class="toctree-l2"><a class="reference internal" href="context.html">Context-Aware Recommenders</a></li>
 <li class="toctree-l2"><a class="reference internal" href="sequential.html">Sequential Recommenders</a></li>
-<li class="toctree-l2 current current-page"><a class="current reference internal" href="#">Proxy Recommender</a></li>
+<li class="toctree-l2"><a class="reference internal" href="proxy.html">Proxy Recommender</a></li>
 <li class="toctree-l2 has-children"><a class="reference internal" href="guide/index.html">Implementation Guide</a><input class="toctree-checkbox" id="toctree-checkbox-4" name="toctree-checkbox-4" role="switch" type="checkbox"/><label for="toctree-checkbox-4"><div class="visually-hidden">Toggle navigation of Implementation Guide</div><i class="icon"><svg><use href="#svg-arrow-right"></use></svg></i></label><ul>
 <li class="toctree-l3"><a class="reference internal" href="guide/classic.html">Classic Recommender Guide</a></li>
 <li class="toctree-l3"><a class="reference internal" href="guide/iterative.html">Iterative Recommender Guide</a></li>
@@ -298,7 +298,7 @@
         </a>
         <div class="content-icon-container">
           <div class="view-this-page">
-  <a class="muted-link" href="../_sources/recommenders/proxy.rst.txt" title="View this page">
+  <a class="muted-link" href="../_sources/recommenders/content.rst.txt" title="View this page">
     <svg><use href="#svg-eye"></use></svg>
     <span class="visually-hidden">View this page</span>
   </a>
@@ -312,21 +312,57 @@
               <svg class="theme-icon-when-light"><use href="#svg-sun"></use></svg>
             </button>
           </div>
-          <label class="toc-overlay-icon toc-content-icon no-toc" for="__toc">
+          <label class="toc-overlay-icon toc-content-icon" for="__toc">
             <div class="visually-hidden">Toggle table of contents sidebar</div>
             <i class="icon"><svg><use href="#svg-toc"></use></svg></i>
           </label>
         </div>
         <article role="main" id="furo-main-content">
-          <section id="proxy-recommender">
-<h1>Proxy Recommender<a class="headerlink" href="#proxy-recommender" title="Link to this heading">¶</a></h1>
-<p>The <strong>Proxy Recommender</strong> is a flexible evaluation component designed to assess recommendation outputs produced by external frameworks.
-It operates exclusively in a <strong>local context</strong> and is <strong>incompatible with the Ray-based training module</strong>, requiring execution within a <strong>custom evaluation pipeline</strong>.</p>
-<p>Users can either run the provided sample script or implement their own evaluation logic by directly interfacing with the Proxy Recommender.
-This design enables seamless integration of third-party recommendation results into the framework’s evaluation workflow.</p>
-<p>To implement your custom script you can follow the documentation regarding <a class="reference internal" href="../scripting/index.html#scripting"><span class="std std-ref">Scripting</span></a>.
-WarpRec also provides a sample script located at <em>sample_pipelines/proxy_evaluation.py</em> that the user can use as-is or modify to fit their needs.</p>
-<p>Work in progress.</p>
+          <section id="content-based-recommenders">
+<h1>Content Based Recommenders<a class="headerlink" href="#content-based-recommenders" title="Link to this heading">¶</a></h1>
+<p>The <strong>Content Based Recommenders</strong> module of WarpRec focuses on generating recommendations by analyzing item attributes and comparing them with user preferences.
+These models rely on side information (e.g., tags, descriptions, metadata) to build user profiles and match them with similar items.
+They are particularly useful in cold-start scenarios or when collaborative signals are sparse.</p>
+<p>In the following sections, you will find the list of available content-based models within WarpRec, together with their respective parameters.</p>
+<section id="vector-space">
+<h2>Vector Space<a class="headerlink" href="#vector-space" title="Link to this heading">¶</a></h2>
+<p>Vector Space models represent items and users as vectors in a multi-dimensional space derived from item features. Similarity is calculated based on the geometric distance or angle between these vectors.</p>
+<ul class="simple">
+<li><p>VSM (Vector Space Model):
+A classical content-based recommender that represents items and users in a shared vector space. Items are encoded using TF-IDF or binary features, while user profiles are typically aggregated from consumed items. Recommendations are generated by computing the similarity (e.g., cosine) between user and item vectors. <strong>This model requires side information to function properly</strong>.</p></li>
+</ul>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">models</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">VSM</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">similarity</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">cosine</span>
+<span class="w">    </span><span class="nt">user_profile</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">binary</span>
+<span class="w">    </span><span class="nt">item_profile</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">tfidf</span>
+</pre></div>
+</div>
+</section>
+<section id="summary-of-available-content-models">
+<h2>Summary of Available Content Models<a class="headerlink" href="#summary-of-available-content-models" title="Link to this heading">¶</a></h2>
+<div class="table-wrapper colwidths-given docutils container">
+<table class="docutils align-default">
+<colgroup>
+<col style="width: 20.0%" />
+<col style="width: 20.0%" />
+<col style="width: 60.0%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>Category</p></th>
+<th class="head"><p>Model</p></th>
+<th class="head"><p>Description</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>Vector Space</p></td>
+<td><p>VSM</p></td>
+<td><p>Classical content-based model using TF-IDF and cosine similarity.</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+</section>
 </section>
 
         </article>
@@ -334,23 +370,23 @@ WarpRec also provides a sample script located at <em>sample_pipelines/proxy_eval
       <footer>
 
         <div class="related-pages">
-          <a class="next-page" href="guide/index.html">
+          <a class="next-page" href="hybrid.html">
               <div class="page-info">
                 <div class="context">
                   <span>Next</span>
                 </div>
-                <div class="title">Implementation Guide</div>
+                <div class="title">Hybrid Recommenders</div>
               </div>
               <svg class="furo-related-icon"><use href="#svg-arrow-right"></use></svg>
             </a>
-          <a class="prev-page" href="sequential.html">
+          <a class="prev-page" href="collaborative.html">
               <svg class="furo-related-icon"><use href="#svg-arrow-right"></use></svg>
               <div class="page-info">
                 <div class="context">
                   <span>Previous</span>
                 </div>
 
-                <div class="title">Sequential Recommenders</div>
+                <div class="title">General Recommenders</div>
 
               </div>
             </a>
@@ -372,8 +408,28 @@ WarpRec also provides a sample script located at <em>sample_pipelines/proxy_eval
 
       </footer>
     </div>
-    <aside class="toc-drawer no-toc">
+    <aside class="toc-drawer">
 
+
+      <div class="toc-sticky toc-scroll">
+        <div class="toc-title-container">
+          <span class="toc-title">
+            On this page
+          </span>
+        </div>
+        <div class="toc-tree-container">
+          <div class="toc-tree">
+            <ul>
+<li><a class="reference internal" href="#">Content Based Recommenders</a><ul>
+<li><a class="reference internal" href="#vector-space">Vector Space</a></li>
+<li><a class="reference internal" href="#summary-of-available-content-models">Summary of Available Content Models</a></li>
+</ul>
+</li>
+</ul>
+
+          </div>
+        </div>
+      </div>
 
 
     </aside>

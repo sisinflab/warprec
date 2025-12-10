@@ -3,7 +3,7 @@
   <head><meta charset="utf-8"/>
     <meta name="viewport" content="width=device-width,initial-scale=1"/>
     <meta name="color-scheme" content="light dark"><meta name="viewport" content="width=device-width, initial-scale=1" />
-<link rel="index" title="Index" href="../genindex.html" /><link rel="search" title="Search" href="../search.html" /><link rel="next" title="Context-Aware Recommenders" href="context.html" /><link rel="prev" title="Recommenders" href="index.html" />
+<link rel="index" title="Index" href="../genindex.html" /><link rel="search" title="Search" href="../search.html" /><link rel="next" title="Content Based Recommenders" href="content.html" /><link rel="prev" title="Recommenders" href="index.html" />
 
     <!-- Generated with Sphinx 8.2.3 and Furo 2025.07.19 -->
         <title>General Recommenders - WarpRec</title>
@@ -220,6 +220,8 @@
 <ul class="current">
 <li class="toctree-l1 current has-children"><a class="reference internal" href="index.html">Recommenders</a><input checked="" class="toctree-checkbox" id="toctree-checkbox-3" name="toctree-checkbox-3" role="switch" type="checkbox"/><label for="toctree-checkbox-3"><div class="visually-hidden">Toggle navigation of Recommenders</div><i class="icon"><svg><use href="#svg-arrow-right"></use></svg></i></label><ul class="current">
 <li class="toctree-l2 current current-page"><a class="current reference internal" href="#">General Recommenders</a></li>
+<li class="toctree-l2"><a class="reference internal" href="content.html">Content Based Recommenders</a></li>
+<li class="toctree-l2"><a class="reference internal" href="hybrid.html">Hybrid Recommenders</a></li>
 <li class="toctree-l2"><a class="reference internal" href="context.html">Context-Aware Recommenders</a></li>
 <li class="toctree-l2"><a class="reference internal" href="sequential.html">Sequential Recommenders</a></li>
 <li class="toctree-l2"><a class="reference internal" href="proxy.html">Proxy Recommender</a></li>
@@ -296,7 +298,7 @@
         </a>
         <div class="content-icon-container">
           <div class="view-this-page">
-  <a class="muted-link" href="../_sources/recommenders/general.rst.txt" title="View this page">
+  <a class="muted-link" href="../_sources/recommenders/collaborative.rst.txt" title="View this page">
     <svg><use href="#svg-eye"></use></svg>
     <span class="visually-hidden">View this page</span>
   </a>
@@ -353,26 +355,6 @@ A denoising autoencoder that specifically incorporates a user-specific latent ve
 </pre></div>
 </div>
 <ul class="simple">
-<li><p>AddEASE:
-An extension of the EASE model using side information. It solves two linear problems, increasing the complexity of the underlying task. <strong>This model requires side information to function properly</strong>.</p></li>
-</ul>
-<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">models</span><span class="p">:</span>
-<span class="w">  </span><span class="nt">AddEASE</span><span class="p">:</span>
-<span class="w">    </span><span class="nt">l2</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">10</span>
-<span class="w">    </span><span class="nt">alpha</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0.1</span>
-</pre></div>
-</div>
-<ul class="simple">
-<li><p>CEASE:
-An extension of the EASE model using side information. Extends the EASE problem without adding more complexity. <strong>This model requires side information to function properly</strong>.</p></li>
-</ul>
-<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">models</span><span class="p">:</span>
-<span class="w">  </span><span class="nt">CEASE</span><span class="p">:</span>
-<span class="w">    </span><span class="nt">l2</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">10</span>
-<span class="w">    </span><span class="nt">alpha</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0.1</span>
-</pre></div>
-</div>
-<ul class="simple">
 <li><p>MultiDAE (Multinomial Denoising Autoencoder):
 A deep autoencoder trained with dropout for denoising input data. Learns robust latent representations from implicit feedback using a multinomial loss.</p></li>
 </ul>
@@ -402,23 +384,6 @@ A probabilistic variant of MultiDAE that models uncertainty in user preferences 
 <span class="w">    </span><span class="nt">batch_size</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">2048</span>
 <span class="w">    </span><span class="nt">epochs</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">200</span>
 <span class="w">    </span><span class="nt">learning_rate</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0.001</span>
-</pre></div>
-</div>
-</section>
-<section id="content-based">
-<h2>Content Based<a class="headerlink" href="#content-based" title="Link to this heading">¶</a></h2>
-<p>Content-based models generate recommendations by analyzing item attributes and comparing them with user preferences.
-These models rely on side information (e.g., tags, descriptions, metadata) to build user profiles and match them with similar items.
-They are particularly useful in cold-start scenarios or when collaborative signals are sparse.</p>
-<ul class="simple">
-<li><p>VSM (Vector Space Model):
-A classical content-based recommender that represents items and users in a shared vector space. Items are encoded using TF-IDF or binary features, while user profiles are typically aggregated from consumed items. Recommendations are generated by computing the similarity (e.g., cosine) between user and item vectors. <strong>This model requires side information to function properly</strong>.</p></li>
-</ul>
-<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">models</span><span class="p">:</span>
-<span class="w">  </span><span class="nt">VSM</span><span class="p">:</span>
-<span class="w">    </span><span class="nt">similarity</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">cosine</span>
-<span class="w">    </span><span class="nt">user_profile</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">binary</span>
-<span class="w">    </span><span class="nt">item_profile</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">tfidf</span>
 </pre></div>
 </div>
 </section>
@@ -538,16 +503,6 @@ A collaborative item-based KNN model that recommends items similar to those the 
 </pre></div>
 </div>
 <ul class="simple">
-<li><p>AttributeItemKNN:
-An item-based KNN variant that incorporates item content to compute similarities.</p></li>
-</ul>
-<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">models</span><span class="p">:</span>
-<span class="w">  </span><span class="nt">AttributeItemKNN</span><span class="p">:</span>
-<span class="w">    </span><span class="nt">k</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">10</span>
-<span class="w">    </span><span class="nt">similarity</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">cosine</span>
-</pre></div>
-</div>
-<ul class="simple">
 <li><p>UserKNN:
 A collaborative user-based KNN model that recommends items liked by similar users.</p></li>
 </ul>
@@ -555,17 +510,6 @@ A collaborative user-based KNN model that recommends items liked by similar user
 <span class="w">  </span><span class="nt">UserKNN</span><span class="p">:</span>
 <span class="w">    </span><span class="nt">k</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">10</span>
 <span class="w">    </span><span class="nt">similarity</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">cosine</span>
-</pre></div>
-</div>
-<ul class="simple">
-<li><p>AttributeUserKNN:
-A user-based KNN model that uses content-based profiles (e.g., TF-IDF) to define user similarity.</p></li>
-</ul>
-<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">models</span><span class="p">:</span>
-<span class="w">  </span><span class="nt">AttributeUserKNN</span><span class="p">:</span>
-<span class="w">    </span><span class="nt">k</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">10</span>
-<span class="w">    </span><span class="nt">similarity</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">cosine</span>
-<span class="w">    </span><span class="nt">user_profile</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">tfidf</span>
 </pre></div>
 </div>
 </section>
@@ -670,26 +614,6 @@ Combines Generalized Matrix Factorization (GMF) with a Multi-Layer Perceptron (M
 </pre></div>
 </div>
 </section>
-<section id="unpersonalized">
-<h2>Unpersonalized<a class="headerlink" href="#unpersonalized" title="Link to this heading">¶</a></h2>
-<p>Unpersonalized models serve as simple baselines in recommender systems research. They are used to produce reference metric scores against which the performance of actual (personalized) models can be compared.</p>
-<ul class="simple">
-<li><p>Pop:
-Recommends the most popular items overall. This model helps assess whether other recommenders are biased towards popularity.</p></li>
-</ul>
-<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">models</span><span class="p">:</span>
-<span class="w">    </span><span class="nt">Pop</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">{}</span>
-</pre></div>
-</div>
-<ul class="simple">
-<li><p>Random:
-Recommends items at random. This model defines a lower bound for performance metrics, serving as a sanity check during evaluation.</p></li>
-</ul>
-<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">models</span><span class="p">:</span>
-<span class="w">    </span><span class="nt">Random</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">{}</span>
-</pre></div>
-</div>
-</section>
 <section id="summary-of-available-general-models">
 <h2>Summary of Available General Models<a class="headerlink" href="#summary-of-available-general-models" title="Link to this heading">¶</a></h2>
 <div class="table-wrapper colwidths-given docutils container">
@@ -715,14 +639,6 @@ Recommends items at random. This model defines a lower bound for performance met
 <td><p>Denoising autoencoder with user-specific latent vectors.</p></td>
 </tr>
 <tr class="row-even"><td></td>
-<td><p>AddEASE</p></td>
-<td><p>EASE with side information for improved accuracy.</p></td>
-</tr>
-<tr class="row-odd"><td></td>
-<td><p>CEASE</p></td>
-<td><p>EASE with side information for improved accuracy.</p></td>
-</tr>
-<tr class="row-even"><td></td>
 <td><p>MultiDAE</p></td>
 <td><p>Denoising autoencoder optimized for implicit data.</p></td>
 </tr>
@@ -730,81 +646,61 @@ Recommends items at random. This model defines a lower bound for performance met
 <td><p>MultiVAE</p></td>
 <td><p>Variational autoencoder modeling uncertainty in preferences.</p></td>
 </tr>
-<tr class="row-even"><td><p>Content Based</p></td>
-<td><p>VSM</p></td>
-<td><p>Classical content-based model using TF-IDF and cosine similarity.</p></td>
-</tr>
-<tr class="row-odd"><td><p>Graph Based</p></td>
+<tr class="row-even"><td><p>Graph Based</p></td>
 <td><p>GCMC</p></td>
 <td><p>Graph autoencoder for explicit feedback using multi-relational convolutions.</p></td>
 </tr>
-<tr class="row-even"><td></td>
+<tr class="row-odd"><td></td>
 <td><p>LightGCN</p></td>
 <td><p>Simplified Graph convolutional neural network.</p></td>
 </tr>
-<tr class="row-odd"><td></td>
+<tr class="row-even"><td></td>
 <td><p>LightGCN++</p></td>
 <td><p>Improved LightGCN with asymmetric normalization and residual connections.</p></td>
 </tr>
-<tr class="row-even"><td></td>
+<tr class="row-odd"><td></td>
 <td><p>NGCF</p></td>
 <td><p>Complex Graph convolutional neural network.</p></td>
 </tr>
-<tr class="row-odd"><td></td>
+<tr class="row-even"><td></td>
 <td><p>RP3Beta</p></td>
 <td><p>Random walk model with popularity penalization.</p></td>
 </tr>
-<tr class="row-even"><td></td>
+<tr class="row-odd"><td></td>
 <td><p>XSimGCL</p></td>
 <td><p>Graph contrastive learning with noise perturbation.</p></td>
 </tr>
-<tr class="row-odd"><td><p>KNN</p></td>
+<tr class="row-even"><td><p>KNN</p></td>
 <td><p>ItemKNN</p></td>
 <td><p>Item-based collaborative KNN using similarity metrics.</p></td>
-</tr>
-<tr class="row-even"><td></td>
-<td><p>AttributeItemKNN</p></td>
-<td><p>Item-based KNN using content features.</p></td>
 </tr>
 <tr class="row-odd"><td></td>
 <td><p>UserKNN</p></td>
 <td><p>User-based collaborative KNN using historical interactions.</p></td>
 </tr>
-<tr class="row-even"><td></td>
-<td><p>AttributeUserKNN</p></td>
-<td><p>User-based KNN using content-derived user profiles.</p></td>
-</tr>
-<tr class="row-odd"><td><p>Latent Factor</p></td>
+<tr class="row-even"><td><p>Latent Factor</p></td>
 <td><p>ADMMSlim</p></td>
 <td><p>Sparse item similarity model optimized via ADMM.</p></td>
 </tr>
-<tr class="row-even"><td></td>
+<tr class="row-odd"><td></td>
 <td><p>BPR</p></td>
 <td><p>Pairwise ranking model for implicit feedback.</p></td>
 </tr>
-<tr class="row-odd"><td></td>
+<tr class="row-even"><td></td>
 <td><p>FISM</p></td>
 <td><p>Efficient item similarity model using weighted average as user embeddings.</p></td>
 </tr>
-<tr class="row-even"><td></td>
+<tr class="row-odd"><td></td>
 <td><p>SLIM</p></td>
 <td><p>Interpretable item similarity model with L1/L2 regularization.</p></td>
 </tr>
-<tr class="row-odd"><td><p>Neural</p></td>
+<tr class="row-even"><td><p>Neural</p></td>
 <td><p>ConvNCF</p></td>
 <td><p>Applies CNNs to user-item embeddings outer product to capture structured interaction patterns.</p></td>
 </tr>
-<tr class="row-even"><td></td>
+<tr class="row-odd"><td></td>
 <td><p>NeuMF</p></td>
 <td><p>Hybrid neural model combining GMF and MLP layers.</p></td>
-</tr>
-<tr class="row-odd"><td><p>Unpersonalized</p></td>
-<td><p>Pop</p></td>
-<td><p>Recommends popular items to all users. Baseline model.</p></td>
-</tr>
-<tr class="row-even"><td></td>
-<td><p>Random</p></td>
-<td><p>Recommends items at random. Defines a performance lower bound.</p></td>
 </tr>
 </tbody>
 </table>
@@ -817,12 +713,12 @@ Recommends items at random. This model defines a lower bound for performance met
       <footer>
 
         <div class="related-pages">
-          <a class="next-page" href="context.html">
+          <a class="next-page" href="content.html">
               <div class="page-info">
                 <div class="context">
                   <span>Next</span>
                 </div>
-                <div class="title">Context-Aware Recommenders</div>
+                <div class="title">Content Based Recommenders</div>
               </div>
               <svg class="furo-related-icon"><use href="#svg-arrow-right"></use></svg>
             </a>
@@ -869,12 +765,10 @@ Recommends items at random. This model defines a lower bound for performance met
             <ul>
 <li><a class="reference internal" href="#">General Recommenders</a><ul>
 <li><a class="reference internal" href="#autoencoders">Autoencoders</a></li>
-<li><a class="reference internal" href="#content-based">Content Based</a></li>
 <li><a class="reference internal" href="#graph-based">Graph Based</a></li>
 <li><a class="reference internal" href="#knn-k-nearest-neighbor">KNN (K Nearest Neighbor)</a></li>
 <li><a class="reference internal" href="#latent-factor">Latent Factor</a></li>
 <li><a class="reference internal" href="#neural">Neural</a></li>
-<li><a class="reference internal" href="#unpersonalized">Unpersonalized</a></li>
 <li><a class="reference internal" href="#summary-of-available-general-models">Summary of Available General Models</a></li>
 </ul>
 </li>

@@ -3,10 +3,10 @@
   <head><meta charset="utf-8"/>
     <meta name="viewport" content="width=device-width,initial-scale=1"/>
     <meta name="color-scheme" content="light dark"><meta name="viewport" content="width=device-width, initial-scale=1" />
-<link rel="index" title="Index" href="../genindex.html" /><link rel="search" title="Search" href="../search.html" /><link rel="next" title="Implementation Guide" href="guide/index.html" /><link rel="prev" title="Sequential Recommenders" href="sequential.html" />
+<link rel="index" title="Index" href="../genindex.html" /><link rel="search" title="Search" href="../search.html" />
 
     <!-- Generated with Sphinx 8.2.3 and Furo 2025.07.19 -->
-        <title>Proxy Recommender - WarpRec</title>
+        <title>Unpersonalized Recommenders - WarpRec</title>
       <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=d111a655" />
     <link rel="stylesheet" type="text/css" href="../_static/styles/furo.css?v=25af2a20" />
     <link rel="stylesheet" type="text/css" href="../_static/styles/furo-extensions.css?v=8dab3a3b" />
@@ -217,14 +217,14 @@
 </li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">CORE</span></p>
-<ul class="current">
-<li class="toctree-l1 current has-children"><a class="reference internal" href="index.html">Recommenders</a><input checked="" class="toctree-checkbox" id="toctree-checkbox-3" name="toctree-checkbox-3" role="switch" type="checkbox"/><label for="toctree-checkbox-3"><div class="visually-hidden">Toggle navigation of Recommenders</div><i class="icon"><svg><use href="#svg-arrow-right"></use></svg></i></label><ul class="current">
+<ul>
+<li class="toctree-l1 has-children"><a class="reference internal" href="index.html">Recommenders</a><input class="toctree-checkbox" id="toctree-checkbox-3" name="toctree-checkbox-3" role="switch" type="checkbox"/><label for="toctree-checkbox-3"><div class="visually-hidden">Toggle navigation of Recommenders</div><i class="icon"><svg><use href="#svg-arrow-right"></use></svg></i></label><ul>
 <li class="toctree-l2"><a class="reference internal" href="collaborative.html">General Recommenders</a></li>
 <li class="toctree-l2"><a class="reference internal" href="content.html">Content Based Recommenders</a></li>
 <li class="toctree-l2"><a class="reference internal" href="hybrid.html">Hybrid Recommenders</a></li>
 <li class="toctree-l2"><a class="reference internal" href="context.html">Context-Aware Recommenders</a></li>
 <li class="toctree-l2"><a class="reference internal" href="sequential.html">Sequential Recommenders</a></li>
-<li class="toctree-l2 current current-page"><a class="current reference internal" href="#">Proxy Recommender</a></li>
+<li class="toctree-l2"><a class="reference internal" href="proxy.html">Proxy Recommender</a></li>
 <li class="toctree-l2 has-children"><a class="reference internal" href="guide/index.html">Implementation Guide</a><input class="toctree-checkbox" id="toctree-checkbox-4" name="toctree-checkbox-4" role="switch" type="checkbox"/><label for="toctree-checkbox-4"><div class="visually-hidden">Toggle navigation of Implementation Guide</div><i class="icon"><svg><use href="#svg-arrow-right"></use></svg></i></label><ul>
 <li class="toctree-l3"><a class="reference internal" href="guide/classic.html">Classic Recommender Guide</a></li>
 <li class="toctree-l3"><a class="reference internal" href="guide/iterative.html">Iterative Recommender Guide</a></li>
@@ -298,7 +298,7 @@
         </a>
         <div class="content-icon-container">
           <div class="view-this-page">
-  <a class="muted-link" href="../_sources/recommenders/proxy.rst.txt" title="View this page">
+  <a class="muted-link" href="../_sources/recommenders/unpersonalized.rst.txt" title="View this page">
     <svg><use href="#svg-eye"></use></svg>
     <span class="visually-hidden">View this page</span>
   </a>
@@ -318,15 +318,28 @@
           </label>
         </div>
         <article role="main" id="furo-main-content">
-          <section id="proxy-recommender">
-<h1>Proxy Recommender<a class="headerlink" href="#proxy-recommender" title="Link to this heading">¶</a></h1>
-<p>The <strong>Proxy Recommender</strong> is a flexible evaluation component designed to assess recommendation outputs produced by external frameworks.
-It operates exclusively in a <strong>local context</strong> and is <strong>incompatible with the Ray-based training module</strong>, requiring execution within a <strong>custom evaluation pipeline</strong>.</p>
-<p>Users can either run the provided sample script or implement their own evaluation logic by directly interfacing with the Proxy Recommender.
-This design enables seamless integration of third-party recommendation results into the framework’s evaluation workflow.</p>
-<p>To implement your custom script you can follow the documentation regarding <a class="reference internal" href="../scripting/index.html#scripting"><span class="std std-ref">Scripting</span></a>.
-WarpRec also provides a sample script located at <em>sample_pipelines/proxy_evaluation.py</em> that the user can use as-is or modify to fit their needs.</p>
-<p>Work in progress.</p>
+          <section id="unpersonalized-recommenders">
+<h1>Unpersonalized Recommenders<a class="headerlink" href="#unpersonalized-recommenders" title="Link to this heading">¶</a></h1>
+<p>The <strong>Unpersonalized Recommenders</strong> module of WarpRec serves as a collection of simple baselines.
+These models do not learn from individual user interactions but instead rely on global statistics or random selection.
+They are essential for producing reference metric scores against which the performance of actual (personalized) models can be compared.</p>
+<p>In the following sections, you will find the list of available unpersonalized models within WarpRec.</p>
+<ul class="simple">
+<li><p>Pop:
+Recommends the most popular items overall. This model helps assess whether other recommenders are biased towards popularity.</p></li>
+</ul>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">models</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">Pop</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">{}</span>
+</pre></div>
+</div>
+<ul class="simple">
+<li><p>Random:
+Recommends items at random. This model defines a lower bound for performance metrics, serving as a sanity check during evaluation.</p></li>
+</ul>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">models</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">Random</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">{}</span>
+</pre></div>
+</div>
 </section>
 
         </article>
@@ -334,26 +347,8 @@ WarpRec also provides a sample script located at <em>sample_pipelines/proxy_eval
       <footer>
 
         <div class="related-pages">
-          <a class="next-page" href="guide/index.html">
-              <div class="page-info">
-                <div class="context">
-                  <span>Next</span>
-                </div>
-                <div class="title">Implementation Guide</div>
-              </div>
-              <svg class="furo-related-icon"><use href="#svg-arrow-right"></use></svg>
-            </a>
-          <a class="prev-page" href="sequential.html">
-              <svg class="furo-related-icon"><use href="#svg-arrow-right"></use></svg>
-              <div class="page-info">
-                <div class="context">
-                  <span>Previous</span>
-                </div>
 
-                <div class="title">Sequential Recommenders</div>
 
-              </div>
-            </a>
         </div>
         <div class="bottom-of-page">
           <div class="left-details">
