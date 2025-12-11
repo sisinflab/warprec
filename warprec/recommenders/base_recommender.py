@@ -1,5 +1,5 @@
 import random
-from typing import Any, Optional
+from typing import Any, Optional, List
 from abc import ABC, abstractmethod
 
 import torch
@@ -283,8 +283,37 @@ class IterativeRecommender(Recommender):
 class ContextRecommenderUtils:
     """Common definition for context-aware recommenders.
 
-    Collection of common method used by all context-aware recommenders.
+    This Mixin handles:
+        1. Initialization of context dimensions.
+        2. Creation of standard Biases (Global, User, Item, Context).
+        3. Creation of Context Embeddings (to avoid boilerplate loops in models).
+        4. Helper methods for Linear computation and Regularization.
+
+    Args:
+        params (dict): Model parameters.
+        interactions (Interactions): The training interactions.
+        info (dict): The dictionary containing dataset information.
+        *args (Any): Variable length argument list.
+        **kwargs (Any): Arbitrary keyword arguments.
+
+    Attributes:
+        n_users (int): Number of users.
+        n_items (int): Number of items.
+        embedding_size (int): The size of the latent vectors.
+        batch_size (int): The batch size used for training.
+        neg_samples (int): Number of negative samples for training.
+
+    Raises:
+        ValueError: If context dimensions are not passed through
+            info dictionary during initialization.
     """
+
+    # Type hints used in general mixin implementations
+    n_users: int
+    n_items: int
+    embedding_size: int
+    batch_size: int
+    neg_samples: int
 
     def __init__(
         self,
@@ -294,19 +323,105 @@ class ContextRecommenderUtils:
         *args: Any,
         **kwargs: Any,
     ):
+        # Context info extraction
         self.context_dims: dict = info.get("context_dims", None)
-
         if self.context_dims is None:
             raise ValueError(
                 f"The model {self.__class__.__name__} is contextual model. "
-                "Contextual dimensions are required inside the info dictionary for "
-                "proper initialization."
+                "Contextual dimensions are required inside the info dictionary."
             )
-
         self.context_labels = list(self.context_dims.keys())
 
-        # Continue the initialization chain
+        # Call super init to populate n_users, n_items, embedding_size
         super().__init__(params, interactions, info, *args, **kwargs)  # type: ignore[call-arg]
+
+        # Define Embeddings (Latent Factors)
+        self.user_embedding = nn.Embedding(self.n_users, self.embedding_size)
+        self.item_embedding = nn.Embedding(
+            self.n_items + 1, self.embedding_size, padding_idx=self.n_items
+        )
+        self.context_embedding = nn.ModuleDict(
+            {
+                name: nn.Embedding(dims, self.embedding_size)
+                for name, dims in self.context_dims.items()
+            }
+        )
+
+        # Define Biases (Standard Linear Infrastructure)
+        self.global_bias = nn.Parameter(torch.zeros(1))
+        self.user_bias = nn.Embedding(self.n_users, 1)
+        self.item_bias = nn.Embedding(self.n_items + 1, 1, padding_idx=self.n_items)
+        self.context_bias = nn.ModuleDict(
+            {name: nn.Embedding(dims, 1) for name, dims in self.context_dims.items()}
+        )
+
+    def get_dataloader(
+        self,
+        interactions: Interactions,
+        sessions: Sessions,
+        low_memory: bool = False,
+        **kwargs,
+    ):
+        return interactions.get_item_rating_dataloader(
+            neg_samples=self.neg_samples,
+            include_context=True,
+            batch_size=self.batch_size,
+            low_memory=low_memory,
+        )
+
+    def compute_first_order(
+        self, user: Tensor, item: Tensor, contexts: Tensor
+    ) -> Tensor:
+        """Computes the First-Order Linear part.
+
+        Formula: global_bias + user_bias + item_bias + sum(context_biases)
+
+        Args:
+            user (Tensor): User indices.
+            item (Tensor): Item indices.
+            contexts (Tensor): Context indices [batch_size, n_contexts].
+
+        Returns:
+            Tensor: The linear score [batch_size].
+        """
+        linear_part = (
+            self.global_bias
+            + self.user_bias(user).squeeze(-1)
+            + self.item_bias(item).squeeze(-1)
+        )
+
+        for idx, name in enumerate(self.context_labels):
+            ctx_input = contexts[:, idx]
+            linear_part += self.context_bias[name](ctx_input).squeeze(-1)
+
+        return linear_part
+
+    def get_reg_params(
+        self, user: Tensor, item: Tensor, contexts: Tensor
+    ) -> List[Tensor]:
+        """Helper to extract ALL embeddings and biases for regularization.
+
+        Args:
+            user (Tensor): User indices.
+            item (Tensor): Item indices.
+            contexts (Tensor): Context indices.
+
+        Returns:
+            List[Tensor]: List of embeddings and biases to be passed to the Reg Loss.
+        """
+        reg_params = [
+            self.user_embedding(user),
+            self.item_embedding(item),
+            self.user_bias(user),
+            self.item_bias(item),
+        ]
+
+        for idx, name in enumerate(self.context_labels):
+            ctx_input = contexts[:, idx]
+            reg_params.append(self.context_embedding[name](ctx_input))
+            reg_params.append(self.context_bias[name](ctx_input))
+
+        return reg_params
 
 
 class SequentialRecommenderUtils(ABC):

@@ -9,7 +9,7 @@ from warprec.recommenders.base_recommender import (
 from warprec.recommenders.layers import FactorizationMachine, MLP
 from warprec.recommenders.losses import EmbLoss
 from warprec.utils.enums import DataLoaderType
-from warprec.data.entities import Interactions, Sessions
+from warprec.data.entities import Interactions
 from warprec.utils.registry import model_registry
 
 
@@ -70,26 +70,6 @@ class DeepFM(ContextRecommenderUtils, IterativeRecommender):
         # Ray Tune converts lists to tuples, convert back to list
         self.mlp_hidden_size = list(self.mlp_hidden_size)
 
-        # Define Embeddings (Shared between FM and Deep parts)
-        self.user_embedding = nn.Embedding(self.n_users, self.embedding_size)
-        self.item_embedding = nn.Embedding(
-            self.n_items + 1, self.embedding_size, padding_idx=self.n_items
-        )
-        self.context_embedding = nn.ModuleDict(
-            {
-                name: nn.Embedding(dims, self.embedding_size)
-                for name, dims in self.context_dims.items()
-            }
-        )
-
-        # Define Biases (FM Linear Part - First Order)
-        self.global_bias = nn.Parameter(torch.zeros(1))
-        self.user_bias = nn.Embedding(self.n_users, 1)
-        self.item_bias = nn.Embedding(self.n_items + 1, 1, padding_idx=self.n_items)
-        self.context_bias = nn.ModuleDict(
-            {name: nn.Embedding(dims, 1) for name, dims in self.context_dims.items()}
-        )
-
         # FM Layer (Interaction Part - Second Order)
         self.fm = FactorizationMachine(reduce_sum=True)
 
@@ -112,20 +92,6 @@ class DeepFM(ContextRecommenderUtils, IterativeRecommender):
         # Initialize weights
         self.apply(self._init_weights)
 
-    def get_dataloader(
-        self,
-        interactions: Interactions,
-        sessions: Sessions,
-        low_memory: bool = False,
-        **kwargs,
-    ):
-        return interactions.get_item_rating_dataloader(
-            neg_samples=self.neg_samples,
-            include_context=True,
-            batch_size=self.batch_size,
-            low_memory=low_memory,
-        )
-
     def train_step(self, batch: Any, epoch: int, *args, **kwargs) -> Tensor:
         user, item, rating, contexts = batch
 
@@ -135,19 +101,7 @@ class DeepFM(ContextRecommenderUtils, IterativeRecommender):
         loss = self.bce_loss(prediction, rating)
 
         # Compute L2 regularization on embeddings and biases
-        reg_params = [
-            self.user_embedding(user),
-            self.item_embedding(item),
-            self.user_bias(user),
-            self.item_bias(item),
-        ]
-
-        # Add context embeddings and biases to regularization
-        for idx, name in enumerate(self.context_labels):
-            ctx_input = contexts[:, idx]
-            reg_params.append(self.context_embedding[name](ctx_input))
-            reg_params.append(self.context_bias[name](ctx_input))
-
+        reg_params = self.get_reg_params(user, item, contexts)
         reg_loss = self.reg_weight * self.reg_loss(*reg_params)
 
         return loss + reg_loss
@@ -163,43 +117,25 @@ class DeepFM(ContextRecommenderUtils, IterativeRecommender):
         Returns:
             Tensor: The prediction score for each triplet (user, item, context).
         """
-        # First Order (Linear Part)
-        # Equation: w_0 + w_u + w_i + sum(w_c)
-        linear_part = (
-            self.global_bias
-            + self.user_bias(user).squeeze(-1)
-            + self.item_bias(item).squeeze(-1)
-        )
+        # Linear Part
+        linear_part = self.compute_first_order(user, item, contexts)
 
-        # Add Context Biases
-        for idx, name in enumerate(self.context_labels):
-            ctx_input = contexts[:, idx]
-            linear_part += self.context_bias[name](ctx_input).squeeze(-1)
-
-        # --- Prepare Embeddings ---
-        # Collect all embeddings: User, Item, Contexts
+        # Prepare Embeddings
         embeddings_list = [self.user_embedding(user), self.item_embedding(item)]
-
         for idx, name in enumerate(self.context_labels):
-            ctx_input = contexts[:, idx]
-            embeddings_list.append(self.context_embedding[name](ctx_input))
+            embeddings_list.append(self.context_embedding[name](contexts[:, idx]))
 
-        # Stack: [batch_size, num_fields, embedding_size]
         stacked_embeddings = torch.stack(embeddings_list, dim=1)
 
-        # FM Component (Second Order)
-        # Apply FM interaction: 0.5 * sum((sum(v_i)^2 - sum(v_i^2)))
+        # FM Interaction
         fm_part = self.fm(stacked_embeddings).squeeze(-1)
 
-        # Deep Component
-        # Flatten embeddings: [batch_size, num_fields * embedding_size]
+        # Deep Interaction
         batch_size = stacked_embeddings.shape[0]
         deep_input = stacked_embeddings.view(batch_size, -1)
-
         deep_output = self.mlp_layers(deep_input)
         deep_part = self.deep_predict_layer(deep_output).squeeze(-1)
 
-        # Final Sum: Linear + FM + Deep
         return linear_part + fm_part + deep_part
 
     @torch.no_grad()
