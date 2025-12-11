@@ -328,9 +328,27 @@ Unlike collaborative filtering recommenders that rely solely on User-Item intera
 <p>Factorization-Based context models extend standard matrix factorization techniques to handle multidimensional data (tensors) or feature vectors that include contextual variables.</p>
 <ul class="simple">
 <li><dl class="simple">
-<dt>FM (Factorization Machines):</dt><dd><p>A generic approach that mimics most factorization models by feature engineering. It models all nested interactions between variables using factorized parameters.
-In WarpRec, this implementation explicitly models the interactions between users, items, and available contextual features using second-order factorized interactions.
-It is particularly effective for sparse datasets with many categorical context features. <strong>This model requires contextual information to function properly.</strong></p>
+<dt>DeepFM (Deep Factorization Machines):</dt><dd><p>A neural architecture that integrates a Factorization Machine component to model low-order feature interactions and a Deep Neural Network to capture high-order interactions. Both components share the same input embedding layer and operate in parallel to predict the final score. <strong>This model requires contextual information to function properly.</strong></p>
+</dd>
+</dl>
+</li>
+</ul>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">models</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">DeepFM</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">embedding_size</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">64</span>
+<span class="w">    </span><span class="nt">mlp_hidden_size</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">64</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">32</span><span class="p p-Indicator">]</span>
+<span class="w">    </span><span class="nt">dropout</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0.3</span>
+<span class="w">    </span><span class="nt">reg_weight</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0.001</span>
+<span class="w">    </span><span class="nt">weight_decay</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0.0001</span>
+<span class="w">    </span><span class="nt">batch_size</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">2048</span>
+<span class="w">    </span><span class="nt">epochs</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">200</span>
+<span class="w">    </span><span class="nt">learning_rate</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0.001</span>
+<span class="w">    </span><span class="nt">neg_samples</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">2</span>
+</pre></div>
+</div>
+<ul class="simple">
+<li><dl class="simple">
+<dt>FM (Factorization Machines):</dt><dd><p>A general predictor that models all nested interactions between input variables using factorized parameters. It explicitly captures second-order interactions between users, items, and contextual features, making it effective for sparse datasets with categorical variables. <strong>This model requires contextual information to function properly.</strong></p>
 </dd>
 </dl>
 </li>
@@ -347,9 +365,7 @@ It is particularly effective for sparse datasets with many categorical context f
 </div>
 <ul class="simple">
 <li><dl class="simple">
-<dt>NFM (Neural Factorization Machines):</dt><dd><p>An extension of Factorization Machines that seamlessly combines the linearity of FM in modeling second-order feature interactions and the non-linearity of neural networks in modeling higher-order feature interactions.
-It replaces the standard second-order interaction term of FM with a “Bi-Interaction Pooling” layer followed by a Multi-Layer Perceptron (MLP).
-This allows the model to capture more complex and non-linear dependencies between users, items, and context features. <strong>This model requires contextual information to function properly.</strong></p>
+<dt>NFM (Neural Factorization Machines):</dt><dd><p>An extension of Factorization Machines that replaces the standard second-order interaction term with a “Bi-Interaction Pooling” layer followed by a Multi-Layer Perceptron (MLP). This architecture allows the model to capture complex, non-linear, and higher-order dependencies between features. <strong>This model requires contextual information to function properly.</strong></p>
 </dd>
 </dl>
 </li>
@@ -360,6 +376,7 @@ This allows the model to capture more complex and non-linear dependencies betwee
 <span class="w">    </span><span class="nt">mlp_hidden_size</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">64</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">32</span><span class="p p-Indicator">]</span>
 <span class="w">    </span><span class="nt">dropout</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0.3</span>
 <span class="w">    </span><span class="nt">reg_weight</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0.001</span>
+<span class="w">    </span><span class="nt">weight_decay</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0.0001</span>
 <span class="w">    </span><span class="nt">batch_size</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">2048</span>
 <span class="w">    </span><span class="nt">epochs</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">200</span>
 <span class="w">    </span><span class="nt">learning_rate</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0.001</span>
@@ -384,10 +401,14 @@ This allows the model to capture more complex and non-linear dependencies betwee
 </thead>
 <tbody>
 <tr class="row-even"><td><p>Factorization-Based</p></td>
+<td><p>DeepFM</p></td>
+<td><p>Parallel combination of FM and DNN to capture both low- and high-order feature interactions.</p></td>
+</tr>
+<tr class="row-odd"><td></td>
 <td><p>FM</p></td>
 <td><p>Factorization Machine modeling second-order interactions between user, item, and context.</p></td>
 </tr>
-<tr class="row-odd"><td><p>Factorization-Based</p></td>
+<tr class="row-even"><td></td>
 <td><p>NFM</p></td>
 <td><p>Neural Factorization Machine using MLP to model higher-order interactions between features.</p></td>
 </tr>

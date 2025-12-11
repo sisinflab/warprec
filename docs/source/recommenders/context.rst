@@ -13,10 +13,25 @@ Factorization-Based
 
 Factorization-Based context models extend standard matrix factorization techniques to handle multidimensional data (tensors) or feature vectors that include contextual variables.
 
+- DeepFM (Deep Factorization Machines):
+    A neural architecture that integrates a Factorization Machine component to model low-order feature interactions and a Deep Neural Network to capture high-order interactions. Both components share the same input embedding layer and operate in parallel to predict the final score. **This model requires contextual information to function properly.**
+
+.. code-block:: yaml
+
+    models:
+      DeepFM:
+        embedding_size: 64
+        mlp_hidden_size: [64, 32]
+        dropout: 0.3
+        reg_weight: 0.001
+        weight_decay: 0.0001
+        batch_size: 2048
+        epochs: 200
+        learning_rate: 0.001
+        neg_samples: 2
+
 - FM (Factorization Machines):
-    A generic approach that mimics most factorization models by feature engineering. It models all nested interactions between variables using factorized parameters.
-    In WarpRec, this implementation explicitly models the interactions between users, items, and available contextual features using second-order factorized interactions.
-    It is particularly effective for sparse datasets with many categorical context features. **This model requires contextual information to function properly.**
+    A general predictor that models all nested interactions between input variables using factorized parameters. It explicitly captures second-order interactions between users, items, and contextual features, making it effective for sparse datasets with categorical variables. **This model requires contextual information to function properly.**
 
 .. code-block:: yaml
 
@@ -30,9 +45,7 @@ Factorization-Based context models extend standard matrix factorization techniqu
         neg_samples: 2
 
 - NFM (Neural Factorization Machines):
-    An extension of Factorization Machines that seamlessly combines the linearity of FM in modeling second-order feature interactions and the non-linearity of neural networks in modeling higher-order feature interactions.
-    It replaces the standard second-order interaction term of FM with a "Bi-Interaction Pooling" layer followed by a Multi-Layer Perceptron (MLP).
-    This allows the model to capture more complex and non-linear dependencies between users, items, and context features. **This model requires contextual information to function properly.**
+    An extension of Factorization Machines that replaces the standard second-order interaction term with a "Bi-Interaction Pooling" layer followed by a Multi-Layer Perceptron (MLP). This architecture allows the model to capture complex, non-linear, and higher-order dependencies between features. **This model requires contextual information to function properly.**
 
 .. code-block:: yaml
 
@@ -42,6 +55,7 @@ Factorization-Based context models extend standard matrix factorization techniqu
         mlp_hidden_size: [64, 32]
         dropout: 0.3
         reg_weight: 0.001
+        weight_decay: 0.0001
         batch_size: 2048
         epochs: 200
         learning_rate: 0.001
@@ -59,8 +73,11 @@ Summary of Available Context-Aware Models
      - Model
      - Description
    * - Factorization-Based
+     - DeepFM
+     - Parallel combination of FM and DNN to capture both low- and high-order feature interactions.
+   * -
      - FM
      - Factorization Machine modeling second-order interactions between user, item, and context.
-   * - Factorization-Based
+   * -
      - NFM
      - Neural Factorization Machine using MLP to model higher-order interactions between features.
