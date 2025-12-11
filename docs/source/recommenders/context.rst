@@ -61,13 +61,13 @@ Factorization-Based context models extend standard matrix factorization techniqu
         learning_rate: 0.001
         neg_samples: 2
 
-- WideDeep (Wide & Deep Learning):
+- WideAndDeep (Wide & Deep Learning):
     A framework that jointly trains a wide linear model for memorization and a deep neural network for generalization. It combines a generalized linear model (Wide) with a feed-forward neural network (Deep) to capture both low-order and high-order feature interactions. **This model requires contextual information to function properly.**
 
 .. code-block:: yaml
 
     models:
-      WideDeep:
+      WideAndDeep:
         embedding_size: 64
         mlp_hidden_size: [64, 32]
         dropout: 0.3
@@ -99,5 +99,5 @@ Summary of Available Context-Aware Models
      - NFM
      - Neural Factorization Machine using MLP to model higher-order interactions between features.
    * -
-     - WideDeep
+     - WideAndDeep
      - Joint training of a linear model (Wide) and a Deep Neural Network (Deep) for memorization and generalization.

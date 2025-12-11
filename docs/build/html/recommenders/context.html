@@ -385,13 +385,13 @@ Unlike collaborative filtering recommenders that rely solely on User-Item intera
 </div>
 <ul class="simple">
 <li><dl class="simple">
-<dt>WideDeep (Wide &amp; Deep Learning):</dt><dd><p>A framework that jointly trains a wide linear model for memorization and a deep neural network for generalization. It combines a generalized linear model (Wide) with a feed-forward neural network (Deep) to capture both low-order and high-order feature interactions. <strong>This model requires contextual information to function properly.</strong></p>
+<dt>WideAndDeep (Wide &amp; Deep Learning):</dt><dd><p>A framework that jointly trains a wide linear model for memorization and a deep neural network for generalization. It combines a generalized linear model (Wide) with a feed-forward neural network (Deep) to capture both low-order and high-order feature interactions. <strong>This model requires contextual information to function properly.</strong></p>
 </dd>
 </dl>
 </li>
 </ul>
 <div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">models</span><span class="p">:</span>
-<span class="w">  </span><span class="nt">WideDeep</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">WideAndDeep</span><span class="p">:</span>
 <span class="w">    </span><span class="nt">embedding_size</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">64</span>
 <span class="w">    </span><span class="nt">mlp_hidden_size</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">64</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">32</span><span class="p p-Indicator">]</span>
 <span class="w">    </span><span class="nt">dropout</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0.3</span>
@@ -433,7 +433,7 @@ Unlike collaborative filtering recommenders that rely solely on User-Item intera
 <td><p>Neural Factorization Machine using MLP to model higher-order interactions between features.</p></td>
 </tr>
 <tr class="row-odd"><td></td>
-<td><p>WideDeep</p></td>
+<td><p>WideAndDeep</p></td>
 <td><p>Joint training of a linear model (Wide) and a Deep Neural Network (Deep) for memorization and generalization.</p></td>
 </tr>
 </tbody>
