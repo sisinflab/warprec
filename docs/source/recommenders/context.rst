@@ -48,6 +48,28 @@ Factorization-Based context models extend standard matrix factorization techniqu
         learning_rate: 0.001
         neg_samples: 2
 
+- DCNv2 (Deep & Cross Network V2):
+    An improved version of DCN that introduces a Mixture-of-Experts (MoE) architecture in the Cross Network to learn feature interactions more effectively. It supports both "parallel" and "stacked" structures and utilizes low-rank techniques to reduce computational complexity while maintaining expressiveness. **This model requires contextual information to function properly.**
+
+.. code-block:: yaml
+
+    models:
+      DCNv2:
+        embedding_size: 64
+        mlp_hidden_size: [64, 32]
+        cross_layer_num: 2
+        dropout: 0.3
+        model_structure: parallel
+        use_mixed: True
+        expert_num: 2
+        low_rank: 32
+        reg_weight: 0.001
+        weight_decay: 0.0001
+        batch_size: 2048
+        epochs: 200
+        learning_rate: 0.001
+        neg_samples: 2
+
 - DeepFM (Deep Factorization Machines):
     A neural architecture that integrates a Factorization Machine component to model low-order feature interactions and a Deep Neural Network to capture high-order interactions. Both components share the same input embedding layer and operate in parallel to predict the final score. **This model requires contextual information to function properly.**
 
@@ -149,6 +171,9 @@ Summary of Available Context-Aware Models
    * -
      - DCN
      - Deep & Cross Network using a Cross Network for explicit bounded-degree feature interactions.
+   * -
+     - DCNv2
+     - Improved DCN with Mixture-of-Experts (MoE) and low-rank cross network.
    * -
      - DeepFM
      - Parallel combination of FM and DNN to capture both low- and high-order feature interactions.

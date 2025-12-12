@@ -369,6 +369,31 @@ Unlike collaborative filtering recommenders that rely solely on User-Item intera
 </div>
 <ul class="simple">
 <li><dl class="simple">
+<dt>DCNv2 (Deep &amp; Cross Network V2):</dt><dd><p>An improved version of DCN that introduces a Mixture-of-Experts (MoE) architecture in the Cross Network to learn feature interactions more effectively. It supports both “parallel” and “stacked” structures and utilizes low-rank techniques to reduce computational complexity while maintaining expressiveness. <strong>This model requires contextual information to function properly.</strong></p>
+</dd>
+</dl>
+</li>
+</ul>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">models</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">DCNv2</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">embedding_size</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">64</span>
+<span class="w">    </span><span class="nt">mlp_hidden_size</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">64</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">32</span><span class="p p-Indicator">]</span>
+<span class="w">    </span><span class="nt">cross_layer_num</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">2</span>
+<span class="w">    </span><span class="nt">dropout</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0.3</span>
+<span class="w">    </span><span class="nt">model_structure</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">parallel</span>
+<span class="w">    </span><span class="nt">use_mixed</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">True</span>
+<span class="w">    </span><span class="nt">expert_num</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">2</span>
+<span class="w">    </span><span class="nt">low_rank</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">32</span>
+<span class="w">    </span><span class="nt">reg_weight</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0.001</span>
+<span class="w">    </span><span class="nt">weight_decay</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0.0001</span>
+<span class="w">    </span><span class="nt">batch_size</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">2048</span>
+<span class="w">    </span><span class="nt">epochs</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">200</span>
+<span class="w">    </span><span class="nt">learning_rate</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0.001</span>
+<span class="w">    </span><span class="nt">neg_samples</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">2</span>
+</pre></div>
+</div>
+<ul class="simple">
+<li><dl class="simple">
 <dt>DeepFM (Deep Factorization Machines):</dt><dd><p>A neural architecture that integrates a Factorization Machine component to model low-order feature interactions and a Deep Neural Network to capture high-order interactions. Both components share the same input embedding layer and operate in parallel to predict the final score. <strong>This model requires contextual information to function properly.</strong></p>
 </dd>
 </dl>
@@ -492,22 +517,26 @@ Unlike collaborative filtering recommenders that rely solely on User-Item intera
 <td><p>Deep &amp; Cross Network using a Cross Network for explicit bounded-degree feature interactions.</p></td>
 </tr>
 <tr class="row-even"><td></td>
+<td><p>DCNv2</p></td>
+<td><p>Improved DCN with Mixture-of-Experts (MoE) and low-rank cross network.</p></td>
+</tr>
+<tr class="row-odd"><td></td>
 <td><p>DeepFM</p></td>
 <td><p>Parallel combination of FM and DNN to capture both low- and high-order feature interactions.</p></td>
 </tr>
-<tr class="row-odd"><td></td>
+<tr class="row-even"><td></td>
 <td><p>FM</p></td>
 <td><p>Factorization Machine modeling second-order interactions between user, item, and context.</p></td>
 </tr>
-<tr class="row-even"><td></td>
+<tr class="row-odd"><td></td>
 <td><p>NFM</p></td>
 <td><p>Neural Factorization Machine using MLP to model higher-order interactions between features.</p></td>
 </tr>
-<tr class="row-odd"><td></td>
+<tr class="row-even"><td></td>
 <td><p>WideAndDeep</p></td>
 <td><p>Joint training of a linear model (Wide) and a Deep Neural Network (Deep) for memorization and generalization.</p></td>
 </tr>
-<tr class="row-even"><td></td>
+<tr class="row-odd"><td></td>
 <td><p>xDeepFM</p></td>
 <td><p>eXtreme DeepFM using Compressed Interaction Network (CIN) for vector-wise explicit interactions.</p></td>
 </tr>
