@@ -459,6 +459,7 @@ def multiple_fold_validation_flow(
 
     # Retrieve common params
     block_size = params.optimization.block_size
+    chunk_size = params.optimization.chunk_size
     validation_score = config.evaluation.validation_metric
     desired_training_it = params.optimization.properties.desired_training_it
     seed = params.optimization.properties.seed
@@ -513,6 +514,7 @@ def multiple_fold_validation_flow(
         info=main_dataset.info(),
         **main_dataset.get_stash(),
         block_size=block_size,
+        chunk_size=chunk_size,
     )
     best_model.to(device)
 

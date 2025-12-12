@@ -70,6 +70,7 @@ def objective_function(
     lr_scheduler: Optional[LRScheduler] = None,
     seed: int = 42,
     block_size: int = 50,
+    chunk_size: int = 4096,
     beta: float = 1.0,
     pop_ratio: float = 0.8,
     custom_models: List[str] = [],
@@ -96,8 +97,10 @@ def objective_function(
         lr_scheduler (Optional[LRScheduler]): The custom learning rate scheduler
             configuration. Defaults to None.
         seed (int): The seed for reproducibility. Defaults to 42.
-        block_size (int): The block size for the model optimization.
+        block_size (int): The block size for the model evaluation.
             Defaults to 50.
+        chunk_size (int): The chunk size for the model evaluation.
+            Defaults to 4096.
         beta (float): The beta value to initialize the Evaluator.
         pop_ratio (float): The pop_ratio value to initialize the Evaluator.
         custom_models (List[str]): List of custom models to import.
@@ -165,6 +168,7 @@ def objective_function(
             info=dataset.info(),
             **dataset.get_stash(),
             block_size=block_size,
+            chunk_size=chunk_size,
         )
         model.to(device)
 
@@ -364,6 +368,7 @@ def objective_function_ddp(config: dict) -> None:
         info=dataset.info(),
         **dataset.get_stash(),
         block_size=config["block_size"],
+        chunk_size=config["chunk_size"],
     )
     model.to(device)
 
@@ -531,6 +536,7 @@ def driver_function_ddp(
     num_negatives: int = 99,
     seed: int = 42,
     block_size: int = 50,
+    chunk_size: int = 4096,
     beta: float = 1.0,
     pop_ratio: float = 0.8,
     custom_models: List[str] = [],
@@ -550,6 +556,7 @@ def driver_function_ddp(
             "num_negatives": num_negatives,
             "seed": seed,
             "block_size": block_size,
+            "chunk_size": chunk_size,
             "beta": beta,
             "pop_ratio": pop_ratio,
             "custom_models": custom_models,

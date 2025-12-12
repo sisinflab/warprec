@@ -81,6 +81,10 @@ def main(args: Namespace):
     )
 
     for model_name, params in config.models.items():
+        # Evaluation params
+        block_size = params.get("optimization", {}).get("block_size", 50)
+        chunk_size = params.get("optimization", {}).get("chunk_size", 4096)
+
         model = model_registry.get(
             name=model_name,
             params=params,
@@ -89,6 +93,8 @@ def main(args: Namespace):
             seed=42,
             info=main_dataset.info(),
             **main_dataset.get_stash(),
+            block_size=block_size,
+            chunk_size=chunk_size,
         )
 
         if isinstance(model, IterativeRecommender):

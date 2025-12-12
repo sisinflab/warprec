@@ -153,6 +153,8 @@ class Optimization(BaseModel):
             Defaults to None. If multi_gpu is set to False, this value will be ignored.
         block_size (Optional[int]): The number of items to process during prediction.
             Used by some neural models, increasing this value will affect memory usage.
+        chunk_size (Optional[int]): The size of the chunk processed during prediction.
+            Used by some deep models to optimize the evaluation process.
         num_samples (Optional[int]): The number of trials that Ray Tune will try.
             In case of a grid search, this parameter should be set to 1.
         checkpoint_to_keep (Optional[int]): The number of checkpoints to keep
@@ -169,6 +171,7 @@ class Optimization(BaseModel):
     multi_gpu: Optional[bool] = False
     num_gpus: Optional[int] = None
     block_size: Optional[int] = 50
+    chunk_size: Optional[int] = 4096
     num_samples: Optional[int] = 1
     checkpoint_to_keep: Optional[int] = 5
 
