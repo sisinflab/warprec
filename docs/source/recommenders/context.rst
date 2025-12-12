@@ -13,6 +13,41 @@ Factorization-Based
 
 Factorization-Based context models extend standard matrix factorization techniques to handle multidimensional data (tensors) or feature vectors that include contextual variables.
 
+- AFM (Attentional Factorization Machines):
+    An extension of Factorization Machines that introduces an attention network to learn the importance of each feature interaction. Unlike standard FM, where all interactions are weighted equally, AFM focuses more on informative interactions and less on useless ones. **This model requires contextual information to function properly.**
+
+.. code-block:: yaml
+
+    models:
+      AFM:
+        embedding_size: 64
+        attention_size: 64
+        dropout: 0.3
+        reg_weight: 0.001
+        weight_decay: 0.0001
+        batch_size: 2048
+        epochs: 200
+        learning_rate: 0.001
+        neg_samples: 2
+
+- DCN (Deep & Cross Network):
+    A model designed to learn explicit and bounded-degree feature interactions effectively. It consists of a Cross Network, which applies explicit feature crossing at each layer, and a Deep Network that captures implicit high-order interactions. **This model requires contextual information to function properly.**
+
+.. code-block:: yaml
+
+    models:
+      DCN:
+        embedding_size: 64
+        mlp_hidden_size: [64, 32]
+        cross_layer_num: 2
+        dropout: 0.3
+        reg_weight: 0.001
+        weight_decay: 0.0001
+        batch_size: 2048
+        epochs: 200
+        learning_rate: 0.001
+        neg_samples: 2
+
 - DeepFM (Deep Factorization Machines):
     A neural architecture that integrates a Factorization Machine component to model low-order feature interactions and a Deep Neural Network to capture high-order interactions. Both components share the same input embedding layer and operate in parallel to predict the final score. **This model requires contextual information to function properly.**
 
@@ -78,6 +113,25 @@ Factorization-Based context models extend standard matrix factorization techniqu
         learning_rate: 0.001
         neg_samples: 2
 
+- xDeepFM (eXtreme Deep Factorization Machine):
+    A model that generates explicit high-order feature interactions at the vector-wise level using a Compressed Interaction Network (CIN). It combines the CIN with a linear part and a plain DNN to learn explicit and implicit interactions simultaneously. **This model requires contextual information to function properly.**
+
+.. code-block:: yaml
+
+    models:
+      xDeepFM:
+        embedding_size: 64
+        mlp_hidden_size: [64, 32]
+        cin_layer_size: [64, 64]
+        dropout: 0.3
+        direct: False
+        reg_weight: 0.001
+        weight_decay: 0.0001
+        batch_size: 2048
+        epochs: 200
+        learning_rate: 0.001
+        neg_samples: 2
+
 ===============================
 Summary of Available Context-Aware Models
 ===============================
@@ -90,6 +144,12 @@ Summary of Available Context-Aware Models
      - Model
      - Description
    * - Factorization-Based
+     - AFM
+     - Attentional Factorization Machine using an attention network to weigh feature interactions.
+   * -
+     - DCN
+     - Deep & Cross Network using a Cross Network for explicit bounded-degree feature interactions.
+   * -
      - DeepFM
      - Parallel combination of FM and DNN to capture both low- and high-order feature interactions.
    * -
@@ -101,3 +161,6 @@ Summary of Available Context-Aware Models
    * -
      - WideAndDeep
      - Joint training of a linear model (Wide) and a Deep Neural Network (Deep) for memorization and generalization.
+   * -
+     - xDeepFM
+     - eXtreme DeepFM using Compressed Interaction Network (CIN) for vector-wise explicit interactions.

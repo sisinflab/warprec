@@ -328,6 +328,47 @@ Unlike collaborative filtering recommenders that rely solely on User-Item intera
 <p>Factorization-Based context models extend standard matrix factorization techniques to handle multidimensional data (tensors) or feature vectors that include contextual variables.</p>
 <ul class="simple">
 <li><dl class="simple">
+<dt>AFM (Attentional Factorization Machines):</dt><dd><p>An extension of Factorization Machines that introduces an attention network to learn the importance of each feature interaction. Unlike standard FM, where all interactions are weighted equally, AFM focuses more on informative interactions and less on useless ones. <strong>This model requires contextual information to function properly.</strong></p>
+</dd>
+</dl>
+</li>
+</ul>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">models</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">AFM</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">embedding_size</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">64</span>
+<span class="w">    </span><span class="nt">attention_size</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">64</span>
+<span class="w">    </span><span class="nt">dropout</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0.3</span>
+<span class="w">    </span><span class="nt">reg_weight</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0.001</span>
+<span class="w">    </span><span class="nt">weight_decay</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0.0001</span>
+<span class="w">    </span><span class="nt">batch_size</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">2048</span>
+<span class="w">    </span><span class="nt">epochs</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">200</span>
+<span class="w">    </span><span class="nt">learning_rate</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0.001</span>
+<span class="w">    </span><span class="nt">neg_samples</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">2</span>
+</pre></div>
+</div>
+<ul class="simple">
+<li><dl class="simple">
+<dt>DCN (Deep &amp; Cross Network):</dt><dd><p>A model designed to learn explicit and bounded-degree feature interactions effectively. It consists of a Cross Network, which applies explicit feature crossing at each layer, and a Deep Network that captures implicit high-order interactions. <strong>This model requires contextual information to function properly.</strong></p>
+</dd>
+</dl>
+</li>
+</ul>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">models</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">DCN</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">embedding_size</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">64</span>
+<span class="w">    </span><span class="nt">mlp_hidden_size</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">64</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">32</span><span class="p p-Indicator">]</span>
+<span class="w">    </span><span class="nt">cross_layer_num</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">2</span>
+<span class="w">    </span><span class="nt">dropout</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0.3</span>
+<span class="w">    </span><span class="nt">reg_weight</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0.001</span>
+<span class="w">    </span><span class="nt">weight_decay</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0.0001</span>
+<span class="w">    </span><span class="nt">batch_size</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">2048</span>
+<span class="w">    </span><span class="nt">epochs</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">200</span>
+<span class="w">    </span><span class="nt">learning_rate</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0.001</span>
+<span class="w">    </span><span class="nt">neg_samples</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">2</span>
+</pre></div>
+</div>
+<ul class="simple">
+<li><dl class="simple">
 <dt>DeepFM (Deep Factorization Machines):</dt><dd><p>A neural architecture that integrates a Factorization Machine component to model low-order feature interactions and a Deep Neural Network to capture high-order interactions. Both components share the same input embedding layer and operate in parallel to predict the final score. <strong>This model requires contextual information to function properly.</strong></p>
 </dd>
 </dl>
@@ -403,6 +444,28 @@ Unlike collaborative filtering recommenders that rely solely on User-Item intera
 <span class="w">    </span><span class="nt">neg_samples</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">2</span>
 </pre></div>
 </div>
+<ul class="simple">
+<li><dl class="simple">
+<dt>xDeepFM (eXtreme Deep Factorization Machine):</dt><dd><p>A model that generates explicit high-order feature interactions at the vector-wise level using a Compressed Interaction Network (CIN). It combines the CIN with a linear part and a plain DNN to learn explicit and implicit interactions simultaneously. <strong>This model requires contextual information to function properly.</strong></p>
+</dd>
+</dl>
+</li>
+</ul>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">models</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">xDeepFM</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">embedding_size</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">64</span>
+<span class="w">    </span><span class="nt">mlp_hidden_size</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">64</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">32</span><span class="p p-Indicator">]</span>
+<span class="w">    </span><span class="nt">cin_layer_size</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">64</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">64</span><span class="p p-Indicator">]</span>
+<span class="w">    </span><span class="nt">dropout</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0.3</span>
+<span class="w">    </span><span class="nt">direct</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">False</span>
+<span class="w">    </span><span class="nt">reg_weight</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0.001</span>
+<span class="w">    </span><span class="nt">weight_decay</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0.0001</span>
+<span class="w">    </span><span class="nt">batch_size</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">2048</span>
+<span class="w">    </span><span class="nt">epochs</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">200</span>
+<span class="w">    </span><span class="nt">learning_rate</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0.001</span>
+<span class="w">    </span><span class="nt">neg_samples</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">2</span>
+</pre></div>
+</div>
 </section>
 <section id="summary-of-available-context-aware-models">
 <h2>Summary of Available Context-Aware Models<a class="headerlink" href="#summary-of-available-context-aware-models" title="Link to this heading">¶</a></h2>
@@ -421,6 +484,14 @@ Unlike collaborative filtering recommenders that rely solely on User-Item intera
 </thead>
 <tbody>
 <tr class="row-even"><td><p>Factorization-Based</p></td>
+<td><p>AFM</p></td>
+<td><p>Attentional Factorization Machine using an attention network to weigh feature interactions.</p></td>
+</tr>
+<tr class="row-odd"><td></td>
+<td><p>DCN</p></td>
+<td><p>Deep &amp; Cross Network using a Cross Network for explicit bounded-degree feature interactions.</p></td>
+</tr>
+<tr class="row-even"><td></td>
 <td><p>DeepFM</p></td>
 <td><p>Parallel combination of FM and DNN to capture both low- and high-order feature interactions.</p></td>
 </tr>
@@ -435,6 +506,10 @@ Unlike collaborative filtering recommenders that rely solely on User-Item intera
 <tr class="row-odd"><td></td>
 <td><p>WideAndDeep</p></td>
 <td><p>Joint training of a linear model (Wide) and a Deep Neural Network (Deep) for memorization and generalization.</p></td>
+</tr>
+<tr class="row-even"><td></td>
+<td><p>xDeepFM</p></td>
+<td><p>eXtreme DeepFM using Compressed Interaction Network (CIN) for vector-wise explicit interactions.</p></td>
 </tr>
 </tbody>
 </table>
