@@ -290,6 +290,19 @@ class xDeepFM(ContextRecommenderUtils, IterativeRecommender):
         contexts: Optional[Tensor] = None,
         **kwargs: Any,
     ) -> Tensor:
+        """Prediction using the xDeepFM model.
+
+        Args:
+            user_indices (Tensor): The batch of user indices.
+            *args (Any): List of arguments.
+            item_indices (Optional[Tensor]): The batch of item indices. If None,
+                full prediction will be produced.
+            contexts (Optional[Tensor]): The batch of contexts.
+            **kwargs (Any): The dictionary of keyword arguments.
+
+        Returns:
+            Tensor: The score matrix {user x item}.
+        """
         batch_size = user_indices.size(0)
 
         # Linear Parts
