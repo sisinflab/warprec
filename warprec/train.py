@@ -49,6 +49,7 @@ from warprec.recommenders.base_recommender import (
     Recommender,
     IterativeRecommender,
     SequentialRecommenderUtils,
+    ContextRecommenderUtils,
 )
 from warprec.evaluation.evaluator import Evaluator
 from warprec.evaluation.statistical_significance import compute_paired_statistical_test
@@ -261,6 +262,7 @@ def main(args: Namespace):
             info = main_dataset.info()
             n_users = info.get("n_users", None)
             n_items = info.get("n_items", None)
+            context_dims = info.get("context_dims", {})
 
             # Define simple sample to measure prediction time
             n_users_to_predict = min(1000, n_users)
@@ -271,6 +273,22 @@ def main(args: Namespace):
                 max_seq_len = best_model.max_seq_len
             else:
                 max_seq_len = 10
+
+            # Create mock data for Context-Aware models
+            contexts = None
+            if isinstance(best_model, ContextRecommenderUtils):
+                model_labels = best_model.context_labels
+
+                if model_labels:
+                    ctx_list = []
+                    for label in model_labels:
+                        dim = context_dims.get(label, 10)
+                        c_data = torch.randint(1, dim, (n_users_to_predict,)).to(
+                            device=best_model_device
+                        )
+                        ctx_list.append(c_data)
+
+                    contexts = torch.stack(ctx_list, dim=1)
 
             # Create mock data to test prediction time
             user_indices = torch.arange(n_users_to_predict).to(device=best_model_device)
@@ -295,6 +313,7 @@ def main(args: Namespace):
                 seq_len=seq_len,
                 train_batch=train_batch,
                 train_sparse=train_sparse,
+                contexts=contexts,
             )
             inference_time = time.time() - inference_time_start
 
