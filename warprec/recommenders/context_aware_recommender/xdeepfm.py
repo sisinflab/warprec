@@ -132,7 +132,6 @@ class xDeepFM(ContextRecommenderUtils, IterativeRecommender):
         cin_layer_size (List[int]): The size of CIN layers.
         dropout (float): The dropout probability.
         direct (bool): The type of output of CIN module.
-        eval_chunk_size (int): The chunk size to use in evaluation.
         reg_weight (float): The L2 regularization weight.
         weight_decay (float): The value of weight decay used in the optimizer.
         batch_size (int): The batch size used for training.
@@ -148,7 +147,6 @@ class xDeepFM(ContextRecommenderUtils, IterativeRecommender):
     cin_layer_size: List[int]
     dropout: float
     direct: bool
-    eval_chunk_size: int
     reg_weight: float
     weight_decay: float
     batch_size: int
@@ -168,6 +166,7 @@ class xDeepFM(ContextRecommenderUtils, IterativeRecommender):
         super().__init__(params, interactions, info, *args, seed=seed, **kwargs)
 
         self.block_size = kwargs.get("block_size", 50)
+        self.chunk_size = kwargs.get("chunk_size", 4096)
         self.mlp_hidden_size = list(self.mlp_hidden_size)
         self.cin_layer_size = list(self.cin_layer_size)
         self.num_fields = 2 + len(self.context_labels)
@@ -255,8 +254,8 @@ class xDeepFM(ContextRecommenderUtils, IterativeRecommender):
         all_scores = torch.empty(total_rows, device=self.device)
 
         # Loop on chunk size parameter
-        for start in range(0, total_rows, self.eval_chunk_size):
-            end = min(start + self.eval_chunk_size, total_rows)
+        for start in range(0, total_rows, self.chunk_size):
+            end = min(start + self.chunk_size, total_rows)
 
             # Slice the views
             u_chunk = u_view[start:end]

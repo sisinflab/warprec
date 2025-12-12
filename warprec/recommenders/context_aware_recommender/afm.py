@@ -53,7 +53,6 @@ class AFM(ContextRecommenderUtils, IterativeRecommender):
         embedding_size (int): The size of the latent vectors.
         attention_size (int): The size of the attention network hidden layer.
         dropout (float): The dropout probability.
-        eval_chunk_size (int): The chunk size to use in evaluation.
         reg_weight (float): The L2 regularization weight for embeddings.
         weight_decay (float): The value of weight decay used in the optimizer.
         batch_size (int): The batch size used for training.
@@ -67,7 +66,6 @@ class AFM(ContextRecommenderUtils, IterativeRecommender):
     embedding_size: int
     attention_size: int
     dropout: float
-    eval_chunk_size: int
     reg_weight: float
     weight_decay: float
     batch_size: int
@@ -87,6 +85,7 @@ class AFM(ContextRecommenderUtils, IterativeRecommender):
         super().__init__(params, interactions, info, *args, seed=seed, **kwargs)
 
         self.block_size = kwargs.get("block_size", 50)
+        self.chunk_size = kwargs.get("chunk_size", 4096)
 
         # Attention Network
         self.attention_layer = AttentionLayer(self.embedding_size, self.attention_size)
@@ -207,8 +206,8 @@ class AFM(ContextRecommenderUtils, IterativeRecommender):
         all_scores = torch.empty(total_rows, device=self.device)
 
         # Loop on chunk size parameter
-        for start in range(0, total_rows, self.eval_chunk_size):
-            end = min(start + self.eval_chunk_size, total_rows)
+        for start in range(0, total_rows, self.chunk_size):
+            end = min(start + self.chunk_size, total_rows)
 
             # Slice the views
             u_chunk = u_view[start:end]
