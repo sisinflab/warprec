@@ -322,6 +322,10 @@
 <h1>Context-Aware Recommenders<a class="headerlink" href="#context-aware-recommenders" title="Link to this heading">¶</a></h1>
 <p>The <strong>Context Recommenders</strong> module of WarpRec contains models designed to incorporate contextual information (e.g., time, location, device, session data) into the recommendation process.
 Unlike collaborative filtering recommenders that rely solely on User-Item interactions, these models leverage additional dimensions to improve prediction accuracy in specific situations.</p>
+<div class="admonition important">
+<p class="admonition-title">Important</p>
+<p>Context-Aware recommenders assume a Leave-One-Out strategy has been used to create the test/validation set. In any other case the framework will not raise an error but it will yield incorrect results.</p>
+</div>
 <p>In the following sections, you will find the list of available context-aware models within WarpRec, together with their respective parameters.</p>
 <section id="factorization-based">
 <h2>Factorization-Based<a class="headerlink" href="#factorization-based" title="Link to this heading">¶</a></h2>

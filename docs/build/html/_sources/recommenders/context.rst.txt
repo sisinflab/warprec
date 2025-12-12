@@ -5,6 +5,9 @@ Context-Aware Recommenders
 The **Context Recommenders** module of WarpRec contains models designed to incorporate contextual information (e.g., time, location, device, session data) into the recommendation process.
 Unlike collaborative filtering recommenders that rely solely on User-Item interactions, these models leverage additional dimensions to improve prediction accuracy in specific situations.
 
+.. important::
+  Context-Aware recommenders assume a Leave-One-Out strategy has been used to create the test/validation set. In any other case the framework will not raise an error but it will yield incorrect results.
+
 In the following sections, you will find the list of available context-aware models within WarpRec, together with their respective parameters.
 
 ===================
