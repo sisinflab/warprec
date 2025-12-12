@@ -1,6 +1,6 @@
 import torch
 from torch import nn, Tensor
-from typing import Any, Optional
+from typing import Any, Optional, List
 
 from warprec.recommenders.base_recommender import (
     IterativeRecommender,
@@ -53,6 +53,7 @@ class AFM(ContextRecommenderUtils, IterativeRecommender):
         embedding_size (int): The size of the latent vectors.
         attention_size (int): The size of the attention network hidden layer.
         dropout (float): The dropout probability.
+        eval_chunk_size (int): The chunk size to use in evaluation.
         reg_weight (float): The L2 regularization weight for embeddings.
         weight_decay (float): The value of weight decay used in the optimizer.
         batch_size (int): The batch size used for training.
@@ -66,6 +67,7 @@ class AFM(ContextRecommenderUtils, IterativeRecommender):
     embedding_size: int
     attention_size: int
     dropout: float
+    eval_chunk_size: int
     reg_weight: float
     weight_decay: float
     batch_size: int
@@ -119,7 +121,7 @@ class AFM(ContextRecommenderUtils, IterativeRecommender):
         self.apply(self._init_weights)
 
     def _compute_afm_interaction(self, stacked_embeddings: Tensor) -> Tensor:
-        """Computes the AFM interaction part"""
+        """Computes the AFM interaction part."""
         # Pair-wise Interaction Layer
         # [batch_size, num_pairs, embedding_size]
         p = stacked_embeddings[:, self.p_idx]  # type: ignore[index]
@@ -179,6 +181,52 @@ class AFM(ContextRecommenderUtils, IterativeRecommender):
 
         return linear_part + afm_part
 
+    def _compute_network_scores(
+        self,
+        u_emb: Tensor,
+        i_emb: Tensor,
+        ctx_emb_list: List[Tensor],
+        batch_size: int,
+        num_items: int,
+    ) -> Tensor:
+        """Compute scores of AFM interaction part efficiently using chunking."""
+        total_rows = batch_size * num_items
+
+        # Create memory efficient view
+        u_view = u_emb.unsqueeze(1).expand(-1, num_items, -1).reshape(total_rows, -1)
+
+        ctx_views = []
+        for c in ctx_emb_list:
+            ctx_views.append(
+                c.unsqueeze(1).expand(-1, num_items, -1).reshape(total_rows, -1)
+            )
+
+        i_view = i_emb.reshape(total_rows, -1)
+
+        # Pre-allocate tensor to memory
+        all_scores = torch.empty(total_rows, device=self.device)
+
+        # Loop on chunk size parameter
+        for start in range(0, total_rows, self.eval_chunk_size):
+            end = min(start + self.eval_chunk_size, total_rows)
+
+            # Slice the views
+            u_chunk = u_view[start:end]
+            i_chunk = i_view[start:end]
+            c_chunks = [c[start:end] for c in ctx_views]
+
+            # Materialize ONLY the chunk
+            # NOTE: This will actually use memory
+            chunk_stack = torch.stack([u_chunk, i_chunk] + c_chunks, dim=1)
+
+            # Compute AFM Interaction
+            afm_s = self._compute_afm_interaction(chunk_stack)
+
+            # Save in place
+            all_scores[start:end] = afm_s
+
+        return all_scores.view(batch_size, num_items)
+
     @torch.no_grad()
     def predict(
         self,
@@ -205,70 +253,48 @@ class AFM(ContextRecommenderUtils, IterativeRecommender):
 
         # Linear Fixed
         fixed_linear = self.global_bias + self.user_bias(user_indices).squeeze(-1)
+        for idx, name in enumerate(self.context_labels):
+            fixed_linear += self.context_bias[name](contexts[:, idx]).squeeze(-1)
 
         # Embeddings Fixed
-        # NOTE: We need to respect the order: User (idx 0), Item (idx 1), Contexts (idx 2+)
         u_emb = self.user_embedding(user_indices)  # [batch_size, embedding_size]
-
-        ctx_emb_list = []
-        for idx, name in enumerate(self.context_labels):
-            ctx_input = contexts[:, idx]
-            fixed_linear += self.context_bias[name](ctx_input).squeeze(-1)
-            ctx_emb_list.append(self.context_embedding[name](ctx_input))
+        ctx_emb_list = [
+            self.context_embedding[name](contexts[:, idx])
+            for idx, name in enumerate(self.context_labels)
+        ]
 
         if item_indices is None:
             # Case 'full': iterate through all items in memory-safe blocks
             preds_list = []
 
-            # Prepare Fixed Embeddings for broadcasting
-            u_emb_exp = u_emb.unsqueeze(1).unsqueeze(2)
-
-            # Contexts
-            ctx_emb_exp_list = [c.unsqueeze(1).unsqueeze(2) for c in ctx_emb_list]
-
             for start in range(0, self.n_items, self.block_size):
                 end = min(start + self.block_size, self.n_items)
-                current_block_size = end - start
+                current_block_len = end - start
 
                 items_block = torch.arange(start, end, device=self.device)
 
                 # Item Embeddings and Bias
-                item_emb = self.item_embedding(
-                    items_block
-                )  # [block_size, embedding_size]
-                item_b = self.item_bias(items_block).squeeze(-1)  # [block_size]
+                item_emb_block = self.item_embedding(items_block)
+                item_bias_block = self.item_bias(items_block).squeeze(-1)
 
-                # Linear Part
-                linear_pred = fixed_linear.unsqueeze(1) + item_b.unsqueeze(
-                    0
-                )  # [batch_size, block_size]
-
-                # AFM Part
-                # Expand Fixed to match block size: [batch_size, block_size, 1, embedding_size]
-                u_batch = u_emb_exp.expand(-1, current_block_size, -1, -1)
-                c_batch_list = [
-                    c.expand(-1, current_block_size, -1, -1) for c in ctx_emb_exp_list
-                ]
+                # Linear Part: [batch_size, 1] + [block_size] -> [batch_size, block_size]
+                linear_pred = fixed_linear.unsqueeze(1) + item_bias_block.unsqueeze(0)
 
                 # Expand Item to match batch size
-                i_batch = item_emb.view(
-                    1, current_block_size, 1, self.embedding_size
-                ).expand(batch_size, -1, -1, -1)
-
-                # Concatenate in correct order: User, Item, Contexts
-                # [batch_size, block_size, num_fields, embedding_size]
-                stack_block = torch.cat([u_batch, i_batch] + c_batch_list, dim=2)
-
-                # Flatten for computation: [batch_size * block_size, num_fields, embedding_size]
-                stack_flat = stack_block.view(-1, self.num_fields, self.embedding_size)
-
-                # Compute
-                afm_pred_flat = self._compute_afm_interaction(stack_flat)
-
-                # Reshape and Add
-                preds_list.append(
-                    linear_pred + afm_pred_flat.view(batch_size, current_block_size)
+                item_emb_expanded = item_emb_block.unsqueeze(0).expand(
+                    batch_size, -1, -1
                 )
+
+                # Compute AFM scores efficiently
+                afm_scores = self._compute_network_scores(
+                    u_emb,
+                    item_emb_expanded,
+                    ctx_emb_list,
+                    batch_size,
+                    current_block_len,
+                )
+
+                preds_list.append(linear_pred + afm_scores)
 
             return torch.cat(preds_list, dim=1)
 
@@ -280,26 +306,15 @@ class AFM(ContextRecommenderUtils, IterativeRecommender):
             item_emb = self.item_embedding(
                 item_indices
             )  # [batch_size, pad_seq, embedding_size]
-            item_b = self.item_bias(item_indices).squeeze(-1)  # [batch_size, pad_seq]
+            item_bias = self.item_bias(item_indices).squeeze(
+                -1
+            )  # [batch_size, pad_seq]
 
-            linear_pred = fixed_linear.unsqueeze(1) + item_b
+            linear_pred = fixed_linear.unsqueeze(1) + item_bias
 
-            # AFM Part
-            # [batch_size, pad_seq, 1, embedding_size]
-            u_batch = u_emb.unsqueeze(1).unsqueeze(2).expand(-1, pad_seq, -1, -1)
-            i_batch = item_emb.unsqueeze(2)
-
-            # Contexts
-            c_batch_list = [
-                c.unsqueeze(1).unsqueeze(2).expand(-1, pad_seq, -1, -1)
-                for c in ctx_emb_list
-            ]
-
-            stack_block = torch.cat([u_batch, i_batch] + c_batch_list, dim=2)
-            stack_flat = stack_block.view(-1, self.num_fields, self.embedding_size)
-
-            afm_pred = self._compute_afm_interaction(stack_flat).view(
-                batch_size, pad_seq
+            # Compute AFM scores efficiently
+            afm_scores = self._compute_network_scores(
+                u_emb, item_emb, ctx_emb_list, batch_size, pad_seq
             )
 
-            return linear_pred + afm_pred
+            return linear_pred + afm_scores
