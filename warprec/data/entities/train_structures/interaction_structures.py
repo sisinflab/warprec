@@ -1,4 +1,4 @@
-from typing import Tuple
+from typing import Tuple, Optional
 
 import torch
 import numpy as np
@@ -69,86 +69,97 @@ class LazyItemRatingDataset(Dataset):
     newly sampled negative interaction (rating=0.0).
 
     Args:
+        user_ids (np.ndarray): The Numpy array of user ids aligned with the items.
+        item_ids (np.ndarray): The Numpy array of item ids aligned with the users.
         sparse_matrix (csr_matrix): The user-item interaction matrix in CSR format.
         neg_samples (int): The number of negative samples to generate for each
             positive interaction.
         niid (int): The total number of unique items for negative sampling.
         seed (int): A random seed to ensure reproducibility of negative sampling.
+        contexts (Optional[Tensor]): The tensor containing the context information
+            of each interaction.
+
+    Raises:
+        ValueError: If arrays length mismatch.
     """
 
     def __init__(
         self,
+        user_ids: np.ndarray,
+        item_ids: np.ndarray,
         sparse_matrix: csr_matrix,
         neg_samples: int,
         niid: int,
         seed: int = 42,
+        contexts: Optional[Tensor] = None,
     ):
+        self.user_ids = user_ids
+        self.item_ids = item_ids
         self.sparse_matrix = sparse_matrix
         self.neg_samples = neg_samples
         self.niid = niid
         self.seed = seed
+        self.contexts = contexts
+        self.num_positives = len(self.user_ids)
 
-        # The COO format is ideal for getting a flat list of all positive interactions
-        sparse_matrix_coo = self.sparse_matrix.tocoo()
-        self.pos_users = sparse_matrix_coo.row
-        self.pos_items = sparse_matrix_coo.col
-        self.num_positives = self.sparse_matrix.nnz
+        # Safety check
+        if len(self.user_ids) != len(self.item_ids):
+            raise ValueError("User and Item arrays must have the same length.")
+        if self.contexts is not None and len(self.contexts) != self.num_positives:
+            raise ValueError("Context tensor length mismatch.")
 
     def __len__(self) -> int:
         """Returns the total number of samples (positive + negative)."""
         # For each positive sample, we have 1 positive + neg_samples negatives
         return self.num_positives * (1 + self.neg_samples)
 
-    def __getitem__(self, idx: int) -> Tuple[Tensor, Tensor, Tensor]:
+    def __getitem__(self, idx: int) -> Tuple[Tensor, ...]:
         """Generates and returns a single (user, item, rating) triplet.
 
         Args:
             idx (int): The index of the sample to generate.
 
         Returns:
-            Tuple[Tensor, Tensor, Tensor]: A tuple containing (user_id, item_id, rating).
+            Tuple[Tensor, ...]: A tuple containing (user_id, item_id, rating).
         """
-        if self.neg_samples == 0:
-            # If no negative sampling, idx directly maps to a positive interaction.
-            user = self.pos_users[idx]
-            item = self.pos_items[idx]
+        # Map the indices
+        pos_interaction_idx = idx // (1 + self.neg_samples)
+        sample_offset = idx % (1 + self.neg_samples)
+
+        # Retrieve the user
+        user = self.user_ids[pos_interaction_idx]
+
+        if sample_offset == 0:
+            # Positive sample
+            item = self.item_ids[pos_interaction_idx]
             rating = 1.0
         else:
-            # Determine if this index corresponds to a positive or negative sample.
-            # Each positive interaction is the head of a "block" of size (1 + neg_samples)
-            pos_interaction_idx = idx // (1 + self.neg_samples)
-            sample_offset = idx % (1 + self.neg_samples)
+            # Negative sample
+            rating = 0.0
 
-            user = self.pos_users[pos_interaction_idx]
+            # Define the set of seen items
+            user_pos_set = set(self.sparse_matrix[user].indices)
 
-            if sample_offset == 0:
-                # This is the positive sample
-                item = self.pos_items[pos_interaction_idx]
-                rating = 1.0
-            else:
-                # This is a negative sample. We need to generate one
-                rating = 0.0
+            # Deterministic rng for reproducibility
+            rng = np.random.default_rng(
+                seed=(self.seed, pos_interaction_idx, sample_offset)
+            )
 
-                # Get the set of items this user has interacted with for efficient collision checking
-                user_pos_set = set(self.sparse_matrix[user].indices)
+            while True:
+                candidate_item = rng.integers(0, self.niid)
+                if candidate_item not in user_pos_set:
+                    item = candidate_item
+                    break
 
-                # Use a unique, deterministic RNG for this specific negative sample slot
-                # to ensure perfect reproducibility
-                rng = np.random.default_rng(
-                    seed=(self.seed, pos_interaction_idx, sample_offset)
-                )
-
-                # Keep sampling until a valid negative item is found
-                while True:
-                    candidate_item = rng.integers(0, self.niid)
-                    if candidate_item not in user_pos_set:
-                        item = candidate_item
-                        break
-
-        # Convert to tensors for the DataLoader
+        # Convert to tensor
         user_tensor = torch.tensor(user, dtype=torch.long)
         item_tensor = torch.tensor(item, dtype=torch.long)
         rating_tensor = torch.tensor(rating, dtype=torch.float)
+
+        # Handle context if required
+        if self.contexts is not None:
+            context_tensor = self.contexts[pos_interaction_idx]
+            return user_tensor, item_tensor, rating_tensor, context_tensor
 
         return user_tensor, item_tensor, rating_tensor
 

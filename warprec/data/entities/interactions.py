@@ -324,11 +324,34 @@ class Interactions:
         if low_memory:
             sparse_matrix = self.get_sparse()
 
+            # Extract positive interaction information
+            pos_users_np = (
+                self._inter_df[self._user_label].map(self._umap).values.astype(np.int64)
+            )
+            pos_items_np = (
+                self._inter_df[self._item_label].map(self._imap).values.astype(np.int64)
+            )
+
+            # Prepare the context
+            context_tensor = None
+            if include_context:
+                if not self._context_labels:
+                    raise ValueError(
+                        "Requested to include context but no context label passed."
+                    )
+
+                context_values = self._inter_df[self._context_labels].values
+                context_tensor = torch.tensor(context_values, dtype=torch.long)
+
+            # Create the lazy dataset
             lazy_dataset = LazyItemRatingDataset(
+                user_ids=pos_users_np,
+                item_ids=pos_items_np,
                 sparse_matrix=sparse_matrix,
                 neg_samples=neg_samples,
                 niid=self._niid,
                 seed=seed,
+                contexts=context_tensor,
             )
 
             # Edge case: No interactions
