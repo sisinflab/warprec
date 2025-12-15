@@ -1,8 +1,8 @@
 ###########################
-Content Based Recommenders
+Content-Based Recommenders
 ###########################
 
-The **Content Based Recommenders** module of WarpRec focuses on generating recommendations by analyzing item attributes and comparing them with user preferences.
+The **Content-Based Recommenders** module of WarpRec focuses on generating recommendations by analyzing item attributes and comparing them with user preferences.
 These models rely on side information (e.g., tags, descriptions, metadata) to build user profiles and match them with similar items.
 They are particularly useful in cold-start scenarios or when collaborative signals are sparse.
 

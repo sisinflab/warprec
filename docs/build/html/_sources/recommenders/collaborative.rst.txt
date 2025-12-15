@@ -1,8 +1,8 @@
 ######################
-General Recommenders
+Collaborative-Filtering Recommenders
 ######################
 
-The **General Recommenders** module of WarpRec is a collection of collaborative and content-based models.
+The **Collaborative-Filtering Recommenders** module of WarpRec is a collection of collaborative models.
 In the following sections you will find the list of available models within WarpRec, together with their respective parameters.
 These models can be used as-is or customized to fit experimental needs.
 
