@@ -134,8 +134,13 @@ def main(args: Namespace):
         f"Data preparation completed in {data_preparation_time:.2f} seconds."
     )
     model_timing_report = []
+
     # Before starting training process, initialize Ray
-    ray.init(runtime_env={"py_modules": config.general.custom_models})
+    py_modules = (
+        [] if config.general.custom_models is None else config.general.custom_models
+    )
+    py_modules.extend(["warprec"])  # type: ignore[union-attr]
+    ray.init(runtime_env={"py_modules": py_modules})
 
     for model_name in models:
         model_exploration_start_time = time.time()
