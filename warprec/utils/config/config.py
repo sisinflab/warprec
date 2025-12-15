@@ -242,7 +242,7 @@ class TrainConfiguration(WarpRecConfiguration):
         """
         parsed_models = {}
 
-        # Check if context-aware model is in the experiment
+        # Check if Context-Aware model is in the experiment
         from warprec.recommenders.base_recommender import ContextRecommenderUtils
 
         for model_name in self.models.keys():
@@ -250,7 +250,7 @@ class TrainConfiguration(WarpRecConfiguration):
 
             if issubclass(model_instance, ContextRecommenderUtils):
                 logger.attention(
-                    f"The model {model_name} is a contextual model. "
+                    f"The model {model_name} is a Context-Aware model. "
                     "Leave-One-Out splitting strategy is advised for a correct evaluation."
                 )
 
