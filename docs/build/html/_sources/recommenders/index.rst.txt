@@ -13,6 +13,7 @@ Recommenders
    hybrid
    context
    sequential
+   unpersonalized
    proxy
    guide/index
 
