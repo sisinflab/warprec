@@ -242,6 +242,18 @@ class TrainConfiguration(WarpRecConfiguration):
         """
         parsed_models = {}
 
+        # Check if context-aware model is in the experiment
+        from warprec.recommenders.base_recommender import ContextRecommenderUtils
+
+        for model_name in self.models.keys():
+            model_instance = model_registry.get_class(model_name)
+
+            if issubclass(model_instance, ContextRecommenderUtils):
+                logger.attention(
+                    f"The model {model_name} is a contextual model. "
+                    "Leave-One-Out splitting strategy is advised for a correct evaluation."
+                )
+
         for model_name, model_data in self.models.items():
             model_class: RecomModel
             if model_name.upper() not in model_registry.list_registered():
