@@ -389,13 +389,13 @@ def dataset_preparation(
     ]
     has_classic = any(
         [
-            not isinstance(model_class, ContextRecommenderUtils)
+            not issubclass(model_class, ContextRecommenderUtils)
             for model_class in model_classes
         ]
     )
     has_context = any(
         [
-            isinstance(model_class, ContextRecommenderUtils)
+            issubclass(model_class, ContextRecommenderUtils)
             for model_class in model_classes
         ]
     )
