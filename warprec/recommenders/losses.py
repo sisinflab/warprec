@@ -91,6 +91,54 @@ class EmbLoss(nn.Module):
         return l2_reg
 
 
+class InfoNCELoss(nn.Module):
+    """InfoNCE Loss (Noise Contrastive Estimation).
+
+    Calculates the contrastive loss between two views of the same batch of nodes.
+    It maximizes the similarity between positive pairs (diagonal elements) and
+    minimizes the similarity with negative pairs (off-diagonal elements).
+
+    Formula:
+        L = -log( exp(sim(u, u') / tau) / sum(exp(sim(u, v') / tau)) )
+          = -sim(u, u')/tau + logsumexp(sim(u, v')/tau)
+
+    Args:
+        temperature (float): The temperature parameter (tau) to scale the similarities.
+            Default: 0.1.
+    """
+
+    def __init__(self, temperature: float = 0.1):
+        super().__init__()
+        self.temperature = temperature
+
+    def forward(self, view1: Tensor, view2: Tensor) -> Tensor:
+        """Compute the InfoNCE loss.
+
+        Args:
+            view1 (Tensor): First batch of embeddings [batch_size, dim].
+            view2 (Tensor): Second batch of embeddings [batch_size, dim].
+
+        Returns:
+            Tensor: The computed scalar loss.
+        """
+        # Normalize embeddings to unit sphere
+        view1 = F.normalize(view1, p=2, dim=1)
+        view2 = F.normalize(view2, p=2, dim=1)
+
+        # Compute similarity matrix [batch_size, batch_size]
+        # logits = (v1 * v2.T) / tau
+        logits = torch.mm(view1, view2.t()) / self.temperature
+
+        # Positive scores are on the diagonal (i-th element of view1 matches i-th of view2)
+        pos_scores = torch.diag(logits)
+
+        # Loss calculation using LogSumExp for numerical stability
+        # Loss = -pos_score + log(sum(exp(all_scores)))
+        loss = -pos_scores + torch.logsumexp(logits, dim=1)
+
+        return loss.mean()
+
+
 class MultiDAELoss(nn.Module):
     """MultiDAELoss, used to train MultiDAE model.
 

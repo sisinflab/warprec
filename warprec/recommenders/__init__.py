@@ -14,7 +14,7 @@ from .base_recommender import (
     ItemSimRecommender,
 )
 from .layers import MLP, CNN, FactorizationMachine
-from .losses import BPRLoss, EmbLoss, MultiDAELoss, MultiVAELoss
+from .losses import BPRLoss, EmbLoss, InfoNCELoss, MultiDAELoss, MultiVAELoss
 from .similarities import Similarity
 from .loops import train_loop
 
@@ -37,6 +37,7 @@ __all__ = [
     "FactorizationMachine",
     "BPRLoss",
     "EmbLoss",
+    "InfoNCELoss",
     "MultiDAELoss",
     "MultiVAELoss",
     "Similarity",
