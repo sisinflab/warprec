@@ -5,6 +5,7 @@ __all__ = ["RP3Beta"]
 try:
     from .graph_utils import GraphRecommenderUtils, SparseDropout  # noqa: F401
     from .egcf import EGCF  # noqa: F401
+    from .esigcf import ESIGCF  # noqa: F401
     from .gcmc import GCMC  # noqa: F401
     from .lightgcn import LightGCN  # noqa: F401
     from .lightgcnpp import LightGCNpp  # noqa: F401
@@ -16,12 +17,14 @@ try:
         [
             "GCMC",
             "EGCF",
+            "ESIGCF",
             "GraphRecommenderUtils",
             "SparseDropout",
             "NGCFLayer",
             "LightGCN",
             "LightGCNpp",
             "NGCF",
+            "UltraGCN",
             "XSimGCL",
         ]
     )
@@ -47,6 +50,17 @@ except ImportError:
         def __init__(self, *args, **kwargs):
             raise ImportError(
                 "EGCF model requires PyG dependencies. "
+                "Please install following the documentation you can find here: "
+                "https://pytorch-geometric.readthedocs.io/en/latest/install/installation.html"
+            )
+
+    @model_registry.register("ESIGCF")
+    class ESIGCF:  # type: ignore[no-redef]
+        """Placeholder for ESIGCF model when PyG dependencies are not installed."""
+
+        def __init__(self, *args, **kwargs):
+            raise ImportError(
+                "ESIGCF model requires PyG dependencies. "
                 "Please install following the documentation you can find here: "
                 "https://pytorch-geometric.readthedocs.io/en/latest/install/installation.html"
             )
