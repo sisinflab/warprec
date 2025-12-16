@@ -4,6 +4,7 @@ __all__ = ["RP3Beta"]
 
 try:
     from .graph_utils import GraphRecommenderUtils, SparseDropout  # noqa: F401
+    from .egcf import EGCF  # noqa: F401
     from .gcmc import GCMC  # noqa: F401
     from .lightgcn import LightGCN  # noqa: F401
     from .lightgcnpp import LightGCNpp  # noqa: F401
@@ -13,6 +14,7 @@ try:
     __all__.extend(
         [
             "GCMC",
+            "EGCF",
             "GraphRecommenderUtils",
             "SparseDropout",
             "NGCFLayer",
@@ -33,6 +35,17 @@ except ImportError:
         def __init__(self, *args, **kwargs):
             raise ImportError(
                 "GCMC model requires PyG dependencies. "
+                "Please install following the documentation you can find here: "
+                "https://pytorch-geometric.readthedocs.io/en/latest/install/installation.html"
+            )
+
+    @model_registry.register("EGCF")
+    class EGCF:  # type: ignore[no-redef]
+        """Placeholder for EGCF model when PyG dependencies are not installed."""
+
+        def __init__(self, *args, **kwargs):
+            raise ImportError(
+                "EGCF model requires PyG dependencies. "
                 "Please install following the documentation you can find here: "
                 "https://pytorch-geometric.readthedocs.io/en/latest/install/installation.html"
             )
