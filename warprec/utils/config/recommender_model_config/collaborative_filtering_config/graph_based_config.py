@@ -104,6 +104,87 @@ class EGCF(RecomModel):
         return validate_greater_than_zero(cls, v, "learning_rate")
 
 
+@params_registry.register("ESIGCF")
+class ESIGCF(RecomModel):
+    """Definition of the model ESIGCF.
+
+    Attributes:
+        embedding_size (INT_FIELD): List of values for embedding_size.
+        n_layers (INT_FIELD): List of values for n_layers.
+        reg_weight (FLOAT_FIELD): List of values for reg_weight.
+        ssl_lambda (FLOAT_FIELD): List of values for ssl_lambda.
+        can_lambda (FLOAT_FIELD): List of values for can_lambda.
+        temperature (FLOAT_FIELD): List of values for temperature.
+        batch_size (INT_FIELD): List of values for batch_size.
+        epochs (INT_FIELD): List of values for epochs.
+        learning_rate (FLOAT_FIELD): List of values for learning rate.
+    """
+
+    embedding_size: INT_FIELD
+    n_layers: INT_FIELD
+    reg_weight: FLOAT_FIELD
+    ssl_lambda: FLOAT_FIELD
+    can_lambda: FLOAT_FIELD
+    temperature: FLOAT_FIELD
+    batch_size: INT_FIELD
+    epochs: INT_FIELD
+    learning_rate: FLOAT_FIELD
+
+    @field_validator("embedding_size")
+    @classmethod
+    def check_embedding_size(cls, v: list):
+        """Validate embedding_size."""
+        return validate_greater_than_zero(cls, v, "embedding_size")
+
+    @field_validator("n_layers")
+    @classmethod
+    def check_n_layers(cls, v: list):
+        """Validate n_layers."""
+        return validate_greater_than_zero(cls, v, "n_layers")
+
+    @field_validator("ssl_lambda")
+    @classmethod
+    def check_ssl_lambda(cls, v: list):
+        """Validate ssl_lambda."""
+        return validate_greater_equal_than_zero(cls, v, "ssl_lambda")
+
+    @field_validator("can_lambda")
+    @classmethod
+    def check_can_lambda(cls, v: list):
+        """Validate can_lambda."""
+        return validate_greater_equal_than_zero(cls, v, "can_lambda")
+
+    @field_validator("temperature")
+    @classmethod
+    def check_temperature(cls, v: list):
+        """Validate temperature."""
+        return validate_greater_than_zero(cls, v, "temperature")
+
+    @field_validator("reg_weight")
+    @classmethod
+    def check_reg_weight(cls, v: list):
+        """Validate reg_weight."""
+        return validate_greater_equal_than_zero(cls, v, "reg_weight")
+
+    @field_validator("batch_size")
+    @classmethod
+    def check_batch_size(cls, v: list):
+        """Validate batch_size."""
+        return validate_greater_than_zero(cls, v, "batch_size")
+
+    @field_validator("epochs")
+    @classmethod
+    def check_epochs(cls, v: list):
+        """Validate epochs."""
+        return validate_greater_than_zero(cls, v, "epochs")
+
+    @field_validator("learning_rate")
+    @classmethod
+    def check_learning_rate(cls, v: list):
+        """Validate learning_rate."""
+        return validate_greater_than_zero(cls, v, "learning_rate")
+
+
 @params_registry.register("GCMC")
 class GCMC(RecomModel):
     """Definition of the model GCMC.
