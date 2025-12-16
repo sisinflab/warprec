@@ -242,6 +242,71 @@ class GCMC(RecomModel):
         return validate_greater_than_zero(cls, v, "learning_rate")
 
 
+@params_registry.register("LightCCF")
+class LightCCF(RecomModel):
+    """Definition of the model LightCCF.
+
+    Attributes:
+        embedding_size (INT_FIELD): List of values for embedding_size.
+        n_layers (INT_FIELD): List of values for n_layers.
+        alpha (FLOAT_FIELD): List of values for alpha.
+        temperature (FLOAT_FIELD): List of values for temperature.
+        reg_weight (FLOAT_FIELD): List of values for reg_weight.
+        batch_size (INT_FIELD): List of values for batch_size.
+        epochs (INT_FIELD): List of values for epochs.
+        learning_rate (FLOAT_FIELD): List of values for learning rate.
+    """
+
+    embedding_size: INT_FIELD
+    n_layers: INT_FIELD
+    alpha: FLOAT_FIELD
+    temperature: FLOAT_FIELD
+    reg_weight: FLOAT_FIELD
+    batch_size: INT_FIELD
+    epochs: INT_FIELD
+    learning_rate: FLOAT_FIELD
+
+    @field_validator("embedding_size")
+    @classmethod
+    def check_embedding_size(cls, v: list):
+        return validate_greater_than_zero(cls, v, "embedding_size")
+
+    @field_validator("n_layers")
+    @classmethod
+    def check_n_layers(cls, v: list):
+        return validate_greater_equal_than_zero(cls, v, "n_layers")
+
+    @field_validator("alpha")
+    @classmethod
+    def check_alpha(cls, v: list):
+        return validate_greater_equal_than_zero(cls, v, "alpha")
+
+    @field_validator("temperature")
+    @classmethod
+    def check_temperature(cls, v: list):
+        return validate_greater_than_zero(cls, v, "temperature")
+
+    @field_validator("reg_weight")
+    @classmethod
+    def check_reg_weight(cls, v: list):
+        return validate_greater_equal_than_zero(cls, v, "reg_weight")
+
+    @field_validator("batch_size")
+    @classmethod
+    def check_batch_size(cls, v: list):
+        return validate_greater_than_zero(cls, v, "batch_size")
+
+    @field_validator("epochs")
+    @classmethod
+    def check_epochs(cls, v: list):
+        return validate_greater_than_zero(cls, v, "epochs")
+
+    @field_validator("learning_rate")
+    @classmethod
+    def check_learning_rate(cls, v: list):
+        return validate_greater_than_zero(cls, v, "learning_rate")
+
+
 @params_registry.register("LightGCN")
 class LightGCN(RecomModel):
     """Definition of the model LightGCN.
