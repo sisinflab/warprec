@@ -101,6 +101,23 @@ They are well-suited for uncovering complex patterns in sparse datasets.
       epochs: 200
       learning_rate: 0.001
 
+- ESIGCF (Extremely Simplified but Intent-enhanced Graph Collaborative Filtering):
+  A simplified graph model that removes explicit user embeddings and utilizes Joint Graph Convolution (JoGCN) with hybrid normalization. It integrates intent-aware contrastive learning to capture user intents without requiring data augmentation.
+
+.. code-block:: yaml
+
+  models:
+    ESIGCF:
+      embedding_size: 64
+      n_layers: 3
+      ssl_lambda: 0.1
+      can_lambda: 0.1
+      temperature: 0.1
+      reg_weight: 0.001
+      batch_size: 2048
+      epochs: 200
+      learning_rate: 0.001
+
 - GCMC (Graph Convolutional Matrix Completion):
   A graph autoencoder designed for explicit feedback. It treats different rating values as distinct edge types in the user-item graph and learns embeddings using a graph convolutional encoder. A decoder then predicts rating probabilities. **This model requires explicit ratings to function properly**.
 
@@ -366,6 +383,9 @@ Summary of Available General Models
    * - Graph Based
      - EGCF
      - Embedding-less graph model using contrastive learning.
+   * -
+     - ESIGCF
+     - Simplified JoGCN with intent-aware contrastive learning.
    * -
      - GCMC
      - Graph autoencoder for explicit feedback using multi-relational convolutions.

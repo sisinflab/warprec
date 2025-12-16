@@ -415,6 +415,23 @@ A simplified graph model that removes user embeddings, learning only item embedd
 </pre></div>
 </div>
 <ul class="simple">
+<li><p>ESIGCF (Extremely Simplified but Intent-enhanced Graph Collaborative Filtering):
+A simplified graph model that removes explicit user embeddings and utilizes Joint Graph Convolution (JoGCN) with hybrid normalization. It integrates intent-aware contrastive learning to capture user intents without requiring data augmentation.</p></li>
+</ul>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">models</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">ESIGCF</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">embedding_size</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">64</span>
+<span class="w">    </span><span class="nt">n_layers</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">3</span>
+<span class="w">    </span><span class="nt">ssl_lambda</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0.1</span>
+<span class="w">    </span><span class="nt">can_lambda</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0.1</span>
+<span class="w">    </span><span class="nt">temperature</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0.1</span>
+<span class="w">    </span><span class="nt">reg_weight</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0.001</span>
+<span class="w">    </span><span class="nt">batch_size</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">2048</span>
+<span class="w">    </span><span class="nt">epochs</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">200</span>
+<span class="w">    </span><span class="nt">learning_rate</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0.001</span>
+</pre></div>
+</div>
+<ul class="simple">
 <li><p>GCMC (Graph Convolutional Matrix Completion):
 A graph autoencoder designed for explicit feedback. It treats different rating values as distinct edge types in the user-item graph and learns embeddings using a graph convolutional encoder. A decoder then predicts rating probabilities. <strong>This model requires explicit ratings to function properly</strong>.</p></li>
 </ul>
@@ -685,62 +702,66 @@ Combines Generalized Matrix Factorization (GMF) with a Multi-Layer Perceptron (M
 <td><p>Embedding-less graph model using contrastive learning.</p></td>
 </tr>
 <tr class="row-odd"><td></td>
+<td><p>ESIGCF</p></td>
+<td><p>Simplified JoGCN with intent-aware contrastive learning.</p></td>
+</tr>
+<tr class="row-even"><td></td>
 <td><p>GCMC</p></td>
 <td><p>Graph autoencoder for explicit feedback using multi-relational convolutions.</p></td>
 </tr>
-<tr class="row-even"><td></td>
+<tr class="row-odd"><td></td>
 <td><p>LightGCN</p></td>
 <td><p>Simplified Graph convolutional neural network.</p></td>
 </tr>
-<tr class="row-odd"><td></td>
+<tr class="row-even"><td></td>
 <td><p>LightGCN++</p></td>
 <td><p>Improved LightGCN with asymmetric normalization and residual connections.</p></td>
 </tr>
-<tr class="row-even"><td></td>
+<tr class="row-odd"><td></td>
 <td><p>NGCF</p></td>
 <td><p>Complex Graph convolutional neural network.</p></td>
 </tr>
-<tr class="row-odd"><td></td>
+<tr class="row-even"><td></td>
 <td><p>RP3Beta</p></td>
 <td><p>Random walk model with popularity penalization.</p></td>
 </tr>
-<tr class="row-even"><td></td>
+<tr class="row-odd"><td></td>
 <td><p>UltraGCN</p></td>
 <td><p>Efficient GCN approximation using constraint losses without message passing.</p></td>
 </tr>
-<tr class="row-odd"><td></td>
+<tr class="row-even"><td></td>
 <td><p>XSimGCL</p></td>
 <td><p>Graph contrastive learning with noise perturbation.</p></td>
 </tr>
-<tr class="row-even"><td><p>KNN</p></td>
+<tr class="row-odd"><td><p>KNN</p></td>
 <td><p>ItemKNN</p></td>
 <td><p>Item-based collaborative KNN using similarity metrics.</p></td>
 </tr>
-<tr class="row-odd"><td></td>
+<tr class="row-even"><td></td>
 <td><p>UserKNN</p></td>
 <td><p>User-based collaborative KNN using historical interactions.</p></td>
 </tr>
-<tr class="row-even"><td><p>Latent Factor</p></td>
+<tr class="row-odd"><td><p>Latent Factor</p></td>
 <td><p>ADMMSlim</p></td>
 <td><p>Sparse item similarity model optimized via ADMM.</p></td>
 </tr>
-<tr class="row-odd"><td></td>
+<tr class="row-even"><td></td>
 <td><p>BPR</p></td>
 <td><p>Pairwise ranking model for implicit feedback.</p></td>
 </tr>
-<tr class="row-even"><td></td>
+<tr class="row-odd"><td></td>
 <td><p>FISM</p></td>
 <td><p>Efficient item similarity model using weighted average as user embeddings.</p></td>
 </tr>
-<tr class="row-odd"><td></td>
+<tr class="row-even"><td></td>
 <td><p>SLIM</p></td>
 <td><p>Interpretable item similarity model with L1/L2 regularization.</p></td>
 </tr>
-<tr class="row-even"><td><p>Neural</p></td>
+<tr class="row-odd"><td><p>Neural</p></td>
 <td><p>ConvNCF</p></td>
 <td><p>Applies CNNs to user-item embeddings outer product to capture structured interaction patterns.</p></td>
 </tr>
-<tr class="row-odd"><td></td>
+<tr class="row-even"><td></td>
 <td><p>NeuMF</p></td>
 <td><p>Hybrid neural model combining GMF and MLP layers.</p></td>
 </tr>
