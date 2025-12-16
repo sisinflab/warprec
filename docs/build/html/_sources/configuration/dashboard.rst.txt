@@ -65,6 +65,18 @@ WarpRec supports **CodeCarbon** via Ray to monitor energy consumption and carbon
 - **output_dir**: Directory where results are stored.
 - **tracking_mode**: Tracking mode for CodeCarbon. Options are ``machine`` or ``process``.
 
+When using the **save_to_api** feature, the main to correctly track the experiment is to create a ``.codecarbon.config`` file which contains the following information:
+
+.. code-block:: yaml
+
+   [codecarbon]
+   experiment_id = YOUR_EXPERIMENT_ID
+   api_key = YOUR_API_KEY
+
+.. important::
+
+   You can find the API key and the experiment ID inside the codecarbon official dashboard.
+
 -----------------------------
 Example Dashboard Configuration
 -----------------------------

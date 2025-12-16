@@ -177,7 +177,7 @@ class TrainConfiguration(WarpRecConfiguration):
     """
 
     writer: WriterConfig
-    splitter: SplittingConfig
+    splitter: SplittingConfig = None
     dashboard: DashboardConfig = Field(default_factory=DashboardConfig)
     evaluation: EvaluationConfig
 
@@ -224,6 +224,14 @@ class TrainConfiguration(WarpRecConfiguration):
                     f"Metrics to evaluate: {self.evaluation.metrics}. "
                     f"TopK to evaluate: {self.evaluation.top_k}."
                 )
+
+        # Check if dataset splitting has been correctly setup
+        if self.reader.loading_strategy == "dataset" and self.splitter is None:
+            raise ValueError(
+                "The 'dataset' loading strategy requires an explicit dataset splitting "
+                "configuration, but none was provided. Please verify the splitter "
+                "settings in the configuration file."
+            )
 
         # Parse and validate models
         self.check_precision()

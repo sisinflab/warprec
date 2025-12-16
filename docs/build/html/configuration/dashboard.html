@@ -382,6 +382,16 @@ Default state for all optional dashboards is <strong>disabled</strong>.</p>
 <li><p><strong>output_dir</strong>: Directory where results are stored.</p></li>
 <li><p><strong>tracking_mode</strong>: Tracking mode for CodeCarbon. Options are <code class="docutils literal notranslate"><span class="pre">machine</span></code> or <code class="docutils literal notranslate"><span class="pre">process</span></code>.</p></li>
 </ul>
+<p>When using the <strong>save_to_api</strong> feature, the main to correctly track the experiment is to create a <code class="docutils literal notranslate"><span class="pre">.codecarbon.config</span></code> file which contains the following information:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="p p-Indicator">[</span><span class="nv">codecarbon</span><span class="p p-Indicator">]</span>
+<span class="l l-Scalar l-Scalar-Plain">experiment_id = YOUR_EXPERIMENT_ID</span>
+<span class="l l-Scalar l-Scalar-Plain">api_key = YOUR_API_KEY</span>
+</pre></div>
+</div>
+<div class="admonition important">
+<p class="admonition-title">Important</p>
+<p>You can find the API key and the experiment ID inside the codecarbon official dashboard.</p>
+</div>
 </section>
 </section>
 <section id="example-dashboard-configuration">
