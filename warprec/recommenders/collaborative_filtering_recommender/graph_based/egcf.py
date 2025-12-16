@@ -2,7 +2,6 @@
 from typing import Tuple, Any, Optional
 
 import torch
-import torch.nn.functional as F
 from torch import nn, Tensor
 from torch_sparse import SparseTensor
 
@@ -11,7 +10,7 @@ from warprec.recommenders.base_recommender import IterativeRecommender
 from warprec.recommenders.collaborative_filtering_recommender.graph_based import (
     GraphRecommenderUtils,
 )
-from warprec.recommenders.losses import BPRLoss, EmbLoss
+from warprec.recommenders.losses import BPRLoss, EmbLoss, InfoNCELoss
 from warprec.utils.enums import DataLoaderType
 from warprec.utils.registry import model_registry
 
@@ -101,6 +100,7 @@ class EGCF(IterativeRecommender, GraphRecommenderUtils):
         self.apply(self._init_weights)
         self.bpr_loss = BPRLoss()
         self.reg_loss = EmbLoss()
+        self.nce_loss = InfoNCELoss(self.temperature)
 
     def _get_user_item_adj(self, interactions: Interactions) -> Tensor:
         """Constructs the normalized User-Item interaction matrix R.
@@ -193,49 +193,18 @@ class EGCF(IterativeRecommender, GraphRecommenderUtils):
         )
 
         # Calculate InfoNCE loss
-        ssl_user_loss = self._calculate_infonce(
+        ssl_user_loss = self.nce_loss(
             u_embeddings, u_embeddings
         )  # User-User Uniformity (L_user)
-        ssl_pos_loss = self._calculate_infonce(
+        ssl_pos_loss = self.nce_loss(
             pos_embeddings, pos_embeddings
         )  # Item-Item Uniformity (L_item)
-        ssl_inter_loss = self._calculate_infonce(
+        ssl_inter_loss = self.nce_loss(
             u_embeddings, pos_embeddings
         )  # User-Item Alignment (L_inter)
         ssl_loss = self.ssl_lambda * (ssl_user_loss + ssl_pos_loss + ssl_inter_loss)
 
         return bpr_loss + reg_loss + ssl_loss
-
-    def _calculate_infonce(self, emb1: Tensor, emb2: Tensor) -> Tensor:
-        """Calculates InfoNCE loss for alignment and uniformity on the batch.
-
-        Args:
-            emb1 (Tensor): First set of embeddings [batch_size, embedding_size].
-            emb2 (Tensor): Second set of embeddings [batch_size, embedding_size].
-
-        Returns:
-            Tensor: The scalar InfoNCE loss.
-        """
-        # Normalize embeddings to unit sphere
-        emb1 = F.normalize(emb1, dim=1)
-        emb2 = F.normalize(emb2, dim=1)
-
-        # Compute similarity matrix [batch_size, batch_size]
-        # sim(u, v) / tau
-        logits = torch.mm(emb1, emb2.t()) / self.temperature
-
-        # Create mask for diagonal (positive samples pairs i.e., (u_i, u_i) or (u_i, i_i))
-        batch_size = emb1.shape[0]
-        mask = torch.eye(batch_size, device=emb1.device).bool()
-
-        # Positive scores (diagonal elements)
-        # We want to maximize similarity between corresponding pairs
-        pos_scores = logits[mask]  # [batch_size]
-
-        # Loss = -pos + log(sum(exp(all)))
-        loss = -pos_scores + torch.logsumexp(logits, dim=1)
-
-        return loss.mean()
 
     def forward(self) -> Tuple[Tensor, Tensor]:
         """Forward pass of EGCF.

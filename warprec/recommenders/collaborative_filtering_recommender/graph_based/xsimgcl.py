@@ -10,7 +10,7 @@ from warprec.recommenders.base_recommender import IterativeRecommender
 from warprec.recommenders.collaborative_filtering_recommender.graph_based import (
     GraphRecommenderUtils,
 )
-from warprec.recommenders.losses import BPRLoss, EmbLoss
+from warprec.recommenders.losses import BPRLoss, EmbLoss, InfoNCELoss
 from warprec.utils.enums import DataLoaderType
 from warprec.utils.registry import model_registry
 
@@ -91,6 +91,7 @@ class XSimGCL(IterativeRecommender, GraphRecommenderUtils):
         # Initialize Losses
         self.bpr_loss = BPRLoss()
         self.reg_loss = EmbLoss()
+        self.nce_loss = InfoNCELoss(self.temperature)
 
     def get_dataloader(
         self,
@@ -108,22 +109,6 @@ class XSimGCL(IterativeRecommender, GraphRecommenderUtils):
         noise = torch.rand_like(embedding)
         noise = F.normalize(noise, p=2, dim=1)
         return embedding + (self.eps * noise)
-
-    def _info_nce_loss(self, view1: Tensor, view2: Tensor) -> Tensor:
-        """Calculates InfoNCE loss between two views."""
-        v1 = F.normalize(view1, p=2, dim=1)
-        v2 = F.normalize(view2, p=2, dim=1)
-
-        # Similarity matrix: [Batch, Batch]
-        sim_matrix = torch.mm(v1, v2.t()) / self.temperature
-
-        # Positive samples are on the diagonal
-        pos_sim = torch.diag(sim_matrix)
-
-        # Loss = -pos + log(sum(exp(all)))
-        # logsumexp is numerically stable
-        loss = -pos_sim + torch.logsumexp(sim_matrix, dim=1)
-        return loss.mean()
 
     def forward(
         self, perturbed: bool = False
@@ -201,8 +186,8 @@ class XSimGCL(IterativeRecommender, GraphRecommenderUtils):
         bpr_loss = self.bpr_loss(pos_scores, neg_scores)
 
         # Calculate loss between the final view and the specific layer view
-        cl_loss_user = self._info_nce_loss(users_final[user], users_cl[user])
-        cl_loss_item = self._info_nce_loss(items_final[pos_item], items_cl[pos_item])
+        cl_loss_user = self.nce_loss(users_final[user], users_cl[user])
+        cl_loss_item = self.nce_loss(items_final[pos_item], items_cl[pos_item])
         cl_loss = self.lambda_ * (cl_loss_user + cl_loss_item)
 
         # Regularize initial (ego) embeddings, not the propagated ones
