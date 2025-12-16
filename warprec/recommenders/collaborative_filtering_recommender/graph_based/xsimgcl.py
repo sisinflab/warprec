@@ -39,7 +39,6 @@ class XSimGCL(IterativeRecommender, GraphRecommenderUtils):
         temperature (float): Temperature for InfoNCE loss.
         layer_cl (int): Layer to pick for contrastive learning.
         reg_weight (float): The L2 regularization weight.
-        weight_decay (float): The value of weight decay used in the optimizer.
         batch_size (int): The batch size used for training.
         epochs (int): The number of epochs.
         learning_rate (float): The learning rate value.
@@ -56,7 +55,6 @@ class XSimGCL(IterativeRecommender, GraphRecommenderUtils):
     temperature: float
     layer_cl: int
     reg_weight: float
-    weight_decay: float
     batch_size: int
     epochs: int
     learning_rate: float

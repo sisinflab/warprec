@@ -38,7 +38,6 @@ class EGCF(IterativeRecommender, GraphRecommenderUtils):
         temperature (float): Temperature parameter for InfoNCE loss.
         mode (str): Propagation mode, either 'parallel' or 'alternating'.
         reg_weight (float): Weight for the regularization loss.
-        weight_decay (float): The weight decay (L2 regularization).
         batch_size (int): The batch size used for training.
         epochs (int): The number of epochs.
         learning_rate (float): The learning rate value.
@@ -57,7 +56,6 @@ class EGCF(IterativeRecommender, GraphRecommenderUtils):
     temperature: float
     mode: str
     reg_weight: float
-    weight_decay: float
     batch_size: int
     epochs: int
     learning_rate: float

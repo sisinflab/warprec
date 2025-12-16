@@ -29,11 +29,10 @@ class EGCF(RecomModel):
     Attributes:
         embedding_size (INT_FIELD): List of values for embedding_size.
         n_layers (INT_FIELD): List of values for n_layers.
-        reg_weight (FLOAT_FIELD): List of values for reg_weight.
         ssl_lambda (FLOAT_FIELD): List of values for ssl_lambda.
         temperature (FLOAT_FIELD): List of values for temperature.
         mode (STR_FIELD): List of values for mode.
-        weight_decay (FLOAT_FIELD): List of values for weight_decay.
+        reg_weight (FLOAT_FIELD): List of values for reg_weight.
         batch_size (INT_FIELD): List of values for batch_size.
         epochs (INT_FIELD): List of values for epochs.
         learning_rate (FLOAT_FIELD): List of values for learning rate.
@@ -41,11 +40,10 @@ class EGCF(RecomModel):
 
     embedding_size: INT_FIELD
     n_layers: INT_FIELD
-    reg_weight: FLOAT_FIELD
     ssl_lambda: FLOAT_FIELD
     temperature: FLOAT_FIELD
     mode: STR_FIELD
-    weight_decay: FLOAT_FIELD
+    reg_weight: FLOAT_FIELD
     batch_size: INT_FIELD
     epochs: INT_FIELD
     learning_rate: FLOAT_FIELD
@@ -61,12 +59,6 @@ class EGCF(RecomModel):
     def check_n_layers(cls, v: list):
         """Validate n_layers."""
         return validate_greater_than_zero(cls, v, "n_layers")
-
-    @field_validator("reg_weight")
-    @classmethod
-    def check_reg_weight(cls, v: list):
-        """Validate reg_weight."""
-        return validate_greater_equal_than_zero(cls, v, "reg_weight")
 
     @field_validator("ssl_lambda")
     @classmethod
@@ -87,11 +79,11 @@ class EGCF(RecomModel):
         allowed = ["parallel", "alternating"]
         return validate_str_list(cls, v, allowed, "mode")
 
-    @field_validator("weight_decay")
+    @field_validator("reg_weight")
     @classmethod
-    def check_weight_decay(cls, v: list):
-        """Validate weight_decay."""
-        return validate_greater_equal_than_zero(cls, v, "weight_decay")
+    def check_reg_weight(cls, v: list):
+        """Validate reg_weight."""
+        return validate_greater_equal_than_zero(cls, v, "reg_weight")
 
     @field_validator("batch_size")
     @classmethod
@@ -505,7 +497,6 @@ class XSimGCL(RecomModel):
         temperature (FLOAT_FIELD): List of values for temperature.
         layer_cl (INT_FIELD): List of values for layer_cl (layer for CL).
         reg_weight (FLOAT_FIELD): List of values for L2 regularization weight.
-        weight_decay (FLOAT_FIELD): List of values for weight_decay.
         batch_size (INT_FIELD): List of values for batch_size.
         epochs (INT_FIELD): List of values for epochs.
         learning_rate (FLOAT_FIELD): List of values for learning rate.
@@ -519,7 +510,6 @@ class XSimGCL(RecomModel):
     temperature: FLOAT_FIELD
     layer_cl: INT_FIELD
     reg_weight: FLOAT_FIELD
-    weight_decay: FLOAT_FIELD
     batch_size: INT_FIELD
     epochs: INT_FIELD
     learning_rate: FLOAT_FIELD
@@ -566,12 +556,6 @@ class XSimGCL(RecomModel):
     def check_reg_weight(cls, v: list):
         """Validate reg_weight."""
         return validate_greater_equal_than_zero(cls, v, "reg_weight")
-
-    @field_validator("weight_decay")
-    @classmethod
-    def check_weight_decay(cls, v: list):
-        """Validate weight_decay."""
-        return validate_greater_equal_than_zero(cls, v, "weight_decay")
 
     @field_validator("batch_size")
     @classmethod

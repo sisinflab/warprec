@@ -97,7 +97,6 @@ They are well-suited for uncovering complex patterns in sparse datasets.
       temperature: 0.1
       mode: alternating
       reg_weight: 0.001
-      weight_decay: 0.0001
       batch_size: 2048
       epochs: 200
       learning_rate: 0.001
@@ -206,7 +205,6 @@ They are well-suited for uncovering complex patterns in sparse datasets.
         temperature: 0.2
         layer_cl: 2
         reg_weight: 0.001
-        weight_decay: 0.0001
         batch_size: 2048
         epochs: 200
         learning_rate: 0.001
