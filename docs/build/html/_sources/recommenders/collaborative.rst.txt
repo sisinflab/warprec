@@ -132,6 +132,22 @@ They are well-suited for uncovering complex patterns in sparse datasets.
       epochs: 200
       learning_rate: 0.001
 
+- LightCCF (Light Contrastive Collaborative Filtering):
+  A contrastive learning model that introduces a Neighborhood Aggregation (NA) loss. It brings users closer to their interacted items while pushing them away from other positive pairs (users and items) in the batch. It can work with a standard MF encoder (n_layers=0) or a GCN encoder.
+
+.. code-block:: yaml
+
+  models:
+    LightCCF:
+      embedding_size: 64
+      n_layers: 0
+      na_weight: 0.1
+      temperature: 0.2
+      reg_weight: 0.0001
+      batch_size: 2048
+      epochs: 200
+      learning_rate: 0.001
+
 - LightGCN:
   A simplified graph convolutional network designed for collaborative filtering. It eliminates feature transformations and nonlinear activations, focusing solely on neighborhood aggregation.
 
@@ -389,6 +405,9 @@ Summary of Available General Models
    * -
      - GCMC
      - Graph autoencoder for explicit feedback using multi-relational convolutions.
+   * -
+     - LightCCF
+     - Contrastive model with Neighborhood Aggregation loss (supports MF/GCN).
    * -
      - LightGCN
      - Simplified Graph convolutional neural network.
