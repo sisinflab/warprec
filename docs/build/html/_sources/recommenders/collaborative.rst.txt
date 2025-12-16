@@ -84,6 +84,24 @@ They are well-suited for uncovering complex patterns in sparse datasets.
 
   Graph-based models require PyTorch Geometric (PyG) dependencies to be installed correctly. Check the :ref:`installation guide <install_guide>` for more information on how to install them.
 
+- EGCF (Embedding-Less Graph Collaborative Filtering):
+  A simplified graph model that removes user embeddings, learning only item embeddings to reduce complexity. It employs a joint loss combining BPR and contrastive learning (InfoNCE) to ensure alignment and uniformity without data augmentation. Supports 'parallel' and 'alternating' propagation modes.
+
+.. code-block:: yaml
+
+  models:
+    EGCF:
+      embedding_size: 64
+      n_layers: 3
+      ssl_lambda: 0.1
+      temperature: 0.1
+      mode: alternating
+      reg_weight: 0.001
+      weight_decay: 0.0001
+      batch_size: 2048
+      epochs: 200
+      learning_rate: 0.001
+
 - GCMC (Graph Convolutional Matrix Completion):
   A graph autoencoder designed for explicit feedback. It treats different rating values as distinct edge types in the user-item graph and learns embeddings using a graph convolutional encoder. A decoder then predicts rating probabilities. **This model requires explicit ratings to function properly**.
 
@@ -331,6 +349,9 @@ Summary of Available General Models
      - MultiVAE
      - Variational autoencoder modeling uncertainty in preferences.
    * - Graph Based
+     - EGCF
+     - Embedding-less graph model using contrastive learning.
+   * -
      - GCMC
      - Graph autoencoder for explicit feedback using multi-relational convolutions.
    * -
