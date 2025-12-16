@@ -175,6 +175,23 @@ They are well-suited for uncovering complex patterns in sparse datasets.
         beta: 0.1
         normalize: True
 
+- UltraGCN:
+  A simplified GCN model that skips explicit message passing during training. It approximates infinite-layer graph convolutions using a constraint loss objective that models both user-item and item-item relationships, resulting in high efficiency and scalability.
+
+.. code-block:: yaml
+
+  models:
+    UltraGCN:
+      embedding_size: 64
+      w_lambda: 1.0
+      w_gamma: 1.0
+      w_neg: 1.0
+      ii_k: 10
+      reg_weight: 0.001
+      batch_size: 2048
+      epochs: 200
+      learning_rate: 0.001
+
 - XSimGCL:
   A graph contrastive learning model that simplifies graph augmentations by adding uniform noise to embeddings. It achieves state-of-the-art performance by regulating the uniformity of the learned representation.
 
@@ -366,6 +383,9 @@ Summary of Available General Models
    * -
      - RP3Beta
      - Random walk model with popularity penalization.
+   * -
+     - UltraGCN
+     - Efficient GCN approximation using constraint losses without message passing.
    * -
      - XSimGCL
      - Graph contrastive learning with noise perturbation.
