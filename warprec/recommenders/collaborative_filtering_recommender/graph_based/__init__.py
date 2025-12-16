@@ -7,6 +7,7 @@ try:
     from .egcf import EGCF  # noqa: F401
     from .esigcf import ESIGCF  # noqa: F401
     from .gcmc import GCMC  # noqa: F401
+    from .lightccf import LightCCF  # noqa: F401
     from .lightgcn import LightGCN  # noqa: F401
     from .lightgcnpp import LightGCNpp  # noqa: F401
     from .ngcf import NGCF  # noqa: F401
@@ -61,6 +62,17 @@ except ImportError:
         def __init__(self, *args, **kwargs):
             raise ImportError(
                 "ESIGCF model requires PyG dependencies. "
+                "Please install following the documentation you can find here: "
+                "https://pytorch-geometric.readthedocs.io/en/latest/install/installation.html"
+            )
+
+    @model_registry.register("LightCCF")
+    class LightCCF:  # type: ignore[no-redef]
+        """Placeholder for LightCCF model when PyG dependencies are not installed."""
+
+        def __init__(self, *args, **kwargs):
+            raise ImportError(
+                "LightCCF model requires PyG dependencies. "
                 "Please install following the documentation you can find here: "
                 "https://pytorch-geometric.readthedocs.io/en/latest/install/installation.html"
             )
