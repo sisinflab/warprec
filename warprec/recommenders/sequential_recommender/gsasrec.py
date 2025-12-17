@@ -216,7 +216,7 @@ class gSASRec(IterativeRecommender, SequentialRecommenderUtils):
                 [positive_logits_transformed, negative_logits], -1
             ).to(torch.float32)
 
-            mask = (model_input != self.n_items).float()
+            mask = (labels != self.n_items).float()
             loss_per_element = nn.functional.binary_cross_entropy_with_logits(
                 final_logits, gt, reduction="none"
             )
