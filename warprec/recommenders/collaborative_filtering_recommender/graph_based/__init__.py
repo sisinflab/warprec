@@ -4,6 +4,7 @@ __all__ = ["RP3Beta"]
 
 try:
     from .graph_utils import GraphRecommenderUtils, SparseDropout  # noqa: F401
+    from .dgcf import DGCF  # noqa: F401
     from .egcf import EGCF  # noqa: F401
     from .esigcf import ESIGCF  # noqa: F401
     from .gcmc import GCMC  # noqa: F401
@@ -16,12 +17,14 @@ try:
 
     __all__.extend(
         [
+            "DGCF",
             "GCMC",
             "EGCF",
             "ESIGCF",
             "GraphRecommenderUtils",
             "SparseDropout",
             "NGCFLayer",
+            "LightCCF",
             "LightGCN",
             "LightGCNpp",
             "NGCF",
@@ -32,6 +35,17 @@ try:
 
 except ImportError:
     from warprec.utils.registry import model_registry
+
+    @model_registry.register("DGCF")
+    class DGCF:  # type: ignore[no-redef]
+        """Placeholder for GDGCFCMC model when PyG dependencies are not installed."""
+
+        def __init__(self, *args, **kwargs):
+            raise ImportError(
+                "DGCF model requires PyG dependencies. "
+                "Please install following the documentation you can find here: "
+                "https://pytorch-geometric.readthedocs.io/en/latest/install/installation.html"
+            )
 
     @model_registry.register("GCMC")
     class GCMC:  # type: ignore[no-redef]
