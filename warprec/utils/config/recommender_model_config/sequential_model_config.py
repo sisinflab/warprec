@@ -691,6 +691,114 @@ class gSASRec(RecomModel):
             )
 
 
+@params_registry.register("LightSANs")
+class LightSANs(RecomModel):
+    """Definition of the model LightSANs.
+
+    Attributes:
+        embedding_size (INT_FIELD): List of values for embedding_size.
+        n_layers (INT_FIELD): List of values for n_layers.
+        n_heads (INT_FIELD): List of values for n_heads.
+        k_interests (INT_FIELD): List of values for k_interests.
+        inner_size (INT_FIELD): List of values for inner_size.
+        dropout_prob (FLOAT_FIELD): List of values for dropout_prob.
+        attn_dropout_prob (FLOAT_FIELD): List of values for attn_dropout_prob.
+        reg_weight (FLOAT_FIELD): List of values for reg_weight.
+        weight_decay (FLOAT_FIELD): List of values for weight_decay.
+        batch_size (INT_FIELD): List of values for batch_size.
+        epochs (INT_FIELD): List of values for epochs.
+        learning_rate (FLOAT_FIELD): List of values for learning rate.
+        neg_samples (INT_FIELD): List of values for neg_samples.
+        max_seq_len (INT_FIELD): List of values for max_seq_len.
+    """
+
+    embedding_size: INT_FIELD
+    n_layers: INT_FIELD
+    n_heads: INT_FIELD
+    k_interests: INT_FIELD
+    inner_size: INT_FIELD
+    dropout_prob: FLOAT_FIELD
+    attn_dropout_prob: FLOAT_FIELD
+    reg_weight: FLOAT_FIELD
+    weight_decay: FLOAT_FIELD
+    batch_size: INT_FIELD
+    epochs: INT_FIELD
+    learning_rate: FLOAT_FIELD
+    neg_samples: INT_FIELD
+    max_seq_len: INT_FIELD
+
+    @field_validator("embedding_size")
+    @classmethod
+    def check_embedding_size(cls, v: list):
+        return validate_greater_than_zero(cls, v, "embedding_size")
+
+    @field_validator("n_layers")
+    @classmethod
+    def check_n_layers(cls, v: list):
+        return validate_greater_than_zero(cls, v, "n_layers")
+
+    @field_validator("n_heads")
+    @classmethod
+    def check_n_heads(cls, v: list):
+        return validate_greater_than_zero(cls, v, "n_heads")
+
+    @field_validator("k_interests")
+    @classmethod
+    def check_k_interests(cls, v: list):
+        return validate_greater_than_zero(cls, v, "k_interests")
+
+    @field_validator("inner_size")
+    @classmethod
+    def check_inner_size(cls, v: list):
+        return validate_greater_than_zero(cls, v, "inner_size")
+
+    @field_validator("dropout_prob")
+    @classmethod
+    def check_dropout_prob(cls, v: list):
+        return validate_between_zero_and_one(cls, v, "dropout_prob")
+
+    @field_validator("attn_dropout_prob")
+    @classmethod
+    def check_attn_dropout_prob(cls, v: list):
+        return validate_between_zero_and_one(cls, v, "attn_dropout_prob")
+
+    @field_validator("reg_weight")
+    @classmethod
+    def check_reg_weight(cls, v: list):
+        return validate_greater_equal_than_zero(cls, v, "reg_weight")
+
+    @field_validator("weight_decay")
+    @classmethod
+    def check_weight_decay(cls, v: list):
+        return validate_greater_equal_than_zero(cls, v, "weight_decay")
+
+    @field_validator("batch_size")
+    @classmethod
+    def check_batch_size(cls, v: list):
+        return validate_greater_than_zero(cls, v, "batch_size")
+
+    @field_validator("epochs")
+    @classmethod
+    def check_epochs(cls, v: list):
+        return validate_greater_than_zero(cls, v, "epochs")
+
+    @field_validator("learning_rate")
+    @classmethod
+    def check_learning_rate(cls, v: list):
+        return validate_greater_than_zero(cls, v, "learning_rate")
+
+    @field_validator("neg_samples")
+    @classmethod
+    def check_neg_samples(cls, v: list):
+        # Can be 0 for CrossEntropy
+        return validate_greater_equal_than_zero(cls, v, "neg_samples")
+
+    @field_validator("max_seq_len")
+    @classmethod
+    def check_max_seq_len(cls, v: list):
+        return validate_greater_than_zero(cls, v, "max_seq_len")
+
+
 @params_registry.register("SASRec")
 class SASRec(RecomModel):
     """Definition of the model SASRec.
