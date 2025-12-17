@@ -22,6 +22,129 @@ from warprec.utils.config.common import (
 from warprec.utils.registry import params_registry
 
 
+@params_registry.register("DGCF")
+class DGCF(RecomModel):
+    """Definition of the model DGCF.
+
+    Attributes:
+        embedding_size (INT_FIELD): List of values for embedding_size.
+        n_factors (INT_FIELD): List of values for n_factors.
+        n_layers (INT_FIELD): List of values for n_layers.
+        n_iterations (INT_FIELD): List of values for n_iterations.
+        cor_weight (FLOAT_FIELD): List of values for cor_weight.
+        reg_weight (FLOAT_FIELD): List of values for reg_weight.
+        batch_size (INT_FIELD): List of values for batch_size.
+        epochs (INT_FIELD): List of values for epochs.
+        learning_rate (FLOAT_FIELD): List of values for learning rate.
+        need_single_trial_validation (ClassVar[bool]): Flag to enable single trial validation.
+    """
+
+    embedding_size: INT_FIELD
+    n_factors: INT_FIELD
+    n_layers: INT_FIELD
+    n_iterations: INT_FIELD
+    cor_weight: FLOAT_FIELD
+    reg_weight: FLOAT_FIELD
+    batch_size: INT_FIELD
+    epochs: INT_FIELD
+    learning_rate: FLOAT_FIELD
+    need_single_trial_validation: ClassVar[bool] = True
+
+    @field_validator("embedding_size")
+    @classmethod
+    def check_embedding_size(cls, v: list):
+        """Validate embedding_size."""
+        return validate_greater_than_zero(cls, v, "embedding_size")
+
+    @field_validator("n_factors")
+    @classmethod
+    def check_n_factors(cls, v: list):
+        """Validate n_factors."""
+        return validate_greater_than_zero(cls, v, "n_factors")
+
+    @field_validator("n_layers")
+    @classmethod
+    def check_n_layers(cls, v: list):
+        """Validate n_layers."""
+        return validate_greater_than_zero(cls, v, "n_layers")
+
+    @field_validator("n_iterations")
+    @classmethod
+    def check_n_iterations(cls, v: list):
+        """Validate n_iterations."""
+        return validate_greater_than_zero(cls, v, "n_iterations")
+
+    @field_validator("cor_weight")
+    @classmethod
+    def check_cor_weight(cls, v: list):
+        """Validate cor_weight."""
+        return validate_greater_equal_than_zero(cls, v, "cor_weight")
+
+    @field_validator("reg_weight")
+    @classmethod
+    def check_reg_weight(cls, v: list):
+        """Validate reg_weight."""
+        return validate_greater_equal_than_zero(cls, v, "reg_weight")
+
+    @field_validator("batch_size")
+    @classmethod
+    def check_batch_size(cls, v: list):
+        """Validate batch_size."""
+        return validate_greater_than_zero(cls, v, "batch_size")
+
+    @field_validator("epochs")
+    @classmethod
+    def check_epochs(cls, v: list):
+        """Validate epochs."""
+        return validate_greater_than_zero(cls, v, "epochs")
+
+    @field_validator("learning_rate")
+    @classmethod
+    def check_learning_rate(cls, v: list):
+        """Validate learning_rate."""
+        return validate_greater_than_zero(cls, v, "learning_rate")
+
+    def validate_all_combinations(self):
+        """Validates if at least one valid combination of hyperparameters exists.
+        Ensures that there is at least one combination where embedding_size is divisible by n_factors.
+        """
+        embedding_sizes = self._clean_param_list(self.embedding_size)
+        n_factors_list = self._clean_param_list(self.n_factors)
+
+        has_valid_combination = False
+        for emb_size, n_fact in product(embedding_sizes, n_factors_list):
+            if emb_size % n_fact == 0:
+                has_valid_combination = True
+                break
+
+        if not has_valid_combination:
+            raise ValueError(
+                "No valid hyperparameter combination found for DGCF. "
+                "Ensure there's at least one combination where 'embedding_size' "
+                "is divisible by 'n_factors'."
+            )
+
+    def validate_single_trial_params(self):
+        """Validates the coherence of embedding_size and n_factors for a single trial."""
+        embedding_size_clean = (
+            self.embedding_size[1]
+            if self.embedding_size and isinstance(self.embedding_size[0], str)
+            else self.embedding_size[0]
+        )
+        n_factors_clean = (
+            self.n_factors[1]
+            if self.n_factors and isinstance(self.n_factors[0], str)
+            else self.n_factors[0]
+        )
+
+        if embedding_size_clean % n_factors_clean != 0:
+            raise ValueError(
+                f"Inconsistent configuration for DGCF: "
+                f"embedding_size ({embedding_size_clean}) must be divisible "
+                f"by n_factors ({n_factors_clean})."
+            )
+
+
 @params_registry.register("EGCF")
 class EGCF(RecomModel):
     """Definition of the model EGCF.
