@@ -114,28 +114,6 @@ They excel at modeling both short-term and long-term user preferences without re
       neg_samples: 1
       max_seq_len: 200
 
-- SASRec (Self-Attentive Sequential Recommendation):
-  A Transformer-based model that uses stacked self-attention blocks to capture item dependencies in user sequences.
-  SASRec effectively models dynamic user preferences in sparse datasets, learning both short- and long-term interests.
-
-.. code-block:: yaml
-
-    models:
-      SASRec:
-        embedding_size: 128
-        n_layers: 2
-        n_heads: 8
-        inner_size: 512
-        dropout_prob: 0.1
-        attn_dropout_prob: 0.1
-        reg_weight: 0.001
-        weight_decay: 0.0001
-        batch_size: 2048
-        epochs: 200
-        learning_rate: 0.001
-        neg_samples: 1
-        max_seq_len: 200
-
 - gSASRec (General Self-Attentive Sequential Recommendation):
   Extends SASRec by introducing general self-attention.
   This enables better modeling of diverse or evolving user interests.
@@ -152,6 +130,50 @@ They excel at modeling both short-term and long-term user preferences without re
         attn_dropout_prob: 0.1
         gbce_t: 0.5
         reuse_item_embeddings: True
+        reg_weight: 0.001
+        weight_decay: 0.0001
+        batch_size: 2048
+        epochs: 200
+        learning_rate: 0.001
+        neg_samples: 1
+        max_seq_len: 200
+
+- LightSANs (Low-Rank Decomposed Self-Attention Networks):
+  A sequential recommender that improves upon standard self-attention (like SASRec) by introducing low-rank decomposed self-attention to reduce complexity and decoupled position encoding to better model sequential relations.
+
+.. code-block:: yaml
+
+  models:
+    LightSANs:
+      embedding_size: 128
+      n_layers: 2
+      n_heads: 8
+      k_interests: 5
+      inner_size: 512
+      dropout_prob: 0.5
+      attn_dropout_prob: 0.5
+      reg_weight: 0.001
+      weight_decay: 0.0001
+      batch_size: 2048
+      epochs: 200
+      learning_rate: 0.001
+      neg_samples: 1
+      max_seq_len: 200
+
+- SASRec (Self-Attentive Sequential Recommendation):
+  A Transformer-based model that uses stacked self-attention blocks to capture item dependencies in user sequences.
+  SASRec effectively models dynamic user preferences in sparse datasets, learning both short- and long-term interests.
+
+.. code-block:: yaml
+
+    models:
+      SASRec:
+        embedding_size: 128
+        n_layers: 2
+        n_heads: 8
+        inner_size: 512
+        dropout_prob: 0.1
+        attn_dropout_prob: 0.1
         reg_weight: 0.001
         weight_decay: 0.0001
         batch_size: 2048
@@ -184,8 +206,11 @@ Summary of Available Sequential Models
      - BERT4Rec
      - Bidirectional Transformer model trained on a masked item prediction task.
    * -
-     - SASRec
-     - Transformer-inspired model learning short- and long-term user preferences.
-   * -
      - gSASRec
      - General self-attention model for diverse and evolving user behaviors.
+   * -
+     - LightSANs
+     - Efficient self-attention with low-rank decomposition and decoupled positioning.
+   * -
+     - SASRec
+     - Transformer-inspired model learning short- and long-term user preferences.
