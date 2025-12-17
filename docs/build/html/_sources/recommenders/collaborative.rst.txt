@@ -84,6 +84,23 @@ They are well-suited for uncovering complex patterns in sparse datasets.
 
   Graph-based models require PyTorch Geometric (PyG) dependencies to be installed correctly. Check the :ref:`installation guide <install_guide>` for more information on how to install them.
 
+- DGCF (Disentangled Graph Collaborative Filtering):
+  A graph-based model that disentangles user and item embeddings into multiple latent intents (factors) using an iterative routing mechanism. It encourages independence between factors via a distance correlation loss.
+
+.. code-block:: yaml
+
+  models:
+    DGCF:
+      embedding_size: 64
+      n_factors: 4
+      n_layers: 3
+      n_iterations: 2
+      cor_weight: 0.01
+      reg_weight: 0.001
+      batch_size: 2048
+      epochs: 200
+      learning_rate: 0.001
+
 - EGCF (Embedding-Less Graph Collaborative Filtering):
   A simplified graph model that removes user embeddings, learning only item embeddings to reduce complexity. It employs a joint loss combining BPR and contrastive learning (InfoNCE) to ensure alignment and uniformity without data augmentation. Supports 'parallel' and 'alternating' propagation modes.
 
@@ -397,6 +414,9 @@ Summary of Available General Models
      - MultiVAE
      - Variational autoencoder modeling uncertainty in preferences.
    * - Graph Based
+     - DGCF
+     - Disentangles embeddings into latent factors using iterative routing.
+   * -
      - EGCF
      - Embedding-less graph model using contrastive learning.
    * -
