@@ -165,6 +165,24 @@ They are well-suited for uncovering complex patterns in sparse datasets.
       epochs: 200
       learning_rate: 0.001
 
+- LightGCL (Simple Yet Effective Graph Contrastive Learning):
+  A graph contrastive learning model that uses Singular Value Decomposition (SVD) to construct a global contrastive view. It contrasts the local graph view (GCN) with the global SVD view to enhance representation learning and robustness against noise.
+
+.. code-block:: yaml
+
+  models:
+    LightGCL:
+      embedding_size: 64
+      n_layers: 2
+      q: 5
+      ssl_lambda: 0.1
+      temperature: 0.2
+      dropout: 0.1
+      reg_weight: 0.001
+      batch_size: 2048
+      epochs: 200
+      learning_rate: 0.001
+
 - LightGCN:
   A simplified graph convolutional network designed for collaborative filtering. It eliminates feature transformations and nonlinear activations, focusing solely on neighborhood aggregation.
 
@@ -445,6 +463,9 @@ Summary of Available General Models
    * -
      - LightCCF
      - Contrastive model with Neighborhood Aggregation loss (supports MF/GCN).
+   * -
+     - LightGCL
+     - Contrastive learning using SVD for global view augmentation.
    * -
      - LightGCN
      - Simplified Graph convolutional neural network.
