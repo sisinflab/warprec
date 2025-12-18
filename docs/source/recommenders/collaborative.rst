@@ -196,6 +196,23 @@ They are well-suited for uncovering complex patterns in sparse datasets.
       epochs: 200
       learning_rate: 0.001
 
+- MixRec (Individual and Collective Mixing):
+  A graph-based model that employs dual mixing strategies (Individual and Collective) to augment embeddings. It uses a dual-mixing contrastive learning objective to enhance consistency between positive pairs while leveraging mixed negatives.
+
+.. code-block:: yaml
+
+  models:
+    MixRec:
+      embedding_size: 64
+      n_layers: 3
+      ssl_lambda: 1.1
+      alpha: 0.1
+      temperature: 0.2
+      reg_weight: 0.001
+      batch_size: 2048
+      epochs: 200
+      learning_rate: 0.001
+
 - NGCF (Neural Graph-based Collaborative Filtering):
   A neural graph-based collaborative filtering model that explicitly captures high-order connectivity by propagating embeddings through the user-item interaction graph.
 
@@ -434,6 +451,9 @@ Summary of Available General Models
    * -
      - LightGCN++
      - Improved LightGCN with asymmetric normalization and residual connections.
+   * -
+     - MixRec
+     - Dual mixing data augmentation with contrastive learning.
    * -
      - NGCF
      - Complex Graph convolutional neural network.
