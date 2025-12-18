@@ -11,6 +11,7 @@ try:
     from .lightccf import LightCCF  # noqa: F401
     from .lightgcn import LightGCN  # noqa: F401
     from .lightgcnpp import LightGCNpp  # noqa: F401
+    from .mixrec import MixRec
     from .ngcf import NGCF  # noqa: F401
     from .ultragcn import UltraGCN  # noqa: F401
     from .xsimgcl import XSimGCL
@@ -27,6 +28,7 @@ try:
             "LightCCF",
             "LightGCN",
             "LightGCNpp",
+            "MixRec",
             "NGCF",
             "UltraGCN",
             "XSimGCL",
@@ -38,7 +40,7 @@ except ImportError:
 
     @model_registry.register("DGCF")
     class DGCF:  # type: ignore[no-redef]
-        """Placeholder for GDGCFCMC model when PyG dependencies are not installed."""
+        """Placeholder for DGCF model when PyG dependencies are not installed."""
 
         def __init__(self, *args, **kwargs):
             raise ImportError(
@@ -109,6 +111,17 @@ except ImportError:
         def __init__(self, *args, **kwargs):
             raise ImportError(
                 "LightGCNpp model requires PyG dependencies. "
+                "Please install following the documentation you can find here: "
+                "https://pytorch-geometric.readthedocs.io/en/latest/install/installation.html"
+            )
+
+    @model_registry.register("MixRec")
+    class MixRec:  # type: ignore[no-redef]
+        """Placeholder for MixRec model when PyG dependencies are not installed."""
+
+        def __init__(self, *args, **kwargs):
+            raise ImportError(
+                "MixRec model requires PyG dependencies. "
                 "Please install following the documentation you can find here: "
                 "https://pytorch-geometric.readthedocs.io/en/latest/install/installation.html"
             )
