@@ -9,6 +9,7 @@ try:
     from .esigcf import ESIGCF  # noqa: F401
     from .gcmc import GCMC  # noqa: F401
     from .lightccf import LightCCF  # noqa: F401
+    from .lightgcl import LightGCL  # noqa: F401
     from .lightgcn import LightGCN  # noqa: F401
     from .lightgcnpp import LightGCNpp  # noqa: F401
     from .mixrec import MixRec
@@ -26,6 +27,7 @@ try:
             "SparseDropout",
             "NGCFLayer",
             "LightCCF",
+            "LightGCL",
             "LightGCN",
             "LightGCNpp",
             "MixRec",
@@ -89,6 +91,17 @@ except ImportError:
         def __init__(self, *args, **kwargs):
             raise ImportError(
                 "LightCCF model requires PyG dependencies. "
+                "Please install following the documentation you can find here: "
+                "https://pytorch-geometric.readthedocs.io/en/latest/install/installation.html"
+            )
+
+    @model_registry.register("LightGCL")
+    class LightGCL:  # type: ignore[no-redef]
+        """Placeholder for LightGCL model when PyG dependencies are not installed."""
+
+        def __init__(self, *args, **kwargs):
+            raise ImportError(
+                "LightGCL model requires PyG dependencies. "
                 "Please install following the documentation you can find here: "
                 "https://pytorch-geometric.readthedocs.io/en/latest/install/installation.html"
             )
