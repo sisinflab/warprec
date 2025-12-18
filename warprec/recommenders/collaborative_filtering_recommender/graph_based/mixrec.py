@@ -2,6 +2,7 @@
 from typing import Tuple, Any, Optional
 
 import torch
+import torch.nn.functional as F
 from torch import nn, Tensor
 from torch_geometric.nn import LGConv
 
@@ -10,7 +11,7 @@ from warprec.recommenders.base_recommender import IterativeRecommender
 from warprec.recommenders.collaborative_filtering_recommender.graph_based import (
     GraphRecommenderUtils,
 )
-from warprec.recommenders.losses import BPRLoss, EmbLoss, InfoNCELoss
+from warprec.recommenders.losses import BPRLoss, EmbLoss
 from warprec.utils.enums import DataLoaderType
 from warprec.utils.registry import model_registry
 
@@ -78,6 +79,7 @@ class MixRec(IterativeRecommender, GraphRecommenderUtils):
             interactions.get_sparse().tocoo(),
             self.n_users,
             self.n_items + 1,
+            normalize=True,
         )
 
         # Propagation Network
@@ -86,8 +88,8 @@ class MixRec(IterativeRecommender, GraphRecommenderUtils):
         )
 
         # Vectorized normalization for embedding aggregation (Mean pooling)
-        alpha_tensor = torch.tensor(
-            [1 / (k + 1) for k in range(self.n_layers + 1)], device=self.device
+        alpha_tensor = torch.full(
+            (self.n_layers + 1,), 1.0 / (self.n_layers + 1), device=self.device
         )
         self.register_buffer("alpha_gcn", alpha_tensor)
 
@@ -97,7 +99,6 @@ class MixRec(IterativeRecommender, GraphRecommenderUtils):
         # Losses
         self.bpr_loss = BPRLoss()
         self.reg_loss = EmbLoss()
-        self.nce_loss = InfoNCELoss(temperature=self.temperature)
 
     def get_dataloader(
         self,
@@ -162,6 +163,45 @@ class MixRec(IterativeRecommender, GraphRecommenderUtils):
         # Expand to match batch size for loss calculation
         return collective_view.expand(batch_size, -1)
 
+    def _hard_nce_loss(
+        self,
+        anchor: Tensor,
+        positive: Tensor,
+        neg_disorder: Tensor,
+        neg_collective: Tensor,
+        temperature: float,
+    ) -> Tensor:
+        """Computes InfoNCE loss with hard negatives."""
+        # L2 normalization
+        anchor = F.normalize(anchor, p=2, dim=1)
+        positive = F.normalize(positive, p=2, dim=1)
+        neg_disorder = F.normalize(neg_disorder, p=2, dim=1)
+        neg_collective = F.normalize(neg_collective, p=2, dim=1)
+
+        # Positive similarity (Anchor vs Mixed)
+        pos_sim = (anchor * positive).sum(dim=1) / temperature  # [Batch]
+
+        # Hard negative 1 similarity (Anchor vs Disorder)
+        dis_sim = (anchor * neg_disorder).sum(dim=1) / temperature  # [Batch]
+
+        # Hard negative 2 similarity (Anchor vs Collective)
+        col_sim = (anchor * neg_collective).sum(dim=1) / temperature  # [Batch]
+
+        # Batch negatives similarity (Anchor vs Mixed)
+        batch_sim_matrix = (
+            torch.mm(anchor, positive.t()) / temperature
+        )  # [Batch, Batch]
+
+        all_logits = torch.cat(
+            [batch_sim_matrix, dis_sim.unsqueeze(1), col_sim.unsqueeze(1)], dim=1
+        )  # [B, B + 2]
+
+        # Loss = -log( exp(pos) / sum(exp(all)) )
+        #      = -pos + logsumexp(all)
+
+        loss = -pos_sim + torch.logsumexp(all_logits, dim=1)
+        return loss
+
     def _dual_mixing_cl_loss(
         self,
         original: Tensor,
@@ -177,19 +217,25 @@ class MixRec(IterativeRecommender, GraphRecommenderUtils):
         L_pos: Anchor=Original. Pos=Mixed. Negs={Disordered, Collective}.
         L_neg: Anchor=Disordered. Pos=Mixed. Negs={Original, Collective}.
         """
-        # Target for L_pos: [Mixed, Collective]
-        targets_pos = torch.cat([mixed, collective], dim=0)
-        # This computes sim(Original, Mixed) as pos, and sim(Original, Collective) + sim(Original, Other_Mixed) as negs
-        l_pos = self.nce_loss(original, targets_pos)
+        # L_pos: Anchor=Original, Pos=Mixed, HardNegs={Disordered, Collective}
+        l_pos = self._hard_nce_loss(
+            anchor=original,
+            positive=mixed,
+            neg_disorder=disordered,
+            neg_collective=collective,
+            temperature=self.temperature,
+        )
 
-        # L_neg
-        # Anchor: Disordered (Negative view acting as anchor)
-        # Positive: Mixed
-        # Target for L_neg: [Mixed, Collective] (Original is implicitly in batch negatives of Disordered)
-        l_neg = self.nce_loss(disordered, targets_pos)
+        # L_neg: Anchor=Disordered, Pos=Mixed, HardNegs={Original, Collective}
+        l_neg = self._hard_nce_loss(
+            anchor=disordered,
+            positive=mixed,
+            neg_disorder=original,
+            neg_collective=collective,
+            temperature=self.temperature,
+        )
 
         # Weighted Sum
-        # beta is [B, 1], we need mean scalar or element-wise mult
         loss = (beta * l_pos + (1 - beta) * l_neg).mean()
         return loss
 
@@ -236,7 +282,7 @@ class MixRec(IterativeRecommender, GraphRecommenderUtils):
 
         # Collective Mixing
         u_cm = self._collective_mixing(u_embeddings)
-        pos_cm = self._collective_mixing(neg_embeddings)
+        pos_cm = self._collective_mixing(pos_embeddings)
 
         # Mixed Negative BPR
         # Encourages item to stay close to user even if mixed with negative
