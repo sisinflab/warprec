@@ -852,6 +852,96 @@ class RP3Beta(RecomModel):
         return validate_bool_values(v)
 
 
+@params_registry.register("SGL")
+class SGL(RecomModel):
+    """Definition of the model SGL.
+
+    Attributes:
+        embedding_size (INT_FIELD): List of values for embedding_size.
+        n_layers (INT_FIELD): List of values for n_layers.
+        ssl_tau (FLOAT_FIELD): List of values for ssl_tau.
+        ssl_reg (FLOAT_FIELD): List of values for ssl_reg.
+        dropout (FLOAT_FIELD): List of values for dropout.
+        aug_type (STR_FIELD): List of values for aug_type.
+        reg_weight (FLOAT_FIELD): List of values for reg_weight.
+        batch_size (INT_FIELD): List of values for batch_size.
+        epochs (INT_FIELD): List of values for epochs.
+        learning_rate (FLOAT_FIELD): List of values for learning rate.
+    """
+
+    embedding_size: INT_FIELD
+    n_layers: INT_FIELD
+    ssl_tau: FLOAT_FIELD
+    ssl_reg: FLOAT_FIELD
+    dropout: FLOAT_FIELD
+    aug_type: STR_FIELD
+    reg_weight: FLOAT_FIELD
+    batch_size: INT_FIELD
+    epochs: INT_FIELD
+    learning_rate: FLOAT_FIELD
+
+    @field_validator("embedding_size")
+    @classmethod
+    def check_embedding_size(cls, v: list):
+        """Validate embedding_size."""
+        return validate_greater_than_zero(cls, v, "embedding_size")
+
+    @field_validator("n_layers")
+    @classmethod
+    def check_n_layers(cls, v: list):
+        """Validate n_layers."""
+        return validate_greater_than_zero(cls, v, "n_layers")
+
+    @field_validator("ssl_tau")
+    @classmethod
+    def check_ssl_tau(cls, v: list):
+        """Validate ssl_tau."""
+        return validate_greater_than_zero(cls, v, "ssl_tau")
+
+    @field_validator("ssl_reg")
+    @classmethod
+    def check_ssl_reg(cls, v: list):
+        """Validate ssl_reg."""
+        return validate_greater_equal_than_zero(cls, v, "ssl_reg")
+
+    @field_validator("dropout")
+    @classmethod
+    def check_dropout(cls, v: list):
+        """Validate dropout."""
+        return validate_between_zero_and_one(cls, v, "dropout")
+
+    @field_validator("aug_type")
+    @classmethod
+    def check_aug_type(cls, v: list):
+        """Validate aug_type."""
+        allowed_types = ["ED", "ND", "RW"]
+        return validate_str_list(cls, v, allowed_types, "aug_type")
+
+    @field_validator("reg_weight")
+    @classmethod
+    def check_reg_weight(cls, v: list):
+        """Validate reg_weight."""
+        return validate_greater_equal_than_zero(cls, v, "reg_weight")
+
+    @field_validator("batch_size")
+    @classmethod
+    def check_batch_size(cls, v: list):
+        """Validate batch_size."""
+        return validate_greater_than_zero(cls, v, "batch_size")
+
+    @field_validator("epochs")
+    @classmethod
+    def check_epochs(cls, v: list):
+        """Validate epochs."""
+        return validate_greater_than_zero(cls, v, "epochs")
+
+    @field_validator("learning_rate")
+    @classmethod
+    def check_learning_rate(cls, v: list):
+        """Validate learning_rate."""
+        return validate_greater_than_zero(cls, v, "learning_rate")
+
+
 @params_registry.register("UltraGCN")
 class UltraGCN(RecomModel):
     """Definition of the model UltraGCN.
