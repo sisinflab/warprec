@@ -275,6 +275,21 @@ They are well-suited for uncovering complex patterns in sparse datasets.
         beta: 0.1
         normalize: True
 
+- SGCL (Supervised Graph Contrastive Learning):
+  A unified framework that merges the recommendation task and self-supervised learning into a single supervised contrastive loss. It simplifies the training pipeline by removing the need for negative sampling and data augmentation.
+
+.. code-block:: yaml
+
+  models:
+    SGCL:
+      embedding_size: 64
+      n_layers: 3
+      temperature: 0.1
+      reg_weight: 0.0001
+      batch_size: 2048
+      epochs: 200
+      learning_rate: 0.001
+
 - SGL (Self-supervised Graph Learning):
   A graph-based model that augments the user-item graph structure (via Node Dropout, Edge Dropout, or Random Walk) to create auxiliary views for contrastive learning, improving robustness and accuracy.
 
@@ -518,6 +533,9 @@ Summary of Available General Models
    * -
      - RP3Beta
      - Random walk model with popularity penalization.
+   * -
+     - SGCL
+     - Unified supervised contrastive learning without negative sampling.
    * -
      - SGL
      - Self-supervised learning with graph structure augmentation (ED, ND, RW).
