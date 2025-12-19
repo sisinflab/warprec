@@ -1,3 +1,4 @@
+# pylint: disable = R0903
 from .rp3beta import RP3Beta
 
 __all__ = ["RP3Beta"]
@@ -12,6 +13,7 @@ try:
     from .lightgcl import LightGCL  # noqa: F401
     from .lightgcn import LightGCN  # noqa: F401
     from .lightgcnpp import LightGCNpp  # noqa: F401
+    from .lightgode import LightGODE  # noqa: F401
     from .mixrec import MixRec
     from .ngcf import NGCF  # noqa: F401
     from .sgl import SGL  # noqa: F401
@@ -31,6 +33,7 @@ try:
             "LightGCL",
             "LightGCN",
             "LightGCNpp",
+            "LightGODE",
             "MixRec",
             "NGCF",
             "UltraGCN",
@@ -125,6 +128,17 @@ except ImportError:
         def __init__(self, *args, **kwargs):
             raise ImportError(
                 "LightGCNpp model requires PyG dependencies. "
+                "Please install following the documentation you can find here: "
+                "https://pytorch-geometric.readthedocs.io/en/latest/install/installation.html"
+            )
+
+    @model_registry.register("LightGODE")
+    class LightGODE:  # type: ignore[no-redef]
+        """Placeholder for LightGODE model when PyG dependencies are not installed."""
+
+        def __init__(self, *args, **kwargs):
+            raise ImportError(
+                "LightGODE model requires PyG dependencies. "
                 "Please install following the documentation you can find here: "
                 "https://pytorch-geometric.readthedocs.io/en/latest/install/installation.html"
             )
