@@ -40,6 +40,28 @@ These models are particularly effective in sparse recommendation settings.
         epochs: 200
         learning_rate: 0.001
 
+- MacridVAE (Macro-Disentangled Variational Autoencoder):
+  A disentangled representation learning model that assumes user intentions are driven by a few macro concepts. It uses a VAE architecture with a specific encoder to separate these high-level concepts, improving interpretability and robustness.
+
+.. code-block:: yaml
+
+  models:
+    MacridVAE:
+      embedding_size: 64
+      encoder_hidden_dims: [600]
+      k_fac: 7
+      tau: 0.1
+      corruption: 1.0
+      nogb: False
+      std: 0.075
+      anneal_cap: 0.2
+      total_anneal_steps: 200000
+      reg_weight: 0.001
+      weight_decay: 0.0001
+      batch_size: 2048
+      epochs: 200
+      learning_rate: 0.001
+
 - MultiDAE (Multinomial Denoising Autoencoder):
   A deep autoencoder trained with dropout for denoising input data. Learns robust latent representations from implicit feedback using a multinomial loss.
 
@@ -66,7 +88,7 @@ These models are particularly effective in sparse recommendation settings.
         latent_dim: 200
         corruption: 1.0
         anneal_cap: 0.2
-        anneal_step: 200
+        anneal_step: 200000
         weight_decay: 0.0001
         batch_size: 2048
         epochs: 200
@@ -491,6 +513,9 @@ Summary of Available General Models
    * -
      - CDAE
      - Denoising autoencoder with user-specific latent vectors.
+   * -
+     - MacridVAE
+     - Disentangled VAE modeling macro concepts for user intentions.
    * -
      - MultiDAE
      - Denoising autoencoder optimized for implicit data.
