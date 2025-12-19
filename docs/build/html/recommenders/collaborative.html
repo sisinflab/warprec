@@ -573,6 +573,24 @@ A graph-based collaborative filtering model that performs a biased random walk o
 </pre></div>
 </div>
 <ul class="simple">
+<li><p>SGL (Self-supervised Graph Learning):
+A graph-based model that augments the user-item graph structure (via Node Dropout, Edge Dropout, or Random Walk) to create auxiliary views for contrastive learning, improving robustness and accuracy.</p></li>
+</ul>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">models</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">SGL</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">embedding_size</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">64</span>
+<span class="w">    </span><span class="nt">n_layers</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">3</span>
+<span class="w">    </span><span class="nt">ssl_tau</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0.2</span>
+<span class="w">    </span><span class="nt">ssl_reg</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0.1</span>
+<span class="w">    </span><span class="nt">dropout</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0.1</span>
+<span class="w">    </span><span class="nt">aug_type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">ED</span>
+<span class="w">    </span><span class="nt">reg_weight</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0.001</span>
+<span class="w">    </span><span class="nt">batch_size</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">2048</span>
+<span class="w">    </span><span class="nt">epochs</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">200</span>
+<span class="w">    </span><span class="nt">learning_rate</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0.001</span>
+</pre></div>
+</div>
+<ul class="simple">
 <li><p>UltraGCN:
 A simplified GCN model that skips explicit message passing during training. It approximates infinite-layer graph convolutions using a constraint loss objective that models both user-item and item-item relationships, resulting in high efficiency and scalability.</p></li>
 </ul>
@@ -810,42 +828,46 @@ Combines Generalized Matrix Factorization (GMF) with a Multi-Layer Perceptron (M
 <td><p>Random walk model with popularity penalization.</p></td>
 </tr>
 <tr class="row-odd"><td></td>
+<td><p>SGL</p></td>
+<td><p>Self-supervised learning with graph structure augmentation (ED, ND, RW).</p></td>
+</tr>
+<tr class="row-even"><td></td>
 <td><p>UltraGCN</p></td>
 <td><p>Efficient GCN approximation using constraint losses without message passing.</p></td>
 </tr>
-<tr class="row-even"><td></td>
+<tr class="row-odd"><td></td>
 <td><p>XSimGCL</p></td>
 <td><p>Graph contrastive learning with noise perturbation.</p></td>
 </tr>
-<tr class="row-odd"><td><p>KNN</p></td>
+<tr class="row-even"><td><p>KNN</p></td>
 <td><p>ItemKNN</p></td>
 <td><p>Item-based collaborative KNN using similarity metrics.</p></td>
 </tr>
-<tr class="row-even"><td></td>
+<tr class="row-odd"><td></td>
 <td><p>UserKNN</p></td>
 <td><p>User-based collaborative KNN using historical interactions.</p></td>
 </tr>
-<tr class="row-odd"><td><p>Latent Factor</p></td>
+<tr class="row-even"><td><p>Latent Factor</p></td>
 <td><p>ADMMSlim</p></td>
 <td><p>Sparse item similarity model optimized via ADMM.</p></td>
 </tr>
-<tr class="row-even"><td></td>
+<tr class="row-odd"><td></td>
 <td><p>BPR</p></td>
 <td><p>Pairwise ranking model for implicit feedback.</p></td>
 </tr>
-<tr class="row-odd"><td></td>
+<tr class="row-even"><td></td>
 <td><p>FISM</p></td>
 <td><p>Efficient item similarity model using weighted average as user embeddings.</p></td>
 </tr>
-<tr class="row-even"><td></td>
+<tr class="row-odd"><td></td>
 <td><p>SLIM</p></td>
 <td><p>Interpretable item similarity model with L1/L2 regularization.</p></td>
 </tr>
-<tr class="row-odd"><td><p>Neural</p></td>
+<tr class="row-even"><td><p>Neural</p></td>
 <td><p>ConvNCF</p></td>
 <td><p>Applies CNNs to user-item embeddings outer product to capture structured interaction patterns.</p></td>
 </tr>
-<tr class="row-even"><td></td>
+<tr class="row-odd"><td></td>
 <td><p>NeuMF</p></td>
 <td><p>Hybrid neural model combining GMF and MLP layers.</p></td>
 </tr>

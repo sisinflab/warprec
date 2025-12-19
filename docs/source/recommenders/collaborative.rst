@@ -259,6 +259,24 @@ They are well-suited for uncovering complex patterns in sparse datasets.
         beta: 0.1
         normalize: True
 
+- SGL (Self-supervised Graph Learning):
+  A graph-based model that augments the user-item graph structure (via Node Dropout, Edge Dropout, or Random Walk) to create auxiliary views for contrastive learning, improving robustness and accuracy.
+
+.. code-block:: yaml
+
+  models:
+    SGL:
+      embedding_size: 64
+      n_layers: 3
+      ssl_tau: 0.2
+      ssl_reg: 0.1
+      dropout: 0.1
+      aug_type: ED
+      reg_weight: 0.001
+      batch_size: 2048
+      epochs: 200
+      learning_rate: 0.001
+
 - UltraGCN:
   A simplified GCN model that skips explicit message passing during training. It approximates infinite-layer graph convolutions using a constraint loss objective that models both user-item and item-item relationships, resulting in high efficiency and scalability.
 
@@ -481,6 +499,9 @@ Summary of Available General Models
    * -
      - RP3Beta
      - Random walk model with popularity penalization.
+   * -
+     - SGL
+     - Self-supervised learning with graph structure augmentation (ED, ND, RW).
    * -
      - UltraGCN
      - Efficient GCN approximation using constraint losses without message passing.
