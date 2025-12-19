@@ -41,6 +41,7 @@ class Evaluator:
         feature_lookup (Optional[Tensor]): The feature lookup tensor.
         user_cluster (Optional[Tensor]): The user cluster lookup tensor.
         item_cluster (Optional[Tensor]): The item cluster lookup tensor.
+        seed (int): The random seed for reproducibility.
     """
 
     def __init__(
@@ -54,12 +55,16 @@ class Evaluator:
         feature_lookup: Optional[Tensor] = None,
         user_cluster: Optional[Tensor] = None,
         item_cluster: Optional[Tensor] = None,
+        seed: int = 42,
     ):
         self.k_values = k_values
         self.metric_list = metric_list
         self.num_items = train_set.shape[1]
         self.metrics: Dict[int, List[BaseMetric]] = {}
         self.required_blocks: Dict[int, Set[MetricBlock]] = {}
+
+        # Set the seed for random permutation in sampled evaluation
+        self.g = torch.Generator().manual_seed(seed)
 
         # Common parameters shared across metrics
         self.common_params: Dict[str, Any] = {
@@ -149,6 +154,8 @@ class Evaluator:
             # Parse the batch
             batch_data = self._parse_batch(batch, strategy, device)
 
+            eval_batch = None  # This will be the Binary Ground Truth for metrics
+
             user_indices = batch_data["user_indices"]
             context = batch_data.get("context")  # Optional (CARS only)
             candidates = batch_data.get("candidates")  # Optional (Sampled only)
@@ -179,12 +186,24 @@ class Evaluator:
                 negatives = batch_data["negatives"]
                 candidates = torch.cat([positives, negatives], dim=1)
 
+                # Initialize the GT tensor
+                eval_batch = torch.zeros_like(candidates)
+                num_pos_cols = positives.shape[1]
+
+                # Construct the GT based on the positives
+                eval_batch[:, :num_pos_cols] = 1.0
+                mask_padding = positives == padding_idx
+                eval_batch[:, :num_pos_cols][mask_padding] = 0.0
+
+                # Random permutation to avoid bias towards position
+                perm = torch.randperm(candidates.shape[1], generator=self.g)
+                candidates = candidates[:, perm]
+                eval_batch = eval_batch[:, perm]
+
                 predict_kwargs["item_indices"] = candidates
 
             # Model prediction
             predictions = model.predict(**predict_kwargs).to(device)
-
-            eval_batch = None  # This will be the Binary Ground Truth for metrics
 
             if strategy == "full":
                 if "target_item" in batch_data:
@@ -204,15 +223,6 @@ class Evaluator:
             elif strategy == "sampled":
                 # Mask seen items
                 predictions[candidates == padding_idx] = -torch.inf
-
-                # Initialize the GT tensor
-                eval_batch = torch.zeros_like(predictions)
-                num_pos_cols = positives.shape[1]
-
-                # Construct the GT based on the positives
-                eval_batch[:, :num_pos_cols] = 1.0
-                mask_padding = positives == padding_idx
-                eval_batch[:, :num_pos_cols][mask_padding] = 0.0
 
             # Metric computation
             self._compute_metrics_step(
