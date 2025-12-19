@@ -16,6 +16,7 @@ try:
     from .lightgode import LightGODE  # noqa: F401
     from .mixrec import MixRec
     from .ngcf import NGCF  # noqa: F401
+    from .sgcl import SGCL  # noqa: F401
     from .sgl import SGL  # noqa: F401
     from .ultragcn import UltraGCN  # noqa: F401
     from .xsimgcl import XSimGCL
@@ -36,6 +37,8 @@ try:
             "LightGODE",
             "MixRec",
             "NGCF",
+            "SGCL",
+            "SGL",
             "UltraGCN",
             "XSimGCL",
         ]
@@ -161,6 +164,17 @@ except ImportError:
         def __init__(self, *args, **kwargs):
             raise ImportError(
                 "NGCF model requires PyG dependencies. "
+                "Please install following the documentation you can find here: "
+                "https://pytorch-geometric.readthedocs.io/en/latest/install/installation.html"
+            )
+
+    @model_registry.register("SGCL")
+    class SGCL:  # type: ignore[no-redef]
+        """Placeholder for SGCL model when PyG dependencies are not installed."""
+
+        def __init__(self, *args, **kwargs):
+            raise ImportError(
+                "SGCL model requires PyG dependencies. "
                 "Please install following the documentation you can find here: "
                 "https://pytorch-geometric.readthedocs.io/en/latest/install/installation.html"
             )
