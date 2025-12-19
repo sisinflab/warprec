@@ -214,6 +214,22 @@ They are well-suited for uncovering complex patterns in sparse datasets.
       epochs: 200
       learning_rate: 0.001
 
+- LightGODE (Light Post-Training Graph-ODE):
+  A highly efficient model that trains embeddings without graph convolution using alignment and uniformity losses. It applies a continuous Graph-ODE solver only during inference to incorporate high-order connectivity.
+
+.. code-block:: yaml
+
+  models:
+    LightGODE:
+      embedding_size: 64
+      gamma: 2.0
+      t: 1.0
+      n_ode_steps: 2
+      reg_weight: 0.001
+      batch_size: 2048
+      epochs: 200
+      learning_rate: 0.001
+
 - MixRec (Individual and Collective Mixing):
   A graph-based model that employs dual mixing strategies (Individual and Collective) to augment embeddings. It uses a dual-mixing contrastive learning objective to enhance consistency between positive pairs while leveraging mixed negatives.
 
@@ -490,6 +506,9 @@ Summary of Available General Models
    * -
      - LightGCN++
      - Improved LightGCN with asymmetric normalization and residual connections.
+   * -
+     - LightGODE
+     - Training-free graph convolution using post-training ODE solver.
    * -
      - MixRec
      - Dual mixing data augmentation with contrastive learning.
