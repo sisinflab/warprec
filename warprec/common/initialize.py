@@ -7,6 +7,7 @@ from warprec.data import Dataset
 from warprec.data.reader import Reader
 from warprec.data.splitting import Splitter
 from warprec.data.filtering import apply_filtering
+from warprec.recommenders.base_recommender import ContextRecommenderUtils
 from warprec.utils.config import TrainConfiguration, DesignConfiguration
 from warprec.utils.callback import WarpRecCallback
 from warprec.utils.enums import SearchSpace
@@ -76,7 +77,9 @@ def initialize_datasets(
                 # Compute splitting
                 train_data, val_data, test_data = splitter.split_transaction(
                     data,
-                    **config.reader.labels.model_dump(exclude=["cluster_label"]),  # type: ignore[arg-type]
+                    **config.reader.labels.model_dump(
+                        exclude=["cluster_label", "context_labels"]  # type: ignore[arg-type]
+                    ),
                     **test_configuration,
                     **val_configuration,
                 )
@@ -199,6 +202,7 @@ def initialize_datasets(
         "rating_label": config.reader.labels.rating_label,
         "timestamp_label": config.reader.labels.timestamp_label,
         "cluster_label": config.reader.labels.cluster_label,
+        "context_labels": config.reader.labels.context_labels,
         "precision": config.general.precision,
     }
 
@@ -337,30 +341,72 @@ def dataset_preparation(
         config (TrainConfiguration): The configuration file used for the experiment.
     """
 
-    def prepare_evaluation_loaders(dataset: Dataset):
+    def prepare_evaluation_loaders(
+        dataset: Dataset, has_classic: bool, has_context: bool
+    ):
         """utility function to prepare the evaluation dataloaders
         for a given dataset based on the evaluation strategy.
 
         Args:
             dataset (Dataset): The dataset to prepare.
+            has_classic (bool): Wether or not experiment has a classic recommender.
+            has_context (bool): Wether or not experiment has a context recommender.
+
+        Raises:
+            ValueError: If both the flags are False.
         """
-        if config.evaluation.strategy == "full":
-            dataset.get_evaluation_dataloader()
-        elif config.evaluation.strategy == "sampled":
-            dataset.get_neg_evaluation_dataloader(
-                num_negatives=config.evaluation.num_negatives,
-                seed=config.evaluation.seed,
+        if not has_classic and not has_context:
+            raise ValueError(
+                "Something went wrong. No correct model found during evaluation "
+                "initialization."
             )
+        strategy = config.evaluation.strategy
+
+        # Initialize the classic evaluation structures
+        if has_classic:
+            if strategy == "full":
+                dataset.get_evaluation_dataloader()
+            elif strategy == "sampled":
+                dataset.get_sampled_evaluation_dataloader(
+                    num_negatives=config.evaluation.num_negatives,
+                    seed=config.evaluation.seed,
+                )
+
+        # Initialize the contextual evaluation structures
+        if has_context:
+            if strategy == "full":
+                dataset.get_contextual_evaluation_dataloader()
+            elif strategy == "sampled":
+                dataset.get_sampled_contextual_evaluation_dataloader(
+                    num_negatives=config.evaluation.num_negatives,
+                    seed=config.evaluation.seed,
+                )
 
     logger.msg("Preparing main dataset inner structures for evaluation.")
 
-    prepare_evaluation_loaders(main_dataset)
+    model_classes = [
+        model_registry.get_class(model_name) for model_name in config.models.keys()
+    ]
+    has_classic = any(
+        [
+            not issubclass(model_class, ContextRecommenderUtils)
+            for model_class in model_classes
+        ]
+    )
+    has_context = any(
+        [
+            issubclass(model_class, ContextRecommenderUtils)
+            for model_class in model_classes
+        ]
+    )
+
+    prepare_evaluation_loaders(main_dataset, has_classic, has_context)
     if fold_dataset is not None and isinstance(fold_dataset, list):
         for i, dataset in enumerate(fold_dataset):
             logger.msg(
                 f"Preparing fold dataset {i + 1}/{len(fold_dataset)} inner structures for evaluation."
             )
-            prepare_evaluation_loaders(dataset)
+            prepare_evaluation_loaders(dataset, has_classic, has_context)
 
     if preparation_strategy is not None and preparation_strategy == "experiment":
         logger.msg("Preparing main dataset inner structures for training.")

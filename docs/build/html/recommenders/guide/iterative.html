@@ -219,8 +219,12 @@
 <p class="caption" role="heading"><span class="caption-text">CORE</span></p>
 <ul class="current">
 <li class="toctree-l1 current has-children"><a class="reference internal" href="../index.html">Recommenders</a><input checked="" class="toctree-checkbox" id="toctree-checkbox-3" name="toctree-checkbox-3" role="switch" type="checkbox"/><label for="toctree-checkbox-3"><div class="visually-hidden">Toggle navigation of Recommenders</div><i class="icon"><svg><use href="#svg-arrow-right"></use></svg></i></label><ul class="current">
-<li class="toctree-l2"><a class="reference internal" href="../general.html">General Recommenders</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../collaborative.html">Collaborative-Filtering Recommenders</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../content.html">Content-Based Recommenders</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../hybrid.html">Hybrid Recommenders</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../context.html">Context-Aware Recommenders</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../sequential.html">Sequential Recommenders</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../unpersonalized.html">Unpersonalized Recommenders</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../proxy.html">Proxy Recommender</a></li>
 <li class="toctree-l2 current has-children"><a class="reference internal" href="index.html">Implementation Guide</a><input checked="" class="toctree-checkbox" id="toctree-checkbox-4" name="toctree-checkbox-4" role="switch" type="checkbox"/><label for="toctree-checkbox-4"><div class="visually-hidden">Toggle navigation of Implementation Guide</div><i class="icon"><svg><use href="#svg-arrow-right"></use></svg></i></label><ul class="current">
 <li class="toctree-l3"><a class="reference internal" href="classic.html">Classic Recommender Guide</a></li>
@@ -392,11 +396,16 @@ embeddings.</p></li>
             <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Items value must be provided to correctly initialize the model.&quot;</span><span class="p">)</span>
 
         <span class="bp">self</span><span class="o">.</span><span class="n">user_embedding</span> <span class="o">=</span> <span class="n">nn</span><span class="o">.</span><span class="n">Embedding</span><span class="p">(</span><span class="n">users</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">embedding_size</span><span class="p">)</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">item_embedding</span> <span class="o">=</span> <span class="n">nn</span><span class="o">.</span><span class="n">Embedding</span><span class="p">(</span><span class="n">items</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">embedding_size</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">item_embedding</span> <span class="o">=</span> <span class="n">nn</span><span class="o">.</span><span class="n">Embedding</span><span class="p">(</span><span class="n">items</span> <span class="o">+</span> <span class="mi">1</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">embedding_size</span><span class="p">,</span> <span class="n">padding_idx</span><span class="o">=</span><span class="n">items</span><span class="p">)</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">apply</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_init_weights</span><span class="p">)</span>  <span class="c1"># See Step 2 for details</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">loss</span> <span class="o">=</span> <span class="n">BPRLoss</span><span class="p">()</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_device</span><span class="p">)</span>
 </pre></div>
+</div>
+<div class="admonition important">
+<p class="admonition-title">Important</p>
+<p>The item_embedding uses <cite>padding_idx=items</cite> to handle potential padding in the item indices.
+Inside WarpRec, items are indexed from <cite>0</cite> to <cite>num_items - 1</cite>, with <cite>num_items</cite> reserved for padding.</p>
 </div>
 </section>
 <section id="step-2-initialize-weights">
@@ -414,8 +423,16 @@ embeddings.</p></li>
 <ol class="arabic simple">
 <li><p><cite>get_dataloader</cite>: Returns a DataLoader that yields batches of training samples.</p></li>
 </ol>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="k">def</span><span class="w"> </span><span class="nf">get_dataloader</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">interactions</span><span class="p">:</span> <span class="n">Interactions</span><span class="p">,</span> <span class="n">sessions</span><span class="p">:</span> <span class="n">Sessions</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
-    <span class="k">return</span> <span class="n">interactions</span><span class="o">.</span><span class="n">get_pos_neg_dataloader</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">batch_size</span><span class="p">)</span>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="k">def</span><span class="w"> </span><span class="nf">get_dataloader</span><span class="p">(</span>
+    <span class="bp">self</span><span class="p">,</span>
+    <span class="n">interactions</span><span class="p">:</span> <span class="n">Interactions</span><span class="p">,</span>
+    <span class="n">sessions</span><span class="p">:</span> <span class="n">Sessions</span><span class="p">,</span>
+    <span class="n">low_memory</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+    <span class="o">**</span><span class="n">kwargs</span><span class="p">,</span>
+<span class="p">):</span>
+    <span class="k">return</span> <span class="n">interactions</span><span class="o">.</span><span class="n">get_pos_neg_dataloader</span><span class="p">(</span>
+        <span class="n">batch_size</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">batch_size</span><span class="p">,</span> <span class="n">low_memory</span><span class="o">=</span><span class="n">low_memory</span>
+    <span class="p">)</span>
 </pre></div>
 </div>
 <div class="admonition important">
@@ -455,24 +472,21 @@ backpropagation and optimizer step automatically. If the returned loss is not a 
 </section>
 <section id="step-4-implement-prediction-methods">
 <h2>Step 4: Implement Prediction Methods<a class="headerlink" href="#step-4-implement-prediction-methods" title="Link to this heading">¶</a></h2>
-<p>Recommendation models should implement <cite>predict_full</cite> and optionally <cite>predict_sampled</cite>.
-In case of the full prediction, the method should return scores for all items for a batch of users.
-In case of sampled prediction, the method should return scores only for a subset of candidate items.
-These methods use the learned embeddings to compute scores:</p>
+<p>Recommendation models must implement a prediction method to generate scores for user-item pairs. You can override the <cite>predict</cite> method to define how predictions are made.
+Normal behavior is to compute a full prediction over the batch of users if item_indices is None, or compute predictions only for the provided item indices:</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="nd">@torch</span><span class="o">.</span><span class="n">no_grad</span><span class="p">()</span>
-<span class="k">def</span><span class="w"> </span><span class="nf">predict_full</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">user_indices</span><span class="p">:</span> <span class="n">Tensor</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
-    <span class="n">user_e_all</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">user_embedding</span><span class="o">.</span><span class="n">weight</span>
-    <span class="n">item_e_all</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">item_embedding</span><span class="o">.</span><span class="n">weight</span>
-    <span class="n">u_embeddings_batch</span> <span class="o">=</span> <span class="n">user_e_all</span><span class="p">[</span><span class="n">user_indices</span><span class="p">]</span>
-    <span class="n">predictions</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">matmul</span><span class="p">(</span><span class="n">u_embeddings_batch</span><span class="p">,</span> <span class="n">item_e_all</span><span class="o">.</span><span class="n">transpose</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">))</span>
-    <span class="k">return</span> <span class="n">predictions</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_device</span><span class="p">)</span>
-
-<span class="nd">@torch</span><span class="o">.</span><span class="n">no_grad</span><span class="p">()</span>
-<span class="k">def</span><span class="w"> </span><span class="nf">predict_sampled</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">user_indices</span><span class="p">:</span> <span class="n">Tensor</span><span class="p">,</span> <span class="n">item_indices</span><span class="p">:</span> <span class="n">Tensor</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">predict</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">user_indices</span><span class="p">:</span> <span class="n">Tensor</span><span class="p">,</span> <span class="n">item_indices</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Tensor</span><span class="p">],</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
     <span class="n">user_embeddings</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">user_embedding</span><span class="p">(</span><span class="n">user_indices</span><span class="p">)</span>
-    <span class="n">candidate_item_embeddings</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">item_embedding</span><span class="p">(</span><span class="n">item_indices</span><span class="o">.</span><span class="n">clamp</span><span class="p">(</span><span class="nb">min</span><span class="o">=</span><span class="mi">0</span><span class="p">))</span>
-    <span class="n">predictions</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">einsum</span><span class="p">(</span><span class="s2">&quot;bi,bji-&gt;bj&quot;</span><span class="p">,</span> <span class="n">user_embeddings</span><span class="p">,</span> <span class="n">candidate_item_embeddings</span><span class="p">)</span>
-    <span class="k">return</span> <span class="n">predictions</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_device</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">item_indices</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="c1"># Case &#39;full&#39;: prediction on all items</span>
+        <span class="n">item_embeddings</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">item_embedding</span><span class="o">.</span><span class="n">weight</span><span class="p">[:</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="p">:]</span>
+        <span class="n">einsum_string</span> <span class="o">=</span> <span class="s2">&quot;be,ie-&gt;bi&quot;</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="c1"># Case &#39;sampled&#39;: prediction on a sampled set of items</span>
+        <span class="n">item_embeddings</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">item_embedding</span><span class="p">(</span><span class="n">item_indices</span><span class="p">)</span>
+        <span class="n">einsum_string</span> <span class="o">=</span> <span class="s2">&quot;be,bse-&gt;bs&quot;</span>
+    <span class="n">predictions</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">einsum</span><span class="p">(</span><span class="n">einsum_string</span><span class="p">,</span> <span class="n">user_embeddings</span><span class="p">,</span> <span class="n">item_embeddings</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">predictions</span>
 </pre></div>
 </div>
 <div class="admonition important">

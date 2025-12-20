@@ -219,8 +219,12 @@
 <p class="caption" role="heading"><span class="caption-text">CORE</span></p>
 <ul>
 <li class="toctree-l1 has-children"><a class="reference internal" href="../recommenders/index.html">Recommenders</a><input class="toctree-checkbox" id="toctree-checkbox-3" name="toctree-checkbox-3" role="switch" type="checkbox"/><label for="toctree-checkbox-3"><div class="visually-hidden">Toggle navigation of Recommenders</div><i class="icon"><svg><use href="#svg-arrow-right"></use></svg></i></label><ul>
-<li class="toctree-l2"><a class="reference internal" href="../recommenders/general.html">General Recommenders</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../recommenders/collaborative.html">Collaborative-Filtering Recommenders</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../recommenders/content.html">Content-Based Recommenders</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../recommenders/hybrid.html">Hybrid Recommenders</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../recommenders/context.html">Context-Aware Recommenders</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../recommenders/sequential.html">Sequential Recommenders</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../recommenders/unpersonalized.html">Unpersonalized Recommenders</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../recommenders/proxy.html">Proxy Recommender</a></li>
 <li class="toctree-l2 has-children"><a class="reference internal" href="../recommenders/guide/index.html">Implementation Guide</a><input class="toctree-checkbox" id="toctree-checkbox-4" name="toctree-checkbox-4" role="switch" type="checkbox"/><label for="toctree-checkbox-4"><div class="visually-hidden">Toggle navigation of Implementation Guide</div><i class="icon"><svg><use href="#svg-arrow-right"></use></svg></i></label><ul>
 <li class="toctree-l3"><a class="reference internal" href="../recommenders/guide/classic.html">Classic Recommender Guide</a></li>
@@ -378,6 +382,16 @@ Default state for all optional dashboards is <strong>disabled</strong>.</p>
 <li><p><strong>output_dir</strong>: Directory where results are stored.</p></li>
 <li><p><strong>tracking_mode</strong>: Tracking mode for CodeCarbon. Options are <code class="docutils literal notranslate"><span class="pre">machine</span></code> or <code class="docutils literal notranslate"><span class="pre">process</span></code>.</p></li>
 </ul>
+<p>When using the <strong>save_to_api</strong> feature, the main to correctly track the experiment is to create a <code class="docutils literal notranslate"><span class="pre">.codecarbon.config</span></code> file which contains the following information:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="p p-Indicator">[</span><span class="nv">codecarbon</span><span class="p p-Indicator">]</span>
+<span class="l l-Scalar l-Scalar-Plain">experiment_id = YOUR_EXPERIMENT_ID</span>
+<span class="l l-Scalar l-Scalar-Plain">api_key = YOUR_API_KEY</span>
+</pre></div>
+</div>
+<div class="admonition important">
+<p class="admonition-title">Important</p>
+<p>You can find the API key and the experiment ID inside the codecarbon official dashboard.</p>
+</div>
 </section>
 </section>
 <section id="example-dashboard-configuration">

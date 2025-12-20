@@ -1,16 +1,14 @@
 # pylint: disable = R0801, E1102, W0221, C0103, W0613, W0235
-from typing import Any
+from typing import Any, Optional
 
 import torch
 from torch import nn, Tensor
-from torch.nn import Module
-from torch.nn.init import xavier_normal_
 
 from warprec.recommenders.base_recommender import (
     IterativeRecommender,
     SequentialRecommenderUtils,
 )
-from warprec.recommenders.losses import BPRLoss
+from warprec.recommenders.losses import BPRLoss, EmbLoss
 from warprec.data.entities import Interactions, Sessions
 from warprec.utils.enums import DataLoaderType
 from warprec.utils.registry import model_registry
@@ -26,14 +24,11 @@ class SASRec(IterativeRecommender, SequentialRecommenderUtils):
 
     Args:
         params (dict): Model parameters.
-        *args (Any): Variable length argument list.
-        device (str): The device used for tensor operations.
-        seed (int): The seed to use for reproducibility.
+        interactions (Interactions): The training interactions.
         info (dict): The dictionary containing dataset information.
+        *args (Any): Variable length argument list.
+        seed (int): The seed to use for reproducibility.
         **kwargs (Any): Arbitrary keyword arguments.
-
-    Raises:
-        ValueError: If the items value was not passed through the info dict.
 
     Attributes:
         DATALOADER_TYPE: The type of dataloader used.
@@ -43,6 +38,7 @@ class SASRec(IterativeRecommender, SequentialRecommenderUtils):
         inner_size (int): The dimensionality of the feed-forward layer in the transformer.
         dropout_prob (float): The probability of dropout for embeddings and other layers.
         attn_dropout_prob (float): The probability of dropout for the attention weights.
+        reg_weight (float): The L2 regularization weight.
         weight_decay (float): The value of weight decay used in the optimizer.
         batch_size (int): The batch size used during training.
         epochs (int): The number of training epochs.
@@ -61,6 +57,7 @@ class SASRec(IterativeRecommender, SequentialRecommenderUtils):
     inner_size: int
     dropout_prob: float
     attn_dropout_prob: float
+    reg_weight: float
     weight_decay: float
     batch_size: int
     epochs: int
@@ -71,22 +68,16 @@ class SASRec(IterativeRecommender, SequentialRecommenderUtils):
     def __init__(
         self,
         params: dict,
+        interactions: Interactions,
+        info: dict,
         *args: Any,
-        device: str = "cpu",
         seed: int = 42,
-        info: dict = None,
         **kwargs: Any,
     ):
-        super().__init__(params, device=device, seed=seed, *args, **kwargs)
-
-        items = info.get("items", None)
-        if not items:
-            raise ValueError(
-                "Items value must be provided to correctly initialize the model."
-            )
+        super().__init__(params, interactions, info, *args, seed=seed, **kwargs)
 
         self.item_embedding = nn.Embedding(
-            items + 1, self.embedding_size, padding_idx=0
+            self.n_items + 1, self.embedding_size, padding_idx=self.n_items
         )
         self.position_embedding = nn.Embedding(self.max_seq_len, self.embedding_size)
         self.emb_dropout = nn.Dropout(self.dropout_prob)
@@ -105,40 +96,21 @@ class SASRec(IterativeRecommender, SequentialRecommenderUtils):
             num_layers=self.n_layers,
         )
 
+        # Precompute causal mask
+        causal_mask = self._generate_square_subsequent_mask(self.max_seq_len)
+        self.register_buffer("causal_mask", causal_mask)
+
         # Initialize weights
         self.apply(self._init_weights)
 
         # Loss function will be based on number of
         # negative samples
-        self.loss: nn.Module
+        self.main_loss: nn.Module
         if self.neg_samples > 0:
-            self.loss = BPRLoss()
+            self.main_loss = BPRLoss()
         else:
-            self.loss = nn.CrossEntropyLoss()
-
-        self.to(self._device)
-
-    def _init_weights(self, module: Module):
-        """Internal method to initialize weights.
-
-        Args:
-            module (Module): The module to initialize.
-        """
-        if isinstance(module, (nn.Embedding, nn.Linear)):
-            # Using Xavier Normal initialization for consistency with the framework
-            xavier_normal_(module.weight.data)
-        elif isinstance(module, nn.LayerNorm):
-            # Standard initialization for LayerNorm
-            module.bias.data.zero_()
-            module.weight.data.fill_(1.0)
-
-        if isinstance(module, nn.Linear) and module.bias is not None:
-            module.bias.data.zero_()
-
-    def _generate_square_subsequent_mask(self, seq_len: int) -> Tensor:
-        """Generates a causal mask for the transformer."""
-        mask = torch.triu(torch.ones(seq_len, seq_len, device=self._device), diagonal=1)
-        return mask.bool()  # True values will be masked
+            self.main_loss = nn.CrossEntropyLoss()
+        self.reg_loss = EmbLoss()
 
     def get_dataloader(
         self,
@@ -156,16 +128,14 @@ class SASRec(IterativeRecommender, SequentialRecommenderUtils):
 
     def train_step(self, batch: Any, *args, **kwargs):
         if self.neg_samples > 0:
-            item_seq, item_seq_len, pos_item, neg_item = [
-                x.to(self._device) for x in batch
-            ]
+            item_seq, item_seq_len, pos_item, neg_item = batch
         else:
-            item_seq, item_seq_len, pos_item = [x.to(self._device) for x in batch]
+            item_seq, item_seq_len, pos_item = batch
             neg_item = None
 
         seq_output = self.forward(item_seq, item_seq_len)
 
-        loss: Tensor
+        # Calculate main loss and L2 regularization
         if self.neg_samples > 0:
             pos_items_emb = self.item_embedding(
                 pos_item
@@ -178,15 +148,28 @@ class SASRec(IterativeRecommender, SequentialRecommenderUtils):
             neg_score = torch.sum(
                 seq_output.unsqueeze(1) * neg_items_emb, dim=-1
             )  # [batch_size]
-            loss = self.loss(pos_score, neg_score)
+            main_loss = self.main_loss(pos_score, neg_score)
+
+            # L2 regularization
+            reg_loss = self.reg_weight * self.reg_loss(
+                self.item_embedding(item_seq),
+                self.item_embedding(pos_item),
+                self.item_embedding(neg_item),
+            )
         else:
-            test_item_emb = self.item_embedding.weight  # [num_items, embedding_size]
+            test_item_emb = self.item_embedding.weight  # [n_items, embedding_size]
             logits = torch.matmul(
                 seq_output, test_item_emb.transpose(0, 1)
-            )  # [batch_size, num_items]
-            loss = self.loss(logits, pos_item)
+            )  # [batch_size, n_items]
+            main_loss = self.main_loss(logits, pos_item)
 
-        return loss
+            # L2 regularization
+            reg_loss = self.reg_weight * self.reg_loss(
+                self.item_embedding(item_seq),
+                self.item_embedding(pos_item),
+            )
+
+        return main_loss + reg_loss
 
     def forward(self, item_seq: Tensor, item_seq_len: Tensor) -> Tensor:
         """Forward pass of the SASRec model.
@@ -202,13 +185,10 @@ class SASRec(IterativeRecommender, SequentialRecommenderUtils):
         seq_len = item_seq.size(1)
 
         # Padding mask to ignore padding tokens
-        padding_mask = item_seq == 0  # [batch_size, seq_len]
-
-        # Causal mask to prevent attending to future tokens
-        causal_mask = self._generate_square_subsequent_mask(seq_len)
+        padding_mask = item_seq == self.n_items  # [batch_size, seq_len]
 
         # Create position IDs
-        position_ids = torch.arange(seq_len, dtype=torch.long, device=self._device)
+        position_ids = torch.arange(seq_len, dtype=torch.long).to(item_seq.device)
         position_ids = position_ids.unsqueeze(0).expand_as(item_seq)
 
         # Get embeddings
@@ -222,7 +202,7 @@ class SASRec(IterativeRecommender, SequentialRecommenderUtils):
         # Pass through Transformer Encoder
         transformer_output = self.transformer_encoder(
             src=seq_emb,
-            mask=causal_mask,
+            mask=self.causal_mask,
             src_key_padding_mask=padding_mask,
         )  # [batch_size, max_seq_len, embedding_size]
 
@@ -234,79 +214,47 @@ class SASRec(IterativeRecommender, SequentialRecommenderUtils):
         return seq_output
 
     @torch.no_grad()
-    def predict_full(
+    def predict(
         self,
         user_indices: Tensor,
-        user_seq: Tensor,
-        seq_len: Tensor,
         *args: Any,
+        item_indices: Optional[Tensor] = None,
+        user_seq: Optional[Tensor] = None,
+        seq_len: Optional[Tensor] = None,
         **kwargs: Any,
     ) -> Tensor:
         """
-        Prediction using the learned session embeddings (full sort prediction).
+        Prediction using the learned session embeddings.
 
         Args:
             user_indices (Tensor): The batch of user indices.
-            user_seq (Tensor): Padded sequences of item IDs for users to predict for.
-            seq_len (Tensor): Actual lengths of these sequences, before padding.
             *args (Any): List of arguments.
+            item_indices (Optional[Tensor]): The batch of item indices. If None,
+                full prediction will be produced.
+            user_seq (Optional[Tensor]): Padded sequences of item IDs for users to predict for.
+            seq_len (Optional[Tensor]): Actual lengths of these sequences, before padding.
             **kwargs (Any): The dictionary of keyword arguments.
 
         Returns:
             Tensor: The score matrix {user x item}.
         """
-        user_seq = user_seq.to(self._device)
-        seq_len = seq_len.to(self._device)
-
-        # Get the session output embedding for each user
-        seq_output = self.forward(user_seq, seq_len)
-
-        # Get embeddings for all items
-        all_item_embeddings = self.item_embedding.weight[1:]
-
-        # Calculate scores for all items
-        predictions = torch.matmul(seq_output, all_item_embeddings.transpose(0, 1))
-        return predictions.to(self._device)
-
-    @torch.no_grad()
-    def predict_sampled(
-        self,
-        user_indices: Tensor,
-        item_indices: Tensor,
-        user_seq: Tensor,
-        seq_len: Tensor,
-        *args: Any,
-        **kwargs: Any,
-    ) -> Tensor:
-        """Prediction of given items using the learned embeddings.
-
-        Args:
-            user_indices (Tensor): The batch of user indices.
-            item_indices (Tensor): The batch of item indices to predict for.
-            user_seq (Tensor): Padded sequences of item IDs for users to predict for.
-            seq_len (Tensor): Actual lengths of these sequences, before padding.
-            *args (Any): List of arguments.
-            **kwargs (Any): The dictionary of keyword arguments.
-
-        Returns:
-            Tensor: The score matrix {user x pad_seq}.
-        """
-        # Move inputs to the correct device
-        user_seq = user_seq.to(self._device)
-        seq_len = seq_len.to(self._device)
-        item_indices = item_indices.to(self._device)
-
-        # Calculate the sequential output embedding for each user in the batch
+        # Get sequence output embeddings
         seq_output = self.forward(user_seq, seq_len)  # [batch_size, embedding_size]
 
-        # Get embeddings for candidate items. We clamp the indices to avoid
-        # out-of-bounds errors with the padding value (-1)
-        candidate_item_embeddings = self.item_embedding(
-            item_indices.clamp(min=0)
-        )  # [batch_size, pad_seq, embedding_size]
+        if item_indices is None:
+            # Case 'full': prediction on all items
+            item_embeddings = self.item_embedding.weight[
+                :-1, :
+            ]  # [n_items, embedding_size]
+            einsum_string = "be,ie->bi"  # b: batch, e: embedding, i: item
+        else:
+            # Case 'sampled': prediction on a sampled set of items
+            item_embeddings = self.item_embedding(
+                item_indices
+            )  # [batch_size, pad_seq, embedding_size]
+            einsum_string = "be,bse->bs"  # b: batch, e: embedding, s: sample
 
-        # Compute scores using a batch matrix multiplication or einsum
         predictions = torch.einsum(
-            "bi,bji->bj", seq_output, candidate_item_embeddings
-        )  # [batch_size, pad_seq]
-        return predictions.to(self._device)
+            einsum_string, seq_output, item_embeddings
+        )  # [batch_size, n_items] or [batch_size, pad_seq]
+        return predictions

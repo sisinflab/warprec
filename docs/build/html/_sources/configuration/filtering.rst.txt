@@ -171,6 +171,26 @@ If no timestamps are provided, the original ordering of interactions is preserve
        UserTailN:
            num_interactions: 30
 
+**12. DropUser**
+
+Filter out all interactions involving specific users identified by their user IDs.
+
+.. code-block:: yaml
+
+   filtering:
+       DropUser:
+           user_ids_to_filter: [123, 456, 789]
+
+**13. DropItem**
+
+Filter out all interactions involving specific items identified by their item IDs.
+
+.. code-block:: yaml
+
+   filtering:
+       DropItem:
+           item_ids_to_filter: [123, 456, 789]
+
 -----------------------------
 Example Filtering Pipeline
 -----------------------------

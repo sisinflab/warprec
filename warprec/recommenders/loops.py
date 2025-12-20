@@ -1,11 +1,11 @@
 from typing import Optional
 from tqdm.auto import tqdm
 
-import torch
 from torch.optim.lr_scheduler import ReduceLROnPlateau
 from torch.optim.lr_scheduler import LRScheduler as LRSchedulerBaseClass
 
 from warprec.data import Dataset
+from warprec.common import standard_optimizer
 from warprec.recommenders.base_recommender import IterativeRecommender
 from warprec.utils.config import LRScheduler
 from warprec.utils.registry import lr_scheduler_registry
@@ -18,6 +18,7 @@ def train_loop(
     epochs: int,
     lr_scheduler: Optional[LRScheduler] = None,
     low_memory: bool = False,
+    device: str = "cpu",
 ):
     """Simple training loop decorated with tqdm.
 
@@ -28,17 +29,19 @@ def train_loop(
         lr_scheduler (Optional[LRScheduler]): The learning rate scheduler configuration.
         low_memory (bool): Wether or not to compute dataloader in
             lazy mode.
+        device (str): The device used for training. Defaults to "cpu".
     """
     logger.msg(f"Starting the training of model {model.name}")
+
+    model.to(device)
 
     train_dataloader = model.get_dataloader(
         interactions=dataset.train_set,
         sessions=dataset.train_session,
         low_memory=low_memory,
     )
-    optimizer = torch.optim.Adam(
-        model.parameters(), lr=model.learning_rate, weight_decay=model.weight_decay
-    )
+
+    optimizer = standard_optimizer(model)
 
     # Check for learning rate scheduler
     scheduler = None
@@ -57,6 +60,7 @@ def train_loop(
             leave=False,
             total=len(train_dataloader),
         ):
+            batch = [x.to(device) for x in batch]
             optimizer.zero_grad()
 
             loss = model.train_step(batch, epoch)

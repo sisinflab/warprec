@@ -1,211 +1,20 @@
-from typing import Tuple, Optional, List, Set, Any, Dict
+from typing import Tuple, Optional, List, Any, Dict
 
 import torch
 import numpy as np
 import pandas as pd
 from torch import Tensor
-from torch.utils.data import DataLoader, Dataset as TorchDataset
-from torch.nn.utils.rnn import pad_sequence
 from pandas import DataFrame
-from scipy.sparse import csr_matrix
 
 from warprec.data.entities import Interactions, Sessions
+from warprec.data.eval_loaders import (
+    EvaluationDataLoader,
+    SampledEvaluationDataLoader,
+    ContextualEvaluationDataLoader,
+    SampledContextualEvaluationDataLoader,
+)
 from warprec.utils.enums import RatingType
 from warprec.utils.logger import logger
-
-
-class EvaluationDataset(TorchDataset):
-    """PyTorch Dataset to yield (train, eval, user_idx) in batch,
-    converting sparse matrices in dense tensors.
-
-    Args:
-        eval_interactions (csr_matrix): Sparse matrix of evaluation interactions.
-    """
-
-    def __init__(
-        self,
-        eval_interactions: csr_matrix,
-    ):
-        self.num_users, self.num_items = eval_interactions.shape
-        self.eval_interactions = eval_interactions
-
-    def __len__(self) -> int:
-        return self.num_users
-
-    def __getitem__(self, idx: int) -> Tuple[Tensor, int]:
-        eval_row = self.eval_interactions.getrow(idx)
-        eval_batch = torch.from_numpy(eval_row.toarray()).to(torch.float32).squeeze(0)
-
-        return eval_batch, idx
-
-
-class NegativeEvaluationDataset(TorchDataset):
-    """PyTorch Dataset to yield (pos_item, neg_item, user_idx) in batch,
-    converting sparse matrices in dense tensors.
-
-    For each user, positive items are retrieve and a number of negatives
-    is sampled randomly.
-
-    Args:
-        train_interactions (csr_matrix): Sparse matrix of training interactions.
-        eval_interactions (csr_matrix): Sparse matrix of evaluation interactions.
-        num_negatives (int): Number of negatives to sample per user.
-        seed (int): Random seed for negative sampling.
-    """
-
-    def __init__(
-        self,
-        train_interactions: csr_matrix,
-        eval_interactions: csr_matrix,
-        num_negatives: int = 99,
-        seed: int = 42,
-    ):
-        super().__init__()
-        self.num_users, self.num_items = train_interactions.shape
-        self.num_negatives = num_negatives
-
-        # Init lists for faster access
-        self.users_with_positives = []
-        self.positive_items_list = []
-        self.negative_items_list = []
-
-        # Get positive interactions in eval set
-        eval_positives_by_user = [
-            eval_interactions.indices[
-                eval_interactions.indptr[u] : eval_interactions.indptr[u + 1]
-            ]
-            for u in range(self.num_users)
-        ]
-
-        # Set the random seed
-        np.random.seed(seed)
-
-        for u in range(self.num_users):
-            # If no pos interaction in eval set, skip
-            if len(eval_positives_by_user[u]) == 0:
-                continue
-
-            self.users_with_positives.append(u)
-            self.positive_items_list.append(
-                torch.tensor(eval_positives_by_user[u], dtype=torch.long)
-            )
-
-            # Obtain all positive (train/eval)
-            train_positives = train_interactions[u].indices
-            user_all_positives = np.union1d(eval_positives_by_user[u], train_positives)
-
-            # Compute candidates
-            candidate_negatives_count = self.num_items - len(user_all_positives)
-            num_to_sample = min(self.num_negatives, candidate_negatives_count)
-
-            # Randomly sample negatives until correctly sampled
-            if num_to_sample > 0:
-                negatives: Set[Any] = set()
-                while len(negatives) < num_to_sample:
-                    candidate = np.random.randint(0, self.num_items)
-                    if candidate not in user_all_positives:
-                        negatives.add(candidate)
-                self.negative_items_list.append(
-                    torch.tensor(list(negatives), dtype=torch.long)
-                )
-            else:
-                self.negative_items_list.append(torch.tensor([], dtype=torch.long))
-
-    def __len__(self) -> int:
-        return len(self.users_with_positives)
-
-    def __getitem__(self, idx: int) -> Tuple[Tensor, Tensor, int]:
-        """Yield data for a single user.
-
-        Args:
-            idx (int): Index of the user.
-
-        Returns:
-            Tuple[Tensor, Tensor, int]:
-                - positive_items (Tensor): Tensor with positive items.
-                - negative_items (Tensor): Tensor with negative items.
-                - idx (int): User index.
-        """
-        # Fast access to pre-computed pos-neg interactions
-        positive_items = self.positive_items_list[idx]
-        negative_items = self.negative_items_list[idx]
-
-        # Retrieve valid user idxs
-        user_idx = self.users_with_positives[idx]
-
-        return (
-            positive_items,
-            negative_items,
-            user_idx,
-        )
-
-
-class EvaluationDataLoader(DataLoader):
-    """Custom DataLoader to yield tuple (train, eval) in batch size."""
-
-    def __init__(
-        self,
-        eval_interactions: csr_matrix,
-        batch_size: int = 1024,
-        **kwargs,
-    ):
-        dataset = EvaluationDataset(
-            eval_interactions=eval_interactions,
-        )
-        super().__init__(dataset, batch_size=batch_size, shuffle=False, **kwargs)
-
-
-class NegativeEvaluationDataLoader(DataLoader):
-    """DataLoader for evaluation with negative sampling."""
-
-    def __init__(
-        self,
-        train_interactions: csr_matrix,
-        eval_interactions: csr_matrix,
-        num_negatives: int = 99,
-        seed: int = 42,
-        batch_size: int = 1024,
-        **kwargs,
-    ):
-        dataset = NegativeEvaluationDataset(
-            train_interactions=train_interactions,
-            eval_interactions=eval_interactions,
-            num_negatives=num_negatives,
-            seed=seed,
-        )
-
-        super().__init__(
-            dataset,
-            batch_size=batch_size,
-            shuffle=False,
-            collate_fn=self._collate_fn,
-            **kwargs,
-        )
-
-    @staticmethod
-    def _collate_fn(
-        batch: List[Tuple[Tensor, Tensor, int]],
-    ) -> Tuple[Tensor, Tensor, Tensor]:
-        """Custom collate_fn to handle negative sampling in evaluation."""
-        positive_tensors, negative_tensors, user_indices = zip(*batch)
-
-        # User indices will be a list of ints, so we convert it
-        user_indices_tensor = torch.tensor(list(user_indices), dtype=torch.long)
-
-        # We use the pad_sequence utility to pad item indices
-        # in order to have all tensor of the same size
-        positives_padded = pad_sequence(
-            positive_tensors,  # type: ignore[arg-type]
-            batch_first=True,
-            padding_value=-1,
-        )
-        negatives_padded = pad_sequence(
-            negative_tensors,  # type: ignore[arg-type]
-            batch_first=True,
-            padding_value=-1,
-        )
-
-        return positives_padded, negatives_padded, user_indices_tensor
 
 
 class Dataset:
@@ -224,6 +33,8 @@ class Dataset:
         rating_label (str): The label of the rating column.
         timestamp_label (str): The label of the timestamp column.
         cluster_label (str): The label of the cluster column.
+        context_labels (Optional[List[str]]): The list of labels of the
+            contextual data.
         precision (Any): The precision of the internal representation of the data.
         evaluation_set (str): The type of evaluation set. Can either be 'Test'
             or 'Validation'.
@@ -259,6 +70,7 @@ class Dataset:
         rating_label: str = None,
         timestamp_label: str = None,
         cluster_label: str = None,
+        context_labels: Optional[List[str]] = None,
         precision: Any = np.float32,
         evaluation_set: str = "Test",
     ):
@@ -273,6 +85,8 @@ class Dataset:
         self._max_seq_len: int = 0
         self._umap: dict[Any, int] = {}
         self._imap: dict[Any, int] = {}
+        self._context_maps: dict[str, dict[Any, int]] = {}
+        self._context_dims: dict[str, int] = {}
         self._feat_lookup: Tensor = None
         self._uc: Tensor = None
         self._ic: Tensor = None
@@ -306,10 +120,21 @@ class Dataset:
         self._umap = {user: i for i, user in enumerate(_uid)}
         self._imap = {item: i for i, item in enumerate(_iid)}
 
+        # Process contextual data
+        if context_labels:
+            train_data = self._process_context_data(
+                train_data, context_labels, fit=True
+            )
+
+            if eval_data is not None:
+                eval_data = self._process_context_data(
+                    eval_data, context_labels, fit=False
+                )
+
         # Process the side information data and filter not valid columns
         self.side = None
         if side_data is not None:
-            self._process_side_data(side_data, item_id_label)
+            self.side = self._process_side_data(side_data, item_id_label)
 
         # Save user and item cluster information inside the dataset
         self.user_cluster = (
@@ -368,6 +193,7 @@ class Dataset:
             batch_size=batch_size,
             rating_type=rating_type,
             rating_label=rating_label,
+            context_labels=context_labels,
             precision=precision,
         )
 
@@ -381,6 +207,7 @@ class Dataset:
                 batch_size=batch_size,
                 rating_type=rating_type,
                 rating_label=rating_label,
+                context_labels=context_labels,
                 precision=precision,
             )
 
@@ -399,6 +226,7 @@ class Dataset:
             user_id_label=user_id_label,
             item_id_label=item_id_label,
             timestamp_label=timestamp_label,
+            context_labels=context_labels,
         )
 
     def _filter_data(
@@ -453,6 +281,7 @@ class Dataset:
         batch_size: int = 1024,
         rating_type: RatingType = RatingType.IMPLICIT,
         rating_label: str = None,
+        context_labels: Optional[List[str]] = None,
         precision: Any = np.float32,
     ) -> Interactions:
         """Functionality to create Interaction data from DataFrame.
@@ -466,6 +295,8 @@ class Dataset:
             batch_size (int): The batch size of the interaction.
             rating_type (RatingType): The type of rating used.
             rating_label (str): The label of the rating column.
+            context_labels (Optional[List[str]]): The list of labels of the
+                contextual data.
             precision (Any): The precision that will be used to store interactions.
 
         Returns:
@@ -482,6 +313,7 @@ class Dataset:
             batch_size=batch_size,
             rating_type=rating_type,
             rating_label=rating_label,
+            context_labels=context_labels,
             precision=precision,
         )
         nuid, niid = inter_set.get_dims()
@@ -497,7 +329,73 @@ class Dataset:
 
         return inter_set
 
-    def _process_side_data(self, side_data: DataFrame, item_id_label: str) -> None:
+    def _process_context_data(
+        self, df: DataFrame, context_labels: List[str], fit: bool = False
+    ) -> DataFrame:
+        """Processes context columns: creates mappings (if fit=True) and converts
+        values to integers.
+
+        Strategy:
+        - Index 0 is reserved for <UNK> (Unknown) or Padding.
+        - Actual values start from index 1.
+
+        Args:
+            df (DataFrame): The DataFrame containing transaction data
+                with contextual information.
+            context_labels (List[str]): The labels of the columns containing
+                the contextual information.
+            fit (bool): Wether or not to fit the dataset on the DataFrame
+                data. Usually used on the train set.
+
+        Returns:
+            DataFrame: The processed data.
+
+        Raises:
+            ValueError: If the contextual column names are not
+                present the the DataFrame.
+        """
+        df_processed = df.copy()
+
+        for col in context_labels:
+            if col not in df_processed.columns:
+                raise ValueError(f"Context label '{col}' not found in DataFrame.")
+
+            if fit:
+                # Create mapping based on unique values in this column
+                uniques = df_processed[col].unique()
+                # Start from 1, reserve 0 for Unknown
+                mapping = {val: i + 1 for i, val in enumerate(uniques)}
+
+                self._context_maps[col] = mapping
+                # Dimension is len(uniques) + 1 (for the UNK token)
+                self._context_dims[col] = len(uniques) + 1
+
+                logger.msg(f"Context '{col}': found {len(uniques)} unique values.")
+            else:
+                # Use existing mapping
+                mapping = self._context_maps.get(col)
+                if mapping is None:
+                    raise ValueError(
+                        f"Mapping for context '{col}' not found. Fit on train first."
+                    )
+
+            # Apply mapping
+            # Values not in mapping become NaN, then fill with 0 (UNK), then cast to int
+            df_processed[col] = df_processed[col].map(mapping).fillna(0).astype(int)
+
+            # Optional: Check for OOV (Out Of Vocabulary) in Eval
+            if not fit:
+                num_unk = (df_processed[col] == 0).sum()
+                if num_unk > 0:
+                    logger.attention(
+                        f"Context '{col}': found {num_unk} unknown values in Eval set (mapped to 0)."
+                    )
+
+        return df_processed
+
+    def _process_side_data(
+        self, side_data: DataFrame, item_id_label: str
+    ) -> Optional[DataFrame]:
         """Process side information data and filter out invalid columns
 
         Args:
@@ -505,7 +403,8 @@ class Dataset:
             item_id_label (str): The label of the item ID.
 
         Returns:
-            None: In case the method fails in advance.
+            Optional[DataFrame]: In case the method fails in advance or
+                cleaned DataFrame with valid columns.
 
         Raises:
             ValueError: When the item ID is not found in side data.
@@ -540,7 +439,7 @@ class Dataset:
             logger.negative(
                 "No valid columns found. Side information will not be available."
             )
-            return
+            return None
 
         # Log the filtered out columns
         if filtered_cols:
@@ -551,8 +450,8 @@ class Dataset:
 
         # Update the inner DataFrame with valid data
         valid_columns = [item_id_label] + numeric_cols
-        self.side = (
-            side_data[valid_columns].copy().fillna(0, inplace=True)
+        return (
+            side_data[valid_columns].copy().fillna(0)
         )  # Missing values will be filled with zeros
 
     def get_evaluation_dataloader(self) -> EvaluationDataLoader:
@@ -573,19 +472,19 @@ class Dataset:
 
         return self._precomputed_dataloader[key]
 
-    def get_neg_evaluation_dataloader(
+    def get_sampled_evaluation_dataloader(
         self,
         num_negatives: int = 99,
         seed: int = 42,
-    ) -> NegativeEvaluationDataLoader:
-        """Retrieve the NegativeEvaluationDataLoader for the dataset.
+    ) -> SampledEvaluationDataLoader:
+        """Retrieve the SampledEvaluationDataLoader for the dataset.
 
         Args:
             num_negatives (int): Number of negative samples per user.
             seed (int): Random seed for negative sampling.
 
         Returns:
-            NegativeEvaluationDataLoader: DataLoader that yields batches
+            SampledEvaluationDataLoader: DataLoader that yields batches
                 of interactions (pos_items, neg_items, user_indices)
         """
         key = f"neg_{num_negatives}_{seed}"
@@ -594,12 +493,89 @@ class Dataset:
             train_sparse = self.train_set.get_sparse()
             eval_sparse = self.eval_set.get_sparse()
 
-            self._precomputed_dataloader[key] = NegativeEvaluationDataLoader(
+            self._precomputed_dataloader[key] = SampledEvaluationDataLoader(
                 train_interactions=train_sparse,
                 eval_interactions=eval_sparse,
                 num_negatives=num_negatives,
                 batch_size=self._batch_size,
                 seed=seed,
+            )
+
+        return self._precomputed_dataloader[key]
+
+    def get_contextual_evaluation_dataloader(self) -> ContextualEvaluationDataLoader:
+        """Retrieve the ContextualEvaluationDataLoader for the dataset.
+
+        This loader is specific for Context-Aware Recommender Systems.
+        It iterates over transactions (User, Item, Context) instead of Users.
+
+        Returns:
+            ContextualEvaluationDataLoader: The contextual data loader.
+        """
+        key = "full_contextual"
+        if key not in self._precomputed_dataloader:
+            eval_data = self.eval_set.get_df()
+
+            # Retrieve labels to pre-compute eval data
+            user_label = self.eval_set._user_label
+            item_label = self.eval_set._item_label
+            context_labels = self.eval_set._context_labels
+
+            # Map the evaluation dataset to ensure consistency
+            eval_data[user_label] = eval_data[user_label].map(self._umap)
+            eval_data[item_label] = eval_data[item_label].map(self._imap)
+            eval_data = eval_data.dropna(subset=[user_label, item_label])
+
+            self._precomputed_dataloader[key] = ContextualEvaluationDataLoader(
+                eval_data=eval_data,
+                user_id_label=user_label,
+                item_id_label=item_label,
+                context_labels=context_labels,
+                batch_size=self._batch_size,
+            )
+
+        return self._precomputed_dataloader[key]
+
+    def get_sampled_contextual_evaluation_dataloader(
+        self,
+        num_negatives: int = 99,
+        seed: int = 42,
+    ) -> SampledContextualEvaluationDataLoader:
+        """Retrieve the SampledContextualEvaluationDataLoader for the dataset.
+
+        Args:
+            num_negatives (int): Number of negative samples per transaction.
+            seed (int): Random seed.
+
+        Returns:
+            SampledContextualEvaluationDataLoader: The sampled contextual loader.
+        """
+        key = f"sampled_contextual_{num_negatives}_{seed}"
+
+        if key not in self._precomputed_dataloader:
+            train_sparse = self.train_set.get_sparse()
+            eval_data = self.eval_set.get_df()
+
+            # Retrieve labels to pre-compute eval data
+            user_label = self.eval_set._user_label
+            item_label = self.eval_set._item_label
+            context_labels = self.eval_set._context_labels
+
+            # Map the evaluation dataset to ensure consistency
+            eval_data[user_label] = eval_data[user_label].map(self._umap)
+            eval_data[item_label] = eval_data[item_label].map(self._imap)
+            eval_data = eval_data.dropna(subset=[user_label, item_label])
+
+            self._precomputed_dataloader[key] = SampledContextualEvaluationDataLoader(
+                train_interactions=train_sparse,
+                eval_data=eval_data,
+                user_id_label=user_label,
+                item_id_label=item_label,
+                context_labels=context_labels,
+                num_items=self._niid,
+                num_negatives=num_negatives,
+                seed=seed,
+                batch_size=self._batch_size,
             )
 
         return self._precomputed_dataloader[key]
@@ -613,6 +589,15 @@ class Dataset:
                 int: Number of unique item_ids.
         """
         return (self._nuid, self._niid)
+
+    def get_context_dims(self) -> Dict[str, int]:
+        """Returns the dimensions (vocab size) of each context feature.
+
+        Returns:
+            Dict[str, int]: A dictionary containing the name of the
+                context feature and the vocab size.
+        """
+        return self._context_dims
 
     def get_mappings(self) -> Tuple[dict, dict]:
         """Returns the mapping used for this dataset.
@@ -677,13 +662,19 @@ class Dataset:
             dict: The dictionary with the main information of
                 the dataset.
         """
-        return {
-            "items": self._niid,
-            "users": self._nuid,
-            "features": self._nfeat,
+        base_info = {
+            "n_items": self._niid,
+            "n_users": self._nuid,
+            "n_features": self._nfeat,
             "item_mapping": self._imap,
             "user_mapping": self._umap,
         }
+
+        # Optionally add contextual dimensions if present
+        if self._context_dims:
+            base_info["context_dims"] = self._context_dims
+
+        return base_info
 
     def add_to_stash(self, key: str, value: Any):
         """Add a custom structure to the stash.

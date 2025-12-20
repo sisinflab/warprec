@@ -219,8 +219,12 @@
 <p class="caption" role="heading"><span class="caption-text">CORE</span></p>
 <ul>
 <li class="toctree-l1 has-children"><a class="reference internal" href="../recommenders/index.html">Recommenders</a><input class="toctree-checkbox" id="toctree-checkbox-3" name="toctree-checkbox-3" role="switch" type="checkbox"/><label for="toctree-checkbox-3"><div class="visually-hidden">Toggle navigation of Recommenders</div><i class="icon"><svg><use href="#svg-arrow-right"></use></svg></i></label><ul>
-<li class="toctree-l2"><a class="reference internal" href="../recommenders/general.html">General Recommenders</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../recommenders/collaborative.html">Collaborative-Filtering Recommenders</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../recommenders/content.html">Content-Based Recommenders</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../recommenders/hybrid.html">Hybrid Recommenders</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../recommenders/context.html">Context-Aware Recommenders</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../recommenders/sequential.html">Sequential Recommenders</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../recommenders/unpersonalized.html">Unpersonalized Recommenders</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../recommenders/proxy.html">Proxy Recommender</a></li>
 <li class="toctree-l2 has-children"><a class="reference internal" href="../recommenders/guide/index.html">Implementation Guide</a><input class="toctree-checkbox" id="toctree-checkbox-4" name="toctree-checkbox-4" role="switch" type="checkbox"/><label for="toctree-checkbox-4"><div class="visually-hidden">Toggle navigation of Implementation Guide</div><i class="icon"><svg><use href="#svg-arrow-right"></use></svg></i></label><ul>
 <li class="toctree-l3"><a class="reference internal" href="../recommenders/guide/classic.html">Classic Recommender Guide</a></li>
@@ -448,6 +452,20 @@ If no timestamps are provided, the original ordering of interactions is preserve
 <div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">filtering</span><span class="p">:</span>
 <span class="w">    </span><span class="nt">UserTailN</span><span class="p">:</span>
 <span class="w">        </span><span class="nt">num_interactions</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">30</span>
+</pre></div>
+</div>
+<p><strong>12. DropUser</strong></p>
+<p>Filter out all interactions involving specific users identified by their user IDs.</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">filtering</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">DropUser</span><span class="p">:</span>
+<span class="w">        </span><span class="nt">user_ids_to_filter</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">123</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">456</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">789</span><span class="p p-Indicator">]</span>
+</pre></div>
+</div>
+<p><strong>13. DropItem</strong></p>
+<p>Filter out all interactions involving specific items identified by their item IDs.</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">filtering</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">DropItem</span><span class="p">:</span>
+<span class="w">        </span><span class="nt">item_ids_to_filter</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">123</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">456</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">789</span><span class="p p-Indicator">]</span>
 </pre></div>
 </div>
 </section>

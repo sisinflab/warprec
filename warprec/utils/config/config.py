@@ -177,7 +177,7 @@ class TrainConfiguration(WarpRecConfiguration):
     """
 
     writer: WriterConfig
-    splitter: SplittingConfig
+    splitter: SplittingConfig = None
     dashboard: DashboardConfig = Field(default_factory=DashboardConfig)
     evaluation: EvaluationConfig
 
@@ -225,6 +225,14 @@ class TrainConfiguration(WarpRecConfiguration):
                     f"TopK to evaluate: {self.evaluation.top_k}."
                 )
 
+        # Check if dataset splitting has been correctly setup
+        if self.reader.loading_strategy == "dataset" and self.splitter is None:
+            raise ValueError(
+                "The 'dataset' loading strategy requires an explicit dataset splitting "
+                "configuration, but none was provided. Please verify the splitter "
+                "settings in the configuration file."
+            )
+
         # Parse and validate models
         self.check_precision()
         self.models = self.parse_models()
@@ -241,6 +249,18 @@ class TrainConfiguration(WarpRecConfiguration):
             ValueError: If a model requires side information and they have not been provided.
         """
         parsed_models = {}
+
+        # Check if Context-Aware model is in the experiment
+        from warprec.recommenders.base_recommender import ContextRecommenderUtils
+
+        for model_name in self.models.keys():
+            model_instance = model_registry.get_class(model_name)
+
+            if issubclass(model_instance, ContextRecommenderUtils):
+                logger.attention(
+                    f"The model {model_name} is a Context-Aware model. "
+                    "Leave-One-Out splitting strategy is advised for a correct evaluation."
+                )
 
         for model_name, model_data in self.models.items():
             model_class: RecomModel

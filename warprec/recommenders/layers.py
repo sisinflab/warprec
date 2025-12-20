@@ -1,8 +1,8 @@
 from typing import List
 
+import torch
 from torch import nn, Tensor
 from torch.nn import Module
-from torch.nn.init import normal_
 
 
 def get_activation(activation: str = "relu") -> Module:
@@ -30,18 +30,6 @@ def get_activation(activation: str = "relu") -> Module:
             raise ValueError("Activation function not supported.")
 
 
-def init_weights(module: Module):
-    """Initialize the weights of a module."""
-    if isinstance(module, nn.Linear):
-        normal_(module.weight.data, mean=0, std=0.01)
-        if module.bias is not None:
-            module.bias.data.fill_(0.0)
-    if isinstance(module, nn.Conv2d):
-        normal_(module.weight.data, mean=0, std=0.01)
-        if module.bias is not None:
-            module.bias.data.fill_(0.0)
-
-
 class MLP(nn.Module):
     """Simple implementation of MultiLayer Perceptron.
 
@@ -50,7 +38,6 @@ class MLP(nn.Module):
         dropout (float): The dropout probability.
         activation (str): The activation function to apply.
         batch_normalization (bool): Wether or not to apply batch normalization.
-        initialize (bool): Wether or not to initialize the weights.
         last_activation (bool): Wether or not to keep last non-linearity function.
     """
 
@@ -60,7 +47,6 @@ class MLP(nn.Module):
         dropout: float = 0.0,
         activation: str = "relu",
         batch_normalization: bool = False,
-        initialize: bool = False,
         last_activation: bool = True,
     ):
         super().__init__()
@@ -75,8 +61,6 @@ class MLP(nn.Module):
         if activation is not None and not last_activation:
             mlp_modules.pop()
         self.mlp_layers = nn.Sequential(*mlp_modules)
-        if initialize:
-            self.apply(init_weights)
 
     def forward(self, input_feature: Tensor):
         """Simple forwarding, input tensor will pass
@@ -93,7 +77,6 @@ class CNN(nn.Module):
         cnn_kernels (List[int]): The kernels of each layer.
         cnn_strides (List[int]): The strides of each layer.
         activation (str): The activation function to apply.
-        initialize (bool): Wether or not to initialize the weights.
 
     Raises:
         ValueError: If the cnn_channels, cnn_kernels and cnn_strides lists
@@ -106,7 +89,6 @@ class CNN(nn.Module):
         cnn_kernels: List[int],
         cnn_strides: List[int],
         activation: str = "relu",
-        initialize: bool = False,
     ):
         super().__init__()
         if not (len(cnn_channels) == len(cnn_kernels) == len(cnn_strides)):
@@ -135,11 +117,44 @@ class CNN(nn.Module):
 
         self.cnn_layers = nn.Sequential(*cnn_modules)
 
-        if initialize:
-            self.apply(init_weights)
-
     def forward(self, input_feature: Tensor):
         """Simple forwarding, input tensor will pass
         through all the CNN layers.
         """
         return self.cnn_layers(input_feature)
+
+
+class FactorizationMachine(nn.Module):
+    """Calculates the Second-Order Interaction (FM part) over embeddings.
+
+    Equation:
+        0.5 * sum( (sum(v))^2 - sum(v^2) )
+
+    Args:
+        reduce_sum (bool): Whether to sum the result along the embedding dimension.
+            - True: Output shape (Batch, 1). Used for standard FM.
+            - False: Output shape (Batch, Embed_Dim). Used for NFM or DeepFM where
+              you might want to feed the result into a DNN.
+            Defaults to True.
+    """
+
+    def __init__(self, reduce_sum: bool = True):
+        super().__init__()
+        self.reduce_sum = reduce_sum
+
+    def forward(self, inputs: Tensor) -> Tensor:
+        """
+        Args:
+            inputs (Tensor): A 3D tensor with shape (batch_size, context_size, embedding_size).
+
+        Returns:
+            Tensor: The second-order interaction result.
+        """
+        square_of_sum = torch.sum(inputs, dim=1) ** 2  # [batch_size, embedding_size]
+        sum_of_square = torch.sum(inputs**2, dim=1)  # [batch_size, embedding_size]
+        output = 0.5 * (square_of_sum - sum_of_square)
+
+        if self.reduce_sum:
+            output = torch.sum(output, dim=1, keepdim=True)  # [batch_size, 1]
+
+        return output

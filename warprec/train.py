@@ -49,6 +49,7 @@ from warprec.recommenders.base_recommender import (
     Recommender,
     IterativeRecommender,
     SequentialRecommenderUtils,
+    ContextRecommenderUtils,
 )
 from warprec.evaluation.evaluator import Evaluator
 from warprec.evaluation.statistical_significance import compute_paired_statistical_test
@@ -133,8 +134,13 @@ def main(args: Namespace):
         f"Data preparation completed in {data_preparation_time:.2f} seconds."
     )
     model_timing_report = []
+
     # Before starting training process, initialize Ray
-    ray.init(runtime_env={"py_modules": config.general.custom_models})
+    py_modules = (
+        [] if config.general.custom_models is None else config.general.custom_models
+    )
+    py_modules.extend(["warprec"])  # type: ignore[union-attr]
+    ray.init(runtime_env={"py_modules": py_modules})
 
     for model_name in models:
         model_exploration_start_time = time.time()
@@ -189,9 +195,13 @@ def main(args: Namespace):
         # Retrieve appropriate evaluation dataloader
         dataloader = retrieve_evaluation_dataloader(
             dataset=main_dataset,
+            model=best_model,
             strategy=config.evaluation.strategy,
             num_negatives=config.evaluation.num_negatives,
         )
+
+        # Retrieve best model device
+        best_model_device = best_model.device
 
         # Evaluation testing
         model_evaluation_start_time = time.time()
@@ -200,7 +210,7 @@ def main(args: Namespace):
             dataloader=dataloader,
             strategy=config.evaluation.strategy,
             dataset=main_dataset,
-            device=str(best_model._device),
+            device=str(best_model_device),
             verbose=True,
         )
         results = evaluator.compute_results()
@@ -255,12 +265,13 @@ def main(args: Namespace):
         if config.general.time_report:
             # Retrieve dataset information
             info = main_dataset.info()
-            num_users = info.get("users", None)
-            num_items = info.get("items", None)
+            n_users = info.get("n_users", None)
+            n_items = info.get("n_items", None)
+            context_dims = info.get("context_dims", {})
 
             # Define simple sample to measure prediction time
-            num_users_to_predict = min(1000, num_users)
-            num_items_to_predict = min(1000, num_items)
+            n_users_to_predict = min(1000, n_users)
+            n_items_to_predict = min(1000, n_items)
 
             # Create mock data to test model performance during inference
             if isinstance(best_model, SequentialRecommenderUtils):
@@ -268,20 +279,31 @@ def main(args: Namespace):
             else:
                 max_seq_len = 10
 
-            # Retrieve best model device
-            best_model_device = best_model._device
+            # Create mock data for Context-Aware models
+            contexts = None
+            if isinstance(best_model, ContextRecommenderUtils):
+                model_labels = best_model.context_labels
+
+                if model_labels:
+                    ctx_list = []
+                    for label in model_labels:
+                        dim = context_dims.get(label, 10)
+                        c_data = torch.randint(1, dim, (n_users_to_predict,)).to(
+                            device=best_model_device
+                        )
+                        ctx_list.append(c_data)
+
+                    contexts = torch.stack(ctx_list, dim=1)
 
             # Create mock data to test prediction time
-            user_indices = torch.arange(num_users_to_predict).to(
+            user_indices = torch.arange(n_users_to_predict).to(device=best_model_device)
+            item_indices = torch.randint(
+                1, n_items, (n_users_to_predict, n_items_to_predict)
+            ).to(device=best_model_device)
+            user_seq = torch.randint(1, n_items, (n_users_to_predict, max_seq_len)).to(
                 device=best_model_device
             )
-            item_indices = torch.randint(
-                1, num_items, (num_users_to_predict, num_items_to_predict)
-            ).to(device=best_model_device)
-            user_seq = torch.randint(
-                1, num_items, (num_users_to_predict, max_seq_len)
-            ).to(device=best_model_device)
-            seq_len = torch.randint(1, max_seq_len + 1, (num_users_to_predict,)).to(
+            seq_len = torch.randint(1, max_seq_len + 1, (n_users_to_predict,)).to(
                 device=best_model_device
             )
             train_sparse = main_dataset.train_set.get_sparse()
@@ -289,13 +311,14 @@ def main(args: Namespace):
 
             # Test inference time
             inference_time_start = time.time()
-            best_model.predict_sampled(
+            best_model.predict(
                 user_indices=user_indices,
                 item_indices=item_indices,
                 user_seq=user_seq,
                 seq_len=seq_len,
                 train_batch=train_batch,
                 train_sparse=train_sparse,
+                contexts=contexts,
             )
             inference_time = time.time() - inference_time_start
 
@@ -460,6 +483,7 @@ def multiple_fold_validation_flow(
 
     # Retrieve common params
     block_size = params.optimization.block_size
+    chunk_size = params.optimization.chunk_size
     validation_score = config.evaluation.validation_metric
     desired_training_it = params.optimization.properties.desired_training_it
     seed = params.optimization.properties.seed
@@ -510,18 +534,19 @@ def multiple_fold_validation_flow(
         name=model_name,
         params=best_params,
         interactions=main_dataset.train_set,
-        device=device,
         seed=seed,
         info=main_dataset.info(),
         **main_dataset.get_stash(),
         block_size=block_size,
+        chunk_size=chunk_size,
     )
+    best_model.to(device)
 
     # Train the model using backpropagation if the model
     # is iterative
     if isinstance(best_model, IterativeRecommender):
         # Training loop decorated with tqdm for a better visualization
-        train_loop(best_model, main_dataset, iterations)
+        train_loop(best_model, main_dataset, iterations, device=device)
 
     # Final reporting
     report["Total Params (Best Model)"] = sum(

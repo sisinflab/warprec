@@ -20,17 +20,18 @@ These models can capture both short-term dependencies and long-term patterns thr
 .. code-block:: yaml
 
     models:
-        Caser:
-            embedding_size: 64
-            n_h: 8
-            n_v: 4
-            dropout_prob: 0.5
-            weight_decay: 0.0
-            batch_size: 512
-            epochs: 30
-            learning_rate: 0.001
-            neg_samples: 1
-            max_seq_len: 20
+      Caser:
+        embedding_size: 64
+        n_h: 8
+        n_v: 4
+        dropout_prob: 0.5
+        reg_weight: 0.001
+        weight_decay: 0.0001
+        batch_size: 2048
+        epochs: 200
+        learning_rate: 0.001
+        neg_samples: 1
+        max_seq_len: 20
 
 =============
 Markov-Chains
@@ -45,17 +46,16 @@ These models are especially suited to scenarios where user behavior exhibits bot
 .. code-block:: yaml
 
     models:
-        FOSSIL:
-            embedding_size: 64
-            order_len: 8
-            reg_weight: 0.001
-            alpha: 0.001
-            weight_decay: 0.0
-            batch_size: 512
-            epochs: 100
-            learning_rate: 0.001
-            neg_samples: 1
-            max_seq_len: 100
+      FOSSIL:
+        embedding_size: 64
+        order_len: 8
+        alpha: 0.001
+        reg_weight: 0.001
+        batch_size: 2048
+        epochs: 200
+        learning_rate: 0.001
+        neg_samples: 1
+        max_seq_len: 200
 
 =============
 RNN-Based
@@ -71,17 +71,18 @@ They are effective for modeling evolving user interests within sessions.
 .. code-block:: yaml
 
     models:
-        GRU4Rec:
-            embedding_size: 128
-            hidden_size: 128
-            num_layers: 1
-            dropout_prob: 0.2
-            weight_decay: 0.0001
-            batch_size: 512
-            epochs: 100
-            learning_rate: 0.001
-            neg_samples: 2
-            max_seq_len: 200
+      GRU4Rec:
+        embedding_size: 128
+        hidden_size: 64
+        num_layers: 2
+        dropout_prob: 0.1
+        reg_weight: 0.001
+        weight_decay: 0.0001
+        batch_size: 2048
+        epochs: 200
+        learning_rate: 0.001
+        neg_samples: 1
+        max_seq_len: 200
 
 =============
 Transformer-Based
@@ -90,26 +91,28 @@ Transformer-Based
 Transformer-inspired recommenders employ self-attention to capture dependencies across an entire sequence simultaneously.
 They excel at modeling both short-term and long-term user preferences without relying on recurrence or convolution.
 
-- SASRec (Self-Attentive Sequential Recommendation):
-  A Transformer-based model that uses stacked self-attention blocks to capture item dependencies in user sequences.
-  SASRec effectively models dynamic user preferences in sparse datasets, learning both short- and long-term interests.
+- BERT4Rec (Bidirectional Encoder Representations from Transformers for Recommendation):
+  Applies a bidirectional Transformer architecture to sequential recommendation.
+  Instead of predicting the next item, it is trained on a "cloze" task, where it predicts randomly masked items in a sequence, allowing it to learn context from both past and future interactions.
 
 .. code-block:: yaml
 
-    models:
-        SASRec:
-            embedding_size: 128
-            n_layers: 2
-            n_heads: 4
-            inner_size: 512
-            dropout_prob: 0.3
-            attn_dropout_prob: 0.3
-            learning_rate: 0.001
-            weight_decay: 0.0
-            batch_size: 512
-            epochs: 100
-            neg_samples: 1
-            max_seq_len: 200
+  models:
+    BERT4Rec:
+      embedding_size: 128
+      n_layers: 2
+      n_heads: 8
+      inner_size: 512
+      dropout_prob: 0.1
+      attn_dropout_prob: 0.1
+      mask_prob: 0.2
+      reg_weight: 0.001
+      weight_decay: 0.0001
+      batch_size: 2048
+      epochs: 200
+      learning_rate: 0.001
+      neg_samples: 1
+      max_seq_len: 200
 
 - gSASRec (General Self-Attentive Sequential Recommendation):
   Extends SASRec by introducing general self-attention.
@@ -118,21 +121,66 @@ They excel at modeling both short-term and long-term user preferences without re
 .. code-block:: yaml
 
     models:
-        gSASRec:
-            embedding_size: 128
-            n_layers: 2
-            n_heads: 4
-            inner_size: 512
-            dropout_prob: 0.3
-            attn_dropout_prob: 0.3
-            learning_rate: 0.001
-            gbce_t: 0.5
-            weight_decay: 0.0
-            batch_size: 512
-            epochs: 100
-            neg_samples: 1
-            max_seq_len: 200
-            reuse_item_embeddings: True
+      gSASRec:
+        embedding_size: 128
+        n_layers: 2
+        n_heads: 8
+        inner_size: 512
+        dropout_prob: 0.1
+        attn_dropout_prob: 0.1
+        gbce_t: 0.5
+        reuse_item_embeddings: True
+        reg_weight: 0.001
+        weight_decay: 0.0001
+        batch_size: 2048
+        epochs: 200
+        learning_rate: 0.001
+        neg_samples: 1
+        max_seq_len: 200
+
+- LightSANs (Low-Rank Decomposed Self-Attention Networks):
+  A sequential recommender that improves upon standard self-attention (like SASRec) by introducing low-rank decomposed self-attention to reduce complexity and decoupled position encoding to better model sequential relations.
+
+.. code-block:: yaml
+
+  models:
+    LightSANs:
+      embedding_size: 128
+      n_layers: 2
+      n_heads: 8
+      k_interests: 5
+      inner_size: 512
+      dropout_prob: 0.5
+      attn_dropout_prob: 0.5
+      reg_weight: 0.001
+      weight_decay: 0.0001
+      batch_size: 2048
+      epochs: 200
+      learning_rate: 0.001
+      neg_samples: 1
+      max_seq_len: 200
+
+- SASRec (Self-Attentive Sequential Recommendation):
+  A Transformer-based model that uses stacked self-attention blocks to capture item dependencies in user sequences.
+  SASRec effectively models dynamic user preferences in sparse datasets, learning both short- and long-term interests.
+
+.. code-block:: yaml
+
+    models:
+      SASRec:
+        embedding_size: 128
+        n_layers: 2
+        n_heads: 8
+        inner_size: 512
+        dropout_prob: 0.1
+        attn_dropout_prob: 0.1
+        reg_weight: 0.001
+        weight_decay: 0.0001
+        batch_size: 2048
+        epochs: 200
+        learning_rate: 0.001
+        neg_samples: 1
+        max_seq_len: 200
 
 ===============================
 Summary of Available Sequential Models
@@ -155,8 +203,14 @@ Summary of Available Sequential Models
      - GRU4Rec
      - Session-based recommender using GRUs for short-term preference modeling.
    * - Transformer-Based
-     - SASRec
-     - Transformer-inspired model learning short- and long-term user preferences.
+     - BERT4Rec
+     - Bidirectional Transformer model trained on a masked item prediction task.
    * -
      - gSASRec
      - General self-attention model for diverse and evolving user behaviors.
+   * -
+     - LightSANs
+     - Efficient self-attention with low-rank decomposition and decoupled positioning.
+   * -
+     - SASRec
+     - Transformer-inspired model learning short- and long-term user preferences.

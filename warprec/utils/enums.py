@@ -188,11 +188,23 @@ class DataLoaderType(Enum):
         construction_params=[],
         fixed_params={},
     )
+    INTERACTION_LOADER_WITH_USER_ID = DataLoaderRequirements(
+        dataloader_source="train_set",
+        method_name="get_interaction_loader",
+        construction_params=[],
+        fixed_params={"include_user_id": True},
+    )
     ITEM_RATING_LOADER = DataLoaderRequirements(
         dataloader_source="train_set",
         method_name="get_item_rating_dataloader",
         construction_params=["neg_samples"],
         fixed_params={},
+    )
+    ITEM_RATING_LOADER_WITH_CONTEXT = DataLoaderRequirements(
+        dataloader_source="train_set",
+        method_name="get_item_rating_dataloader",
+        construction_params=["neg_samples"],
+        fixed_params={"include_context": True},
     )
     POS_NEG_LOADER = DataLoaderRequirements(
         dataloader_source="train_set",
@@ -224,6 +236,12 @@ class DataLoaderType(Enum):
         dataloader_source="train_session",
         method_name="get_user_history_dataloader",
         construction_params=["max_seq_len", "neg_samples"],
+        fixed_params={},
+    )
+    CLOZE_MASK_LOADER = DataLoaderRequirements(
+        dataloader_source="train_session",
+        method_name="get_cloze_mask_dataloader",
+        construction_params=["max_seq_len", "mask_prob", "neg_samples"],
         fixed_params={},
     )
 

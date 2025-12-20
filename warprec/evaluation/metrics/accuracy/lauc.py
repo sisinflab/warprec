@@ -167,14 +167,15 @@ class LAUC(TopKMetric):
         )  # [batch_size]
         auc_tensor = auc_matrix.sum(dim=1)  # [batch_size]
 
+        # Safe division in case of 0 in normalization
+        users_score = (auc_tensor / normalization).nan_to_num(0)
+
         if self.compute_per_user:
             self.lauc.index_add_(
-                0, user_indices, auc_tensor / normalization
+                0, user_indices, users_score
             )  # Index metric values per user
         else:
-            self.lauc += (
-                auc_tensor / normalization
-            ).sum()  # Sum the global lauc metric
+            self.lauc += (users_score).sum()  # Sum the global lauc metric
 
         # Count only users with at least one interaction
         self.users += users

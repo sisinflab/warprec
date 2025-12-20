@@ -18,6 +18,7 @@ from ray.train import ScalingConfig, RunConfig, CheckpointConfig
 from ray.train.torch import TorchTrainer, get_device
 
 from warprec.data import Dataset
+from warprec.common import standard_optimizer
 from warprec.evaluation.evaluator import Evaluator
 from warprec.recommenders.base_recommender import Recommender, IterativeRecommender
 from warprec.utils.config import RecomModel, LRScheduler
@@ -69,6 +70,7 @@ def objective_function(
     lr_scheduler: Optional[LRScheduler] = None,
     seed: int = 42,
     block_size: int = 50,
+    chunk_size: int = 4096,
     beta: float = 1.0,
     pop_ratio: float = 0.8,
     custom_models: List[str] = [],
@@ -95,8 +97,10 @@ def objective_function(
         lr_scheduler (Optional[LRScheduler]): The custom learning rate scheduler
             configuration. Defaults to None.
         seed (int): The seed for reproducibility. Defaults to 42.
-        block_size (int): The block size for the model optimization.
+        block_size (int): The block size for the model evaluation.
             Defaults to 50.
+        chunk_size (int): The chunk size for the model evaluation.
+            Defaults to 4096.
         beta (float): The beta value to initialize the Evaluator.
         pop_ratio (float): The pop_ratio value to initialize the Evaluator.
         custom_models (List[str]): List of custom models to import.
@@ -125,13 +129,6 @@ def objective_function(
         dataset = dataset_folds[fold_index]
     else:
         dataset = dataset_folds
-
-    # Retrieve appropriate evaluation dataloader
-    dataloader = retrieve_evaluation_dataloader(
-        dataset=dataset,
-        strategy=strategy,
-        num_negatives=num_negatives,
-    )
 
     # Initialize the Evaluator for current Trial
     evaluator = Evaluator(
@@ -171,7 +168,18 @@ def objective_function(
             info=dataset.info(),
             **dataset.get_stash(),
             block_size=block_size,
+            chunk_size=chunk_size,
         )
+        model.to(device)
+
+        # Retrieve appropriate evaluation dataloader
+        dataloader = retrieve_evaluation_dataloader(
+            dataset=dataset,
+            model=model,
+            strategy=strategy,
+            num_negatives=num_negatives,
+        )
+
         if isinstance(model, IterativeRecommender):
             # Proceed with standard training loop
             train_dataloader = model.get_dataloader(
@@ -179,11 +187,7 @@ def objective_function(
                 sessions=dataset.train_session,
                 low_memory=low_memory,
             )
-            optimizer = torch.optim.Adam(
-                model.parameters(),
-                lr=model.learning_rate,
-                weight_decay=model.weight_decay,
-            )
+            optimizer = standard_optimizer(model)
             epochs = model.epochs
 
             # Check for learning rate scheduler
@@ -199,6 +203,7 @@ def objective_function(
                 model.train()
                 epoch_loss = 0.0
                 for batch in train_dataloader:
+                    batch = [x.to(device) for x in batch]
                     optimizer.zero_grad()
 
                     loss = model.train_step(batch, epoch)
@@ -363,7 +368,9 @@ def objective_function_ddp(config: dict) -> None:
         info=dataset.info(),
         **dataset.get_stash(),
         block_size=config["block_size"],
+        chunk_size=config["chunk_size"],
     )
+    model.to(device)
 
     # Only IterativeRecommender models are supported in DDP
     if not isinstance(model, IterativeRecommender):
@@ -386,11 +393,7 @@ def objective_function_ddp(config: dict) -> None:
     train_dataloader = train.torch.prepare_data_loader(train_dataloader)
 
     # Initialize the optimizer
-    optimizer = torch.optim.Adam(
-        unwrapped_model.parameters(),
-        lr=unwrapped_model.learning_rate,
-        weight_decay=unwrapped_model.weight_decay,
-    )
+    optimizer = standard_optimizer(unwrapped_model)
 
     # Check for learning rate scheduler
     scheduler = None
@@ -403,6 +406,7 @@ def objective_function_ddp(config: dict) -> None:
     # Prepare the evaluation dataloader
     eval_dataloader = retrieve_evaluation_dataloader(
         dataset=dataset,
+        model=unwrapped_model,
         strategy=config["strategy"],
         num_negatives=config["num_negatives"],
     )
@@ -430,6 +434,7 @@ def objective_function_ddp(config: dict) -> None:
         train_dataloader.sampler.set_epoch(epoch)  # type:ignore [attr-defined]
 
         for batch in train_dataloader:
+            batch = [x.to(device) for x in batch]
             optimizer.zero_grad()
 
             loss = unwrapped_model.train_step(batch, epoch)
@@ -531,6 +536,7 @@ def driver_function_ddp(
     num_negatives: int = 99,
     seed: int = 42,
     block_size: int = 50,
+    chunk_size: int = 4096,
     beta: float = 1.0,
     pop_ratio: float = 0.8,
     custom_models: List[str] = [],
@@ -550,6 +556,7 @@ def driver_function_ddp(
             "num_negatives": num_negatives,
             "seed": seed,
             "block_size": block_size,
+            "chunk_size": chunk_size,
             "beta": beta,
             "pop_ratio": pop_ratio,
             "custom_models": custom_models,

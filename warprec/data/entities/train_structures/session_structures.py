@@ -351,3 +351,151 @@ class LazyUserHistoryDataset(Dataset):
             neg_tensor[current_len - 1 :, :] = 0
 
         return pos_tensor, neg_tensor
+
+
+class ClozeMaskDataset(Dataset):
+    """Dataset for cloze mask task.
+
+    Args:
+        masked_sequences (Tensor): The sequences with masked items.
+        positive_items (Tensor): The positive items corresponding to the masked positions.
+        negative_items (Tensor): The negative items corresponding to the masked positions.
+        masked_indices (Tensor): The indices of the masked items in the sequences.
+    """
+
+    def __init__(
+        self,
+        masked_sequences: Tensor,
+        positive_items: Tensor,
+        negative_items: Tensor,
+        masked_indices: Tensor,
+    ):
+        self.masked_sequences = masked_sequences
+        self.positive_items = positive_items
+        self.negative_items = negative_items
+        self.masked_indices = masked_indices
+
+    def __len__(self):
+        return len(self.masked_sequences)
+
+    def __getitem__(self, idx):
+        return (
+            self.masked_sequences[idx],
+            self.positive_items[idx],
+            self.negative_items[idx],
+            self.masked_indices[idx],
+        )
+
+
+class LazyClozeMaskDataset(Dataset):
+    """A PyTorch Dataset for cloze task that generates samples on-the-fly.
+
+    This dataset is designed for low-memory environments. It processes one user
+    session at a time in its `__getitem__` method, performing random masking and
+    negative sampling dynamically.
+
+    Args:
+        user_sessions (Series): A Series where the index is the user ID and the
+            value is a list of their 0-indexed item interactions.
+        max_seq_len (int): The maximum length of the user history sequence.
+        mask_prob (float): The probability of an item being masked.
+        mask_token_id (int): The special token ID used for masking.
+        neg_samples (int): The number of negative items to sample per masked item.
+        niid (int): The total number of unique items for negative sampling.
+        padding_token_id (int): The special token ID used for padding.
+        seed (int): A random seed to ensure reproducibility.
+    """
+
+    def __init__(
+        self,
+        user_sessions: Series,
+        max_seq_len: int,
+        mask_prob: float,
+        mask_token_id: int,
+        neg_samples: int,
+        niid: int,
+        padding_token_id: int,
+        seed: int = 42,
+    ):
+        self.max_seq_len = max_seq_len
+        self.mask_prob = mask_prob
+        self.mask_token_id = mask_token_id
+        self.neg_samples = neg_samples
+        self.niid = niid
+        self.padding_token_id = padding_token_id
+        self.seed = seed
+
+        # Filter for sessions with at least one item and store as a list
+        self.sessions = user_sessions[user_sessions.str.len() >= 1].tolist()
+
+        # Pre-calculate sets for faster negative sampling
+        self.session_sets = [set(s) for s in self.sessions]
+        self.valid_item_set = set(range(self.niid))
+
+    def __len__(self) -> int:
+        """Returns the total number of users with valid histories."""
+        return len(self.sessions)
+
+    def __getitem__(self, idx: int) -> Tuple[Tensor, ...]:
+        """Generates and returns a single masked training sample on-the-fly.
+
+        Args:
+            idx (int): The index of the user session to process.
+
+        Returns:
+            Tuple[Tensor, ...]: A tuple containing:
+            (masked_sequence, positive_items, negative_items, masked_indices)
+        """
+        # Use a unique, deterministic RNG for this sample
+        rng = np.random.default_rng(seed=(self.seed, idx))
+
+        # Get and truncate the session
+        session_0_indexed = self.sessions[idx][-self.max_seq_len :]
+
+        # Perform masking
+        valid_indices = np.arange(len(session_0_indexed))
+        num_to_mask = max(1, int(np.ceil(len(valid_indices) * self.mask_prob)))
+        indices_to_mask = rng.choice(valid_indices, num_to_mask, replace=False)
+
+        # Create the masked sequence
+        masked_seq_np = np.array(session_0_indexed, dtype=np.int64)
+        pos_items_np = masked_seq_np[indices_to_mask]
+        masked_seq_np[indices_to_mask] = self.mask_token_id
+
+        # Perform negative sampling
+        history_set = self.session_sets[idx]
+        possible_negatives = list(self.valid_item_set - history_set)
+
+        neg_items_np = np.zeros((num_to_mask, self.neg_samples), dtype=np.int64)
+        for i in range(num_to_mask):
+            # Sample with replacement if not enough unique negatives are available
+            replace = len(possible_negatives) < self.neg_samples
+            sampled = rng.choice(possible_negatives, self.neg_samples, replace=replace)
+            neg_items_np[i, :] = sampled
+
+        # Padded sequence
+        padded_masked_seq = np.full(
+            self.max_seq_len, self.padding_token_id, dtype=np.int64
+        )
+        padded_masked_seq[: len(masked_seq_np)] = masked_seq_np
+
+        # Padded positive items
+        padded_pos_items = np.full(num_to_mask, self.padding_token_id, dtype=np.int64)
+        padded_pos_items[: len(pos_items_np)] = pos_items_np
+
+        # Padded masked indices (use 0 for padding, will be ignored by loss mask)
+        padded_masked_indices = np.zeros(num_to_mask, dtype=np.int64)
+        padded_masked_indices[: len(indices_to_mask)] = indices_to_mask
+
+        # Convert to Tensors
+        masked_seq_tensor = torch.from_numpy(padded_masked_seq).long()
+        pos_items_tensor = torch.from_numpy(padded_pos_items).long()
+        neg_items_tensor = torch.from_numpy(neg_items_np).long()
+        masked_indices_tensor = torch.from_numpy(padded_masked_indices).long()
+
+        return (
+            masked_seq_tensor,
+            pos_items_tensor,
+            neg_items_tensor,
+            masked_indices_tensor,
+        )

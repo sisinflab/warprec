@@ -1,16 +1,15 @@
 # pylint: disable = R0801, E1102, W0221, C0103, W0613, W0235, R0902
-from typing import Callable, Any
+from typing import Callable, Any, Optional
 
 import torch
 from torch import nn, Tensor
-from torch.nn import Module
-from torch.nn.init import xavier_normal_
 
 from warprec.recommenders.base_recommender import (
     IterativeRecommender,
     SequentialRecommenderUtils,
 )
-from warprec.data.entities import Sessions
+from warprec.recommenders.losses import EmbLoss
+from warprec.data.entities import Interactions, Sessions
 from warprec.utils.enums import DataLoaderType
 from warprec.utils.registry import model_registry
 
@@ -24,15 +23,11 @@ class gSASRec(IterativeRecommender, SequentialRecommenderUtils):
 
     Args:
         params (dict): Model parameters.
-        *args (Any): Variable length argument list.
-        device (str): The device used for tensor operations.
-        seed (int): The seed to use for reproducibility.
+        interactions (Interactions): The training interactions.
         info (dict): The dictionary containing dataset information.
+        *args (Any): Variable length argument list.
+        seed (int): The seed to use for reproducibility.
         **kwargs (Any): Arbitrary keyword arguments.
-
-    Raises:
-        ValueError: If essential values like 'items' are not passed
-                    through the info dict.
 
     Attributes:
         DATALOADER_TYPE: The type of dataloader used.
@@ -42,6 +37,7 @@ class gSASRec(IterativeRecommender, SequentialRecommenderUtils):
         inner_size (int): The dimensionality of the feed-forward layer in the transformer.
         dropout_prob (float): The probability of dropout for embeddings and other layers.
         attn_dropout_prob (float): The probability of dropout for the attention weights.
+        reg_weight (float): The L2 regularization weight.
         weight_decay (float): The value of weight decay used in the optimizer.
         batch_size (int): The batch size used during training.
         epochs (int): The number of training epochs.
@@ -62,6 +58,7 @@ class gSASRec(IterativeRecommender, SequentialRecommenderUtils):
     inner_size: int
     dropout_prob: float
     attn_dropout_prob: float
+    reg_weight: float
     weight_decay: float
     batch_size: int
     epochs: int
@@ -74,29 +71,22 @@ class gSASRec(IterativeRecommender, SequentialRecommenderUtils):
     def __init__(
         self,
         params: dict,
+        interactions: Interactions,
+        info: dict,
         *args: Any,
-        device: str = "cpu",
         seed: int = 42,
-        info: dict = None,
         **kwargs: Any,
     ):
-        super().__init__(params, device=device, seed=seed, *args, **kwargs)
-
-        # Get information from dataset info
-        self.n_items = info.get("items", None)
-        if not self.n_items or not self.max_seq_len:
-            raise ValueError(
-                "Both 'items' must be provided to correctly initialize the model."
-            )
+        super().__init__(params, interactions, info, *args, seed=seed, **kwargs)
 
         self.item_embedding = nn.Embedding(
-            self.n_items + 1, self.embedding_size, padding_idx=0
+            self.n_items + 1, self.embedding_size, padding_idx=self.n_items
         )
         self.position_embedding = nn.Embedding(self.max_seq_len, self.embedding_size)
 
         if not self.reuse_item_embeddings:
             self.output_embedding = nn.Embedding(
-                self.n_items + 1, self.embedding_size, padding_idx=0
+                self.n_items + 1, self.embedding_size, padding_idx=self.n_items
             )
 
         self.emb_dropout = nn.Dropout(self.dropout_prob)
@@ -115,24 +105,14 @@ class gSASRec(IterativeRecommender, SequentialRecommenderUtils):
             num_layers=self.n_layers,
         )
 
+        # Precompute causal mask
+        causal_mask = self._generate_square_subsequent_mask(self.max_seq_len)
+        self.register_buffer("causal_mask", causal_mask)
+
         # Initialize weights
         self.apply(self._init_weights)
-        self.loss = self._gbce_loss_function()
-
-        self.to(self._device)
-
-    def _generate_square_subsequent_mask(self, seq_len: int) -> Tensor:
-        """Generate a square mask for the sequence.
-
-        Args:
-            seq_len (int): Length of the sequence.
-
-        Returns:
-            Tensor: A square mask of shape [seq_len, seq_len] with True for positions
-                    that should not be attended to.
-        """
-        mask = torch.triu(torch.ones(seq_len, seq_len, device=self._device), diagonal=1)
-        return mask.bool()
+        self.gbce_loss = self._gbce_loss_function()
+        self.reg_loss = EmbLoss()
 
     def _get_output_embeddings(self) -> nn.Embedding:
         """Return embeddings based on the flag value reuse_item_embeddings.
@@ -145,17 +125,12 @@ class gSASRec(IterativeRecommender, SequentialRecommenderUtils):
             return self.item_embedding
         return self.output_embedding
 
-    def _init_weights(self, module: Module):
-        if isinstance(module, (nn.Embedding, nn.Linear)):
-            xavier_normal_(module.weight.data)
-        elif isinstance(module, nn.LayerNorm):
-            module.bias.data.zero_()
-            module.weight.data.fill_(1.0)
-        if isinstance(module, nn.Linear) and module.bias is not None:
-            module.bias.data.zero_()
-
     def get_dataloader(
-        self, interactions, sessions: Sessions, low_memory: bool = False, **kwargs
+        self,
+        interactions: Interactions,
+        sessions: Sessions,
+        low_memory: bool = False,
+        **kwargs,
     ):
         return sessions.get_user_history_dataloader(
             max_seq_len=self.max_seq_len,
@@ -163,17 +138,6 @@ class gSASRec(IterativeRecommender, SequentialRecommenderUtils):
             batch_size=self.batch_size,
             low_memory=low_memory,
         )
-
-    def get_output_embeddings(self) -> nn.Embedding:
-        """Return embeddings based on the flag value reuse_item_embeddings.
-
-        Returns:
-            nn.Embedding: The item embedding if reuse_item_embeddings is True,
-                else the output embedding.
-        """
-        if self.reuse_item_embeddings:
-            return self.item_embedding
-        return self.output_embedding
 
     def forward(self, item_seq: Tensor) -> Tensor:
         """Forward pass of gSASRec. Returns the output of the Transformer
@@ -186,10 +150,9 @@ class gSASRec(IterativeRecommender, SequentialRecommenderUtils):
             Tensor: Output of the Transformer encoder [batch_size, seq_len, embedding_size].
         """
         seq_len = item_seq.size(1)
-        padding_mask = item_seq == 0
-        causal_mask = self._generate_square_subsequent_mask(seq_len)
+        padding_mask = item_seq == self.n_items
 
-        position_ids = torch.arange(seq_len, dtype=torch.long, device=self._device)
+        position_ids = torch.arange(seq_len, dtype=torch.long).to(item_seq.device)
         position_ids = position_ids.unsqueeze(0).expand_as(item_seq)
 
         item_emb = self.item_embedding(item_seq)
@@ -200,7 +163,7 @@ class gSASRec(IterativeRecommender, SequentialRecommenderUtils):
 
         transformer_output = self.transformer_encoder(
             src=seq_emb,
-            mask=causal_mask,
+            mask=self.causal_mask[:seq_len, :seq_len],  # type:ignore [index]
             src_key_padding_mask=padding_mask,
         )
         return transformer_output
@@ -219,13 +182,13 @@ class gSASRec(IterativeRecommender, SequentialRecommenderUtils):
             model_input: Tensor,
         ):
             pos_neg_concat = torch.cat([labels.unsqueeze(-1), negatives], dim=-1)
-            pos_neg_embeddings = self.get_output_embeddings()(pos_neg_concat)
+            pos_neg_embeddings = self._get_output_embeddings()(pos_neg_concat)
 
             logits = torch.einsum(
                 "bse, bsne -> bsn", sequence_hidden_states, pos_neg_embeddings
             )
 
-            gt = torch.zeros_like(logits, device=self._device)
+            gt = torch.zeros_like(logits).to(logits.device)
             gt[:, :, 0] = 1.0
 
             alpha = self.neg_samples / (self.n_items - 1)
@@ -253,7 +216,7 @@ class gSASRec(IterativeRecommender, SequentialRecommenderUtils):
                 [positive_logits_transformed, negative_logits], -1
             ).to(torch.float32)
 
-            mask = (model_input != 0).float()
+            mask = (labels != self.n_items).float()
             loss_per_element = nn.functional.binary_cross_entropy_with_logits(
                 final_logits, gt, reduction="none"
             )
@@ -265,102 +228,80 @@ class gSASRec(IterativeRecommender, SequentialRecommenderUtils):
         return gbce_loss_fn
 
     def train_step(self, batch: Any, *args, **kwargs):
-        positives, negatives = [x.to(self._device) for x in batch]
+        positives, negatives = batch
 
         if positives.shape[0] == 0 or positives.shape[1] < 2:
-            return torch.tensor(0.0, device=self._device, requires_grad=True)
+            return torch.tensor(0.0, requires_grad=True).to(positives.device)
 
         model_input = positives[:, :-1]
         labels = positives[:, 1:]
 
         if model_input.shape[1] == 0:
-            return torch.tensor(0.0, device=self._device, requires_grad=True)
+            return torch.tensor(0.0, requires_grad=True).to(positives.device)
 
+        # Calculate GBCE loss
         sequence_hidden_states = self.forward(model_input)
-        total_loss = self.loss(sequence_hidden_states, labels, negatives, model_input)
+        gbce_loss = self.gbce_loss(
+            sequence_hidden_states, labels, negatives, model_input
+        )
 
-        return total_loss
+        # Calculate L2 regularization
+        reg_loss = self.reg_weight * self.reg_loss(
+            self.item_embedding(model_input),
+            self._get_output_embeddings()(labels),
+            self._get_output_embeddings()(negatives),
+        )
+
+        return gbce_loss + reg_loss
 
     @torch.no_grad()
-    def predict_full(
+    def predict(
         self,
         user_indices: Tensor,
-        user_seq: Tensor,
-        seq_len: Tensor,
         *args: Any,
+        item_indices: Optional[Tensor] = None,
+        user_seq: Optional[Tensor] = None,
+        seq_len: Optional[Tensor] = None,
         **kwargs: Any,
     ) -> Tensor:
         """
-        Prediction using the learned session embeddings (full sort prediction).
+        Prediction using the learned session embeddings.
 
         Args:
             user_indices (Tensor): The batch of user indices.
-            user_seq (Tensor): Padded sequences of item IDs for users to predict for.
-            seq_len (Tensor): Actual lengths of these sequences, before padding.
             *args (Any): List of arguments.
+            item_indices (Optional[Tensor]): The batch of item indices. If None,
+                full prediction will be produced.
+            user_seq (Optional[Tensor]): Padded sequences of item IDs for users to predict for.
+            seq_len (Optional[Tensor]): Actual lengths of these sequences, before padding.
             **kwargs (Any): The dictionary of keyword arguments.
 
         Returns:
             Tensor: The score matrix {user x item}.
         """
-        user_seq = user_seq.to(self._device)
-        seq_len = seq_len.to(self._device)
-
+        # Get the transformer output for all tokens in the sequence
         transformer_output = self.forward(user_seq)
-        seq_output = self._gather_indexes(transformer_output, seq_len - 1)
 
-        all_item_embeddings = self._get_output_embeddings().weight[1:]
-        predictions = torch.matmul(seq_output, all_item_embeddings.transpose(0, 1))
-        return predictions.to(self._device)
-
-    @torch.no_grad()
-    def predict_sampled(
-        self,
-        user_indices: Tensor,
-        item_indices: Tensor,
-        user_seq: Tensor,
-        seq_len: Tensor,
-        *args: Any,
-        **kwargs: Any,
-    ) -> Tensor:
-        """Prediction of given items using the learned embeddings.
-
-        Args:
-            user_indices (Tensor): The batch of user indices.
-            item_indices (Tensor): The batch of item indices to predict for.
-            user_seq (Tensor): Padded sequences of item IDs for users to predict for.
-            seq_len (Tensor): Actual lengths of these sequences, before padding.
-            *args (Any): List of arguments.
-            **kwargs (Any): The dictionary of keyword arguments.
-
-        Returns:
-            Tensor: The score matrix {user x pad_seq}.
-        """
-        # Move inputs to the correct device
-        user_seq = user_seq.to(self._device)
-        seq_len = seq_len.to(self._device)
-        item_indices = item_indices.to(self._device)
-
-        # The forward pass of gSASRec returns the output for all items in the sequence
-        transformer_output = self.forward(
-            user_seq
-        )  # [batch_size, max_seq_len, embedding_size]
-
-        # Get the output embedding corresponding to the last item in each sequence,
-        # as this is the one used for the next-item prediction.
+        # Get the embedding of the LAST relevant item for prediction
         seq_output = self._gather_indexes(
             transformer_output, seq_len - 1
         )  # [batch_size, embedding_size]
 
-        # Get embeddings for candidate items. We clamp the indices to avoid
-        # out-of-bounds errors with the padding value (-1)
-        candidate_item_embeddings = self._get_output_embeddings()(
-            item_indices.clamp(min=0)
-        )  # [batch_size, pad_seq, embedding_size]
+        target_item_embeddings = self._get_output_embeddings()
+        if item_indices is None:
+            # Case 'full': prediction on all items
+            item_embeddings = target_item_embeddings.weight[
+                :-1, :
+            ]  # [n_items, embedding_size]
+            einsum_string = "be,ie->bi"  # b: batch, e: embedding, i: item
+        else:
+            # Case 'sampled': prediction on a sampled set of items
+            item_embeddings = target_item_embeddings(
+                item_indices
+            )  # [batch_size, pad_seq, embedding_size]
+            einsum_string = "be,bse->bs"  # b: batch, e: embedding, s: sample
 
-        # Compute scores using the dot product between the user's final session
-        # embedding and the embeddings of all candidate items.
         predictions = torch.einsum(
-            "bi,bji->bj", seq_output, candidate_item_embeddings
-        )  # [batch_size, pad_seq]
-        return predictions.to(self._device)
+            einsum_string, seq_output, item_embeddings
+        )  # [batch_size, n_items] or [batch_size, pad_seq]
+        return predictions
