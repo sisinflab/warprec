@@ -1,0 +1,106 @@
+cluster_name: warprec-gcp
+
+max_workers: 1
+
+provider:
+    type: gcp
+    region: europe-west3
+    availability_zone: europe-west3-a
+    project_id: YOUR-PROJECT-ID
+
+docker:
+    image: "rayproject/ray:2.45.0-py312-cpu"
+    container_name: "warprec-container"
+    pull_before_run: True
+    run_options:
+        - "--shm-size=20gb"
+        - "--privileged"
+
+available_node_types:
+    ray_head_default:
+        resources: {"CPU": 4, "memory": 16000000000}
+        node_config:
+            machineType: e2-standard-4
+            serviceAccounts:
+              - email: default
+                scopes:
+                  - https://www.googleapis.com/auth/cloud-platform
+            disks:
+              - boot: true
+                autoDelete: true
+                type: PERSISTENT
+                initializeParams:
+                  diskSizeGb: 50
+                  sourceImage: projects/ubuntu-os-cloud/global/images/family/ubuntu-2204-lts
+
+    ray_worker_small:
+        min_workers: 1
+        max_workers: 1
+        resources: {}
+        node_config:
+            machineType: e2-standard-4
+            serviceAccounts:
+              - email: default
+                scopes:
+                  - https://www.googleapis.com/auth/cloud-platform
+            disks:
+              - boot: true
+                autoDelete: true
+                type: PERSISTENT
+                initializeParams:
+                  diskSizeGb: 50
+                  sourceImage: projects/ubuntu-os-cloud/global/images/family/ubuntu-2204-lts
+            scheduling:
+                preemptible: True
+
+head_node_type: ray_head_default
+
+file_mounts:
+    "/home/ray/environment.yml": "./environment.yml"
+
+initialization_commands:
+    - curl -fsSL https://get.docker.com -o get-docker.sh
+    - sudo sh get-docker.sh
+    - sudo usermod -aG docker $(whoami)
+    - sudo systemctl restart docker -f
+    - sudo apt-get update && sudo apt-get install -y rsync
+
+setup_commands:
+    # System dependecies + GCSFuse
+    - sudo apt-get update && sudo apt-get install -y curl bzip2 rsync openssh-client procps build-essential git iproute2 net-tools lsb-release gnupg
+    - export GCSFUSE_REPO=gcsfuse-`lsb_release -c -s` && echo "deb https://packages.cloud.google.com/apt $GCSFUSE_REPO main" | sudo tee /etc/apt/sources.list.d/gcsfuse.list
+    - curl https://packages.cloud.google.com/apt/doc/apt-key.gpg | sudo apt-key add -
+    - sudo apt-get update && sudo apt-get install -y gcsfuse
+
+    # Install Micromamba
+    - curl -Ls https://micro.mamba.pm/api/micromamba/linux-64/latest | tar -xvj bin/micromamba
+    - sudo mv bin/micromamba /usr/local/bin/micromamba
+    - sudo chmod +x /usr/local/bin/micromamba
+    - rm -rf bin
+
+    # Setup Environment
+    - sudo mkdir -p /home/ray
+    - sudo chown -R ray /home/ray
+    - /usr/local/bin/micromamba create -f /home/ray/environment.yml -r /home/ray/micromamba -y || true
+    - /usr/local/bin/micromamba run -r /home/ray/micromamba -n warprec pip install --upgrade grpcio google-api-python-client
+
+    # Create the shared directory
+    - mkdir -p /home/ray/shared
+
+head_start_ray_commands:
+    # Mount the GCS bucket
+    - fusermount -u /home/ray/shared || true
+    - gcsfuse --implicit-dirs YOUR-BLOB-STORAGE-NAME /home/ray/shared
+
+    # Start Ray head
+    - /usr/local/bin/micromamba run -r /home/ray/micromamba -n warprec ray stop
+    - /usr/local/bin/micromamba run -r /home/ray/micromamba -n warprec ray start --head --port=6379 --object-manager-port=8076 --autoscaling-config=~/ray_bootstrap_config.yaml --dashboard-host=0.0.0.0 --ray-client-server-port=10001
+
+worker_start_ray_commands:
+    # Mount the GCS bucket
+    - fusermount -u /home/ray/shared || true
+    - gcsfuse --implicit-dirs YOUR-BLOB-STORAGE-NAME /home/ray/shared
+
+    # Start Ray worker
+    - /usr/local/bin/micromamba run -r /home/ray/micromamba -n warprec ray stop
+    - /usr/local/bin/micromamba run -r /home/ray/micromamba -n warprec ray start --address=$RAY_HEAD_IP:6379
