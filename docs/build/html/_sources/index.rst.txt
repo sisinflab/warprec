@@ -29,6 +29,7 @@ Welcome to WarpRec
 
    callback/index
    scripting/index
+   clustering
 
 .. toctree::
    :hidden:
