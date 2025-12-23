@@ -150,8 +150,6 @@ class GeneralConfig(BaseModel):
                 the cache will be cleared.
             - "experiment": Data structures will be prepared for the whole experiment.
                 Will require more memory.
-        cuda_visible_devices (Optional[List[int] | int]): The list of visible CUDA devices.
-            Defaults to all visible devices.
         custom_models (Optional[str | List[str]]): List of custom model paths to load.
             This is useful for loading custom models that are not part of the
             standard Warprec framework.
@@ -164,9 +162,6 @@ class GeneralConfig(BaseModel):
     ray_verbose: Optional[int] = 1
     time_report: Optional[bool] = True
     train_data_preparation: Optional[str] = None
-    cuda_visible_devices: Optional[List[int] | int] = list(
-        range(torch.cuda.device_count())
-    )
     custom_models: Optional[str | List[str]] = None
     callback: Optional[WarpRecCallbackConfig] = Field(
         default_factory=WarpRecCallbackConfig
@@ -197,22 +192,6 @@ class GeneralConfig(BaseModel):
             f"Train data preparation value can either be: None, 'conservative' or 'experiment'. "
             f"Value received: {v}"
         )
-
-    @field_validator("cuda_visible_devices")
-    @classmethod
-    def check_cuda_visible_devices(cls, v: List[int] | int):
-        """Validate cuda_visible_devices."""
-        available_gpus = torch.cuda.device_count()
-
-        if isinstance(v, int):
-            v = [v]
-
-        if v is not None:
-            if len(v) != available_gpus:
-                raise ValueError(
-                    "Something went wrong during CUDA devices initialization."
-                )
-        return v
 
     @field_validator("custom_models")
     @classmethod
