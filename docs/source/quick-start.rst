@@ -111,7 +111,7 @@ If you wish to start a training experiment, a Ray cluster must be initialized. Y
 
     ray start --head
 
-If you wish to customize available resources, you can start your head node manually using the following command:
+To customize available resources, you can start your head node manually using the following command:
 
 .. code-block:: bash
 
