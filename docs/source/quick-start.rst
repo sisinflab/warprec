@@ -105,7 +105,13 @@ From here, you can extend the configuration by:
 
 For a detailed explanation of the configuration system, see :ref:`Configuration Files <configuration>`.
 
-If you wish to start a training experiment, a Ray cluster must be initialized. WarpRec will by default start a local Ray instance using all available resources. If you wish to customize available resources, you can start your head node manually using the following command:
+If you wish to start a training experiment, a Ray cluster must be initialized. You can do so using the following command:
+
+.. code-block:: bash
+
+    ray start --head
+
+If you wish to customize available resources, you can start your head node manually using the following command:
 
 .. code-block:: bash
 

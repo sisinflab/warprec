@@ -443,7 +443,11 @@ From here, you can extend the configuration by:</p>
 <li><p>Enabling distributed training and large-scale evaluation.</p></li>
 </ul>
 <p>For a detailed explanation of the configuration system, see <a class="reference internal" href="configuration/index.html#configuration"><span class="std std-ref">Configuration Files</span></a>.</p>
-<p>If you wish to start a training experiment, a Ray cluster must be initialized. WarpRec will by default start a local Ray instance using all available resources. If you wish to customize available resources, you can start your head node manually using the following command:</p>
+<p>If you wish to start a training experiment, a Ray cluster must be initialized. You can do so using the following command:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>ray<span class="w"> </span>start<span class="w"> </span>--head
+</pre></div>
+</div>
+<p>If you wish to customize available resources, you can start your head node manually using the following command:</p>
 <div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>ray<span class="w"> </span>start<span class="w"> </span>--head<span class="w"> </span>--num-cpus<span class="w"> </span>&lt;NUM_CPUS&gt;<span class="w"> </span>--num-gpus<span class="w"> </span>&lt;NUM_GPUS&gt;
 </pre></div>
 </div>
