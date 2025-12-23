@@ -129,7 +129,14 @@ def main(args: Namespace):
         [] if config.general.custom_models is None else config.general.custom_models
     )
     py_modules.extend(["warprec"])  # type: ignore[union-attr]
-    ray.init(runtime_env={"py_modules": py_modules})
+
+    try:
+        ray.init(address="auto", runtime_env={"py_modules": py_modules})
+        logger.positive("Connected to existing Ray cluster.")
+    except ConnectionError:
+        raise ConnectionError(
+            "Unable to connect to Ray cluster. Please ensure Ray is running."
+        )
 
     for model_name in models:
         model_exploration_start_time = time.time()
