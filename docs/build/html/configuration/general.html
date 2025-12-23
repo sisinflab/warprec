@@ -346,7 +346,6 @@ It allows customization of numerical precision, device usage, logging verbosity,
 <p>The <strong>train_data_preparation</strong> parameter affects how memory is managed during the experiment. The default mode uses the least memory, conservative requires more, and experiment is the most memory-intensive option. Choosing the latter modes can lead to faster training times, as key results are cached directly within the dataset.</p>
 </div>
 <ul class="simple">
-<li><p><strong>cuda_visible_devices</strong>: Indexes of CUDA devices that WarpRec can use. Defaults to all available devices.</p></li>
 <li><p><strong>custom_models</strong>: Python modules to import custom models into WarpRec. Can be a string or a list of strings.</p></li>
 <li><p><strong>callback</strong>: Nested section to configure a custom callback.</p></li>
 <li><p><strong>azure</strong>: Nested section to configure Azure information needed for reading and writing data from/to Azure Blob Storage.</p></li>
@@ -382,7 +381,6 @@ It allows customization of numerical precision, device usage, logging verbosity,
 <p>Below is a complete example of a <strong>general configuration</strong> including precision, verbosity, and a custom callback:</p>
 <div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">general</span><span class="p">:</span>
 <span class="w">    </span><span class="nt">device</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">cuda</span>
-<span class="w">    </span><span class="nt">cuda_visible_devices</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">0</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">1</span><span class="p p-Indicator">]</span>
 <span class="w">    </span><span class="nt">ray_verbose</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0</span>
 <span class="w">    </span><span class="nt">callback</span><span class="p">:</span>
 <span class="w">        </span><span class="nt">callback_path</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">path/to/the/script.py</span>

@@ -23,7 +23,6 @@ Available Keywords
 .. important::
     The **train_data_preparation** parameter affects how memory is managed during the experiment. The default mode uses the least memory, conservative requires more, and experiment is the most memory-intensive option. Choosing the latter modes can lead to faster training times, as key results are cached directly within the dataset.
 
-- **cuda_visible_devices**: Indexes of CUDA devices that WarpRec can use. Defaults to all available devices.
 - **custom_models**: Python modules to import custom models into WarpRec. Can be a string or a list of strings.
 - **callback**: Nested section to configure a custom callback.
 - **azure**: Nested section to configure Azure information needed for reading and writing data from/to Azure Blob Storage.
@@ -61,7 +60,6 @@ Below is a complete example of a **general configuration** including precision, 
 
    general:
        device: cuda
-       cuda_visible_devices: [0, 1]
        ray_verbose: 0
        callback:
            callback_path: path/to/the/script.py
