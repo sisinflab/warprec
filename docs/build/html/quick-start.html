@@ -443,6 +443,14 @@ From here, you can extend the configuration by:</p>
 <li><p>Enabling distributed training and large-scale evaluation.</p></li>
 </ul>
 <p>For a detailed explanation of the configuration system, see <a class="reference internal" href="configuration/index.html#configuration"><span class="std std-ref">Configuration Files</span></a>.</p>
+<p>If you wish to start a training experiment, a Ray cluster must be initialized. WarpRec will by default start a local Ray instance using all available resources. If you wish to customize available resources, you can start your head node manually using the following command:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>ray<span class="w"> </span>start<span class="w"> </span>--head<span class="w"> </span>--num-cpus<span class="w"> </span>&lt;NUM_CPUS&gt;<span class="w"> </span>--num-gpus<span class="w"> </span>&lt;NUM_GPUS&gt;
+</pre></div>
+</div>
+<p>Also, in scenarios where multiple users share the same machine, you might want to specify which GPU devices to use by setting the <code class="docutils literal notranslate"><span class="pre">CUDA_VISIBLE_DEVICES</span></code> environment variable. For example, to use only GPU devices 0 and 2, you can run the following command:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="nv">CUDA_VISIBLE_DEVICES</span><span class="o">=</span><span class="m">0</span>,2<span class="w"> </span>ray<span class="w"> </span>start<span class="w"> </span>--head<span class="w"> </span>--num-cpus<span class="o">=</span>&lt;NUM_CPUS&gt;<span class="w"> </span>--num-gpus<span class="o">=</span><span class="m">2</span>
+</pre></div>
+</div>
 <p>Finally you can run your experiment using the following command:</p>
 <div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>python<span class="w"> </span>warprec/train.py<span class="w"> </span>-c<span class="w"> </span>config/quick_start.yml
 </pre></div>
