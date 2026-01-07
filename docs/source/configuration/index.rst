@@ -83,7 +83,7 @@ Run the training pipeline with:
 
 .. code-block:: bash
 
-    python warprec/train.py --config path/to/the/config.yml
+    python -m warprec.run --config path/to/the/config.yml --pipeline train
 
 Design Pipeline
 ~~~~~~~~~~~~~~~
@@ -134,4 +134,4 @@ Run the design pipeline with:
 
 .. code-block:: bash
 
-    python warprec/design.py --config path/to/the/config.yml
+    python -m warprec.run --config path/to/the/config.yml --pipeline design

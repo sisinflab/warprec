@@ -90,7 +90,7 @@ To submit a WarpRec job to the cluster, ensure the dashboard tunnel is running, 
         --working-dir . \
         -- \
         /usr/local/bin/micromamba run -r /home/ray/micromamba -n warprec \
-        python -m warprec.train -c path/to/config.yml
+        python -m warprec.run -c path/to/config.yml -p train
 
 Make sure to replace ``path/to/config.yml`` with the path to your WarpRec configuration file (relative to your current directory).
 

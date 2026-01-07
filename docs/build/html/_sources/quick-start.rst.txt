@@ -127,4 +127,4 @@ Finally you can run your experiment using the following command:
 
 .. code-block:: bash
 
-    python warprec/train.py -c config/quick_start.yml
+    python -m warprec.run -c config/quick_start.yml -p train
