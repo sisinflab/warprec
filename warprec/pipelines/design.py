@@ -1,7 +1,4 @@
-# pylint: disable=wrong-import-position, wrong-import-order
-import argparse
 import time
-from argparse import Namespace
 
 from warprec.common import initialize_datasets
 from warprec.data.reader import ReaderFactory
@@ -15,17 +12,20 @@ from warprec.recommenders.base_recommender import IterativeRecommender
 from warprec.evaluation.evaluator import Evaluator
 
 
-def main(args: Namespace):
+def design_pipeline(path: str):
     """Main function to start the design pipeline.
 
     During the design execution you can test your custom models
     and debug them using a simpler version of the train pipeline.
+
+    Args:
+        path (str): Path to the configuration file.
     """
     logger.msg("Starting the Design Pipeline.")
     experiment_start_time = time.time()
 
     # Configuration loading
-    config = load_design_configuration(args.config)
+    config = load_design_configuration(path)
 
     # Load custom callback if specified
     callback: WarpRecCallback = load_callback(
@@ -127,17 +127,3 @@ def main(args: Namespace):
         )
 
     logger.positive("Design pipeline executed successfully. WarpRec is shutting down.")
-
-
-if __name__ == "__main__":
-    parser = argparse.ArgumentParser()
-    parser.add_argument(
-        "-c",
-        "--config",
-        type=str,
-        action="store",
-        required=True,
-        help="Config file local path",
-    )
-    args = parser.parse_args()
-    main(args)

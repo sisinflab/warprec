@@ -1,9 +1,6 @@
-# pylint: disable=wrong-import-position, wrong-import-order
 import os
-import argparse
 import time
 from typing import List, Tuple, Dict, Any
-from argparse import Namespace
 
 import ray
 import torch
@@ -42,16 +39,22 @@ from warprec.evaluation.statistical_significance import compute_paired_statistic
 from warprec.utils.registry import model_registry
 
 
-def main(args: Namespace):
+def train_pipeline(path: str):
     """Main function to start the experiment.
 
     This method will start the train pipeline.
+
+    Args:
+        path (str): Path to the configuration file.
+
+    Raises:
+        ConnectionError: If unable to connect to Ray cluster.
     """
     logger.msg("Starting experiment.")
     experiment_start_time = time.time()
 
     # Config parser testing
-    config = load_train_configuration(args.config)
+    config = load_train_configuration(path)
 
     # Set Ray environment variable to enable new features
     os.environ["RAY_TRAIN_V2_ENABLED"] = "1"
@@ -553,17 +556,3 @@ def multiple_fold_validation_flow(
     )
 
     return best_model, report
-
-
-if __name__ == "__main__":
-    parser = argparse.ArgumentParser()
-    parser.add_argument(
-        "-c",
-        "--config",
-        type=str,
-        action="store",
-        required=True,
-        help="Config file local path",
-    )
-    args = parser.parse_args()
-    main(args)
