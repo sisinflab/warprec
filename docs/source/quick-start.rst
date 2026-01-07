@@ -105,8 +105,26 @@ From here, you can extend the configuration by:
 
 For a detailed explanation of the configuration system, see :ref:`Configuration Files <configuration>`.
 
+If you wish to start a training experiment, a Ray cluster must be initialized. You can do so using the following command:
+
+.. code-block:: bash
+
+    ray start --head
+
+To customize available resources, you can start your head node manually using the following command:
+
+.. code-block:: bash
+
+    ray start --head --num-cpus <NUM_CPUS> --num-gpus <NUM_GPUS>
+
+Also, in scenarios where multiple users share the same machine, you might want to specify which GPU devices to use by setting the ``CUDA_VISIBLE_DEVICES`` environment variable. For example, to use only GPU devices 0 and 2, you can run the following command:
+
+.. code-block:: bash
+
+    CUDA_VISIBLE_DEVICES=0,2 ray start --head --num-cpus=<NUM_CPUS> --num-gpus=2
+
 Finally you can run your experiment using the following command:
 
 .. code-block:: bash
 
-    python warprec/train.py -c config/quick_start.yml
+    python -m warprec.run -c config/quick_start.yml -p train

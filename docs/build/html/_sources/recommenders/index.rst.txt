@@ -14,7 +14,6 @@ Recommenders
    context
    sequential
    unpersonalized
-   proxy
    guide/index
 
 WarpRec provides a comprehensive collection of **built-in recommender algorithms**, covering both classical and state-of-the-art approaches widely used in the recommendation systems domain.

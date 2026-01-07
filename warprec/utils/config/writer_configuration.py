@@ -108,9 +108,11 @@ class WriterConfig(BaseModel):
                 raise ValueError(
                     "When choosing local writing method a local path must be provided."
                 )
-            if not os.path.exists(self.local_experiment_path):
-                raise FileNotFoundError(
+            try:
+                os.makedirs(self.local_experiment_path, exist_ok=True)
+            except OSError as e:
+                raise ValueError(
                     f"The local path provided {self.local_experiment_path} "
-                    f"does not exists."
+                    f"is not accessible or writable. Error: {e}"
                 )
         return self

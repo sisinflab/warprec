@@ -3,10 +3,10 @@
   <head><meta charset="utf-8"/>
     <meta name="viewport" content="width=device-width,initial-scale=1"/>
     <meta name="color-scheme" content="light dark"><meta name="viewport" content="width=device-width, initial-scale=1" />
-<link rel="index" title="Index" href="genindex.html" /><link rel="search" title="Search" href="search.html" /><link rel="next" title="Quick Start" href="quick-start.html" /><link rel="prev" title="Introduction" href="introduction.html" />
+<link rel="index" title="Index" href="genindex.html" /><link rel="search" title="Search" href="search.html" /><link rel="next" title="Authentication" href="authentication.html" /><link rel="prev" title="Scripting" href="scripting/index.html" />
 
     <!-- Generated with Sphinx 8.2.3 and Furo 2025.07.19 -->
-        <title>Install WarpRec - WarpRec</title>
+        <title>Cloud Clustering - WarpRec</title>
       <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=d111a655" />
     <link rel="stylesheet" type="text/css" href="_static/styles/furo.css?v=25af2a20" />
     <link rel="stylesheet" type="text/css" href="_static/styles/furo-extensions.css?v=8dab3a3b" />
@@ -198,9 +198,9 @@
 </form>
 <div id="searchbox"></div><div class="sidebar-scroll"><div class="sidebar-tree">
   <p class="caption" role="heading"><span class="caption-text">GET STARTED</span></p>
-<ul class="current">
-<li class="toctree-l1 current has-children"><a class="reference internal" href="introduction.html">Introduction</a><input checked="" class="toctree-checkbox" id="toctree-checkbox-1" name="toctree-checkbox-1" role="switch" type="checkbox"/><label for="toctree-checkbox-1"><div class="visually-hidden">Toggle navigation of Introduction</div><i class="icon"><svg><use href="#svg-arrow-right"></use></svg></i></label><ul class="current">
-<li class="toctree-l2 current current-page"><a class="current reference internal" href="#">Install WarpRec</a></li>
+<ul>
+<li class="toctree-l1 has-children"><a class="reference internal" href="introduction.html">Introduction</a><input class="toctree-checkbox" id="toctree-checkbox-1" name="toctree-checkbox-1" role="switch" type="checkbox"/><label for="toctree-checkbox-1"><div class="visually-hidden">Toggle navigation of Introduction</div><i class="icon"><svg><use href="#svg-arrow-right"></use></svg></i></label><ul>
+<li class="toctree-l2"><a class="reference internal" href="install.html">Install WarpRec</a></li>
 <li class="toctree-l2"><a class="reference internal" href="quick-start.html">Quick Start</a></li>
 </ul>
 </li>
@@ -254,13 +254,13 @@
 </li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">ADVANCED GUIDES</span></p>
-<ul>
+<ul class="current">
 <li class="toctree-l1 has-children"><a class="reference internal" href="callback/index.html">Callbacks</a><input class="toctree-checkbox" id="toctree-checkbox-8" name="toctree-checkbox-8" role="switch" type="checkbox"/><label for="toctree-checkbox-8"><div class="visually-hidden">Toggle navigation of Callbacks</div><i class="icon"><svg><use href="#svg-arrow-right"></use></svg></i></label><ul>
 <li class="toctree-l2"><a class="reference internal" href="callback/implement.html">Implementation Guide</a></li>
 </ul>
 </li>
 <li class="toctree-l1"><a class="reference internal" href="scripting/index.html">Scripting</a></li>
-<li class="toctree-l1"><a class="reference internal" href="clustering.html">Cloud Clustering</a></li>
+<li class="toctree-l1 current current-page"><a class="current reference internal" href="#">Cloud Clustering</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">I/O MODULES</span></p>
 <ul>
@@ -299,7 +299,7 @@
         </a>
         <div class="content-icon-container">
           <div class="view-this-page">
-  <a class="muted-link" href="_sources/install.rst.txt" title="View this page">
+  <a class="muted-link" href="_sources/clustering.rst.txt" title="View this page">
     <svg><use href="#svg-eye"></use></svg>
     <span class="visually-hidden">View this page</span>
   </a>
@@ -319,159 +319,74 @@
           </label>
         </div>
         <article role="main" id="furo-main-content">
-          <section id="install-warprec">
-<h1>Install WarpRec<a class="headerlink" href="#install-warprec" title="Link to this heading">¶</a></h1>
-<p>The procedure to install WarpRec its very simple, there are not many pre-requisites:</p>
-<ul class="simple">
-<li><p>Python 3.12</p></li>
-<li><p><a class="reference external" href="https://python-poetry.org/">Poetry 2.1.2</a> for dependency management. Poetry is required only for development.</p></li>
-</ul>
-<p>WarpRec is designed with a <strong>modular dependency structure</strong> leveraging Poetry. This allows you to install a lean <strong>core</strong> and selectively add optional <em>extras</em> for advanced functionalities (like experiment tracking or cloud I/O).</p>
-<div class="table-wrapper colwidths-given docutils container" id="id1">
-<table class="docutils align-default" id="id1">
-<caption><span class="caption-text"><strong>Dependency Groups</strong></span><a class="headerlink" href="#id1" title="Link to this table">¶</a></caption>
-<colgroup>
-<col style="width: 25.0%" />
-<col style="width: 75.0%" />
-</colgroup>
-<thead>
-<tr class="row-odd"><th class="head"><p>Group</p></th>
-<th class="head"><p>Description</p></th>
-</tr>
-</thead>
-<tbody>
-<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">core</span></code> (main)</p></td>
-<td><p>Essential functionalities, including base models (ItemKNN, EASE, MultiDAE), data handling, and evaluation metrics.</p></td>
-</tr>
-<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">dashboard</span></code></p></td>
-<td><p>Remote logging and experiment tracking tools (<cite>Weights &amp; Biases</cite>, <cite>MLflow</cite>, <cite>CodeCarbon</cite>).</p></td>
-</tr>
-<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">remote-io</span></code></p></td>
-<td><p>Functionality for reading and writing data to/from cloud storage (e.g., Azure Blob Storage).</p></td>
-</tr>
-</tbody>
-</table>
+          <section id="cloud-clustering">
+<h1>Cloud Clustering<a class="headerlink" href="#cloud-clustering" title="Link to this heading">¶</a></h1>
+<p>WarpRec supports clustering of cloud resources to optimize distributed training and hyperparameter optimization tasks. By grouping similar cloud instances together, WarpRec can efficiently allocate resources based on workload requirements, leading to improved performance and cost savings.</p>
+<p>This process is facilitated through the integration of Ray, a distributed computing framework that enables seamless scaling of machine learning workloads across multiple nodes. With Ray, WarpRec can dynamically manage clusters, monitor resource utilization, and ensure that tasks are executed in an optimal manner.</p>
+<p>In this guide, we will explore how to set up and utilize cloud clustering using WarpRec. For this example, we will use GCP, but similar principles apply to other cloud providers supported by Ray.</p>
+<section id="setting-up-your-project">
+<h2>Setting Up Your Project<a class="headerlink" href="#setting-up-your-project" title="Link to this heading">¶</a></h2>
+<p>Before you begin, ensure that you have a Google Cloud Platform (GCP) account and have set up a project. You will need to enable the Compute Engine API and create a service account with the necessary permissions to manage resources. The IAM API should be enabled as well.</p>
+<p>Once your project is set up, you will need to authenticate your local environment with GCP. First of all, install the Ray GCP dependencies and the Google Cloud CLI if you haven’t already:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>pip<span class="w"> </span>install<span class="w"> </span>google-api-python-client
+</pre></div>
 </div>
-<p>Also the core of WarpRec supports a wide variety of recommendation models, Graph-based models requires manual installation of <strong>PyTorch Geometric (PyG)</strong> due to strict CUDA/PyTorch version constraints. It enables the use of Graph Neural Network (GNN) models.</p>
-<section id="installation-guide">
-<span id="install-guide"></span><h2>Installation guide<a class="headerlink" href="#installation-guide" title="Link to this heading">¶</a></h2>
-<p>In the following sections you will be guided on how to install WarpRec. Here are three supported approaches, depending on your workflow.</p>
+<p>Then, authenticate using the following command:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>gcloud<span class="w"> </span>auth<span class="w"> </span>application-default<span class="w"> </span>login
+</pre></div>
+</div>
+<p>After the authentication is complete, you will need to set up a Blob Storage bucket to store your WarpRec experiment data. You also must upload your dataset to a GCP Storage bucket to be accessible by the cloud instances. In order to do so, you can use the following commands:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>gcloud<span class="w"> </span>storage<span class="w"> </span>buckets<span class="w"> </span>create<span class="w"> </span>gs://name-of-your-bucket<span class="w"> </span>--location<span class="o">=</span>europe-west3
+gcloud<span class="w"> </span>storage<span class="w"> </span>cp<span class="w"> </span>-r<span class="w"> </span>./datasets<span class="w"> </span>gs://name-of-your-bucket/dataset
+</pre></div>
+</div>
 <div class="admonition note">
 <p class="admonition-title">Note</p>
-<p>PyG (PyTorch Geometric) is highly sensitive to the version of PyTorch and CUDA. Incorrect combinations may lead to runtime errors or failed builds.</p>
-<dl class="simple">
-<dt>Always check the official compatibility matrix before installing PyTorch and PyG:</dt><dd><ul class="simple">
-<li><p><a class="reference external" href="https://pytorch.org/get-started/previous-versions/">PyTorch CUDA Support Matrix</a></p></li>
-<li><p><a class="reference external" href="https://pytorch-geometric.readthedocs.io/en/latest/install/installation.html">PyG CUDA Compatibility</a></p></li>
-</ul>
-</dd>
-</dl>
-<p>If you’re unsure about your system’s CUDA version, run:</p>
-<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>nvcc<span class="w"> </span>--version
+<p>Make sure to replace <code class="docutils literal notranslate"><span class="pre">name-of-your-bucket</span></code> with a unique name for your storage bucket.
+Location can be adjusted based on your preferences.</p>
+</div>
+<p>Now everything is set up to start using WarpRec with cloud clustering.</p>
+</section>
+<section id="creating-a-cluster">
+<h2>Creating a Cluster<a class="headerlink" href="#creating-a-cluster" title="Link to this heading">¶</a></h2>
+<p>To create a cluster using WarpRec and Ray, you will need to define the cluster configuration in a YAML file. This configuration will specify the number of nodes, machine types, Docker images, and setup commands (including Micromamba environment creation).</p>
+<p>You can find the example configuration file <cite>ray_cluster.yml</cite> in the <cite>guides/gcp_clustering</cite> directory of the WarpRec repository.</p>
+<p>The available settings for Ray Clustering can be found in the <a class="reference external" href="https://docs.ray.io/en/latest/cluster/getting-started.html">Ray Cluster Configuration Documentation</a>.</p>
+<p>To start a cluster using a Ray Cluster configuration file, use the following command:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>ray<span class="w"> </span>up<span class="w"> </span>path/to/your/cluster_config.yml<span class="w"> </span>-y
 </pre></div>
 </div>
-</div>
-<div class="admonition important">
-<p class="admonition-title">Important</p>
-<p>While these environments are made available for convenience and broader compatibility, <strong>Poetry remains the preferred tool for development</strong>, ensuring consistency with the project’s setup.</p>
-</div>
-<section id="using-poetry-pyproject-toml">
-<h3>Using Poetry (<cite>pyproject.toml</cite>)<a class="headerlink" href="#using-poetry-pyproject-toml" title="Link to this heading">¶</a></h3>
-<p>Poetry is the recommended tool, as it allows you to selectively install dependencies.</p>
-<ol class="arabic">
-<li><p><strong>Create and activate the environment:</strong></p>
-<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>poetry<span class="w"> </span>env<span class="w"> </span>use<span class="w"> </span>python3.12
+<p>This command will initiate the cluster creation process based on the specifications provided in your configuration file. The <code class="docutils literal notranslate"><span class="pre">-y</span></code> flag automatically confirms the creation without prompting for user input. This process may take a few minutes as the necessary resources are provisioned and configured.</p>
+<p>Once the cluster is up and running, you <strong>must</strong> open the Ray dashboard connection. This creates a secure tunnel between your local machine and the cluster, which is required for submitting jobs. Use the following command in a dedicated terminal:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>ray<span class="w"> </span>dashboard<span class="w"> </span>path/to/your/cluster_config.yml
 </pre></div>
 </div>
-</li>
-<li><p><strong>Install core and optional extras:</strong></p>
-<p>To install only the <strong>core</strong> dependencies (<code class="docutils literal notranslate"><span class="pre">main</span></code>):</p>
-<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>poetry<span class="w"> </span>install<span class="w"> </span>--only<span class="w"> </span>main
+<p>This will open the Ray dashboard in your default web browser (usually at <cite>http://localhost:8265</cite>), allowing you to visualize the cluster’s performance and manage tasks effectively. <strong>Keep this terminal open.</strong></p>
+<p>To shut down the cluster when you are done, use the following command:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>ray<span class="w"> </span>down<span class="w"> </span>path/to/your/cluster_config.yml<span class="w"> </span>-y
 </pre></div>
 </div>
-<p>To install the <strong>core plus specific extras</strong> (e.g., <code class="docutils literal notranslate"><span class="pre">remote-io</span></code>):</p>
-<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>poetry<span class="w"> </span>install<span class="w"> </span>--only<span class="w"> </span>main<span class="w"> </span>remote-io
-</pre></div>
-</div>
-<p>To install the <strong>core plus ALL extras</strong> (<code class="docutils literal notranslate"><span class="pre">dashboard</span></code>, <code class="docutils literal notranslate"><span class="pre">remote-io</span></code>, etc.):</p>
-<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>poetry<span class="w"> </span>install
-</pre></div>
-</div>
-</li>
-<li><p><strong>Install PyTorch Geometric (PyG) - Optional for Graph Models:</strong></p>
-<p><strong>PyG is only required if you intend to use or develop Graph-based recommendation models.</strong> It must be installed manually with the correct PyTorch and CUDA version. Refer to the official guides for the latest instructions:</p>
+</section>
+<section id="submitting-warprec-jobs-to-the-cluster">
+<h2>Submitting WarpRec Jobs to the Cluster<a class="headerlink" href="#submitting-warprec-jobs-to-the-cluster" title="Link to this heading">¶</a></h2>
+<p>You can submit WarpRec training or hyperparameter optimization jobs to the Ray cluster using the <cite>ray job submit</cite> command. This allows you to leverage the distributed computing capabilities of the cluster for your recommender system tasks.</p>
+<p><strong>Important Configuration Note:</strong>
+Since the cluster uses GCS Fuse to mount your bucket, you should not use <cite>gs://</cite> paths in your WarpRec configuration file. Instead, point to the shared mount point on the cluster nodes:</p>
 <ul class="simple">
-<li><p><a class="reference external" href="https://pytorch.org/get-started/locally/">PyTorch Installation Guide</a></p></li>
-<li><p><a class="reference external" href="https://pytorch-geometric.readthedocs.io/en/latest/install/installation.html">PyG Installation Guide</a></p></li>
+<li><p><strong>Dataset Path:</strong> <cite>/home/ray/shared/dataset/your_file.csv</cite></p></li>
+<li><p><strong>Experiment Output:</strong> <cite>/home/ray/shared/experiments/your_experiment_name/</cite></p></li>
 </ul>
-<p>Example (replace with your CUDA version):</p>
-<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="c1"># Example for CUDA 11.8</span>
-poetry<span class="w"> </span>run<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </span>torch-scatter<span class="w"> </span>torch-sparse<span class="w"> </span>torch-cluster<span class="w"> </span>torch-spline-conv<span class="w"> </span><span class="se">\</span>
--f<span class="w"> </span>https://data.pyg.org/whl/torch-2.7.0+cu118.html
-poetry<span class="w"> </span>run<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </span>torch-geometric
+<p>To submit a WarpRec job to the cluster, ensure the dashboard tunnel is running, then use the following command:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>ray<span class="w"> </span>job<span class="w"> </span>submit<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>--address<span class="w"> </span>http://localhost:8265<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>--working-dir<span class="w"> </span>.<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>--<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>/usr/local/bin/micromamba<span class="w"> </span>run<span class="w"> </span>-r<span class="w"> </span>/home/ray/micromamba<span class="w"> </span>-n<span class="w"> </span>warprec<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>python<span class="w"> </span>-m<span class="w"> </span>warprec.run<span class="w"> </span>-c<span class="w"> </span>path/to/config.yml<span class="w"> </span>-p<span class="w"> </span>train
 </pre></div>
 </div>
-</li>
-</ol>
-</section>
-<section id="using-venv-requirements-txt">
-<h3>Using venv (<cite>requirements.txt</cite>)<a class="headerlink" href="#using-venv-requirements-txt" title="Link to this heading">¶</a></h3>
-<p>When installing via <cite>pip</cite> and <cite>requirements.txt</cite>, <strong>all dependencies (core and all extras) are installed simultaneously</strong> for maximum functionality.</p>
-<ol class="arabic">
-<li><p><strong>Create and activate a virtual environment:</strong></p>
-<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>python3.12<span class="w"> </span>-m<span class="w"> </span>venv<span class="w"> </span>.venv
-<span class="nb">source</span><span class="w"> </span>.venv/bin/activate
-</pre></div>
-</div>
-</li>
-<li><p><strong>Install all dependencies:</strong></p>
-<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>pip<span class="w"> </span>install<span class="w"> </span>--upgrade<span class="w"> </span>pip
-pip<span class="w"> </span>install<span class="w"> </span>-r<span class="w"> </span>requirements.txt
-</pre></div>
-</div>
-</li>
-<li><p><strong>Install compatible versions of PyTorch and PyG (if needed):</strong></p>
-<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="c1"># Make sure to install the correct versions matching your CUDA setup</span>
-pip<span class="w"> </span>install<span class="w"> </span>torch-scatter<span class="w"> </span>torch-sparse<span class="w"> </span>torch-cluster<span class="w"> </span>torch-spline-conv<span class="w"> </span><span class="se">\</span>
--f<span class="w"> </span>https://data.pyg.org/whl/torch-2.7.0+cu118.html
-pip<span class="w"> </span>install<span class="w"> </span>torch-geometric
-</pre></div>
-</div>
-</li>
-</ol>
-</section>
-<section id="using-conda-mamba-environment-yml">
-<h3>Using Conda/Mamba (<cite>environment.yml</cite>)<a class="headerlink" href="#using-conda-mamba-environment-yml" title="Link to this heading">¶</a></h3>
-<p>Similar to <code class="docutils literal notranslate"><span class="pre">venv</span></code>, the Conda environment file typically includes <strong>all dependencies (core and extras)</strong>.</p>
-<ol class="arabic">
-<li><p><strong>Create or update the environment:</strong></p>
-<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>conda<span class="w"> </span>env<span class="w"> </span>create<span class="w"> </span>--file<span class="w"> </span>environment.yml<span class="w"> </span>--name<span class="w"> </span>warprec
-<span class="c1"># or, if the env already exists</span>
-conda<span class="w"> </span>env<span class="w"> </span>update<span class="w"> </span>--file<span class="w"> </span>environment.yml<span class="w"> </span>--name<span class="w"> </span>warprec
-</pre></div>
-</div>
-</li>
-<li><p><strong>Activate the environment:</strong></p>
-<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>conda<span class="w"> </span>activate<span class="w"> </span>warprec
-</pre></div>
-</div>
-</li>
-<li><p><strong>Manually install compatible PyTorch and PyG (if needed):</strong></p>
-<p>Conda may not always provide the latest compatible versions. For full compatibility, refer to the installation links above and install with <cite>pip</cite> inside the Conda environment.</p>
-</li>
-</ol>
-<div class="admonition note">
-<p class="admonition-title">Note</p>
-<p>On some Linux systems, it has been observed that the <code class="docutils literal notranslate"><span class="pre">grpcio</span></code> library may need to be upgraded manually.
-This is typically required if you encounter errors related to gRPC during installation or runtime.</p>
-<p>You can upgrade <code class="docutils literal notranslate"><span class="pre">grpcio</span></code> using <code class="docutils literal notranslate"><span class="pre">pip</span></code> as follows:</p>
-<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="c1"># Upgrade grpcio to the latest version</span>
-pip<span class="w"> </span>install<span class="w"> </span>--upgrade<span class="w"> </span>grpcio
-</pre></div>
-</div>
-<p>If you are using a virtual environment or Poetry, make sure the command is executed <strong>inside the environment</strong>.</p>
-</div>
-</section>
+<p>Make sure to replace <code class="docutils literal notranslate"><span class="pre">path/to/config.yml</span></code> with the path to your WarpRec configuration file (relative to your current directory).</p>
+<p>And with this, you are all set to run WarpRec experiments using cloud clustering! Enjoy the scalability and efficiency that comes with distributed training on the cloud.</p>
 </section>
 </section>
 
@@ -480,23 +395,23 @@ pip<span class="w"> </span>install<span class="w"> </span>--upgrade<span class="
       <footer>
 
         <div class="related-pages">
-          <a class="next-page" href="quick-start.html">
+          <a class="next-page" href="authentication.html">
               <div class="page-info">
                 <div class="context">
                   <span>Next</span>
                 </div>
-                <div class="title">Quick Start</div>
+                <div class="title">Authentication</div>
               </div>
               <svg class="furo-related-icon"><use href="#svg-arrow-right"></use></svg>
             </a>
-          <a class="prev-page" href="introduction.html">
+          <a class="prev-page" href="scripting/index.html">
               <svg class="furo-related-icon"><use href="#svg-arrow-right"></use></svg>
               <div class="page-info">
                 <div class="context">
                   <span>Previous</span>
                 </div>
 
-                <div class="title">Introduction</div>
+                <div class="title">Scripting</div>
 
               </div>
             </a>
@@ -530,13 +445,10 @@ pip<span class="w"> </span>install<span class="w"> </span>--upgrade<span class="
         <div class="toc-tree-container">
           <div class="toc-tree">
             <ul>
-<li><a class="reference internal" href="#">Install WarpRec</a><ul>
-<li><a class="reference internal" href="#installation-guide">Installation guide</a><ul>
-<li><a class="reference internal" href="#using-poetry-pyproject-toml">Using Poetry (<cite>pyproject.toml</cite>)</a></li>
-<li><a class="reference internal" href="#using-venv-requirements-txt">Using venv (<cite>requirements.txt</cite>)</a></li>
-<li><a class="reference internal" href="#using-conda-mamba-environment-yml">Using Conda/Mamba (<cite>environment.yml</cite>)</a></li>
-</ul>
-</li>
+<li><a class="reference internal" href="#">Cloud Clustering</a><ul>
+<li><a class="reference internal" href="#setting-up-your-project">Setting Up Your Project</a></li>
+<li><a class="reference internal" href="#creating-a-cluster">Creating a Cluster</a></li>
+<li><a class="reference internal" href="#submitting-warprec-jobs-to-the-cluster">Submitting WarpRec Jobs to the Cluster</a></li>
 </ul>
 </li>
 </ul>
