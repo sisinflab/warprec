@@ -3,21 +3,6 @@ import argparse
 import time
 from argparse import Namespace
 
-# Correctly initialize environment variables
-from env import initialize_environment
-
-parser = argparse.ArgumentParser()
-parser.add_argument(
-    "-c",
-    "--config",
-    type=str,
-    action="store",
-    required=True,
-    help="Config file local path",
-)
-args = parser.parse_args()
-initialize_environment(args.config)
-
 from warprec.common import initialize_datasets
 from warprec.data.reader import ReaderFactory
 from warprec.utils.callback import WarpRecCallback
@@ -145,4 +130,14 @@ def main(args: Namespace):
 
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "-c",
+        "--config",
+        type=str,
+        action="store",
+        required=True,
+        help="Config file local path",
+    )
+    args = parser.parse_args()
     main(args)

@@ -1,23 +1,9 @@
 # pylint: disable=wrong-import-position, wrong-import-order
+import os
 import argparse
 import time
 from typing import List, Tuple, Dict, Any
 from argparse import Namespace
-
-# Correctly initialize environment variables
-from env import initialize_environment
-
-parser = argparse.ArgumentParser()
-parser.add_argument(
-    "-c",
-    "--config",
-    type=str,
-    action="store",
-    required=True,
-    help="Config file local path",
-)
-args = parser.parse_args()
-initialize_environment(args.config)
 
 import ray
 import torch
@@ -66,6 +52,9 @@ def main(args: Namespace):
 
     # Config parser testing
     config = load_train_configuration(args.config)
+
+    # Set Ray environment variable to enable new features
+    os.environ["RAY_TRAIN_V2_ENABLED"] = "1"
 
     # Load custom callback if specified
     callback: WarpRecCallback = load_callback(
@@ -140,7 +129,14 @@ def main(args: Namespace):
         [] if config.general.custom_models is None else config.general.custom_models
     )
     py_modules.extend(["warprec"])  # type: ignore[union-attr]
-    ray.init(runtime_env={"py_modules": py_modules})
+
+    try:
+        ray.init(address="auto", runtime_env={"py_modules": py_modules})
+        logger.positive("Connected to existing Ray cluster.")
+    except ConnectionError:
+        raise ConnectionError(
+            "Unable to connect to Ray cluster. Please ensure Ray is running."
+        )
 
     for model_name in models:
         model_exploration_start_time = time.time()
@@ -560,4 +556,14 @@ def multiple_fold_validation_flow(
 
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "-c",
+        "--config",
+        type=str,
+        action="store",
+        required=True,
+        help="Config file local path",
+    )
+    args = parser.parse_args()
     main(args)
