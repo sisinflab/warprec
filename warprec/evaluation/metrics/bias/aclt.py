@@ -126,10 +126,10 @@ class ACLT(TopKMetric):
         long_tail_mask = torch.isin(top_k_indices, self.long_tail)
 
         # Sum the number of long-tail hits per user
-        long_hits = long_tail_mask.sum(dim=1).float()  # [batch_size x long_tail]
+        long_hits = long_tail_mask.sum(dim=1).float()  # [batch_size]
 
         if self.compute_per_user:
-            self.long_hits.index_add_(0, user_indices, long_hits.sum(dim=1))
+            self.long_hits.index_add_(0, user_indices, long_hits)
         else:
             self.long_hits += long_hits.sum()
 
