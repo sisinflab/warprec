@@ -400,7 +400,7 @@ class Interactions:
         # Extract side information if flagged
         pos_features = None
         if include_side_info:
-            if self._inter_side_tensor:
+            if self._inter_side_tensor is not None:
                 pos_features = self._inter_side_tensor[pos_items]
             else:
                 raise ValueError(
