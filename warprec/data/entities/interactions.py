@@ -107,9 +107,19 @@ class Interactions:
             feature_cols = [
                 c for c in self._inter_side.columns if c != self._item_label
             ]
-            self._inter_side_tensor = torch.tensor(
+
+            # Create the lookup tensor for side information
+            side_tensor = torch.tensor(
                 self._inter_side[feature_cols].values, dtype=torch.long
             )
+
+            # Create the padding row (zeros)
+            padding_row = torch.zeros((1, side_tensor.shape[1]), dtype=torch.long)
+
+            # Concatenate padding row at the beginning
+            self._inter_side_tensor = torch.cat([side_tensor, padding_row], dim=0)
+
+            # Store the feature labels
             self._inter_side_labels = feature_cols
 
         # Definition of dimensions
