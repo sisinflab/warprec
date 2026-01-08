@@ -368,22 +368,28 @@ class ContextRecommenderUtils:
     ):
         return interactions.get_item_rating_dataloader(
             neg_samples=self.neg_samples,
-            include_context=True,
+            include_side_info=bool(self.feature_dims),
+            include_context=bool(self.context_dims),
             batch_size=self.batch_size,
             low_memory=low_memory,
         )
 
     def compute_first_order(
-        self, user: Tensor, item: Tensor, contexts: Tensor
+        self,
+        user: Tensor,
+        item: Tensor,
+        features: Optional[Tensor],
+        contexts: Optional[Tensor],
     ) -> Tensor:
         """Computes the First-Order Linear part.
 
-        Formula: global_bias + user_bias + item_bias + sum(context_biases)
+        Formula: global_bias + user_bias + item_bias + sum(feature_biases) + sum(context_biases)
 
         Args:
             user (Tensor): User indices.
             item (Tensor): Item indices.
-            contexts (Tensor): Context indices [batch_size, n_contexts].
+            features (Optional[Tensor]): Feature indices [batch_size, n_features].
+            contexts (Optional[Tensor]): Context indices [batch_size, n_contexts].
 
         Returns:
             Tensor: The linear score [batch_size].
@@ -394,21 +400,32 @@ class ContextRecommenderUtils:
             + self.item_bias(item).squeeze(-1)
         )
 
-        for idx, name in enumerate(self.context_labels):
-            ctx_input = contexts[:, idx]
-            linear_part += self.context_bias[name](ctx_input).squeeze(-1)
+        # Add feature biases
+        if features is not None and self.feature_labels:
+            for idx, name in enumerate(self.feature_labels):
+                linear_part += self.feature_bias[name](features[:, idx]).squeeze(-1)
+
+        # Add context biases
+        if contexts is not None and self.context_labels:
+            for idx, name in enumerate(self.context_labels):
+                linear_part += self.context_bias[name](contexts[:, idx]).squeeze(-1)
 
         return linear_part
 
     def get_reg_params(
-        self, user: Tensor, item: Tensor, contexts: Tensor
+        self,
+        user: Tensor,
+        item: Tensor,
+        features: Optional[Tensor],
+        contexts: Optional[Tensor],
     ) -> List[Tensor]:
         """Helper to extract ALL embeddings and biases for regularization.
 
         Args:
             user (Tensor): User indices.
             item (Tensor): Item indices.
-            contexts (Tensor): Context indices.
+            features (Optional[Tensor]): Feature indices.
+            contexts (Optional[Tensor]): Context indices.
 
         Returns:
             List[Tensor]: List of embeddings and biases to be passed to the Reg Loss.
@@ -420,10 +437,17 @@ class ContextRecommenderUtils:
             self.item_bias(item),
         ]
 
-        for idx, name in enumerate(self.context_labels):
-            ctx_input = contexts[:, idx]
-            reg_params.append(self.context_embedding[name](ctx_input))
-            reg_params.append(self.context_bias[name](ctx_input))
+        if contexts is not None:
+            for idx, name in enumerate(self.context_labels):
+                ctx_input = contexts[:, idx]
+                reg_params.append(self.context_embedding[name](ctx_input))
+                reg_params.append(self.context_bias[name](ctx_input))
+
+        if features is not None:
+            for idx, name in enumerate(self.feature_labels):
+                feat_input = features[:, idx]
+                reg_params.append(self.feature_embedding[name](feat_input))
+                reg_params.append(self.feature_bias[name](feat_input))
 
         return reg_params
 
