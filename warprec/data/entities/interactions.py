@@ -245,6 +245,14 @@ class Interactions:
         )
         return self._inter_side_sparse
 
+    def get_side_tensor(self) -> Tensor:
+        """This method retrieves the tensor representation of side data.
+
+        Returns:
+            Tensor: Tensor representation of the features if available.
+        """
+        return self._inter_side_tensor
+
     def get_interaction_loader(
         self,
         include_user_id: bool = False,
