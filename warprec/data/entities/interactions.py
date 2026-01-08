@@ -494,22 +494,22 @@ class Interactions:
 
             # Construct the final dataset
             tensors = [all_users, all_items, all_ratings]
-            if include_context:
-                all_contexts = torch.cat([pos_contexts, neg_contexts])
-                tensors.append(all_contexts)
             if include_side_info:
                 all_features = torch.cat([pos_features, neg_features])
                 tensors.append(all_features)
+            if include_context:
+                all_contexts = torch.cat([pos_contexts, neg_contexts])
+                tensors.append(all_contexts)
 
             dataset = TensorDataset(*tensors)
 
         else:
             # Only positive interactions
             tensors = [pos_users, pos_items, pos_ratings]
-            if include_context:
-                tensors.append(pos_contexts)
             if include_side_info:
                 tensors.append(pos_features)
+            if include_context:
+                tensors.append(pos_contexts)
 
             dataset = TensorDataset(*tensors)
 
