@@ -302,10 +302,6 @@ class ContextRecommenderUtils:
         embedding_size (int): The size of the latent vectors.
         batch_size (int): The batch size used for training.
         neg_samples (int): Number of negative samples for training.
-
-    Raises:
-        ValueError: If context dimensions are not passed through
-            info dictionary during initialization.
     """
 
     # Type hints used in general mixin implementations
@@ -323,13 +319,12 @@ class ContextRecommenderUtils:
         *args: Any,
         **kwargs: Any,
     ):
+        # Feature info extraction
+        self.feature_dims: dict = info.get("feature_dims", {})
+        self.feature_labels = list(self.feature_dims.keys())
+
         # Context info extraction
-        self.context_dims: dict = info.get("context_dims", None)
-        if self.context_dims is None:
-            raise ValueError(
-                f"The model {self.__class__.__name__} is contextual model. "
-                "Contextual dimensions are required inside the info dictionary."
-            )
+        self.context_dims: dict = info.get("context_dims", {})
         self.context_labels = list(self.context_dims.keys())
 
         # Call super init to populate n_users, n_items, embedding_size
@@ -339,6 +334,12 @@ class ContextRecommenderUtils:
         self.user_embedding = nn.Embedding(self.n_users, self.embedding_size)
         self.item_embedding = nn.Embedding(
             self.n_items + 1, self.embedding_size, padding_idx=self.n_items
+        )
+        self.feature_embedding = nn.ModuleDict(
+            {
+                name: nn.Embedding(dims, self.embedding_size)
+                for name, dims in self.feature_dims.items()
+            }
         )
         self.context_embedding = nn.ModuleDict(
             {
@@ -351,6 +352,9 @@ class ContextRecommenderUtils:
         self.global_bias = nn.Parameter(torch.zeros(1))
         self.user_bias = nn.Embedding(self.n_users, 1)
         self.item_bias = nn.Embedding(self.n_items + 1, 1, padding_idx=self.n_items)
+        self.feature_bias = nn.ModuleDict(
+            {name: nn.Embedding(dims, 1) for name, dims in self.feature_dims.items()}
+        )
         self.context_bias = nn.ModuleDict(
             {name: nn.Embedding(dims, 1) for name, dims in self.context_dims.items()}
         )
