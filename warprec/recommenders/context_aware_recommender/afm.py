@@ -98,8 +98,8 @@ class AFM(ContextRecommenderUtils, IterativeRecommender):
         self.dropout_layer = nn.Dropout(self.dropout)
 
         # Pre-compute Pair Indices
-        # Total fields = User (1) + Item (1) + Contexts (N)
-        self.num_fields = 2 + len(self.context_labels)
+        # Total fields = User (1) + Item (1) + Features (N) + Contexts (M)
+        self.num_fields = 2 + len(self.feature_labels) + len(self.context_labels)
 
         # Generate indices for all unique pairs (i, j) where i < j
         row_idx = []
@@ -148,28 +148,56 @@ class AFM(ContextRecommenderUtils, IterativeRecommender):
         return afm_score
 
     def train_step(self, batch: Any, *args, **kwargs) -> Tensor:
-        user, item, rating, contexts = batch
+        user, item, rating = batch[0], batch[1], batch[2]
 
-        prediction = self.forward(user, item, contexts)
+        contexts: Optional[Tensor] = None
+        features: Optional[Tensor] = None
+
+        current_idx = 3
+
+        # If feature dimensions exist, the next element is features
+        if self.feature_dims:
+            features = batch[current_idx]
+            current_idx += 1
+
+        # If context dimensions exist, the next element is context
+        if self.context_dims:
+            contexts = batch[current_idx]
+
+        prediction = self.forward(user, item, features, contexts)
 
         # Compute BCE loss
         loss = self.bce_loss(prediction, rating)
 
         # Compute L2 regularization on embeddings and biases
-        reg_params = self.get_reg_params(user, item, contexts)
+        reg_params = self.get_reg_params(user, item, features, contexts)
         reg_loss = self.reg_weight * self.reg_loss(*reg_params)
 
         return loss + reg_loss
 
-    def forward(self, user: Tensor, item: Tensor, contexts: Tensor) -> Tensor:
+    def forward(
+        self,
+        user: Tensor,
+        item: Tensor,
+        features: Optional[Tensor] = None,
+        contexts: Optional[Tensor] = None,
+    ) -> Tensor:
         # Linear Part (First Order)
-        linear_part = self.compute_first_order(user, item, contexts)
+        linear_part = self.compute_first_order(user, item, features, contexts)
 
         # Prepare Embeddings
-        # Order MUST be: User, Item, Contexts (to match p_idx/q_idx logic)
+        # Order MUST be consistent with num_fields logic
         embeddings_list = [self.user_embedding(user), self.item_embedding(item)]
-        for idx, name in enumerate(self.context_labels):
-            embeddings_list.append(self.context_embedding[name](contexts[:, idx]))
+
+        # Add Features
+        if features is not None and self.feature_labels:
+            for idx, name in enumerate(self.feature_labels):
+                embeddings_list.append(self.feature_embedding[name](features[:, idx]))
+
+        # Add Contexts
+        if contexts is not None and self.context_labels:
+            for idx, name in enumerate(self.context_labels):
+                embeddings_list.append(self.context_embedding[name](contexts[:, idx]))
 
         stacked_embeddings = torch.stack(
             embeddings_list, dim=1
@@ -184,6 +212,7 @@ class AFM(ContextRecommenderUtils, IterativeRecommender):
         self,
         u_emb: Tensor,
         i_emb: Tensor,
+        feat_emb_list: List[Tensor],
         ctx_emb_list: List[Tensor],
         batch_size: int,
         num_items: int,
@@ -194,6 +223,13 @@ class AFM(ContextRecommenderUtils, IterativeRecommender):
         # Create memory efficient view
         u_view = u_emb.unsqueeze(1).expand(-1, num_items, -1).reshape(total_rows, -1)
 
+        # Handle Feature views
+        feat_views = []
+        for f in feat_emb_list:
+            f_exp = f.unsqueeze(0).expand(batch_size, -1, -1).reshape(total_rows, -1)
+            feat_views.append(f_exp)
+
+        # Handle Context views
         ctx_views = []
         for c in ctx_emb_list:
             ctx_views.append(
@@ -212,11 +248,12 @@ class AFM(ContextRecommenderUtils, IterativeRecommender):
             # Slice the views
             u_chunk = u_view[start:end]
             i_chunk = i_view[start:end]
+            f_chunks = [f[start:end] for f in feat_views]
             c_chunks = [c[start:end] for c in ctx_views]
 
             # Materialize ONLY the chunk
             # NOTE: This will actually use memory
-            chunk_stack = torch.stack([u_chunk, i_chunk] + c_chunks, dim=1)
+            chunk_stack = torch.stack([u_chunk, i_chunk] + f_chunks + c_chunks, dim=1)
 
             # Compute AFM Interaction
             afm_s = self._compute_afm_interaction(chunk_stack)
@@ -252,15 +289,43 @@ class AFM(ContextRecommenderUtils, IterativeRecommender):
 
         # Linear Fixed
         fixed_linear = self.global_bias + self.user_bias(user_indices).squeeze(-1)
-        for idx, name in enumerate(self.context_labels):
-            fixed_linear += self.context_bias[name](contexts[:, idx]).squeeze(-1)
+        if contexts is not None and self.context_labels:
+            for idx, name in enumerate(self.context_labels):
+                fixed_linear += self.context_bias[name](contexts[:, idx]).squeeze(-1)
 
         # Embeddings Fixed
         u_emb = self.user_embedding(user_indices)  # [batch_size, embedding_size]
-        ctx_emb_list = [
-            self.context_embedding[name](contexts[:, idx])
-            for idx, name in enumerate(self.context_labels)
-        ]
+        ctx_emb_list = []
+        if contexts is not None and self.context_labels:
+            ctx_emb_list = [
+                self.context_embedding[name](contexts[:, idx])
+                for idx, name in enumerate(self.context_labels)
+            ]
+
+        # Helper function to retrieve feature embeddings
+        def get_feature_embeddings(target_items):
+            feat_embs = []
+            if self.feature_dims and self.item_features is not None:
+                flat_items = target_items.view(-1).cpu()
+                item_feats = self.item_features[flat_items].to(self.device)
+                target_shape = target_items.shape
+
+                for idx, name in enumerate(self.feature_labels):
+                    feat_col = item_feats[:, idx].view(target_shape)
+                    feat_embs.append(self.feature_embedding[name](feat_col))
+            return feat_embs
+
+        # Helper function to add feature bias
+        def add_feature_bias(linear_score, target_items):
+            if self.feature_dims and self.item_features is not None:
+                flat_items = target_items.view(-1).cpu()
+                item_feats = self.item_features[flat_items].to(self.device)
+                target_shape = target_items.shape
+
+                for idx, name in enumerate(self.feature_labels):
+                    feat_col = item_feats[:, idx].view(target_shape)
+                    linear_score += self.feature_bias[name](feat_col).squeeze(-1)
+            return linear_score
 
         if item_indices is None:
             # Case 'full': iterate through all items in memory-safe blocks
@@ -274,7 +339,13 @@ class AFM(ContextRecommenderUtils, IterativeRecommender):
 
                 # Item Embeddings and Bias
                 item_emb_block = self.item_embedding(items_block)
+
+                # Retrieve block feature embeddings
+                feat_emb_block_list = get_feature_embeddings(items_block)
+
+                # Linear Part
                 item_bias_block = self.item_bias(items_block).squeeze(-1)
+                item_bias_block = add_feature_bias(item_bias_block, items_block)
 
                 # Linear Part: [batch_size, 1] + [block_size] -> [batch_size, block_size]
                 linear_pred = fixed_linear.unsqueeze(1) + item_bias_block.unsqueeze(0)
@@ -288,6 +359,7 @@ class AFM(ContextRecommenderUtils, IterativeRecommender):
                 afm_scores = self._compute_network_scores(
                     u_emb,
                     item_emb_expanded,
+                    feat_emb_block_list,
                     ctx_emb_list,
                     batch_size,
                     current_block_len,
@@ -305,15 +377,33 @@ class AFM(ContextRecommenderUtils, IterativeRecommender):
             item_emb = self.item_embedding(
                 item_indices
             )  # [batch_size, pad_seq, embedding_size]
-            item_bias = self.item_bias(item_indices).squeeze(
-                -1
-            )  # [batch_size, pad_seq]
 
+            # Retrieve item feature embeddings
+            feat_emb_list = get_feature_embeddings(item_indices)
+
+            # Linear
+            item_bias = self.item_bias(item_indices).squeeze(-1)
+            item_bias = add_feature_bias(item_bias, item_indices)
             linear_pred = fixed_linear.unsqueeze(1) + item_bias
 
-            # Compute AFM scores efficiently
-            afm_scores = self._compute_network_scores(
-                u_emb, item_emb, ctx_emb_list, batch_size, pad_seq
+            u_emb_exp = u_emb.unsqueeze(1).expand(-1, pad_seq, -1)
+
+            # Context: [batch, emb] -> [batch, pad_seq, emb]
+            ctx_emb_exp_list = [
+                c.unsqueeze(1).expand(-1, pad_seq, -1) for c in ctx_emb_list
+            ]
+
+            # Stack
+            stack = torch.stack(
+                [u_emb_exp, item_emb] + feat_emb_list + ctx_emb_exp_list, dim=2
             )
+
+            # Reshape to [batch, pad_seq, num_fields, emb]
+            total_rows = batch_size * pad_seq
+            stack_flat = stack.view(total_rows, self.num_fields, self.embedding_size)
+
+            # AFM part
+            afm_scores_flat = self._compute_afm_interaction(stack_flat)
+            afm_scores = afm_scores_flat.view(batch_size, pad_seq)
 
             return linear_pred + afm_scores
