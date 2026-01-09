@@ -90,37 +90,66 @@ class NFM(ContextRecommenderUtils, IterativeRecommender):
         self.apply(self._init_weights)
 
     def train_step(self, batch: Any, epoch: int, *args, **kwargs) -> Tensor:
-        user, item, rating, contexts = batch
+        user, item, rating = batch[0], batch[1], batch[2]
 
-        prediction = self.forward(user, item, contexts)
+        contexts: Optional[Tensor] = None
+        features: Optional[Tensor] = None
+
+        current_idx = 3
+
+        # If feature dimensions exist, the next element is features
+        if self.feature_dims:
+            features = batch[current_idx]
+            current_idx += 1
+
+        # If context dimensions exist, the next element is context
+        if self.context_dims:
+            contexts = batch[current_idx]
+
+        prediction = self.forward(user, item, features, contexts)
 
         # Compute BCE loss
         loss = self.bce_loss(prediction, rating)
 
         # Compute L2 regularization on embeddings and biases
-        reg_params = self.get_reg_params(user, item, contexts)
+        reg_params = self.get_reg_params(user, item, features, contexts)
         reg_loss = self.reg_weight * self.reg_loss(*reg_params)
 
         return loss + reg_loss
 
-    def forward(self, user: Tensor, item: Tensor, contexts: Tensor) -> Tensor:
+    def forward(
+        self,
+        user: Tensor,
+        item: Tensor,
+        features: Optional[Tensor] = None,
+        contexts: Optional[Tensor] = None,
+    ) -> Tensor:
         """Forward pass of the NFM model.
 
         Args:
             user (Tensor): The tensor containing the user indexes.
             item (Tensor): The tensor containing the item indexes.
-            contexts (Tensor): The tensor containing the context of the interactions.
+            features (Optional[Tensor]): The tensor containing the features of the interactions.
+            contexts (Optional[Tensor]): The tensor containing the context of the interactions.
 
         Returns:
             Tensor: The prediction score for each triplet (user, item, context).
         """
         # Linear Part
-        linear_part = self.compute_first_order(user, item, contexts)
+        linear_part = self.compute_first_order(user, item, features, contexts)
 
         # Second Order (Interaction Part)
         embeddings_list = [self.user_embedding(user), self.item_embedding(item)]
-        for idx, name in enumerate(self.context_labels):
-            embeddings_list.append(self.context_embedding[name](contexts[:, idx]))
+
+        # Add Feature Embeddings
+        if features is not None and self.feature_labels:
+            for idx, name in enumerate(self.feature_labels):
+                embeddings_list.append(self.feature_embedding[name](features[:, idx]))
+
+        # Add Context Embeddings
+        if contexts is not None and self.context_labels:
+            for idx, name in enumerate(self.context_labels):
+                embeddings_list.append(self.context_embedding[name](contexts[:, idx]))
 
         fm_input = torch.stack(embeddings_list, dim=1)
 
@@ -168,16 +197,43 @@ class NFM(ContextRecommenderUtils, IterativeRecommender):
         sum_sq_v_fixed = sum_v_fixed.pow(2)
 
         # Process Contexts
-        for idx, name in enumerate(self.context_labels):
-            ctx_input = contexts[:, idx]
+        if contexts is not None and self.context_labels:
+            for idx, name in enumerate(self.context_labels):
+                ctx_input = contexts[:, idx]
 
-            # Linear
-            fixed_linear += self.context_bias[name](ctx_input).squeeze(-1)
+                # Linear
+                fixed_linear += self.context_bias[name](ctx_input).squeeze(-1)
 
-            # Interaction
-            ctx_emb = self.context_embedding[name](ctx_input)
-            sum_v_fixed += ctx_emb
-            sum_sq_v_fixed += ctx_emb.pow(2)
+                # Interaction
+                ctx_emb = self.context_embedding[name](ctx_input)
+                sum_v_fixed += ctx_emb
+                sum_sq_v_fixed += ctx_emb.pow(2)
+
+        # Helper to retrieve feature embeddings for a set of items
+        def get_feature_embeddings(target_items: Tensor) -> List[Tensor]:
+            feat_embs = []
+            if self.feature_dims and self.item_features is not None:
+                flat_items = target_items.view(-1).cpu()
+                item_feats = self.item_features[flat_items].to(self.device)
+                target_shape = target_items.shape
+
+                for idx, name in enumerate(self.feature_labels):
+                    feat_col = item_feats[:, idx].view(target_shape)
+                    feat_embs.append(self.feature_embedding[name](feat_col))
+            return feat_embs
+
+        # Helper to retrieve feature biases
+        def get_feature_biases(target_items: Tensor) -> Tensor:
+            feat_bias_sum = torch.zeros(target_items.shape, device=self.device)
+            if self.feature_dims and self.item_features is not None:
+                flat_items = target_items.view(-1).cpu()
+                item_feats = self.item_features[flat_items].to(self.device)
+                target_shape = target_items.shape
+
+                for idx, name in enumerate(self.feature_labels):
+                    feat_col = item_feats[:, idx].view(target_shape)
+                    feat_bias_sum += self.feature_bias[name](feat_col).squeeze(-1)
+            return feat_bias_sum
 
         if item_indices is None:
             # Case 'full': iterate through all items in memory-safe blocks
@@ -196,13 +252,32 @@ class NFM(ContextRecommenderUtils, IterativeRecommender):
                 )  # [block_size, embedding_size]
                 item_b = self.item_bias(items_block).squeeze(-1)  # [block_size]
 
-                # Calculate Bi-Interaction for the block
-                # (V_fixed + V_item)^2
-                sum_v_total = sum_v_fixed.unsqueeze(1) + item_emb.unsqueeze(0)
+                # Get Feature Embeddings & Bias
+                feat_emb_list = get_feature_embeddings(items_block)
+                feat_b = get_feature_biases(items_block)
+
+                # Linear Part
+                linear_pred = (
+                    fixed_linear.unsqueeze(1)
+                    + item_b.unsqueeze(0)
+                    + feat_b.unsqueeze(0)
+                )
+
+                # Bi-Interaction Part
+                # Aggregate Item + Features
+                item_feat_sum = item_emb
+                item_feat_sq_sum = item_emb.pow(2)
+
+                for f_emb in feat_emb_list:
+                    item_feat_sum = item_feat_sum + f_emb
+                    item_feat_sq_sum = item_feat_sq_sum + f_emb.pow(2)
+
+                # (V_fixed + V_item_total)^2
+                sum_v_total = sum_v_fixed.unsqueeze(1) + item_feat_sum.unsqueeze(0)
                 sum_v_total_sq = sum_v_total.pow(2)
 
-                # (V_fixed^2 + V_item^2)
-                sum_sq_total = sum_sq_v_fixed.unsqueeze(1) + item_emb.pow(2).unsqueeze(
+                # (V_fixed^2 + V_item_total^2)
+                sum_sq_total = sum_sq_v_fixed.unsqueeze(1) + item_feat_sq_sum.unsqueeze(
                     0
                 )
 
@@ -219,11 +294,6 @@ class NFM(ContextRecommenderUtils, IterativeRecommender):
                     batch_size, current_block_size
                 )
 
-                # Calculate Linear Part
-                linear_pred = fixed_linear.unsqueeze(1) + item_b.unsqueeze(
-                    0
-                )  # [batch_size, block_size]
-
                 # Sum and append
                 preds_list.append(linear_pred + neural_pred)
 
@@ -232,22 +302,35 @@ class NFM(ContextRecommenderUtils, IterativeRecommender):
         else:
             # Case 'sampled': process given item_indices
             if item_indices.dim() == 1:
-                item_indices = item_indices.unsqueeze(1)  # [batch_size, 1]
+                item_indices = item_indices.unsqueeze(1)
 
             pad_seq = item_indices.size(1)
 
             # Get Item Embeddings & Bias
-            item_emb = self.item_embedding(
-                item_indices
-            )  # [batch_size, pad_seq, embedding_size]
-            item_b = self.item_bias(item_indices).squeeze(-1)  # [batch_size, pad_seq]
+            item_emb = self.item_embedding(item_indices)
+            item_b = self.item_bias(item_indices).squeeze(-1)
 
-            # Calculate Bi-Interaction
+            # Get Feature Embeddings & Bias
+            feat_emb_list = get_feature_embeddings(item_indices)
+            feat_b = get_feature_biases(item_indices)
+
+            # Linear Part
+            linear_pred = fixed_linear.unsqueeze(1) + item_b + feat_b
+
+            # Bi-Interaction Part
+            # Aggregate Item + Features
+            item_feat_sum = item_emb
+            item_feat_sq_sum = item_emb.pow(2)
+
+            for f_emb in feat_emb_list:
+                item_feat_sum = item_feat_sum + f_emb
+                item_feat_sq_sum = item_feat_sq_sum + f_emb.pow(2)
+
             sum_v_fixed_exp = sum_v_fixed.unsqueeze(1)
             sum_sq_v_fixed_exp = sum_sq_v_fixed.unsqueeze(1)
 
-            sum_v_total_sq = (sum_v_fixed_exp + item_emb).pow(2)
-            sum_sq_total = sum_sq_v_fixed_exp + item_emb.pow(2)
+            sum_v_total_sq = (sum_v_fixed_exp + item_feat_sum).pow(2)
+            sum_sq_total = sum_sq_v_fixed_exp + item_feat_sq_sum
 
             bi_interaction = 0.5 * (sum_v_total_sq - sum_sq_total)
 
@@ -258,8 +341,5 @@ class NFM(ContextRecommenderUtils, IterativeRecommender):
             bi_interaction_flat = self.batch_norm(bi_interaction_flat)
             mlp_out = self.mlp_layers(bi_interaction_flat)
             neural_pred = self.predict_layer(mlp_out).view(batch_size, pad_seq)
-
-            # Linear Part
-            linear_pred = fixed_linear.unsqueeze(1) + item_b
 
             return linear_pred + neural_pred
