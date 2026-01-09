@@ -71,6 +71,8 @@ class Interactions:
         self._inter_dict: dict = {}
         self._inter_sparse: csr_matrix = None
         self._inter_side_sparse: csr_matrix = None
+        self._inter_side_tensor: Tensor = None
+        self._inter_side_labels: List[str] = []
         self._history_matrix: Tensor = None
         self._history_lens: Tensor = None
         self._history_mask: Tensor = None
@@ -100,6 +102,25 @@ class Interactions:
                 .drop(columns="order")
                 .reset_index(drop=True)
             )
+
+            # Construct lookup for side information features
+            feature_cols = [
+                c for c in self._inter_side.columns if c != self._item_label
+            ]
+
+            # Create the lookup tensor for side information
+            side_tensor = torch.tensor(
+                self._inter_side[feature_cols].values, dtype=torch.long
+            )
+
+            # Create the padding row (zeros)
+            padding_row = torch.zeros((1, side_tensor.shape[1]), dtype=torch.long)
+
+            # Concatenate padding row at the beginning
+            self._inter_side_tensor = torch.cat([side_tensor, padding_row], dim=0)
+
+            # Store the feature labels
+            self._inter_side_labels = feature_cols
 
         # Definition of dimensions
         self._uid = self._inter_df[self._user_label].unique()
@@ -234,6 +255,14 @@ class Interactions:
         )
         return self._inter_side_sparse
 
+    def get_side_tensor(self) -> Tensor:
+        """This method retrieves the tensor representation of side data.
+
+        Returns:
+            Tensor: Tensor representation of the features if available.
+        """
+        return self._inter_side_tensor
+
     def get_interaction_loader(
         self,
         include_user_id: bool = False,
@@ -297,6 +326,7 @@ class Interactions:
     def get_item_rating_dataloader(
         self,
         neg_samples: int = 0,
+        include_side_info: bool = False,
         include_context: bool = False,
         batch_size: int = 1024,
         shuffle: bool = True,
@@ -307,6 +337,7 @@ class Interactions:
 
         Args:
             neg_samples (int): Number of negative samples per user.
+            include_side_info (bool): Whether to include side information features in the output.
             include_context (bool): Wether to include the context in the output.
             batch_size (int): The batch size that will be used to
             shuffle (bool): Whether to shuffle the data.
@@ -332,12 +363,22 @@ class Interactions:
                 self._inter_df[self._item_label].map(self._imap).values.astype(np.int64)
             )
 
+            # Prepare side information
+            side_info_tensor = None
+            if include_side_info:
+                if self._inter_side_tensor is not None:
+                    side_info_tensor = self._inter_side_tensor
+                else:
+                    raise ValueError(
+                        "Requested side information but none provided in init."
+                    )
+
             # Prepare the context
             context_tensor = None
             if include_context:
                 if not self._context_labels:
                     raise ValueError(
-                        "Requested to include context but no context label passed."
+                        "Requested context information but none provided in init."
                     )
 
                 context_values = self._inter_df[self._context_labels].values
@@ -351,6 +392,7 @@ class Interactions:
                 neg_samples=neg_samples,
                 niid=self._niid,
                 seed=seed,
+                side_information=side_info_tensor,
                 contexts=context_tensor,
             )
 
@@ -384,6 +426,16 @@ class Interactions:
         pos_items = torch.from_numpy(pos_items_np)
         pos_ratings = torch.ones(len(pos_users), dtype=torch.float)
 
+        # Extract side information if flagged
+        pos_features = None
+        if include_side_info:
+            if self._inter_side_tensor is not None:
+                pos_features = self._inter_side_tensor[pos_items]
+            else:
+                raise ValueError(
+                    "Requested side information but none provided in init."
+                )
+
         # Extract positive context data if flagged
         pos_contexts = None
         if include_context:
@@ -393,7 +445,7 @@ class Interactions:
                 )
             else:
                 raise ValueError(
-                    "Requested to include context but no context label passed."
+                    "Requested context information but none provided in init."
                 )
 
         # Negative sampling
@@ -445,6 +497,11 @@ class Interactions:
             neg_items = torch.from_numpy(neg_items_np)
             neg_ratings = torch.zeros(total_neg, dtype=torch.float)
 
+            # Extract side information for negatives if flagged
+            neg_features = None
+            if include_side_info and pos_features is not None:
+                neg_features = self._inter_side_tensor[neg_items]
+
             # Repeat the context if flagged
             neg_contexts = None
             if include_context and pos_contexts is not None:
@@ -456,18 +513,26 @@ class Interactions:
             all_items = torch.cat([pos_items, neg_items])
             all_ratings = torch.cat([pos_ratings, neg_ratings])
 
+            # Construct the final dataset
+            tensors = [all_users, all_items, all_ratings]
+            if include_side_info:
+                all_features = torch.cat([pos_features, neg_features])
+                tensors.append(all_features)
             if include_context:
                 all_contexts = torch.cat([pos_contexts, neg_contexts])
-                dataset = TensorDataset(all_users, all_items, all_ratings, all_contexts)
-            else:
-                dataset = TensorDataset(all_users, all_items, all_ratings)
+                tensors.append(all_contexts)
+
+            dataset = TensorDataset(*tensors)
 
         else:
             # Only positive interactions
+            tensors = [pos_users, pos_items, pos_ratings]
+            if include_side_info:
+                tensors.append(pos_features)
             if include_context:
-                dataset = TensorDataset(pos_users, pos_items, pos_ratings, pos_contexts)
-            else:
-                dataset = TensorDataset(pos_users, pos_items, pos_ratings)
+                tensors.append(pos_contexts)
+
+            dataset = TensorDataset(*tensors)
 
         # Cache the dataset and return the dataloader
         self._cached_dataset[cache_key] = dataset
