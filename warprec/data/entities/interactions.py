@@ -363,12 +363,22 @@ class Interactions:
                 self._inter_df[self._item_label].map(self._imap).values.astype(np.int64)
             )
 
+            # Prepare side information
+            side_info_tensor = None
+            if include_side_info:
+                if self._inter_side_tensor is not None:
+                    side_info_tensor = self._inter_side_tensor
+                else:
+                    raise ValueError(
+                        "Requested side information but none provided in init."
+                    )
+
             # Prepare the context
             context_tensor = None
             if include_context:
                 if not self._context_labels:
                     raise ValueError(
-                        "Requested to include context but no context label passed."
+                        "Requested context information but none provided in init."
                     )
 
                 context_values = self._inter_df[self._context_labels].values
@@ -382,6 +392,7 @@ class Interactions:
                 neg_samples=neg_samples,
                 niid=self._niid,
                 seed=seed,
+                side_information=side_info_tensor,
                 contexts=context_tensor,
             )
 
