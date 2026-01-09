@@ -70,7 +70,7 @@ class DCN(ContextRecommenderUtils, IterativeRecommender):
         self.mlp_hidden_size = list(self.mlp_hidden_size)
 
         # DCN Specific Layers
-        self.num_fields = 2 + len(self.context_labels)
+        self.num_fields = 2 + len(self.feature_labels) + len(self.context_labels)
         self.input_dim = self.num_fields * self.embedding_size
 
         # Cross Network Parameters
@@ -147,26 +147,47 @@ class DCN(ContextRecommenderUtils, IterativeRecommender):
         return output
 
     def train_step(self, batch: Any, *args, **kwargs) -> Tensor:
-        user, item, rating, contexts = batch
+        user, item, rating = batch[0], batch[1], batch[2]
 
-        prediction = self.forward(user, item, contexts)
+        contexts: Optional[Tensor] = None
+        features: Optional[Tensor] = None
+
+        current_idx = 3
+
+        # If feature dimensions exist, the next element is features
+        if self.feature_dims:
+            features = batch[current_idx]
+            current_idx += 1
+
+        # If context dimensions exist, the next element is context
+        if self.context_dims:
+            contexts = batch[current_idx]
+
+        prediction = self.forward(user, item, features, contexts)
 
         # Compute BCE loss
         loss = self.bce_loss(prediction, rating)
 
         # Compute L2 regularization on embeddings and biases
-        reg_params = self.get_reg_params(user, item, contexts)
+        reg_params = self.get_reg_params(user, item, features, contexts)
         reg_loss = self.reg_weight * self.reg_loss(*reg_params)
 
         return loss + reg_loss
 
-    def forward(self, user: Tensor, item: Tensor, contexts: Tensor) -> Tensor:
+    def forward(
+        self,
+        user: Tensor,
+        item: Tensor,
+        features: Optional[Tensor] = None,
+        contexts: Optional[Tensor] = None,
+    ) -> Tensor:
         """Forward pass of the DCN model.
 
         Args:
             user (Tensor): The tensor containing the user indexes.
             item (Tensor): The tensor containing the item indexes.
-            contexts (Tensor): The tensor containing the context of the interactions.
+            features (Optional[Tensor]): The tensor containing the features of the interactions.
+            contexts (Optional[Tensor]): The tensor containing the context of the interactions.
 
         Returns:
             Tensor: The prediction score for each triplet (user, item, context).
@@ -175,17 +196,21 @@ class DCN(ContextRecommenderUtils, IterativeRecommender):
         u_emb = self.user_embedding(user)
         i_emb = self.item_embedding(item)
 
-        # Contexts: List of [batch, emb]
-        ctx_emb_list = [
-            self.context_embedding[name](contexts[:, idx])
-            for idx, name in enumerate(self.context_labels)
-        ]
+        embeddings_list = [u_emb, i_emb]
+
+        # Add Feature Embeddings
+        if features is not None and self.feature_labels:
+            for idx, name in enumerate(self.feature_labels):
+                embeddings_list.append(self.feature_embedding[name](features[:, idx]))
+
+        # Add Context Embeddings
+        if contexts is not None and self.context_labels:
+            for idx, name in enumerate(self.context_labels):
+                embeddings_list.append(self.context_embedding[name](contexts[:, idx]))
 
         # Stack and Flatten
-        embeddings_list = [u_emb, i_emb] + ctx_emb_list
-        dcn_input = torch.cat(
-            embeddings_list, dim=1
-        )  # [batch, num_fields * embedding_size]
+        # [batch, num_fields * embedding_size]
+        dcn_input = torch.cat(embeddings_list, dim=1)
 
         # Compute Network
         output = self._compute_logits(dcn_input)
@@ -219,30 +244,52 @@ class DCN(ContextRecommenderUtils, IterativeRecommender):
         # Retrieve Fixed Embeddings (User + Contexts)
         # [batch, embedding_size]
         user_emb = self.user_embedding(user_indices)
-        ctx_emb_list = [
-            self.context_embedding[name](contexts[:, idx])
-            for idx, name in enumerate(self.context_labels)
-        ]
+        ctx_emb_list = []
+        if contexts is not None and self.context_labels:
+            ctx_emb_list = [
+                self.context_embedding[name](contexts[:, idx])
+                for idx, name in enumerate(self.context_labels)
+            ]
+
+        # Helper to retrieve feature embeddings for a set of items
+        def get_feature_embeddings(target_items: Tensor) -> List[Tensor]:
+            feat_embs = []
+            if self.feature_dims and self.item_features is not None:
+                flat_items = target_items.view(-1).cpu()
+                item_feats = self.item_features[flat_items].to(self.device)
+                target_shape = target_items.shape
+
+                for idx, name in enumerate(self.feature_labels):
+                    feat_col = item_feats[:, idx].view(target_shape)
+                    feat_embs.append(self.feature_embedding[name](feat_col))
+            return feat_embs
 
         # Helper function to process item block
-        def process_block(items_emb_block: Tensor) -> Tensor:
+        def process_block(
+            items_emb_block: Tensor, feat_emb_block_list: List[Tensor]
+        ) -> Tensor:
             n_items = items_emb_block.shape[-2]
 
             # Expand User & Contexts to match items dimension
             u_exp = user_emb.unsqueeze(1).expand(-1, n_items, -1)
             c_exp_list = [c.unsqueeze(1).expand(-1, n_items, -1) for c in ctx_emb_list]
 
-            # Handle Item Embedding expansion if necessary
+            # Handle Item & Feature Embedding expansion if necessary
             if items_emb_block.dim() == 2:
                 # Case: Full prediction (items shared across all users in batch)
                 # [n_items, emb] -> [batch, n_items, emb]
                 i_exp = items_emb_block.unsqueeze(0).expand(batch_size, -1, -1)
+                f_exp_list = [
+                    f.unsqueeze(0).expand(batch_size, -1, -1)
+                    for f in feat_emb_block_list
+                ]
             else:
                 # Case: Sampled prediction (specific items per user)
                 i_exp = items_emb_block
+                f_exp_list = feat_emb_block_list
 
-            # Concatenate all fields
-            dcn_input_block = torch.cat([u_exp, i_exp] + c_exp_list, dim=2)
+            # Concatenate all fields: User, Item, Features, Contexts
+            dcn_input_block = torch.cat([u_exp, i_exp] + f_exp_list + c_exp_list, dim=2)
 
             # Flatten for the network: [batch_size * n_items, input_dim]
             dcn_input_flat = dcn_input_block.view(-1, self.input_dim)
@@ -265,8 +312,11 @@ class DCN(ContextRecommenderUtils, IterativeRecommender):
                     items_block
                 )  # [block_size, embedding_size]
 
+                # Get feature embeddings for the block
+                feat_emb_block_list = get_feature_embeddings(items_block)
+
                 # Process the block
-                preds_list.append(process_block(item_emb_block))
+                preds_list.append(process_block(item_emb_block, feat_emb_block_list))
 
             return torch.cat(preds_list, dim=1)
 
@@ -275,4 +325,8 @@ class DCN(ContextRecommenderUtils, IterativeRecommender):
             item_emb = self.item_embedding(
                 item_indices
             )  # [batch_size, seq_len, embedding_size]
-            return process_block(item_emb)
+
+            # Get feature embeddings for the specific items
+            feat_emb_list = get_feature_embeddings(item_indices)
+
+            return process_block(item_emb, feat_emb_list)
