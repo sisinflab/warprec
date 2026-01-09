@@ -206,4 +206,6 @@ def eval_pipeline(path: str):
                 "Statistical significance tests require at least two evaluated models. "
                 "Skipping statistical significance computation."
             )
-    logger.positive("Design pipeline executed successfully. WarpRec is shutting down.")
+    logger.positive(
+        "Evaluation pipeline executed successfully. WarpRec is shutting down."
+    )
