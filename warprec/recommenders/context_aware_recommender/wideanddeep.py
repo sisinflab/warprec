@@ -138,19 +138,23 @@ class WideAndDeep(ContextRecommenderUtils, IterativeRecommender):
         wide_part = self.compute_first_order(user, item, features, contexts)
 
         # Deep Part (DNN)
-        embeddings_list = [self.user_embedding(user), self.item_embedding(item)]
+        u_emb = self.user_embedding(user).unsqueeze(1)
+        i_emb = self.item_embedding(item).unsqueeze(1)
+        components = [u_emb, i_emb]
 
         # Add Feature Embeddings
-        if features is not None and self.feature_labels:
-            for idx, name in enumerate(self.feature_labels):
-                embeddings_list.append(self.feature_embedding[name](features[:, idx]))
+        if features is not None and self.feature_dims:
+            global_feat = features + self.feature_offsets
+            f_emb = self.merged_feature_embedding(global_feat)
+            components.append(f_emb)
 
         # Add Context Embeddings
         if contexts is not None and self.context_labels:
-            for idx, name in enumerate(self.context_labels):
-                embeddings_list.append(self.context_embedding[name](contexts[:, idx]))
+            global_ctx = contexts + self.context_offsets
+            c_emb = self.merged_context_embedding(global_ctx)
+            components.append(c_emb)
 
-        stacked_embeddings = torch.stack(embeddings_list, dim=1)
+        stacked_embeddings = torch.cat(components, dim=1)
         batch_size = stacked_embeddings.shape[0]
 
         deep_input = stacked_embeddings.view(batch_size, -1)
@@ -186,44 +190,35 @@ class WideAndDeep(ContextRecommenderUtils, IterativeRecommender):
         # Wide Fixed
         fixed_wide = self.global_bias + self.user_bias(user_indices).squeeze(-1)
 
-        # Deep Fixed Parts (List of embeddings to be concatenated)
+        # Deep Fixed Parts
         user_emb = self.user_embedding(user_indices)
-        ctx_emb_list = []
 
-        # Process Contexts
-        if contexts is not None and self.context_labels:
-            for idx, name in enumerate(self.context_labels):
-                ctx_input = contexts[:, idx]
+        # Contexts (Vettorizzato)
+        ctx_emb_tensor = self._get_context_embeddings(contexts)
 
-                # Wide
-                fixed_wide += self.context_bias[name](ctx_input).squeeze(-1)
-
-                # Deep
-                ctx_emb = self.context_embedding[name](ctx_input)
-                ctx_emb_list.append(ctx_emb)
+        if contexts is not None and self.context_dims:
+            # Wide
+            global_ctx = contexts + self.context_offsets
+            ctx_bias = self.merged_context_bias(global_ctx).sum(dim=1).squeeze(-1)
+            fixed_wide += ctx_bias
 
         if item_indices is None:
-            # Case 'full': iterate through all items in memory-safe blocks
+            # Case 'full'
             preds_list = []
 
             for start in range(0, self.n_items, self.block_size):
                 end = min(start + self.block_size, self.n_items)
                 current_block_size = end - start
 
-                # Item indices for this block
                 items_block = torch.arange(start, end, device=user_indices.device)
 
-                # Get Item Embeddings and Bias
-                item_emb = self.item_embedding(
-                    items_block
-                )  # [block_size, embedding_size]
-                item_b = self.item_bias(items_block).squeeze(-1)  # [block_size]
+                # Item Embeddings and Bias
+                item_emb = self.item_embedding(items_block)
+                item_b = self.item_bias(items_block).squeeze(-1)
 
-                # Get Feature Embeddings and Bias
-                feat_emb_list = self._get_feature_embeddings(
-                    items_block
-                )  # List of [block_size, emb]
-                feat_b = self._get_feature_bias(items_block)  # [block_size]
+                # Feature Embeddings and Bias (Vettorizzato)
+                feat_emb_tensor = self._get_feature_embeddings(items_block)
+                feat_b = self._get_feature_bias(items_block)
 
                 # Wide Part
                 wide_pred = (
@@ -231,24 +226,34 @@ class WideAndDeep(ContextRecommenderUtils, IterativeRecommender):
                 )
 
                 # Deep Part
-                # Expand User & Contexts
-                user_emb_exp = user_emb.unsqueeze(1).expand(-1, current_block_size, -1)
-                ctx_emb_exp_list = [
-                    c.unsqueeze(1).expand(-1, current_block_size, -1)
-                    for c in ctx_emb_list
-                ]
-
-                # Expand Item & Features
-                item_emb_exp = item_emb.unsqueeze(0).expand(batch_size, -1, -1)
-                feat_emb_exp_list = [
-                    f.unsqueeze(0).expand(batch_size, -1, -1) for f in feat_emb_list
-                ]
-
-                # Concatenate: User, Item, Features, Contexts
-                deep_input_block = torch.cat(
-                    [user_emb_exp, item_emb_exp] + feat_emb_exp_list + ctx_emb_exp_list,
-                    dim=2,
+                # Expand User: [Batch, 1, 1, Emb] -> [Batch, Block, 1, Emb]
+                u_exp = (
+                    user_emb.unsqueeze(1)
+                    .unsqueeze(2)
+                    .expand(-1, current_block_size, -1, -1)
                 )
+
+                # Expand Item: [1, Block, 1, Emb] -> [Batch, Block, 1, Emb]
+                i_exp = (
+                    item_emb.unsqueeze(0).unsqueeze(2).expand(batch_size, -1, -1, -1)
+                )
+
+                stack_list = [u_exp, i_exp]
+
+                # Expand Features: [1, Block, N_Feat, Emb] -> [Batch, Block, N_Feat, Emb]
+                if feat_emb_tensor is not None:
+                    f_exp = feat_emb_tensor.unsqueeze(0).expand(batch_size, -1, -1, -1)
+                    stack_list.append(f_exp)
+
+                # Expand Contexts: [Batch, 1, N_Ctx, Emb] -> [Batch, Block, N_Ctx, Emb]
+                if ctx_emb_tensor is not None:
+                    c_exp = ctx_emb_tensor.unsqueeze(1).expand(
+                        -1, current_block_size, -1, -1
+                    )
+                    stack_list.append(c_exp)
+
+                # Concatenate: [Batch, Block, Total_Fields, Emb]
+                deep_input_block = torch.cat(stack_list, dim=2)
 
                 deep_input_flat = deep_input_block.view(
                     -1, self.num_fields * self.embedding_size
@@ -259,42 +264,42 @@ class WideAndDeep(ContextRecommenderUtils, IterativeRecommender):
                     batch_size, current_block_size
                 )
 
-                # Sum and append
                 preds_list.append(wide_pred + deep_pred)
 
             return torch.cat(preds_list, dim=1)
 
         else:
-            # Case 'sampled': process given item_indices
-            if item_indices.dim() == 1:
-                item_indices = item_indices.unsqueeze(1)
-
+            # Case 'sampled'
             pad_seq = item_indices.size(1)
 
-            # Get Item Embeddings and Bias
             item_emb = self.item_embedding(item_indices)
             item_b = self.item_bias(item_indices).squeeze(-1)
 
-            # Get Feature Embeddings and Bias
-            feat_emb_list = self._get_feature_embeddings(
-                item_indices
-            )  # List of [batch, pad_seq, emb]
-            feat_b = self._get_feature_bias(item_indices)  # [batch, pad_seq]
+            feat_emb_tensor = self._get_feature_embeddings(item_indices)
+            feat_b = self._get_feature_bias(item_indices)
 
             # Wide Part
             wide_pred = fixed_wide.unsqueeze(1) + item_b + feat_b
 
             # Deep Part
-            user_emb_exp = user_emb.unsqueeze(1).expand(-1, pad_seq, -1)
-            ctx_emb_exp_list = [
-                c.unsqueeze(1).expand(-1, pad_seq, -1) for c in ctx_emb_list
-            ]
+            # User: [Batch, Seq, 1, Emb]
+            u_exp = user_emb.unsqueeze(1).unsqueeze(2).expand(-1, pad_seq, -1, -1)
 
-            # Item & Features are already [batch, pad_seq, emb]
+            # Item: [Batch, Seq, 1, Emb]
+            i_exp = item_emb.unsqueeze(2)
 
-            deep_input_block = torch.cat(
-                [user_emb_exp, item_emb] + feat_emb_list + ctx_emb_exp_list, dim=2
-            )
+            stack_list = [u_exp, i_exp]
+
+            # Features: [Batch, Seq, N_Feat, Emb] (Already correct)
+            if feat_emb_tensor is not None:
+                stack_list.append(feat_emb_tensor)
+
+            # Contexts: [Batch, Seq, N_Ctx, Emb]
+            if ctx_emb_tensor is not None:
+                c_exp = ctx_emb_tensor.unsqueeze(1).expand(-1, pad_seq, -1, -1)
+                stack_list.append(c_exp)
+
+            deep_input_block = torch.cat(stack_list, dim=2)
             deep_input_flat = deep_input_block.view(
                 -1, self.num_fields * self.embedding_size
             )

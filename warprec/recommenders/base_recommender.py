@@ -280,7 +280,7 @@ class IterativeRecommender(Recommender):
         """
 
 
-class ContextRecommenderUtils:
+class ContextRecommenderUtils(nn.Module):
     """Common definition for context-aware recommenders.
 
     This Mixin handles:
@@ -302,6 +302,12 @@ class ContextRecommenderUtils:
         embedding_size (int): The size of the latent vectors.
         batch_size (int): The batch size used for training.
         neg_samples (int): Number of negative samples for training.
+        merged_feature_embedding (Optional[nn.Embedding]): Single feature embedding.
+        merged_feature_bias (Optional[nn.Embedding]): Single feature bias.
+        feature_offsets (Optional[Tensor]): Offset buffer to index the single embedding.
+        merged_context_embedding (Optional[nn.Embedding]): Single context embedding.
+        merged_context_bias (Optional[nn.Embedding]): Single context bias.
+        context_offsets (Optional[Tensor]): Offset buffer to index the single context.
     """
 
     # Type hints used in general mixin implementations
@@ -310,6 +316,15 @@ class ContextRecommenderUtils:
     embedding_size: int
     batch_size: int
     neg_samples: int
+
+    # Explicit Type Hinting for Dynamic Attributes to fix Linting errors
+    merged_feature_embedding: Optional[nn.Embedding]
+    merged_feature_bias: Optional[nn.Embedding]
+    feature_offsets: Optional[Tensor]
+
+    merged_context_embedding: Optional[nn.Embedding]
+    merged_context_bias: Optional[nn.Embedding]
+    context_offsets: Optional[Tensor]
 
     def __init__(
         self,
@@ -335,29 +350,46 @@ class ContextRecommenderUtils:
         self.item_embedding = nn.Embedding(
             self.n_items + 1, self.embedding_size, padding_idx=self.n_items
         )
-        self.feature_embedding = nn.ModuleDict(
-            {
-                name: nn.Embedding(dims, self.embedding_size)
-                for name, dims in self.feature_dims.items()
-            }
-        )
-        self.context_embedding = nn.ModuleDict(
-            {
-                name: nn.Embedding(dims, self.embedding_size)
-                for name, dims in self.context_dims.items()
-            }
-        )
+
+        # Context Embeddings
+        if self.context_dims:
+            ctx_dims_list = [self.context_dims[name] for name in self.context_labels]
+            self.total_ctx_dim = sum(ctx_dims_list)
+
+            # Offsets: [0, dim_0, dim_0+dim_1, ...]
+            ctx_offsets = torch.tensor([0] + ctx_dims_list[:-1]).cumsum(0)
+            self.register_buffer("context_offsets", ctx_offsets)
+
+            self.merged_context_embedding = nn.Embedding(
+                self.total_ctx_dim, self.embedding_size
+            )
+            self.merged_context_bias = nn.Embedding(self.total_ctx_dim, 1)
+        else:
+            self.register_buffer("context_offsets", None)
+            self.merged_context_embedding = None
+            self.merged_context_bias = None
+
+        # Feature Embeddings
+        if self.feature_dims:
+            feat_dims_list = [self.feature_dims[name] for name in self.feature_labels]
+            self.total_feat_dim = sum(feat_dims_list)
+
+            feat_offsets = torch.tensor([0] + feat_dims_list[:-1]).cumsum(0)
+            self.register_buffer("feature_offsets", feat_offsets)
+
+            self.merged_feature_embedding = nn.Embedding(
+                self.total_feat_dim, self.embedding_size
+            )
+            self.merged_feature_bias = nn.Embedding(self.total_feat_dim, 1)
+        else:
+            self.register_buffer("feature_offsets", None)
+            self.merged_feature_embedding = None
+            self.merged_feature_bias = None
 
         # Define Biases (Standard Linear Infrastructure)
         self.global_bias = nn.Parameter(torch.zeros(1))
         self.user_bias = nn.Embedding(self.n_users, 1)
         self.item_bias = nn.Embedding(self.n_items + 1, 1, padding_idx=self.n_items)
-        self.feature_bias = nn.ModuleDict(
-            {name: nn.Embedding(dims, 1) for name, dims in self.feature_dims.items()}
-        )
-        self.context_bias = nn.ModuleDict(
-            {name: nn.Embedding(dims, 1) for name, dims in self.context_dims.items()}
-        )
 
         # Fixed feature lookup Tensor
         self.item_features = interactions.get_side_tensor()
@@ -404,14 +436,16 @@ class ContextRecommenderUtils:
         )
 
         # Add feature biases
-        if features is not None and self.feature_labels:
-            for idx, name in enumerate(self.feature_labels):
-                linear_part += self.feature_bias[name](features[:, idx]).squeeze(-1)
+        if features is not None and self.merged_feature_bias is not None:
+            global_indices = features + self.feature_offsets
+            feat_bias = self.merged_feature_bias(global_indices).sum(dim=1).squeeze(-1)
+            linear_part += feat_bias
 
         # Add context biases
-        if contexts is not None and self.context_labels:
-            for idx, name in enumerate(self.context_labels):
-                linear_part += self.context_bias[name](contexts[:, idx]).squeeze(-1)
+        if contexts is not None and self.merged_context_bias is not None:
+            global_indices = contexts + self.context_offsets
+            ctx_bias = self.merged_context_bias(global_indices).sum(dim=1).squeeze(-1)
+            linear_part += ctx_bias
 
         return linear_part
 
@@ -440,49 +474,61 @@ class ContextRecommenderUtils:
             self.item_bias(item),
         ]
 
-        if contexts is not None:
-            for idx, name in enumerate(self.context_labels):
-                ctx_input = contexts[:, idx]
-                reg_params.append(self.context_embedding[name](ctx_input))
-                reg_params.append(self.context_bias[name](ctx_input))
+        if features is not None and self.merged_feature_embedding is not None:
+            global_indices = features + self.feature_offsets
+            reg_params.append(self.merged_feature_embedding(global_indices))
+            reg_params.append(self.merged_feature_bias(global_indices))
 
-        if features is not None:
-            for idx, name in enumerate(self.feature_labels):
-                feat_input = features[:, idx]
-                reg_params.append(self.feature_embedding[name](feat_input))
-                reg_params.append(self.feature_bias[name](feat_input))
+        if contexts is not None and self.merged_context_embedding is not None:
+            global_indices = contexts + self.context_offsets
+            reg_params.append(self.merged_context_embedding(global_indices))
+            reg_params.append(self.merged_context_bias(global_indices))
 
         return reg_params
 
-    def _get_feature_embeddings(self, target_items: Tensor) -> List[Tensor]:
+    def _get_feature_embeddings(self, target_items: Tensor) -> Tensor:
         """Helper to retrieve feature embeddings for a set of items."""
-        feat_embs = []
-        if self.feature_dims and self.item_features is not None:
-            flat_items = target_items.view(-1).cpu()
-            item_feats = self.item_features[flat_items].to(target_items.device)
+        if not self.feature_dims or self.item_features is None:
+            return None
 
-            target_shape = target_items.shape
+        # Indices Lookup
+        flat_items = target_items.view(-1).cpu()
+        raw_indices = self.item_features[flat_items].to(target_items.device)
 
-            for idx, name in enumerate(self.feature_labels):
-                feat_col = item_feats[:, idx].view(target_shape)
-                feat_embs.append(self.feature_embedding[name](feat_col))
+        # Apply Offsets
+        global_indices = raw_indices + self.feature_offsets
 
-        return feat_embs
+        # Single Lookup
+        embeddings = self.merged_feature_embedding(global_indices)
+
+        # Reshape to match input
+        target_shape = target_items.shape
+        return embeddings.view(
+            *target_shape, len(self.feature_labels), self.embedding_size
+        )
+
+    def _get_context_embeddings(self, contexts: Tensor) -> Optional[Tensor]:
+        """Retrieves context embeddings as a single Tensor."""
+        if not self.context_dims or self.merged_context_embedding is None:
+            return None
+
+        global_indices = contexts + self.context_offsets
+        return self.merged_context_embedding(global_indices)
 
     def _get_feature_bias(self, target_items: Tensor) -> Tensor:
         """Helper to retrieve the sum of feature biases for a set of items."""
-        total_feature_bias = torch.zeros(target_items.shape, device=target_items.device)
+        if not self.feature_dims or self.item_features is None:
+            return torch.zeros(target_items.shape, device=target_items.device)
 
-        if self.feature_dims and self.item_features is not None:
-            flat_items = target_items.view(-1).cpu()
-            item_feats = self.item_features[flat_items].to(target_items.device)
-            target_shape = target_items.shape
+        flat_items = target_items.view(-1).cpu()
+        raw_indices = self.item_features[flat_items].to(target_items.device)
 
-            for idx, name in enumerate(self.feature_labels):
-                feat_col = item_feats[:, idx].view(target_shape)
-                total_feature_bias += self.feature_bias[name](feat_col).squeeze(-1)
+        global_indices = raw_indices + self.feature_offsets
 
-        return total_feature_bias
+        # Lookup & Sum
+        biases = self.merged_feature_bias(global_indices).sum(dim=1).squeeze(-1)
+
+        return biases.view(target_items.shape)
 
 
 class SequentialRecommenderUtils(ABC):

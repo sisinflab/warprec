@@ -192,30 +192,37 @@ class DCN(ContextRecommenderUtils, IterativeRecommender):
         Returns:
             Tensor: The prediction score for each triplet (user, item, context).
         """
-        # Retrieve Embeddings
-        u_emb = self.user_embedding(user)
-        i_emb = self.item_embedding(item)
+        # Linear Part (First Order)
+        linear_part = self.compute_first_order(user, item, features, contexts)
 
-        embeddings_list = [u_emb, i_emb]
+        # Interaction Part (Second Order)
+        u_emb = self.user_embedding(user).unsqueeze(1)
+        i_emb = self.item_embedding(item).unsqueeze(1)
+        components = [u_emb, i_emb]
 
         # Add Feature Embeddings
-        if features is not None and self.feature_labels:
-            for idx, name in enumerate(self.feature_labels):
-                embeddings_list.append(self.feature_embedding[name](features[:, idx]))
+        if features is not None and self.feature_dims:
+            global_feat = features + self.feature_offsets
+            f_emb = self.merged_feature_embedding(global_feat)
+            components.append(f_emb)
 
         # Add Context Embeddings
         if contexts is not None and self.context_labels:
-            for idx, name in enumerate(self.context_labels):
-                embeddings_list.append(self.context_embedding[name](contexts[:, idx]))
+            global_ctx = contexts + self.context_offsets
+            c_emb = self.merged_context_embedding(global_ctx)
+            components.append(c_emb)
 
-        # Stack and Flatten
-        # [batch, num_fields * embedding_size]
-        dcn_input = torch.cat(embeddings_list, dim=1)
+        # Concatenate on Field dimension
+        dcn_input_block = torch.cat(components, dim=1)
+
+        # Flatten the input
+        batch_size = dcn_input_block.shape[0]
+        dcn_input = dcn_input_block.view(batch_size, -1)
 
         # Compute Network
         output = self._compute_logits(dcn_input)
 
-        return output.squeeze(-1)
+        return linear_part + output.squeeze(-1)
 
     @torch.no_grad()
     def predict(
@@ -244,47 +251,74 @@ class DCN(ContextRecommenderUtils, IterativeRecommender):
         # Retrieve Fixed Embeddings (User + Contexts)
         # [batch, embedding_size]
         user_emb = self.user_embedding(user_indices)
-        ctx_emb_list = []
-        if contexts is not None and self.context_labels:
-            ctx_emb_list = [
-                self.context_embedding[name](contexts[:, idx])
-                for idx, name in enumerate(self.context_labels)
-            ]
+        ctx_emb_tensor = self._get_context_embeddings(contexts)
 
         # Helper function to process item block
         def process_block(
-            items_emb_block: Tensor, feat_emb_block_list: List[Tensor]
+            items_emb_block: Tensor, feat_emb_block_tensor: Tensor
         ) -> Tensor:
             n_items = items_emb_block.shape[-2]
 
             # Expand User & Contexts to match items dimension
             u_exp = user_emb.unsqueeze(1).expand(-1, n_items, -1)
-            c_exp_list = [c.unsqueeze(1).expand(-1, n_items, -1) for c in ctx_emb_list]
 
             # Handle Item & Feature Embedding expansion if necessary
             if items_emb_block.dim() == 2:
-                # Case: Full prediction (items shared across all users in batch)
-                # [n_items, emb] -> [batch, n_items, emb]
-                i_exp = items_emb_block.unsqueeze(0).expand(batch_size, -1, -1)
-                f_exp_list = [
-                    f.unsqueeze(0).expand(batch_size, -1, -1)
-                    for f in feat_emb_block_list
-                ]
+                # Case: Full prediction
+                n_items = items_emb_block.shape[0]
+
+                # User: [Batch, 1, 1, Emb] -> Expand su Items
+                u_exp = user_emb.unsqueeze(1).unsqueeze(2).expand(-1, n_items, -1, -1)
+
+                # Item: [1, Block, 1, Emb] -> Expand su Batch
+                i_exp = (
+                    items_emb_block.unsqueeze(0)
+                    .unsqueeze(2)
+                    .expand(batch_size, -1, -1, -1)
+                )
+
+                # [Block, N_Feat, Emb] -> [Batch, Block, N_Feat, Emb]
+                f_exp = None
+                if feat_emb_block_tensor is not None:
+                    f_exp = feat_emb_block_tensor.unsqueeze(0).expand(
+                        batch_size, -1, -1, -1
+                    )
+
+                # [Batch, N_Ctx, Emb] -> [Batch, Block, N_Ctx, Emb]
+                c_exp = None
+                if ctx_emb_tensor is not None:
+                    c_exp = ctx_emb_tensor.unsqueeze(1).expand(-1, n_items, -1, -1)
+
             else:
-                # Case: Sampled prediction (specific items per user)
-                i_exp = items_emb_block
-                f_exp_list = feat_emb_block_list
+                # Case: Sampled prediction
+                n_items = items_emb_block.shape[1]
 
-            # Concatenate all fields: User, Item, Features, Contexts
-            dcn_input_block = torch.cat([u_exp, i_exp] + f_exp_list + c_exp_list, dim=2)
+                # User: [Batch, Seq, 1, Emb]
+                u_exp = user_emb.unsqueeze(1).unsqueeze(2).expand(-1, n_items, -1, -1)
 
-            # Flatten for the network: [batch_size * n_items, input_dim]
+                # Item: [Batch, Seq, 1, Emb]
+                i_exp = items_emb_block.unsqueeze(2)
+
+                f_exp = feat_emb_block_tensor
+
+                # [Batch, 1, N_Ctx, Emb] -> [Batch, Seq, N_Ctx, Emb]
+                c_exp = None
+                if ctx_emb_tensor is not None:
+                    c_exp = ctx_emb_tensor.unsqueeze(1).expand(-1, n_items, -1, -1)
+
+            stack_list = [u_exp, i_exp]
+            if f_exp is not None:
+                stack_list.append(f_exp)
+            if c_exp is not None:
+                stack_list.append(c_exp)
+
+            # Concatenate all fields on dim=2
+            dcn_input_block = torch.cat(stack_list, dim=2)
+
+            # Flatten: [Batch * N_Items, Total_Fields * Emb]
             dcn_input_flat = dcn_input_block.view(-1, self.input_dim)
 
-            # Compute Logits
             logits = self._compute_logits(dcn_input_flat)
-
-            # Reshape back: [batch_size, n_items]
             return logits.view(batch_size, n_items)
 
         if item_indices is None:
@@ -314,6 +348,6 @@ class DCN(ContextRecommenderUtils, IterativeRecommender):
             )  # [batch_size, seq_len, embedding_size]
 
             # Get feature embeddings for the specific items
-            feat_emb_list = self._get_feature_embeddings(item_indices)
+            feat_emb_tensor = self._get_feature_embeddings(item_indices)
 
-            return process_block(item_emb, feat_emb_list)
+            return process_block(item_emb, feat_emb_tensor)

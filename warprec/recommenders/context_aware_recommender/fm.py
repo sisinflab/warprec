@@ -118,19 +118,23 @@ class FM(ContextRecommenderUtils, IterativeRecommender):
         linear_part = self.compute_first_order(user, item, features, contexts)
 
         # Interaction Part (Second Order)
-        embeddings_list = [self.user_embedding(user), self.item_embedding(item)]
+        u_emb = self.user_embedding(user).unsqueeze(1)
+        i_emb = self.item_embedding(item).unsqueeze(1)
+        components = [u_emb, i_emb]
 
         # Add Feature Embeddings
-        if features is not None and self.feature_labels:
-            for idx, name in enumerate(self.feature_labels):
-                embeddings_list.append(self.feature_embedding[name](features[:, idx]))
+        if features is not None and self.feature_dims:
+            global_feat = features + self.feature_offsets
+            f_emb = self.merged_feature_embedding(global_feat)
+            components.append(f_emb)
 
         # Add Context Embeddings
         if contexts is not None and self.context_labels:
-            for idx, name in enumerate(self.context_labels):
-                embeddings_list.append(self.context_embedding[name](contexts[:, idx]))
+            global_ctx = contexts + self.context_offsets
+            c_emb = self.merged_context_embedding(global_ctx)
+            components.append(c_emb)
 
-        fm_input = torch.stack(embeddings_list, dim=1)
+        fm_input = torch.cat(components, dim=1)
         interaction_part = self.fm(fm_input).squeeze(-1)
 
         return linear_part + interaction_part
@@ -167,16 +171,15 @@ class FM(ContextRecommenderUtils, IterativeRecommender):
 
         # Process Contexts
         if contexts is not None and self.context_labels:
-            for idx, name in enumerate(self.context_labels):
-                ctx_input = contexts[:, idx]
+            # Linear Context
+            global_ctx = contexts + self.context_offsets
+            ctx_bias = self.merged_context_bias(global_ctx).sum(dim=1).squeeze(-1)
+            fixed_linear += ctx_bias
 
-                # Linear
-                fixed_linear += self.context_bias[name](ctx_input).squeeze(-1)
-
-                # Interaction
-                ctx_emb = self.context_embedding[name](ctx_input)
-                sum_v_fixed += ctx_emb
-                sum_sq_v_fixed += ctx_emb.pow(2)
+            # FM Context
+            ctx_emb = self.merged_context_embedding(global_ctx)
+            sum_v_fixed += ctx_emb.sum(dim=1)
+            sum_sq_v_fixed += ctx_emb.pow(2).sum(dim=1)
 
         # Determine target items
         if item_indices is None:
@@ -189,79 +192,58 @@ class FM(ContextRecommenderUtils, IterativeRecommender):
                     1
                 )  # [batch_size, 1] for sampled case
 
-        # Calculate Total Item Linear Bias (Bias_i + Sum Bias_features)
+        # Item Linear Bias
         item_linear_total = self.item_bias(target_items).squeeze(-1)
 
-        # Calculate Total Item Embedding (V_i + Sum V_features) -> For (Sum V)^2 term
-        item_emb_sum = self.item_embedding(target_items)
+        # Item Embeddings
+        item_emb = self.item_embedding(target_items)
 
-        # Calculate Total Item Squared Embedding (V_i^2 + Sum V_features^2) -> For Sum (V^2) term
-        item_emb_sq_sum = self.item_embedding(target_items).pow(2)
+        # Feature Handling
+        feat_bias = self._get_feature_bias(target_items)
+        feat_emb_tensor = self._get_feature_embeddings(target_items)
 
-        # Add Features if available
-        if self.feature_dims and self.item_features is not None:
-            # Flatten target_items for indexing, then reshape back
-            flat_items = target_items.view(-1).cpu()
-            item_feats = self.item_features[flat_items].to(fixed_linear.device)
+        # Update Linear
+        item_linear_total += feat_bias
 
-            # Reshape to [n_items, n_features] or [batch_size, 1, n_features]
-            target_shape = target_items.shape
+        # Update FM accumulators
+        if feat_emb_tensor is not None:
+            feat_sum = feat_emb_tensor.sum(dim=-2)
+            feat_sq_sum = feat_emb_tensor.pow(2).sum(dim=-2)
 
-            for idx, name in enumerate(self.feature_labels):
-                feat_col = item_feats[:, idx].view(target_shape)
-
-                # Linear Bias
-                feat_bias = self.feature_bias[name](feat_col).squeeze(-1)
-                item_linear_total += feat_bias
-
-                # Embeddings
-                feat_emb = self.feature_embedding[name](feat_col)
-
-                # Update Sum (for the first part of FM equation)
-                item_emb_sum += feat_emb
-
-                # Update Sum Sq (for the second part of FM equation)
-                item_emb_sq_sum += feat_emb.pow(2)
+            # Total Item Component
+            item_component_sum = item_emb + feat_sum
+            item_component_sq_sum = item_emb.pow(2) + feat_sq_sum
+        else:
+            item_component_sum = item_emb
+            item_component_sq_sum = item_emb.pow(2)
 
         if item_indices is None:
             # Case 'full': [batch_size, n_items]
-            # Broadcast Fixed (Batch, 1) vs Variable (1, Items)
 
             final_linear = fixed_linear.unsqueeze(1) + item_linear_total.unsqueeze(0)
 
             # Prepare for broadcasting
-            sum_v_fixed_exp = sum_v_fixed.unsqueeze(1)  # [batch_size, 1, emb_size]
-            sum_sq_v_fixed_exp = sum_sq_v_fixed.unsqueeze(
-                1
-            )  # [batch_size, 1, emb_size]
+            sum_v_fixed_exp = sum_v_fixed.unsqueeze(1)  # [B, 1, E]
+            sum_sq_v_fixed_exp = sum_sq_v_fixed.unsqueeze(1)  # [B, 1, E]
 
-            item_emb_sum_exp = item_emb_sum.unsqueeze(0)  # [1, n_items, emb_size]
-            item_emb_sq_sum_exp = item_emb_sq_sum.unsqueeze(0)  # [1, n_items, emb_size]
+            item_sum_exp = item_component_sum.unsqueeze(0)  # [1, I, E]
+            item_sq_sum_exp = item_component_sq_sum.unsqueeze(0)  # [1, I, E]
 
-            # FM Equation: 0.5 * ( (Sum V)^2 - Sum (V^2) )
-
-            # (Sum V)^2 = (V_fixed + V_item_total)^2
-            sum_all_sq = (sum_v_fixed_exp + item_emb_sum_exp).pow(2)
-
-            # Sum (V^2) = V_fixed^2 + V_item_total_sq
-            sum_sq_all = sum_sq_v_fixed_exp + item_emb_sq_sum_exp
+            # FM Equation
+            sum_all_sq = (sum_v_fixed_exp + item_sum_exp).pow(2)
+            sum_sq_all = sum_sq_v_fixed_exp + item_sq_sum_exp
 
             interaction = 0.5 * (sum_all_sq - sum_sq_all).sum(dim=2)
-
         else:
             # Case 'sampled': [batch_size, 1]
-            # Dimensions match directly or broadcast on batch
 
             final_linear = fixed_linear.unsqueeze(1) + item_linear_total
 
             sum_v_fixed_exp = sum_v_fixed.unsqueeze(1)
             sum_sq_v_fixed_exp = sum_sq_v_fixed.unsqueeze(1)
 
-            # (Sum V)^2
-            sum_all_sq = (sum_v_fixed_exp + item_emb_sum).pow(2)
-
-            # Sum (V^2)
-            sum_sq_all = sum_sq_v_fixed_exp + item_emb_sq_sum
+            sum_all_sq = (sum_v_fixed_exp + item_component_sum).pow(2)
+            sum_sq_all = sum_sq_v_fixed_exp + item_component_sq_sum
 
             interaction = 0.5 * (sum_all_sq - sum_sq_all).sum(dim=2)
 

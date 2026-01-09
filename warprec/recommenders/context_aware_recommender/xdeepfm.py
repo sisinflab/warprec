@@ -227,21 +227,24 @@ class xDeepFM(ContextRecommenderUtils, IterativeRecommender):
         # Linear Part
         linear_part = self.compute_first_order(user, item, features, contexts)
 
-        # Prepare Embeddings
-        embeddings_list = [self.user_embedding(user), self.item_embedding(item)]
+        # Interaction Part (Second Order)
+        u_emb = self.user_embedding(user).unsqueeze(1)
+        i_emb = self.item_embedding(item).unsqueeze(1)
+        components = [u_emb, i_emb]
 
         # Add Feature Embeddings
-        if features is not None and self.feature_labels:
-            for idx, name in enumerate(self.feature_labels):
-                embeddings_list.append(self.feature_embedding[name](features[:, idx]))
+        if features is not None and self.feature_dims:
+            global_feat = features + self.feature_offsets
+            f_emb = self.merged_feature_embedding(global_feat)
+            components.append(f_emb)
 
         # Add Context Embeddings
         if contexts is not None and self.context_labels:
-            for idx, name in enumerate(self.context_labels):
-                embeddings_list.append(self.context_embedding[name](contexts[:, idx]))
+            global_ctx = contexts + self.context_offsets
+            c_emb = self.merged_context_embedding(global_ctx)
+            components.append(c_emb)
 
-        # [batch_size, num_fields, embedding_size]
-        stacked_embeddings = torch.stack(embeddings_list, dim=1)
+        stacked_embeddings = torch.cat(components, dim=1)
 
         # CIN Part
         cin_output = self.cin(stacked_embeddings)
@@ -260,48 +263,55 @@ class xDeepFM(ContextRecommenderUtils, IterativeRecommender):
         self,
         u_emb: Tensor,
         i_emb: Tensor,
-        feat_emb_list: List[Tensor],
-        ctx_emb_list: List[Tensor],
+        feat_emb_tensor: Optional[Tensor],
+        ctx_emb_tensor: Optional[Tensor],
         batch_size: int,
         num_items: int,
     ) -> Tensor:
         """Compute scores of deep part (CIN + MLP) efficiently"""
         total_rows = batch_size * num_items
 
-        # Create memory efficient view
-        u_view = u_emb.unsqueeze(1).expand(-1, num_items, -1).reshape(total_rows, -1)
+        # Create memory efficient views
+        u_view = (
+            u_emb.unsqueeze(1)
+            .unsqueeze(2)
+            .expand(-1, num_items, -1, -1)
+            .reshape(total_rows, 1, -1)
+        )
+        i_view = i_emb.unsqueeze(2).reshape(total_rows, 1, -1)
+
+        views = [u_view, i_view]
 
         # Handle Feature views
-        feat_views = []
-        for f in feat_emb_list:
-            f_exp = f.unsqueeze(0).expand(batch_size, -1, -1).reshape(total_rows, -1)
-            feat_views.append(f_exp)
+        if feat_emb_tensor is not None:
+            f_view = (
+                feat_emb_tensor.unsqueeze(0)
+                .expand(batch_size, -1, -1, -1)
+                .reshape(total_rows, -1, self.embedding_size)
+            )
+            views.append(f_view)
 
         # Handle Context views
-        ctx_views = []
-        for c in ctx_emb_list:
-            ctx_views.append(
-                c.unsqueeze(1).expand(-1, num_items, -1).reshape(total_rows, -1)
+        if ctx_emb_tensor is not None:
+            c_view = (
+                ctx_emb_tensor.unsqueeze(1)
+                .expand(-1, num_items, -1, -1)
+                .reshape(total_rows, -1, self.embedding_size)
             )
+            views.append(c_view)
 
-        i_view = i_emb.reshape(total_rows, -1)
-
-        # Pre-allocate tensor to memory to avoid overhead later
+        # Pre-allocate tensor to memory
         all_scores = torch.empty(total_rows, device=self.device)
 
         # Loop on chunk size parameter
         for start in range(0, total_rows, self.chunk_size):
             end = min(start + self.chunk_size, total_rows)
 
-            # Slice the views
-            u_chunk = u_view[start:end]
-            i_chunk = i_view[start:end]
-            f_chunks = [f[start:end] for f in feat_views]
-            c_chunks = [c[start:end] for c in ctx_views]
+            # Slice the views and concatenate
+            chunk_components = [v[start:end] for v in views]
 
-            # Materialize ONLY the chunk
-            # NOTE: This will actually use memory
-            chunk_stack = torch.stack([u_chunk, i_chunk] + f_chunks + c_chunks, dim=1)
+            # Concatenate on Field dimension (dim=1)
+            chunk_stack = torch.cat(chunk_components, dim=1)
 
             # Forward CIN
             cin_out = self.cin(chunk_stack)
@@ -312,7 +322,7 @@ class xDeepFM(ContextRecommenderUtils, IterativeRecommender):
             dnn_out = self.mlp_layers(dnn_in)
             dnn_s = self.dnn_linear(dnn_out).squeeze(-1)
 
-            # Save in place in the pre-allocated tensor
+            # Save in place
             all_scores[start:end] = cin_s + dnn_s
 
         return all_scores.view(batch_size, num_items)
@@ -343,57 +353,55 @@ class xDeepFM(ContextRecommenderUtils, IterativeRecommender):
 
         # Linear Parts (User + Context)
         fixed_linear = self.global_bias + self.user_bias(user_indices).squeeze(-1)
-        if contexts is not None and self.context_labels:
-            for idx, name in enumerate(self.context_labels):
-                fixed_linear += self.context_bias[name](contexts[:, idx]).squeeze(-1)
 
-        # Embeddings (User + Context)
+        # Contexts
+        ctx_emb_tensor = self._get_context_embeddings(contexts)
+
+        if contexts is not None and self.context_dims:
+            # Linear
+            global_ctx = contexts + self.context_offsets
+            ctx_bias = self.merged_context_bias(global_ctx).sum(dim=1).squeeze(-1)
+            fixed_linear += ctx_bias
+
+        # Embeddings (User)
         u_emb = self.user_embedding(user_indices)
-        ctx_emb_list = []
-        if contexts is not None and self.context_labels:
-            ctx_emb_list = [
-                self.context_embedding[name](contexts[:, idx])
-                for idx, name in enumerate(self.context_labels)
-            ]
 
         if item_indices is None:
-            # Case 'full': iterate through all items in memory-safe blocks
+            # Case 'full'
             preds_list = []
 
             for start in range(0, self.n_items, self.block_size):
                 end = min(start + self.block_size, self.n_items)
                 current_block_len = end - start
 
-                # Indices and Embeddings for this block
                 items_block = torch.arange(start, end, device=self.device)
 
-                # [block_size, embedding_size]
+                # Item Embeddings and Bias
                 item_emb_block = self.item_embedding(items_block)
                 item_bias_block = self.item_bias(items_block).squeeze(-1)
 
-                # Retrieve block feature embeddings and bias
-                feat_emb_block_list = self._get_feature_embeddings(items_block)
+                # Feature Embeddings and Bias
+                feat_emb_block_tensor = self._get_feature_embeddings(items_block)
                 feat_bias_block = self._get_feature_bias(items_block)
 
                 # Linear Part
-                item_bias_block = self.item_bias(items_block).squeeze(-1)
                 linear_pred = (
                     fixed_linear.unsqueeze(1)
                     + item_bias_block.unsqueeze(0)
                     + feat_bias_block.unsqueeze(0)
                 )
 
-                # Expand item part
+                # Expand Item to match batch size
                 item_emb_expanded = item_emb_block.unsqueeze(0).expand(
                     batch_size, -1, -1
-                )  # [batch_size, block_size, embedding_size]
+                )
 
                 # Compute scores efficiently
                 net_scores = self._compute_network_scores(
                     u_emb,
                     item_emb_expanded,
-                    feat_emb_block_list,
-                    ctx_emb_list,
+                    feat_emb_block_tensor,
+                    ctx_emb_tensor,
                     batch_size,
                     current_block_len,
                 )
@@ -403,30 +411,36 @@ class xDeepFM(ContextRecommenderUtils, IterativeRecommender):
             return torch.cat(preds_list, dim=1)
 
         else:
-            # Case 'sampled': process given item_indices
+            # Case 'sampled'
             pad_seq = item_indices.size(1)
 
             item_emb = self.item_embedding(item_indices)
             item_bias = self.item_bias(item_indices).squeeze(-1)
 
-            # Retrieve item feature embeddings & bias
-            feat_emb_list = self._get_feature_embeddings(item_indices)
+            feat_emb_tensor = self._get_feature_embeddings(item_indices)
             feat_bias = self._get_feature_bias(item_indices)
 
             # Linear
-            item_bias = self.item_bias(item_indices).squeeze(-1)
             linear_pred = fixed_linear.unsqueeze(1) + item_bias + feat_bias
 
-            # Build the stack for xDeepFM
-            u_emb_exp = u_emb.unsqueeze(1).expand(-1, pad_seq, -1)
-            ctx_emb_exp_list = [
-                c.unsqueeze(1).expand(-1, pad_seq, -1) for c in ctx_emb_list
-            ]
+            # Stack Construction
+            # User: [Batch, 1, 1, Emb] -> [Batch, Seq, 1, Emb]
+            u_emb_exp = u_emb.unsqueeze(1).unsqueeze(2).expand(-1, pad_seq, -1, -1)
 
-            # Stack consistent with forward: User, Item, Features, Contexts
-            stack = torch.stack(
-                [u_emb_exp, item_emb] + feat_emb_list + ctx_emb_exp_list, dim=2
-            )
+            # Item: [Batch, Seq, Emb] -> [Batch, Seq, 1, Emb]
+            i_emb_exp = item_emb.unsqueeze(2)
+
+            stack_list = [u_emb_exp, i_emb_exp]
+
+            if feat_emb_tensor is not None:
+                stack_list.append(feat_emb_tensor)
+
+            if ctx_emb_tensor is not None:
+                c_emb_exp = ctx_emb_tensor.unsqueeze(1).expand(-1, pad_seq, -1, -1)
+                stack_list.append(c_emb_exp)
+
+            # Concatenate on Field dimension (dim=2)
+            stack = torch.cat(stack_list, dim=2)
 
             # Flatten to process the whole batch together
             total_rows = batch_size * pad_seq
