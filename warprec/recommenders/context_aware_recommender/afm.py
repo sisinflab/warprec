@@ -302,31 +302,6 @@ class AFM(ContextRecommenderUtils, IterativeRecommender):
                 for idx, name in enumerate(self.context_labels)
             ]
 
-        # Helper function to retrieve feature embeddings
-        def get_feature_embeddings(target_items):
-            feat_embs = []
-            if self.feature_dims and self.item_features is not None:
-                flat_items = target_items.view(-1).cpu()
-                item_feats = self.item_features[flat_items].to(self.device)
-                target_shape = target_items.shape
-
-                for idx, name in enumerate(self.feature_labels):
-                    feat_col = item_feats[:, idx].view(target_shape)
-                    feat_embs.append(self.feature_embedding[name](feat_col))
-            return feat_embs
-
-        # Helper function to add feature bias
-        def add_feature_bias(linear_score, target_items):
-            if self.feature_dims and self.item_features is not None:
-                flat_items = target_items.view(-1).cpu()
-                item_feats = self.item_features[flat_items].to(self.device)
-                target_shape = target_items.shape
-
-                for idx, name in enumerate(self.feature_labels):
-                    feat_col = item_feats[:, idx].view(target_shape)
-                    linear_score += self.feature_bias[name](feat_col).squeeze(-1)
-            return linear_score
-
         if item_indices is None:
             # Case 'full': iterate through all items in memory-safe blocks
             preds_list = []
@@ -340,15 +315,17 @@ class AFM(ContextRecommenderUtils, IterativeRecommender):
                 # Item Embeddings and Bias
                 item_emb_block = self.item_embedding(items_block)
 
-                # Retrieve block feature embeddings
-                feat_emb_block_list = get_feature_embeddings(items_block)
+                # Retrieve block feature embeddings and bias
+                feat_emb_block_list = self._get_feature_embeddings(items_block)
+                feat_bias_block = self._get_feature_bias(items_block)
 
                 # Linear Part
                 item_bias_block = self.item_bias(items_block).squeeze(-1)
-                item_bias_block = add_feature_bias(item_bias_block, items_block)
-
-                # Linear Part: [batch_size, 1] + [block_size] -> [batch_size, block_size]
-                linear_pred = fixed_linear.unsqueeze(1) + item_bias_block.unsqueeze(0)
+                linear_pred = (
+                    fixed_linear.unsqueeze(1)
+                    + item_bias_block.unsqueeze(0)
+                    + feat_bias_block.unsqueeze(0)
+                )
 
                 # Expand Item to match batch size
                 item_emb_expanded = item_emb_block.unsqueeze(0).expand(
@@ -378,13 +355,13 @@ class AFM(ContextRecommenderUtils, IterativeRecommender):
                 item_indices
             )  # [batch_size, pad_seq, embedding_size]
 
-            # Retrieve item feature embeddings
-            feat_emb_list = get_feature_embeddings(item_indices)
+            # Retrieve item feature embeddings & bias
+            feat_emb_list = self._get_feature_embeddings(item_indices)
+            feat_bias = self._get_feature_bias(item_indices)
 
             # Linear
             item_bias = self.item_bias(item_indices).squeeze(-1)
-            item_bias = add_feature_bias(item_bias, item_indices)
-            linear_pred = fixed_linear.unsqueeze(1) + item_bias
+            linear_pred = fixed_linear.unsqueeze(1) + item_bias + feat_bias
 
             u_emb_exp = u_emb.unsqueeze(1).expand(-1, pad_seq, -1)
 

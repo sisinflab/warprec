@@ -454,6 +454,36 @@ class ContextRecommenderUtils:
 
         return reg_params
 
+    def _get_feature_embeddings(self, target_items: Tensor) -> List[Tensor]:
+        """Helper to retrieve feature embeddings for a set of items."""
+        feat_embs = []
+        if self.feature_dims and self.item_features is not None:
+            flat_items = target_items.view(-1).cpu()
+            item_feats = self.item_features[flat_items].to(target_items.device)
+
+            target_shape = target_items.shape
+
+            for idx, name in enumerate(self.feature_labels):
+                feat_col = item_feats[:, idx].view(target_shape)
+                feat_embs.append(self.feature_embedding[name](feat_col))
+
+        return feat_embs
+
+    def _get_feature_bias(self, target_items: Tensor) -> Tensor:
+        """Helper to retrieve the sum of feature biases for a set of items."""
+        total_feature_bias = torch.zeros(target_items.shape, device=target_items.device)
+
+        if self.feature_dims and self.item_features is not None:
+            flat_items = target_items.view(-1).cpu()
+            item_feats = self.item_features[flat_items].to(target_items.device)
+            target_shape = target_items.shape
+
+            for idx, name in enumerate(self.feature_labels):
+                feat_col = item_feats[:, idx].view(target_shape)
+                total_feature_bias += self.feature_bias[name](feat_col).squeeze(-1)
+
+        return total_feature_bias
+
 
 class SequentialRecommenderUtils(ABC):
     """Common definition for sequential recommenders.

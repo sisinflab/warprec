@@ -209,32 +209,6 @@ class NFM(ContextRecommenderUtils, IterativeRecommender):
                 sum_v_fixed += ctx_emb
                 sum_sq_v_fixed += ctx_emb.pow(2)
 
-        # Helper to retrieve feature embeddings for a set of items
-        def get_feature_embeddings(target_items: Tensor) -> List[Tensor]:
-            feat_embs = []
-            if self.feature_dims and self.item_features is not None:
-                flat_items = target_items.view(-1).cpu()
-                item_feats = self.item_features[flat_items].to(self.device)
-                target_shape = target_items.shape
-
-                for idx, name in enumerate(self.feature_labels):
-                    feat_col = item_feats[:, idx].view(target_shape)
-                    feat_embs.append(self.feature_embedding[name](feat_col))
-            return feat_embs
-
-        # Helper to retrieve feature biases
-        def get_feature_biases(target_items: Tensor) -> Tensor:
-            feat_bias_sum = torch.zeros(target_items.shape, device=self.device)
-            if self.feature_dims and self.item_features is not None:
-                flat_items = target_items.view(-1).cpu()
-                item_feats = self.item_features[flat_items].to(self.device)
-                target_shape = target_items.shape
-
-                for idx, name in enumerate(self.feature_labels):
-                    feat_col = item_feats[:, idx].view(target_shape)
-                    feat_bias_sum += self.feature_bias[name](feat_col).squeeze(-1)
-            return feat_bias_sum
-
         if item_indices is None:
             # Case 'full': iterate through all items in memory-safe blocks
             preds_list = []
@@ -253,8 +227,8 @@ class NFM(ContextRecommenderUtils, IterativeRecommender):
                 item_b = self.item_bias(items_block).squeeze(-1)  # [block_size]
 
                 # Get Feature Embeddings & Bias
-                feat_emb_list = get_feature_embeddings(items_block)
-                feat_b = get_feature_biases(items_block)
+                feat_emb_list = self._get_feature_embeddings(items_block)
+                feat_b = self._get_feature_bias(items_block)
 
                 # Linear Part
                 linear_pred = (
@@ -311,8 +285,8 @@ class NFM(ContextRecommenderUtils, IterativeRecommender):
             item_b = self.item_bias(item_indices).squeeze(-1)
 
             # Get Feature Embeddings & Bias
-            feat_emb_list = get_feature_embeddings(item_indices)
-            feat_b = get_feature_biases(item_indices)
+            feat_emb_list = self._get_feature_embeddings(item_indices)
+            feat_b = self._get_feature_bias(item_indices)
 
             # Linear Part
             linear_pred = fixed_linear.unsqueeze(1) + item_b + feat_b

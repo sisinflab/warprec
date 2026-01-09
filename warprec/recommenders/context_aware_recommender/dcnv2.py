@@ -322,19 +322,6 @@ class DCNv2(ContextRecommenderUtils, IterativeRecommender):
                 for idx, name in enumerate(self.context_labels)
             ]
 
-        # Helper to retrieve feature embeddings for a set of items
-        def get_feature_embeddings(target_items: Tensor) -> List[Tensor]:
-            feat_embs = []
-            if self.feature_dims and self.item_features is not None:
-                flat_items = target_items.view(-1).cpu()
-                item_feats = self.item_features[flat_items].to(self.device)
-                target_shape = target_items.shape
-
-                for idx, name in enumerate(self.feature_labels):
-                    feat_col = item_feats[:, idx].view(target_shape)
-                    feat_embs.append(self.feature_embedding[name](feat_col))
-            return feat_embs
-
         # Helper for block processing
         def process_block(
             items_emb_block: Tensor, feat_emb_block_list: List[Tensor]
@@ -377,7 +364,7 @@ class DCNv2(ContextRecommenderUtils, IterativeRecommender):
                 item_emb_block = self.item_embedding(items_block)
 
                 # Get feature embeddings for the block
-                feat_emb_block_list = get_feature_embeddings(items_block)
+                feat_emb_block_list = self._get_feature_embeddings(items_block)
 
                 preds_list.append(process_block(item_emb_block, feat_emb_block_list))
             return torch.cat(preds_list, dim=1)
@@ -386,6 +373,6 @@ class DCNv2(ContextRecommenderUtils, IterativeRecommender):
             item_emb = self.item_embedding(item_indices)
 
             # Get feature embeddings for the specific items
-            feat_emb_list = get_feature_embeddings(item_indices)
+            feat_emb_list = self._get_feature_embeddings(item_indices)
 
             return process_block(item_emb, feat_emb_list)
