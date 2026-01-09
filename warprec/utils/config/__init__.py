@@ -25,6 +25,7 @@ from .config import (
     DesignConfiguration,
     load_train_configuration,
     load_design_configuration,
+    load_eval_configuration,
     load_callback,
 )
 
@@ -58,5 +59,6 @@ __all__ = [
     "DesignConfiguration",
     "load_train_configuration",
     "load_design_configuration",
+    "load_eval_configuration",
     "load_callback",
 ]
