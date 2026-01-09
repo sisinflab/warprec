@@ -271,7 +271,6 @@ class Trainer:
             logger.negative(
                 f"All trials failed during training for {model_name}. Shutting down the Trainer."
             )
-            ray.shutdown()
             return None, {}
 
         # Memory report
@@ -326,8 +325,6 @@ class Trainer:
         best_model.load_state_dict(model_state)
 
         report = self._create_report(results, additional_report, best_model)
-
-        ray.shutdown()
 
         return best_model, report
 
@@ -422,7 +419,6 @@ class Trainer:
             logger.negative(
                 f"All trials failed during training for {model_name}. Shutting down the Trainer."
             )
-            ray.shutdown()
             return None, {}
 
         hyperparam_cols = [
@@ -503,8 +499,6 @@ class Trainer:
         logger.positive(f"Hyperparameter tuning for {model_name} ended successfully.")
 
         report = self._create_report(results, additional_report)
-
-        ray.shutdown()
 
         return best_hyperparameters, report
 
