@@ -169,7 +169,7 @@ class xDeepFM(ContextRecommenderUtils, IterativeRecommender):
         self.chunk_size = kwargs.get("chunk_size", 4096)
         self.mlp_hidden_size = list(self.mlp_hidden_size)
         self.cin_layer_size = list(self.cin_layer_size)
-        self.num_fields = 2 + len(self.context_labels)
+        self.num_fields = 2 + len(self.feature_labels) + len(self.context_labels)
 
         # CIN (Compressed Interaction Network) - Explicit High-order
         self.cin = CIN(
@@ -190,27 +190,55 @@ class xDeepFM(ContextRecommenderUtils, IterativeRecommender):
         self.apply(self._init_weights)
 
     def train_step(self, batch: Any, *args, **kwargs) -> Tensor:
-        user, item, rating, contexts = batch
+        user, item, rating = batch[0], batch[1], batch[2]
 
-        prediction = self.forward(user, item, contexts)
+        contexts: Optional[Tensor] = None
+        features: Optional[Tensor] = None
+
+        current_idx = 3
+
+        # If feature dimensions exist, the next element is features
+        if self.feature_dims:
+            features = batch[current_idx]
+            current_idx += 1
+
+        # If context dimensions exist, the next element is context
+        if self.context_dims:
+            contexts = batch[current_idx]
+
+        prediction = self.forward(user, item, features, contexts)
 
         # Compute BCE loss
         loss = self.bce_loss(prediction, rating)
 
         # Compute L2 regularization on embeddings and biases
-        reg_params = self.get_reg_params(user, item, contexts)
+        reg_params = self.get_reg_params(user, item, features, contexts)
         reg_loss = self.reg_weight * self.reg_loss(*reg_params)
 
         return loss + reg_loss
 
-    def forward(self, user: Tensor, item: Tensor, contexts: Tensor) -> Tensor:
-        # Linear Part (First Order)
-        linear_part = self.compute_first_order(user, item, contexts)
+    def forward(
+        self,
+        user: Tensor,
+        item: Tensor,
+        features: Optional[Tensor] = None,
+        contexts: Optional[Tensor] = None,
+    ) -> Tensor:
+        # Linear Part
+        linear_part = self.compute_first_order(user, item, features, contexts)
 
         # Prepare Embeddings
         embeddings_list = [self.user_embedding(user), self.item_embedding(item)]
-        for idx, name in enumerate(self.context_labels):
-            embeddings_list.append(self.context_embedding[name](contexts[:, idx]))
+
+        # Add Feature Embeddings
+        if features is not None and self.feature_labels:
+            for idx, name in enumerate(self.feature_labels):
+                embeddings_list.append(self.feature_embedding[name](features[:, idx]))
+
+        # Add Context Embeddings
+        if contexts is not None and self.context_labels:
+            for idx, name in enumerate(self.context_labels):
+                embeddings_list.append(self.context_embedding[name](contexts[:, idx]))
 
         # [batch_size, num_fields, embedding_size]
         stacked_embeddings = torch.stack(embeddings_list, dim=1)
@@ -232,6 +260,7 @@ class xDeepFM(ContextRecommenderUtils, IterativeRecommender):
         self,
         u_emb: Tensor,
         i_emb: Tensor,
+        feat_emb_list: List[Tensor],
         ctx_emb_list: List[Tensor],
         batch_size: int,
         num_items: int,
@@ -242,6 +271,13 @@ class xDeepFM(ContextRecommenderUtils, IterativeRecommender):
         # Create memory efficient view
         u_view = u_emb.unsqueeze(1).expand(-1, num_items, -1).reshape(total_rows, -1)
 
+        # Handle Feature views
+        feat_views = []
+        for f in feat_emb_list:
+            f_exp = f.unsqueeze(0).expand(batch_size, -1, -1).reshape(total_rows, -1)
+            feat_views.append(f_exp)
+
+        # Handle Context views
         ctx_views = []
         for c in ctx_emb_list:
             ctx_views.append(
@@ -260,11 +296,12 @@ class xDeepFM(ContextRecommenderUtils, IterativeRecommender):
             # Slice the views
             u_chunk = u_view[start:end]
             i_chunk = i_view[start:end]
+            f_chunks = [f[start:end] for f in feat_views]
             c_chunks = [c[start:end] for c in ctx_views]
 
             # Materialize ONLY the chunk
             # NOTE: This will actually use memory
-            chunk_stack = torch.stack([u_chunk, i_chunk] + c_chunks, dim=1)
+            chunk_stack = torch.stack([u_chunk, i_chunk] + f_chunks + c_chunks, dim=1)
 
             # Forward CIN
             cin_out = self.cin(chunk_stack)
@@ -304,17 +341,45 @@ class xDeepFM(ContextRecommenderUtils, IterativeRecommender):
         """
         batch_size = user_indices.size(0)
 
-        # Linear Parts
+        # Linear Parts (User + Context)
         fixed_linear = self.global_bias + self.user_bias(user_indices).squeeze(-1)
-        for idx, name in enumerate(self.context_labels):
-            fixed_linear += self.context_bias[name](contexts[:, idx]).squeeze(-1)
+        if contexts is not None and self.context_labels:
+            for idx, name in enumerate(self.context_labels):
+                fixed_linear += self.context_bias[name](contexts[:, idx]).squeeze(-1)
 
-        # Embeddings
+        # Embeddings (User + Context)
         u_emb = self.user_embedding(user_indices)
-        ctx_emb_list = [
-            self.context_embedding[name](contexts[:, idx])
-            for idx, name in enumerate(self.context_labels)
-        ]
+        ctx_emb_list = []
+        if contexts is not None and self.context_labels:
+            ctx_emb_list = [
+                self.context_embedding[name](contexts[:, idx])
+                for idx, name in enumerate(self.context_labels)
+            ]
+
+        # Helper to retrieve feature embeddings for a set of items
+        def get_feature_embeddings(target_items):
+            feat_embs = []
+            if self.feature_dims and self.item_features is not None:
+                flat_items = target_items.view(-1).cpu()
+                item_feats = self.item_features[flat_items].to(self.device)
+                target_shape = target_items.shape
+
+                for idx, name in enumerate(self.feature_labels):
+                    feat_col = item_feats[:, idx].view(target_shape)
+                    feat_embs.append(self.feature_embedding[name](feat_col))
+            return feat_embs
+
+        # Helper to retrieve feature bias
+        def add_feature_bias(linear_score, target_items):
+            if self.feature_dims and self.item_features is not None:
+                flat_items = target_items.view(-1).cpu()
+                item_feats = self.item_features[flat_items].to(self.device)
+                target_shape = target_items.shape
+
+                for idx, name in enumerate(self.feature_labels):
+                    feat_col = item_feats[:, idx].view(target_shape)
+                    linear_score += self.feature_bias[name](feat_col).squeeze(-1)
+            return linear_score
 
         if item_indices is None:
             # Case 'full': iterate through all items in memory-safe blocks
@@ -331,7 +396,11 @@ class xDeepFM(ContextRecommenderUtils, IterativeRecommender):
                 item_emb_block = self.item_embedding(items_block)
                 item_bias_block = self.item_bias(items_block).squeeze(-1)
 
-                # Linear Part: [batch_size, 1] + [block_size] -> [batch_size, block_size]
+                # Feature Embeddings (for this block)
+                feat_emb_block_list = get_feature_embeddings(items_block)
+
+                # Linear Part
+                item_bias_block = add_feature_bias(item_bias_block, items_block)
                 linear_pred = fixed_linear.unsqueeze(1) + item_bias_block.unsqueeze(0)
 
                 # Expand item part
@@ -343,6 +412,7 @@ class xDeepFM(ContextRecommenderUtils, IterativeRecommender):
                 net_scores = self._compute_network_scores(
                     u_emb,
                     item_emb_expanded,
+                    feat_emb_block_list,
                     ctx_emb_list,
                     batch_size,
                     current_block_len,
@@ -356,19 +426,40 @@ class xDeepFM(ContextRecommenderUtils, IterativeRecommender):
             # Case 'sampled': process given item_indices
             pad_seq = item_indices.size(1)
 
-            item_emb = self.item_embedding(
-                item_indices
-            )  # [batch_size, pad_seq, embedding_size]
-            item_bias = self.item_bias(item_indices).squeeze(
-                -1
-            )  # [batch_size, pad_seq]
+            item_emb = self.item_embedding(item_indices)
+            item_bias = self.item_bias(item_indices).squeeze(-1)
+
+            # Feature Embeddings
+            feat_emb_list = get_feature_embeddings(item_indices)
 
             # Linear Part
+            item_bias = add_feature_bias(item_bias, item_indices)
             linear_pred = fixed_linear.unsqueeze(1) + item_bias
 
-            # Compute scores efficiently
-            net_scores = self._compute_network_scores(
-                u_emb, item_emb, ctx_emb_list, batch_size, pad_seq
+            # Build the stack for xDeepFM
+            u_emb_exp = u_emb.unsqueeze(1).expand(-1, pad_seq, -1)
+            ctx_emb_exp_list = [
+                c.unsqueeze(1).expand(-1, pad_seq, -1) for c in ctx_emb_list
+            ]
+
+            # Stack consistent with forward: User, Item, Features, Contexts
+            stack = torch.stack(
+                [u_emb_exp, item_emb] + feat_emb_list + ctx_emb_exp_list, dim=2
             )
+
+            # Flatten to process the whole batch together
+            total_rows = batch_size * pad_seq
+            stack_flat = stack.view(total_rows, self.num_fields, self.embedding_size)
+
+            # Forward CIN
+            cin_out = self.cin(stack_flat)
+            cin_s = self.cin_linear(cin_out).squeeze(-1)
+
+            # Forward MLP
+            dnn_in = stack_flat.view(total_rows, -1)
+            dnn_out = self.mlp_layers(dnn_in)
+            dnn_s = self.dnn_linear(dnn_out).squeeze(-1)
+
+            net_scores = (cin_s + dnn_s).view(batch_size, pad_seq)
 
             return linear_pred + net_scores
