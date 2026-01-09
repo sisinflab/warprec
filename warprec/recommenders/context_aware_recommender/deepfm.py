@@ -74,8 +74,8 @@ class DeepFM(ContextRecommenderUtils, IterativeRecommender):
         self.fm = FactorizationMachine(reduce_sum=True)
 
         # Deep Part (DNN)
-        # Calculate total number of fields: User + Item + Contexts
-        self.num_fields = 2 + len(self.context_labels)
+        # Calculate total number of fields: User + Item + Features + Contexts
+        self.num_fields = 2 + len(self.feature_labels) + len(self.context_labels)
 
         # Input size for MLP is the concatenation of all embeddings
         input_dim = self.num_fields * self.embedding_size
@@ -93,37 +93,66 @@ class DeepFM(ContextRecommenderUtils, IterativeRecommender):
         self.apply(self._init_weights)
 
     def train_step(self, batch: Any, epoch: int, *args, **kwargs) -> Tensor:
-        user, item, rating, contexts = batch
+        user, item, rating = batch[0], batch[1], batch[2]
 
-        prediction = self.forward(user, item, contexts)
+        contexts: Optional[Tensor] = None
+        features: Optional[Tensor] = None
+
+        current_idx = 3
+
+        # If feature dimensions exist, the next element is features
+        if self.feature_dims:
+            features = batch[current_idx]
+            current_idx += 1
+
+        # If context dimensions exist, the next element is context
+        if self.context_dims:
+            contexts = batch[current_idx]
+
+        prediction = self.forward(user, item, features, contexts)
 
         # Compute BCE loss
         loss = self.bce_loss(prediction, rating)
 
         # Compute L2 regularization on embeddings and biases
-        reg_params = self.get_reg_params(user, item, contexts)
+        reg_params = self.get_reg_params(user, item, features, contexts)
         reg_loss = self.reg_weight * self.reg_loss(*reg_params)
 
         return loss + reg_loss
 
-    def forward(self, user: Tensor, item: Tensor, contexts: Tensor) -> Tensor:
+    def forward(
+        self,
+        user: Tensor,
+        item: Tensor,
+        features: Optional[Tensor] = None,
+        contexts: Optional[Tensor] = None,
+    ) -> Tensor:
         """Forward pass of the DeepFM model.
 
         Args:
             user (Tensor): The tensor containing the user indexes.
             item (Tensor): The tensor containing the item indexes.
-            contexts (Tensor): The tensor containing the context of the interactions.
+            features (Optional[Tensor]): The tensor containing the features of the interactions.
+            contexts (Optional[Tensor]): The tensor containing the context of the interactions.
 
         Returns:
-            Tensor: The prediction score for each triplet (user, item, context).
+            Tensor: The prediction score.
         """
         # Linear Part
-        linear_part = self.compute_first_order(user, item, contexts)
+        linear_part = self.compute_first_order(user, item, features, contexts)
 
         # Prepare Embeddings
         embeddings_list = [self.user_embedding(user), self.item_embedding(item)]
-        for idx, name in enumerate(self.context_labels):
-            embeddings_list.append(self.context_embedding[name](contexts[:, idx]))
+
+        # Add Feature Embeddings
+        if features is not None and self.feature_labels:
+            for idx, name in enumerate(self.feature_labels):
+                embeddings_list.append(self.feature_embedding[name](features[:, idx]))
+
+        # Add Context Embeddings
+        if contexts is not None and self.context_labels:
+            for idx, name in enumerate(self.context_labels):
+                embeddings_list.append(self.context_embedding[name](contexts[:, idx]))
 
         stacked_embeddings = torch.stack(embeddings_list, dim=1)
 
@@ -170,24 +199,50 @@ class DeepFM(ContextRecommenderUtils, IterativeRecommender):
         sum_sq_v_fixed = sum_v_fixed.pow(2)
 
         # Deep Fixed Parts (List of embeddings to be concatenated)
-        # Order must match forward: User, Item, Contexts
-        user_emb = self.user_embedding(user_indices)  # [batch_size, embedding_size]
+        user_emb = self.user_embedding(user_indices)
         ctx_emb_list = []
 
         # Process Contexts
-        for idx, name in enumerate(self.context_labels):
-            ctx_input = contexts[:, idx]
+        if contexts is not None and self.context_labels:
+            for idx, name in enumerate(self.context_labels):
+                ctx_input = contexts[:, idx]
 
-            # Linear
-            fixed_linear += self.context_bias[name](ctx_input).squeeze(-1)
+                # Linear
+                fixed_linear += self.context_bias[name](ctx_input).squeeze(-1)
 
-            # FM Interaction
-            ctx_emb = self.context_embedding[name](ctx_input)
-            sum_v_fixed += ctx_emb
-            sum_sq_v_fixed += ctx_emb.pow(2)
+                # FM Interaction
+                ctx_emb = self.context_embedding[name](ctx_input)
+                sum_v_fixed += ctx_emb
+                sum_sq_v_fixed += ctx_emb.pow(2)
 
-            # Deep
-            ctx_emb_list.append(ctx_emb)
+                # Deep
+                ctx_emb_list.append(ctx_emb)
+
+        # Helper to retrieve feature embeddings for a set of items
+        def get_feature_embeddings(target_items: Tensor) -> List[Tensor]:
+            feat_embs = []
+            if self.feature_dims and self.item_features is not None:
+                flat_items = target_items.view(-1).cpu()
+                item_feats = self.item_features[flat_items].to(self.device)
+                target_shape = target_items.shape
+
+                for idx, name in enumerate(self.feature_labels):
+                    feat_col = item_feats[:, idx].view(target_shape)
+                    feat_embs.append(self.feature_embedding[name](feat_col))
+            return feat_embs
+
+        # Helper to retrieve feature biases
+        def get_feature_biases(target_items: Tensor) -> Tensor:
+            feat_bias_sum = torch.zeros(target_items.shape, device=self.device)
+            if self.feature_dims and self.item_features is not None:
+                flat_items = target_items.view(-1).cpu()
+                item_feats = self.item_features[flat_items].to(self.device)
+                target_shape = target_items.shape
+
+                for idx, name in enumerate(self.feature_labels):
+                    feat_col = item_feats[:, idx].view(target_shape)
+                    feat_bias_sum += self.feature_bias[name](feat_col).squeeze(-1)
+            return feat_bias_sum
 
         if item_indices is None:
             # Case 'full': iterate through all items in memory-safe blocks
@@ -206,39 +261,62 @@ class DeepFM(ContextRecommenderUtils, IterativeRecommender):
                 )  # [block_size, embedding_size]
                 item_b = self.item_bias(items_block).squeeze(-1)  # [block_size]
 
+                # Get Feature Embeddings and Bias
+                feat_emb_list = get_feature_embeddings(
+                    items_block
+                )  # List of [block_size, emb]
+                feat_b = get_feature_biases(items_block)  # [block_size]
+
                 # Linear Part
-                linear_pred = fixed_linear.unsqueeze(1) + item_b.unsqueeze(0)
+                linear_pred = (
+                    fixed_linear.unsqueeze(1)
+                    + item_b.unsqueeze(0)
+                    + feat_b.unsqueeze(0)
+                )
 
                 # FM Part
-                # (V_fixed + V_item)^2
-                sum_v_total = sum_v_fixed.unsqueeze(1) + item_emb.unsqueeze(0)
+                # Aggregate Item + Features for FM (Vector Sum Trick)
+                item_feat_sum = item_emb
+                item_feat_sq_sum = item_emb.pow(2)
+
+                for f_emb in feat_emb_list:
+                    item_feat_sum = item_feat_sum + f_emb
+                    item_feat_sq_sum = item_feat_sq_sum + f_emb.pow(2)
+
+                # (V_fixed + V_item_total)^2
+                sum_v_total = sum_v_fixed.unsqueeze(1) + item_feat_sum.unsqueeze(0)
                 sum_v_total_sq = sum_v_total.pow(2)
 
-                # (V_fixed^2 + V_item^2)
-                sum_sq_total = sum_sq_v_fixed.unsqueeze(1) + item_emb.pow(2).unsqueeze(
+                # (V_fixed^2 + V_item_total^2)
+                sum_sq_total = sum_sq_v_fixed.unsqueeze(1) + item_feat_sq_sum.unsqueeze(
                     0
                 )
 
                 fm_pred = 0.5 * (sum_v_total_sq - sum_sq_total).sum(dim=2)
 
                 # Deep Part
+                # Expand User & Contexts
                 user_emb_exp = user_emb.unsqueeze(1).expand(-1, current_block_size, -1)
-                item_emb_exp = item_emb.unsqueeze(0).expand(
-                    batch_size, -1, -1
-                )  # [batch_size, block_size, embedding_size]
-
-                # Expand Contexts
                 ctx_emb_exp_list = [
                     c.unsqueeze(1).expand(-1, current_block_size, -1)
                     for c in ctx_emb_list
                 ]
 
+                # Expand Item & Features
+                item_emb_exp = item_emb.unsqueeze(0).expand(batch_size, -1, -1)
+                feat_emb_exp_list = [
+                    f.unsqueeze(0).expand(batch_size, -1, -1) for f in feat_emb_list
+                ]
+
+                # Concatenate: User, Item, Features, Contexts
                 deep_input_block = torch.cat(
-                    [user_emb_exp, item_emb_exp] + ctx_emb_exp_list, dim=2
-                )  # [batch_size, block_size, num_fields * embedding_size]
+                    [user_emb_exp, item_emb_exp] + feat_emb_exp_list + ctx_emb_exp_list,
+                    dim=2,
+                )
+
                 deep_input_flat = deep_input_block.view(
                     -1, self.num_fields * self.embedding_size
-                )  # [batch_size * block_size, input_dim]
+                )
 
                 deep_out = self.mlp_layers(deep_input_flat)
                 deep_pred = self.deep_predict_layer(deep_out).view(
@@ -253,40 +331,48 @@ class DeepFM(ContextRecommenderUtils, IterativeRecommender):
         else:
             # Case 'sampled': process given item_indices
             if item_indices.dim() == 1:
-                item_indices = item_indices.unsqueeze(1)  # [batch_size, 1]
+                item_indices = item_indices.unsqueeze(1)
 
             pad_seq = item_indices.size(1)
 
             # Get Item Embeddings and Bias
-            item_emb = self.item_embedding(
+            item_emb = self.item_embedding(item_indices)
+            item_b = self.item_bias(item_indices).squeeze(-1)
+
+            # Get Feature Embeddings and Bias
+            feat_emb_list = get_feature_embeddings(
                 item_indices
-            )  # [batch_size, pad_seq, embedding_size]
-            item_b = self.item_bias(item_indices).squeeze(-1)  # [batch_size, pad_seq]
+            )  # List of [batch, pad_seq, emb]
+            feat_b = get_feature_biases(item_indices)  # [batch, pad_seq]
 
             # Linear Part
-            linear_pred = fixed_linear.unsqueeze(1) + item_b
+            linear_pred = fixed_linear.unsqueeze(1) + item_b + feat_b
 
             # FM Part
+            # Aggregate Item + Features
+            item_feat_sum = item_emb
+            item_feat_sq_sum = item_emb.pow(2)
+
+            for f_emb in feat_emb_list:
+                item_feat_sum = item_feat_sum + f_emb
+                item_feat_sq_sum = item_feat_sq_sum + f_emb.pow(2)
+
             sum_v_fixed_exp = sum_v_fixed.unsqueeze(1)
             sum_sq_v_fixed_exp = sum_sq_v_fixed.unsqueeze(1)
 
-            sum_v_total_sq = (sum_v_fixed_exp + item_emb).pow(2)
-            sum_sq_total = sum_sq_v_fixed_exp + item_emb.pow(2)
+            sum_v_total_sq = (sum_v_fixed_exp + item_feat_sum).pow(2)
+            sum_sq_total = sum_sq_v_fixed_exp + item_feat_sq_sum
 
             fm_pred = 0.5 * (sum_v_total_sq - sum_sq_total).sum(dim=2)
 
             # Deep Part
-            user_emb_exp = user_emb.unsqueeze(1).expand(
-                -1, pad_seq, -1
-            )  # [batch_size, pad_seq, embedding_size]
-
-            # Expand Contexts
+            user_emb_exp = user_emb.unsqueeze(1).expand(-1, pad_seq, -1)
             ctx_emb_exp_list = [
                 c.unsqueeze(1).expand(-1, pad_seq, -1) for c in ctx_emb_list
             ]
 
             deep_input_block = torch.cat(
-                [user_emb_exp, item_emb] + ctx_emb_exp_list, dim=2
+                [user_emb_exp, item_emb] + feat_emb_list + ctx_emb_exp_list, dim=2
             )
             deep_input_flat = deep_input_block.view(
                 -1, self.num_fields * self.embedding_size
