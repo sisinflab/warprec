@@ -359,6 +359,9 @@ class ContextRecommenderUtils:
             {name: nn.Embedding(dims, 1) for name, dims in self.context_dims.items()}
         )
 
+        # Fixed feature lookup Tensor
+        self.item_features = interactions.get_side_tensor()
+
     def get_dataloader(
         self,
         interactions: Interactions,
