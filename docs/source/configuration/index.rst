@@ -135,3 +135,54 @@ Run the design pipeline with:
 .. code-block:: bash
 
     python -m warprec.run --config path/to/the/config.yml --pipeline design
+
+Evaluation Pipeline
+~~~~~~~~~~~~~~~
+
+The **evaluation pipeline** is used for rapid evaluation of models. It does **not train** the models but rather evaluate them, using (optionally) pre-trained checkpoints. The workflow requires the following sections:
+
+- reader
+- writer
+- splitter
+- models
+- evaluation
+
+Optionally, you can also provide:
+
+- filtering
+- general
+
+An example use of the evaluation pipeline is to evaluate a pre-trained model. Here is a configuration example:
+
+.. code-block:: yaml
+
+    reader:
+        loading_strategy: dataset
+        data_type: transaction
+        reading_method: local
+        local_path: tests/test_dataset/movielens.csv
+        rating_type: explicit
+        sep: ','
+    splitter:
+        test_splitting:
+            strategy: temporal_holdout
+            ratio: 0.1
+    models:
+        BPR:
+            meta:
+                load_from: path/to/checkpoint.pth
+            embedding_size: 512
+            reg_weight: 1e-4
+            batch_size: 4096
+            epochs: 200
+            learning_rate: 1e-3
+    evaluation:
+        top_k: [10, 20, 50]
+        batch_size: 1024
+        metrics: [nDCG, Precision, Recall, HitRate]
+
+Run the evaluation pipeline with:
+
+.. code-block:: bash
+
+    python -m warprec.run --config path/to/the/config.yml --pipeline eval
