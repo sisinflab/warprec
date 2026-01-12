@@ -441,6 +441,53 @@ Proper configuration ensures reproducibility, optimal performance, and easy mana
 </pre></div>
 </div>
 </section>
+<section id="evaluation-pipeline">
+<h3>Evaluation Pipeline<a class="headerlink" href="#evaluation-pipeline" title="Link to this heading">¶</a></h3>
+<p>The <strong>evaluation pipeline</strong> is used for rapid evaluation of models. It does <strong>not train</strong> the models but rather evaluate them, using (optionally) pre-trained checkpoints. The workflow requires the following sections:</p>
+<ul class="simple">
+<li><p>reader</p></li>
+<li><p>writer</p></li>
+<li><p>splitter</p></li>
+<li><p>models</p></li>
+<li><p>evaluation</p></li>
+</ul>
+<p>Optionally, you can also provide:</p>
+<ul class="simple">
+<li><p>filtering</p></li>
+<li><p>general</p></li>
+</ul>
+<p>An example use of the evaluation pipeline is to evaluate a pre-trained model. Here is a configuration example:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">reader</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">loading_strategy</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">dataset</span>
+<span class="w">    </span><span class="nt">data_type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">transaction</span>
+<span class="w">    </span><span class="nt">reading_method</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">local</span>
+<span class="w">    </span><span class="nt">local_path</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">tests/test_dataset/movielens.csv</span>
+<span class="w">    </span><span class="nt">rating_type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">explicit</span>
+<span class="w">    </span><span class="nt">sep</span><span class="p">:</span><span class="w"> </span><span class="s">&#39;,&#39;</span>
+<span class="nt">splitter</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">test_splitting</span><span class="p">:</span>
+<span class="w">        </span><span class="nt">strategy</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">temporal_holdout</span>
+<span class="w">        </span><span class="nt">ratio</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0.1</span>
+<span class="nt">models</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">BPR</span><span class="p">:</span>
+<span class="w">        </span><span class="nt">meta</span><span class="p">:</span>
+<span class="w">            </span><span class="nt">load_from</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">path/to/checkpoint.pth</span>
+<span class="w">        </span><span class="nt">embedding_size</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">512</span>
+<span class="w">        </span><span class="nt">reg_weight</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">1e-4</span>
+<span class="w">        </span><span class="nt">batch_size</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">4096</span>
+<span class="w">        </span><span class="nt">epochs</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">200</span>
+<span class="w">        </span><span class="nt">learning_rate</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">1e-3</span>
+<span class="nt">evaluation</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">top_k</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">10</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">20</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">50</span><span class="p p-Indicator">]</span>
+<span class="w">    </span><span class="nt">batch_size</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">1024</span>
+<span class="w">    </span><span class="nt">metrics</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">nDCG</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">Precision</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">Recall</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">HitRate</span><span class="p p-Indicator">]</span>
+</pre></div>
+</div>
+<p>Run the evaluation pipeline with:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>python<span class="w"> </span>-m<span class="w"> </span>warprec.run<span class="w"> </span>--config<span class="w"> </span>path/to/the/config.yml<span class="w"> </span>--pipeline<span class="w"> </span><span class="nb">eval</span>
+</pre></div>
+</div>
+</section>
 </section>
 </section>
 
@@ -504,6 +551,7 @@ Proper configuration ensures reproducibility, optimal performance, and easy mana
 <li><a class="reference internal" href="#pipeline-configurations">Pipeline Configurations</a><ul>
 <li><a class="reference internal" href="#training-pipeline">Training Pipeline</a></li>
 <li><a class="reference internal" href="#design-pipeline">Design Pipeline</a></li>
+<li><a class="reference internal" href="#evaluation-pipeline">Evaluation Pipeline</a></li>
 </ul>
 </li>
 </ul>

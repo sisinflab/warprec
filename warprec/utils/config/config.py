@@ -348,6 +348,20 @@ class DesignConfiguration(WarpRecConfiguration):
     evaluation: EvaluationConfig
 
 
+class EvalConfiguration(WarpRecConfiguration):
+    """Definition of eval pipeline configuration, used evaluate trained models.
+
+    Attributes:
+        writer (WriterConfig): Configuration of the writing process.
+        splitter (SplittingConfig): Configuration of the splitting process.
+        evaluation (EvaluationConfig): Configuration of the evaluation process.
+    """
+
+    writer: WriterConfig
+    splitter: SplittingConfig = None
+    evaluation: EvaluationConfig
+
+
 def load_train_configuration(path: str) -> TrainConfiguration:
     """This method reads the train configuration file and returns
         a TrainConfiguration object.
@@ -380,6 +394,23 @@ def load_design_configuration(path: str) -> DesignConfiguration:
         data = yaml.safe_load(file)
     logger.msg("Reading process completed correctly.")
     return DesignConfiguration(**data)
+
+
+def load_eval_configuration(path: str) -> EvalConfiguration:
+    """This method reads the train configuration file and returns
+        a EvalConfiguration object.
+
+    Args:
+        path (str): The path to the configuration file.
+
+    Returns:
+        EvalConfiguration: The configuration object created from the configuration file.
+    """
+    logger.msg(f"Reading eval configuration file in: {path}")
+    with open(path, "r", encoding="utf-8") as file:
+        data = yaml.safe_load(file)
+    logger.msg("Reading process completed correctly.")
+    return EvalConfiguration(**data)
 
 
 def load_callback(

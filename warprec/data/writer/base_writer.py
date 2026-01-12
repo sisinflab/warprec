@@ -17,7 +17,7 @@ from warprec.recommenders.base_recommender import (
     Recommender,
     SequentialRecommenderUtils,
 )
-from warprec.utils.config import TrainConfiguration
+from warprec.utils.config import TrainConfiguration, EvalConfiguration
 from warprec.utils.enums import WritingMethods
 from warprec.utils.logger import logger
 
@@ -399,17 +399,17 @@ class WriterFactory:  # pylint: disable=C0415, R0903
     """Factory class for creating Writer instances based on configuration.
 
     Attributes:
-        config (TrainConfiguration): The configuration of the experiment.
+        config (TrainConfiguration | EvalConfiguration): The configuration of the experiment.
     """
 
-    config: TrainConfiguration = None
+    config: TrainConfiguration | EvalConfiguration = None
 
     @classmethod
-    def get_writer(cls, config: TrainConfiguration) -> Writer:
+    def get_writer(cls, config: TrainConfiguration | EvalConfiguration) -> Writer:
         """Factory method to get the appropriate Writer instance based on the configuration.
 
         Args:
-            config (TrainConfiguration): The configuration of the experiment.
+            config (TrainConfiguration | EvalConfiguration): The configuration of the experiment.
 
         Returns:
             Writer: An instance of a class that extends the Writer abstract class.

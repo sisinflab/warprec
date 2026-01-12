@@ -341,14 +341,14 @@ def train_pipeline(path: str):
             # Update time report
             writer.write_time_report(model_timing_report)
 
-            # Clear out the dataset cache if in 'conservative' mode
-            if preparation_strategy == "conservative":
-                main_dataset.clear_cache()
+        # Clear out the dataset cache if in 'conservative' mode
+        if preparation_strategy == "conservative":
+            main_dataset.clear_cache()
 
-                for fold in fold_dataset:
-                    fold.clear_cache()
+            for fold in fold_dataset:
+                fold.clear_cache()
 
-                logger.positive("Dataset cache cleared.")
+            logger.positive("Dataset cache cleared.")
 
     if requires_stat_significance:
         # Check if enough models have been evaluated
