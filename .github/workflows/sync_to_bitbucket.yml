@@ -1,10 +1,15 @@
 name: Sync Merged PR to Bitbucket
 
+# on:
+#   pull_request:
+#     branches: [main]
+#     types: [closed]
 on:
   pull_request:
+    branches: ["*"]
+  push:
     branches: [main]
-    types: [closed]
-
+    
 jobs:
   sync:
     if: github.event.pull_request.merged == true

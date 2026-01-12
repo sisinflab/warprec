@@ -16,7 +16,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.12'  # Adjust to your version
+          python-version: '3.12'
       - name: Cache Poetry venv
         uses: actions/cache@v4
         with:
@@ -28,7 +28,8 @@ jobs:
           virtualenvs-create: true
           virtualenvs-in-project: true
           installer-parallel: true
+          version: 2.1.2
       - name: Install dependencies
-        run: poetry install --no-interaction
+        run: poetry install --group dev --no-interaction
       - name: Run pre-commit
         run: poetry run pre-commit run --all-files
