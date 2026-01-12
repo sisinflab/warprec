@@ -81,7 +81,7 @@ class DCNv2(ContextRecommenderUtils, IterativeRecommender):
         self.mlp_hidden_size = list(self.mlp_hidden_size)
 
         # Input Dimensions
-        self.num_fields = 2 + len(self.context_labels)
+        self.num_fields = 2 + len(self.feature_labels) + len(self.context_labels)
         self.input_dim = self.num_fields * self.embedding_size
 
         if self.use_mixed:
@@ -231,36 +231,71 @@ class DCNv2(ContextRecommenderUtils, IterativeRecommender):
         return output
 
     def train_step(self, batch: Any, *args, **kwargs) -> Tensor:
-        user, item, rating, contexts = batch
+        user, item, rating = batch[0], batch[1], batch[2]
 
-        prediction = self.forward(user, item, contexts)
+        contexts: Optional[Tensor] = None
+        features: Optional[Tensor] = None
+
+        current_idx = 3
+
+        # If feature dimensions exist, the next element is features
+        if self.feature_dims:
+            features = batch[current_idx]
+            current_idx += 1
+
+        # If context dimensions exist, the next element is context
+        if self.context_dims:
+            contexts = batch[current_idx]
+
+        prediction = self.forward(user, item, features, contexts)
 
         # Compute BCE loss
         loss = self.bce_loss(prediction, rating)
 
         # Compute L2 regularization on embeddings and biases
-        reg_params = self.get_reg_params(user, item, contexts)
+        reg_params = self.get_reg_params(user, item, features, contexts)
         reg_loss = self.reg_weight * self.reg_loss(*reg_params)
 
         return loss + reg_loss
 
-    def forward(self, user: Tensor, item: Tensor, contexts: Tensor) -> Tensor:
-        # Retrieve Embeddings
-        u_emb = self.user_embedding(user)
-        i_emb = self.item_embedding(item)
-        ctx_emb_list = [
-            self.context_embedding[name](contexts[:, idx])
-            for idx, name in enumerate(self.context_labels)
-        ]
+    def forward(
+        self,
+        user: Tensor,
+        item: Tensor,
+        features: Optional[Tensor] = None,
+        contexts: Optional[Tensor] = None,
+    ) -> Tensor:
+        # Linear Part (First Order)
+        linear_part = self.compute_first_order(user, item, features, contexts)
 
-        # Stack and Flatten
-        embeddings_list = [u_emb, i_emb] + ctx_emb_list
-        dcn_input = torch.cat(embeddings_list, dim=1)
+        # Interaction Part (Second Order)
+        u_emb = self.user_embedding(user).unsqueeze(1)
+        i_emb = self.item_embedding(item).unsqueeze(1)
+        components = [u_emb, i_emb]
 
-        # Compute
+        # Add Feature Embeddings
+        if features is not None and self.feature_dims:
+            global_feat = features + self.feature_offsets
+            f_emb = self.merged_feature_embedding(global_feat)
+            components.append(f_emb)
+
+        # Add Context Embeddings
+        if contexts is not None and self.context_labels:
+            global_ctx = contexts + self.context_offsets
+            c_emb = self.merged_context_embedding(global_ctx)
+            components.append(c_emb)
+
+        # Concatenate on Field dimension
+        dcn_input_block = torch.cat(components, dim=1)
+
+        # Flatten the input
+        batch_size = dcn_input_block.shape[0]
+        dcn_input = dcn_input_block.view(batch_size, -1)
+
+        # Compute Network
         output = self._compute_logits(dcn_input)
 
-        return output.squeeze(-1)
+        return linear_part + output.squeeze(-1)
 
     @torch.no_grad()
     def predict(
@@ -286,48 +321,98 @@ class DCNv2(ContextRecommenderUtils, IterativeRecommender):
         """
         batch_size = user_indices.size(0)
 
-        # Retrieve Fixed Embeddings
+        # Retrieve Fixed Embeddings (User + Contexts)
+        # [batch, embedding_size]
         user_emb = self.user_embedding(user_indices)
-        ctx_emb_list = [
-            self.context_embedding[name](contexts[:, idx])
-            for idx, name in enumerate(self.context_labels)
-        ]
+        ctx_emb_tensor = self._get_context_embeddings(contexts)
 
-        # Helper for block processing
-        def process_block(items_emb_block: Tensor) -> Tensor:
-            num_items = items_emb_block.shape[-2]
+        # Helper function to process item block
+        def process_block(
+            items_emb_block: Tensor, feat_emb_block_tensor: Tensor
+        ) -> Tensor:
+            n_items = items_emb_block.shape[-2]
 
-            # Expand User and Contexts
-            u_exp = user_emb.unsqueeze(1).expand(-1, num_items, -1)
-            c_exp_list = [
-                c.unsqueeze(1).expand(-1, num_items, -1) for c in ctx_emb_list
-            ]
+            # Expand User & Contexts to match items dimension
+            u_exp = user_emb.unsqueeze(1).expand(-1, n_items, -1)
 
-            # Handle Item Embedding
-            if items_emb_block.dim() == 2:  # Full
-                i_exp = items_emb_block.unsqueeze(0).expand(batch_size, -1, -1)
-            else:  # Sampled
-                i_exp = items_emb_block
+            # Handle Item & Feature Embedding expansion if necessary
+            if items_emb_block.dim() == 2:
+                # Case: Full prediction
+                n_items = items_emb_block.shape[0]
 
-            # Concatenate
-            dcn_input_block = torch.cat([u_exp, i_exp] + c_exp_list, dim=2)
+                # User: [Batch, 1, 1, Emb] -> Expand su Items
+                u_exp = user_emb.unsqueeze(1).unsqueeze(2).expand(-1, n_items, -1, -1)
+
+                # Item: [1, Block, 1, Emb] -> Expand su Batch
+                i_exp = (
+                    items_emb_block.unsqueeze(0)
+                    .unsqueeze(2)
+                    .expand(batch_size, -1, -1, -1)
+                )
+
+                # [Block, N_Feat, Emb] -> [Batch, Block, N_Feat, Emb]
+                f_exp = None
+                if feat_emb_block_tensor is not None:
+                    f_exp = feat_emb_block_tensor.unsqueeze(0).expand(
+                        batch_size, -1, -1, -1
+                    )
+
+                # [Batch, N_Ctx, Emb] -> [Batch, Block, N_Ctx, Emb]
+                c_exp = None
+                if ctx_emb_tensor is not None:
+                    c_exp = ctx_emb_tensor.unsqueeze(1).expand(-1, n_items, -1, -1)
+
+            else:
+                # Case: Sampled prediction
+                n_items = items_emb_block.shape[1]
+
+                # User: [Batch, Seq, 1, Emb]
+                u_exp = user_emb.unsqueeze(1).unsqueeze(2).expand(-1, n_items, -1, -1)
+
+                # Item: [Batch, Seq, 1, Emb]
+                i_exp = items_emb_block.unsqueeze(2)
+
+                f_exp = feat_emb_block_tensor
+
+                # [Batch, 1, N_Ctx, Emb] -> [Batch, Seq, N_Ctx, Emb]
+                c_exp = None
+                if ctx_emb_tensor is not None:
+                    c_exp = ctx_emb_tensor.unsqueeze(1).expand(-1, n_items, -1, -1)
+
+            stack_list = [u_exp, i_exp]
+            if f_exp is not None:
+                stack_list.append(f_exp)
+            if c_exp is not None:
+                stack_list.append(c_exp)
+
+            # Concatenate all fields on dim=2
+            dcn_input_block = torch.cat(stack_list, dim=2)
+
+            # Flatten: [Batch * N_Items, Total_Fields * Emb]
             dcn_input_flat = dcn_input_block.view(-1, self.input_dim)
 
-            # Compute
             logits = self._compute_logits(dcn_input_flat)
-
-            return logits.view(batch_size, num_items)
+            return logits.view(batch_size, n_items)
 
         if item_indices is None:
             # Case 'full': iterate through all items in memory-safe blocks
             preds_list = []
             for start in range(0, self.n_items, self.block_size):
                 end = min(start + self.block_size, self.n_items)
+
                 items_block = torch.arange(start, end, device=self.device)
                 item_emb_block = self.item_embedding(items_block)
-                preds_list.append(process_block(item_emb_block))
+
+                # Get feature embeddings for the block
+                feat_emb_block_tensor = self._get_feature_embeddings(items_block)
+
+                preds_list.append(process_block(item_emb_block, feat_emb_block_tensor))
             return torch.cat(preds_list, dim=1)
         else:
             # Case 'sampled': process given item_indices
             item_emb = self.item_embedding(item_indices)
-            return process_block(item_emb)
+
+            # Get feature embeddings for the specific items
+            feat_emb_tensor = self._get_feature_embeddings(item_indices)
+
+            return process_block(item_emb, feat_emb_tensor)
