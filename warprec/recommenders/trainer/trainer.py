@@ -797,6 +797,10 @@ class CodeCarbonCallback(tune.Callback):
         self.output_dir = output_dir
         self.tracking_mode = tracking_mode
 
+        # Check if local output dir exists
+        if not os.path.exists(self.output_dir):
+            os.makedirs(self.output_dir)
+
     def on_trial_start(self, iteration, trials, trial, **info):
         tracker = EmissionsTracker(
             save_to_api=self.save_to_api,
