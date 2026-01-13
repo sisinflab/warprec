@@ -1,3 +1,4 @@
+# pylint: disable=too-many-branches, too-many-statements
 import os
 import time
 from typing import List, Tuple, Dict, Any
@@ -136,10 +137,10 @@ def train_pipeline(path: str):
     try:
         ray.init(address="auto", runtime_env={"py_modules": py_modules})
         logger.positive("Connected to existing Ray cluster.")
-    except ConnectionError:
+    except ConnectionError as e:
         raise ConnectionError(
             "Unable to connect to Ray cluster. Please ensure Ray is running."
-        )
+        ) from e
 
     for model_name in models:
         model_exploration_start_time = time.time()
