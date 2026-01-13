@@ -32,8 +32,16 @@ jobs:
           BITBUCKET_PASSWORD: ${{ secrets.BITBUCKET_PASSWORD }}
           BITBUCKET_WORKSPACE: ${{ secrets.BITBUCKET_WORKSPACE }}
           BITBUCKET_REPO: ${{ secrets.BITBUCKET_REPO }}
+        # run: |
+        #   git remote add bitbucket https://${BITBUCKET_USERNAME}:${BITBUCKET_PASSWORD}@bitbucket.org/${BITBUCKET_WORKSPACE}/${BITBUCKET_REPO}.git || true
+        #   SOURCE_BRANCH="${{ steps.vars.outputs.SOURCE_BRANCH }}"
+        #   git checkout $SOURCE_BRANCH
+        #   git push bitbucket $SOURCE_BRANCH --force --verbose
         run: |
-          git remote add bitbucket https://${BITBUCKET_USERNAME}:${BITBUCKET_PASSWORD}@bitbucket.org/${BITBUCKET_WORKSPACE}/${BITBUCKET_REPO}.git || true
+          git config --global credential.helper store
+          echo "https://${BITBUCKET_USERNAME}:${BITBUCKET_PASSWORD}@bitbucket.org" > ~/.git-credentials
+          git remote add bitbucket https://bitbucket.org/${BITBUCKET_WORKSPACE}/${BITBUCKET_REPO}.git || true
+
           SOURCE_BRANCH="${{ steps.vars.outputs.SOURCE_BRANCH }}"
           git checkout $SOURCE_BRANCH
           git push bitbucket $SOURCE_BRANCH --force --verbose
@@ -41,13 +49,13 @@ jobs:
       - name: Create Bitbucket PR
         env:
           BITBUCKET_USERNAME: ${{ secrets.BITBUCKET_USERNAME }}
-          BITBUCKET_APP_PASSWORD: ${{ secrets.BITBUCKET_APP_PASSWORD }}
+          BITBUCKET_APP_PASSWORD: ${{ secrets.BITBUCKET_PASSWORD }}
           BITBUCKET_WORKSPACE: ${{ secrets.BITBUCKET_WORKSPACE }}
           BITBUCKET_REPO: ${{ secrets.BITBUCKET_REPO }}
         run: |
           SOURCE_BRANCH="${{ steps.vars.outputs.SOURCE_BRANCH }}"
           curl -v -X POST \
-            -u "${BITBUCKET_USERNAME}:${BITBUCKET_APP_PASSWORD}" \
+            -u "${BITBUCKET_USERNAME}:${BITBUCKET_PASSWORD}" \
             -H "Content-Type: application/json" \
             "https://api.bitbucket.org/2.0/repositories/${BITBUCKET_WORKSPACE}/${BITBUCKET_REPO}/pullrequests/" \
             -d '{
