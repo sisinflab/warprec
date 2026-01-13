@@ -30,6 +30,6 @@ jobs:
           installer-parallel: true
           version: 2.1.2
       - name: Install dependencies
-        run: poetry install --group dev --no-interaction
+        run: poetry install --only dev --no-interaction
       - name: Run pre-commit
         run: poetry run pre-commit run --all-files
