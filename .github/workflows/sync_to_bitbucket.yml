@@ -1,13 +1,18 @@
 name: Sync Merged PR to Bitbucket
 
+# on:
+#   pull_request:
+#     branches: [main]
+#     types: [closed]
 on:
   pull_request:
+    branches: ["*"]
+  push:
     branches: [main]
-    types: [closed]
 
 jobs:
   sync:
-    if: github.event.pull_request.merged == true
+    # if: github.event.pull_request.merged == true
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -18,7 +23,8 @@ jobs:
 
       - name: Set SOURCE_BRANCH output
         id: vars
-        run: echo "SOURCE_BRANCH=${{ github.event.pull_request.head_ref }}" >> $GITHUB_OUTPUT
+        #run: echo "SOURCE_BRANCH=${{ github.event.pull_request.head_ref }}" >> $GITHUB_OUTPUT
+        run: echo "SOURCE_BRANCH=add-bitbucket-workflow" >> $GITHUB_OUTPUT
 
       - name: Push to Bitbucket target branch
         env:
@@ -38,6 +44,7 @@ jobs:
           BITBUCKET_REPO: ${{ secrets.BITBUCKET_REPO }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
           PR_URL: ${{ github.event.pull_request.html_url }}
+        # Add reviewers
         run: |
           SOURCE_BRANCH="${{ steps.vars.outputs.SOURCE_BRANCH }}"
           curl -v -X POST \
