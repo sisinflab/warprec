@@ -5,6 +5,7 @@ from typing import Optional, Generator
 
 from azure.identity import DefaultAzureCredential
 from azure.core.exceptions import ResourceNotFoundError, ResourceExistsError
+from azure.core.exceptions import AzureError
 from azure.storage.blob import BlobServiceClient
 
 from warprec.data.writer import Writer
@@ -121,7 +122,7 @@ class AzureBlobWriter(Writer):
             # upload_blob can take a generator for memory-efficient streaming
             blob_client.upload_blob(csv_batch_generator(), overwrite=True)
             logger.msg(f"Recommendations successfully written to blob: {path}")
-        except Exception as e:
+        except AzureError as e:
             logger.negative(f"Error writing recommendations to blob {path}: {e}")
 
     def _write_text(self, path: str, content: str) -> None:
