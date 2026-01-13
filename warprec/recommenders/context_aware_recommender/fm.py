@@ -1,3 +1,4 @@
+# pylint: disable = R0801, E1102
 import torch
 from torch import nn, Tensor
 from typing import Any, Optional
