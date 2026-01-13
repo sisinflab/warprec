@@ -91,14 +91,14 @@ class CNN(nn.Module):
         activation: str = "relu",
     ):
         super().__init__()
-        if not (len(cnn_channels) == len(cnn_kernels) == len(cnn_strides)):
+        if not len(cnn_channels) == len(cnn_kernels) == len(cnn_strides):
             raise ValueError(
                 "cnn_channels, cnn_kernels, and cnn_strides must have the same length."
             )
 
         cnn_modules: List[Module] = []
         in_channel = 1  # The first input channel will always be 1
-        for i in range(len(cnn_channels)):
+        for i, out_channel in enumerate(cnn_channels):
             out_channel = cnn_channels[i]
             kernel_size = cnn_kernels[i]
             stride = cnn_strides[i]
