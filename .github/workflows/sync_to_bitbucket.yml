@@ -32,17 +32,24 @@ jobs:
           BITBUCKET_PASSWORD: ${{ secrets.BITBUCKET_PASSWORD }}
           BITBUCKET_WORKSPACE: ${{ secrets.BITBUCKET_WORKSPACE }}
           BITBUCKET_REPO: ${{ secrets.BITBUCKET_REPO }}
-        # run: |
-        #   git remote add bitbucket https://${BITBUCKET_USERNAME}:${BITBUCKET_PASSWORD}@bitbucket.org/${BITBUCKET_WORKSPACE}/${BITBUCKET_REPO}.git || true
-        #   SOURCE_BRANCH="${{ steps.vars.outputs.SOURCE_BRANCH }}"
-        #   git checkout $SOURCE_BRANCH
-        #   git push bitbucket $SOURCE_BRANCH --force --verbose
         run: |
-          git config --global credential.helper store
-          echo "https://${BITBUCKET_USERNAME}:${BITBUCKET_PASSWORD}@bitbucket.org" > ~/.git-credentials
-          git remote add bitbucket https://bitbucket.org/${BITBUCKET_WORKSPACE}/${BITBUCKET_REPO}.git || true
-
+          git remote add bitbucket https://${BITBUCKET_USERNAME}:${BITBUCKET_PASSWORD}@bitbucket.org/${BITBUCKET_WORKSPACE}/${BITBUCKET_REPO}.git || true
           SOURCE_BRANCH="${{ steps.vars.outputs.SOURCE_BRANCH }}"
+
+          echo "🔍 VERIFICA CREDENZIALI..."
+          HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" -u "${BITBUCKET_USERNAME}:${BITBUCKET_APP_PASSWORD}" "https://api.bitbucket.org/2.0/repositories/${BITBUCKET_WORKSPACE}/${BITBUCKET_REPO}")
+
+          if [ "$HTTP_STATUS" -ne 200 ]; then
+            echo "❌ ERRORE AUTENTICAZIONE API: $HTTP_STATUS"
+            echo "Verifica che:"
+            echo "1. BITBUCKET_USERNAME sia lo 'username' (non l'email)."
+            echo "2. BITBUCKET_WORKSPACE sia lo slug corretto."
+            echo "3. L'App Password abbia i permessi 'Repository: Write'."
+            exit 1
+          else
+            echo "✅ Credenziali API valide. Procedo con Git..."
+          fi
+
           git checkout $SOURCE_BRANCH
           git push bitbucket $SOURCE_BRANCH --force --verbose
 
