@@ -111,7 +111,7 @@ class Dataset:
         self._nuid = train_data[user_id_label].nunique()
         self._niid = train_data[item_id_label].nunique()
         self._nfeat = len(side_data.columns) - 1 if side_data is not None else 0
-        self._batch_size = batch_size
+        self.batch_size = batch_size
 
         # Values that will be used to calculate mappings
         _uid = train_data[user_id_label].unique()
@@ -461,7 +461,7 @@ class Dataset:
 
             self._precomputed_dataloader[key] = EvaluationDataLoader(
                 eval_interactions=eval_sparse,
-                batch_size=self._batch_size,
+                batch_size=self.batch_size,
             )
 
         return self._precomputed_dataloader[key]
@@ -491,7 +491,7 @@ class Dataset:
                 train_interactions=train_sparse,
                 eval_interactions=eval_sparse,
                 num_negatives=num_negatives,
-                batch_size=self._batch_size,
+                batch_size=self.batch_size,
                 seed=seed,
             )
 
@@ -525,7 +525,7 @@ class Dataset:
                 user_id_label=user_label,
                 item_id_label=item_label,
                 context_labels=context_labels,
-                batch_size=self._batch_size,
+                batch_size=self.batch_size,
             )
 
         return self._precomputed_dataloader[key]
@@ -569,7 +569,7 @@ class Dataset:
                 num_items=self._niid,
                 num_negatives=num_negatives,
                 seed=seed,
-                batch_size=self._batch_size,
+                batch_size=self.batch_size,
             )
 
         return self._precomputed_dataloader[key]
