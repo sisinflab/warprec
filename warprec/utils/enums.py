@@ -181,6 +181,8 @@ DataLoaderRequirements = namedtuple(
 
 
 class DataLoaderType(Enum):
+    """Custom enumerator definition for DataLoader types."""
+
     # Interactions
     INTERACTION_LOADER = DataLoaderRequirements(
         dataloader_source="train_set",
@@ -247,16 +249,20 @@ class DataLoaderType(Enum):
 
     @property
     def source(self) -> str:
+        """Getter method for dataloader source."""
         return self.value.dataloader_source
 
     @property
     def method(self) -> str:
+        """Getter method for method."""
         return self.value.method_name
 
     @property
     def construction_params(self) -> list:
+        """Getter method for construction parameters."""
         return self.value.construction_params
 
     @property
     def fixed_params(self) -> dict:
+        """Getter method for fixed parameters."""
         return self.value.fixed_params
