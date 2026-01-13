@@ -4,8 +4,8 @@ from typing import Tuple, Any, Optional, Dict, List
 import torch
 import numpy as np
 from torch import Tensor
-from pandas import DataFrame
 from torch.utils.data import DataLoader, TensorDataset
+from pandas import DataFrame
 from scipy.sparse import csr_matrix, coo_matrix
 
 from warprec.data.entities.train_structures import (
@@ -322,7 +322,6 @@ class Interactions:
         # The DataLoader will handle batching and shuffling.
         return DataLoader(dataset, batch_size=batch_size, shuffle=shuffle)
 
-    @typing.no_type_check
     def get_item_rating_dataloader(
         self,
         neg_samples: int = 0,
@@ -352,6 +351,7 @@ class Interactions:
             ValueError: If context flag has been set but no context
                 information is present in the DataFrame.
         """
+        # pylint: disable=too-many-branches, too-many-statements
         if low_memory:
             sparse_matrix = self.get_sparse()
 
