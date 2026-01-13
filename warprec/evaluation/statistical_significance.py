@@ -255,7 +255,7 @@ def compute_paired_statistical_test(
                                 f"Significance (α={alpha})": accepted,
                             }
                         )
-                except Exception as e:
+                except (KeyError, ValueError, AttributeError) as e:
                     logger.negative(
                         f"Error on {model_a} vs {model_b} | {metric} @ {cutoff}: {e}"
                     )
