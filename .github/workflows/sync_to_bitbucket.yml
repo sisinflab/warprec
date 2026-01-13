@@ -37,7 +37,7 @@ jobs:
           SOURCE_BRANCH="${{ steps.vars.outputs.SOURCE_BRANCH }}"
 
           echo "🔍 VERIFICA CREDENZIALI..."
-          HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" -u "${BITBUCKET_USERNAME}:${BITBUCKET_APP_PASSWORD}" "https://api.bitbucket.org/2.0/repositories/${BITBUCKET_WORKSPACE}/${BITBUCKET_REPO}")
+          HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" -u "${BITBUCKET_USERNAME}:${BITBUCKET_PASSWORD}" "https://api.bitbucket.org/2.0/repositories/${BITBUCKET_WORKSPACE}/${BITBUCKET_REPO}")
 
           if [ "$HTTP_STATUS" -ne 200 ]; then
             echo "❌ ERRORE AUTENTICAZIONE API: $HTTP_STATUS"
@@ -45,6 +45,10 @@ jobs:
             echo "1. BITBUCKET_USERNAME sia lo 'username' (non l'email)."
             echo "2. BITBUCKET_WORKSPACE sia lo slug corretto."
             echo "3. L'App Password abbia i permessi 'Repository: Write'."
+            echo "Username: ${BITBUCKET_USERNAME}"
+            echo "Password: ${BITBUCKET_PASSWORD}"
+            echo "Workspace: ${BITBUCKET_WORKSPACE}"
+            echo "Repo: ${BITBUCKET_REPO}"
             exit 1
           else
             echo "✅ Credenziali API valide. Procedo con Git..."
