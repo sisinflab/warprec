@@ -1,3 +1,4 @@
+# pylint: disable=duplicate-code
 from itertools import product
 from typing import ClassVar
 
@@ -392,41 +393,49 @@ class LightCCF(RecomModel):
     @field_validator("embedding_size")
     @classmethod
     def check_embedding_size(cls, v: list):
+        """Validate embedding_size."""
         return validate_greater_than_zero(cls, v, "embedding_size")
 
     @field_validator("n_layers")
     @classmethod
     def check_n_layers(cls, v: list):
+        """Validate n_layers."""
         return validate_greater_equal_than_zero(cls, v, "n_layers")
 
     @field_validator("alpha")
     @classmethod
     def check_alpha(cls, v: list):
+        """Validate alpha."""
         return validate_greater_equal_than_zero(cls, v, "alpha")
 
     @field_validator("temperature")
     @classmethod
     def check_temperature(cls, v: list):
+        """Validate temperature."""
         return validate_greater_than_zero(cls, v, "temperature")
 
     @field_validator("reg_weight")
     @classmethod
     def check_reg_weight(cls, v: list):
+        """Validate reg_weight."""
         return validate_greater_equal_than_zero(cls, v, "reg_weight")
 
     @field_validator("batch_size")
     @classmethod
     def check_batch_size(cls, v: list):
+        """Validate batch_size."""
         return validate_greater_than_zero(cls, v, "batch_size")
 
     @field_validator("epochs")
     @classmethod
     def check_epochs(cls, v: list):
+        """Validate epochs."""
         return validate_greater_than_zero(cls, v, "epochs")
 
     @field_validator("learning_rate")
     @classmethod
     def check_learning_rate(cls, v: list):
+        """Validate learning_rate."""
         return validate_greater_than_zero(cls, v, "learning_rate")
 
 
@@ -473,7 +482,7 @@ class LightGCL(RecomModel):
     @field_validator("q")
     @classmethod
     def check_q(cls, v: list):
-        """Validate q (SVD rank)."""
+        """Validate q."""
         return validate_greater_than_zero(cls, v, "q")
 
     @field_validator("ssl_lambda")
@@ -684,41 +693,49 @@ class LightGODE(RecomModel):
     @field_validator("embedding_size")
     @classmethod
     def check_embedding_size(cls, v: list):
+        """Validate embedding_size."""
         return validate_greater_than_zero(cls, v, "embedding_size")
 
     @field_validator("gamma")
     @classmethod
     def check_gamma(cls, v: list):
+        """Validate gamma."""
         return validate_greater_equal_than_zero(cls, v, "gamma")
 
     @field_validator("t")
     @classmethod
     def check_t(cls, v: list):
+        """Validate t."""
         return validate_greater_than_zero(cls, v, "t")
 
     @field_validator("n_ode_steps")
     @classmethod
     def check_n_ode_steps(cls, v: list):
+        """Validate n_ode_steps."""
         return validate_greater_than_zero(cls, v, "n_ode_steps")
 
     @field_validator("reg_weight")
     @classmethod
     def check_reg_weight(cls, v: list):
+        """Validate reg_weight."""
         return validate_greater_equal_than_zero(cls, v, "reg_weight")
 
     @field_validator("batch_size")
     @classmethod
     def check_batch_size(cls, v: list):
+        """Validate batch_size."""
         return validate_greater_than_zero(cls, v, "batch_size")
 
     @field_validator("epochs")
     @classmethod
     def check_epochs(cls, v: list):
+        """Validate epochs."""
         return validate_greater_than_zero(cls, v, "epochs")
 
     @field_validator("learning_rate")
     @classmethod
     def check_learning_rate(cls, v: list):
+        """Validate learning_rate."""
         return validate_greater_than_zero(cls, v, "learning_rate")
 
 
@@ -1101,46 +1118,55 @@ class UltraGCN(RecomModel):
     @field_validator("embedding_size")
     @classmethod
     def check_embedding_size(cls, v: list):
+        """Validate embedding_size."""
         return validate_greater_than_zero(cls, v, "embedding_size")
 
     @field_validator("w_lambda")
     @classmethod
     def check_w_lambda(cls, v: list):
+        """Validate w_lambda."""
         return validate_greater_equal_than_zero(cls, v, "w_lambda")
 
     @field_validator("w_gamma")
     @classmethod
     def check_w_gamma(cls, v: list):
+        """Validate w_gamma."""
         return validate_greater_equal_than_zero(cls, v, "w_gamma")
 
     @field_validator("w_neg")
     @classmethod
     def check_w_neg(cls, v: list):
+        """Validate w_neg."""
         return validate_greater_than_zero(cls, v, "w_neg")
 
     @field_validator("ii_k")
     @classmethod
     def check_ii_k(cls, v: list):
+        """Validate ii_k."""
         return validate_greater_than_zero(cls, v, "ii_k")
 
     @field_validator("reg_weight")
     @classmethod
     def check_reg_weight(cls, v: list):
+        """Validate reg_weight."""
         return validate_greater_equal_than_zero(cls, v, "reg_weight")
 
     @field_validator("batch_size")
     @classmethod
     def check_batch_size(cls, v: list):
+        """Validate batch_size."""
         return validate_greater_than_zero(cls, v, "batch_size")
 
     @field_validator("epochs")
     @classmethod
     def check_epochs(cls, v: list):
+        """Validate epochs."""
         return validate_greater_than_zero(cls, v, "epochs")
 
     @field_validator("learning_rate")
     @classmethod
     def check_learning_rate(cls, v: list):
+        """Validate learning_rate."""
         return validate_greater_than_zero(cls, v, "learning_rate")
 
 
