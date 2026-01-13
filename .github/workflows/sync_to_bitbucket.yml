@@ -33,7 +33,7 @@ jobs:
           BITBUCKET_WORKSPACE: ${{ secrets.BITBUCKET_WORKSPACE }}
           BITBUCKET_REPO: ${{ secrets.BITBUCKET_REPO }}
         run: |
-          git remote add bitbucket https://${BITBUCKET_USERNAME}:${BITBUCKET_PASSWORD}@bitbucket.org/${BITBUCKET_WORKSPACE}/${BITBUCKET_REPO}.git || true
+          git remote add bitbucket https://x-token-auth:${BITBUCKET_PASSWORD}@bitbucket.org/${BITBUCKET_WORKSPACE}/${BITBUCKET_REPO}.git || true
           SOURCE_BRANCH="${{ steps.vars.outputs.SOURCE_BRANCH }}"
 
           echo "🔍 VERIFICA CREDENZIALI..."
