@@ -1,3 +1,4 @@
+# pylint: disable = too-many-branches, too-many-statements
 from typing import Tuple, Optional, List, Any, Dict
 
 import torch
@@ -101,8 +102,8 @@ class Dataset:
         # If side information data has been provided, we filter the main dataset
         if side_data is not None:
             train_data, eval_data = self._filter_data(
-                train=train_data,
-                eval=eval_data,
+                train_set=train_data,
+                eval_set=eval_data,
                 filter_data=side_data,
                 label=item_id_label,
             )
@@ -232,16 +233,16 @@ class Dataset:
 
     def _filter_data(
         self,
-        train: DataFrame,
-        eval: DataFrame,
+        train_set: DataFrame,
+        eval_set: DataFrame,
         filter_data: DataFrame,
         label: str,
     ) -> Tuple[DataFrame, DataFrame]:
         """Filter the data based on a given additional information set and label.
 
         Args:
-            train (DataFrame): The train set.
-            eval (DataFrame): The evaluation set.
+            train_set (DataFrame): The train set.
+            eval_set (DataFrame): The evaluation set.
             filter_data (DataFrame): The additional information dataset.
             label (str): The label used to filter the data.
 
@@ -251,26 +252,26 @@ class Dataset:
                 - DataFrame: The filtered evaluation set.
         """
         # Compute shared data points first
-        shared_data = set(train[label]).intersection(filter_data[label])
+        shared_data = set(train_set[label]).intersection(filter_data[label])
 
         # Count the number of data points before filtering
-        train_data_before_filter = train[label].nunique()
+        train_data_before_filter = train_set[label].nunique()
 
         # Filter all the data based on data points present in both train data and filter.
         # This procedure is fundamental because we need dimensions to match
-        train = train[train[label].isin(shared_data)]
-        eval = eval[eval[label].isin(shared_data)]
+        train_set = train_set[train_set[label].isin(shared_data)]
+        eval_set = eval_set[eval_set[label].isin(shared_data)]
         filter_data = filter_data[filter_data[label].isin(shared_data)]
 
         # Count the number of data points after filtering
-        train_data_after_filter = train[label].nunique()
+        train_data_after_filter = train_set[label].nunique()
 
         logger.attention(
             ""
             f"Filtered out {train_data_before_filter - train_data_after_filter} {label}."
         )
 
-        return train, eval
+        return train_set, eval_set
 
     def _create_inner_set(
         self,
@@ -511,9 +512,9 @@ class Dataset:
             eval_data = self.eval_set.get_df()
 
             # Retrieve labels to pre-compute eval data
-            user_label = self.eval_set._user_label
-            item_label = self.eval_set._item_label
-            context_labels = self.eval_set._context_labels
+            user_label = self.eval_set.user_label
+            item_label = self.eval_set.item_label
+            context_labels = self.eval_set.context_labels
 
             # Map the evaluation dataset to ensure consistency
             eval_data[user_label] = eval_data[user_label].map(self._umap)
@@ -551,9 +552,9 @@ class Dataset:
             eval_data = self.eval_set.get_df()
 
             # Retrieve labels to pre-compute eval data
-            user_label = self.eval_set._user_label
-            item_label = self.eval_set._item_label
-            context_labels = self.eval_set._context_labels
+            user_label = self.eval_set.user_label
+            item_label = self.eval_set.item_label
+            context_labels = self.eval_set.context_labels
 
             # Map the evaluation dataset to ensure consistency
             eval_data[user_label] = eval_data[user_label].map(self._umap)
@@ -699,8 +700,8 @@ class Dataset:
             user_mapping (dict): The mapping of user_id -> user_idx.
             item_mapping (dict): The mapping of item_id -> item_idx.
         """
-        self.umap = user_mapping
-        self.imap = item_mapping
+        self._umap = user_mapping
+        self._imap = item_mapping
 
     def clear_cache(self):
         """Clear the cache of inner data structures."""
