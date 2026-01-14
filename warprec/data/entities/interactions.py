@@ -78,23 +78,19 @@ class Interactions:
         self._history_mask: Tensor = None
 
         # Set DataFrame labels
-        self._user_label = data.columns[0]
-        self._item_label = data.columns[1]
-        self._rating_label = (
-            rating_label if rating_type == RatingType.EXPLICIT else None
-        )
-        self._context_labels = context_labels if context_labels else []
+        self.user_label = data.columns[0]
+        self.item_label = data.columns[1]
+        self.rating_label = rating_label if rating_type == RatingType.EXPLICIT else None
+        self.context_labels = context_labels if context_labels else []
 
         # Filter side information (if present)
         if self._inter_side is not None:
             self._inter_side = self._inter_side[
-                self._inter_side[self._item_label].isin(
-                    self._inter_df[self._item_label]
-                )
+                self._inter_side[self.item_label].isin(self._inter_df[self.item_label])
             ]
 
             # Order side information to be in the same order of the dataset
-            self._inter_side["order"] = self._inter_side[self._item_label].map(
+            self._inter_side["order"] = self._inter_side[self.item_label].map(
                 item_mapping
             )
             self._inter_side = (
@@ -104,9 +100,7 @@ class Interactions:
             )
 
             # Construct lookup for side information features
-            feature_cols = [
-                c for c in self._inter_side.columns if c != self._item_label
-            ]
+            feature_cols = [c for c in self._inter_side.columns if c != self.item_label]
 
             # Create the lookup tensor for side information
             side_tensor = torch.tensor(
@@ -123,9 +117,9 @@ class Interactions:
             self._inter_side_labels = feature_cols
 
         # Definition of dimensions
-        self._uid = self._inter_df[self._user_label].unique()
-        self._nuid = self._inter_df[self._user_label].nunique()
-        self._niid = self._inter_df[self._item_label].nunique()
+        self._uid = self._inter_df[self.user_label].unique()
+        self._nuid = self._inter_df[self.user_label].nunique()
+        self._niid = self._inter_df[self.item_label].nunique()
         self._og_nuid, self._og_niid = original_dims
         self._transactions = len(self._inter_df)
 
@@ -139,9 +133,9 @@ class Interactions:
         # Define the interaction dictionary, based on the RatingType selected
         if rating_type == RatingType.EXPLICIT:
             self._inter_dict = (
-                self._inter_df.groupby(self._user_label)
+                self._inter_df.groupby(self.user_label)
                 .apply(
-                    lambda df: dict(zip(df[self._item_label], df[self._rating_label])),
+                    lambda df: dict(zip(df[self.item_label], df[self.rating_label])),
                     include_groups=False,
                 )
                 .to_dict()
@@ -149,8 +143,8 @@ class Interactions:
         elif rating_type == RatingType.IMPLICIT:
             self._inter_dict = {
                 user: dict.fromkeys(items, 1)
-                for user, items in self._inter_df.groupby(self._user_label)[
-                    self._item_label
+                for user, items in self._inter_df.groupby(self.user_label)[
+                    self.item_label
                 ]
             }
         else:
@@ -208,21 +202,21 @@ class Interactions:
             ValueError: If interactions are not explicit or if
                 rating label is None.
         """
-        if self.rating_type != RatingType.EXPLICIT or self._rating_label is None:
+        if self.rating_type != RatingType.EXPLICIT or self.rating_label is None:
             raise ValueError(
                 "Filtering by rating is only supported for explicit feedback data."
             )
 
         # Filter original DataFrame for the specified rating value
-        rating_df = self._inter_df[self._inter_df[self._rating_label] == rating_value]
+        rating_df = self._inter_df[self._inter_df[self.rating_label] == rating_value]
 
         # Edge case: No interactions with the specified rating
         if rating_df.empty:
             return coo_matrix((self._og_nuid, self._og_niid), dtype=self.precision)
 
         # Map users and items to internal indices
-        users = rating_df[self._user_label].map(self._umap).values
-        items = rating_df[self._item_label].map(self._imap).values
+        users = rating_df[self.user_label].map(self._umap).values
+        items = rating_df[self.item_label].map(self._imap).values
 
         # Filter out any NaN mappings (in case of unknown users/items)
         mask = ~np.isnan(users) & ~np.isnan(items)
@@ -251,7 +245,7 @@ class Interactions:
         if self._inter_side is None:
             return None
         self._inter_side_sparse = csr_matrix(
-            self._inter_side.drop(self._item_label, axis=1), dtype=self.precision
+            self._inter_side.drop(self.item_label, axis=1), dtype=self.precision
         )
         return self._inter_side_sparse
 
@@ -357,10 +351,10 @@ class Interactions:
 
             # Extract positive interaction information
             pos_users_np = (
-                self._inter_df[self._user_label].map(self._umap).values.astype(np.int64)
+                self._inter_df[self.user_label].map(self._umap).values.astype(np.int64)
             )
             pos_items_np = (
-                self._inter_df[self._item_label].map(self._imap).values.astype(np.int64)
+                self._inter_df[self.item_label].map(self._imap).values.astype(np.int64)
             )
 
             # Prepare side information
@@ -376,12 +370,12 @@ class Interactions:
             # Prepare the context
             context_tensor = None
             if include_context:
-                if not self._context_labels:
+                if not self.context_labels:
                     raise ValueError(
                         "Requested context information but none provided in init."
                     )
 
-                context_values = self._inter_df[self._context_labels].values
+                context_values = self._inter_df[self.context_labels].values
                 context_tensor = torch.tensor(context_values, dtype=torch.long)
 
             # Create the lazy dataset
@@ -416,10 +410,10 @@ class Interactions:
 
         # Extract the positive interactions
         pos_users_np = (
-            self._inter_df[self._user_label].map(self._umap).values.astype(np.int64)
+            self._inter_df[self.user_label].map(self._umap).values.astype(np.int64)
         )
         pos_items_np = (
-            self._inter_df[self._item_label].map(self._imap).values.astype(np.int64)
+            self._inter_df[self.item_label].map(self._imap).values.astype(np.int64)
         )
 
         pos_users = torch.from_numpy(pos_users_np)
@@ -439,9 +433,9 @@ class Interactions:
         # Extract positive context data if flagged
         pos_contexts = None
         if include_context:
-            if self._context_labels:
+            if self.context_labels:
                 pos_contexts = torch.tensor(
-                    self._inter_df[self._context_labels].values, dtype=torch.long
+                    self._inter_df[self.context_labels].values, dtype=torch.long
                 )
             else:
                 raise ValueError(
@@ -699,10 +693,10 @@ class Interactions:
         Returns:
             np.ndarray: A sorted array of unique rating values.
         """
-        if self.rating_type != RatingType.EXPLICIT or self._rating_label is None:
+        if self.rating_type != RatingType.EXPLICIT or self.rating_label is None:
             return np.array([])
 
-        return np.sort(self._inter_df[self._rating_label].unique())
+        return np.sort(self._inter_df[self.rating_label].unique())
 
     def _to_sparse(self) -> csr_matrix:
         """This method will create the sparse representation of the data contained.
@@ -712,11 +706,11 @@ class Interactions:
         Returns:
             csr_matrix: Sparse representation of the transactions (CSR Format).
         """
-        users = self._inter_df[self._user_label].map(self._umap).values
-        items = self._inter_df[self._item_label].map(self._imap).values
+        users = self._inter_df[self.user_label].map(self._umap).values
+        items = self._inter_df[self.item_label].map(self._imap).values
         ratings = (
             self._inter_df[
-                self._rating_label
+                self.rating_label
             ].values  # With explicit rating we read from dictionary
             if self.rating_type == RatingType.EXPLICIT
             else np.ones(
