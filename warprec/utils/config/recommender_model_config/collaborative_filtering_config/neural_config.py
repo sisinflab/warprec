@@ -144,7 +144,7 @@ class ConvNCF(RecomModel):
             cnn_strides_processed,
         ):
             # Check for lengths
-            if not (len(channels_config) == len(kernels_config) == len(strides_config)):
+            if not len(channels_config) == len(kernels_config) == len(strides_config):
                 continue
             # Check for embedding size
             if emb_size != channels_config[0]:
@@ -200,7 +200,7 @@ class ConvNCF(RecomModel):
         # Check if this is a possible combination of parameters
         # if not, just raise an error.
         # RayTune will skip this trial
-        if not (len_channels == len_kernels == len_strides):
+        if not len_channels == len_kernels == len_strides:
             raise ValueError(
                 f"Inconsistent CNN layer configuration: "
                 f"cnn_channels length ({len_channels}), cnn_kernels length ({len_kernels}), "
