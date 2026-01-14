@@ -1,3 +1,4 @@
+# pylint: disable = unused-argument
 import random
 from typing import Any, Optional, List
 from abc import ABC, abstractmethod
@@ -208,17 +209,17 @@ class IterativeRecommender(Recommender):
         Args:
             module (nn.Module): The module to initialize.
         """
-        # --- Layers with standard weight matrices ---
+        # Layers with standard weight matrices
         if isinstance(module, (nn.Linear, nn.Conv1d, nn.Conv2d)):
             xavier_normal_(module.weight.data)
             if hasattr(module, "bias") and module.bias is not None:
                 constant_(module.bias.data, 0)
 
-        # --- Embedding Layer ---
+        # Embedding Layer
         elif isinstance(module, nn.Embedding):
             xavier_normal_(module.weight.data)
 
-        # --- Recurrent Layers ---
+        # Recurrent Layers
         elif isinstance(module, (nn.GRU, nn.LSTM, nn.RNN)):
             for name, param in module.named_parameters():
                 if "weight_ih" in name or "weight_hh" in name:
@@ -226,7 +227,7 @@ class IterativeRecommender(Recommender):
                 elif "bias" in name:
                     constant_(param.data, 0)
 
-        # --- Normalization Layers ---
+        # Normalization Layers
         elif isinstance(module, nn.LayerNorm):
             constant_(module.bias.data, 0)
             constant_(module.weight.data, 1.0)
@@ -253,7 +254,7 @@ class IterativeRecommender(Recommender):
 
         Args:
             interactions (Interactions): The interaction of users with items.
-            sessions (Sessions): The sessions of the users,
+            sessions (Sessions): The sessions of the users.
             **kwargs (Any): Additional keyword arguments.
 
         Returns:
@@ -280,7 +281,7 @@ class IterativeRecommender(Recommender):
         """
 
 
-class ContextRecommenderUtils(nn.Module):
+class ContextRecommenderUtils(nn.Module, ABC):
     """Common definition for context-aware recommenders.
 
     This Mixin handles:
@@ -399,8 +400,20 @@ class ContextRecommenderUtils(nn.Module):
         interactions: Interactions,
         sessions: Sessions,
         low_memory: bool = False,
-        **kwargs,
-    ):
+        **kwargs: Any,
+    ) -> DataLoader:
+        """Common dataloader retrieval used by contextual models.
+
+        Args:
+            interactions (Interactions): The interaction of users with items.
+            sessions (Sessions): The sessions of the users.
+            low_memory (bool): Wether or not to retrieve the lazy
+                version of the dataloader.
+            **kwargs (Any): Additional keyword arguments.
+
+        Returns:
+            DataLoader: The appropriate dataloader for the training.
+        """
         return interactions.get_item_rating_dataloader(
             neg_samples=self.neg_samples,
             include_side_info=bool(self.feature_dims),
@@ -531,6 +544,7 @@ class ContextRecommenderUtils(nn.Module):
         return biases.view(target_items.shape)
 
 
+# pylint: disable = too-few-public-methods
 class SequentialRecommenderUtils(ABC):
     """Common definition for sequential recommenders.
 
@@ -662,11 +676,11 @@ class ItemSimRecommender(Recommender):
         if item_indices is None:
             # Case 'full': prediction on all items
             return predictions  # [batch_size, n_items]
-        else:
-            # Case 'sampled': prediction on a sampled set of items
-            return predictions.gather(
-                1,
-                item_indices.to(predictions.device).clamp(
-                    max=self.n_items - 1
-                ),  # [batch_size, pad_seq]
-            )
+
+        # Case 'sampled': prediction on a sampled set of items
+        return predictions.gather(
+            1,
+            item_indices.to(predictions.device).clamp(
+                max=self.n_items - 1
+            ),  # [batch_size, pad_seq]
+        )

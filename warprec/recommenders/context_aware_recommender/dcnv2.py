@@ -1,7 +1,8 @@
 # pylint: disable = R0801, E1102
+from typing import Any, Optional, List
+
 import torch
 from torch import nn, Tensor
-from typing import Any, Optional, List
 
 from warprec.recommenders.base_recommender import (
     IterativeRecommender,
@@ -409,11 +410,10 @@ class DCNv2(ContextRecommenderUtils, IterativeRecommender):
 
                 preds_list.append(process_block(item_emb_block, feat_emb_block_tensor))
             return torch.cat(preds_list, dim=1)
-        else:
-            # Case 'sampled': process given item_indices
-            item_emb = self.item_embedding(item_indices)
+        # Case 'sampled': process given item_indices
+        item_emb = self.item_embedding(item_indices)
 
-            # Get feature embeddings for the specific items
-            feat_emb_tensor = self._get_feature_embeddings(item_indices)
+        # Get feature embeddings for the specific items
+        feat_emb_tensor = self._get_feature_embeddings(item_indices)
 
-            return process_block(item_emb, feat_emb_tensor)
+        return process_block(item_emb, feat_emb_tensor)

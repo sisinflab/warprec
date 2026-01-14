@@ -1,7 +1,8 @@
 # pylint: disable = R0801, E1102
+from typing import Any, Optional, List
+
 import torch
 from torch import nn, Tensor
-from typing import Any, Optional, List
 
 from warprec.recommenders.base_recommender import (
     IterativeRecommender,
@@ -58,6 +59,14 @@ class CIN(nn.Module):
             )
 
     def forward(self, x: Tensor) -> Tensor:
+        """The forward step of the CIN.
+
+        Args:
+            x (Tensor): The input tensor.
+
+        Returns:
+            Tensor: The output scores of the network.
+        """
         # x: [batch_size, num_fields, embedding_size]
         batch_size = x.shape[0]
         hidden_nn_layers = [x]
@@ -411,51 +420,50 @@ class xDeepFM(ContextRecommenderUtils, IterativeRecommender):
 
             return torch.cat(preds_list, dim=1)
 
-        else:
-            # Case 'sampled'
-            pad_seq = item_indices.size(1)
+        # Case 'sampled'
+        pad_seq = item_indices.size(1)
 
-            item_emb = self.item_embedding(item_indices)
-            item_bias = self.item_bias(item_indices).squeeze(-1)
+        item_emb = self.item_embedding(item_indices)
+        item_bias = self.item_bias(item_indices).squeeze(-1)
 
-            feat_emb_tensor = self._get_feature_embeddings(item_indices)
-            feat_bias = self._get_feature_bias(item_indices)
+        feat_emb_tensor = self._get_feature_embeddings(item_indices)
+        feat_bias = self._get_feature_bias(item_indices)
 
-            # Linear
-            linear_pred = fixed_linear.unsqueeze(1) + item_bias + feat_bias
+        # Linear
+        linear_pred = fixed_linear.unsqueeze(1) + item_bias + feat_bias
 
-            # Stack Construction
-            # User: [Batch, 1, 1, Emb] -> [Batch, Seq, 1, Emb]
-            u_emb_exp = u_emb.unsqueeze(1).unsqueeze(2).expand(-1, pad_seq, -1, -1)
+        # Stack Construction
+        # User: [Batch, 1, 1, Emb] -> [Batch, Seq, 1, Emb]
+        u_emb_exp = u_emb.unsqueeze(1).unsqueeze(2).expand(-1, pad_seq, -1, -1)
 
-            # Item: [Batch, Seq, Emb] -> [Batch, Seq, 1, Emb]
-            i_emb_exp = item_emb.unsqueeze(2)
+        # Item: [Batch, Seq, Emb] -> [Batch, Seq, 1, Emb]
+        i_emb_exp = item_emb.unsqueeze(2)
 
-            stack_list = [u_emb_exp, i_emb_exp]
+        stack_list = [u_emb_exp, i_emb_exp]
 
-            if feat_emb_tensor is not None:
-                stack_list.append(feat_emb_tensor)
+        if feat_emb_tensor is not None:
+            stack_list.append(feat_emb_tensor)
 
-            if ctx_emb_tensor is not None:
-                c_emb_exp = ctx_emb_tensor.unsqueeze(1).expand(-1, pad_seq, -1, -1)
-                stack_list.append(c_emb_exp)
+        if ctx_emb_tensor is not None:
+            c_emb_exp = ctx_emb_tensor.unsqueeze(1).expand(-1, pad_seq, -1, -1)
+            stack_list.append(c_emb_exp)
 
-            # Concatenate on Field dimension (dim=2)
-            stack = torch.cat(stack_list, dim=2)
+        # Concatenate on Field dimension (dim=2)
+        stack = torch.cat(stack_list, dim=2)
 
-            # Flatten to process the whole batch together
-            total_rows = batch_size * pad_seq
-            stack_flat = stack.view(total_rows, self.num_fields, self.embedding_size)
+        # Flatten to process the whole batch together
+        total_rows = batch_size * pad_seq
+        stack_flat = stack.view(total_rows, self.num_fields, self.embedding_size)
 
-            # Forward CIN
-            cin_out = self.cin(stack_flat)
-            cin_s = self.cin_linear(cin_out).squeeze(-1)
+        # Forward CIN
+        cin_out = self.cin(stack_flat)
+        cin_s = self.cin_linear(cin_out).squeeze(-1)
 
-            # Forward MLP
-            dnn_in = stack_flat.view(total_rows, -1)
-            dnn_out = self.mlp_layers(dnn_in)
-            dnn_s = self.dnn_linear(dnn_out).squeeze(-1)
+        # Forward MLP
+        dnn_in = stack_flat.view(total_rows, -1)
+        dnn_out = self.mlp_layers(dnn_in)
+        dnn_s = self.dnn_linear(dnn_out).squeeze(-1)
 
-            net_scores = (cin_s + dnn_s).view(batch_size, pad_seq)
+        net_scores = (cin_s + dnn_s).view(batch_size, pad_seq)
 
-            return linear_pred + net_scores
+        return linear_pred + net_scores

@@ -1,7 +1,8 @@
-# pylint: disable = R0801, E1102
+# pylint: disable = R0801, E1102, R0915
+from typing import Any, Optional, List
+
 import torch
 from torch import nn, Tensor
-from typing import Any, Optional, List
 
 from warprec.recommenders.base_recommender import (
     IterativeRecommender,
@@ -275,41 +276,40 @@ class NFM(ContextRecommenderUtils, IterativeRecommender):
 
             return torch.cat(preds_list, dim=1)
 
+        # Case 'sampled'
+        pad_seq = item_indices.size(1)
+
+        item_emb = self.item_embedding(item_indices)
+        item_b = self.item_bias(item_indices).squeeze(-1)
+
+        feat_emb_tensor = self._get_feature_embeddings(item_indices)
+        feat_b = self._get_feature_bias(item_indices)
+
+        # Linear Part
+        linear_pred = fixed_linear.unsqueeze(1) + item_b + feat_b
+
+        # Bi-Interaction Part
+        if feat_emb_tensor is not None:
+            item_feat_sum = item_emb + feat_emb_tensor.sum(dim=2)
+            item_feat_sq_sum = item_emb.pow(2) + feat_emb_tensor.pow(2).sum(dim=2)
         else:
-            # Case 'sampled'
-            pad_seq = item_indices.size(1)
+            item_feat_sum = item_emb
+            item_feat_sq_sum = item_emb.pow(2)
 
-            item_emb = self.item_embedding(item_indices)
-            item_b = self.item_bias(item_indices).squeeze(-1)
+        sum_v_fixed_exp = sum_v_fixed.unsqueeze(1)
+        sum_sq_v_fixed_exp = sum_sq_v_fixed.unsqueeze(1)
 
-            feat_emb_tensor = self._get_feature_embeddings(item_indices)
-            feat_b = self._get_feature_bias(item_indices)
+        sum_v_total_sq = (sum_v_fixed_exp + item_feat_sum).pow(2)
+        sum_sq_total = sum_sq_v_fixed_exp + item_feat_sq_sum
 
-            # Linear Part
-            linear_pred = fixed_linear.unsqueeze(1) + item_b + feat_b
+        bi_interaction = 0.5 * (sum_v_total_sq - sum_sq_total)
 
-            # Bi-Interaction Part
-            if feat_emb_tensor is not None:
-                item_feat_sum = item_emb + feat_emb_tensor.sum(dim=2)
-                item_feat_sq_sum = item_emb.pow(2) + feat_emb_tensor.pow(2).sum(dim=2)
-            else:
-                item_feat_sum = item_emb
-                item_feat_sq_sum = item_emb.pow(2)
+        # Flatten for MLP
+        bi_interaction_flat = bi_interaction.view(-1, self.embedding_size)
 
-            sum_v_fixed_exp = sum_v_fixed.unsqueeze(1)
-            sum_sq_v_fixed_exp = sum_sq_v_fixed.unsqueeze(1)
+        # Neural Part
+        bi_interaction_flat = self.batch_norm(bi_interaction_flat)
+        mlp_out = self.mlp_layers(bi_interaction_flat)
+        neural_pred = self.predict_layer(mlp_out).view(batch_size, pad_seq)
 
-            sum_v_total_sq = (sum_v_fixed_exp + item_feat_sum).pow(2)
-            sum_sq_total = sum_sq_v_fixed_exp + item_feat_sq_sum
-
-            bi_interaction = 0.5 * (sum_v_total_sq - sum_sq_total)
-
-            # Flatten for MLP
-            bi_interaction_flat = bi_interaction.view(-1, self.embedding_size)
-
-            # Neural Part
-            bi_interaction_flat = self.batch_norm(bi_interaction_flat)
-            mlp_out = self.mlp_layers(bi_interaction_flat)
-            neural_pred = self.predict_layer(mlp_out).view(batch_size, pad_seq)
-
-            return linear_pred + neural_pred
+        return linear_pred + neural_pred

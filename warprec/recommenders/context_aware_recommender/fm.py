@@ -1,7 +1,8 @@
 # pylint: disable = R0801, E1102
+from typing import Any, Optional
+
 import torch
 from torch import nn, Tensor
-from typing import Any, Optional
 
 from warprec.recommenders.base_recommender import (
     IterativeRecommender,

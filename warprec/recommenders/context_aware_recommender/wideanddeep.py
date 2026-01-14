@@ -1,7 +1,8 @@
-# pylint: disable = R0801, E1102
+# pylint: disable = R0801, E1102, R0915
+from typing import Any, Optional, List
+
 import torch
 from torch import nn, Tensor
-from typing import Any, Optional, List
 
 from warprec.recommenders.base_recommender import (
     IterativeRecommender,
@@ -269,43 +270,42 @@ class WideAndDeep(ContextRecommenderUtils, IterativeRecommender):
 
             return torch.cat(preds_list, dim=1)
 
-        else:
-            # Case 'sampled'
-            pad_seq = item_indices.size(1)
+        # Case 'sampled'
+        pad_seq = item_indices.size(1)
 
-            item_emb = self.item_embedding(item_indices)
-            item_b = self.item_bias(item_indices).squeeze(-1)
+        item_emb = self.item_embedding(item_indices)
+        item_b = self.item_bias(item_indices).squeeze(-1)
 
-            feat_emb_tensor = self._get_feature_embeddings(item_indices)
-            feat_b = self._get_feature_bias(item_indices)
+        feat_emb_tensor = self._get_feature_embeddings(item_indices)
+        feat_b = self._get_feature_bias(item_indices)
 
-            # Wide Part
-            wide_pred = fixed_wide.unsqueeze(1) + item_b + feat_b
+        # Wide Part
+        wide_pred = fixed_wide.unsqueeze(1) + item_b + feat_b
 
-            # Deep Part
-            # User: [Batch, Seq, 1, Emb]
-            u_exp = user_emb.unsqueeze(1).unsqueeze(2).expand(-1, pad_seq, -1, -1)
+        # Deep Part
+        # User: [Batch, Seq, 1, Emb]
+        u_exp = user_emb.unsqueeze(1).unsqueeze(2).expand(-1, pad_seq, -1, -1)
 
-            # Item: [Batch, Seq, 1, Emb]
-            i_exp = item_emb.unsqueeze(2)
+        # Item: [Batch, Seq, 1, Emb]
+        i_exp = item_emb.unsqueeze(2)
 
-            stack_list = [u_exp, i_exp]
+        stack_list = [u_exp, i_exp]
 
-            # Features: [Batch, Seq, N_Feat, Emb] (Already correct)
-            if feat_emb_tensor is not None:
-                stack_list.append(feat_emb_tensor)
+        # Features: [Batch, Seq, N_Feat, Emb] (Already correct)
+        if feat_emb_tensor is not None:
+            stack_list.append(feat_emb_tensor)
 
-            # Contexts: [Batch, Seq, N_Ctx, Emb]
-            if ctx_emb_tensor is not None:
-                c_exp = ctx_emb_tensor.unsqueeze(1).expand(-1, pad_seq, -1, -1)
-                stack_list.append(c_exp)
+        # Contexts: [Batch, Seq, N_Ctx, Emb]
+        if ctx_emb_tensor is not None:
+            c_exp = ctx_emb_tensor.unsqueeze(1).expand(-1, pad_seq, -1, -1)
+            stack_list.append(c_exp)
 
-            deep_input_block = torch.cat(stack_list, dim=2)
-            deep_input_flat = deep_input_block.view(
-                -1, self.num_fields * self.embedding_size
-            )
+        deep_input_block = torch.cat(stack_list, dim=2)
+        deep_input_flat = deep_input_block.view(
+            -1, self.num_fields * self.embedding_size
+        )
 
-            deep_out = self.mlp_layers(deep_input_flat)
-            deep_pred = self.deep_predict_layer(deep_out).view(batch_size, pad_seq)
+        deep_out = self.mlp_layers(deep_input_flat)
+        deep_pred = self.deep_predict_layer(deep_out).view(batch_size, pad_seq)
 
-            return wide_pred + deep_pred
+        return wide_pred + deep_pred

@@ -1,7 +1,8 @@
 # pylint: disable = R0801, E1102
+from typing import Any, Optional
+
 import torch
 from torch import nn, Tensor
-from typing import Any, Optional
 
 from warprec.recommenders.base_recommender import (
     IterativeRecommender,
@@ -17,6 +18,10 @@ class AttentionLayer(nn.Module):
     """Implements the Attention Network.
 
     Equation: a_ij = h^T ReLU(W(v_i * v_j) + b)
+
+    Args:
+        embedding_size (int): The embedding size value.
+        attention_size (int): The attention size value.
     """
 
     def __init__(self, embedding_size: int, attention_size: int):
@@ -28,6 +33,14 @@ class AttentionLayer(nn.Module):
         )
 
     def forward(self, x: Tensor) -> Tensor:
+        """The forward step of the attention layer.
+
+        Args:
+            x (Tensor): The input tensor.
+
+        Returns:
+            Tensor: The score tensor.
+        """
         # x: [batch_size, num_pairs, embedding_size]
         # scores: [batch_size, num_pairs, 1]
         logits = self.mlp(x)
@@ -37,7 +50,8 @@ class AttentionLayer(nn.Module):
 @model_registry.register(name="AFM")
 class AFM(ContextRecommenderUtils, IterativeRecommender):
     """Implementation of AFM algorithm from
-        Attentional Factorization Machines: Learning the Weight of Feature Interactions via Attention Networks, IJCAI 2017.
+        Attentional Factorization Machines: Learning the Weight of Feature Interactions
+        via Attention Networks, IJCAI 2017.
 
     For further details, check the `paper <https://arxiv.org/abs/1708.04617>`_.
 
@@ -352,49 +366,48 @@ class AFM(ContextRecommenderUtils, IterativeRecommender):
 
             return torch.cat(preds_list, dim=1)
 
-        else:
-            # Case 'sampled': process given item_indices
-            pad_seq = item_indices.size(1)
+        # Case 'sampled': process given item_indices
+        pad_seq = item_indices.size(1)
 
-            # Item Embeddings: [Batch, Seq, Emb]
-            item_emb = self.item_embedding(item_indices)
+        # Item Embeddings: [Batch, Seq, Emb]
+        item_emb = self.item_embedding(item_indices)
 
-            # Retrieve item feature embeddings & bias
-            # feat_emb_tensor: [Batch, Seq, Num_Feat, Emb]
-            feat_emb_tensor = self._get_feature_embeddings(item_indices)
-            feat_bias = self._get_feature_bias(item_indices)
+        # Retrieve item feature embeddings & bias
+        # feat_emb_tensor: [Batch, Seq, Num_Feat, Emb]
+        feat_emb_tensor = self._get_feature_embeddings(item_indices)
+        feat_bias = self._get_feature_bias(item_indices)
 
-            # Linear
-            item_bias = self.item_bias(item_indices).squeeze(-1)
-            linear_pred = fixed_linear.unsqueeze(1) + item_bias + feat_bias
+        # Linear
+        item_bias = self.item_bias(item_indices).squeeze(-1)
+        linear_pred = fixed_linear.unsqueeze(1) + item_bias + feat_bias
 
-            # Stack Construction
-            # User: [Batch, 1, 1, Emb] -> [Batch, Seq, 1, Emb]
-            u_emb_exp = u_emb.unsqueeze(1).unsqueeze(2).expand(-1, pad_seq, -1, -1)
+        # Stack Construction
+        # User: [Batch, 1, 1, Emb] -> [Batch, Seq, 1, Emb]
+        u_emb_exp = u_emb.unsqueeze(1).unsqueeze(2).expand(-1, pad_seq, -1, -1)
 
-            # Item: [Batch, Seq, Emb] -> [Batch, Seq, 1, Emb]
-            i_emb_exp = item_emb.unsqueeze(2)
+        # Item: [Batch, Seq, Emb] -> [Batch, Seq, 1, Emb]
+        i_emb_exp = item_emb.unsqueeze(2)
 
-            stack_list = [u_emb_exp, i_emb_exp]
+        stack_list = [u_emb_exp, i_emb_exp]
 
-            if feat_emb_tensor is not None:
-                stack_list.append(feat_emb_tensor)
+        if feat_emb_tensor is not None:
+            stack_list.append(feat_emb_tensor)
 
-            if ctx_emb_tensor is not None:
-                # Context: [Batch, Num_Ctx, Emb] -> [Batch, 1, Num_Ctx, Emb] -> [Batch, Seq, Num_Ctx, Emb]
-                c_emb_exp = ctx_emb_tensor.unsqueeze(1).expand(-1, pad_seq, -1, -1)
-                stack_list.append(c_emb_exp)
+        if ctx_emb_tensor is not None:
+            # Context: [Batch, Num_Ctx, Emb] -> [Batch, 1, Num_Ctx, Emb] -> [Batch, Seq, Num_Ctx, Emb]
+            c_emb_exp = ctx_emb_tensor.unsqueeze(1).expand(-1, pad_seq, -1, -1)
+            stack_list.append(c_emb_exp)
 
-            # Concatenate on Field dimension (dim=2)
-            # [Batch, Seq, Total_Fields, Emb]
-            stack = torch.cat(stack_list, dim=2)
+        # Concatenate on Field dimension (dim=2)
+        # [Batch, Seq, Total_Fields, Emb]
+        stack = torch.cat(stack_list, dim=2)
 
-            # Reshape to [Batch * Seq, Total_Fields, Emb]
-            total_rows = batch_size * pad_seq
-            stack_flat = stack.view(total_rows, self.num_fields, self.embedding_size)
+        # Reshape to [Batch * Seq, Total_Fields, Emb]
+        total_rows = batch_size * pad_seq
+        stack_flat = stack.view(total_rows, self.num_fields, self.embedding_size)
 
-            # AFM part
-            afm_scores_flat = self._compute_afm_interaction(stack_flat)
-            afm_scores = afm_scores_flat.view(batch_size, pad_seq)
+        # AFM part
+        afm_scores_flat = self._compute_afm_interaction(stack_flat)
+        afm_scores = afm_scores_flat.view(batch_size, pad_seq)
 
-            return linear_pred + afm_scores
+        return linear_pred + afm_scores

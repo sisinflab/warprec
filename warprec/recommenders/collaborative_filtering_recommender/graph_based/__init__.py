@@ -1,4 +1,4 @@
-# pylint: disable = R0903
+# pylint: disable = R0903, R0401
 from .rp3beta import RP3Beta
 
 __all__ = ["RP3Beta"]
