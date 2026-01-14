@@ -2,12 +2,18 @@ reader:
   loading_strategy: dataset
   data_type: transaction
   reading_method: local
-  local_path: path/to/your/dataset.tsv
+  local_path: path/to/my/dataset.csv
   rating_type: explicit
+  sep: ','
+  labels:
+    user_id_label: user_id
+    item_id_label: item_id
+    rating_label: rating
+    timestamp_label: timestamp
 writer:
-  dataset_name: MyDataset
+  dataset_name: MyExperiment
   writing_method: local
-  local_experiment_path: experiment/test/
+  local_experiment_path: experiments/test/
 splitter:
   test_splitting:
     strategy: temporal_holdout
@@ -17,7 +23,7 @@ models:
     k: 100
     similarity: cosine
 evaluation:
-  top_k: [5, 10]
+  top_k: [10, 20, 50]
+  metrics: [nDCG, Precision, Recall, HitRate]
   strategy: sampled
-  num_negatives: 100
-  metrics: [Precision, Recall, nDCG]
+  num_negatives: 99

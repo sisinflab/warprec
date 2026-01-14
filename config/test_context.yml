@@ -1,0 +1,93 @@
+reader:
+  loading_strategy: split
+  data_type: transaction
+  reading_method: local
+  rating_type: explicit
+  labels:
+    user_id_label: user_id
+    item_id_label: item_id
+    rating_label: rating
+    context_labels: [
+        "daytime_afternoon",
+        "daytime_evening",
+        "daytime_morning",
+        "daytime_night",
+        "daytime_noon",
+        "daytime_sunrise",
+        "daytime_sunset",
+        "weather_cloudy",
+        "weather_drizzle",
+        "weather_foggy",
+        "weather_rainy",
+        "weather_snowy",
+        "weather_stormy",
+        "weather_sunny",
+        "weather_unknown",
+        "isweekend_weekend",
+        "isweekend_workday",
+        "homework_home",
+        "homework_unknown",
+        "homework_work",
+    ]
+  split:
+    local_path: tests/frappe/
+    ext: .csv
+writer:
+  dataset_name: Frappe
+  writing_method: local
+  local_experiment_path: experiment/test/
+models:
+  AFM:
+    embedding_size: 16
+    attention_size: 16
+    dropout: 0.3
+    reg_weight: 0.001
+    weight_decay: 0.0001
+    batch_size: 2048
+    epochs: 1
+    learning_rate: 0.001
+    neg_samples: 2
+  # DCN:
+  #   embedding_size: 64
+  #   mlp_hidden_size: [64, 32]
+  #   cross_layer_num: 2
+  #   dropout: 0.3
+  #   reg_weight: 0.001
+  #   weight_decay: 0.0001
+  #   batch_size: 2048
+  #   epochs: 1
+  #   learning_rate: 0.001
+  #   neg_samples: 2
+  # DCNv2:
+  #   embedding_size: 64
+  #   model_structure: stacked
+  #   use_mixed: False
+  #   expert_num: 2
+  #   low_rank: 32
+  #   mlp_hidden_size: [64, 32]
+  #   cross_layer_num: 2
+  #   dropout: 0.3
+  #   reg_weight: 0.001
+  #   weight_decay: 0.0001
+  #   batch_size: 2048
+  #   epochs: 1
+  #   learning_rate: 0.001
+  #   neg_samples: 2
+  # xDeepFM:
+  #   embedding_size: 16
+  #   mlp_hidden_size: [8]
+  #   cin_layer_size: [8]
+  #   dropout: 0.3
+  #   direct: True
+  #   eval_chunk_size: 4096
+  #   reg_weight: 0.001
+  #   weight_decay: 0.0001
+  #   batch_size: 2048
+  #   epochs: 1
+  #   learning_rate: 0.001
+  #   neg_samples: 2
+evaluation:
+  top_k: [10, 20, 50]
+  metrics: [nDCG, Precision, Recall, HitRate]
+  strategy: sampled
+  num_negatives: 99
