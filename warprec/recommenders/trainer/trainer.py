@@ -1,12 +1,12 @@
 import os
-import torch
 import uuid
 import math
 from typing import List, Tuple, Optional, Dict, Any, Callable
 from copy import deepcopy
 
-import ray
+import torch
 import numpy as np
+import ray
 from ray import tune
 from ray.tune import Tuner, TuneConfig, CheckpointConfig
 from ray.tune import RunConfig
@@ -46,13 +46,14 @@ from warprec.utils.registry import (
 )
 
 try:
+    # pylint: disable = ungrouped-imports
     from ray.air.integrations.wandb import WandbLoggerCallback
     from ray.air.integrations.mlflow import MLflowLoggerCallback
     from codecarbon import EmissionsTracker
 
     DASHBOARD_AVAILABLE = True
 
-except Exception:
+except ImportError:
     DASHBOARD_AVAILABLE = False
 
 
@@ -63,7 +64,7 @@ class Trainer:
         custom_callback (WarpRecCallback): The custom callback to use
             during training and evaluation. Default is an empty
             WarpRecCallback instance.
-        custom_models (str | List[str]): The list of custom models to load.
+        custom_models (Optional[str | List[str]]): The list of custom models to load.
         enable_wandb (bool): Wether or not to enable Wandb.
         team_wandb (Optional[str]): The name of the Wandb team.
         project_wandb (str): The name of the Wandb project.
@@ -71,7 +72,7 @@ class Trainer:
         api_key_file_wandb (Optional[str]): The path to the Wandb
             API key file.
         api_key_wandb (Optional[str]): The Wandb API key.
-        excludes_wandb (list): The list of parameters to exclude
+        excludes_wandb (Optional[List[str]] ): The list of parameters to exclude
             from Wandb logging.
         log_config_wandb (bool): Wether or not to log the config
             in Wandb.
@@ -90,7 +91,7 @@ class Trainer:
         tracking_uri_mlflow (str): The URI of the MLflow tracking server.
         registry_uri_mlflow (str): The URI of the MLflow model registry.
         experiment_name_mlflow (Optional[str]): The name of the MLflow experiment.
-        tags_mlflow (dict): The tags to be added to the MLflow run.
+        tags_mlflow (Optional[dict]): The tags to be added to the MLflow run.
         tracking_token_mlflow (Optional[str]): The token for MLflow tracking.
         save_artifacts_mlflow (bool): Wether or not to save artifacts
             in MLflow.
@@ -100,14 +101,14 @@ class Trainer:
     def __init__(
         self,
         custom_callback: WarpRecCallback = WarpRecCallback(),
-        custom_models: str | List[str] = [],
+        custom_models: Optional[str | List[str]] = None,
         enable_wandb: bool = False,
         team_wandb: Optional[str] = None,
         project_wandb: str = "WarpRec",
         group_wandb: Optional[str] = None,
         api_key_file_wandb: Optional[str] = None,
         api_key_wandb: Optional[str] = None,
-        excludes_wandb: list = [],
+        excludes_wandb: Optional[List[str]] = None,
         log_config_wandb: bool = False,
         upload_checkpoints_wandb: bool = False,
         enable_codecarbon: bool = False,
@@ -119,11 +120,17 @@ class Trainer:
         tracking_uri_mlflow: str = "mlruns/",
         registry_uri_mlflow: str = "mlruns/",
         experiment_name_mlflow: Optional[str] = None,
-        tags_mlflow: dict = {},
+        tags_mlflow: Optional[dict] = None,
         tracking_token_mlflow: Optional[str] = None,
         save_artifacts_mlflow: bool = False,
         config: TrainConfiguration = None,
     ):
+        if custom_models is None:
+            custom_models = []
+        if excludes_wandb is None:
+            excludes_wandb = []
+        if tags_mlflow is None:
+            tags_mlflow = {}
         if config:
             dashboard = config.dashboard
         else:
@@ -238,7 +245,7 @@ class Trainer:
         result_df = results.get_dataframe(
             filter_metric=validation_score, filter_mode=mode
         )
-        analysis = results._experiment_analysis
+        analysis = results._experiment_analysis  # pylint: disable = protected-access
 
         # Retrieve the correct DF row
         if mode == "max":
@@ -256,7 +263,7 @@ class Trainer:
         # Find the best checkpoint through ExperimentAnalysis object
         for trial in analysis.trials:
             if trial.trial_id == best_trial_id:
-                checkpoints = analysis._get_trial_checkpoints_with_metric(trial)
+                checkpoints = analysis._get_trial_checkpoints_with_metric(trial)  # pylint: disable = protected-access
                 best_checkpoint, _ = max(checkpoints, key=lambda item: item[1])  # type: ignore[arg-type, return-value]
 
                 break  # Nothing more to do
@@ -448,9 +455,7 @@ class Trainer:
         )
 
         # Order by mean to find best hyperparameters (ordering will be dependent on mode)
-        best_config_df = agg_df.sort_values(
-            by="mean_score", ascending=True if mode == "min" else False
-        )
+        best_config_df = agg_df.sort_values(by="mean_score", ascending=mode == "min")
         best_hyperparameters_row = best_config_df.iloc[0]
         best_mean_score = best_hyperparameters_row["mean_score"]
         best_std_score = best_hyperparameters_row["std_score"]
@@ -538,7 +543,9 @@ class Trainer:
         return tune_params
 
     def trail_name(self, model_name: str):
-        def _trial_name_creator(trial: Trial):
+        """Custom name generator function."""
+
+        def _trial_name_creator(trial: Trial):  # pylint: disable = unused-argument
             random_id = str(uuid.uuid4())[:8]
 
             return f"{model_name}_{random_id}"
@@ -784,6 +791,16 @@ class Trainer:
 
 
 class CodeCarbonCallback(tune.Callback):
+    """Custom CodeCarbon callback for Ray Tune.
+
+    Args:
+        save_to_api (bool): Wether or not to save results to API.
+        save_to_file (bool): Wether or not to save results to file.
+        output_dir (str): The path to the directory where
+            to save results locally.
+        tracking_mode (str): The mode to use during the tracking process.
+    """
+
     def __init__(
         self,
         save_to_api: bool = False,
@@ -800,7 +817,7 @@ class CodeCarbonCallback(tune.Callback):
         # Check if local output dir exists
         os.makedirs(self.output_dir, exist_ok=True)
 
-    def on_trial_start(self, iteration, trials, trial, **info):
+    def on_trial_start(self, iteration, trials, trial, **info):  # pylint: disable = unused-argument
         tracker = EmissionsTracker(
             save_to_api=self.save_to_api,
             save_to_file=self.save_to_file,
@@ -810,12 +827,12 @@ class CodeCarbonCallback(tune.Callback):
         tracker.start()
         self.trackers[trial.trial_id] = tracker
 
-    def on_trial_complete(self, iteration, trials, trial, **info):
+    def on_trial_complete(self, iteration, trials, trial, **info):  # pylint: disable = unused-argument
         tracker = self.trackers.pop(trial.trial_id, None)
         if tracker:
             tracker.stop()
 
-    def on_trial_fail(self, iteration, trials, trial, **info):
+    def on_trial_fail(self, iteration, trials, trial, **info):  # pylint: disable = unused-argument, missing-function-docstring
         tracker = self.trackers.pop(trial.trial_id, None)
         if tracker:
             tracker.stop()
