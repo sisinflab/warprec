@@ -1,3 +1,4 @@
+# pylint: disable = R0801
 from io import StringIO, BytesIO
 from typing import List, Dict, Tuple, Optional, Any
 
