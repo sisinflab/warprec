@@ -103,6 +103,7 @@ class WriterConfig(BaseModel):
 
     @model_validator(mode="after")
     def model_validation(self):
+        """Validation of the WriterConfig model."""
         if self.writing_method == WritingMethods.LOCAL:
             if not self.local_experiment_path:
                 raise ValueError(
@@ -114,5 +115,5 @@ class WriterConfig(BaseModel):
                 raise ValueError(
                     f"The local path provided {self.local_experiment_path} "
                     f"is not accessible or writable. Error: {e}"
-                )
+                ) from e
         return self
