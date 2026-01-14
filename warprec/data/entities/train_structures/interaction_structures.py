@@ -55,9 +55,9 @@ class LazyInteractionDataset(Dataset):
         if self.include_user_id:
             # Return also the user indices
             return torch.tensor(idx, dtype=torch.long), user_tensor
-        else:
-            # Normal behavior
-            return (user_tensor,)
+
+        # Normal behavior
+        return (user_tensor,)
 
 
 class LazyItemRatingDataset(Dataset):
