@@ -731,72 +731,85 @@ class LightSANs(RecomModel):
     @field_validator("embedding_size")
     @classmethod
     def check_embedding_size(cls, v: list):
+        """Validate embedding_size."""
         return validate_greater_than_zero(cls, v, "embedding_size")
 
     @field_validator("n_layers")
     @classmethod
     def check_n_layers(cls, v: list):
+        """Validate n_layers."""
         return validate_greater_than_zero(cls, v, "n_layers")
 
     @field_validator("n_heads")
     @classmethod
     def check_n_heads(cls, v: list):
+        """Validate n_heads."""
         return validate_greater_than_zero(cls, v, "n_heads")
 
     @field_validator("k_interests")
     @classmethod
     def check_k_interests(cls, v: list):
+        """Validate k_interests."""
         return validate_greater_than_zero(cls, v, "k_interests")
 
     @field_validator("inner_size")
     @classmethod
     def check_inner_size(cls, v: list):
+        """Validate inner_size."""
         return validate_greater_than_zero(cls, v, "inner_size")
 
     @field_validator("dropout_prob")
     @classmethod
     def check_dropout_prob(cls, v: list):
+        """Validate dropout_prob."""
         return validate_between_zero_and_one(cls, v, "dropout_prob")
 
     @field_validator("attn_dropout_prob")
     @classmethod
     def check_attn_dropout_prob(cls, v: list):
+        """Validate attn_dropout_prob."""
         return validate_between_zero_and_one(cls, v, "attn_dropout_prob")
 
     @field_validator("reg_weight")
     @classmethod
     def check_reg_weight(cls, v: list):
+        """Validate reg_weight."""
         return validate_greater_equal_than_zero(cls, v, "reg_weight")
 
     @field_validator("weight_decay")
     @classmethod
     def check_weight_decay(cls, v: list):
+        """Validate weight_decay."""
         return validate_greater_equal_than_zero(cls, v, "weight_decay")
 
     @field_validator("batch_size")
     @classmethod
     def check_batch_size(cls, v: list):
+        """Validate batch_size."""
         return validate_greater_than_zero(cls, v, "batch_size")
 
     @field_validator("epochs")
     @classmethod
     def check_epochs(cls, v: list):
+        """Validate epochs."""
         return validate_greater_than_zero(cls, v, "epochs")
 
     @field_validator("learning_rate")
     @classmethod
     def check_learning_rate(cls, v: list):
+        """Validate learning_rate."""
         return validate_greater_than_zero(cls, v, "learning_rate")
 
     @field_validator("neg_samples")
     @classmethod
     def check_neg_samples(cls, v: list):
-        # Can be 0 for CrossEntropy
+        """Validate neg_samples."""
         return validate_greater_equal_than_zero(cls, v, "neg_samples")
 
     @field_validator("max_seq_len")
     @classmethod
     def check_max_seq_len(cls, v: list):
+        """Validate max_seq_len."""
         return validate_greater_than_zero(cls, v, "max_seq_len")
 
 
