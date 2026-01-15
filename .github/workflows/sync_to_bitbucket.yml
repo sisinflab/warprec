@@ -1,0 +1,66 @@
+name: Sync Merged PR to Bitbucket
+
+on:
+  pull_request:
+    branches: [main]
+    types: [closed]
+
+jobs:
+  sync:
+    if: github.event.pull_request.merged == true
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+
+      - name: Set SOURCE_BRANCH output
+        id: vars
+        run: echo "SOURCE_BRANCH=${{ github.event.pull_request.head_ref }}" >> $GITHUB_OUTPUT
+
+      - name: Push to Bitbucket target branch
+        env:
+          BITBUCKET_TOKEN: ${{ secrets.BITBUCKET_TOKEN }}
+          BITBUCKET_WORKSPACE: ${{ secrets.BITBUCKET_WORKSPACE }}
+          BITBUCKET_REPO: ${{ secrets.BITBUCKET_REPO }}
+        run: |
+          git remote add bitbucket https://x-token-auth:${BITBUCKET_TOKEN}@bitbucket.org/${BITBUCKET_WORKSPACE}/${BITBUCKET_REPO}.git || true
+          SOURCE_BRANCH="${{ steps.vars.outputs.SOURCE_BRANCH }}"
+          git checkout -b $SOURCE_BRANCH
+          git push bitbucket $SOURCE_BRANCH --force --verbose
+
+      - name: Create Bitbucket PR
+        env:
+          BITBUCKET_TOKEN: ${{ secrets.BITBUCKET_TOKEN }}
+          BITBUCKET_WORKSPACE: ${{ secrets.BITBUCKET_WORKSPACE }}
+          BITBUCKET_REPO: ${{ secrets.BITBUCKET_REPO }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_URL: ${{ github.event.pull_request.html_url }}
+          REVIEWER_1_UUID: "{eba0ea30-5453-4bc6-8d6b-35ad3167d644}"
+        run: |
+          SOURCE_BRANCH="${{ steps.vars.outputs.SOURCE_BRANCH }}"
+          curl -v -X POST \
+            -H "Authorization: Bearer ${BITBUCKET_TOKEN}" \
+            -H "Content-Type: application/json" \
+            -H "Accept: application/json" \
+            "https://api.bitbucket.org/2.0/repositories/${BITBUCKET_WORKSPACE}/${BITBUCKET_REPO}/pullrequests" \
+            -d "{
+              \"title\": \"Sync merged GitHub PR #${PR_NUMBER} (${SOURCE_BRANCH})\",
+              \"description\": \"Automated sync from GitHub PR #${PR_NUMBER}: ${PR_URL}\",
+              \"source\": {
+                \"branch\": {
+                  \"name\": \"${SOURCE_BRANCH}\"
+                }
+              },
+              \"destination\": {
+                \"branch\": {
+                  \"name\": \"main\"
+                }
+              },
+              \"reviewers\": [
+                { \"uuid\": \"${REVIEWER_1_UUID}\" }
+              ],
+              \"close_source_branch\": false
+            }"
