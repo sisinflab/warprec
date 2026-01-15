@@ -1,4 +1,4 @@
-# pylint: disable=arguments-differ, unused-argument, line-too-long
+# pylint: disable=arguments-differ, unused-argument, line-too-long, duplicate-code
 from typing import Any, Set
 
 import torch
@@ -147,9 +147,9 @@ class MAP(TopKMetric):
     def compute(self):
         """Computes the final MAP@K value."""
         if self.compute_per_user:
-            map = self.ap  # Return the tensor with per_user metric
+            map_ = self.ap  # Return the tensor with per_user metric
         else:
-            map = (
+            map_ = (
                 self.ap / self.users if self.users > 0 else torch.tensor(0.0)
             ).item()  # Return the metric value
-        return {self.name: map}
+        return {self.name: map_}

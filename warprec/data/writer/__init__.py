@@ -1,3 +1,4 @@
+# pylint: disable=too-few-public-methods, cyclic-import
 from .base_writer import Writer, WriterFactory
 from .local_writer import LocalWriter
 

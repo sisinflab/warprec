@@ -39,8 +39,9 @@ class WarpRecCallbackConfig(BaseModel):
     @field_validator("callback_path")
     @classmethod
     def check_callback_path(cls, v: str):
+        """Validate callback_path."""
         if v is None:
-            return
+            return None
 
         if not isinstance(v, str):
             raise ValueError(
@@ -80,7 +81,7 @@ class WarpRecCallbackConfig(BaseModel):
             )
             return self
         except Exception as e:
-            raise ValueError(f"Error validating custom callback: {e}")
+            raise ValueError(f"Error validating custom callback: {e}") from e
 
     def _load_and_validate_custom_callback_class(
         self, module_path: str, class_name: str

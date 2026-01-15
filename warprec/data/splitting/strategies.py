@@ -150,7 +150,8 @@ class TimestampSlicingSplit(SplittingStrategy):
     some users might be completely cut out of the train or the test. With the best
     strategy we ensure that the most amount of users will be represented in both sets.
 
-    For further details about the 'best' timestamp, check the `paper <https://link.springer.com/chapter/10.1007/978-3-030-15712-8_63>`_.
+    For further details about the 'best' timestamp,
+        check the `paper <https://link.springer.com/chapter/10.1007/978-3-030-15712-8_63>`_.
 
     Timestamp must be provided to use this strategy.
     """
@@ -290,7 +291,10 @@ class RandomHoldoutSplit(SplittingStrategy):
         first_partition_idxs = permuted[n_partition:]
         second_partition_idxs = permuted[:n_partition]
 
-        return [(data.loc[first_partition_idxs], data.loc[second_partition_idxs])]  # type: ignore[return-value]
+        # Split the data using pre-compute indices
+        first_split = data.loc[first_partition_idxs]
+        second_split = data.loc[second_partition_idxs]
+        return [(first_split, second_split)]
 
 
 @splitting_registry.register(SplittingStrategies.RANDOM_LEAVE_K_OUT)
@@ -394,8 +398,7 @@ class KFoldCrossValidation(SplittingStrategy):
 
         def infinite_looper(folds: int = 5):
             while True:
-                for f in range(folds):
-                    yield f
+                yield from range(folds)
 
         looper = infinite_looper(folds)
         return [next(looper) for _ in range(length)]

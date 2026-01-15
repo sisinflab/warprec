@@ -132,7 +132,7 @@ class LightGCL(IterativeRecommender, GraphRecommenderUtils):
 
         # Perform SVD
         # U: [N, q], S: [q], Vt: [q, N]
-        u, s, vt = sp.linalg.svds(norm_adj, k=self.q)
+        u, s, _ = sp.linalg.svds(norm_adj, k=self.q)
 
         # Handle negative strides from scipy svds
         u = u.copy()
@@ -167,7 +167,7 @@ class LightGCL(IterativeRecommender, GraphRecommenderUtils):
         """Applies edge dropout to the torch_sparse.SparseTensor."""
         if self.training and self.dropout > 0:
             # Extract values from SparseTensor
-            row, col, val = adj.coo()
+            _, _, val = adj.coo()
 
             # Create dropout mask
             mask = torch.rand(val.size(0), device=val.device) > self.dropout

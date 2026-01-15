@@ -277,6 +277,7 @@ class Sessions:
                 - Tensor: Positive item tensor.
                 - Optional[Tensor]: Negative item tensor.
         """
+        # pylint: disable=too-many-statements
         # Retrieve the processed and sorted DataFrame
         sorted_df = self._get_processed_data()
 
@@ -560,6 +561,7 @@ class Sessions:
                 - Tensor: Padded positive item sequences.
                 - Tensor: Padded negative item samples.
         """
+        # pylint: disable=too-many-statements
         user_sessions = self._get_user_sessions()
 
         # Compute lengths and filter out sessions too short for training (< 2 items)
@@ -833,9 +835,7 @@ class Sessions:
 
         max_masked_items = 0
 
-        for i in range(len(padded_seqs)):
-            seq = padded_seqs[i]
-
+        for i, seq in enumerate(padded_seqs):
             # Find valid indices (non-padded)
             valid_indices = (seq != self._niid).nonzero(as_tuple=True)[0]
             if len(valid_indices) == 0:

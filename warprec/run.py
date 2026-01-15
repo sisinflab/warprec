@@ -2,19 +2,31 @@ import argparse
 from argparse import Namespace
 from pathlib import Path
 
-from warprec.pipelines import design_pipeline, train_pipeline
+from warprec.pipelines import design_pipeline, train_pipeline, eval_pipeline
 
 
 def main(args: Namespace):
+    """Main Warprec access point.
+
+    This function will parse and pass the correct arguments
+    to the pre-constructed Warprec pipelines.
+
+    Args:
+        args (Namespace): The arguments passed from CLI.
+
+    Raises:
+        FileNotFoundError: If the configuration file cannot be found.
+        ValueError: If the pipeline selected is not supported.
+    """
     path = args.config
     pipeline = args.pipeline.lower()
 
     if not Path(path).is_file():
         raise FileNotFoundError(f"Configuration file not found at: {path}")
 
-    if pipeline not in ["train", "design"]:
+    if pipeline not in ["train", "design", "eval"]:
         raise ValueError(
-            f"Invalid pipeline specified: {pipeline}. Choose 'train' or 'design'."
+            f"Invalid pipeline specified: {pipeline}. Choose 'train', 'design' or 'eval'."
         )
 
     match pipeline:
@@ -22,6 +34,8 @@ def main(args: Namespace):
             train_pipeline(path)
         case "design":
             design_pipeline(path)
+        case "eval":
+            eval_pipeline(path)
 
 
 if __name__ == "__main__":
@@ -48,5 +62,5 @@ if __name__ == "__main__":
     )
 
     # Parse arguments and execute main function
-    args = parser.parse_args()
-    main(args)
+    cli_args = parser.parse_args()
+    main(cli_args)

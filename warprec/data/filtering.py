@@ -9,6 +9,7 @@ from warprec.utils.logger import logger
 from warprec.utils.registry import filter_registry
 
 
+# pylint: disable = unused-argument
 class Filter(ABC):
     """Abstract definition of a filter.
     Filters are used to process datasets by applying specific conditions
@@ -259,6 +260,7 @@ class IterativeKCore(Filter):
     """
 
     def __init__(self, min_interactions: int, **kwargs: Any):
+        super().__init__(**kwargs)
         if min_interactions <= 0:
             raise ValueError("min_interactions must be a positive integer.")
         self.user_core = UserMin(min_interactions, **kwargs)
@@ -298,6 +300,7 @@ class NRoundsKCore(Filter):
     """
 
     def __init__(self, rounds: int, min_interactions: int, **kwargs: Any):
+        super().__init__(**kwargs)
         if rounds <= 0:
             raise ValueError("rounds must be a positive integer.")
         if min_interactions <= 0:

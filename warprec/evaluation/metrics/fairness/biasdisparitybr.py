@@ -1,7 +1,9 @@
+# pylint: disable=arguments-differ, unused-argument, line-too-long, duplicate-code
 from typing import Any, Set
 
 import torch
 from torch import Tensor
+
 from warprec.utils.registry import metric_registry
 from warprec.utils.enums import MetricBlock
 from warprec.evaluation.metrics.base_metric import TopKMetric

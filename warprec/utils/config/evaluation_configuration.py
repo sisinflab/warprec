@@ -143,7 +143,7 @@ class EvaluationConfig(BaseModel):
 
                 continue  # Skip normal metric check
 
-            elif match_efd_epc:
+            if match_efd_epc:
                 relevance = match_efd_epc.group(2)
 
                 if relevance.lower() not in supported_relevance:

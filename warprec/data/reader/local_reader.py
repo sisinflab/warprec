@@ -16,7 +16,7 @@ class LocalReader(Reader):
         self,
         local_path: str,
         column_names: Optional[List[str]] = None,
-        dtypes: Optional[Dict[str, str]] = {},
+        dtypes: Optional[Dict[str, str]] = None,
         sep: str = "\t",
         header: bool = True,
         *args: Any,
@@ -40,6 +40,8 @@ class LocalReader(Reader):
             DataFrame: A pandas DataFrame containing the tabular data. Returns an empty DataFrame
                 if the blob is not found.
         """
+        if dtypes is None:
+            dtypes = {}
         path = Path(local_path)
         if not path.exists():
             # Return an empty df that the split logic can check

@@ -112,14 +112,12 @@ class LightSANsLayer(nn.Module):
         v_tilde = torch.matmul(d_scores_t, v)
 
         # Item-to-Interest Interaction
-        # [batch_size, n_heads, seq_len, head_dim] * [batch_size, n_heads, head_dim, k] -> [batch_size, n_heads, seq_len, k]
         attn_item_scores = torch.matmul(q, k_tilde.transpose(-1, -2))
         attn_item_scores = attn_item_scores / (self.head_dim**0.5)
         attn_item_probs = F.softmax(attn_item_scores, dim=-1)
         attn_item_probs = self.attn_dropout(attn_item_probs)
 
         # Context Representation: A_item * V_tilde
-        # [batch_size, n_heads, seq_len, k] * [batch_size, n_heads, k, head_dim] -> [batch_size, n_heads, seq_len, head_dim]
         context_layer = torch.matmul(attn_item_probs, v_tilde)
 
         # Decoupled Position Encoding
@@ -145,7 +143,6 @@ class LightSANsLayer(nn.Module):
         attn_pos_probs = self.attn_dropout(attn_pos_probs)
 
         # Position Context: A_pos * V (Original V)
-        # [1, n_heads, seq_len, seq_len] * [batch_size, n_heads, seq_len, head_dim] -> [batch_size, n_heads, seq_len, head_dim]
         # We unsqueeze dim 0 to broadcast across batch
         pos_context = torch.matmul(attn_pos_probs.unsqueeze(0), v)
 

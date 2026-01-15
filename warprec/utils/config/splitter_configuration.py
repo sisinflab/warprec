@@ -28,6 +28,7 @@ class SplitStrategy(BaseModel):
     @field_validator("timestamp")
     @classmethod
     def check_timestamp(cls, v: Optional[Union[int, str]]):
+        """Validate timestamp."""
         if v and isinstance(v, str):
             if v != "best":
                 raise ValueError(
@@ -45,18 +46,26 @@ class SplitStrategy(BaseModel):
         """
         # ValueError checks
         if (
-            self.strategy == SplittingStrategies.TEMPORAL_HOLDOUT
-            or self.strategy == SplittingStrategies.RANDOM_HOLDOUT
-        ) and self.ratio is None:
+            self.strategy
+            in (
+                SplittingStrategies.TEMPORAL_HOLDOUT,
+                SplittingStrategies.RANDOM_HOLDOUT,
+            )
+            and self.ratio is None
+        ):
             raise ValueError(
                 f"You have chosen {self.strategy.value} splitting but "
                 "the ratio field has not been filled."
             )
 
         if (
-            self.strategy == SplittingStrategies.TEMPORAL_LEAVE_K_OUT
-            or self.strategy == SplittingStrategies.RANDOM_LEAVE_K_OUT
-        ) and self.k is None:
+            self.strategy
+            in (
+                SplittingStrategies.TEMPORAL_LEAVE_K_OUT,
+                SplittingStrategies.RANDOM_LEAVE_K_OUT,
+            )
+            and self.k is None
+        ):
             raise ValueError(
                 f"You have chosen {self.strategy.value} splitting but "
                 "the k field has not been filled."

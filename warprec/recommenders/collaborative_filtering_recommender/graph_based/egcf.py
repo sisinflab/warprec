@@ -151,11 +151,10 @@ class EGCF(IterativeRecommender, GraphRecommenderUtils):
         if isinstance(sparse_mat, Tensor):
             # Standard PyTorch sparse tensor
             return torch.sparse.mm(sparse_mat, dense_mat)
-        elif isinstance(sparse_mat, SparseTensor):
+        if isinstance(sparse_mat, SparseTensor):
             # torch_sparse.SparseTensor
             return sparse_mat.matmul(dense_mat)
-        else:
-            raise TypeError(f"Unsupported sparse matrix type: {type(sparse_mat)}")
+        raise TypeError(f"Unsupported sparse matrix type: {type(sparse_mat)}")
 
     def get_dataloader(
         self,
@@ -218,8 +217,7 @@ class EGCF(IterativeRecommender, GraphRecommenderUtils):
 
         if self.mode == "parallel":
             return self._forward_parallel()
-        else:
-            return self._forward_alternating()
+        return self._forward_alternating()
 
     def _forward_alternating(self) -> Tuple[Tensor, Tensor]:
         """Alternating Iteration.

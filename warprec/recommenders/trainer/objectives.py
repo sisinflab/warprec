@@ -1,3 +1,4 @@
+# pylint: disable = too-many-branches, too-many-statements
 import os
 import tempfile
 import types
@@ -73,7 +74,7 @@ def objective_function(
     chunk_size: int = 4096,
     beta: float = 1.0,
     pop_ratio: float = 0.8,
-    custom_models: List[str] = [],
+    custom_models: Optional[List[str]] = None,
 ) -> None:
     """Objective function to optimize the hyperparameters.
 
@@ -103,13 +104,16 @@ def objective_function(
             Defaults to 4096.
         beta (float): The beta value to initialize the Evaluator.
         pop_ratio (float): The pop_ratio value to initialize the Evaluator.
-        custom_models (List[str]): List of custom models to import.
-            Defaults to an empty list.
+        custom_models (Optional[List[str]]): List of custom models to import.
+            Defaults to None.
 
     Returns:
         None: This function reports metrics and checkpoints to Ray Tune
             via `tune.report()` and does not explicitly return a value.
     """
+    if custom_models is None:
+        custom_models = []
+
     # Memory reporting
     process = psutil.Process(os.getpid())
     initial_ram_mb = process.memory_info().rss / 1024**2
@@ -296,7 +300,7 @@ def objective_function(
                 **memory_report,
             )
 
-    except Exception as e:
+    except Exception as e:  # pylint: disable=broad-exception-caught
         logger.negative(
             f"The fitting of the model {model_name}, failed "
             f"with parameters: {params}. Error: {e}"
@@ -305,6 +309,15 @@ def objective_function(
 
 
 def objective_function_ddp(config: dict) -> None:
+    """The objective function definition for DDP training.
+
+    Args:
+        config (dict): The configuration of the training.
+
+    Raises:
+        ValueError: If the parameter are not valid or
+            if the model is not trainable.
+    """
     # Monitor memory consumption
     process = psutil.Process(os.getpid())
     initial_ram_mb = process.memory_info().rss / 1024**2
@@ -539,8 +552,41 @@ def driver_function_ddp(
     chunk_size: int = 4096,
     beta: float = 1.0,
     pop_ratio: float = 0.8,
-    custom_models: List[str] = [],
+    custom_models: Optional[List[str]] = None,
 ):
+    """The driver function used to run the real objective during
+        the tuning process.
+
+    Args:
+        params (dict): The parameter to train the model.
+        model_name (str): The name of the model to train.
+        dataset_folds (Dataset | List[Dataset]): The dataset to train the model on.
+            If a list is passed, then it will be handled as folding.
+        metrics (List[str]): List of metrics to compute on each report.
+        topk (List[int]): List of cutoffs for metrics.
+        validation_top_k (int): The number of top items to consider for evaluation.
+        validation_metric_name (str): The name of the metric to optimize.
+        mode (str): Whether or not to maximize or minimize the metric.
+        num_gpus (int): The number of GPUs to use during the DDP training.
+        storage_path (str): The storage path used by Ray.
+        num_to_keep (int): The number of checkpoint to keep of the model.
+        strategy (str): Evaluation strategy, either "full" or "sampled".
+            Defaults to "full".
+        num_negatives (int): Number of negative samples to use in "sampled" strategy.
+            Defaults to 99.
+        seed (int): The seed for reproducibility. Defaults to 42.
+        block_size (int): The block size for the model evaluation.
+            Defaults to 50.
+        chunk_size (int): The chunk size for the model evaluation.
+            Defaults to 4096.
+        beta (float): The beta value to initialize the Evaluator.
+        pop_ratio (float): The pop_ratio value to initialize the Evaluator.
+        custom_models (Optional[List[str]]): List of custom models to import.
+            Defaults to None.
+    """
+    if custom_models is None:
+        custom_models = []
+
     trainer = TorchTrainer(
         objective_function_ddp,
         train_loop_config={
@@ -579,6 +625,12 @@ def driver_function_ddp(
 
 
 def validation_report(model: Recommender, **kwargs: Any):
+    """Standardized Ray Tuner report with metrics and model results.
+
+    Args:
+        model (Recommender): The model used during the tuning.
+        **kwargs (Any): Additional keyword arguments to add to the report.
+    """
     # If the score has been computed per user we report only the mean
     for key, value in kwargs.items():
         if isinstance(value, Tensor):
@@ -598,6 +650,16 @@ def validation_report(model: Recommender, **kwargs: Any):
 
 
 def failed_report(mode: str, validation_score: str, report_type: str):
+    """Standardized failed Ray Tune report with fallback metrics results.
+
+    Args:
+        mode (str): The original optimization mode.
+        validation_score (str): The validation metric used in the tuning.
+        report_type (str): The type of report to produce.
+
+    Raises:
+        ValueError: If the report type is not supported.
+    """
     # Define reporting API
     reporter: types.ModuleType
     if report_type == "tune":

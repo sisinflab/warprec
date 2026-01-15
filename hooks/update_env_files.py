@@ -51,9 +51,9 @@ def convert_poetry_specifier(version: str) -> str:
             # Case: ~X.Y.Z -> >=X.Y.Z,<X.(Y+1).0
             patch = int(patch_str)
             return f">={major}.{minor}.{patch},<{major}.{next_minor}.0"
-        else:
-            # Case: ~X.Y -> >=X.Y,<X.(Y+1)
-            return f">={major}.{minor},<{major}.{next_minor}"
+
+        # Case: ~X.Y -> >=X.Y,<X.(Y+1)
+        return f">={major}.{minor},<{major}.{next_minor}"
 
     # If no special character is matched, return the original string
     return version
@@ -128,6 +128,11 @@ def convert_to_requirements_format(dependencies: list[str]) -> list[str]:
 
 
 def main():
+    """Main function of the hook.
+
+    This hook checks the pyproject.toml file and updates
+    other environment files.
+    """
     with PYPROJECT_PATH.open("rb") as f:
         pyproject = tomllib.load(f)
 
@@ -185,7 +190,7 @@ dependencies:
         for dep in sorted(pip_deps):
             env_yml += f"    - {dep}\n"
 
-    OUTPUT_CONDA_PATH.write_text(env_yml)
+    OUTPUT_CONDA_PATH.write_text(env_yml, encoding="utf-8")
 
     # Generate requirements.txt
     # requirements.txt contains all dependencies
@@ -194,7 +199,7 @@ dependencies:
 
     requirements_txt_content = "\n".join(formatted_requirements) + "\n"
 
-    OUTPUT_REQUIREMENTS_PATH.write_text(requirements_txt_content)
+    OUTPUT_REQUIREMENTS_PATH.write_text(requirements_txt_content, encoding="utf-8")
 
 
 if __name__ == "__main__":

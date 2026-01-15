@@ -10,15 +10,18 @@ reader:
     item_id_label: item_id
     rating_label: rating
     timestamp_label: timestamp
+writer:
+  dataset_name: MyExperiment
+  writing_method: local
+  local_experiment_path: experiments/test/
 splitter:
   test_splitting:
     strategy: temporal_holdout
     ratio: 0.1
 models:
-  # Models used in the design pipeline are
-  # expected to have one value per hyperparameter
-  # NOTE: these models can be user-defined
-  CustomBPR:
+  BPR:
+    meta:
+      load_from: path/to/my/checkpoint.pth
     embedding_size: 512
     reg_weight: 0.0001
     batch_size: 2048
@@ -29,5 +32,3 @@ evaluation:
   metrics: [nDCG, Precision, Recall, HitRate]
   strategy: sampled
   num_negatives: 99
-general:
-  custom_models: [my_custom_model.py]

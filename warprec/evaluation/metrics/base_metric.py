@@ -180,6 +180,11 @@ class BaseMetric(Metric, ABC):
         """The name of the metric."""
         return self.__class__.__name__
 
+    @property
+    def components(self):
+        """The required components to compute the metric."""
+        return self._REQUIRED_COMPONENTS
+
 
 class TopKMetric(BaseMetric):
     """The definition of a Top-K metric."""

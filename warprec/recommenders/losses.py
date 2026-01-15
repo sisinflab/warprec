@@ -146,7 +146,7 @@ class MultiDAELoss(nn.Module):
     """
 
     def __init__(self):
-        super(MultiDAELoss, self).__init__()
+        super().__init__()
 
     def forward(self, rating_matrix: Tensor, reconstructed: Tensor) -> Tensor:
         """Compute loss for MultiDAE model.
@@ -163,8 +163,13 @@ class MultiDAELoss(nn.Module):
 
 
 class MultiVAELoss(nn.Module):
+    """MultiVAELoss, used to train MultiVAE model.
+
+    For further details, check the `paper <https://dl.acm.org/doi/10.1145/3178876.3186150>`_.
+    """
+
     def __init__(self):
-        super(MultiVAELoss, self).__init__()
+        super().__init__()
 
     def forward(
         self,

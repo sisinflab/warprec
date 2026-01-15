@@ -1,3 +1,4 @@
+import json
 from typing import Dict, Optional, List, Any, Generator
 from abc import ABC, abstractmethod
 from datetime import datetime, timedelta
@@ -6,7 +7,6 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
-import json
 import torch
 from torch import Tensor
 from pandas import DataFrame
@@ -17,7 +17,7 @@ from warprec.recommenders.base_recommender import (
     Recommender,
     SequentialRecommenderUtils,
 )
-from warprec.utils.config import TrainConfiguration
+from warprec.utils.config import TrainConfiguration, EvalConfiguration
 from warprec.utils.enums import WritingMethods
 from warprec.utils.logger import logger
 
@@ -82,7 +82,7 @@ class Writer(ABC):
         umap_i, imap_i = dataset.get_inverse_mappings()
         num_users = train_sparse.shape[0]
         all_user_indices = torch.arange(num_users, device=model.device)
-        batch_size = dataset._batch_size
+        batch_size = dataset.batch_size
 
         batch_iterator = range(0, num_users, batch_size)
         for i in tqdm(batch_iterator, desc="Generating recommendation batches"):
@@ -122,6 +122,15 @@ class Writer(ABC):
         sep: str = "\t",
         ext: str = ".tsv",
     ) -> None:
+        """Process and write results of the experiment.
+
+        Args:
+            result_data (Dict[int, Dict[str, float | Tensor]]): The results
+                of the experiment.
+            model_name (str): The model used to produce the results.
+            sep (str): The separator of the file to produce.
+            ext (str): The extension of the file to produce.
+        """
         # This implementation remains the same as before
         path = self._path_join(
             self.experiment_evaluation_path,
@@ -132,7 +141,7 @@ class Writer(ABC):
         if existing_content:
             try:
                 existing_df = pd.read_csv(StringIO(existing_content), sep=sep)
-            except Exception as e:
+            except (pd.errors.ParserError, ValueError, pd.errors.EmptyDataError) as e:
                 logger.attention(
                     f"Could not parse existing results from {path}: {e}. Overwriting."
                 )
@@ -162,7 +171,7 @@ class Writer(ABC):
             output_csv = final_df.to_csv(sep=sep, index=False)
             self._write_text(path, output_csv)
             logger.msg(f"Results successfully written to {path}")
-        except Exception as e:
+        except (pd.errors.ParserError, ValueError, pd.errors.EmptyDataError) as e:
             logger.negative(f"Error writing results to {path}: {e}")
 
     def write_results_per_user(
@@ -230,7 +239,7 @@ class Writer(ABC):
                     f"Per-user results for {model_name} (k={k}) written to {path}"
                 )
 
-            except Exception as e:
+            except (pd.errors.ParserError, ValueError, pd.errors.EmptyDataError) as e:
                 logger.negative(
                     f"Error writing per-user results for {model_name} (k={k}) to {path}: {e}"
                 )
@@ -250,7 +259,7 @@ class Writer(ABC):
             buffer.seek(0)
             self._write_bytes(path, buffer.read())
             logger.msg(f"Model state successfully written to {path}")
-        except Exception as e:
+        except (pd.errors.ParserError, ValueError, pd.errors.EmptyDataError) as e:
             logger.negative(f"Error writing model to {path}: {e}")
 
     def write_params(self, params: dict) -> None:
@@ -278,7 +287,7 @@ class Writer(ABC):
             output_json = json.dumps(existing_data, indent=4)
             self._write_text(path, output_json)
             logger.msg(f"Parameters successfully written to {path}")
-        except Exception as e:
+        except Exception as e:  # pylint: disable=broad-exception-caught
             logger.negative(f"Error writing parameters to {path}: {e}")
 
     def write_split(
@@ -307,7 +316,7 @@ class Writer(ABC):
                     sep=sep, header=header, index=False
                 )
                 self._write_text(eval_path, eval_csv)
-            except Exception as e:
+            except (pd.errors.ParserError, ValueError, pd.errors.EmptyDataError) as e:
                 logger.negative(f"Failed to write dataset split to {path_prefix}: {e}")
 
         main_split_path = str(self.experiment_split_path)
@@ -337,7 +346,7 @@ class Writer(ABC):
         if existing_content:
             try:
                 existing_df = pd.read_csv(StringIO(existing_content), sep=sep)
-            except Exception as e:
+            except (pd.errors.ParserError, ValueError, pd.errors.EmptyDataError) as e:
                 logger.attention(
                     f"Could not parse existing time report from {path}: {e}. Overwriting."
                 )
@@ -372,7 +381,7 @@ class Writer(ABC):
             output_csv = report.to_csv(sep=sep, index=False)
             self._write_text(path, output_csv)
             logger.msg(f"Time report written to {path}")
-        except Exception as e:
+        except (pd.errors.ParserError, ValueError, pd.errors.EmptyDataError) as e:
             logger.negative(f"Error writing time report to {path}: {e}")
 
     def write_statistical_significance_test(
@@ -391,7 +400,7 @@ class Writer(ABC):
             output_csv = test_results.to_csv(sep=sep, index=False)
             self._write_text(path, output_csv)
             logger.msg(f"Statistical significance test results written to {path}")
-        except Exception as e:
+        except (pd.errors.ParserError, ValueError, pd.errors.EmptyDataError) as e:
             logger.negative(f"Error writing statistical test results to {path}: {e}")
 
 
@@ -399,17 +408,17 @@ class WriterFactory:  # pylint: disable=C0415, R0903
     """Factory class for creating Writer instances based on configuration.
 
     Attributes:
-        config (TrainConfiguration): The configuration of the experiment.
+        config (TrainConfiguration | EvalConfiguration): The configuration of the experiment.
     """
 
-    config: TrainConfiguration = None
+    config: TrainConfiguration | EvalConfiguration = None
 
     @classmethod
-    def get_writer(cls, config: TrainConfiguration) -> Writer:
+    def get_writer(cls, config: TrainConfiguration | EvalConfiguration) -> Writer:
         """Factory method to get the appropriate Writer instance based on the configuration.
 
         Args:
-            config (TrainConfiguration): The configuration of the experiment.
+            config (TrainConfiguration | EvalConfiguration): The configuration of the experiment.
 
         Returns:
             Writer: An instance of a class that extends the Writer abstract class.

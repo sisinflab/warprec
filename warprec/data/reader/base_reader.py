@@ -21,7 +21,7 @@ class Reader(ABC):
         sep: str,
         header: bool,
         desired_cols: Optional[List[str]] = None,
-        desired_dtypes: Dict[str, str] = {},
+        desired_dtypes: Optional[Dict[str, str]] = None,
     ) -> DataFrame:
         """Processes tabular data from an in-memory text stream robustly, handling variations
         in columns and data types. This is the shared logic moved from child classes.
@@ -31,12 +31,15 @@ class Reader(ABC):
             sep (str): The delimiter character.
             header (bool): A boolean indicating if the data file has a header row.
             desired_cols (Optional[List[str]]): An optional list of column names to select and return.
-            desired_dtypes (Dict[str, str]): A dictionary mapping column names to desired data types.
+            desired_dtypes (Optional[Dict[str, str]]): A dictionary mapping column names to desired data types.
 
         Returns:
             DataFrame: A Pandas DataFrame containing the processed data, adhering to
             `desired_cols` and `desired_dtypes` where possible.
         """
+        # pylint: disable = too-many-return-statements, unused-argument
+        if desired_dtypes is None:
+            desired_dtypes = {}
         # Case 1: The tabular file has a header row
         if header:
             try:
@@ -119,11 +122,12 @@ class Reader(ABC):
     def read_tabular_split(self, *args: Any, **kwargs: Any) -> DataFrame:
         """This method will read the tabular split data from the source."""
 
+    # pylint: disable = unused-argument
     def _process_tabular_split(
         self,
         base_location: str,
         column_names: Optional[List[str]] = None,
-        dtypes: Optional[Dict[str, str]] = {},
+        dtypes: Optional[Dict[str, str]] = None,
         sep: str = "\t",
         ext: str = ".tsv",
         header: bool = True,
@@ -162,6 +166,9 @@ class Reader(ABC):
         Raises:
             FileNotFoundError: If the main train or test files are not found or are empty.
         """
+        if dtypes is None:
+            dtypes = {}
+
         # Use posixpath for blobs and Path for local files
         path_joiner = posixpath.join if is_remote else lambda *a: str(Path(*a))
 

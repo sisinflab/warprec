@@ -4,8 +4,8 @@ from typing import Tuple, Any, Optional, Dict, List
 import torch
 import numpy as np
 from torch import Tensor
-from pandas import DataFrame
 from torch.utils.data import DataLoader, TensorDataset
+from pandas import DataFrame
 from scipy.sparse import csr_matrix, coo_matrix
 
 from warprec.data.entities.train_structures import (
@@ -71,28 +71,26 @@ class Interactions:
         self._inter_dict: dict = {}
         self._inter_sparse: csr_matrix = None
         self._inter_side_sparse: csr_matrix = None
+        self._inter_side_tensor: Tensor = None
+        self._inter_side_labels: List[str] = []
         self._history_matrix: Tensor = None
         self._history_lens: Tensor = None
         self._history_mask: Tensor = None
 
         # Set DataFrame labels
-        self._user_label = data.columns[0]
-        self._item_label = data.columns[1]
-        self._rating_label = (
-            rating_label if rating_type == RatingType.EXPLICIT else None
-        )
-        self._context_labels = context_labels if context_labels else []
+        self.user_label = data.columns[0]
+        self.item_label = data.columns[1]
+        self.rating_label = rating_label if rating_type == RatingType.EXPLICIT else None
+        self.context_labels = context_labels if context_labels else []
 
         # Filter side information (if present)
         if self._inter_side is not None:
             self._inter_side = self._inter_side[
-                self._inter_side[self._item_label].isin(
-                    self._inter_df[self._item_label]
-                )
+                self._inter_side[self.item_label].isin(self._inter_df[self.item_label])
             ]
 
             # Order side information to be in the same order of the dataset
-            self._inter_side["order"] = self._inter_side[self._item_label].map(
+            self._inter_side["order"] = self._inter_side[self.item_label].map(
                 item_mapping
             )
             self._inter_side = (
@@ -101,10 +99,27 @@ class Interactions:
                 .reset_index(drop=True)
             )
 
+            # Construct lookup for side information features
+            feature_cols = [c for c in self._inter_side.columns if c != self.item_label]
+
+            # Create the lookup tensor for side information
+            side_tensor = torch.tensor(
+                self._inter_side[feature_cols].values, dtype=torch.long
+            )
+
+            # Create the padding row (zeros)
+            padding_row = torch.zeros((1, side_tensor.shape[1]), dtype=torch.long)
+
+            # Concatenate padding row at the beginning
+            self._inter_side_tensor = torch.cat([side_tensor, padding_row], dim=0)
+
+            # Store the feature labels
+            self._inter_side_labels = feature_cols
+
         # Definition of dimensions
-        self._uid = self._inter_df[self._user_label].unique()
-        self._nuid = self._inter_df[self._user_label].nunique()
-        self._niid = self._inter_df[self._item_label].nunique()
+        self._uid = self._inter_df[self.user_label].unique()
+        self._nuid = self._inter_df[self.user_label].nunique()
+        self._niid = self._inter_df[self.item_label].nunique()
         self._og_nuid, self._og_niid = original_dims
         self._transactions = len(self._inter_df)
 
@@ -118,9 +133,9 @@ class Interactions:
         # Define the interaction dictionary, based on the RatingType selected
         if rating_type == RatingType.EXPLICIT:
             self._inter_dict = (
-                self._inter_df.groupby(self._user_label)
+                self._inter_df.groupby(self.user_label)
                 .apply(
-                    lambda df: dict(zip(df[self._item_label], df[self._rating_label])),
+                    lambda df: dict(zip(df[self.item_label], df[self.rating_label])),
                     include_groups=False,
                 )
                 .to_dict()
@@ -128,8 +143,8 @@ class Interactions:
         elif rating_type == RatingType.IMPLICIT:
             self._inter_dict = {
                 user: dict.fromkeys(items, 1)
-                for user, items in self._inter_df.groupby(self._user_label)[
-                    self._item_label
+                for user, items in self._inter_df.groupby(self.user_label)[
+                    self.item_label
                 ]
             }
         else:
@@ -187,21 +202,21 @@ class Interactions:
             ValueError: If interactions are not explicit or if
                 rating label is None.
         """
-        if self.rating_type != RatingType.EXPLICIT or self._rating_label is None:
+        if self.rating_type != RatingType.EXPLICIT or self.rating_label is None:
             raise ValueError(
                 "Filtering by rating is only supported for explicit feedback data."
             )
 
         # Filter original DataFrame for the specified rating value
-        rating_df = self._inter_df[self._inter_df[self._rating_label] == rating_value]
+        rating_df = self._inter_df[self._inter_df[self.rating_label] == rating_value]
 
         # Edge case: No interactions with the specified rating
         if rating_df.empty:
             return coo_matrix((self._og_nuid, self._og_niid), dtype=self.precision)
 
         # Map users and items to internal indices
-        users = rating_df[self._user_label].map(self._umap).values
-        items = rating_df[self._item_label].map(self._imap).values
+        users = rating_df[self.user_label].map(self._umap).values
+        items = rating_df[self.item_label].map(self._imap).values
 
         # Filter out any NaN mappings (in case of unknown users/items)
         mask = ~np.isnan(users) & ~np.isnan(items)
@@ -230,9 +245,17 @@ class Interactions:
         if self._inter_side is None:
             return None
         self._inter_side_sparse = csr_matrix(
-            self._inter_side.drop(self._item_label, axis=1), dtype=self.precision
+            self._inter_side.drop(self.item_label, axis=1), dtype=self.precision
         )
         return self._inter_side_sparse
+
+    def get_side_tensor(self) -> Tensor:
+        """This method retrieves the tensor representation of side data.
+
+        Returns:
+            Tensor: Tensor representation of the features if available.
+        """
+        return self._inter_side_tensor
 
     def get_interaction_loader(
         self,
@@ -293,10 +316,10 @@ class Interactions:
         # The DataLoader will handle batching and shuffling.
         return DataLoader(dataset, batch_size=batch_size, shuffle=shuffle)
 
-    @typing.no_type_check
     def get_item_rating_dataloader(
         self,
         neg_samples: int = 0,
+        include_side_info: bool = False,
         include_context: bool = False,
         batch_size: int = 1024,
         shuffle: bool = True,
@@ -307,6 +330,7 @@ class Interactions:
 
         Args:
             neg_samples (int): Number of negative samples per user.
+            include_side_info (bool): Whether to include side information features in the output.
             include_context (bool): Wether to include the context in the output.
             batch_size (int): The batch size that will be used to
             shuffle (bool): Whether to shuffle the data.
@@ -321,26 +345,37 @@ class Interactions:
             ValueError: If context flag has been set but no context
                 information is present in the DataFrame.
         """
+        # pylint: disable=too-many-branches, too-many-statements
         if low_memory:
             sparse_matrix = self.get_sparse()
 
             # Extract positive interaction information
             pos_users_np = (
-                self._inter_df[self._user_label].map(self._umap).values.astype(np.int64)
+                self._inter_df[self.user_label].map(self._umap).values.astype(np.int64)
             )
             pos_items_np = (
-                self._inter_df[self._item_label].map(self._imap).values.astype(np.int64)
+                self._inter_df[self.item_label].map(self._imap).values.astype(np.int64)
             )
+
+            # Prepare side information
+            side_info_tensor = None
+            if include_side_info:
+                if self._inter_side_tensor is not None:
+                    side_info_tensor = self._inter_side_tensor
+                else:
+                    raise ValueError(
+                        "Requested side information but none provided in init."
+                    )
 
             # Prepare the context
             context_tensor = None
             if include_context:
-                if not self._context_labels:
+                if not self.context_labels:
                     raise ValueError(
-                        "Requested to include context but no context label passed."
+                        "Requested context information but none provided in init."
                     )
 
-                context_values = self._inter_df[self._context_labels].values
+                context_values = self._inter_df[self.context_labels].values
                 context_tensor = torch.tensor(context_values, dtype=torch.long)
 
             # Create the lazy dataset
@@ -351,6 +386,7 @@ class Interactions:
                 neg_samples=neg_samples,
                 niid=self._niid,
                 seed=seed,
+                side_information=side_info_tensor,
                 contexts=context_tensor,
             )
 
@@ -374,26 +410,36 @@ class Interactions:
 
         # Extract the positive interactions
         pos_users_np = (
-            self._inter_df[self._user_label].map(self._umap).values.astype(np.int64)
+            self._inter_df[self.user_label].map(self._umap).values.astype(np.int64)
         )
         pos_items_np = (
-            self._inter_df[self._item_label].map(self._imap).values.astype(np.int64)
+            self._inter_df[self.item_label].map(self._imap).values.astype(np.int64)
         )
 
         pos_users = torch.from_numpy(pos_users_np)
         pos_items = torch.from_numpy(pos_items_np)
         pos_ratings = torch.ones(len(pos_users), dtype=torch.float)
 
+        # Extract side information if flagged
+        pos_features = None
+        if include_side_info:
+            if self._inter_side_tensor is not None:
+                pos_features = self._inter_side_tensor[pos_items]
+            else:
+                raise ValueError(
+                    "Requested side information but none provided in init."
+                )
+
         # Extract positive context data if flagged
         pos_contexts = None
         if include_context:
-            if self._context_labels:
+            if self.context_labels:
                 pos_contexts = torch.tensor(
-                    self._inter_df[self._context_labels].values, dtype=torch.long
+                    self._inter_df[self.context_labels].values, dtype=torch.long
                 )
             else:
                 raise ValueError(
-                    "Requested to include context but no context label passed."
+                    "Requested context information but none provided in init."
                 )
 
         # Negative sampling
@@ -445,6 +491,11 @@ class Interactions:
             neg_items = torch.from_numpy(neg_items_np)
             neg_ratings = torch.zeros(total_neg, dtype=torch.float)
 
+            # Extract side information for negatives if flagged
+            neg_features = None
+            if include_side_info and pos_features is not None:
+                neg_features = self._inter_side_tensor[neg_items]
+
             # Repeat the context if flagged
             neg_contexts = None
             if include_context and pos_contexts is not None:
@@ -456,18 +507,26 @@ class Interactions:
             all_items = torch.cat([pos_items, neg_items])
             all_ratings = torch.cat([pos_ratings, neg_ratings])
 
+            # Construct the final dataset
+            tensors = [all_users, all_items, all_ratings]
+            if include_side_info:
+                all_features = torch.cat([pos_features, neg_features])
+                tensors.append(all_features)
             if include_context:
                 all_contexts = torch.cat([pos_contexts, neg_contexts])
-                dataset = TensorDataset(all_users, all_items, all_ratings, all_contexts)
-            else:
-                dataset = TensorDataset(all_users, all_items, all_ratings)
+                tensors.append(all_contexts)
+
+            dataset = TensorDataset(*tensors)
 
         else:
             # Only positive interactions
+            tensors = [pos_users, pos_items, pos_ratings]
+            if include_side_info:
+                tensors.append(pos_features)
             if include_context:
-                dataset = TensorDataset(pos_users, pos_items, pos_ratings, pos_contexts)
-            else:
-                dataset = TensorDataset(pos_users, pos_items, pos_ratings)
+                tensors.append(pos_contexts)
+
+            dataset = TensorDataset(*tensors)
 
         # Cache the dataset and return the dataloader
         self._cached_dataset[cache_key] = dataset
@@ -634,10 +693,10 @@ class Interactions:
         Returns:
             np.ndarray: A sorted array of unique rating values.
         """
-        if self.rating_type != RatingType.EXPLICIT or self._rating_label is None:
+        if self.rating_type != RatingType.EXPLICIT or self.rating_label is None:
             return np.array([])
 
-        return np.sort(self._inter_df[self._rating_label].unique())
+        return np.sort(self._inter_df[self.rating_label].unique())
 
     def _to_sparse(self) -> csr_matrix:
         """This method will create the sparse representation of the data contained.
@@ -647,11 +706,11 @@ class Interactions:
         Returns:
             csr_matrix: Sparse representation of the transactions (CSR Format).
         """
-        users = self._inter_df[self._user_label].map(self._umap).values
-        items = self._inter_df[self._item_label].map(self._imap).values
+        users = self._inter_df[self.user_label].map(self._umap).values
+        items = self._inter_df[self.item_label].map(self._imap).values
         ratings = (
             self._inter_df[
-                self._rating_label
+                self.rating_label
             ].values  # With explicit rating we read from dictionary
             if self.rating_type == RatingType.EXPLICIT
             else np.ones(

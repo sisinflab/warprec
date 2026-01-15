@@ -682,13 +682,11 @@ class RecomModel(BaseModel, ABC):
         Ray Tune will call this method to validate a possible configuration
         of parameters.
         """
-        pass
 
     def validate_all_combinations(self):
         """This method validates all possible combinations and ensures that
         at least one is valid.
         """
-        pass
 
     def _clean_param_list(
         self,

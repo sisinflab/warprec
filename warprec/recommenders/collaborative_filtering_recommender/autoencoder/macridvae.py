@@ -2,8 +2,8 @@
 from typing import Tuple, Any, List, Optional
 
 import torch
-import torch.nn as nn
 import torch.nn.functional as F
+from torch import nn
 from torch import Tensor
 from scipy.sparse import csr_matrix
 
@@ -17,10 +17,16 @@ from warprec.utils.registry import model_registry
 class Sampling(nn.Module):
     """Uses (z_mean, z_log_var) to sample z using reparameterization trick."""
 
-    def __init__(self):
-        super().__init__()
-
     def forward(self, z_mean: Tensor, z_log_var: Tensor) -> Tensor:
+        """Forward pass of the sampler.
+
+        Args:
+            z_mean (Tensor): The mean value.
+            z_log_var (Tensor): The log variance value.
+
+        Returns:
+            Tensor: The sampled mean value.
+        """
         if self.training:
             epsilon = torch.randn_like(z_log_var)
             return z_mean + torch.exp(0.5 * z_log_var) * epsilon
@@ -56,6 +62,14 @@ class MacridEncoder(nn.Module):
         self.dense_log_var = nn.Linear(curr_dim, latent_dim)
 
     def forward(self, inputs: Tensor) -> Tuple[Tensor, Tensor]:
+        """Forward pass of the MacridEncoder.
+
+        Args:
+            inputs (Tensor): The input tensor.
+
+        Returns:
+            Tuple[Tensor, Tensor]: Mean value and log variance value.
+        """
         # Normalize input as per MacridVAE paper (L2 norm)
         i_normalized = F.normalize(inputs, p=2, dim=1)
         i_drop = self.dropout(i_normalized)

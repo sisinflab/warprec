@@ -106,39 +106,39 @@ Or fall back to the CPU version of all packages by omitting the CUDA suffixes. A
 
 ### 🏋️‍♂️ Training a model
 
-To train a model, use the `train.py` script. Here's an example:
+To train a model, use the `train` pipeline. Here's an example:
 
 1. Prepare a configuration file (e.g. `config/train_config.yml`) with details
     about the model, dataset and training parameters.
 2. Run the following command:
     ```bash
-    poetry run python warprec/train.py --config config/train_config.yml
+    python -m warprec.run -c config/train_config.yml -p train
 
 This command starts the training process using the specified configuration file.
 
-### 🔍 Infer a model
-
-To run inference on a model, use the `infer.py` script. Here's an example:
-
-1. Prepare a configuration file (e.g. `config/infer_config.yml`) with details
-    about the model, dataset and training parameters.
-2. Run the following command:
-    ```bash
-    poetry run python warprec/infer.py --config config/infer_config.yml
-
-This command starts the inference process using the specified configuration file.
-
 ### ✏️ Design a model
 
-To implement a custom model, WarpRec provides a dedicated design interface via the `design.py` script. The recommended workflow is as follows:
+To implement a custom model, WarpRec provides a dedicated design interface via the `design` pipeline. The recommended workflow is as follows:
 
 1. Prepare a configuration file (e.g. `config/design_config.yml`) with details
     about the custom models, dataset and training parameters.
 2. Run the following command:
     ```bash
-    poetry run python warprec/design.py --config config/design_config.yml
+    python -m warprec.run -c config/design_config.yml -p design
 
 This command initializes a lightweight training pipeline, specifically intended for rapid prototyping and debugging of custom architectures within the framework.
+
+### 🔍 Evaluate a model
+
+To run only evaluation on a model, use the `eval` pipeline. Here's an example:
+
+1. Prepare a configuration file (e.g. `config/eval_config.yml`) with details
+    about the model, dataset and training parameters.
+2. Run the following command:
+    ```bash
+    python -m warprec.run -c config/eval_config.yml -p eval
+
+This command starts the evaluation process using the specified configuration file.
 
 ### 🧰 Makefile Commands
 

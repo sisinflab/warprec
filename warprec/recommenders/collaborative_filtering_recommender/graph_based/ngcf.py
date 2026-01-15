@@ -1,9 +1,9 @@
 # pylint: disable = R0801, E1102
 from typing import Tuple, Any, Optional
 
-import torch
 import numpy as np
 import scipy.sparse as sp
+import torch
 import torch.nn.functional as F
 from torch import nn, Tensor
 from torch_sparse import SparseTensor
@@ -55,6 +55,7 @@ class NGCFLayer(nn.Module):
         self.init_parameters()
 
     def init_parameters(self):
+        """Custom initialization of the layer."""
         nn.init.xavier_normal_(self.W1.data)
         nn.init.xavier_normal_(self.W2.data)
         nn.init.zeros_(self.b1.data)

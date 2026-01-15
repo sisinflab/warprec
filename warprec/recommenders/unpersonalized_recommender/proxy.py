@@ -93,22 +93,22 @@ class ProxyRecommender(Recommender):
                 shape=(self.n_users, self.n_items),
                 dtype=np.float32,
             ).tocsr()
-        except FileNotFoundError:
+        except FileNotFoundError as exc:
             raise FileNotFoundError(
                 f"Recommendation file {self.recommendation_file} not found."
-            )
-        except pd.errors.EmptyDataError:
+            ) from exc
+        except pd.errors.EmptyDataError as exc:
             raise ValueError(
                 f"Recommendation file {self.recommendation_file} is empty."
-            )
-        except pd.errors.ParserError:
+            ) from exc
+        except pd.errors.ParserError as exc:
             raise ValueError(
                 f"Recommendation file {self.recommendation_file} is malformed."
-            )
+            ) from exc
         except Exception as e:
             raise RuntimeError(
                 f"An error occurred while reading the recommendation file: {e}"
-            )
+            ) from e
 
     @torch.no_grad()
     def predict(
@@ -140,11 +140,11 @@ class ProxyRecommender(Recommender):
         if item_indices is None:
             # Case 'full': prediction on all items
             return predictions  # [batch_size, n_items]
-        else:
-            # Case 'sampled': prediction on a sampled set of items
-            return predictions.gather(
-                1,
-                item_indices.to(predictions.device).clamp(
-                    max=self.n_items - 1
-                ),  # [batch_size, pad_seq]
-            )
+
+        # Case 'sampled': prediction on a sampled set of items
+        return predictions.gather(
+            1,
+            item_indices.to(predictions.device).clamp(
+                max=self.n_items - 1
+            ),  # [batch_size, pad_seq]
+        )
