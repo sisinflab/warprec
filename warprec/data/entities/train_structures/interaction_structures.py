@@ -55,9 +55,9 @@ class LazyInteractionDataset(Dataset):
         if self.include_user_id:
             # Return also the user indices
             return torch.tensor(idx, dtype=torch.long), user_tensor
-        else:
-            # Normal behavior
-            return (user_tensor,)
+
+        # Normal behavior
+        return (user_tensor,)
 
 
 class LazyItemRatingDataset(Dataset):
@@ -76,6 +76,8 @@ class LazyItemRatingDataset(Dataset):
             positive interaction.
         niid (int): The total number of unique items for negative sampling.
         seed (int): A random seed to ensure reproducibility of negative sampling.
+        side_information (Optional[Tensor]): The tensor containing the side information
+            of each interaction.
         contexts (Optional[Tensor]): The tensor containing the context information
             of each interaction.
 
@@ -91,6 +93,7 @@ class LazyItemRatingDataset(Dataset):
         neg_samples: int,
         niid: int,
         seed: int = 42,
+        side_information: Optional[Tensor] = None,
         contexts: Optional[Tensor] = None,
     ):
         self.user_ids = user_ids
@@ -99,6 +102,7 @@ class LazyItemRatingDataset(Dataset):
         self.neg_samples = neg_samples
         self.niid = niid
         self.seed = seed
+        self.side_information = side_information
         self.contexts = contexts
         self.num_positives = len(self.user_ids)
 
@@ -156,12 +160,20 @@ class LazyItemRatingDataset(Dataset):
         item_tensor = torch.tensor(item, dtype=torch.long)
         rating_tensor = torch.tensor(rating, dtype=torch.float)
 
+        # Construct the base return structure
+        return_tensors = [user_tensor, item_tensor, rating_tensor]
+
+        # Handle side info if required
+        if self.side_information is not None:
+            item_features = self.side_information[item]
+            return_tensors.append(item_features)
+
         # Handle context if required
         if self.contexts is not None:
             context_tensor = self.contexts[pos_interaction_idx]
-            return user_tensor, item_tensor, rating_tensor, context_tensor
+            return_tensors.append(context_tensor)
 
-        return user_tensor, item_tensor, rating_tensor
+        return tuple(return_tensors)
 
 
 class LazyTripletDataset(Dataset):

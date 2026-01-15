@@ -5,9 +5,9 @@ from typing import List, Dict, Optional, Set, Any, Tuple
 
 import torch
 from torch import Tensor
+from torch.utils.data import DataLoader
 from scipy.sparse import csr_matrix
 from tabulate import tabulate
-from torch.utils.data import DataLoader
 
 from warprec.data import Dataset
 from warprec.evaluation.metrics.base_metric import BaseMetric
@@ -110,7 +110,7 @@ class Evaluator:
                     **metric_params,
                 )
                 self.metrics[k].append(metric_instance)
-                self.required_blocks[k].update(metric_instance._REQUIRED_COMPONENTS)
+                self.required_blocks[k].update(metric_instance.components)
 
     def evaluate(
         self,
@@ -135,6 +135,7 @@ class Evaluator:
         Raises:
             ValueError: If the strategy isn't either "full" or "sampled".
         """
+        # pylint: disable=too-many-statements
         if strategy not in ["full", "sampled"]:
             raise ValueError(f"Strategy '{strategy}' not supported.")
 

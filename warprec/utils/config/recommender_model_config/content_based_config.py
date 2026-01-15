@@ -1,3 +1,4 @@
+# pylint: disable=duplicate-code
 from typing import ClassVar
 
 from pydantic import field_validator

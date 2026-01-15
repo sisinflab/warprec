@@ -1,14 +1,19 @@
-from typing import Tuple, List, Optional, Dict
+# pylint: disable=too-many-branches, too-many-statements
+from typing import Tuple, List, Optional, Dict, Union
+from itertools import product
 
 from pandas import DataFrame
-from itertools import product
 
 from warprec.data import Dataset
 from warprec.data.reader import Reader
 from warprec.data.splitting import Splitter
 from warprec.data.filtering import apply_filtering
 from warprec.recommenders.base_recommender import ContextRecommenderUtils
-from warprec.utils.config import TrainConfiguration, DesignConfiguration
+from warprec.utils.config import (
+    TrainConfiguration,
+    DesignConfiguration,
+    EvalConfiguration,
+)
 from warprec.utils.callback import WarpRecCallback
 from warprec.utils.enums import SearchSpace
 from warprec.utils.registry import model_registry
@@ -18,7 +23,7 @@ from warprec.utils.logger import logger
 def initialize_datasets(
     reader: Reader,
     callback: WarpRecCallback,
-    config: TrainConfiguration | DesignConfiguration,
+    config: Union[TrainConfiguration, DesignConfiguration, EvalConfiguration],
 ) -> Tuple[Dataset, Dataset | None, List[Dataset]]:
     """Initialize datasets based on the configuration. This is a common operation
     used in both training and design scripts.
@@ -26,8 +31,8 @@ def initialize_datasets(
     Args:
         reader (Reader): The initialized reader object that will be used to read data.
         callback (WarpRecCallback): The callback object for handling events during initialization.
-        config (TrainConfiguration | DesignConfiguration): The configuration object containing
-            all necessary settings for data loading, filtering, and splitting.
+        config (Union[TrainConfiguration, DesignConfiguration, EvalConfiguration]): The configuration
+            object containing all necessary settings for data loading, filtering, and splitting.
 
     Returns:
         Tuple[Dataset, Dataset | None, List[Dataset]]: A tuple containing the main
@@ -252,6 +257,15 @@ def initialize_datasets(
 
 
 def prepare_train_loaders(dataset: Dataset, models_configuration: Dict[str, dict]):
+    """Prepare train dataloader structure.
+
+    Args:
+        dataset (Dataset): The dataset used to train the model.
+        models_configuration (Dict[str, dict]): The model experiment configuration.
+
+    Raises:
+        ValueError: If the dataloader initialization fails.
+    """
     # Check each model requirements
     for model_name, params in models_configuration.items():
         logger.msg(f"Preparing data structures for model {model_name}")
@@ -316,7 +330,7 @@ def prepare_train_loaders(dataset: Dataset, models_configuration: Dict[str, dict
                     except Exception as e:
                         raise ValueError(
                             f"During dataset initialization a method failed with the following error: {e}"
-                        )
+                        ) from e
             else:
                 # No specific parameters to pass to the method
                 loader_method(**fixed_params)
@@ -388,16 +402,12 @@ def dataset_preparation(
         model_registry.get_class(model_name) for model_name in config.models.keys()
     ]
     has_classic = any(
-        [
-            not issubclass(model_class, ContextRecommenderUtils)
-            for model_class in model_classes
-        ]
+        not issubclass(model_class, ContextRecommenderUtils)
+        for model_class in model_classes
     )
     has_context = any(
-        [
-            issubclass(model_class, ContextRecommenderUtils)
-            for model_class in model_classes
-        ]
+        issubclass(model_class, ContextRecommenderUtils)
+        for model_class in model_classes
     )
 
     prepare_evaluation_loaders(main_dataset, has_classic, has_context)

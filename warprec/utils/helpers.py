@@ -109,11 +109,15 @@ def retrieve_evaluation_dataloader(
     Raises:
         ValueError: If an unknown evaluation strategy is provided.
     """
-    from warprec.recommenders.base_recommender import ContextRecommenderUtils
+    from warprec.recommenders.base_recommender import ContextRecommenderUtils  # pylint: disable = import-outside-toplevel
 
+    # Determine if the model uses context-aware information
     is_context = isinstance(model, ContextRecommenderUtils)
+    use_context = (
+        is_context and hasattr(model, "context_dims") and bool(model.context_dims)
+    )
 
-    match (strategy, is_context):
+    match (strategy, use_context):
         case ("full", False):
             return dataset.get_evaluation_dataloader()
         case ("sampled", False):

@@ -1,8 +1,8 @@
+# pylint: disable = too-many-branches, too-many-statements
 from typing import Tuple, Optional, List, Any, Dict
 
 import torch
 import numpy as np
-import pandas as pd
 from torch import Tensor
 from pandas import DataFrame
 
@@ -85,6 +85,8 @@ class Dataset:
         self._max_seq_len: int = 0
         self._umap: dict[Any, int] = {}
         self._imap: dict[Any, int] = {}
+        self._feature_maps: dict[str, dict[Any, int]] = {}
+        self._feature_dims: dict[str, int] = {}
         self._context_maps: dict[str, dict[Any, int]] = {}
         self._context_dims: dict[str, int] = {}
         self._feat_lookup: Tensor = None
@@ -100,8 +102,8 @@ class Dataset:
         # If side information data has been provided, we filter the main dataset
         if side_data is not None:
             train_data, eval_data = self._filter_data(
-                train=train_data,
-                eval=eval_data,
+                train_set=train_data,
+                eval_set=eval_data,
                 filter_data=side_data,
                 label=item_id_label,
             )
@@ -110,7 +112,7 @@ class Dataset:
         self._nuid = train_data[user_id_label].nunique()
         self._niid = train_data[item_id_label].nunique()
         self._nfeat = len(side_data.columns) - 1 if side_data is not None else 0
-        self._batch_size = batch_size
+        self.batch_size = batch_size
 
         # Values that will be used to calculate mappings
         _uid = train_data[user_id_label].unique()
@@ -231,16 +233,16 @@ class Dataset:
 
     def _filter_data(
         self,
-        train: DataFrame,
-        eval: DataFrame,
+        train_set: DataFrame,
+        eval_set: DataFrame,
         filter_data: DataFrame,
         label: str,
     ) -> Tuple[DataFrame, DataFrame]:
         """Filter the data based on a given additional information set and label.
 
         Args:
-            train (DataFrame): The train set.
-            eval (DataFrame): The evaluation set.
+            train_set (DataFrame): The train set.
+            eval_set (DataFrame): The evaluation set.
             filter_data (DataFrame): The additional information dataset.
             label (str): The label used to filter the data.
 
@@ -250,26 +252,26 @@ class Dataset:
                 - DataFrame: The filtered evaluation set.
         """
         # Compute shared data points first
-        shared_data = set(train[label]).intersection(filter_data[label])
+        shared_data = set(train_set[label]).intersection(filter_data[label])
 
         # Count the number of data points before filtering
-        train_data_before_filter = train[label].nunique()
+        train_data_before_filter = train_set[label].nunique()
 
         # Filter all the data based on data points present in both train data and filter.
         # This procedure is fundamental because we need dimensions to match
-        train = train[train[label].isin(shared_data)]
-        eval = eval[eval[label].isin(shared_data)]
+        train_set = train_set[train_set[label].isin(shared_data)]
+        eval_set = eval_set[eval_set[label].isin(shared_data)]
         filter_data = filter_data[filter_data[label].isin(shared_data)]
 
         # Count the number of data points after filtering
-        train_data_after_filter = train[label].nunique()
+        train_data_after_filter = train_set[label].nunique()
 
         logger.attention(
             ""
             f"Filtered out {train_data_before_filter - train_data_after_filter} {label}."
         )
 
-        return train, eval
+        return train_set, eval_set
 
     def _create_inner_set(
         self,
@@ -328,6 +330,60 @@ class Dataset:
         )
 
         return inter_set
+
+    def _process_side_data(
+        self, side_data: DataFrame, item_id_label: str
+    ) -> Optional[DataFrame]:
+        """Process side information data.
+
+        It maps categorical/numerical values to integer indices suitable for Embeddings.
+
+        Args:
+            side_data (DataFrame): The side data DataFrame.
+            item_id_label (str): The label of the item ID.
+
+        Returns:
+            Optional[DataFrame]: The processed DataFrame with integer indices.
+
+        Raises:
+            ValueError: If the item ID label is not found in side_data.
+        """
+        # Check for item ID label
+        if item_id_label not in side_data.columns:
+            raise ValueError("Item ID label not found inside side information data.")
+
+        df_processed = side_data.copy()
+
+        # Identify feature columns (all except item_id_label)
+        feature_cols = [c for c in df_processed.columns if c != item_id_label]
+
+        if not feature_cols:
+            logger.negative("No feature columns found in side data.")
+            return None
+
+        # Iterate over each feature column to create mappings and transform data
+        for col in feature_cols:
+            # Fill missing data with a placeholder
+            df_processed[col] = df_processed[col].fillna("UNK")
+
+            # Create a mapping from unique values to integers
+            unique_vals = df_processed[col].unique()
+
+            # Map: value -> index (starting from 1, reserving 0 for unknown/padding)
+            mapping = {val: i + 1 for i, val in enumerate(unique_vals)}
+
+            # Save the mapping
+            self._feature_maps[col] = mapping
+
+            # Save the dimension (vocab size + 1 for UNK)
+            self._feature_dims[col] = len(unique_vals) + 1
+
+            # Apply the mapping to the columns
+            df_processed[col] = df_processed[col].map(mapping).fillna(0).astype(int)
+
+            logger.msg(f"Side Feature '{col}': found {len(unique_vals)} unique values.")
+
+        return df_processed
 
     def _process_context_data(
         self, df: DataFrame, context_labels: List[str], fit: bool = False
@@ -393,67 +449,6 @@ class Dataset:
 
         return df_processed
 
-    def _process_side_data(
-        self, side_data: DataFrame, item_id_label: str
-    ) -> Optional[DataFrame]:
-        """Process side information data and filter out invalid columns
-
-        Args:
-            side_data (DataFrame): The side data DataFrame.
-            item_id_label (str): The label of the item ID.
-
-        Returns:
-            Optional[DataFrame]: In case the method fails in advance or
-                cleaned DataFrame with valid columns.
-
-        Raises:
-            ValueError: When the item ID is not found in side data.
-        """
-        # Check for item ID label
-        if item_id_label not in side_data.columns:
-            raise ValueError("Item ID label not found inside side information data.")
-
-        # View only the needed columns
-        feature_cols = side_data.drop(columns=[item_id_label])
-
-        # Find all the numeric columns
-        numeric_cols = []
-        filtered_cols = []
-        for col in feature_cols.columns:
-            series_with_nan = feature_cols[col].replace("", np.nan).copy()
-
-            # Count NaNs before and after conversion
-            nulls_before = series_with_nan.isnull().sum()
-            coerced_series = pd.to_numeric(series_with_nan, errors="coerce")
-            nulls_after = coerced_series.isnull().sum()
-
-            # If the number of nulls remain un-changed, this will be considered
-            # a numeric column, else we filter it
-            if nulls_after > nulls_before:
-                filtered_cols.append(col)
-            else:
-                numeric_cols.append(col)
-
-        # Check if there are valid columns
-        if not numeric_cols:
-            logger.negative(
-                "No valid columns found. Side information will not be available."
-            )
-            return None
-
-        # Log the filtered out columns
-        if filtered_cols:
-            logger.attention(
-                "Side information contains non-numeric values. "
-                f"The following columns will be ignored: {filtered_cols}"
-            )
-
-        # Update the inner DataFrame with valid data
-        valid_columns = [item_id_label] + numeric_cols
-        return (
-            side_data[valid_columns].copy().fillna(0)
-        )  # Missing values will be filled with zeros
-
     def get_evaluation_dataloader(self) -> EvaluationDataLoader:
         """Retrieve the EvaluationDataLoader for the dataset.
 
@@ -467,7 +462,7 @@ class Dataset:
 
             self._precomputed_dataloader[key] = EvaluationDataLoader(
                 eval_interactions=eval_sparse,
-                batch_size=self._batch_size,
+                batch_size=self.batch_size,
             )
 
         return self._precomputed_dataloader[key]
@@ -497,7 +492,7 @@ class Dataset:
                 train_interactions=train_sparse,
                 eval_interactions=eval_sparse,
                 num_negatives=num_negatives,
-                batch_size=self._batch_size,
+                batch_size=self.batch_size,
                 seed=seed,
             )
 
@@ -517,9 +512,9 @@ class Dataset:
             eval_data = self.eval_set.get_df()
 
             # Retrieve labels to pre-compute eval data
-            user_label = self.eval_set._user_label
-            item_label = self.eval_set._item_label
-            context_labels = self.eval_set._context_labels
+            user_label = self.eval_set.user_label
+            item_label = self.eval_set.item_label
+            context_labels = self.eval_set.context_labels
 
             # Map the evaluation dataset to ensure consistency
             eval_data[user_label] = eval_data[user_label].map(self._umap)
@@ -531,7 +526,7 @@ class Dataset:
                 user_id_label=user_label,
                 item_id_label=item_label,
                 context_labels=context_labels,
-                batch_size=self._batch_size,
+                batch_size=self.batch_size,
             )
 
         return self._precomputed_dataloader[key]
@@ -557,9 +552,9 @@ class Dataset:
             eval_data = self.eval_set.get_df()
 
             # Retrieve labels to pre-compute eval data
-            user_label = self.eval_set._user_label
-            item_label = self.eval_set._item_label
-            context_labels = self.eval_set._context_labels
+            user_label = self.eval_set.user_label
+            item_label = self.eval_set.item_label
+            context_labels = self.eval_set.context_labels
 
             # Map the evaluation dataset to ensure consistency
             eval_data[user_label] = eval_data[user_label].map(self._umap)
@@ -575,7 +570,7 @@ class Dataset:
                 num_items=self._niid,
                 num_negatives=num_negatives,
                 seed=seed,
-                batch_size=self._batch_size,
+                batch_size=self.batch_size,
             )
 
         return self._precomputed_dataloader[key]
@@ -589,6 +584,15 @@ class Dataset:
                 int: Number of unique item_ids.
         """
         return (self._nuid, self._niid)
+
+    def get_feature_dims(self) -> Dict[str, int]:
+        """Returns the dimensions (vocab size) of each side information feature.
+
+        Returns:
+            Dict[str, int]: A dictionary containing the name of the
+                feature and the vocab size.
+        """
+        return self._feature_dims
 
     def get_context_dims(self) -> Dict[str, int]:
         """Returns the dimensions (vocab size) of each context feature.
@@ -670,6 +674,10 @@ class Dataset:
             "user_mapping": self._umap,
         }
 
+        # Optionally add feature dimensions if present
+        if self._feature_dims:
+            base_info["feature_dims"] = self._feature_dims
+
         # Optionally add contextual dimensions if present
         if self._context_dims:
             base_info["context_dims"] = self._context_dims
@@ -692,8 +700,8 @@ class Dataset:
             user_mapping (dict): The mapping of user_id -> user_idx.
             item_mapping (dict): The mapping of item_id -> item_idx.
         """
-        self.umap = user_mapping
-        self.imap = item_mapping
+        self._umap = user_mapping
+        self._imap = item_mapping
 
     def clear_cache(self):
         """Clear the cache of inner data structures."""

@@ -177,6 +177,7 @@ class SampledContextualEvaluationDataset(TorchDataset):
         num_negatives: int = 99,
         seed: int = 42,
     ):
+        # pylint: disable = too-many-nested-blocks
         self.num_negatives = num_negatives
         self.num_items = num_items
 

@@ -91,7 +91,7 @@ class LocalWriter(Writer):
                 for batch in batch_generator:
                     writer.writerows(batch)
             logger.msg(f"Recommendations successfully written to {path}")
-        except Exception as e:
+        except (OSError, csv.Error) as e:
             logger.negative(f"Error writing recommendations to {path}: {e}")
 
     def _write_text(self, path: str, content: str) -> None:

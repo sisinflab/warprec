@@ -1,4 +1,4 @@
-# pylint: disable=unused-argument
+# pylint: disable=unused-argument, too-few-public-methods
 from typing import Any
 from abc import ABC, abstractmethod
 

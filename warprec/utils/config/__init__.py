@@ -23,8 +23,10 @@ from .config import (
     WarpRecConfiguration,
     TrainConfiguration,
     DesignConfiguration,
+    EvalConfiguration,
     load_train_configuration,
     load_design_configuration,
+    load_eval_configuration,
     load_callback,
 )
 
@@ -56,7 +58,9 @@ __all__ = [
     "WarpRecConfiguration",
     "TrainConfiguration",
     "DesignConfiguration",
+    "EvalConfiguration",
     "load_train_configuration",
     "load_design_configuration",
+    "load_eval_configuration",
     "load_callback",
 ]

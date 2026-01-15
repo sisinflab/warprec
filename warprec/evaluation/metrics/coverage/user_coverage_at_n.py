@@ -1,4 +1,4 @@
-# pylint: disable=arguments-differ, unused-argument
+# pylint: disable=arguments-differ, unused-argument, line-too-long, duplicate-code
 from typing import Any
 
 import torch

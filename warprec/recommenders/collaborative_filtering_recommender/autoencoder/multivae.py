@@ -1,4 +1,6 @@
+# pylint: disable = R0801, E1102
 from typing import Any, Tuple, Optional
+
 import torch
 import torch.nn.functional as F
 from torch import Tensor
@@ -16,6 +18,15 @@ class Sampling(nn.Module):
     """Uses (z_mean, z_log_var) to sample z using reparameterization trick."""
 
     def forward(self, z_mean: Tensor, z_log_var: Tensor) -> Tensor:
+        """The forward step of the sampler.
+
+        Args:
+            z_mean (Tensor): The mean value.
+            z_log_var (Tensor): The log variance value.
+
+        Returns:
+            Tensor: The sampled value.
+        """
         epsilon = torch.randn_like(z_log_var)
         return z_mean + torch.exp(0.5 * z_log_var) * epsilon
 

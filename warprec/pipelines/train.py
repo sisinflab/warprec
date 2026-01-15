@@ -1,3 +1,4 @@
+# pylint: disable=too-many-branches, too-many-statements
 import os
 import time
 from typing import List, Tuple, Dict, Any
@@ -136,10 +137,10 @@ def train_pipeline(path: str):
     try:
         ray.init(address="auto", runtime_env={"py_modules": py_modules})
         logger.positive("Connected to existing Ray cluster.")
-    except ConnectionError:
+    except ConnectionError as e:
         raise ConnectionError(
             "Unable to connect to Ray cluster. Please ensure Ray is running."
-        )
+        ) from e
 
     for model_name in models:
         model_exploration_start_time = time.time()
@@ -199,8 +200,11 @@ def train_pipeline(path: str):
             num_negatives=config.evaluation.num_negatives,
         )
 
-        # Retrieve best model device
-        best_model_device = best_model.device
+        # Move model to device
+        general_device = config.general.device
+        model_device = params.optimization.device
+        device = general_device if model_device is None else model_device
+        best_model.to(device)
 
         # Evaluation testing
         model_evaluation_start_time = time.time()
@@ -209,7 +213,7 @@ def train_pipeline(path: str):
             dataloader=dataloader,
             strategy=config.evaluation.strategy,
             dataset=main_dataset,
-            device=str(best_model_device),
+            device=device,
             verbose=True,
         )
         results = evaluator.compute_results()
@@ -288,22 +292,22 @@ def train_pipeline(path: str):
                     for label in model_labels:
                         dim = context_dims.get(label, 10)
                         c_data = torch.randint(1, dim, (n_users_to_predict,)).to(
-                            device=best_model_device
+                            device=device
                         )
                         ctx_list.append(c_data)
 
                     contexts = torch.stack(ctx_list, dim=1)
 
             # Create mock data to test prediction time
-            user_indices = torch.arange(n_users_to_predict).to(device=best_model_device)
+            user_indices = torch.arange(n_users_to_predict).to(device=device)
             item_indices = torch.randint(
                 1, n_items, (n_users_to_predict, n_items_to_predict)
-            ).to(device=best_model_device)
+            ).to(device=device)
             user_seq = torch.randint(1, n_items, (n_users_to_predict, max_seq_len)).to(
-                device=best_model_device
+                device=device
             )
             seq_len = torch.randint(1, max_seq_len + 1, (n_users_to_predict,)).to(
-                device=best_model_device
+                device=device
             )
             train_sparse = main_dataset.train_set.get_sparse()
             train_batch = train_sparse[user_indices.tolist(), :]
@@ -338,14 +342,14 @@ def train_pipeline(path: str):
             # Update time report
             writer.write_time_report(model_timing_report)
 
-            # Clear out the dataset cache if in 'conservative' mode
-            if preparation_strategy == "conservative":
-                main_dataset.clear_cache()
+        # Clear out the dataset cache if in 'conservative' mode
+        if preparation_strategy == "conservative":
+            main_dataset.clear_cache()
 
-                for fold in fold_dataset:
-                    fold.clear_cache()
+            for fold in fold_dataset:
+                fold.clear_cache()
 
-                logger.positive("Dataset cache cleared.")
+            logger.positive("Dataset cache cleared.")
 
     if requires_stat_significance:
         # Check if enough models have been evaluated

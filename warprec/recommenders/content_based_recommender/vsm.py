@@ -1,4 +1,4 @@
-# pylint: disable = R0801, E1102
+# pylint: disable = R0801, E1102, R0401
 from typing import Any, Optional
 
 import torch
@@ -6,6 +6,7 @@ import numpy as np
 from torch import Tensor
 from scipy.sparse import csr_matrix, diags
 from sklearn.preprocessing import normalize
+
 from warprec.data.entities import Interactions
 from warprec.recommenders.base_recommender import Recommender
 from warprec.utils.registry import model_registry, similarities_registry

@@ -108,14 +108,15 @@ class WarpRecConfiguration(BaseModel):
             for filter_name, filter_params in self.filtering.items():
                 if filter_name.upper() not in filter_registry.list_registered():
                     raise ValueError(
-                        f"Filter '{filter_name}' is not registered. These are the filters registered: {filter_registry.list_registered()}"
+                        f"Filter '{filter_name}' is not registered. These are "
+                        f"the filters registered: {filter_registry.list_registered()}"
                     )
                 try:
                     filter_registry.get(filter_name, **filter_params, **labels)
                 except Exception as e:
                     raise ValueError(
                         f"Error initializing filter '{filter_name}' with these params {filter_params}: {e}"
-                    )
+                    ) from e
 
         # Check if the precision is supported
         self.check_precision()
@@ -251,9 +252,9 @@ class TrainConfiguration(WarpRecConfiguration):
         parsed_models = {}
 
         # Check if Context-Aware model is in the experiment
-        from warprec.recommenders.base_recommender import ContextRecommenderUtils
+        from warprec.recommenders.base_recommender import ContextRecommenderUtils  # pylint: disable = import-outside-toplevel
 
-        for model_name in self.models.keys():
+        for model_name, _ in self.models.items():
             model_instance = model_registry.get_class(model_name)
 
             if issubclass(model_instance, ContextRecommenderUtils):
@@ -271,7 +272,7 @@ class TrainConfiguration(WarpRecConfiguration):
                     "Check the configuration file."
                 )
                 continue
-            elif (
+            if (
                 model_name.upper() in model_registry.list_registered()
                 and model_name.upper() not in params_registry.list_registered()
             ):
@@ -282,29 +283,29 @@ class TrainConfiguration(WarpRecConfiguration):
                 model_class = RecomModel(**model_data)
                 parsed_models[model_name] = model_class.model_dump()
                 continue
-            else:
-                model_class = params_registry.get(model_name, **model_data)
 
-                if model_class.need_side_information and self.reader.side is None:
-                    raise ValueError(
-                        f"The model {model_name} requires side information to be provided, "
-                        "but none have been provided. Check the configuration file."
-                    )
+            model_class = params_registry.get(model_name, **model_data)
 
-                # Check if there is at least one valid combination
-                model_class.validate_all_combinations()
+            if model_class.need_side_information and self.reader.side is None:
+                raise ValueError(
+                    f"The model {model_name} requires side information to be provided, "
+                    "but none have been provided. Check the configuration file."
+                )
 
-                # Extract model train parameters, removing the meta infos
-                model_data = {
-                    k: (
-                        [v]
-                        if not isinstance(v, list) and v is not None and k != "meta"
-                        else v
-                    )
-                    for k, v in model_data.items()
-                }
+            # Check if there is at least one valid combination
+            model_class.validate_all_combinations()
 
-                parsed_models[model_name] = model_class.model_dump()
+            # Extract model train parameters, removing the meta infos
+            model_data = {
+                k: (
+                    [v]
+                    if not isinstance(v, list) and v is not None and k != "meta"
+                    else v
+                )
+                for k, v in model_data.items()
+            }
+
+            parsed_models[model_name] = model_class.model_dump()
 
         return parsed_models
 
@@ -348,6 +349,20 @@ class DesignConfiguration(WarpRecConfiguration):
     evaluation: EvaluationConfig
 
 
+class EvalConfiguration(WarpRecConfiguration):
+    """Definition of eval pipeline configuration, used evaluate trained models.
+
+    Attributes:
+        writer (WriterConfig): Configuration of the writing process.
+        splitter (SplittingConfig): Configuration of the splitting process.
+        evaluation (EvaluationConfig): Configuration of the evaluation process.
+    """
+
+    writer: WriterConfig
+    splitter: SplittingConfig = None
+    evaluation: EvaluationConfig
+
+
 def load_train_configuration(path: str) -> TrainConfiguration:
     """This method reads the train configuration file and returns
         a TrainConfiguration object.
@@ -380,6 +395,23 @@ def load_design_configuration(path: str) -> DesignConfiguration:
         data = yaml.safe_load(file)
     logger.msg("Reading process completed correctly.")
     return DesignConfiguration(**data)
+
+
+def load_eval_configuration(path: str) -> EvalConfiguration:
+    """This method reads the train configuration file and returns
+        a EvalConfiguration object.
+
+    Args:
+        path (str): The path to the configuration file.
+
+    Returns:
+        EvalConfiguration: The configuration object created from the configuration file.
+    """
+    logger.msg(f"Reading eval configuration file in: {path}")
+    with open(path, "r", encoding="utf-8") as file:
+        data = yaml.safe_load(file)
+    logger.msg("Reading process completed correctly.")
+    return EvalConfiguration(**data)
 
 
 def load_callback(
