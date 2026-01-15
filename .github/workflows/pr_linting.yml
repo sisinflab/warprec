@@ -1,0 +1,35 @@
+name: PR-Linting
+
+on:
+  pull_request:
+    branches: ["*"]
+  push:
+    branches: [main]
+
+jobs:
+  pre-commit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Cache Poetry venv
+        uses: actions/cache@v4
+        with:
+          path: .venv
+          key: venv-${{ runner.os }}-${{ hashFiles('poetry.lock') }}-${{ hashFiles('pyproject.toml') }}
+      - name: Install Poetry
+        uses: snok/install-poetry@v1
+        with:
+          virtualenvs-create: true
+          virtualenvs-in-project: true
+          installer-parallel: true
+          version: 2.1.2
+      - name: Install dependencies
+        run: poetry install --no-interaction
+      - name: Run pre-commit
+        run: poetry run pre-commit run --all-files
