@@ -32,6 +32,7 @@ jobs:
           BITBUCKET_WORKSPACE: ${{ secrets.BITBUCKET_WORKSPACE }}
           BITBUCKET_REPO: ${{ secrets.BITBUCKET_REPO }}
         run: |
+          ls -a
           git remote add bitbucket https://x-token-auth:${BITBUCKET_TOKEN}@bitbucket.org/${BITBUCKET_WORKSPACE}/${BITBUCKET_REPO}.git || true
           SOURCE_BRANCH="${{ steps.vars.outputs.SOURCE_BRANCH }}"
           git checkout -b $SOURCE_BRANCH
