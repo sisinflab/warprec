@@ -39,6 +39,8 @@ jobs:
           PR_NUMBER: ${{ github.event.pull_request.number }}
           PR_URL: ${{ github.event.pull_request.html_url }}
           REVIEWER_1_UUID: "{eba0ea30-5453-4bc6-8d6b-35ad3167d644}"
+          REVIEWER_2_UUID: "{e949da44-c721-444c-86e7-c7857b8cd18e}"
+          REVIEWER_3_UUID: "{44485681-52b9-4d7a-b2a4-b8d35214fdb2}"
         run: |
           SOURCE_BRANCH="${{ steps.vars.outputs.SOURCE_BRANCH }}"
           curl -v -X POST \
@@ -60,7 +62,9 @@ jobs:
                 }
               },
               \"reviewers\": [
-                { \"uuid\": \"${REVIEWER_1_UUID}\" }
+                { \"uuid\": \"${REVIEWER_1_UUID}\" },
+                { \"uuid\": \"${REVIEWER_2_UUID}\" },
+                { \"uuid\": \"${REVIEWER_3_UUID}\" }
               ],
               \"close_source_branch\": false
             }"
