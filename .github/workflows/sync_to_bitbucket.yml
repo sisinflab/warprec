@@ -1,19 +1,13 @@
 name: Sync Merged PR to Bitbucket
 
-# on:
-#   pull_request:
-#     branches: [main]
-#     types: [closed]
-
 on:
   pull_request:
-    branches: ["*"]
-  push:
     branches: [main]
+    types: [closed]
 
 jobs:
   sync:
-    # if: github.event.pull_request.merged == true
+    if: github.event.pull_request.merged == true
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -24,7 +18,7 @@ jobs:
 
       - name: Set SOURCE_BRANCH output
         id: vars
-        run: echo "SOURCE_BRANCH=Add-Github-Actions" >> $GITHUB_OUTPUT
+        run: echo "SOURCE_BRANCH=${{ github.event.pull_request.head_ref }}" >> $GITHUB_OUTPUT
 
       - name: Push to Bitbucket target branch
         env:
@@ -32,7 +26,6 @@ jobs:
           BITBUCKET_WORKSPACE: ${{ secrets.BITBUCKET_WORKSPACE }}
           BITBUCKET_REPO: ${{ secrets.BITBUCKET_REPO }}
         run: |
-          ls -a
           git remote add bitbucket https://x-token-auth:${BITBUCKET_TOKEN}@bitbucket.org/${BITBUCKET_WORKSPACE}/${BITBUCKET_REPO}.git || true
           SOURCE_BRANCH="${{ steps.vars.outputs.SOURCE_BRANCH }}"
           git checkout -b $SOURCE_BRANCH
@@ -54,8 +47,8 @@ jobs:
             -H "Accept: application/json" \
             "https://api.bitbucket.org/2.0/repositories/${BITBUCKET_WORKSPACE}/${BITBUCKET_REPO}/pullrequests" \
             -d "{
-              \"title\": \"Sync merged GitHub PR #${PR_NUMBER} (${SOURCE_BRANCH})\",
-              \"description\": \"Automated sync from GitHub PR #${PR_NUMBER}: ${PR_URL}\",
+              \"title\": \"Sync merged GitHub PR ${PR_NUMBER} (${SOURCE_BRANCH})\",
+              \"description\": \"Automated sync from GitHub PR ${PR_NUMBER}: ${PR_URL}\",
               \"source\": {
                 \"branch\": {
                   \"name\": \"${SOURCE_BRANCH}\"
