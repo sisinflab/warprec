@@ -22,9 +22,9 @@ jobs:
       #     ref: ${{ github.event.pull_request.head.sha }}
       #     fetch-depth: 0
 
-      # - name: Set SOURCE_BRANCH output
-      #   id: vars
-      #   run: echo "SOURCE_BRANCH=${{ github.event.pull_request.head_ref }}" >> $GITHUB_OUTPUT
+      - name: Set SOURCE_BRANCH output
+        id: vars
+        run: echo "SOURCE_BRANCH=Add-Github-Actions" >> $GITHUB_OUTPUT
 
       - name: Push to Bitbucket target branch
         env:
@@ -33,7 +33,7 @@ jobs:
           BITBUCKET_REPO: ${{ secrets.BITBUCKET_REPO }}
         run: |
           git remote add bitbucket https://x-token-auth:${BITBUCKET_TOKEN}@bitbucket.org/${BITBUCKET_WORKSPACE}/${BITBUCKET_REPO}.git || true
-          SOURCE_BRANCH="Add-Github-Actions"
+          SOURCE_BRANCH="${{ steps.vars.outputs.SOURCE_BRANCH }}"
           git checkout -b $SOURCE_BRANCH
           git push bitbucket $SOURCE_BRANCH --force --verbose
 
@@ -46,7 +46,7 @@ jobs:
           PR_URL: ${{ github.event.pull_request.html_url }}
           REVIEWER_1_UUID: "{eba0ea30-5453-4bc6-8d6b-35ad3167d644}"
         run: |
-          SOURCE_BRANCH="Add-Github-Actions"
+          SOURCE_BRANCH="${{ steps.vars.outputs.SOURCE_BRANCH }}"
           curl -v -X POST \
             -H "Authorization: Bearer ${BITBUCKET_TOKEN}" \
             -H "Content-Type: application/json" \
