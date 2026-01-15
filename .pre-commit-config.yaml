@@ -25,7 +25,7 @@ repos:
         entry: poetry run mypy
         language: system
         types: [python]
-        args: [--no-strict-optional, --ignore-missing-imports]
+        args: [--no-strict-optional, --ignore-missing-imports, --no-incremental]
         exclude: ^tests/|^docs/
 
   - repo: local
