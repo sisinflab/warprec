@@ -18,7 +18,7 @@ jobs:
 
       - name: Set SOURCE_BRANCH output
         id: vars
-        run: echo "SOURCE_BRANCH=${{ github.event.pull_request.head_ref }}" >> $GITHUB_OUTPUT
+        run: echo "SOURCE_BRANCH=${{ github.head_ref }}" >> $GITHUB_OUTPUT
 
       - name: Push to Bitbucket target branch
         env:
