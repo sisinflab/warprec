@@ -30,6 +30,9 @@ jobs:
           installer-parallel: true
           version: 2.1.2
       - name: Install dependencies
-        run: poetry install --no-interaction
+        run: |
+          poetry install --no-interaction
+          poetry run pip install pyg_lib torch_scatter torch_sparse torch_cluster torch_spline_conv -f https://data.pyg.org/whl/torch-2.7.0+cpu.html
+          poetry run pip install torch_geometric
       - name: Run pre-commit
         run: poetry run pre-commit run --all-files
