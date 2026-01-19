@@ -1,15 +1,14 @@
-# pylint: disable=arguments-differ, unused-argument, line-too-long, duplicate-code
-from typing import Any, Set
+from typing import Any, Set, Tuple
 
 import torch
 from torch import Tensor
-from warprec.evaluation.metrics.base_metric import TopKMetric
+from warprec.evaluation.metrics.base_metric import UserAverageTopKMetric
 from warprec.utils.enums import MetricBlock
 from warprec.utils.registry import metric_registry
 
 
 @metric_registry.register("nDCG")
-class nDCG(TopKMetric):
+class nDCG(UserAverageTopKMetric):
     """The nDCG@k metric is defined as the rapport of the DCG@k and the IDCG@k.
 
     The DCG@k represent the Discounted Cumulative Gain,
@@ -68,12 +67,6 @@ class nDCG(TopKMetric):
 
     For further details, please refer to this `link <https://en.wikipedia.org/wiki/Discounted_cumulative_gain>`_.
 
-    Attributes:
-        ndcg (Tensor): The total value of ndcg per user.
-        users (Tensor): The number of users evaluated.
-        compute_per_user (bool): Wether or not to compute the metric
-            per user or globally.
-
     Args:
         k (int): The cutoff.
         num_users (int): Number of users in the training set.
@@ -89,83 +82,30 @@ class nDCG(TopKMetric):
         MetricBlock.VALID_USERS,
         MetricBlock.TOP_K_DISCOUNTED_RELEVANCE,
     }
-    _CAN_COMPUTE_PER_USER: bool = True
 
-    ndcg: Tensor
-    users: Tensor
-    compute_per_user: bool
-
-    def __init__(
-        self,
-        k: int,
-        num_users: int,
-        *args: Any,
-        compute_per_user: bool = False,
-        dist_sync_on_step: bool = False,
-        **kwargs: Any,
-    ):
-        super().__init__(k, dist_sync_on_step)
-        self.compute_per_user = compute_per_user
-
-        if self.compute_per_user:
-            self.add_state(
-                "ndcg", default=torch.zeros(num_users), dist_reduce_fx="sum"
-            )  # Initialize a tensor to store metric value for each user
-            self.add_state(
-                "users", default=torch.zeros(num_users), dist_reduce_fx="sum"
-            )
-        else:
-            self.add_state(
-                "ndcg", default=torch.tensor(0.0), dist_reduce_fx="sum"
-            )  # Initialize a scalar to store global value
-            self.add_state("users", default=torch.tensor(0.0), dist_reduce_fx="sum")
-
-    def update(self, preds: Tensor, user_indices: Tensor, **kwargs: Any):
-        """Updates the metric state with the new batch of predictions."""
-        # The discounted relevance is computed as 2^(rel + 1) - 1
-        target: Tensor = kwargs.get("discounted_relevance", torch.zeros_like(preds))
-        users: Tensor = kwargs.get("valid_users", self.valid_users(target))
-        top_k_rel: Tensor = kwargs.get(
+    def unpack_inputs(
+        self, preds: Tensor, **kwargs: Any
+    ) -> Tuple[Tensor, Tensor, Tensor]:
+        target = kwargs.get("discounted_relevance", torch.zeros_like(preds))
+        users = kwargs.get("valid_users", self.valid_users(target))
+        top_k_rel = kwargs.get(
             f"top_{self.k}_discounted_relevance",
             self.top_k_relevance(preds, target, self.k),
         )
+        return target, users, top_k_rel
 
+    def compute_scores(
+        self, preds: Tensor, target: Tensor, top_k_rel: Tensor, **kwargs: Any
+    ) -> Tensor:
         ideal_rel = torch.topk(target, self.k, dim=1).values
         dcg_score = self.dcg(top_k_rel)
         idcg_score = self.dcg(ideal_rel).clamp(min=1e-10)
 
-        # NOTE: nan_to_num(0) is used in case of division by 0
-        if self.compute_per_user:
-            self.ndcg.index_add_(
-                0, user_indices, (dcg_score / idcg_score).nan_to_num(0)
-            )  # Index metric values per user
-
-            # Count only users with at least one interaction
-            self.users.index_add_(0, user_indices, users)
-        else:
-            self.ndcg += (
-                (dcg_score / idcg_score).nan_to_num(0).sum()
-            )  # Sum global nDCG value
-
-            # Count only users with at least one interaction
-            self.users += users.sum()
-
-    def compute(self):
-        """Computes the final metric value."""
-        if self.compute_per_user:
-            ndcg = self.ndcg  # Return the tensor with per_user metric
-            ndcg[self.users == 0] = float(
-                "nan"
-            )  # Set nan for users with no interactions
-        else:
-            ndcg = (
-                self.ndcg / self.users if self.users > 0 else torch.tensor(0.0)
-            ).item()  # Return the metric value
-        return {self.name: ndcg}
+        return (dcg_score / idcg_score).nan_to_num(0)
 
 
 @metric_registry.register("nDCGRendle2020")
-class nDCGRendle2020(TopKMetric):
+class nDCGRendle2020(UserAverageTopKMetric):
     r"""Normalized Discounted Cumulative Gain (nDCG) metric for evaluating recommender systems.
 
     It measures the ranking quality by considering the position of relevant items,
@@ -188,10 +128,13 @@ class nDCGRendle2020(TopKMetric):
 
     In these formulas:
         - $k$: The cutoff, i.e., the number of items considered in the top of the ranked list.
-        - $rel_i$: The *binary* relevance (1 if relevant, 0 otherwise) of the item at rank $i$ in the recommendation list.
-        - $IDCG_k$: The maximum possible DCG score for the given list of relevant items, achieved by ranking all relevant items before non-relevant items up to rank $k$.
+        - $rel_i$: The *binary* relevance (1 if relevant, 0 otherwise) of the
+            item at rank $i$ in the recommendation list.
+        - $IDCG_k$: The maximum possible DCG score for the given list of relevant items,
+            achieved by ranking all relevant items before non-relevant items up to rank $k$.
 
-    The metric computes the nDCG@k for each user and returns the average across all users with at least one relevant item.
+    The metric computes the nDCG@k for each user and returns the average across
+        all users with at least one relevant item.
 
     Tensor Calculation Example:
 
@@ -232,9 +175,11 @@ class nDCGRendle2020(TopKMetric):
     +---+---+---+
 
     Calculate DCG for `rel` and `ideal_rel` for each user using $\sum_{i=1}^k \frac{rel_i}{\log_2(i+1)}$:
-    User 1 DCG (`rel` [1, 1, 0]): $\frac{1}{\log_2(1+1)} + \frac{1}{\log_2(2+1)} + \frac{0}{\log_2(3+1)} = \frac{1}{1} + \frac{1}{\log_2 3} + 0 \approx 1 + 0.6309 = 1.6309$
+    User 1 DCG (`rel` [1, 1, 0]): $\frac{1}{\log_2(1+1)} + \frac{1}{\log_2(2+1)} + \frac{0}{\log_2(3+1)} =
+        \frac{1}{1} + \frac{1}{\log_2 3} + 0 \approx 1 + 0.6309 = 1.6309$
     User 1 IDCG (`ideal_rel` [1, 1, 0]): $\frac{1}{1} + \frac{1}{\log_2 3} + \frac{0}{\log_2 4} \approx 1.6309$
-    User 2 DCG (`rel` [0, 1, 0]): $\frac{0}{\log_2(1+1)} + \frac{1}{\log_2(2+1)} + \frac{0}{\log_2(3+1)} = 0 + \frac{1}{\log_2 3} + 0 \approx 0.6309$
+    User 2 DCG (`rel` [0, 1, 0]): $\frac{0}{\log_2(1+1)} + \frac{1}{\log_2(2+1)} + \frac{0}{\log_2(3+1)} =
+        0 + \frac{1}{\log_2 3} + 0 \approx 0.6309$
     User 2 IDCG (`ideal_rel` [1, 1, 0]): $\frac{1}{1} + \frac{1}{\log_2 3} + \frac{0}{\log_2 4} \approx 1.6309$
 
     Calculate nDCG for each user (DCG / IDCG):
@@ -247,24 +192,10 @@ class nDCGRendle2020(TopKMetric):
     Final nDCG = Sum of nDCG / Number of users = $1.3869 / 2 \approx 0.69345$
 
     This implementation provides a standard calculation of nDCG@k often used in the evaluation
-        of recommender systems, including contexts related to the work of S. Rendle (e.g., in implicit feedback scenarios with binary relevance).
+        of recommender systems, including contexts related to the work of S. Rendle
+        (e.g., in implicit feedback scenarios with binary relevance).
 
     For further details, please refer to this `link <https://dl.acm.org/doi/10.1145/3394486.3403226>`_.
-
-    Attributes:
-        ndcg (Tensor): The accumulated sum of per-user nDCG scores across all processed batches.
-        users (Tensor): The total number of users processed who have at least one relevant item (i.e., contribute to the denominator in the final average).
-        compute_per_user (bool): Wether or not to compute the metric
-            per user or globally.
-
-    Args:
-        k (int): The cutoff for recommendations.
-        num_users (int): Number of users in the training set.
-        *args (Any): Additional positional arguments list.
-        compute_per_user (bool): Wether or not to compute the metric
-            per user or globally.
-        dist_sync_on_step (bool): Torchmetrics parameter for distributed synchronization. Defaults to `False`.
-        **kwargs (Any): Additional keyword arguments dictionary.
     """
 
     _REQUIRED_COMPONENTS: Set[MetricBlock] = {
@@ -272,68 +203,12 @@ class nDCGRendle2020(TopKMetric):
         MetricBlock.VALID_USERS,
         MetricBlock.TOP_K_BINARY_RELEVANCE,
     }
-    _CAN_COMPUTE_PER_USER: bool = True
 
-    ndcg: Tensor
-    users: Tensor
-    compute_per_user: bool
-
-    def __init__(
-        self,
-        k: int,
-        num_users: int,
-        *args: Any,
-        compute_per_user: bool = False,
-        dist_sync_on_step: bool = False,
-        **kwargs: Any,
-    ):
-        super().__init__(k, dist_sync_on_step)
-        self.compute_per_user = compute_per_user
-
-        if self.compute_per_user:
-            self.add_state(
-                "ndcg", default=torch.zeros(num_users), dist_reduce_fx="sum"
-            )  # Initialize a tensor to store metric value for each user
-        else:
-            self.add_state(
-                "ndcg", default=torch.tensor(0.0), dist_reduce_fx="sum"
-            )  # Initialize a scalar to store global value
-        self.add_state("users", default=torch.tensor(0.0), dist_reduce_fx="sum")
-
-    def update(self, preds: Tensor, user_indices: Tensor, **kwargs: Any):
-        """Updates the metric state with the new batch of predictions."""
-        # The discounted relevance is computed as 2^(rel + 1) - 1
-        target = kwargs.get("binary_relevance", torch.zeros_like(preds))
-        users = kwargs.get("valid_users", self.valid_users(target))
-        top_k_rel: Tensor = kwargs.get(
-            f"top_{self.k}_binary_relevance",
-            self.top_k_relevance(preds, target, self.k),
-        )
-
-        ideal_rel = torch.topk(target, self.k, dim=1, largest=True, sorted=True).values
-
+    def compute_scores(
+        self, preds: Tensor, target: Tensor, top_k_rel: Tensor, **kwargs: Any
+    ) -> Tensor:
+        ideal_rel = torch.topk(target, self.k, dim=1).values
         dcg_score = self.dcg(top_k_rel)
         idcg_score = self.dcg(ideal_rel).clamp(min=1e-10)
 
-        # NOTE: nan_to_num(0) is used in case of division by 0
-        if self.compute_per_user:
-            self.ndcg.index_add_(
-                0, user_indices, (dcg_score / idcg_score).nan_to_num(0)
-            )  # Index metric values per user
-        else:
-            self.ndcg += (
-                (dcg_score / idcg_score).nan_to_num(0).sum()
-            )  # Sum global nDCG value
-
-        # Count only users with at least one interaction
-        self.users += users
-
-    def compute(self):
-        """Computes the final metric value."""
-        if self.compute_per_user:
-            ndcg = self.ndcg  # Return the tensor with per_user metric
-        else:
-            ndcg = (
-                self.ndcg / self.users if self.users > 0 else torch.tensor(0.0)
-            ).item()  # Return the metric value
-        return {self.name: ndcg}
+        return (dcg_score / idcg_score).nan_to_num(0)

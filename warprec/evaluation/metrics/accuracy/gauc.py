@@ -1,15 +1,14 @@
-# pylint: disable=arguments-differ, unused-argument, line-too-long, duplicate-code
-from typing import Any, Set
+from typing import Any, Set, Tuple
 
 import torch
 from torch import Tensor
-from warprec.evaluation.metrics.base_metric import BaseMetric
+from warprec.evaluation.metrics.base_metric import UserAverageTopKMetric
 from warprec.utils.enums import MetricBlock
 from warprec.utils.registry import metric_registry
 
 
 @metric_registry.register("GAUC")
-class GAUC(BaseMetric):
+class GAUC(UserAverageTopKMetric):
     """Computes Group Area Under the ROC Curve (GAUC) using the following approach:
 
     Matrix computation of the metric:
@@ -64,12 +63,9 @@ class GAUC(BaseMetric):
     For further details, please refer to this
         `paper <https://www.ijcai.org/Proceedings/2019/0319.pdf>`_.
 
-    Attributes:
-        gauc (Tensor): The gauc value across all users.
-        users (Tensor): The number of users.
-
     Args:
         num_items (int): Number of items in the training set.
+        num_users (int): Number of users in the training set.
         *args (Any): The argument list.
         dist_sync_on_step (bool): Torchmetrics parameter.
         **kwargs (Any): The keyword argument dictionary.
@@ -79,72 +75,29 @@ class GAUC(BaseMetric):
         MetricBlock.BINARY_RELEVANCE,
     }
 
-    gauc: Tensor
-    users: Tensor
-
     def __init__(
         self,
         num_items: int,
+        num_users: int,
         *args: Any,
         dist_sync_on_step: bool = False,
         **kwargs: Any,
     ):
-        super().__init__(dist_sync_on_step=dist_sync_on_step)
+        super().__init__(k=0, num_users=num_users, dist_sync_on_step=dist_sync_on_step)
         self.num_items = num_items
-        self.add_state("gauc", default=torch.tensor(0.0), dist_reduce_fx="sum")
-        self.add_state("users", default=torch.tensor(0.0), dist_reduce_fx="sum")
 
-    def update(self, preds: Tensor, **kwargs: Any):
-        """Updates the metric state with the new batch of predictions."""
-        target: Tensor = kwargs.get("binary_relevance", torch.zeros_like(preds))
-        users: Tensor = kwargs.get("valid_users", self.valid_users(target))
-        device = preds.device
+    def unpack_inputs(self, preds: Tensor, **kwargs: Any) -> Tuple[Tensor, Tensor, Any]:
+        target = kwargs.get("binary_relevance", torch.zeros_like(preds))
+        users = kwargs.get("valid_users", self.valid_users(target))
+        return target, users, None
 
-        # Negative samples
-        train_set = torch.isinf(preds).logical_and(preds < 0).sum(dim=1)  # [batch_size]
-        target_set = target.sum(dim=1)  # [batch_size]
-        neg_num: Tensor = self.num_items - train_set - target_set + 1  # [batch_size]
-        neg_num = neg_num.unsqueeze(1)
+    def compute_scores(
+        self, preds: Tensor, target: Tensor, top_k_rel: Any, **kwargs: Any
+    ) -> Tensor:
+        # Compute area and positives per user
+        area, positives = self.compute_area_stats(preds, target, self.num_items, k=None)
 
-        # Sorted recommendations
-        _, sorted_preds = torch.sort(
-            preds, dim=1, descending=True
-        )  # [batch_size x items]
-        sorted_target = torch.gather(target, 1, sorted_preds)
-
-        # Effective rank
-        col_indices = torch.arange(sorted_target.shape[1], device=device).repeat(
-            sorted_target.shape[0], 1
+        # GAUC = total_area / total_positives
+        return torch.where(
+            positives > 0, area / positives, torch.tensor(0.0, device=preds.device)
         )
-        effective_rank = torch.where(
-            sorted_target == 1, col_indices, torch.tensor(0.0, device=device)
-        )  # [batch_size x items]
-
-        # Progressive position
-        cumsum = torch.cumsum(sorted_target, dim=1)
-        progressive_position = torch.where(
-            sorted_target == 1, cumsum - 1, sorted_target
-        )  # [batch_size x items]
-
-        # GAUC compute
-        auc_matrix = torch.where(
-            sorted_target > 0,
-            ((neg_num - effective_rank + progressive_position) / neg_num),
-            sorted_target,
-        )
-        positive_sum = sorted_target.sum(dim=1)  # [batch_size]
-        auc_tensor = auc_matrix.sum(dim=1)  # [batch_size]
-        gauc_values = torch.where(
-            positive_sum != 0, auc_tensor / positive_sum, positive_sum
-        )
-
-        # Update
-        self.gauc += gauc_values.sum()
-
-        # Count only users with at least one interaction
-        self.users += users.sum()
-
-    def compute(self):
-        """Computes the final metric value."""
-        score = self.gauc / self.users if self.users > 0 else torch.tensor(0.0)
-        return {self.name: score.item()}
