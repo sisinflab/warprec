@@ -99,11 +99,14 @@ class APLT(TopKMetric):
             self.add_state(
                 "long_hits", default=torch.zeros(num_users), dist_reduce_fx="sum"
             )  # Initialize a tensor to store metric value for each user
+            self.add_state(
+                "users", default=torch.zeros(num_users), dist_reduce_fx="sum"
+            )
         else:
             self.add_state(
                 "long_hits", default=torch.tensor(0.0), dist_reduce_fx="sum"
             )  # Initialize a scalar to store global value
-        self.add_state("users", default=torch.tensor(0.0), dist_reduce_fx="sum")
+            self.add_state("users", default=torch.tensor(0.0), dist_reduce_fx="sum")
 
         # Add long tail items as buffer
         _, lt = self.compute_head_tail(item_interactions, pop_ratio)
@@ -112,7 +115,7 @@ class APLT(TopKMetric):
     def update(self, preds: Tensor, user_indices: Tensor, **kwargs: Any):
         """Updates the metric state with the new batch of predictions."""
         target: Tensor = kwargs.get("binary_relevance", torch.zeros_like(preds))
-        users = kwargs.get("valid_users", self.valid_users(target))
+        users: Tensor = kwargs.get("valid_users", self.valid_users(target))
         top_k_indices: Tensor = kwargs.get(
             f"top_{self.k}_indices", self.top_k_values_indices(preds, self.k)[1]
         )
@@ -130,16 +133,22 @@ class APLT(TopKMetric):
 
         if self.compute_per_user:
             self.long_hits.index_add_(0, user_indices, long_hits)
+
+            # Count only users with at least one interaction
+            self.users.index_add_(0, user_indices, users)
         else:
             self.long_hits += long_hits.sum()
 
-        # Count only users with at least one interaction
-        self.users += users
+            # Count only users with at least one interaction
+            self.users += users.sum()
 
     def compute(self):
         """Computes the final metric value."""
         if self.compute_per_user:
             aplt = self.long_hits / self.k
+            aplt[self.users == 0] = float(
+                "nan"
+            )  # Set nan for users with no interactions
         else:
             aplt = (
                 self.long_hits / (self.users * self.k)

@@ -110,11 +110,14 @@ class EPC(TopKMetric):
             self.add_state(
                 "epc", default=torch.zeros(num_users), dist_reduce_fx="sum"
             )  # Initialize a tensor to store metric value for each user
+            self.add_state(
+                "users", default=torch.zeros(num_users), dist_reduce_fx="sum"
+            )
         else:
             self.add_state(
                 "epc", default=torch.tensor(0.0), dist_reduce_fx="sum"
             )  # Initialize a scalar to store global value
-        self.add_state("users", default=torch.tensor(0.0), dist_reduce_fx="sum")
+            self.add_state("users", default=torch.tensor(0.0), dist_reduce_fx="sum")
 
         # Add novelty profile as buffer
         self.register_buffer(
@@ -152,7 +155,7 @@ class EPC(TopKMetric):
                 f"top_{self.k}_binary_relevance",
                 self.top_k_relevance(preds, target, self.k),
             )
-        users = kwargs.get("valid_users", self.valid_users(target))
+        users: Tensor = kwargs.get("valid_users", self.valid_users(target))
 
         # Extract novelty values
         batch_novelty = self.novelty_profile.repeat(
@@ -162,16 +165,22 @@ class EPC(TopKMetric):
 
         if self.compute_per_user:
             self.epc.index_add_(0, user_indices, self.dcg(top_k_rel * novelty))
+
+            # Count only users with at least one interaction
+            self.users.index_add_(0, user_indices, users)
         else:
             self.epc += self.dcg(top_k_rel * novelty).sum()
 
-        # Count only users with at least one interaction
-        self.users += users
+            # Count only users with at least one interaction
+            self.users += users.sum()
 
     def compute(self):
         """Computes the final value of the metric."""
         if self.compute_per_user:
             epc = self.epc / self.discounted_sum(self.k)
+            epc[self.users == 0] = float(
+                "nan"
+            )  # Set nan for users with no interactions
         else:
             epc = (
                 self.epc / (self.users * self.discounted_sum(self.k))

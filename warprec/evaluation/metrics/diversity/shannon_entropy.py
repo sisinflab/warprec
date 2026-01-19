@@ -87,7 +87,7 @@ class ShannonEntropy(TopKMetric):
 
     def update(self, preds: Tensor, **kwargs: Any):
         target: Tensor = kwargs.get("binary_relevance", torch.zeros_like(preds))
-        users = kwargs.get("valid_users", self.valid_users(target))
+        users: Tensor = kwargs.get("valid_users", self.valid_users(target))
         top_k_indices: Tensor = kwargs.get(
             f"top_{self.k}_indices", self.top_k_values_indices(preds, self.k)[1]
         )
@@ -102,7 +102,7 @@ class ShannonEntropy(TopKMetric):
 
         # Update state
         self.item_counts += torch.bincount(flattened, minlength=self.num_items)
-        self.users += users
+        self.users += users.sum()
 
     def compute(self):
         """Calculate final entropy value."""

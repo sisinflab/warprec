@@ -103,18 +103,21 @@ class ARP(TopKMetric):
             self.add_state(
                 "retrieved_pop", default=torch.zeros(num_users), dist_reduce_fx="sum"
             )  # Initialize a tensor to store metric value for each user
+            self.add_state(
+                "users", default=torch.zeros(num_users), dist_reduce_fx="sum"
+            )
         else:
             self.add_state(
                 "retrieved_pop", default=torch.tensor(0.0), dist_reduce_fx="sum"
             )  # Initialize a scalar to store global value
-        self.add_state("users", default=torch.tensor(0.0), dist_reduce_fx="sum")
+            self.add_state("users", default=torch.tensor(0.0), dist_reduce_fx="sum")
 
         # Add popularity counts as buffer
         self.register_buffer("pop", self.compute_popularity(item_interactions))
 
     def update(self, preds: Tensor, user_indices: Tensor, **kwargs: Any):
         """Updates the metric state with the new batch of predictions."""
-        users = kwargs.get("valid_users", self.valid_users(preds))
+        users: Tensor = kwargs.get("valid_users", self.valid_users(preds))
         top_k_indices: Tensor = kwargs.get(
             f"top_{self.k}_indices", self.top_k_values_indices(preds, self.k)[1]
         )
@@ -132,16 +135,22 @@ class ARP(TopKMetric):
 
         if self.compute_per_user:
             self.retrieved_pop.index_add_(0, user_indices, user_pop_sum)
+
+            # Count only users with at least one interaction
+            self.users.index_add_(0, user_indices, users)
         else:
             self.retrieved_pop += user_pop_sum.sum()
 
-        # Count only users with at least one interaction
-        self.users += users
+            # Count only users with at least one interaction
+            self.users += users.sum()
 
     def compute(self):
         """Computes the final metric value."""
         if self.compute_per_user:
             arp = self.retrieved_pop / self.k
+            arp[self.users == 0] = float(
+                "nan"
+            )  # Set nan for users with no interactions
         else:
             arp = (
                 self.retrieved_pop / (self.users * self.k)

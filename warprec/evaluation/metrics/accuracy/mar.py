@@ -103,16 +103,19 @@ class MAR(TopKMetric):
             self.add_state(
                 "ar", default=torch.zeros(num_users), dist_reduce_fx="sum"
             )  # Initialize a tensor to store metric value for each user
+            self.add_state(
+                "users", default=torch.zeros(num_users), dist_reduce_fx="sum"
+            )
         else:
             self.add_state(
                 "ar", default=torch.tensor(0.0), dist_reduce_fx="sum"
             )  # Initialize a scalar to store global value
-        self.add_state("users", default=torch.tensor(0.0), dist_reduce_fx="sum")
+            self.add_state("users", default=torch.tensor(0.0), dist_reduce_fx="sum")
 
     def update(self, preds: Tensor, user_indices: Tensor, **kwargs: Any):
         """Updates the MAR metric state with a batch of predictions."""
         target: Tensor = kwargs.get("binary_relevance", torch.zeros_like(preds))
-        users = kwargs.get("valid_users", self.valid_users(target))
+        users: Tensor = kwargs.get("valid_users", self.valid_users(target))
         top_k_rel: Tensor = kwargs.get(
             f"top_{self.k}_binary_relevance",
             self.top_k_relevance(preds, target, self.k),
@@ -137,16 +140,22 @@ class MAR(TopKMetric):
             self.ar.index_add_(
                 0, user_indices, ar_per_user
             )  # Index metric values per user
+
+            # Count only users with at least one interaction
+            self.users.index_add_(0, user_indices, users)
         else:
             self.ar += ar_per_user.sum()  # Compute total average recall
 
-        # Count only users with at least one interaction
-        self.users += users
+            # Count only users with at least one interaction
+            self.users += users.sum()
 
     def compute(self):
         """Computes the final MAR@K value."""
         if self.compute_per_user:
             mar = self.ar  # Return the tensor with per_user metric
+            mar[self.users == 0] = float(
+                "nan"
+            )  # Set nan for users with no interactions
         else:
             mar = (
                 self.ar / self.users if self.users > 0 else torch.tensor(0.0)

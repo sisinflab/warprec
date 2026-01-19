@@ -117,16 +117,19 @@ class LAUC(TopKMetric):
             self.add_state(
                 "lauc", default=torch.zeros(num_users), dist_reduce_fx="sum"
             )  # Initialize a tensor to store metric value for each user
+            self.add_state(
+                "users", default=torch.zeros(num_users), dist_reduce_fx="sum"
+            )
         else:
             self.add_state(
                 "lauc", default=torch.tensor(0.0), dist_reduce_fx="sum"
             )  # Initialize a scalar to store global value
-        self.add_state("users", default=torch.tensor(0.0), dist_reduce_fx="sum")
+            self.add_state("users", default=torch.tensor(0.0), dist_reduce_fx="sum")
 
     def update(self, preds: Tensor, user_indices: Tensor, **kwargs: Any):
         """Updates the metric state with the new batch of predictions."""
         target = kwargs.get("binary_relevance", torch.zeros_like(preds))
-        users = kwargs.get("valid_users", self.valid_users(target))
+        users: Tensor = kwargs.get("valid_users", self.valid_users(target))
         device = preds.device
 
         # Negative samples
@@ -174,16 +177,22 @@ class LAUC(TopKMetric):
             self.lauc.index_add_(
                 0, user_indices, users_score
             )  # Index metric values per user
+
+            # Count only users with at least one interaction
+            self.users.index_add_(0, user_indices, users)
         else:
             self.lauc += (users_score).sum()  # Sum the global lauc metric
 
-        # Count only users with at least one interaction
-        self.users += users
+            # Count only users with at least one interaction
+            self.users += users.sum()
 
     def compute(self):
         """Computes the final metric value."""
         if self.compute_per_user:
             lauc = self.lauc
+            lauc[self.users == 0] = float(
+                "nan"
+            )  # Set nan for users with no interactions
         else:
             lauc = (
                 self.lauc / self.users if self.users > 0 else torch.tensor(0.0)

@@ -243,7 +243,7 @@ def objective_function(
                 # Maximize case
                 if mode == "max" and current_validation_score > best_validation_score:
                     best_validation_score = (
-                        current_validation_score.mean().item()
+                        current_validation_score.nanmean().item()
                         if isinstance(current_validation_score, Tensor)
                         else current_validation_score
                     )
@@ -251,7 +251,7 @@ def objective_function(
                 # Minimize case
                 if mode == "min" and current_validation_score < best_validation_score:
                     best_validation_score = (
-                        current_validation_score.mean().item()
+                        current_validation_score.nanmean().item()
                         if isinstance(current_validation_score, Tensor)
                         else current_validation_score
                     )
@@ -486,7 +486,7 @@ def objective_function_ddp(config: dict) -> None:
         # Maximize case
         if mode == "max" and current_validation_score > best_validation_score:
             best_validation_score = (
-                current_validation_score.mean().item()
+                current_validation_score.nanmean().item()
                 if isinstance(current_validation_score, Tensor)
                 else current_validation_score
             )
@@ -494,7 +494,7 @@ def objective_function_ddp(config: dict) -> None:
         # Minimize case
         if mode == "min" and current_validation_score < best_validation_score:
             best_validation_score = (
-                current_validation_score.mean().item()
+                current_validation_score.nanmean().item()
                 if isinstance(current_validation_score, Tensor)
                 else current_validation_score
             )
