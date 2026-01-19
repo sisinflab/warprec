@@ -434,7 +434,7 @@ class Evaluator:
                     if isinstance(
                         metric, Tensor
                     ):  # In case of user_wise computation, we compute the mean
-                        metric = metric.mean().item()
+                        metric = metric.nanmean().item()
                     _metric_tab.append(str(metric))
                 _tab.append(_metric_tab)
 

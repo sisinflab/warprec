@@ -150,7 +150,7 @@ class Writer(ABC):
             row = {"Model": model_name, "Top@k": k}
             for metric_name, metric_result in metrics.items():
                 value = (
-                    metric_result.mean().item()
+                    metric_result.nanmean().item()
                     if isinstance(metric_result, Tensor)
                     else metric_result
                 )

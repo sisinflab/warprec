@@ -241,6 +241,19 @@ def compute_paired_statistical_test(
                         array_a = values_a.cpu().numpy()
                         array_b = values_b.cpu().numpy()
 
+                        # Clean NaN values from arrays
+                        # NOTE: NaN values can appear when users have no interactions
+                        mask = ~np.isnan(array_a) & ~np.isnan(array_b)
+                        array_a = array_a[mask]
+                        array_b = array_b[mask]
+
+                        # Safety check for minimum number of samples
+                        if len(array_a) < 2 or len(array_b) < 2:
+                            logger.attention(
+                                f"Not enough valid samples for {model_a} vs {model_b} on {metric}"
+                            )
+                            continue
+
                         stat, p = stat_test.compute(array_a, array_b)
                         accepted = "Accepted" if p < alpha else "Rejected"
 
