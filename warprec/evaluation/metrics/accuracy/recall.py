@@ -90,16 +90,19 @@ class Recall(TopKMetric):
             self.add_state(
                 "retrieved", default=torch.zeros(num_users), dist_reduce_fx="sum"
             )  # Initialize a tensor to store metric value for each user
+            self.add_state(
+                "users", default=torch.zeros(num_users), dist_reduce_fx="sum"
+            )
         else:
             self.add_state(
                 "retrieved", default=torch.tensor(0.0), dist_reduce_fx="sum"
             )  # Initialize a scalar to store global value
-        self.add_state("users", default=torch.tensor(0.0), dist_reduce_fx="sum")
+            self.add_state("users", default=torch.tensor(0.0), dist_reduce_fx="sum")
 
     def update(self, preds: Tensor, user_indices: Tensor, **kwargs: Any):
         """Updates the metric state with the new batch of predictions."""
         target: Tensor = kwargs.get("binary_relevance", torch.zeros_like(preds))
-        users = kwargs.get("valid_users", self.valid_users(target))
+        users: Tensor = kwargs.get("valid_users", self.valid_users(target))
         top_k_rel: Tensor = kwargs.get(
             f"top_{self.k}_binary_relevance",
             self.top_k_relevance(preds, target, self.k),
@@ -114,6 +117,9 @@ class Recall(TopKMetric):
                 user_indices,
                 torch.where(relevant > 0, hits / relevant, torch.tensor(0.0)),
             )  # Index metric values per user
+
+            # Count only users with at least one interaction
+            self.users.index_add_(0, user_indices, users)
         else:
             self.retrieved += (
                 torch.where(relevant > 0, hits / relevant, torch.tensor(0.0))
@@ -121,13 +127,16 @@ class Recall(TopKMetric):
                 .float()
             )  # Count global 'retrieved' items
 
-        # Count only users with at least one interaction
-        self.users += users
+            # Count only users with at least one interaction
+            self.users += users.sum()
 
     def compute(self):
         """Computes the final metric value."""
         if self.compute_per_user:
             recall = self.retrieved  # Return the tensor with per_user metric
+            recall[self.users == 0] = float(
+                "nan"
+            )  # Set nan for users with no interactions
         else:
             recall = (
                 self.retrieved / self.users if self.users > 0 else torch.tensor(0.0)

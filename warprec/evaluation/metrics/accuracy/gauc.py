@@ -97,6 +97,7 @@ class GAUC(BaseMetric):
     def update(self, preds: Tensor, **kwargs: Any):
         """Updates the metric state with the new batch of predictions."""
         target: Tensor = kwargs.get("binary_relevance", torch.zeros_like(preds))
+        users: Tensor = kwargs.get("valid_users", self.valid_users(target))
         device = preds.device
 
         # Negative samples
@@ -141,14 +142,9 @@ class GAUC(BaseMetric):
         self.gauc += gauc_values.sum()
 
         # Count only users with at least one interaction
-        self.users += (target > 0).any(dim=1).sum().item()
+        self.users += users.sum()
 
     def compute(self):
         """Computes the final metric value."""
         score = self.gauc / self.users if self.users > 0 else torch.tensor(0.0)
         return {self.name: score.item()}
-
-    def reset(self):
-        """Resets the metric state."""
-        self.gauc.zero_()
-        self.users.zero_()

@@ -92,16 +92,19 @@ class MRR(TopKMetric):
             self.add_state(
                 "reciprocal_rank", default=torch.zeros(num_users), dist_reduce_fx="sum"
             )  # Initialize a tensor to store metric value for each user
+            self.add_state(
+                "users", default=torch.zeros(num_users), dist_reduce_fx="sum"
+            )
         else:
             self.add_state(
                 "reciprocal_rank", default=torch.tensor(0.0), dist_reduce_fx="sum"
             )  # Initialize a scalar to store global value
-        self.add_state("users", default=torch.tensor(0.0), dist_reduce_fx="sum")
+            self.add_state("users", default=torch.tensor(0.0), dist_reduce_fx="sum")
 
     def update(self, preds: Tensor, user_indices: Tensor, **kwargs: Any):
         """Updates the MRR metric state with a batch of predictions."""
         target: Tensor = kwargs.get("binary_relevance", torch.zeros_like(preds))
-        users = kwargs.get("valid_users", self.valid_users(target))
+        users: Tensor = kwargs.get("valid_users", self.valid_users(target))
         top_k_rel: Tensor = kwargs.get(
             f"top_{self.k}_binary_relevance",
             self.top_k_relevance(preds, target, self.k),
@@ -115,16 +118,22 @@ class MRR(TopKMetric):
             self.reciprocal_rank.index_add_(
                 0, user_indices, reciprocal_ranks
             )  # Index metric values per user
+
+            # Count only users with at least one interaction
+            self.users.index_add_(0, user_indices, users)
         else:
             self.reciprocal_rank += reciprocal_ranks.sum()  # Sum the total RR values
 
-        # Count only users with at least one interaction
-        self.users += users
+            # Count only users with at least one interaction
+            self.users += users.sum()
 
     def compute(self):
         """Computes the final MRR@K value."""
         if self.compute_per_user:
             mrr = self.reciprocal_rank  # Return the tensor with per_user metric
+            mrr[self.users == 0] = float(
+                "nan"
+            )  # Set nan for users with no interactions
         else:
             mrr = (
                 self.reciprocal_rank / self.users
