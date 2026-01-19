@@ -39,10 +39,10 @@ class UserCoverage(TopKMetric):
     def update(self, preds: Tensor, **kwargs: Any):
         """Updates the metric state with the new batch of predictions."""
         target: Tensor = kwargs.get("binary_relevance", torch.zeros_like(preds))
-        users = kwargs.get("valid_users", self.valid_users(target))
+        users: Tensor = kwargs.get("valid_users", self.valid_users(target))
 
         # Count only users with at least one interaction
-        self.users += users
+        self.users += users.sum()
 
     def compute(self):
         """Computes the final metric value."""
