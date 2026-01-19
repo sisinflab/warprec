@@ -1,6 +1,5 @@
-# pylint: disable=arguments-differ
 from abc import abstractmethod, ABC
-from typing import Any, Tuple, Set
+from typing import Any, Tuple, Set, Optional
 
 import torch
 from torch import Tensor
@@ -14,9 +13,6 @@ class BaseMetric(Metric, ABC):
     _REQUIRED_COMPONENTS: Set[MetricBlock] = (
         set()
     )  # This defines the data that needs to be pre-computed
-    _CAN_COMPUTE_PER_USER: bool = (
-        False  # Flag value for user-wise computation of metric
-    )
 
     @abstractmethod
     def compute(self) -> dict[str, float]:
@@ -176,6 +172,68 @@ class BaseMetric(Metric, ABC):
             return -torch.log2(item_interactions / total_interactions).unsqueeze(0)
         return (1 - (item_interactions / num_users)).unsqueeze(0)
 
+    def compute_area_stats(
+        self, preds: Tensor, target: Tensor, num_items: int, k: Optional[int] = None
+    ) -> Tuple[Tensor, Tensor]:
+        """Computes the Area per user and the Number of Positives per user.
+
+        Args:
+            preds (Tensor): Predictions tensor.
+            target (Tensor): Binary relevance tensor.
+            num_items (int): Total number of items.
+            k (Optional[int]): Cutoff for top-k evaluation. If None, considers all items.
+
+        Returns:
+            Tuple[Tensor, Tensor]:
+                - Tensor: Area per user.
+                - Tensor: Number of positives per user.
+        """
+        device = preds.device
+        batch_size = preds.shape[0]
+
+        # Negative samples count
+        # Logic: Total - Train(masked) - Target + 1
+        train_set = torch.isinf(preds).logical_and(preds < 0).sum(dim=1)
+        target_set = target.sum(dim=1)
+        neg_num = (num_items - train_set - target_set + 1).unsqueeze(1)
+
+        # Sorting
+        _, sorted_preds = torch.sort(preds, dim=1, descending=True)
+        sorted_target = torch.gather(target, 1, sorted_preds)
+
+        # Optional Slicing for top-l
+        if k is not None:
+            sorted_target = sorted_target[:, :k]
+
+        # Effective Rank and Progressive Position
+        # Create column indices [0, 1, 2, ...]
+        col_indices = torch.arange(sorted_target.shape[1], device=device).expand(
+            batch_size, -1
+        )
+
+        effective_rank = torch.where(
+            sorted_target == 1, col_indices, torch.tensor(0.0, device=device)
+        )
+
+        cumsum = torch.cumsum(sorted_target, dim=1)
+        progressive_position = torch.where(
+            sorted_target == 1, cumsum - 1, sorted_target
+        )
+
+        # AUC Matrix Calculation
+        # Formula: (Neg - Eff + Prog) / Neg
+        auc_matrix = torch.where(
+            sorted_target > 0,
+            ((neg_num - effective_rank + progressive_position) / neg_num),
+            sorted_target,  # This puts 0 where target is 0
+        )
+
+        # Aggregation per user
+        area_per_user = auc_matrix.sum(dim=1)
+        positives_per_user = sorted_target.sum(dim=1)
+
+        return area_per_user, positives_per_user
+
     @property
     def name(self):
         """The name of the metric."""
@@ -187,10 +245,87 @@ class BaseMetric(Metric, ABC):
         return self._REQUIRED_COMPONENTS
 
 
-class TopKMetric(BaseMetric):
-    """The definition of a Top-K metric."""
+class RatingMetric(BaseMetric):
+    """The definition of Rating Metric.
 
-    def __init__(self, k: int, dist_sync_on_step=False, **kwargs: Any):
+    Attributes:
+        error_sum (Tensor): The tensor to store per-user error sum.
+        total_count (Tensor): The tensor to store per-user count of ratings.
+
+    Args:
+        num_users (int): Number of users in the training set.
+        dist_sync_on_step (bool): Torchmetrics parameter.
+        **kwargs (Any): Additional keyword arguments to pass to the parent class.
+    """
+
+    error_sum: Tensor
+    total_count: Tensor
+
+    def __init__(
+        self,
+        num_users: int,
+        dist_sync_on_step: bool = False,
+        **kwargs: Any,
+    ):
+        super().__init__(dist_sync_on_step=dist_sync_on_step)
+        self.add_state(
+            "error_sum", default=torch.zeros(num_users), dist_reduce_fx="sum"
+        )  # Initialize a tensor to store per-user error sum
+        self.add_state(
+            "total_count", default=torch.zeros(num_users), dist_reduce_fx="sum"
+        )  # Initialize a tensor to store per-user count of ratings
+
+    @abstractmethod
+    def _compute_element_error(self, preds: Tensor, target: Tensor) -> Tensor:
+        """Computes the error between predictions and target."""
+        pass
+
+    def update(self, preds: Tensor, user_indices: Tensor, **kwargs: Any):
+        """Unified update logic using index_add_."""
+        target = kwargs.get("ground", torch.zeros_like(preds))
+
+        # Mask for valid ratings
+        mask = target > 0
+
+        # Compute error
+        errors = self._compute_element_error(preds, target)
+
+        # Zero out errors for non-rated items to be safe
+        errors = errors * mask.float()
+
+        # Accumulate per user
+        self.error_sum.index_add_(0, user_indices, errors.sum(dim=1))
+        self.total_count.index_add_(0, user_indices, mask.sum(dim=1).float())
+
+    def compute(self):
+        """Computes the final metric value."""
+        results = self.error_sum / self.total_count  # Calculate metric per user
+        results[self.total_count == 0] = float(
+            "nan"
+        )  # Set nan for users with no interactions
+        return {self.name: results}
+
+
+class TopKMetric(BaseMetric):
+    """The definition of a Top-K metric.
+
+    Attributes:
+        k (int): The cutoff value.
+
+    Args:
+        k (int): The cutoff for recommendations.
+        dist_sync_on_step (bool): Torchmetrics parameter.
+        **kwargs (Any): Additional keyword arguments to pass to the parent class.
+    """
+
+    k: int
+
+    def __init__(
+        self,
+        k: int,
+        dist_sync_on_step: bool = False,
+        **kwargs: Any,
+    ):
         super().__init__(dist_sync_on_step=dist_sync_on_step)
         self.k = k
 
@@ -218,3 +353,104 @@ class TopKMetric(BaseMetric):
         """
         ranks = torch.arange(k)
         return torch.sum(1.0 / torch.log2(ranks.float() + 2))
+
+
+class UserAverageTopKMetric(TopKMetric):
+    """The definition of a User Average Top-K metric.
+
+    Attributes:
+        scores (Tensor): The tensor to store metric values.
+        user_interactions (Tensor): The tensor to store number of interactions per user.
+
+    Args:
+        k (int): The cutoff.
+        num_users (int): Number of users in the training set.
+        *args (Any): The argument list.
+        dist_sync_on_step (bool): Torchmetrics parameter.
+        **kwargs (Any): Additional keyword arguments to pass to the parent class.
+    """
+
+    scores: Tensor
+    user_interactions: Tensor
+
+    def __init__(
+        self,
+        k: int,
+        num_users: int,
+        *args: Any,
+        dist_sync_on_step: bool = False,
+        **kwargs: Any,
+    ):
+        super().__init__(k=k, dist_sync_on_step=dist_sync_on_step)
+        self.add_state(
+            "scores", default=torch.zeros(num_users), dist_reduce_fx="sum"
+        )  # Initialize a tensor to store metric value for each user
+        self.add_state(
+            "user_interactions", default=torch.zeros(num_users), dist_reduce_fx="sum"
+        )  # Initialize a tensor to store number of interactions per user
+
+    def unpack_inputs(
+        self, preds: Tensor, **kwargs: Any
+    ) -> Tuple[Tensor, Tensor, Tensor]:
+        """Default unpacking method used by most metrics.
+
+        Retrieves the binary relevance, valid users and top-k binary relevance.
+
+        Args:
+            preds (Tensor): The prediction tensor.
+            **kwargs (Any): The keyword argument dictionary.
+
+        Returns:
+            Tuple[Tensor, Tensor, Tensor]:
+                - Tensor: The target tensor.
+                - Tensor: The valid users tensor.
+                - Tensor: The top-k relevance tensor.
+        """
+        target = kwargs.get("binary_relevance", torch.zeros_like(preds))
+        users = kwargs.get("valid_users", self.valid_users(target))
+        top_k_rel = kwargs.get(
+            f"top_{self.k}_binary_relevance",
+            self.top_k_relevance(preds, target, self.k),
+        )
+        return target, users, top_k_rel
+
+    @abstractmethod
+    def compute_scores(
+        self, preds: Tensor, target: Tensor, top_k_rel: Tensor, **kwargs: Any
+    ) -> Tensor:
+        """Math formula for the specific metric.
+
+        Metrics must implement this method.
+
+        Args:
+            preds (Tensor): The prediction tensor.
+            target (Tensor): The target tensor.
+            top_k_rel (Tensor): The top-k relevance tensor.
+            **kwargs (Any): The keyword argument dictionary.
+
+        Returns:
+            Tensor: The computed metric values per user.
+        """
+        pass
+
+    def update(self, preds: Tensor, user_indices: Tensor, **kwargs: Any):
+        """Unified update logic."""
+        target, users, top_k_data = self.unpack_inputs(preds, **kwargs)
+        batch_scores = self.compute_scores(preds, target, top_k_data, **kwargs)
+
+        # Safety masking
+        batch_scores = torch.where(
+            users > 0, batch_scores, torch.tensor(0.0, device=preds.device)
+        )
+
+        # Accumulate per user
+        self.scores.index_add_(0, user_indices, batch_scores)
+        self.user_interactions.index_add_(0, user_indices, users)
+
+    def compute(self):
+        """Computes the final metric value."""
+        scores = self.scores / self.user_interactions  # Normalize the metric score
+        scores[self.user_interactions == 0] = float(
+            "nan"
+        )  # Set nan for users with no interactions
+        return {self.name: scores}
