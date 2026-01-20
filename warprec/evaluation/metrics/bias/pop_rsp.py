@@ -1,4 +1,3 @@
-# pylint: disable=arguments-differ, unused-argument, line-too-long, duplicate-code
 from typing import Any, Set
 
 import torch
@@ -68,7 +67,6 @@ class PopRSP(TopKMetric):
         k (int): The cutoff for recommendations.
         item_interactions (Tensor): The counts for item interactions in training set.
         pop_ratio (float): The percentile considered popular.
-        *args (Any): The argument list.
         dist_sync_on_step (bool): Torchmetrics parameter.
         **kwargs (Any): The keyword argument dictionary.
     """
@@ -90,7 +88,6 @@ class PopRSP(TopKMetric):
         k: int,
         item_interactions: Tensor,
         pop_ratio: float,
-        *args: Any,
         dist_sync_on_step: bool = False,
         **kwargs: Any,
     ):
@@ -104,41 +101,35 @@ class PopRSP(TopKMetric):
         self.register_buffer("long_tail", lt)
 
         # Store the total number of items in each group
-        self.register_buffer("total_short", torch.tensor(len(sh)))
-        self.register_buffer("total_long", torch.tensor(len(lt)))
+        self.register_buffer("total_short", torch.tensor(len(sh), dtype=torch.float))
+        self.register_buffer("total_long", torch.tensor(len(lt), dtype=torch.float))
 
     def update(self, preds: Tensor, **kwargs: Any):
-        """Updates the metric state with the new batch of predictions."""
-        top_k_indices: Tensor = kwargs.get(
-            f"top_{self.k}_indices", self.top_k_values_indices(preds, self.k)[1]
-        )
+        top_k_indices = kwargs.get(f"top_{self.k}_indices")
+        item_indices = kwargs.get("item_indices")
 
         # Handle sampled item indices if provided
         item_indices = kwargs.get("item_indices", None)
         if item_indices is not None:
             top_k_indices = torch.gather(item_indices, 1, top_k_indices)
 
-        # Count short head and long tail items in recommendations
-        short_recs = torch.isin(top_k_indices, self.short_head).sum().float()
-        long_recs = torch.isin(top_k_indices, self.long_tail).sum().float()
-
-        # Update
-        self.short_recs += short_recs
-        self.long_recs += long_recs
+        # Accumulate short head and long tail recommendations
+        self.short_recs += torch.isin(top_k_indices, self.short_head).sum().float()
+        self.long_recs += torch.isin(top_k_indices, self.long_tail).sum().float()
 
     def compute(self):
         """Computes the final metric value."""
         # Handle division by zero
         if self.total_short == 0 or self.total_long == 0:
-            return torch.tensor(0.0).item()
+            return {self.name: torch.tensor(0.0)}
 
         pr_short = self.short_recs / self.total_short
         pr_long = self.long_recs / self.total_long
-
-        # Handle NaN/Inf when both groups have zero probability
-        if torch.isnan(pr_short) or torch.isnan(pr_long):
-            return torch.tensor(0.0).item()
-
         pr = torch.stack([pr_short, pr_long])
+
+        # Handle the case where mean is zero
+        if torch.mean(pr) == 0:
+            return {self.name: torch.tensor(0.0)}
+
         pop_rsp = torch.std(pr, unbiased=False) / torch.mean(pr)
         return {self.name: pop_rsp.item()}
