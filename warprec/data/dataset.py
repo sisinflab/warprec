@@ -186,6 +186,10 @@ class Dataset:
         else:
             self._ic = torch.ones(self._niid, dtype=torch.long)
 
+        # Add padding value to item clusters
+        padding_value = torch.tensor([0], dtype=torch.long)
+        self._ic = torch.cat((self._ic, padding_value), dim=0)
+
         # Create the main data structures
         self.train_set = self._create_inner_set(
             train_data,
