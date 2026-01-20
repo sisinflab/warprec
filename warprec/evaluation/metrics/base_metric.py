@@ -167,9 +167,9 @@ class BaseMetric(Metric, ABC):
         # count to 1 if any item has zero interactions
         item_interactions = torch.clamp(item_interactions, min=1)
 
-        # Add padding row
-        padding_row = torch.zeros(1, device=item_interactions.device)
-        item_interactions = torch.cat((item_interactions, padding_row), dim=0)
+        # Add padding value
+        padding_value = torch.zeros(1, device=item_interactions.device)
+        item_interactions = torch.cat((item_interactions, padding_value), dim=0)
 
         # Compute novelty scores
         if log_discount:
