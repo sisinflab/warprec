@@ -216,9 +216,13 @@ class Dataset:
         # Save side information inside the dataset
         if self.side is not None:
             # Create the lookup tensor for side information features
-            self._feat_lookup = torch.tensor(
+            feature_lookup = torch.tensor(
                 self.train_set._inter_side.iloc[:, 1:].values
             ).float()
+
+            # Add a padding row
+            padding_row = torch.zeros((1, feature_lookup.size(1)))
+            self._feat_lookup = torch.cat([feature_lookup, padding_row], dim=0)
 
         # Sequential recommendation sessions
         self.train_session = Sessions(
