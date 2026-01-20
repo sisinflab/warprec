@@ -634,7 +634,7 @@ def validation_report(model: Recommender, **kwargs: Any):
     # If the score has been computed per user we report only the mean
     for key, value in kwargs.items():
         if isinstance(value, Tensor):
-            kwargs[key] = value.nanmean()
+            kwargs[key] = value.nanmean().item()
 
     with tempfile.TemporaryDirectory() as tmpdir:
         torch.save(
