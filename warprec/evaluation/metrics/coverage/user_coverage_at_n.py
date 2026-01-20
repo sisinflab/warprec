@@ -1,4 +1,3 @@
-# pylint: disable=arguments-differ, unused-argument, line-too-long, duplicate-code
 from typing import Any
 
 import torch
@@ -29,25 +28,25 @@ class UserCoverageAtN(TopKMetric):
 
     Args:
         k (int): The cutoff.
-        *args (Any): The argument list.
         dist_sync_on_step (bool): Torchmetrics parameter.
         **kwargs (Any): The keyword argument dictionary.
     """
 
     users: Tensor
 
-    def __init__(
-        self, k: int, *args: Any, dist_sync_on_step: bool = False, **kwargs: Any
-    ):
+    def __init__(self, k: int, dist_sync_on_step: bool = False, **kwargs: Any):
         super().__init__(k, dist_sync_on_step)
 
         self.add_state("users", default=torch.tensor(0.0), dist_reduce_fx="sum")
 
     def update(self, preds: Tensor, **kwargs: Any):
-        """Updates the metric state with the new batch of predictions."""
-        self.users += (preds > 0).sum(dim=1).ge(self.k).sum()
+        # Count how many items have a score > 0 for each user
+        valid_items_per_user = (preds > 0).sum(dim=1)
+
+        # Check if the count is >= k
+        satisfied_users = valid_items_per_user.ge(self.k).sum()
+
+        self.users += satisfied_users
 
     def compute(self):
-        """Computes the final metric value."""
-        user_coverage_at_n = int(self.users.item())
-        return {self.name: user_coverage_at_n}
+        return {self.name: int(self.users.item())}
