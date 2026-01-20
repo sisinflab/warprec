@@ -1,16 +1,15 @@
-# pylint: disable=arguments-differ, unused-argument, line-too-long, duplicate-code
 from typing import Any
 
 import torch
 from torch import Tensor
 
-from warprec.evaluation.metrics.base_metric import TopKMetric
+from warprec.evaluation.metrics.base_metric import UserAverageTopKMetric
 from warprec.utils.enums import MetricBlock
 from warprec.utils.registry import metric_registry
 
 
 @metric_registry.register("EPC")
-class EPC(TopKMetric):
+class EPC(UserAverageTopKMetric):
     """
     Expected Popularity Complement at K metric.
 
@@ -67,57 +66,31 @@ class EPC(TopKMetric):
 
     Attributes:
         novelty_profile (Tensor): The item novelty lookup tensor.
-        epc (Tensor): The EPC value for every user.
-        users (Tensor): Number of users evaluated.
-        compute_per_user (bool): Wether or not to compute the metric
-            per user or globally.
+        relevance (str): The type of relevance to use for computation.
 
     Args:
         k (int): The cutoff for recommendations.
         num_users (int): Number of users in the training set.
         item_interactions (Tensor): The counts for item interactions in training set.
-        *args (Any): Additional arguments.
-        compute_per_user (bool): Wether or not to compute the metric
-            per user or globally.
         dist_sync_on_step (bool): Torchmetrics parameter.
         relevance (str): The type of relevance to use for computation.
         **kwargs (Any): Additional keyword arguments.
     """
 
-    _CAN_COMPUTE_PER_USER: bool = True
-
     novelty_profile: Tensor
-    epc: Tensor
-    users: Tensor
-    compute_per_user: bool
+    relevance: str
 
     def __init__(
         self,
         k: int,
         num_users: int,
         item_interactions: Tensor,
-        *args: Any,
-        compute_per_user: bool = False,
         dist_sync_on_step: bool = False,
         relevance: str = "binary",
         **kwargs: Any,
     ):
-        super().__init__(k, dist_sync_on_step)
+        super().__init__(k=k, num_users=num_users, dist_sync_on_step=dist_sync_on_step)
         self.relevance = relevance
-        self.compute_per_user = compute_per_user
-
-        if self.compute_per_user:
-            self.add_state(
-                "epc", default=torch.zeros(num_users), dist_reduce_fx="sum"
-            )  # Initialize a tensor to store metric value for each user
-            self.add_state(
-                "users", default=torch.zeros(num_users), dist_reduce_fx="sum"
-            )
-        else:
-            self.add_state(
-                "epc", default=torch.tensor(0.0), dist_reduce_fx="sum"
-            )  # Initialize a scalar to store global value
-            self.add_state("users", default=torch.tensor(0.0), dist_reduce_fx="sum")
 
         # Add novelty profile as buffer
         self.register_buffer(
@@ -136,58 +109,37 @@ class EPC(TopKMetric):
         self._REQUIRED_COMPONENTS.add(MetricBlock.VALID_USERS)
         self._REQUIRED_COMPONENTS.add(MetricBlock.TOP_K_INDICES)
 
-    def update(self, preds: Tensor, user_indices: Tensor, **kwargs: Any):
-        """Updates the metric state with a new batch of predictions."""
-        top_k_indices: Tensor = kwargs.get(
-            f"top_{self.k}_indices", self.top_k_values_indices(preds, self.k)[1]
-        )
-        target: Tensor = None
-        top_k_rel: Tensor = None
+    def unpack_inputs(self, preds: Tensor, **kwargs: Any):
+        users = kwargs.get("valid_users")
+
+        # Handle relevance types
         if self.relevance == "discounted":
-            target = kwargs.get("discounted_relevance", torch.zeros_like(preds))
-            top_k_rel = kwargs.get(
-                f"top_{self.k}_discounted_relevance",
-                self.top_k_relevance(preds, target, self.k),
-            )
+            target = kwargs.get("discounted_relevance")
+            top_k_rel = kwargs.get(f"top_{self.k}_discounted_relevance")
+            return target, users, top_k_rel
+        target = kwargs.get("binary_relevance")
+        top_k_rel = kwargs.get(f"top_{self.k}_binary_relevance")
+        return target, users, top_k_rel
+
+    def compute_scores(
+        self, preds: Tensor, target: Tensor, top_k_rel: Tensor, **kwargs: Any
+    ) -> Tensor:
+        top_k_indices = kwargs.get(f"top_{self.k}_indices")
+        item_indices = kwargs.get("item_indices")
+
+        # Retrieve Novelty for Top-K items
+        if item_indices is not None:
+            batch_novelty = self.novelty_profile[0, item_indices]
+            novelty = torch.gather(batch_novelty, 1, top_k_indices)
         else:
-            target = kwargs.get("binary_relevance", torch.zeros_like(preds))
-            top_k_rel = kwargs.get(
-                f"top_{self.k}_binary_relevance",
-                self.top_k_relevance(preds, target, self.k),
-            )
-        users: Tensor = kwargs.get("valid_users", self.valid_users(target))
+            novelty = self.novelty_profile[0, top_k_indices]
 
-        # Extract novelty values
-        batch_novelty = self.novelty_profile.repeat(
-            target.shape[0], 1
-        )  # [batch_size x items]
-        novelty = torch.gather(batch_novelty, 1, top_k_indices)  # [batch_size x top_k]
+        # Compute DCG(rel * novelty)
+        gain = top_k_rel * novelty
+        dcg_val = self.dcg(gain)
 
-        if self.compute_per_user:
-            self.epc.index_add_(0, user_indices, self.dcg(top_k_rel * novelty))
-
-            # Count only users with at least one interaction
-            self.users.index_add_(0, user_indices, users)
-        else:
-            self.epc += self.dcg(top_k_rel * novelty).sum()
-
-            # Count only users with at least one interaction
-            self.users += users.sum()
-
-    def compute(self):
-        """Computes the final value of the metric."""
-        if self.compute_per_user:
-            epc = self.epc / self.discounted_sum(self.k)
-            epc[self.users == 0] = float(
-                "nan"
-            )  # Set nan for users with no interactions
-        else:
-            epc = (
-                self.epc / (self.users * self.discounted_sum(self.k))
-                if self.users > 0
-                else torch.tensor(0.0)
-            ).item()
-        return {self.name: epc}
+        # Normalize by Discounted Sum (IDCG-like factor)
+        return dcg_val / self.discounted_sum(self.k)
 
     @property
     def name(self):
