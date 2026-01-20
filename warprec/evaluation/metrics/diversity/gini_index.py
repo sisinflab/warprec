@@ -1,4 +1,3 @@
-# pylint: disable=arguments-differ, unused-argument, line-too-long, duplicate-code
 from typing import Any, Set
 
 import torch
@@ -31,7 +30,6 @@ class Gini(TopKMetric):
     Args:
         k (int): The cutoff for recommendations.
         num_items (int): Number of items in the training set.
-        *args (Any): The argument list.
         dist_sync_on_step (bool): Torchmetrics parameter.
         **kwargs (Any): The keyword argument dictionary.
     """
@@ -46,13 +44,11 @@ class Gini(TopKMetric):
         self,
         k: int,
         num_items: int,
-        *args: Any,
         dist_sync_on_step: bool = False,
         **kwargs: Any,
     ):
         super().__init__(k, dist_sync_on_step)
         self.num_items = num_items
-        # Initialize item_counts as a tensor of zeros, size num_items
         self.add_state(
             "item_counts", default=torch.zeros(self.num_items), dist_reduce_fx="sum"
         )
@@ -60,13 +56,11 @@ class Gini(TopKMetric):
         self.add_state("free_norm", default=torch.tensor(0.0), dist_reduce_fx="sum")
 
     def update(self, preds: Tensor, **kwargs: Any):
-        """Updates the metric state with the new batch of predictions."""
-        top_k_indices: Tensor = kwargs.get(
-            f"top_{self.k}_indices", self.top_k_values_indices(preds, self.k)[1]
-        )
+        # Retrieve top_k_indices from kwargs
+        top_k_indices = kwargs.get(f"top_{self.k}_indices")
 
-        # Handle sampled item indices if provided
-        item_indices = kwargs.get("item_indices", None)
+        # Handle sampled item indices if provided (map local batch indices to global item IDs)
+        item_indices = kwargs.get("item_indices")
         if item_indices is not None:
             top_k_indices = torch.gather(item_indices, 1, top_k_indices)
 
@@ -75,32 +69,37 @@ class Gini(TopKMetric):
 
         # Flatten the indices and update item_counts
         flat_indices = top_k_indices.flatten()
+
+        # Ensure indices are within bounds (safety check)
+        flat_indices = flat_indices[flat_indices < self.num_items]
+
         batch_counts = torch.bincount(flat_indices, minlength=self.num_items)
         self.item_counts += batch_counts.to(self.item_counts)
 
     def compute(self):
-        """Computes the final metric value."""
         # Consider only items that have been recommended at least once
         recommended_counts = self.item_counts[self.item_counts > 0].float()
 
         if (
             recommended_counts.numel() == 0
-            or self.num_items is None
+            or self.num_items == 0
             or self.free_norm == 0
         ):
-            return torch.tensor(0.0)
+            return {self.name: torch.tensor(0.0)}
 
         n_rec_items = recommended_counts.numel()
         sorted_counts, _ = torch.sort(recommended_counts)
 
-        # Offset to account for items never recommended.
+        # Offset to account for items never recommended
         offset = self.num_items - n_rec_items
         j = torch.arange(
             n_rec_items, dtype=sorted_counts.dtype, device=sorted_counts.device
         )
+
         contributions = (2 * (j + offset + 1) - self.num_items - 1) * (
             sorted_counts / self.free_norm
         )
-        # Sum contributions and normalize.
+
+        # Sum contributions and normalize
         gini_index = (torch.sum(contributions) / (self.num_items - 1)).item()
         return {self.name: gini_index}
