@@ -1,4 +1,3 @@
-# pylint: disable=arguments-differ, unused-argument, line-too-long, duplicate-code
 from typing import Any
 
 import torch
@@ -33,18 +32,13 @@ class BiasDisparityBS(BaseMetric):
 
     Attributes:
         user_clusters (Tensor): Tensor mapping each user to a user cluster.
-        n_user_effective_clusters (int): The total number of unique user clusters.
-        n_user_clusters (int): The total number of unique user clusters, including fallback cluster.
         item_clusters (Tensor): Tensor mapping each item to an item cluster.
-        n_item_effective_clusters (int): The total number of unique item clusters.
-        n_item_clusters (int): The total number of unique item clusters, including fallback cluster.
         PC (Tensor): Global distribution of items across item clusters.
         category_sum (Tensor): Accumulated counts of positive interactions per user-item cluster pair.
         total_sum (Tensor): Accumulated counts of positive interactions per user cluster.
 
     Args:
         num_items (int): Number of items in the training set.
-        *args (Any): The argument list.
         user_cluster (Tensor): Lookup tensor of user clusters.
         item_cluster (Tensor): Lookup tensor of item clusters.
         dist_sync_on_step (bool): Whether to synchronize metric state across distributed processes.
@@ -52,11 +46,7 @@ class BiasDisparityBS(BaseMetric):
     """
 
     user_clusters: Tensor
-    n_user_effective_clusters: int
-    n_user_clusters: int
     item_clusters: Tensor
-    n_item_effective_clusters: int
-    n_item_clusters: int
     PC: Tensor
     category_sum: Tensor
     total_sum: Tensor
@@ -64,30 +54,29 @@ class BiasDisparityBS(BaseMetric):
     def __init__(
         self,
         num_items: int,
-        *args: Any,
-        user_cluster: Tensor = None,
-        item_cluster: Tensor = None,
+        user_cluster: Tensor,
+        item_cluster: Tensor,
         dist_sync_on_step: bool = False,
         **kwargs: Any,
     ):
         super().__init__(dist_sync_on_step=dist_sync_on_step)
+
+        # Register static buffers
         self.register_buffer("user_clusters", user_cluster)
-        self.n_user_effective_clusters = int(user_cluster.max().item())
-        self.n_user_clusters = (
-            self.n_user_effective_clusters + 1
-        )  # Take into account the zero cluster
-
         self.register_buffer("item_clusters", item_cluster)
-        self.n_item_effective_clusters = int(item_cluster.max().item())
-        self.n_item_clusters = (
-            self.n_item_effective_clusters + 1
-        )  # Take into account the zero cluster
 
-        # Global distribution of items
+        self.n_user_effective_clusters = int(user_cluster.max().item())
+        self.n_user_clusters = self.n_user_effective_clusters + 1
+
+        self.n_item_effective_clusters = int(item_cluster.max().item())
+        self.n_item_clusters = self.n_item_effective_clusters + 1
+
+        # Global distribution of items (P_global)
         pc = torch.bincount(item_cluster, minlength=self.n_item_clusters).float()
-        pc = pc / float(num_items)  # Normalize to get proportions
+        pc = pc / float(num_items)
         self.register_buffer("PC", pc)
 
+        # Accumulators
         self.add_state(
             "category_sum",
             default=torch.zeros(self.n_user_clusters, self.n_item_clusters),
@@ -98,42 +87,53 @@ class BiasDisparityBS(BaseMetric):
         )
 
     def update(self, preds: Tensor, user_indices: Tensor, **kwargs: Any):
-        """Updates the metric state with the new batch of predictions."""
-        target: Tensor = kwargs.get("ground", torch.zeros_like(preds))
+        # Retrieve Ground Truth (Binary or Raw)
+        target = kwargs.get("ground")
 
-        # Find all positive interactions within the current batch
-        user_batch_idx, item_idx_local = target.nonzero(as_tuple=True)
+        # Find positive interactions in the batch
+        user_idx_local, item_idx_local = target.nonzero(as_tuple=True)
 
-        # Get the global user indices for the positive interactions
-        user_idx_global = user_indices[user_batch_idx]
+        if user_idx_local.numel() == 0:
+            return
 
-        # Get the global item indices. If sampled, use item_indices to map.
-        item_indices_global = kwargs.get("item_indices", None)
-        if item_indices_global is not None:
-            item_idx_global = item_indices_global[user_batch_idx, item_idx_local]
+        # Map User Indices: Batch -> Global
+        user_idx_global = user_indices[user_idx_local]
+
+        # Map Item Indices: Local -> Global
+        item_indices = kwargs.get("item_indices")
+        if item_indices is not None:
+            item_idx_global = item_indices[user_idx_local, item_idx_local]
         else:
             item_idx_global = item_idx_local
 
-        # Map to clusters
-        grp = self.user_clusters[user_idx_global]
-        cat = self.item_clusters[item_idx_global]
+        # Get Clusters
+        u_clusters = self.user_clusters[user_idx_global]
+        i_clusters = self.item_clusters[item_idx_global]
 
-        # Accumulate counts
+        # Accumulate
+        # We use index_put_ with accumulate=True for efficient scatter add
         self.category_sum.index_put_(
-            (grp, cat), torch.ones_like(grp, dtype=torch.float), accumulate=True
+            (u_clusters, i_clusters),
+            torch.ones_like(u_clusters, dtype=torch.float),
+            accumulate=True,
         )
         self.total_sum.index_put_(
-            (grp,), torch.ones_like(grp, dtype=torch.float), accumulate=True
+            (u_clusters,),
+            torch.ones_like(u_clusters, dtype=torch.float),
+            accumulate=True,
         )
 
     def compute(self):
-        """Computes the final metric value."""
-        bias_src = (
-            self.category_sum / self.total_sum.unsqueeze(1)
-        ) / self.PC  # [n_user_clusters x n_item_clusters]
+        # P_train(u, c) / P_global(c)
+        # Avoid division by zero for total_sum
+        safe_total = self.total_sum.unsqueeze(1).clamp(min=1.0)
+
+        bias_src = (self.category_sum / safe_total) / self.PC.unsqueeze(0)
+
         results = {}
         for uc in range(self.n_user_effective_clusters):
             for ic in range(self.n_item_effective_clusters):
+                # +1 because cluster 0 is usually padding/unknown
                 key = f"{self.name}_UC{uc + 1}_IC{ic + 1}"
                 results[key] = bias_src[uc + 1, ic + 1].item()
         return results

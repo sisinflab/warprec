@@ -1,4 +1,3 @@
-# pylint: disable=arguments-differ, unused-argument, line-too-long, duplicate-code
 from typing import Any, Set
 
 import torch
@@ -50,7 +49,6 @@ class ItemMADRating(TopKMetric):
     Args:
         k (int): Cutoff for top-k recommendations.
         num_items (int): Number of items in the training set.
-        *args (Any): The argument list.
         item_cluster (Tensor): Lookup tensor of item clusters.
         dist_sync_on_step (bool): Whether to synchronize metric state across distributed processes.
         **kwargs (Any): Additional keyword arguments.
@@ -58,8 +56,9 @@ class ItemMADRating(TopKMetric):
 
     _REQUIRED_COMPONENTS: Set[MetricBlock] = {
         MetricBlock.BINARY_RELEVANCE,
-        MetricBlock.TOP_K_VALUES,
+        MetricBlock.TOP_K_BINARY_RELEVANCE,
         MetricBlock.TOP_K_INDICES,
+        MetricBlock.TOP_K_VALUES,
     }
 
     num_items: int
@@ -71,122 +70,87 @@ class ItemMADRating(TopKMetric):
         self,
         k: int,
         num_items: int,
-        *args: Any,
-        item_cluster: Tensor = None,
+        item_cluster: Tensor,
         dist_sync_on_step: bool = False,
         **kwargs: Any,
     ):
-        super().__init__(k, dist_sync_on_step)
-
+        super().__init__(k=k, dist_sync_on_step=dist_sync_on_step)
         self.num_items = num_items
 
         self.register_buffer("item_clusters", item_cluster)
+        self.n_item_clusters = int(item_cluster.max().item()) + 1
 
-        # Initialize accumulators for counts and gains (relevant items only)
-        self.add_state(
-            "item_counts",
-            torch.zeros(num_items),
-            dist_reduce_fx="sum",
-        )
-        self.add_state(
-            "item_gains",
-            torch.zeros(num_items),
-            dist_reduce_fx="sum",
-        )
+        # Initialize accumulators
+        self.add_state("item_counts", torch.zeros(num_items), dist_reduce_fx="sum")
+        self.add_state("item_gains", torch.zeros(num_items), dist_reduce_fx="sum")
 
     def update(self, preds: Tensor, **kwargs: Any):
-        """Updates the metric state with the new batch of predictions."""
-        target: Tensor = kwargs.get("binary_relevance", torch.zeros_like(preds))
-        top_k_values: Tensor = kwargs.get(
-            f"top_{self.k}_values", self.top_k_values_indices(preds, self.k)[0]
-        )
-        top_k_indices: Tensor = kwargs.get(
-            f"top_{self.k}_indices", self.top_k_values_indices(preds, self.k)[1]
-        )
+        top_k_values = kwargs.get(f"top_{self.k}_values")
+        top_k_indices = kwargs.get(f"top_{self.k}_indices")
+        top_k_rel = kwargs.get(f"top_{self.k}_binary_relevance")
 
-        # Get the item indices for the current batch (either full or sampled)
-        item_indices = kwargs.get("item_indices", None)
+        # Create relevance mask (only consider relevant items)
+        rel_mask = top_k_rel.bool()
+
+        # Handle sampled item indices if provided (map local batch indices to global item IDs)
+        item_indices = kwargs.get("item_indices")
         if item_indices is not None:
-            batch_item_indices = item_indices
-        else:
-            batch_item_indices = (
-                torch.arange(preds.shape[1], device=preds.device)
-                .unsqueeze(0)
-                .repeat(preds.shape[0], 1)
+            top_k_indices = torch.gather(item_indices, 1, top_k_indices)
+
+        # Filter only Relevant items (True Positives)
+        # We select elements from global_indices and top_k_values where relevance_mask is True
+        relevant_indices = torch.masked_select(top_k_indices, rel_mask)
+        relevant_scores = torch.masked_select(top_k_values, rel_mask)
+
+        if relevant_indices.numel() > 0:
+            # Accumulate counts (1 for every relevant appearance)
+            self.item_counts.index_add_(
+                0, relevant_indices, torch.ones_like(relevant_scores)
             )
 
-        # Compute relevance mask using local top_k_indices
-        batch_size = target.size(0)
-        row_indices = torch.arange(batch_size, device=target.device)[:, None].expand(
-            -1, self.k
-        )
-        relevance_mask = target[row_indices, top_k_indices].bool()  # [batch_size x k]
-
-        # Filter out the global item indices for relevant items only
-        relevant_top_k_global_indices = torch.masked_select(
-            torch.gather(batch_item_indices, 1, top_k_indices), relevance_mask
-        )  # [batch_size, k]
-
-        # Filter out the gains and counts for relevant items only
-        relevant_top_k_gains = torch.masked_select(
-            top_k_values, relevance_mask
-        )  # [batch_size, k]
-
-        # Accumulate counts and gains
-        self.item_counts.index_add_(
-            0, relevant_top_k_global_indices, torch.ones_like(relevant_top_k_gains)
-        )
-        self.item_gains.index_add_(
-            0, relevant_top_k_global_indices, relevant_top_k_gains
-        )
+            # Accumulate gains (predicted scores of relevant items)
+            self.item_gains.index_add_(0, relevant_indices, relevant_scores)
 
     def compute(self):
-        item_avg_gain_when_recommended = torch.zeros_like(self.item_gains)
+        # Compute average rating per item (only for recommended and relevant items)
         recommended_mask = self.item_counts > 0
 
-        item_avg_gain_when_recommended[recommended_mask] = (
+        if not recommended_mask.any():
+            return {self.name: torch.tensor(0.0)}
+
+        item_avg_ratings = torch.zeros_like(self.item_gains)
+        item_avg_ratings[recommended_mask] = (
             self.item_gains[recommended_mask] / self.item_counts[recommended_mask]
         )
 
-        num_clusters = self.item_clusters.max().item() + 1
+        # Aggregate per cluster
+        rec_indices = torch.where(recommended_mask)[0]
+        rec_clusters = self.item_clusters[rec_indices]
+        rec_ratings = item_avg_ratings[rec_indices]
 
-        recommended_item_indices = torch.where(recommended_mask)[0]
-        recommended_item_cluster_indices = self.item_clusters[recommended_item_indices]
-        recommended_item_avg_gains = item_avg_gain_when_recommended[
-            recommended_item_indices
-        ]
+        cluster_sum_ratings = torch.zeros(self.n_item_clusters, device=self.device)
+        cluster_counts = torch.zeros(self.n_item_clusters, device=self.device)
 
-        cluster_sum_of_avg_item_gains = torch.bincount(
-            recommended_item_cluster_indices,
-            weights=recommended_item_avg_gains,
-            minlength=num_clusters,
+        cluster_sum_ratings.index_add_(0, rec_clusters, rec_ratings)
+        cluster_counts.index_add_(0, rec_clusters, torch.ones_like(rec_ratings))
+
+        # Compute Mean per cluster
+        valid_clusters = cluster_counts > 0
+
+        if not valid_clusters.any():
+            return {self.name: torch.tensor(0.0)}
+
+        cluster_means = (
+            cluster_sum_ratings[valid_clusters] / cluster_counts[valid_clusters]
         )
 
-        cluster_recommended_item_counts = torch.bincount(
-            recommended_item_cluster_indices, minlength=num_clusters
-        )
-
-        cluster_mean = torch.zeros(
-            num_clusters, dtype=torch.float, device=self.item_gains.device
-        )
-        mask = cluster_recommended_item_counts > 0
-        cluster_mean[mask] = (
-            cluster_sum_of_avg_item_gains[mask] / cluster_recommended_item_counts[mask]
-        )
-
-        valid_clusters_mask = cluster_recommended_item_counts > 0
-        valid_cluster_means = cluster_mean[valid_clusters_mask]
-
-        if valid_cluster_means.numel() < 2:
-            mad = torch.tensor(0.0, device=self.item_gains.device).item()
+        # Compute MAD
+        if cluster_means.numel() < 2:
+            mad = torch.tensor(0.0, device=self.device)
         else:
-            i, j = torch.triu_indices(
-                valid_cluster_means.size(0), valid_cluster_means.size(0), offset=1
-            )
-            diff_matrix = torch.abs(
-                valid_cluster_means.unsqueeze(0) - valid_cluster_means.unsqueeze(1)
-            )
-            differences = diff_matrix[i, j]
-            mad = differences.mean().item()
+            diffs = (cluster_means.unsqueeze(0) - cluster_means.unsqueeze(1)).abs()
+            pairwise_sum = diffs.triu(diagonal=1).sum()
+            num_pairs = cluster_means.numel() * (cluster_means.numel() - 1) / 2
+            mad = pairwise_sum / num_pairs
 
-        return {self.name: mad}
+        return {self.name: mad.item()}
