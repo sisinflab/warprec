@@ -67,7 +67,7 @@ class ContextualEvaluationDataset(TorchDataset):
 
 class SequentialEvaluationDataset(TorchDataset):
     """
-    Yields: (user_idx, target_item_idx, sequence_tensor)
+    Yields: (user_idx, target_item_idx, sequence_tensor, sequence_length)
     """
 
     def __init__(
@@ -124,7 +124,7 @@ class SequentialEvaluationDataset(TorchDataset):
     def __len__(self) -> int:
         return len(self.samples)
 
-    def __getitem__(self, idx: int) -> Tuple[int, Tensor, Tensor]:
+    def __getitem__(self, idx: int) -> Tuple[int, Tensor, Tensor, Tensor]:
         user_id, target_idx = self.samples[idx]
         full_history = self.user_history[user_id]
 
@@ -136,10 +136,14 @@ class SequentialEvaluationDataset(TorchDataset):
         seq_list = full_history[:target_idx]
         seq_list = seq_list[-self.max_seq_len :]
 
+        # Calculate actual length before padding
+        seq_len = len(seq_list)
+
         seq_tensor = torch.tensor(seq_list, dtype=torch.long)
         target_tensor = torch.tensor(target_item, dtype=torch.long)
+        len_tensor = torch.tensor(seq_len, dtype=torch.long)
 
-        return user_id, target_tensor, seq_tensor
+        return user_id, target_tensor, seq_tensor, len_tensor
 
 
 class SampledEvaluationDataset(TorchDataset):
@@ -330,7 +334,7 @@ class SampledContextualEvaluationDataset(TorchDataset):
 
 class SampledSequentialEvaluationDataset(TorchDataset):
     """
-    Yields: (user_idx, pos_item, neg_items_vector, sequence_tensor)
+    Yields: (user_idx, pos_item, neg_items_vector, sequence_tensor, sequence_length)
     """
 
     def __init__(
@@ -398,7 +402,7 @@ class SampledSequentialEvaluationDataset(TorchDataset):
     def __len__(self) -> int:
         return len(self.samples)
 
-    def __getitem__(self, idx: int) -> Tuple[int, Tensor, Tensor, Tensor]:
+    def __getitem__(self, idx: int) -> Tuple[int, Tensor, Tensor, Tensor, Tensor]:
         user_id, target_idx = self.samples[idx]
         full_history = self.user_history[user_id]
 
@@ -408,7 +412,12 @@ class SampledSequentialEvaluationDataset(TorchDataset):
         # Input Sequence
         seq_list = full_history[:target_idx]
         seq_list = seq_list[-self.max_seq_len :]
+
+        # Calculate actual length
+        seq_len = len(seq_list)
+
         seq_tensor = torch.tensor(seq_list, dtype=torch.long)
+        len_tensor = torch.tensor(seq_len, dtype=torch.long)
 
         # Negative Sampling
         seen_items = self.seen_items_cache[user_id]
@@ -447,6 +456,7 @@ class SampledSequentialEvaluationDataset(TorchDataset):
             torch.tensor(target_item, dtype=torch.long),
             negatives,
             seq_tensor,
+            len_tensor,
         )
 
 
@@ -492,7 +502,7 @@ class ContextualEvaluationDataLoader(DataLoader):
 
 class SequentialEvaluationDataLoader(DataLoader):
     """
-    Output Batch: (user_indices, target_items, padded_sequences)
+    Output Batch: (user_indices, target_items, padded_sequences, sequence_lengths)
     """
 
     def __init__(
@@ -526,11 +536,12 @@ class SequentialEvaluationDataLoader(DataLoader):
     def _collate_fn(
         self,
         batch: List[Tuple[int, Tensor, Tensor]],
-    ) -> Tuple[Tensor, Tensor, Tensor]:
-        user_indices, target_tensors, seq_tensors = zip(*batch)
+    ) -> Tuple[Tensor, Tensor, Tensor, Tensor]:
+        user_indices, target_tensors, seq_tensors, len_tensors = zip(*batch)
 
         user_indices_tensor = torch.tensor(list(user_indices), dtype=torch.long)
         target_items_tensor = torch.stack(target_tensors)
+        seq_lengths_tensor = torch.stack(len_tensors)
 
         seqs_padded = pad_sequence(
             seq_tensors,  # type: ignore[arg-type]
@@ -538,7 +549,7 @@ class SequentialEvaluationDataLoader(DataLoader):
             padding_value=self.num_items,
         )
 
-        return user_indices_tensor, target_items_tensor, seqs_padded
+        return user_indices_tensor, target_items_tensor, seqs_padded, seq_lengths_tensor
 
 
 class SampledEvaluationDataLoader(DataLoader):
@@ -653,7 +664,7 @@ class SampledContextualEvaluationDataLoader(DataLoader):
 
 class SampledSequentialEvaluationDataLoader(DataLoader):
     """
-    Output Batch: (user_indices, pos_items, neg_items, padded_sequences)
+    Output Batch: (user_indices, pos_items, neg_items, padded_sequences, sequence_lengths)
     """
 
     def __init__(
@@ -696,9 +707,9 @@ class SampledSequentialEvaluationDataLoader(DataLoader):
 
     def _collate_fn(
         self,
-        batch: List[Tuple[int, Tensor, Tensor, Tensor]],
-    ) -> Tuple[Tensor, Tensor, Tensor, Tensor]:
-        user_indices, pos_tensors, neg_tensors, seq_tensors = zip(*batch)
+        batch: List[Tuple[int, Tensor, Tensor, Tensor, Tensor]],
+    ) -> Tuple[Tensor, Tensor, Tensor, Tensor, Tensor]:
+        user_indices, pos_tensors, neg_tensors, seq_tensors, len_tensors = zip(*batch)
 
         user_indices_tensor = torch.tensor(list(user_indices), dtype=torch.long)
 
@@ -709,6 +720,9 @@ class SampledSequentialEvaluationDataLoader(DataLoader):
         # Negatives: Stack to get (Batch, Num_Negatives)
         neg_items_tensor = torch.stack(neg_tensors)
 
+        # Lengths: Stack to get (Batch,)
+        seq_lengths_tensor = torch.stack(len_tensors)
+
         # Sequences: Pad to (Batch, Max_Len_In_Batch)
         # Using num_items as padding value to match your previous Sequential loader
         seqs_padded = pad_sequence(
@@ -717,4 +731,10 @@ class SampledSequentialEvaluationDataLoader(DataLoader):
             padding_value=self.num_items,
         )
 
-        return user_indices_tensor, pos_items_tensor, neg_items_tensor, seqs_padded
+        return (
+            user_indices_tensor,
+            pos_items_tensor,
+            neg_items_tensor,
+            seqs_padded,
+            seq_lengths_tensor,
+        )
