@@ -2,8 +2,10 @@ from .dataset import Dataset
 from .eval_loaders import (
     EvaluationDataLoader,
     ContextualEvaluationDataLoader,
+    SequentialEvaluationDataLoader,
     SampledEvaluationDataLoader,
     SampledContextualEvaluationDataLoader,
+    SampledSequentialEvaluationDataLoader,
 )
 from . import entities
 from . import reader
@@ -15,8 +17,10 @@ __all__ = [
     "Dataset",
     "EvaluationDataLoader",
     "ContextualEvaluationDataLoader",
+    "SequentialEvaluationDataLoader",
     "SampledEvaluationDataLoader",
     "SampledContextualEvaluationDataLoader",
+    "SampledSequentialEvaluationDataLoader",
     "entities",
     "reader",
     "splitting",

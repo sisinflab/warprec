@@ -1,4 +1,4 @@
-from typing import Tuple, List
+from typing import Tuple, List, Dict, Any
 
 import torch
 import numpy as np
@@ -63,6 +63,83 @@ class ContextualEvaluationDataset(TorchDataset):
             self.item_indices[idx],
             self.context_features[idx],
         )
+
+
+class SequentialEvaluationDataset(TorchDataset):
+    """
+    Yields: (user_idx, target_item_idx, sequence_tensor)
+    """
+
+    def __init__(
+        self,
+        train_df: DataFrame,
+        eval_df: DataFrame,
+        user_id_label: str,
+        item_id_label: str,
+        max_seq_len: int,
+    ):
+        self.max_seq_len = max_seq_len
+
+        # Internal storage for samples: List of (user_id, target_index_in_full_history)
+        self.samples: List[Tuple[int, int]] = []
+
+        # Internal storage for full history: Dict[user_id, List[item_id]]
+        self.user_history: Dict[int, List[int]] = {}
+
+        self._preprocess_data(train_df, eval_df, user_id_label, item_id_label)
+
+    def _preprocess_data(
+        self, train_df: DataFrame, eval_df: DataFrame, user_col: str, item_col: str
+    ):
+        # Grouping by user to get lists of items
+        # NOTE: Assumes DataFrames are already sorted by time/interaction order
+        train_groups = train_df.groupby(user_col)[item_col].apply(list)
+        eval_groups = eval_df.groupby(user_col)[item_col].apply(list)
+
+        # Identify all unique users involved in evaluation
+        eval_users = eval_groups.index.unique()
+
+        for user_id in eval_users:
+            # Get histories (default to empty list if user not in train)
+            train_seq = train_groups.get(user_id, [])
+            eval_seq = eval_groups.get(user_id, [])
+
+            if not eval_seq:
+                continue
+
+            # Combine to create full timeline
+            full_history = train_seq + eval_seq
+            self.user_history[user_id] = full_history
+
+            # The index where Eval data starts in the full history
+            start_eval_idx = len(train_seq)
+
+            # Create a sample for EACH item in the evaluation set
+            # The target is at index 'i' in full_history
+            # The sequence is full_history[:i]
+            for i in range(len(eval_seq)):
+                target_idx_in_history = start_eval_idx + i
+                self.samples.append((user_id, target_idx_in_history))
+
+    def __len__(self) -> int:
+        return len(self.samples)
+
+    def __getitem__(self, idx: int) -> Tuple[int, Tensor, Tensor]:
+        user_id, target_idx = self.samples[idx]
+        full_history = self.user_history[user_id]
+
+        # Target Item
+        target_item = full_history[target_idx]
+
+        # Input Sequence: Everything before target
+        # Slicing logic: take up to target_idx, then take last max_seq_len
+        seq_list = full_history[:target_idx]
+        seq_list = seq_list[-self.max_seq_len :]
+
+        seq_tensor = torch.tensor(seq_list, dtype=torch.long)
+        target_tensor = torch.tensor(target_item, dtype=torch.long)
+
+        return user_id, target_tensor, seq_tensor
 
 
 class SampledEvaluationDataset(TorchDataset):
@@ -251,6 +328,128 @@ class SampledContextualEvaluationDataset(TorchDataset):
         )
 
 
+class SampledSequentialEvaluationDataset(TorchDataset):
+    """
+    Yields: (user_idx, pos_item, neg_items_vector, sequence_tensor)
+    """
+
+    def __init__(
+        self,
+        train_df: DataFrame,
+        eval_df: DataFrame,
+        user_id_label: str,
+        item_id_label: str,
+        max_seq_len: int,
+        num_items: int,
+        num_negatives: int = 99,
+        seed: int = 42,
+    ):
+        self.max_seq_len = max_seq_len
+        self.num_items = num_items
+        self.num_negatives = num_negatives
+
+        # Internal storage for samples: List of (user_id, target_index_in_full_history)
+        self.samples: List[Tuple[int, int]] = []
+
+        # Internal storage for full history: Dict[user_id, List[item_id]]
+        self.user_history: Dict[int, List[int]] = {}
+
+        # Cache for seen items (as numpy arrays) for fast negative sampling
+        self.seen_items_cache: Dict[int, np.ndarray] = {}
+
+        # Initialize random seed
+        np.random.seed(seed)
+
+        self._preprocess_data(train_df, eval_df, user_id_label, item_id_label)
+
+    def _preprocess_data(
+        self, train_df: DataFrame, eval_df: DataFrame, user_col: str, item_col: str
+    ):
+        # Grouping by user to get lists of items
+        train_groups = train_df.groupby(user_col)[item_col].apply(list)
+        eval_groups = eval_df.groupby(user_col)[item_col].apply(list)
+
+        # Identify all unique users involved in evaluation
+        eval_users = eval_groups.index.unique()
+
+        for user_id in eval_users:
+            # Get histories
+            train_seq = train_groups.get(user_id, [])
+            eval_seq = eval_groups.get(user_id, [])
+
+            if not eval_seq:
+                continue
+
+            # Combine to create full timeline
+            full_history = train_seq + eval_seq
+            self.user_history[user_id] = full_history
+
+            # Store seen items as numpy array for fast 'np.isin' checks later
+            self.seen_items_cache[user_id] = np.array(full_history)
+
+            # The index where Eval data starts in the full history
+            start_eval_idx = len(train_seq)
+
+            # Create a sample for EACH item in the evaluation set
+            for i in range(len(eval_seq)):
+                target_idx_in_history = start_eval_idx + i
+                self.samples.append((user_id, target_idx_in_history))
+
+    def __len__(self) -> int:
+        return len(self.samples)
+
+    def __getitem__(self, idx: int) -> Tuple[int, Tensor, Tensor, Tensor]:
+        user_id, target_idx = self.samples[idx]
+        full_history = self.user_history[user_id]
+
+        # Target Item (Positive)
+        target_item = full_history[target_idx]
+
+        # Input Sequence
+        seq_list = full_history[:target_idx]
+        seq_list = seq_list[-self.max_seq_len :]
+        seq_tensor = torch.tensor(seq_list, dtype=torch.long)
+
+        # Negative Sampling
+        seen_items = self.seen_items_cache[user_id]
+
+        # Check if sampling is possible
+        if self.num_items - len(seen_items) <= 0:
+            # Fallback: return empty or random if user saw everything (edge case)
+            negatives = torch.randint(
+                0, self.num_items, (self.num_negatives,), dtype=torch.long
+            )
+        else:
+            # Generate 2x candidates to avoid loops in most cases
+            num_to_generate = self.num_negatives * 2
+            candidates = np.random.randint(0, self.num_items, size=num_to_generate)
+
+            # Filter out seen items
+            mask = np.isin(candidates, seen_items, invert=True)
+            valid_negatives = candidates[mask]
+            valid_negatives = np.unique(valid_negatives)
+
+            # Fallback loop if not enough negatives
+            if len(valid_negatives) < self.num_negatives:
+                final_negs: List[Any] = list(valid_negatives)
+                while len(final_negs) < self.num_negatives:
+                    cand = np.random.randint(0, self.num_items)
+                    if cand not in seen_items and cand not in final_negs:
+                        final_negs.append(cand)
+                valid_negatives = np.array(final_negs)
+
+            negatives = torch.tensor(
+                valid_negatives[: self.num_negatives], dtype=torch.long
+            )
+
+        return (
+            user_id,
+            torch.tensor(target_item, dtype=torch.long),
+            negatives,
+            seq_tensor,
+        )
+
+
 class EvaluationDataLoader(DataLoader):
     """
     Output Batch: (user_indices, ground_truths)
@@ -289,6 +488,57 @@ class ContextualEvaluationDataLoader(DataLoader):
             context_labels=context_labels,
         )
         super().__init__(dataset, batch_size=batch_size, shuffle=False, **kwargs)
+
+
+class SequentialEvaluationDataLoader(DataLoader):
+    """
+    Output Batch: (user_indices, target_items, padded_sequences)
+    """
+
+    def __init__(
+        self,
+        train_data: DataFrame,
+        eval_data: DataFrame,
+        user_id_label: str,
+        item_id_label: str,
+        max_seq_len: int,
+        batch_size: int = 1024,
+        **kwargs,
+    ):
+        self.num_items = train_data[item_id_label].nunique()
+
+        dataset = SequentialEvaluationDataset(
+            train_df=train_data,
+            eval_df=eval_data,
+            user_id_label=user_id_label,
+            item_id_label=item_id_label,
+            max_seq_len=max_seq_len,
+        )
+
+        super().__init__(
+            dataset,
+            batch_size=batch_size,
+            shuffle=False,
+            collate_fn=self._collate_fn,
+            **kwargs,
+        )
+
+    def _collate_fn(
+        self,
+        batch: List[Tuple[int, Tensor, Tensor]],
+    ) -> Tuple[Tensor, Tensor, Tensor]:
+        user_indices, target_tensors, seq_tensors = zip(*batch)
+
+        user_indices_tensor = torch.tensor(list(user_indices), dtype=torch.long)
+        target_items_tensor = torch.stack(target_tensors)
+
+        seqs_padded = pad_sequence(
+            seq_tensors,  # type: ignore[arg-type]
+            batch_first=True,
+            padding_value=self.num_items,
+        )
+
+        return user_indices_tensor, target_items_tensor, seqs_padded
 
 
 class SampledEvaluationDataLoader(DataLoader):
@@ -399,3 +649,72 @@ class SampledContextualEvaluationDataLoader(DataLoader):
             tensor_neg_items,
             tensor_context_features,
         )
+
+
+class SampledSequentialEvaluationDataLoader(DataLoader):
+    """
+    Output Batch: (user_indices, pos_items, neg_items, padded_sequences)
+    """
+
+    def __init__(
+        self,
+        train_data: DataFrame,
+        eval_data: DataFrame,
+        user_id_label: str,
+        item_id_label: str,
+        max_seq_len: int,
+        num_negatives: int = 99,
+        seed: int = 42,
+        batch_size: int = 1024,
+        **kwargs,
+    ):
+        # Infer num_items from data if possible, or pass it explicitly if needed.
+        # Here we assume item_ids are contiguous 0..N-1, so max_id + 1 is num_items.
+        # Ideally, this should be passed as an argument to be safe.
+        max_train = train_data[item_id_label].max()
+        max_eval = eval_data[item_id_label].max()
+        self.num_items = max(max_train, max_eval) + 1
+
+        dataset = SampledSequentialEvaluationDataset(
+            train_df=train_data,
+            eval_df=eval_data,
+            user_id_label=user_id_label,
+            item_id_label=item_id_label,
+            max_seq_len=max_seq_len,
+            num_items=self.num_items,
+            num_negatives=num_negatives,
+            seed=seed,
+        )
+
+        super().__init__(
+            dataset,
+            batch_size=batch_size,
+            shuffle=False,
+            collate_fn=self._collate_fn,
+            **kwargs,
+        )
+
+    def _collate_fn(
+        self,
+        batch: List[Tuple[int, Tensor, Tensor, Tensor]],
+    ) -> Tuple[Tensor, Tensor, Tensor, Tensor]:
+        user_indices, pos_tensors, neg_tensors, seq_tensors = zip(*batch)
+
+        user_indices_tensor = torch.tensor(list(user_indices), dtype=torch.long)
+
+        # Positives: Stack and unsqueeze to get (Batch, 1)
+        # This matches the shape (Batch, Num_Negatives) for easy concatenation later
+        pos_items_tensor = torch.stack(pos_tensors).unsqueeze(1)
+
+        # Negatives: Stack to get (Batch, Num_Negatives)
+        neg_items_tensor = torch.stack(neg_tensors)
+
+        # Sequences: Pad to (Batch, Max_Len_In_Batch)
+        # Using num_items as padding value to match your previous Sequential loader
+        seqs_padded = pad_sequence(
+            seq_tensors,  # type: ignore[arg-type]
+            batch_first=True,
+            padding_value=self.num_items,
+        )
+
+        return user_indices_tensor, pos_items_tensor, neg_items_tensor, seqs_padded
