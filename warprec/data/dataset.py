@@ -12,6 +12,8 @@ from warprec.data.eval_loaders import (
     SampledEvaluationDataLoader,
     ContextualEvaluationDataLoader,
     SampledContextualEvaluationDataLoader,
+    SequentialEvaluationDataLoader,
+    SampledSequentialEvaluationDataLoader,
 )
 from warprec.utils.enums import RatingType
 from warprec.utils.logger import logger
@@ -576,6 +578,92 @@ class Dataset:
                 item_id_label=item_label,
                 context_labels=context_labels,
                 num_items=self._niid,
+                num_negatives=num_negatives,
+                seed=seed,
+                batch_size=self.batch_size,
+            )
+
+        return self._precomputed_dataloader[key]
+
+    def get_sequential_evaluation_dataloader(
+        self, max_seq_len: int
+    ) -> SequentialEvaluationDataLoader:
+        """Retrieve the SequentialEvaluationDataLoader for the dataset.
+
+        Args:
+            max_seq_len (int): Maximum sequence length for sequential evaluation.
+
+        Returns:
+            SequentialEvaluationDataLoader: The sampled sequential loader.
+        """
+        key = f"sequential_{max_seq_len}"
+
+        if key not in self._precomputed_dataloader:
+            train_data = self.train_set.get_df()
+            eval_data = self.eval_set.get_df()
+
+            # Retrieve labels to pre-compute DataFrames
+            user_label = self.train_set.user_label
+            item_label = self.train_set.item_label
+
+            # Map the train and evaluation dataset to ensure consistency
+            train_data[user_label] = train_data[user_label].map(self._umap)
+            train_data[item_label] = train_data[item_label].map(self._imap)
+            train_data = train_data.dropna(subset=[user_label, item_label])
+
+            eval_data[user_label] = eval_data[user_label].map(self._umap)
+            eval_data[item_label] = eval_data[item_label].map(self._imap)
+            eval_data = eval_data.dropna(subset=[user_label, item_label])
+
+            self._precomputed_dataloader[key] = SequentialEvaluationDataLoader(
+                train_data=train_data,
+                eval_data=eval_data,
+                user_id_label=user_label,
+                item_id_label=item_label,
+                batch_size=self.batch_size,
+                max_seq_len=max_seq_len,
+            )
+
+        return self._precomputed_dataloader[key]
+
+    def get_sampled_sequential_evaluation_dataloader(
+        self, max_seq_len: int, num_negatives: int = 99, seed: int = 42
+    ) -> SampledSequentialEvaluationDataLoader:
+        """Retrieve the SampledSequentialEvaluationDataLoader for the dataset.
+
+        Args:
+            max_seq_len (int): Maximum sequence length for sequential evaluation.
+            num_negatives (int): Number of negative samples per transaction.
+            seed (int): Random seed.
+
+        Returns:
+            SampledSequentialEvaluationDataLoader: The sampled sequential loader.
+        """
+        key = f"sampled_sequential_{max_seq_len}_{num_negatives}_{seed}"
+
+        if key not in self._precomputed_dataloader:
+            train_data = self.train_set.get_df()
+            eval_data = self.eval_set.get_df()
+
+            # Retrieve labels to pre-compute DataFrames
+            user_label = self.train_set.user_label
+            item_label = self.train_set.item_label
+
+            # Map the train and evaluation dataset to ensure consistency
+            train_data[user_label] = train_data[user_label].map(self._umap)
+            train_data[item_label] = train_data[item_label].map(self._imap)
+            train_data = train_data.dropna(subset=[user_label, item_label])
+
+            eval_data[user_label] = eval_data[user_label].map(self._umap)
+            eval_data[item_label] = eval_data[item_label].map(self._imap)
+            eval_data = eval_data.dropna(subset=[user_label, item_label])
+
+            self._precomputed_dataloader[key] = SampledSequentialEvaluationDataLoader(
+                train_data=train_data,
+                eval_data=eval_data,
+                user_id_label=user_label,
+                item_id_label=item_label,
+                max_seq_len=max_seq_len,
                 num_negatives=num_negatives,
                 seed=seed,
                 batch_size=self.batch_size,
