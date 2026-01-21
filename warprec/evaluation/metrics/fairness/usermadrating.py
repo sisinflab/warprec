@@ -1,16 +1,15 @@
-# pylint: disable=arguments-differ, unused-argument, line-too-long, duplicate-code
 from typing import Any, Set
 
 import torch
 from torch import Tensor
 
-from warprec.evaluation.metrics.base_metric import TopKMetric
+from warprec.evaluation.metrics.base_metric import UserAverageTopKMetric
 from warprec.utils.enums import MetricBlock
 from warprec.utils.registry import metric_registry
 
 
 @metric_registry.register("UserMADRating")
-class UserMADRating(TopKMetric):
+class UserMADRating(UserAverageTopKMetric):
     """User MAD Rating (UserMADRating) metric.
 
     This metric measures the disparity in the average rating/score received by users
@@ -42,101 +41,79 @@ class UserMADRating(TopKMetric):
 
     Attributes:
         user_clusters (Tensor): Tensor mapping each user to an user cluster.
-        user_counts (Tensor): Tensor of counts of batches/updates each user was seen in.
-        user_gains (Tensor): Tensor of summed average top-k prediction scores per user across batches.
-        n_user_clusters (int): The total number of unique user clusters, including fallback cluster.
 
     Args:
         k (int): Cutoff for top-k recommendations.
         num_users (int): Number of users in the training set.
-        *args (Any): The argument list.
         user_cluster (Tensor): Lookup tensor of user clusters.
         dist_sync_on_step (bool): Whether to synchronize metric state across distributed processes.
         **kwargs (Any): Additional keyword arguments.
     """
 
-    _REQUIRED_COMPONENTS: Set[MetricBlock] = {MetricBlock.TOP_K_VALUES}
+    _REQUIRED_COMPONENTS: Set[MetricBlock] = {
+        MetricBlock.BINARY_RELEVANCE,
+        MetricBlock.TOP_K_VALUES,
+        MetricBlock.VALID_USERS,
+    }
 
     user_clusters: Tensor
-    user_counts: Tensor
-    user_gains: Tensor
-    n_user_clusters: int
 
     def __init__(
         self,
         k: int,
         num_users: int,
-        *args: Any,
-        user_cluster: Tensor = None,
+        user_cluster: Tensor,
         dist_sync_on_step: bool = False,
         **kwargs: Any,
     ):
-        super().__init__(k, dist_sync_on_step)
+        super().__init__(k=k, num_users=num_users, dist_sync_on_step=dist_sync_on_step)
+
         self.register_buffer("user_clusters", user_cluster)
-        self.n_user_clusters = (
-            int(user_cluster.max().item()) + 1
-        )  # Take into account the zero cluster
+        self.n_user_clusters = int(user_cluster.max().item()) + 1
 
-        # Per-user accumulators
-        self.add_state(
-            "user_counts",
-            torch.zeros(num_users),
-            dist_reduce_fx="sum",
-        )
-        self.add_state(
-            "user_gains",
-            torch.zeros(num_users),
-            dist_reduce_fx="sum",
-        )
+    def compute_scores(
+        self, preds: Tensor, target: Tensor, top_k_rel: Tensor, **kwargs: Any
+    ) -> Tensor:
+        top_k_values = kwargs.get(f"top_{self.k}_values")
 
-    def update(self, preds: Tensor, **kwargs: Any):
-        """Updates the metric state with the new batch of predictions."""
-        start = kwargs.get("start", 0)
-        top_k_values: Tensor = kwargs.get(
-            f"top_{self.k}_values", self.top_k_values_indices(preds, self.k)[0]
-        )
-
-        # Global user indices for the current batch
-        batch_size = preds.size(0)
-        user_idx = torch.arange(start, start + batch_size, device=preds.device)
-
-        user_avg_scores = top_k_values.mean(dim=1)  # [batch_size]
-        self.user_gains.index_add_(0, user_idx, user_avg_scores)
-        self.user_counts.index_add_(0, user_idx, torch.ones_like(user_avg_scores))
+        # Average score of the top-k items for each user
+        return top_k_values.mean(dim=1)
 
     def compute(self):
-        """Computes the final metric value."""
-        # Per-user mean nDCG
-        mask = self.user_counts > 0
-        v = torch.zeros_like(self.user_gains)
-        v[mask] = self.user_gains[mask] / self.user_counts[mask]
+        # Calculate average rating per user
+        mask = self.user_interactions > 0
+
+        if not mask.any():
+            return {self.name: torch.tensor(0.0)}
+
+        user_vals = torch.zeros_like(self.scores)
+        user_vals[mask] = self.scores[mask] / self.user_interactions[mask]
 
         # Aggregate per cluster
-        sum_cluster = torch.zeros(self.n_user_clusters, device=v.device)
+        sum_cluster = torch.zeros(self.n_user_clusters, device=self.device)
         count_cluster = torch.zeros(
-            self.n_user_clusters, dtype=torch.long, device=v.device
+            self.n_user_clusters, dtype=torch.long, device=self.device
         )
-        sum_cluster.scatter_add_(0, self.user_clusters, v)
+
+        sum_cluster.scatter_add_(0, self.user_clusters, user_vals)
         count_cluster.scatter_add_(0, self.user_clusters, mask.long())
 
         # Mean per cluster
-        mean_cluster = torch.zeros_like(sum_cluster)
-        nz = count_cluster > 0
-        mean_cluster[nz] = sum_cluster[nz] / count_cluster[nz]
+        valid_clusters = count_cluster > 0
 
-        # Pairwise absolute differences
-        values = mean_cluster[nz]
-        m = values.numel()
+        if not valid_clusters.any():
+            return {self.name: torch.tensor(0.0)}
+
+        mean_cluster = sum_cluster[valid_clusters] / count_cluster[valid_clusters]
+
+        # Pairwise absolute differences (MAD)
+        m = mean_cluster.numel()
         if m < 2:
-            mad = torch.tensor(0.0, device=values.device).item()
+            mad = torch.tensor(0.0, device=self.device)
         else:
-            # vectorized pairwise diffs
-            i = values.unsqueeze(0)
-            j = values.unsqueeze(1)
-            diffs = (i - j).abs()
-            # take upper triangle without diagonal
-            pairwise = diffs.triu(diagonal=1)
-            # mean of non-zero entries
-            mad = (pairwise.sum() / (m * (m - 1) / 2)).item()
+            diffs = (mean_cluster.unsqueeze(0) - mean_cluster.unsqueeze(1)).abs()
+            pairwise_sum = diffs.triu(diagonal=1).sum()
+            num_pairs = m * (m - 1) / 2
+            mad = pairwise_sum / num_pairs
 
-        return {self.name: mad}
+        return {self.name: mad.item()}

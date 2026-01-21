@@ -1,4 +1,3 @@
-# pylint: disable=arguments-differ, unused-argument, line-too-long, duplicate-code
 from typing import Any, Set
 
 import torch
@@ -19,7 +18,6 @@ class ItemCoverage(TopKMetric):
     Args:
         k (int): The cutoff.
         num_items (int): Number of items in the training set.
-        *args (Any): The argument list.
         dist_sync_on_step (bool): Torchmetrics parameter.
         **kwargs (Any): The keyword argument dictionary.
     """
@@ -32,7 +30,6 @@ class ItemCoverage(TopKMetric):
         self,
         k: int,
         num_items: int,
-        *args: Any,
         dist_sync_on_step: bool = False,
         **kwargs: Any,
     ):
@@ -42,23 +39,21 @@ class ItemCoverage(TopKMetric):
         )
 
     def update(self, preds: Tensor, **kwargs: Any):
-        """Updates the metric state with the new batch of predictions."""
-        top_k_indices: Tensor = kwargs.get(
-            f"top_{self.k}_indices", self.top_k_values_indices(preds, self.k)[1]
-        )
+        # Retrieve top_k_indices from kwargs
+        top_k_indices = kwargs.get(f"top_{self.k}_indices")
 
-        # Handle sampled item indices if provided
-        item_indices = kwargs.get("item_indices", None)
+        # Handle sampled item indices if provided (map local batch indices to global item IDs)
+        item_indices = kwargs.get("item_indices")
         if item_indices is not None:
-            top_k_indices = torch.gather(kwargs.get("item_indices"), 1, top_k_indices)
+            top_k_indices = torch.gather(item_indices, 1, top_k_indices)
 
-        # Flatten the indices
+        # Flatten the indices to count occurrences across the entire batch
         flat_indices = top_k_indices.flatten()
 
+        # Update counts
         batch_counts = torch.bincount(flat_indices, minlength=len(self.item_counts))
         self.item_counts += batch_counts.to(self.item_counts)
 
     def compute(self):
-        """Computes the final metric value."""
         item_coverage = (self.item_counts > 0).sum().item()
         return {self.name: item_coverage}

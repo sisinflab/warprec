@@ -1,4 +1,3 @@
-# pylint: disable=arguments-differ, unused-argument, line-too-long, duplicate-code
 from typing import Any, Set
 
 import torch
@@ -29,10 +28,12 @@ class REO(TopKMetric):
         - A is the total number of item clusters.
 
     The probability for a cluster g_a is calculated as:
-        P(R@k | g=g_a, y=1) = (Sum over users u of |{relevant items in top-k for u} AND {items in group g_a}|) / (Sum over users u of |{relevant items for u} AND {items in group g_a}|)
+        P(R@k | g=g_a, y=1) = (Sum over users u of |{relevant items in top-k for u} AND
+            {items in group g_a}|) / (Sum over users u of |{relevant items for u} AND {items in group g_a}|)
 
     This simplifies to:
-        P(R@k | g=g_a, y=1) = (Total count of relevant group g_a items in top-k across all users) / (Total count of relevant group g_a items across all users)
+        P(R@k | g=g_a, y=1) = (Total count of relevant group g_a items in top-k across all users) /
+            (Total count of relevant group g_a items across all users)
 
     Matrix computation of the metric within a batch:
     Given recommendations (preds) and ground truth relevance (target) for a batch of users:
@@ -46,8 +47,10 @@ class REO(TopKMetric):
     1. Get top-k recommended item indices for each user.
     2. Create a binary matrix 'rel' where rel[u, i] = 1 if item i is relevant to user u AND i is in u's top-k recommendations, 0 otherwise.
     3. For each item cluster 'c' (0 to n_item_clusters-1):
-        a. Sum rel[u, i] for all users u and items i where item_clusters[i] == c. This is the total count of relevant recommended items from cluster c in the batch.
-        b. Sum target[u, i] for all users u and items i where item_clusters[i] == c. This is the total count of relevant items from cluster c in the ground truth for the batch.
+        a. Sum rel[u, i] for all users u and items i where item_clusters[i] == c.
+            This is the total count of relevant recommended items from cluster c in the batch.
+        b. Sum target[u, i] for all users u and items i where item_clusters[i] == c.
+            This is the total count of relevant items from cluster c in the ground truth for the batch.
     4. Accumulate these counts across batches.
 
     After processing all batches, compute the per-cluster probabilities:
@@ -75,6 +78,7 @@ class REO(TopKMetric):
     _REQUIRED_COMPONENTS: Set[MetricBlock] = {
         MetricBlock.BINARY_RELEVANCE,
         MetricBlock.TOP_K_INDICES,
+        MetricBlock.TOP_K_BINARY_RELEVANCE,
     }
 
     item_clusters: Tensor
@@ -111,90 +115,80 @@ class REO(TopKMetric):
         )
 
     def update(self, preds: Tensor, **kwargs: Any):
-        """Updates the metric state with the new batch of predictions."""
-        target: Tensor = kwargs.get("binary_relevance", torch.zeros_like(preds))
-        top_k_indices: Tensor = kwargs.get(
-            f"top_{self.k}_indices", self.top_k_values_indices(preds, self.k)[1]
-        )
-        batch_size = preds.shape[0]
+        target = kwargs.get("binary_relevance")
+        top_k_indices = kwargs.get(f"top_{self.k}_indices")
+        top_k_rel = kwargs.get(f"top_{self.k}_binary_relevance")
+        item_indices = kwargs.get("item_indices")
 
-        # Handle sampled item indices if provided
-        item_indices = kwargs.get("item_indices", None)
+        # Identify Global Indices for Recommendations
         if item_indices is not None:
-            batch_item_clusters = self.item_clusters[item_indices]
+            top_k_indices_global = torch.gather(item_indices, 1, top_k_indices)
+            rows, cols = target.nonzero(as_tuple=True)
+            positive_indices_global = item_indices[rows, cols]
         else:
-            batch_item_clusters = self.item_clusters.unsqueeze(0).repeat(batch_size, 1)
+            top_k_indices_global = top_k_indices
+            _, positive_indices_global = target.nonzero(as_tuple=True)
 
-        # Create a mask for items in the top-k recommendations
-        top_k_mask = torch.zeros_like(preds, dtype=torch.bool)
-        top_k_mask.scatter_(
-            dim=1, index=top_k_indices, value=True
-        )  # [batch_size x num_items]
+        # Identify Relevant Recommended Items
+        rel_mask = top_k_rel > 0
+        relevant_rec_indices_global = top_k_indices_global[rel_mask]
 
-        # Retrieve relevant items
-        rel = target * top_k_mask.int()  # [batch_size x num_items]
+        # Map to Clusters
+        rec_clusters = self.item_clusters[relevant_rec_indices_global]
+        gt_clusters = self.item_clusters[positive_indices_global]
 
-        # Accumulate counts per cluster for relevant recommended items
-        # Flatten the batch tensors and repeat cluster IDs for each user
-        flat_relevant_recommended = rel.flatten()  # [batch_size * num_items]
-        flat_target = target.flatten()  # [batch_size * num_items]
-        flat_item_clusters = batch_item_clusters.flatten()  # [batch_size * num_items]
+        # Accumulate Counts
+        batch_rec_counts = torch.bincount(
+            rec_clusters, minlength=self.n_item_clusters
+        ).float()
 
-        # Initialize batch accumulators
-        batch_rec_counts = torch.zeros(
-            self.n_item_clusters, dtype=torch.float, device=preds.device
-        )
-        batch_total_counts = torch.zeros(
-            self.n_item_clusters, dtype=torch.float, device=preds.device
-        )
+        batch_total_counts = torch.bincount(
+            gt_clusters, minlength=self.n_item_clusters
+        ).float()
 
-        # Use scatter_add to sum values based on cluster index
-        batch_rec_counts.scatter_add_(0, flat_item_clusters, flat_relevant_recommended)
-        batch_total_counts.scatter_add_(0, flat_item_clusters, flat_target)
-
-        # Update the state variables
         self.cluster_recommendations += batch_rec_counts
         self.cluster_total_items += batch_total_counts
 
     def compute(self):
-        """Computes the final value of the metric."""
-        # Find clusters with relevant items in the ground truth
-        valid_cluster_mask = self.cluster_total_items > 0
+        # Mask for clusters that exist in the ground truth
+        # We assume cluster 0 is padding/unknown and usually ignore it if it has no items
+        valid_mask = self.cluster_total_items > 0
 
-        # If no relevant items exist in any cluster, REO is undefined, return 0.0
-        if not valid_cluster_mask.any():
+        if not valid_mask.any():
             return {self.name: torch.tensor(0.0).item()}
 
-        # Compute probabilities only for clusters with relevant items
-        # pr_c = (relevant recommended in cluster c) / (total relevant in cluster c)
-        valid_cluster_recommendations = self.cluster_recommendations[valid_cluster_mask]
-        valid_cluster_total_items = self.cluster_total_items[valid_cluster_mask]
-        cluster_probabilities = (
-            valid_cluster_recommendations / valid_cluster_total_items
-        )
+        # Calculate probabilities for ALL clusters (keep 0 for invalid ones to maintain index alignment)
+        # Avoid division by zero
+        safe_denom = self.cluster_total_items.clone()
+        safe_denom[~valid_mask] = 1.0
 
-        # If there's only one valid cluster, std dev is 0, so REO is 0.0
-        if cluster_probabilities.numel() <= 1:
-            return {self.name: torch.tensor(0.0).item()}
+        probs = self.cluster_recommendations / safe_denom
+        probs[~valid_mask] = 0.0  # Ensure invalid clusters are 0
 
-        # Calculate mean prob for later
-        mean_prob = torch.mean(cluster_probabilities)
+        # Calculate global stats based ONLY on valid clusters
+        valid_probs = probs[valid_mask]
 
-        # Handle case where mean probability is zero
-        # (e.g., valid clusters had relevant items, but none were recommended in top-k)
-        if mean_prob == 0:
-            return {self.name: torch.tensor(0.0).item()}
-
-        std_prob = torch.std(
-            cluster_probabilities, unbiased=False
-        )  # Use population standard deviation as in original formula
-
-        reo_score = std_prob / cluster_probabilities
+        if valid_probs.numel() <= 1:
+            std_prob = torch.tensor(0.0)
+            mean_prob = torch.tensor(1.0)  # Avoid div/0
+        else:
+            std_prob = torch.std(valid_probs, unbiased=False)
+            mean_prob = torch.mean(valid_probs)
 
         results = {}
-        for ic in range(self.n_effective_clusters):
-            key = f"{self.name}_IC{ic + 1}"
-            results[key] = reo_score[ic].item()
 
-        results[self.name] = (std_prob / mean_prob).item()
+        # Populate per-cluster probability
+        for ic in range(1, self.n_effective_clusters + 1):
+            key = f"{self.name}_IC{ic}"
+            if valid_mask[ic]:
+                results[key] = probs[ic].item()
+            else:
+                results[key] = float("nan")
+
+        # Aggregate Score
+        if mean_prob == 0:
+            results[self.name] = 0.0
+        else:
+            results[self.name] = (std_prob / mean_prob).item()
+
         return results

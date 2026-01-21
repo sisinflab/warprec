@@ -1,4 +1,3 @@
-# pylint: disable=arguments-differ, unused-argument, line-too-long, duplicate-code
 from typing import Any, Set
 
 import torch
@@ -69,7 +68,6 @@ class PopREO(TopKMetric):
         k (int): The cutoff for recommendations.
         item_interactions (Tensor): The counts for item interactions in training set.
         pop_ratio (float): The percentile considered popular.
-        *args (Any): The argument list.
         dist_sync_on_step (bool): Torchmetrics parameter.
         **kwargs (Any): The keyword argument dictionary.
     """
@@ -91,7 +89,6 @@ class PopREO(TopKMetric):
         k: int,
         item_interactions: Tensor,
         pop_ratio: float,
-        *args: Any,
         dist_sync_on_step: bool = False,
         **kwargs: Any,
     ):
@@ -107,51 +104,26 @@ class PopREO(TopKMetric):
         self.register_buffer("long_tail", lt)
 
     def update(self, preds: Tensor, **kwargs: Any):
-        """Updates the metric state with the new batch of predictions."""
-        target: Tensor = kwargs.get("binary_relevance", torch.zeros_like(preds))
-        top_k_indices: Tensor = kwargs.get(
-            f"top_{self.k}_indices", self.top_k_values_indices(preds, self.k)[1]
-        )
+        target = kwargs.get("binary_relevance")
+        top_k_indices = kwargs.get(f"top_{self.k}_indices")
+        item_indices = kwargs.get("item_indices")
 
         # Handle sampled item indices if provided
-        item_indices = kwargs.get("item_indices", None)
         if item_indices is not None:
-            # Map top_k_indices from local batch indices to global item indices
-            top_k_indices_global = torch.gather(item_indices, 1, top_k_indices)
-
-            # Find the global item IDs of the positive interactions in the target matrix
-            positive_indices_global = item_indices[target.nonzero(as_tuple=True)]
-
-            # Count recommended items from each group
-            short_recs = torch.isin(top_k_indices_global, self.short_head).sum().float()
-            long_recs = torch.isin(top_k_indices_global, self.long_tail).sum().float()
-
-            # Count ground truth items from each group
-            short_gt = (
-                torch.isin(positive_indices_global, self.short_head).sum().float()
-            )
-            long_gt = torch.isin(positive_indices_global, self.long_tail).sum().float()
+            top_k_indices = torch.gather(item_indices, 1, top_k_indices)
+            rows, cols = target.nonzero(as_tuple=True)
+            positive_indices = item_indices[rows, cols]
 
         else:  # Full evaluation
-            # Count recommended items from each group
-            short_recs = torch.isin(top_k_indices, self.short_head).sum().float()
-            long_recs = torch.isin(top_k_indices, self.long_tail).sum().float()
+            _, positive_indices = target.nonzero(as_tuple=True)
 
-            # Get item IDs of positive interactions in the full target matrix
-            positive_indices = target.nonzero(as_tuple=True)[1]
-
-            # Count ground truth items from each group
-            short_gt = torch.isin(positive_indices, self.short_head).sum().float()
-            long_gt = torch.isin(positive_indices, self.long_tail).sum().float()
-
-        # Update
-        self.short_recs += short_recs
-        self.long_recs += long_recs
-        self.short_gt += short_gt
-        self.long_gt += long_gt
+        # Accumulate short head and long tail recommendations
+        self.short_recs += torch.isin(top_k_indices, self.short_head).sum().float()
+        self.long_recs += torch.isin(top_k_indices, self.long_tail).sum().float()
+        self.short_gt += torch.isin(positive_indices, self.short_head).sum().float()
+        self.long_gt += torch.isin(positive_indices, self.long_tail).sum().float()
 
     def compute(self):
-        """Computes the final metric value."""
         # Calculate proportions of hits per group
         pr_short = self.short_recs / (self.short_gt if self.short_gt > 0 else 1.0)
         pr_long = self.long_recs / (self.long_gt if self.long_gt > 0 else 1.0)
@@ -161,5 +133,6 @@ class PopREO(TopKMetric):
             return torch.tensor(0.0)
 
         pr = torch.stack([pr_short, pr_long])
+        # std(unbiased=False) matches numpy std by default for population std
         pop_reo = (torch.std(pr, unbiased=False) / torch.mean(pr)).item()
         return {self.name: pop_reo}

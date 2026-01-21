@@ -1,4 +1,3 @@
-# pylint: disable=arguments-differ, unused-argument, line-too-long, duplicate-code
 from typing import Any, Set
 
 import torch
@@ -31,10 +30,12 @@ class RSP(TopKMetric):
         - A is the total number of item clusters.
 
     The probability for a cluster g_a is calculated as:
-        P(R@k | g=g_a) = (Sum over users u of |{items in top-k for u} AND {items in group g_a}|) / (Sum over users u of |{items not in training set for u} AND {items in group g_a}|)
+        P(R@k | g=g_a) = (Sum over users u of |{items in top-k for u} AND
+            {items in group g_a}|) / (Sum over users u of |{items not in training set for u} AND {items in group g_a}|)
 
     This simplifies to:
-        P(R@k | g=g_a) = (Total count of group g_a items in top-k across all users) / (Total count of group g_a items not in training set across all users)
+        P(R@k | g=g_a) = (Total count of group g_a items in top-k across all users) /
+            (Total count of group g_a items not in training set across all users)
 
     Matrix computation of the numerator within a batch:
     Given recommendations (preds) and ground truth relevance (target) for a batch of users:
@@ -48,7 +49,8 @@ class RSP(TopKMetric):
     1. Get top-k recommended item indices for each user.
     2. Create a binary mask 'top_k_mask' where top_k_mask[u, i] = 1 if item i is in u's top-k recommendations, 0 otherwise.
     3. For each item cluster 'c' (0 to n_item_clusters-1):
-        a. Sum top_k_mask[u, i] for all users u and items i where item_clusters[i] == c. This is the total count of recommended items from cluster c in the batch.
+        a. Sum top_k_mask[u, i] for all users u and items i where item_clusters[i] == c.
+            This is the total count of recommended items from cluster c in the batch.
     4. Accumulate these counts across batches into 'cluster_recommendations'.
 
     The denominator (Total count of group g_a items not in training set across all users)
@@ -67,31 +69,34 @@ class RSP(TopKMetric):
         denominator_counts (Tensor): Pre-calculated total count of items per cluster not in the training set across all users.
         n_effective_clusters (int): The total number of unique item clusters.
         n_item_clusters (int): The total number of unique item clusters, including fallback cluster.
+        user_interactions (Tensor): Accumulator for counting how many times each user has been evaluated.
 
     Args:
         k (int): Cutoff for top-k recommendations.
         num_users (int): Number of users in the training set.
-        item_indices (Tensor): Indices of items in the training set used to calculate the denominator counts.
-        *args (Any): The argument list.
+        item_interactions (Tensor): Tensor containing counts of item interactions in the training set.
         item_cluster (Tensor): Lookup tensor of item clusters.
         dist_sync_on_step (bool): Whether to synchronize metric state across distributed processes.
         **kwargs (Any): Additional keyword arguments.
     """
 
-    _REQUIRED_COMPONENTS: Set[MetricBlock] = {MetricBlock.TOP_K_INDICES}
+    _REQUIRED_COMPONENTS: Set[MetricBlock] = {
+        MetricBlock.TOP_K_INDICES,
+        MetricBlock.VALID_USERS,
+    }
 
     item_clusters: Tensor
     cluster_recommendations: Tensor
     denominator_counts: Tensor
     n_effective_clusters: int
     n_item_clusters: int
+    user_interactions: Tensor
 
     def __init__(
         self,
         k: int,
         num_users: int,
-        item_indices: Tensor,
-        *args: Any,
+        item_interactions: Tensor,
         item_cluster: Tensor = None,
         dist_sync_on_step: bool = False,
         **kwargs: Any,
@@ -99,114 +104,109 @@ class RSP(TopKMetric):
         super().__init__(k, dist_sync_on_step)
         self.register_buffer("item_clusters", item_cluster)
         self.n_effective_clusters = int(item_cluster.max().item())
-        self.n_item_clusters = (
-            self.n_effective_clusters + 1
-        )  # Take into account the zero cluster
+        self.n_item_clusters = self.n_effective_clusters + 1
 
-        # Calculate |g_a| for each cluster g_a
-        cluster_item_counts = torch.bincount(
-            self.item_clusters, minlength=self.n_item_clusters
-        ).float()  # [num_clusters]
-
-        # Calculate total count of training interactions whose item is in group g_a
-        train_item_clusters = self.item_clusters[item_indices]
-
-        # Count occurrences of each cluster ID among training items
-        cluster_train_interaction_counts = torch.zeros(
-            self.n_item_clusters, dtype=torch.float
+        # Count cluster of items in the catalog
+        self.register_buffer(
+            "cluster_item_counts",
+            torch.bincount(item_cluster, minlength=self.n_item_clusters).float(),
         )
-        cluster_train_interaction_counts.scatter_add_(
-            0,
-            train_item_clusters,
-            torch.ones_like(train_item_clusters, dtype=torch.float),
-        )  # Sum counts per cluster
 
-        # Calculate the denominator for each cluster
-        total_potential_items_per_cluster = num_users * cluster_item_counts
-        denominator_counts = (
-            total_potential_items_per_cluster - cluster_train_interaction_counts
-        )  # [n_item_clusters]
+        # Global count of items per cluster in the training set
+        cluster_train_counts = torch.zeros(
+            self.n_item_clusters, dtype=torch.float, device=item_cluster.device
+        )
+        cluster_train_counts.index_add_(0, item_cluster, item_interactions.float())
+        self.register_buffer("cluster_train_interaction_counts", cluster_train_counts)
 
-        self.register_buffer("denominator_counts", denominator_counts)
+        # Accumulators
         self.add_state(
             "cluster_recommendations",
             torch.zeros(self.n_item_clusters, dtype=torch.float),
             dist_reduce_fx="sum",
         )
-
-    def update(self, preds: Tensor, **kwargs: Any):
-        """Updates the metric state with the new batch of predictions."""
-        top_k_indices: Tensor = kwargs.get(
-            f"top_{self.k}_indices", self.top_k_values_indices(preds, self.k)[1]
+        self.add_state(
+            "user_interactions",
+            default=torch.zeros(num_users, dtype=torch.float),
+            dist_reduce_fx="sum",
         )
-        batch_size = preds.shape[0]
 
-        # Handle sampled item indices if provided
-        item_indices = kwargs.get("item_indices", None)
+    def update(self, preds: Tensor, user_indices: Tensor, **kwargs: Any):
+        users = kwargs.get("valid_users")
+        top_k_indices = kwargs.get(f"top_{self.k}_indices")
+
+        # Handle sampled item indices if provided (map local batch indices to global item IDs)
+        item_indices = kwargs.get("item_indices")
         if item_indices is not None:
-            batch_item_clusters = self.item_clusters[item_indices]
-        else:
-            batch_item_clusters = self.item_clusters.unsqueeze(0).repeat(batch_size, 1)
+            top_k_indices = torch.gather(item_indices, 1, top_k_indices)
 
-        # Create a mask for items in the top-k recommendations
-        top_k_mask = torch.zeros_like(preds, dtype=torch.bool, device=preds.device)
-        top_k_mask.scatter_(
-            dim=1, index=top_k_indices, value=True
-        )  # [batch_size x num_items]
-
-        # Accumulate counts per cluster for recommended items (regardless of relevance)
-        # Flatten the batch mask and repeat cluster IDs for each user
-        flat_top_k_mask_float = top_k_mask.float().flatten()  # [batch_size * num_items]
-        flat_item_clusters = batch_item_clusters.flatten()  # [batch_size * num_items]
-
-        # Initialize batch accumulator for recommendations
-        batch_rec_counts = torch.zeros(
-            self.n_item_clusters, dtype=torch.float, device=preds.device
-        )
-
-        # Use scatter_add to sum values based on cluster index
-        batch_rec_counts.scatter_add_(0, flat_item_clusters, flat_top_k_mask_float)
-
-        # Update the state variable
+        # Accumulate cluster recommendations for numerator
+        flat_indices = top_k_indices.flatten()
+        rec_clusters = self.item_clusters[flat_indices]
+        batch_rec_counts = torch.bincount(
+            rec_clusters, minlength=self.n_item_clusters
+        ).float()
         self.cluster_recommendations += batch_rec_counts
 
+        # Accumulate user interactions for denominator
+        self.user_interactions.index_add_(0, user_indices, users.float())
+
     def compute(self):
-        """Computes the final value of the metric."""
-        # Find clusters with a non-zero denominator (i.e., eligible items in the test pool)
-        valid_cluster_mask = self.denominator_counts > 0
+        # Compute total interactions across all users
+        total_interactions = self.user_interactions.sum()
 
-        # If no clusters have eligible items in the test pool, RSP is undefined, return 0.0
-        if not valid_cluster_mask.any():
-            return {self.name: torch.tensor(0.0).item()}
+        if total_interactions == 0:
+            return {self.name: 0.0}
 
-        # Compute probabilities only for clusters with eligible items
-        # pr_c = (recommended in cluster c) / (eligible items in cluster c)
-        valid_cluster_recommendations = self.cluster_recommendations[valid_cluster_mask]
-        valid_denominator_counts = self.denominator_counts[valid_cluster_mask]
-        cluster_probabilities = valid_cluster_recommendations / valid_denominator_counts
+        # Total potential items per cluster not in training set
+        total_potential = total_interactions * self.cluster_item_counts
 
-        # If there's only one valid cluster, std dev is 0, so RSP is 0.0
-        if cluster_probabilities.numel() <= 1:
-            return {self.name: torch.tensor(0.0).item()}
+        # Estimate masked items per cluster
+        num_total_users = self.user_interactions.size(0)
+        scaling_factor = total_interactions / num_total_users
+        estimated_masked_items = scaling_factor * self.cluster_train_interaction_counts
 
-        # Calculate RSP = std(probs) / mean(probs)
-        mean_prob = torch.mean(cluster_probabilities)
+        # Final denominator counts
+        denominator_counts = total_potential - estimated_masked_items
 
-        # Handle case where mean probability is zero
-        # (e.g., valid clusters had eligible items, but none were recommended in top-k)
-        if mean_prob == 0:
-            return {self.name: torch.tensor(0.0).item()}
+        # Safety clamp to avoid negative values
+        denominator_counts = torch.clamp(denominator_counts, min=0.0)
 
-        std_prob = torch.std(
-            cluster_probabilities, unbiased=False
-        )  # Use population standard deviation as in original formula
+        # Valid clusters for computation
+        valid_mask = denominator_counts > 0
 
-        rsp_score = std_prob / cluster_probabilities
+        if not valid_mask.any():
+            return {self.name: 0.0}
+
+        # Compute probabilities per cluster
+        probs = torch.zeros_like(self.cluster_recommendations)
+        probs[valid_mask] = (
+            self.cluster_recommendations[valid_mask] / denominator_counts[valid_mask]
+        )
+
+        valid_probs = probs[valid_mask]
+
+        if valid_probs.numel() <= 1:
+            std_prob = 0.0
+            mean_prob = 1.0
+        else:
+            std_prob = torch.std(valid_probs, unbiased=False).item()
+            mean_prob = torch.mean(valid_probs).item()
 
         results = {}
-        for ic in range(self.n_effective_clusters):
-            key = f"{self.name}_IC{ic + 1}"
-            results[key] = rsp_score[ic].item()
 
-        results[self.name] = (std_prob / mean_prob).item()
+        # Populate per-cluster probability
+        for ic in range(1, self.n_effective_clusters + 1):
+            key = f"{self.name}_IC{ic}"
+            if valid_mask[ic]:
+                results[key] = probs[ic].item()
+            else:
+                results[key] = float("nan")
+
+        # Aggregate Score
+        if mean_prob == 0:
+            results[self.name] = 0.0
+        else:
+            results[self.name] = std_prob / mean_prob
+
         return results

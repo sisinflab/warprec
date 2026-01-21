@@ -310,6 +310,11 @@ class Evaluator:
             else None
         )
 
+        # Valid Users Computation
+        valid_users = None
+        if MetricBlock.VALID_USERS in all_required_blocks:
+            valid_users = BaseMetric.valid_users(eval_batch)
+
         # Top-K Computation (Once for max K)
         if self.k_values and any(
             b in all_required_blocks
@@ -355,6 +360,7 @@ class Evaluator:
                     "ground": eval_batch,
                     "binary_relevance": binary_relevance,
                     "discounted_relevance": discounted_relevance,
+                    "valid_users": valid_users,
                     "user_indices": user_indices,
                     "item_indices": candidates,  # None for Full, Tensor for Sampled
                     **precomputed_blocks[k],

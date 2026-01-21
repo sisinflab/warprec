@@ -1,15 +1,14 @@
-# pylint: disable=arguments-differ, unused-argument, line-too-long, duplicate-code
 from typing import Any, Set
 
 import torch
 from torch import Tensor
-from warprec.evaluation.metrics.base_metric import TopKMetric
+from warprec.evaluation.metrics.base_metric import UserAverageTopKMetric
 from warprec.utils.enums import MetricBlock
 from warprec.utils.registry import metric_registry
 
 
 @metric_registry.register("NumRetrieved")
-class NumRetrieved(TopKMetric):
+class NumRetrieved(UserAverageTopKMetric):
     """The NumRetrieved@k counts the number of items retrieved in the top-k list.
 
     This metric simply counts how many items are present in the recommended list up to
@@ -27,21 +26,6 @@ class NumRetrieved(TopKMetric):
           |L_u| is effectively the total number of items.
 
     For further details, please refer to the `link <https://github.com/RankSys/RankSys/blob/master/RankSys-metrics/src/main/java/es/uam/eps/ir/ranksys/metrics/basic/NumRetrieved.java>`_
-
-    Attributes:
-        num_retrieved (Tensor): Counts of retrieved items per user.
-        users (Tensor): Number of user with at least 1 relevant item.
-        compute_per_user (bool): Wether or not to compute the metric
-            per user or globally.
-
-    Args:
-        k (int): The cutoff.
-        num_users (int): Number of users in the training set.
-        *args (Any): The argument list.
-        compute_per_user (bool): Wether or not to compute the metric
-            per user or globally.
-        dist_sync_on_step (bool): Torchmetrics parameter.
-        **kwargs (Any): The keyword argument dictionary.
     """
 
     _REQUIRED_COMPONENTS: Set[MetricBlock] = {
@@ -49,71 +33,12 @@ class NumRetrieved(TopKMetric):
         MetricBlock.VALID_USERS,
         MetricBlock.TOP_K_VALUES,
     }
-    _CAN_COMPUTE_PER_USER: bool = True
 
-    num_retrieved: Tensor
-    users: Tensor
-    compute_per_user: bool
+    def compute_scores(
+        self, preds: Tensor, target: Tensor, top_k_rel: Tensor, **kwargs: Any
+    ) -> Tensor:
+        # Retrieve top_k_values from kwargs
+        top_k_values = kwargs.get(f"top_{self.k}_values")
 
-    def __init__(
-        self,
-        k: int,
-        num_users: int,
-        *args: Any,
-        compute_per_user: bool = False,
-        dist_sync_on_step: bool = False,
-        **kwargs: Any,
-    ):
-        super().__init__(k, dist_sync_on_step)
-        self.compute_per_user = compute_per_user
-
-        if self.compute_per_user:
-            self.add_state(
-                "num_retrieved", default=torch.zeros(num_users), dist_reduce_fx="sum"
-            )  # Initialize a tensor to store metric value for each user
-            self.add_state(
-                "users", default=torch.zeros(num_users), dist_reduce_fx="sum"
-            )
-        else:
-            self.add_state(
-                "num_retrieved", default=torch.tensor(0.0), dist_reduce_fx="sum"
-            )  # Initialize a scalar to store global value
-            self.add_state("users", default=torch.tensor(0.0), dist_reduce_fx="sum")
-
-    def update(self, preds: Tensor, user_indices: Tensor, **kwargs: Any):
-        """Updates the metric state with the new batch of predictions."""
-        target: Tensor = kwargs.get("binary_relevance", torch.zeros_like(preds))
-        users: Tensor = kwargs.get("valid_users", self.valid_users(target))
-        top_k_values: Tensor = kwargs.get(
-            f"top_{self.k}_values", self.top_k_values_indices(preds, self.k)[0]
-        )
-
-        if self.compute_per_user:
-            self.num_retrieved.index_add_(
-                0, user_indices, (~torch.isinf(top_k_values)).sum(dim=1).float()
-            )
-
-            # Count only users with at least one interaction
-            self.users.index_add_(0, user_indices, users)
-        else:
-            self.num_retrieved += (~torch.isinf(top_k_values)).sum().float()
-
-            # Count only users with at least one interaction
-            self.users += users.sum()
-
-    def compute(self):
-        """Computes the final metric value."""
-        if self.compute_per_user:
-            num_retrieved = self.num_retrieved
-            num_retrieved[self.users == 0] = float(
-                "nan"
-            )  # Set nan for users with no interactions
-        else:
-            num_retrieved = int(
-                (
-                    self.num_retrieved / self.users
-                    if self.users > 0
-                    else torch.tensor(0.0)
-                ).item()
-            )
-        return {self.name: num_retrieved}
+        # Count items that are not -inf (valid recommendations)
+        return (~torch.isinf(top_k_values)).sum(dim=1).float()

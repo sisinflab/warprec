@@ -1,15 +1,14 @@
-# pylint: disable=arguments-differ, unused-argument, line-too-long, duplicate-code
 from typing import Any, Set
 
 import torch
 from torch import Tensor
-from warprec.evaluation.metrics.base_metric import TopKMetric
+from warprec.evaluation.metrics.base_metric import UserAverageTopKMetric
 from warprec.utils.enums import MetricBlock
 from warprec.utils.registry import metric_registry
 
 
 @metric_registry.register("ACLT")
-class ACLT(TopKMetric):
+class ACLT(UserAverageTopKMetric):
     """ACLT (Average Coverage of Long-Tail items) is a metric that evaluates the
     extent to which a recommendation system provides recommendations from the long-tail
     of item popularity. The long-tail is determined based on a given popularity percentile threshold.
@@ -52,19 +51,12 @@ class ACLT(TopKMetric):
 
     Attributes:
         long_tail (Tensor): The lookup tensor of long tail items.
-        long_hits (Tensor): The long tail recommendation hits.
-        users (Tensor): The number of users evaluated.
-        compute_per_user (bool): Wether or not to compute the metric
-            per user or globally.
 
     Args:
         k (int): The cutoff for recommendations.
         num_users (int): Number of users in the training set.
         item_interactions (Tensor): The counts for item interactions in training set.
         pop_ratio (float): The percentile considered popular.
-        *args (Any): The argument list.
-        compute_per_user (bool): Wether or not to compute the metric
-            per user or globally.
         dist_sync_on_step (bool): Torchmetrics parameter.
         **kwargs (Any): The keyword argument dictionary.
     """
@@ -74,12 +66,8 @@ class ACLT(TopKMetric):
         MetricBlock.VALID_USERS,
         MetricBlock.TOP_K_INDICES,
     }
-    _CAN_COMPUTE_PER_USER: bool = True
 
     long_tail: Tensor
-    long_hits: Tensor
-    users: Tensor
-    compute_per_user: bool
 
     def __init__(
         self,
@@ -87,70 +75,28 @@ class ACLT(TopKMetric):
         num_users: int,
         item_interactions: Tensor,
         pop_ratio: float,
-        *args: Any,
-        compute_per_user: bool = False,
         dist_sync_on_step: bool = False,
         **kwargs: Any,
     ):
-        super().__init__(k, dist_sync_on_step)
-        self.compute_per_user = compute_per_user
-
-        if self.compute_per_user:
-            self.add_state(
-                "long_hits", default=torch.zeros(num_users), dist_reduce_fx="sum"
-            )  # Initialize a tensor to store metric value for each user
-            self.add_state(
-                "users", default=torch.zeros(num_users), dist_reduce_fx="sum"
-            )
-        else:
-            self.add_state(
-                "long_hits", default=torch.tensor(0.0), dist_reduce_fx="sum"
-            )  # Initialize a scalar to store global value
-            self.add_state("users", default=torch.tensor(0.0), dist_reduce_fx="sum")
-
-        # Add long tail items as buffer
+        super().__init__(
+            k=k, num_users=num_users, dist_sync_on_step=dist_sync_on_step, **kwargs
+        )
         _, lt = self.compute_head_tail(item_interactions, pop_ratio)
         self.register_buffer("long_tail", lt)
 
-    def update(self, preds: Tensor, user_indices: Tensor, **kwargs: Any):
-        """Updates the metric state with the new batch of predictions."""
-        target: Tensor = kwargs.get("binary_relevance", torch.zeros_like(preds))
-        users: Tensor = kwargs.get("valid_users", self.valid_users(target))
-        top_k_indices: Tensor = kwargs.get(
-            f"top_{self.k}_indices", self.top_k_values_indices(preds, self.k)[1]
-        )
+    def compute_scores(
+        self, preds: Tensor, target: Tensor, top_k_rel: Tensor, **kwargs: Any
+    ) -> Tensor:
+        # Retrieve top_k_indices from kwargs
+        top_k_indices = kwargs.get(f"top_{self.k}_indices")
 
-        # Handle sampled item indices if provided
-        item_indices = kwargs.get("item_indices", None)
+        # Handle sampled item indices if provided (map local batch indices to global item IDs)
+        item_indices = kwargs.get("item_indices")
         if item_indices is not None:
             top_k_indices = torch.gather(item_indices, 1, top_k_indices)
 
-        # Create a boolean tensor where True indicates a long-tail item
-        long_tail_mask = torch.isin(top_k_indices, self.long_tail)
+        # Check which items are in the long tail
+        is_long_tail = torch.isin(top_k_indices, self.long_tail)
 
-        # Sum the number of long-tail hits per user
-        long_hits = long_tail_mask.sum(dim=1).float()  # [batch_size]
-
-        if self.compute_per_user:
-            self.long_hits.index_add_(0, user_indices, long_hits)
-
-            # Count only users with at least one interaction
-            self.users.index_add_(0, user_indices, users)
-        else:
-            self.long_hits += long_hits.sum()
-
-            # Count only users with at least one interaction
-            self.users += users.sum()
-
-    def compute(self):
-        """Computes the final metric value."""
-        if self.compute_per_user:
-            aclt = self.long_hits
-            aclt[self.users == 0] = float(
-                "nan"
-            )  # Set nan for users with no interactions
-        else:
-            aclt = (
-                self.long_hits / self.users if self.users > 0 else torch.tensor(0.0)
-            ).item()
-        return {self.name: aclt}
+        # Sum hits per user (Count of Long Tail items)
+        return is_long_tail.sum(dim=1).float()

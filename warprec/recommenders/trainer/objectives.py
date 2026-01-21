@@ -238,7 +238,11 @@ def objective_function(
                 metric_report["loss"] = epoch_loss / len(train_dataloader)
 
                 # Check for best validation score
-                current_validation_score = metric_report[validation_score]
+                score = metric_report[validation_score]
+                if isinstance(score, Tensor):
+                    current_validation_score = score.nanmean().item()
+                else:
+                    current_validation_score = score
 
                 # Maximize case
                 if mode == "max" and current_validation_score > best_validation_score:
@@ -481,7 +485,11 @@ def objective_function_ddp(config: dict) -> None:
         metric_report["loss"] = epoch_loss / (len(train_dataloader) * world_size)
 
         # Check for best validation score
-        current_validation_score = metric_report[validation_score]
+        score = metric_report[validation_score]
+        if isinstance(score, Tensor):
+            current_validation_score = score.nanmean().item()
+        else:
+            current_validation_score = score
 
         # Maximize case
         if mode == "max" and current_validation_score > best_validation_score:
@@ -634,7 +642,7 @@ def validation_report(model: Recommender, **kwargs: Any):
     # If the score has been computed per user we report only the mean
     for key, value in kwargs.items():
         if isinstance(value, Tensor):
-            kwargs[key] = value.mean()
+            kwargs[key] = value.nanmean().item()
 
     with tempfile.TemporaryDirectory() as tmpdir:
         torch.save(

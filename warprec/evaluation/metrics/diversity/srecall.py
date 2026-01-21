@@ -1,15 +1,14 @@
-# pylint: disable=arguments-differ, unused-argument, line-too-long, duplicate-code
 from typing import Any, Set
 
 import torch
 from torch import Tensor
-from warprec.evaluation.metrics.base_metric import TopKMetric
+from warprec.evaluation.metrics.base_metric import UserAverageTopKMetric
 from warprec.utils.enums import MetricBlock
 from warprec.utils.registry import metric_registry
 
 
 @metric_registry.register("SRecall")
-class SRecall(TopKMetric):
+class SRecall(UserAverageTopKMetric):
     r"""Subtopic Recall (SRecall) metric for evaluating recommender systems.
 
     It measures the proportion of a user's relevant features (or subtopics) that are present
@@ -26,7 +25,9 @@ class SRecall(TopKMetric):
         - $K$: The cutoff, i.e., the number of items in the top-k.
         - $d_i$: The i-th item recommended in the top-k.
         - ${subtopics}\left(d_{i}\right)$: The set of features (subtopics) associated with item $d_i$.
-        - $\left|\cup_{i=1}^{K} {subtopics}\left(d_{i}\right)\right|$: The cardinality of the union set of features of *relevant* items present in the top-k recommendations for the user. This represents the number of unique relevant features retrieved in the top-k.
+        - $\left|\cup_{i=1}^{K} {subtopics}\left(d_{i}\right)\right|$: The cardinality of the union set of
+            features of *relevant* items present in the top-k recommendations for the user. This represents
+            the number of unique relevant features retrieved in the top-k.
         - $n_{A}$: The total number of unique features associated with *all* relevant items for the user.
 
     The final SRecall metric is calculated as the average of these ratios across all users in the dataset.
@@ -94,143 +95,91 @@ class SRecall(TopKMetric):
 
     Attributes:
         feature_lookup (Tensor): The item feature lookup tensor.
-        ratio_feature_retrieved (Tensor): Sum, across all processed users, of the ratio between
-            the number of unique relevant features retrieved in the top-k and the total number of unique relevant features.
-        users (Tensor): The total number of processed users who have at least one relevant item.
-        compute_per_user (bool): Wether or not to compute the metric
-            per user or globally.
 
     Args:
         k (int): The cutoff for recommendations.
         num_users (int): Number of users in the training set.
         feature_lookup (Tensor): A tensor containing the features associated with each item.
             Tensor shape is expected to be [num_items, num_features].
-        *args (Any): Additional positional arguments list.
-        compute_per_user (bool): Wether or not to compute the metric
-            per user or globally.
         dist_sync_on_step (bool): Torchmetrics parameter for distributed synchronization. Defaults to `False`.
         **kwargs (Any): Additional keyword arguments dictionary.
     """
 
     _REQUIRED_COMPONENTS: Set[MetricBlock] = {
+        MetricBlock.BINARY_RELEVANCE,
         MetricBlock.VALID_USERS,
         MetricBlock.TOP_K_INDICES,
+        MetricBlock.TOP_K_BINARY_RELEVANCE,
     }
-    _CAN_COMPUTE_PER_USER: bool = True
 
     feature_lookup: Tensor
-    ratio_feature_retrieved: Tensor
-    users: Tensor
-    compute_per_user: bool
 
     def __init__(
         self,
         k: int,
         num_users: int,
         feature_lookup: Tensor,
-        *args: Any,
-        compute_per_user: bool = False,
         dist_sync_on_step: bool = False,
         **kwargs: Any,
     ):
-        super().__init__(k, dist_sync_on_step=dist_sync_on_step)
-        self.compute_per_user = compute_per_user
-
-        if self.compute_per_user:
-            self.add_state(
-                "ratio_feature_retrieved",
-                default=torch.zeros(num_users),
-                dist_reduce_fx="sum",
-            )  # Initialize a tensor to store metric value for each user
-            self.add_state(
-                "users", default=torch.zeros(num_users), dist_reduce_fx="sum"
-            )
-        else:
-            self.add_state(
-                "ratio_feature_retrieved",
-                default=torch.tensor(0.0),
-                dist_reduce_fx="sum",
-            )  # Initialize a scalar to store global value
-            self.add_state("users", torch.tensor(0.0), dist_reduce_fx="sum")
+        super().__init__(k=k, num_users=num_users, dist_sync_on_step=dist_sync_on_step)
 
         # Add feature lookup as buffer
         self.register_buffer("feature_lookup", feature_lookup)
 
-    def update(self, preds: Tensor, user_indices: Tensor, **kwargs: Any):
-        """Computes the final value of the metric."""
-        target: Tensor = kwargs.get("ground", torch.zeros_like(preds))
-        users: Tensor = kwargs.get("valid_users", self.valid_users(target))
-        top_k_indices: Tensor = kwargs.get(
-            f"top_{self.k}_indices", self.top_k_values_indices(preds, self.k)[1]
-        )
+    def compute_scores(
+        self, preds: Tensor, target: Tensor, top_k_rel: Tensor, **kwargs: Any
+    ) -> Tensor:
+        top_k_indices = kwargs.get(f"top_{self.k}_indices")
+        item_indices = kwargs.get("item_indices")
 
-        # Create a mask for items in the top-k recommendations
-        top_k_mask = torch.zeros_like(preds, dtype=torch.bool, device=preds.device)
-        top_k_mask.scatter_(
-            dim=1, index=top_k_indices, value=True
-        )  # [batch_size x num_items]
-
-        # Filter only for relevant items
-        relevant_mask = target > 0
-        relevant_top_k_mask = top_k_mask & relevant_mask  # [batch_size x num_items]
-
-        # Handle possible filtering of the lookup features
-        item_indices = kwargs.get("item_indices", None)
+        # Handle sampled item indices if provided
         if item_indices is not None:
-            sampled_features = self.feature_lookup[item_indices]
+            # We subset the feature lookup to match the batch items
+            batch_features = self.feature_lookup[
+                item_indices
+            ]  # [batch, num_samples, n_feats]
+
+            # For Top-K, we need to map indices to gather features
+            top_k_features = torch.gather(
+                batch_features,
+                1,
+                top_k_indices.unsqueeze(-1).expand(-1, -1, batch_features.size(-1)),
+            )  # [batch, k, n_feats]
+
         else:
-            sampled_features = self.feature_lookup
+            batch_features = self.feature_lookup.unsqueeze(0)  # [1, num_items, n_feats]
+            top_k_features = self.feature_lookup[top_k_indices]  # [batch, k, n_feats]
 
-        # Compute numerator as the number of features retrieved
-        # from the recommender and relevant
-        masked_features = sampled_features.unsqueeze(0) * relevant_top_k_mask.unsqueeze(
-            -1
-        )  # [batch_size x num_items x num_features]
-        user_feature_counts = masked_features.sum(dim=1)  # [batch_size x num_features]
-        unique_feature_mask = user_feature_counts > 0  # [batch_size x num_features]
-        unique_feature_counts = unique_feature_mask.sum(dim=1)  # [batch_size]
+        # Denominator: Unique features in ALL Relevant items
+        relevant_mask = (target > 0).unsqueeze(-1)  # [batch, num_items, 1]
 
-        # Compute denominator as the number of features relevant to the user
-        relevant_features = sampled_features.unsqueeze(0) * relevant_mask.unsqueeze(
-            -1
-        )  # [batch_size x num_items x num_features]
-        user_relevant_counts = relevant_features.sum(
-            dim=1
-        )  # [batch_size x num_features]
-        unique_relevant_mask = user_relevant_counts > 0  # [batch_size x num_features]
-        unique_relevant_counts = unique_relevant_mask.sum(dim=1)  # [batch_size]
+        # Mask features that are not relevant
+        relevant_features_batch = batch_features * relevant_mask
 
-        # Update the state avoiding division by zero
-        non_zero_mask = unique_relevant_counts != 0
-        if self.compute_per_user:
-            self.ratio_feature_retrieved.index_add_(
-                0,
-                user_indices[non_zero_mask],
-                unique_feature_counts[non_zero_mask]
-                / unique_relevant_counts[non_zero_mask],
-            )
+        # Count unique features: Sum over items -> if > 0, feature is present
+        # [batch, n_feats]
+        features_present_in_relevant = (relevant_features_batch.sum(dim=1) > 0).float()
 
-            # Count only users with at least one interaction
-            self.users.index_add_(0, user_indices, users)
-        else:
-            self.ratio_feature_retrieved += (
-                unique_feature_counts[non_zero_mask]
-                / unique_relevant_counts[non_zero_mask]
-            ).sum()
+        # Total unique relevant features per user
+        denominator = features_present_in_relevant.sum(dim=1)  # [batch]
 
-            # Count only users with at least one interaction
-            self.users += users.sum()
+        # Numerator: Unique features in Top-K AND Relevant items
+        top_k_rel_mask = (top_k_rel > 0).unsqueeze(-1)  # [batch, k, 1]
 
-    def compute(self):
-        if self.compute_per_user:
-            srecall = self.ratio_feature_retrieved
-            srecall[self.users == 0] = float(
-                "nan"
-            )  # Set nan for users with no interactions
-        else:
-            srecall = (
-                self.ratio_feature_retrieved / self.users
-                if self.users > 0
-                else torch.tensor(0.0)
-            ).item()
-        return {self.name: srecall}
+        # Mask features of Top-K items that are NOT relevant
+        relevant_top_k_features = top_k_features * top_k_rel_mask
+
+        # Count unique features
+        features_present_in_top_k = (relevant_top_k_features.sum(dim=1) > 0).float()
+
+        # Total unique relevant features retrieved per user
+        numerator = features_present_in_top_k.sum(dim=1)  # [batch]
+
+        # Compute Ratio
+        # Handle division by zero (users with no relevant items)
+        return torch.where(
+            denominator > 0,
+            numerator / denominator,
+            torch.tensor(0.0, device=preds.device),
+        )

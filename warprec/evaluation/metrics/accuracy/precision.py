@@ -1,15 +1,13 @@
-# pylint: disable=arguments-differ, unused-argument, line-too-long, duplicate-code
 from typing import Any, Set
 
-import torch
 from torch import Tensor
-from warprec.evaluation.metrics.base_metric import TopKMetric
+from warprec.evaluation.metrics.base_metric import UserAverageTopKMetric
 from warprec.utils.enums import MetricBlock
 from warprec.utils.registry import metric_registry
 
 
 @metric_registry.register("Precision")
-class Precision(TopKMetric):
+class Precision(UserAverageTopKMetric):
     """The Precision@k counts the number of item retrieved correctly,
         over the maximum number of possible retrieve items.
 
@@ -44,12 +42,6 @@ class Precision(TopKMetric):
 
     For further details, please refer to this `link <https://en.wikipedia.org/wiki/Precision_and_recall>`_.
 
-    Attributes:
-        correct (Tensor): The number of hits in the top-k recommendations.
-        users (Tensor): The number of users evaluated.
-        compute_per_user (bool): Wether or not to compute the metric
-            per user or globally.
-
     Args:
         k (int): The cutoff.
         num_users (int): Number of users in the training set.
@@ -65,70 +57,8 @@ class Precision(TopKMetric):
         MetricBlock.VALID_USERS,
         MetricBlock.TOP_K_BINARY_RELEVANCE,
     }
-    _CAN_COMPUTE_PER_USER: bool = True
 
-    correct: Tensor
-    users: Tensor
-    compute_per_user: bool
-
-    def __init__(
-        self,
-        k: int,
-        num_users: int,
-        *args: Any,
-        compute_per_user: bool = False,
-        dist_sync_on_step: bool = False,
-        **kwargs: Any,
-    ):
-        super().__init__(k, dist_sync_on_step)
-        self.compute_per_user = compute_per_user
-
-        if self.compute_per_user:
-            self.add_state(
-                "correct", default=torch.zeros(num_users), dist_reduce_fx="sum"
-            )  # Initialize a tensor to store metric value for each user
-            self.add_state(
-                "users", default=torch.zeros(num_users), dist_reduce_fx="sum"
-            )
-        else:
-            self.add_state(
-                "correct", default=torch.tensor(0.0), dist_reduce_fx="sum"
-            )  # Initialize a scalar to store global value
-            self.add_state("users", default=torch.tensor(0.0), dist_reduce_fx="sum")
-
-    def update(self, preds: Tensor, user_indices: Tensor, **kwargs: Any):
-        """Updates the metric state with the new batch of predictions."""
-        target: Tensor = kwargs.get("binary_relevance", torch.zeros_like(preds))
-        users: Tensor = kwargs.get("valid_users", self.valid_users(target))
-        top_k_rel: Tensor = kwargs.get(
-            f"top_{self.k}_binary_relevance",
-            self.top_k_relevance(preds, target, self.k),
-        )
-
-        if self.compute_per_user:
-            self.correct.index_add_(
-                0, user_indices, top_k_rel.sum(dim=1).float()
-            )  # Index metric values per user
-
-            # Count only users with at least one interaction
-            self.users.index_add_(0, user_indices, users)
-        else:
-            self.correct += top_k_rel.sum().float()  # Count total 'hits'
-
-            # Count only users with at least one interaction
-            self.users += users.sum()
-
-    def compute(self):
-        """Computes the final metric value."""
-        if self.compute_per_user:
-            precision = self.correct / self.k  # Return the tensor with per_user metric
-            precision[self.users == 0] = float(
-                "nan"
-            )  # Set nan for users with no interactions
-        else:
-            precision = (
-                self.correct / (self.users * self.k)
-                if self.users > 0
-                else torch.tensor(0.0)
-            ).item()  # Return the metric value
-        return {self.name: precision}
+    def compute_scores(
+        self, preds: Tensor, target: Tensor, top_k_rel: Tensor, **kwargs: Any
+    ) -> Tensor:
+        return top_k_rel.sum(dim=1).float() / self.k

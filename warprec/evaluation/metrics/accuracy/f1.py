@@ -1,4 +1,3 @@
-# pylint: disable=arguments-differ, unused-argument, line-too-long, duplicate-code
 from typing import Any
 
 import torch
@@ -30,8 +29,6 @@ class F1(TopKMetric):
     Attributes:
         metric_1 (BaseMetric): First metric to use inside F1-score computation.
         metric_2 (BaseMetric): Second metric to use inside F1-score computation.
-        compute_per_user (bool): Wether or not to compute the metric
-            per user or globally.
 
     Args:
         k (int): The number of top recommendations to consider (cutoff).
@@ -39,19 +36,14 @@ class F1(TopKMetric):
         num_items (int): Number of items in the training set.
         *args (Any): Additional arguments to pass to the parent class.
         beta (float): The weight of recall in the harmonic mean. Default is 1.0.
-        compute_per_user (bool): Wether or not to compute the metric
-            per user or globally.
         dist_sync_on_step (bool): Torchmetrics parameter.
         metric_name_1 (str): The name of the first metric. Defaults to Precision.
         metric_name_2 (str): The name of the second metric. Defaults to Recall.
         **kwargs (Any): Additional keyword arguments to pass to the parent class.
     """
 
-    _CAN_COMPUTE_PER_USER: bool = True
-
     metric_1: BaseMetric
     metric_2: BaseMetric
-    compute_per_user: bool
 
     def __init__(
         self,
@@ -60,7 +52,6 @@ class F1(TopKMetric):
         num_items: int,
         *args: Any,
         beta: float = 1.0,
-        compute_per_user: bool = False,
         dist_sync_on_step: bool = False,
         metric_name_1: str = "Precision",
         metric_name_2: str = "Recall",
@@ -69,7 +60,6 @@ class F1(TopKMetric):
         super().__init__(k, dist_sync_on_step)
         self.num_users = num_users
         self.beta = beta
-        self.compute_per_user = compute_per_user
         self.metric_name_1 = metric_name_1
         self.metric_name_2 = metric_name_2
 
@@ -79,7 +69,6 @@ class F1(TopKMetric):
             k=k,
             num_users=num_users,
             num_items=num_items,
-            compute_per_user=True,
             dist_sync_on_step=dist_sync_on_step,
             **kwargs,
         )
@@ -88,7 +77,6 @@ class F1(TopKMetric):
             k=k,
             num_users=num_users,
             num_items=num_items,
-            compute_per_user=True,
             dist_sync_on_step=dist_sync_on_step,
             **kwargs,
         )
@@ -109,6 +97,7 @@ class F1(TopKMetric):
 
     def compute(self):
         """Computes the F1 score using the two custom metrics."""
+        # Get scores from both metrics
         score_1 = self.metric_1.compute().get(
             self.metric_name_1, torch.zeros(self.num_users)
         )
@@ -116,23 +105,12 @@ class F1(TopKMetric):
             self.metric_name_2, torch.zeros(self.num_users)
         )
 
-        if self.compute_per_user:
-            f1_score = (
-                (1 + self.beta**2)
-                * (score_1 * score_2)
-                / (self.beta**2 * score_1 + score_2)
-            ).nan_to_num(0)  # In user_wise scenario the denominator might be 0
-        else:
-            f1_score = (
-                (
-                    (1 + self.beta**2)
-                    * (score_1 * score_2)
-                    / (self.beta**2 * score_1 + score_2)
-                )
-                .nan_to_num(0)
-                .mean()
-                .item()
-            )
+        # Compute the final F1 score
+        f1_score = (
+            (1 + self.beta**2)
+            * (score_1 * score_2)
+            / (self.beta**2 * score_1 + score_2)
+        ).nan_to_num(0)
         return {self.name: f1_score}
 
     @property
