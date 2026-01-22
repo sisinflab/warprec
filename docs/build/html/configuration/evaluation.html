@@ -337,13 +337,13 @@ It provides flexible control over ranking cutoffs, sampling strategies, statisti
 <li><p><strong>strategy</strong>: Evaluation strategy: <code class="docutils literal notranslate"><span class="pre">full</span></code> or <code class="docutils literal notranslate"><span class="pre">sampled</span></code>. <code class="docutils literal notranslate"><span class="pre">sampled</span></code> is recommended for large datasets. Defaults to <code class="docutils literal notranslate"><span class="pre">full</span></code>.</p></li>
 <li><p><strong>num_negatives</strong>: Number of negative samples used in the <code class="docutils literal notranslate"><span class="pre">sampled</span></code> strategy.</p></li>
 <li><p><strong>seed</strong>: Random seed used for reproducibility in sampling. Defaults to <code class="docutils literal notranslate"><span class="pre">42</span></code>.</p></li>
-<li><p><strong>compute_per_user</strong>: Whether or not to compute the metrics per user and save the results. Defaults to <code class="docutils literal notranslate"><span class="pre">False</span></code>.</p></li>
 <li><p><strong>stat_significance</strong>: Nested section defining statistical significance tests.</p></li>
 <li><p><strong>full_evaluation_on_report</strong>: Whether to perform full evaluation each epoch. Defaults to <code class="docutils literal notranslate"><span class="pre">False</span></code>.</p></li>
 <li><p><strong>max_metric_per_row</strong>: Number of metrics logged per row. Defaults to <code class="docutils literal notranslate"><span class="pre">4</span></code>.</p></li>
 <li><p><strong>beta</strong>: Beta value for F1-score computation. Defaults to <code class="docutils literal notranslate"><span class="pre">1.0</span></code>.</p></li>
 <li><p><strong>pop_ratio</strong>: Fraction of transactions considered popular. Defaults to <code class="docutils literal notranslate"><span class="pre">0.8</span></code>.</p></li>
 <li><p><strong>save_evaluation</strong>: Whether to save evaluation results. Defaults to <code class="docutils literal notranslate"><span class="pre">True</span></code>.</p></li>
+<li><p><strong>save_per_user</strong>: Whether to save per-user evaluation results. Defaults to <code class="docutils literal notranslate"><span class="pre">False</span></code>.</p></li>
 </ul>
 <div class="admonition note">
 <p class="admonition-title">Note</p>

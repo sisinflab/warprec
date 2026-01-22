@@ -21,13 +21,13 @@ Available Keywords
 - **strategy**: Evaluation strategy: ``full`` or ``sampled``. ``sampled`` is recommended for large datasets. Defaults to ``full``.
 - **num_negatives**: Number of negative samples used in the ``sampled`` strategy.
 - **seed**: Random seed used for reproducibility in sampling. Defaults to ``42``.
-- **compute_per_user**: Whether or not to compute the metrics per user and save the results. Defaults to ``False``.
 - **stat_significance**: Nested section defining statistical significance tests.
 - **full_evaluation_on_report**: Whether to perform full evaluation each epoch. Defaults to ``False``.
 - **max_metric_per_row**: Number of metrics logged per row. Defaults to ``4``.
 - **beta**: Beta value for F1-score computation. Defaults to ``1.0``.
 - **pop_ratio**: Fraction of transactions considered popular. Defaults to ``0.8``.
 - **save_evaluation**: Whether to save evaluation results. Defaults to ``True``.
+- **save_per_user**: Whether to save per-user evaluation results. Defaults to ``False``.
 
 .. note::
     The Beta and Popularity ratio parameters are set to default values commonly used in typical experimental setups. Modifying these values may affect the results of certain metrics.

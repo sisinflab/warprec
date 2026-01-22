@@ -63,10 +63,6 @@ def eval_pipeline(path: str):
         )
         model_results: Dict[str, Any] = {}
 
-    # General check for user-wise computation
-    compute_per_user = config.evaluation.compute_per_user
-    requires_per_user_evaluation = requires_stat_significance or compute_per_user
-
     # Create instance of main evaluator used to evaluate the main dataset
     evaluator = Evaluator(
         list(config.evaluation.metrics),
@@ -75,7 +71,6 @@ def eval_pipeline(path: str):
         additional_data=main_dataset.get_stash(),
         beta=config.evaluation.beta,
         pop_ratio=config.evaluation.pop_ratio,
-        compute_per_user=requires_per_user_evaluation,
         feature_lookup=main_dataset.get_features_lookup(),
         user_cluster=main_dataset.get_user_cluster(),
         item_cluster=main_dataset.get_item_cluster(),
@@ -166,7 +161,7 @@ def eval_pipeline(path: str):
         )
 
         # Check if per-user results are needed
-        if compute_per_user:
+        if config.evaluation.save_per_user:
             i_umap, _ = main_dataset.get_inverse_mappings()
             writer.write_results_per_user(
                 results,

@@ -66,15 +66,6 @@ class nDCG(UserAverageTopKMetric):
     nDCG@2 = 64.89 / 84.30 = 0.77
 
     For further details, please refer to this `link <https://en.wikipedia.org/wiki/Discounted_cumulative_gain>`_.
-
-    Args:
-        k (int): The cutoff.
-        num_users (int): Number of users in the training set.
-        *args (Any): The argument list.
-        compute_per_user (bool): Wether or not to compute the metric
-            per user or globally.
-        dist_sync_on_step (bool): Torchmetrics parameter.
-        **kwargs (Any): The keyword argument dictionary.
     """
 
     _REQUIRED_COMPONENTS: Set[MetricBlock] = {
