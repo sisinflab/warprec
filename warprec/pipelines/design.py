@@ -103,6 +103,7 @@ def design_pipeline(path: str):
         dataloader = retrieve_evaluation_dataloader(
             dataset=main_dataset,
             model=model,
+            max_seq_len=getattr(model, "max_seq_len", None),
             strategy=config.evaluation.strategy,
             num_negatives=config.evaluation.num_negatives,
         )

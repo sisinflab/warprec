@@ -180,6 +180,7 @@ def objective_function(
         dataloader = retrieve_evaluation_dataloader(
             dataset=dataset,
             model=model,
+            max_seq_len=getattr(model, "max_seq_len", None),
             strategy=strategy,
             num_negatives=num_negatives,
         )
@@ -424,6 +425,7 @@ def objective_function_ddp(config: dict) -> None:
     eval_dataloader = retrieve_evaluation_dataloader(
         dataset=dataset,
         model=unwrapped_model,
+        max_seq_len=getattr(unwrapped_model, "max_seq_len", None),
         strategy=config["strategy"],
         num_negatives=config["num_negatives"],
     )
