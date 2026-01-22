@@ -13,10 +13,10 @@ from warprec.data import Dataset
 from warprec.evaluation.metrics.base_metric import BaseMetric
 from warprec.recommenders.base_recommender import (
     Recommender,
-    SequentialRecommenderUtils,
 )
 from warprec.utils.enums import MetricBlock
 from warprec.utils.logger import logger
+from warprec.utils.helpers import model_type
 from warprec.utils.registry import metric_registry
 
 
@@ -151,14 +151,19 @@ class Evaluator:
         train_sparse = dataset.train_set.get_sparse()
         padding_idx = train_sparse.shape[1]
 
+        # Retrieve model type
+        m_type = model_type(model)
+
         for batch in dataloader:
             # Parse the batch
-            batch_data = self._parse_batch(batch, strategy, device)
+            batch_data = self._parse_batch(batch, strategy, m_type, device)
 
             eval_batch = None  # This will be the Binary Ground Truth for metrics
 
             user_indices = batch_data["user_indices"]
             context = batch_data.get("context")  # Optional (CARS only)
+            user_seq = batch_data.get("user_seq")  # Optional (Sequential only)
+            seq_len = batch_data.get("seq_len")  # Optional (Sequential only)
             candidates = batch_data.get("candidates")  # Optional (Sampled only)
 
             # Prepare the model input
@@ -169,19 +174,16 @@ class Evaluator:
                 "train_batch": train_batch,
             }
 
-            # A. Sequential Models Support
-            if isinstance(model, SequentialRecommenderUtils):
-                user_seq, seq_len = self._retrieve_sequences_for_user(
-                    dataset, user_indices.tolist(), model.max_seq_len
-                )
-                predict_kwargs["user_seq"] = user_seq.to(device)
-                predict_kwargs["seq_len"] = seq_len.to(device)
-
-            # B. Context Support
+            # Context Support
             if context is not None:
                 predict_kwargs["contexts"] = context
 
-            # C. Item Indices (used in sampled evaluation)
+            # Sequential Support
+            if user_seq is not None:
+                predict_kwargs["user_seq"] = user_seq
+                predict_kwargs["seq_len"] = seq_len
+
+            # Item Indices (used in sampled evaluation)
             if strategy == "sampled":
                 positives = batch_data["positives"]
                 negatives = batch_data["negatives"]
@@ -236,12 +238,15 @@ class Evaluator:
         if verbose:
             self._log_results(eval_start_time, model.name)
 
-    def _parse_batch(self, batch: Tuple, strategy: str, device: str) -> Dict[str, Any]:
+    def _parse_batch(
+        self, batch: Tuple, strategy: str, m_type: str, device: str
+    ) -> Dict[str, Any]:
         """Parses the batch tuple based on strategy and dimensions.
 
         Args:
             batch (Tuple): The batch to parse.
             strategy (str): The strategy used for evaluation.
+            m_type (str): The type of the model ('general', 'contextual', 'sequential').
             device (str): The device of the evaluation.
 
         Returns:
@@ -250,39 +255,47 @@ class Evaluator:
         Raises:
             ValueError: If the batch has unexpected length.
         """
+        # Model type check
+        if m_type not in ["general", "contextual", "sequential"]:
+            raise ValueError(f"Unknown model type '{m_type}' encountered.")
+
         data = {}
         batch = [x.to(device) for x in batch]  # type: ignore[assignment]
 
         # Index 0 is ALWAYS user_indices
         data["user_indices"] = batch[0]
 
-        if strategy == "full":
-            if len(batch) == 2:
+        match (strategy, m_type):
+            case ("full", "general"):
                 # Standard: (users, ground_truth)
                 data["ground_truth"] = batch[1]
-            elif len(batch) == 3:
+            case ("full", "contextual"):
                 # Contextual: (users, target_item, context)
                 data["target_item"] = batch[1]
                 data["context"] = batch[2]
-            else:
-                raise ValueError(
-                    f"Unexpected batch size {len(batch)} for Full strategy"
-                )
-
-        elif strategy == "sampled":
-            if len(batch) == 3:
+            case ("full", "sequential"):
+                # Sequential: (users, target_item, user_seq, seq_len)
+                data["target_item"] = batch[1]
+                data["user_seq"] = batch[2]
+                data["seq_len"] = batch[3]
+            case ("sampled", "general"):
                 # Standard Sampled: (users, positives, negatives)
                 data["positives"] = batch[1]
                 data["negatives"] = batch[2]
-
-            elif len(batch) == 4:
+            case ("sampled", "contextual"):
                 # Contextual Sampled: (users, positives, negatives, context)
                 data["positives"] = batch[1]
                 data["negatives"] = batch[2]
                 data["context"] = batch[3]
-            else:
+            case ("sampled", "sequential"):
+                # Sequential Sampled: (users, positives, negatives, user_seq, seq_len)
+                data["positives"] = batch[1]
+                data["negatives"] = batch[2]
+                data["user_seq"] = batch[3]
+                data["seq_len"] = batch[4]
+            case _:
                 raise ValueError(
-                    f"Unexpected batch size {len(batch)} for Sampled strategy"
+                    f"Unexpected combination of strategy '{strategy}' and model type '{m_type}'."
                 )
 
         return data
