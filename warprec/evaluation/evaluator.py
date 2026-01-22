@@ -36,8 +36,6 @@ class Evaluator:
         train_set (csr_matrix): The train set sparse matrix.
         additional_data (Optional[Dict[str, Any]]): Additional data
             passed in the initialization of metrics.
-        compute_per_user (bool): Wether or not to compute the metric
-            per user or globally.
         beta (float): The beta value used in some metrics.
         pop_ratio (float): The percentile considered popular.
         feature_lookup (Optional[Tensor]): The feature lookup tensor.
@@ -52,7 +50,6 @@ class Evaluator:
         k_values: List[int],
         train_set: csr_matrix,
         additional_data: Optional[Dict[str, Any]] = None,
-        compute_per_user: bool = False,
         beta: float = 1.0,
         pop_ratio: float = 0.8,
         feature_lookup: Optional[Tensor] = None,
@@ -71,7 +68,6 @@ class Evaluator:
 
         # Common parameters shared across metrics
         self.common_params: Dict[str, Any] = {
-            "compute_per_user": compute_per_user,
             "num_users": train_set.shape[0],
             "num_items": train_set.shape[1],
             "item_interactions": torch.tensor(train_set.getnnz(axis=0)).float(),
