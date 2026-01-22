@@ -68,8 +68,6 @@ class EvaluationConfig(BaseModel):
         strategy (Optional[str]): Evaluation strategy, either "full" or "sampled".
         num_negatives (Optional[int]): Number of negative samples to use in "sampled" strategy.
         seed (Optional[int]): Random seed for reproducibility. Used in negative sampling.
-        compute_per_user (Optional[bool]): Wether or not to save the metric computation for
-            each user.
         stat_significance (Optional[StatSignificance]): Statistical significance configuration.
         full_evaluation_on_report (Optional[bool]): Wether or not to compute all metric
             for each report produced.
@@ -78,6 +76,7 @@ class EvaluationConfig(BaseModel):
         pop_ratio (Optional[float]): The percentage of item transactions that
             will be considered popular.
         save_evaluation (Optional[bool]): Wether or not to save the evaluation.
+        save_per_user (Optional[bool]): Wether or not to save per-user evaluation.
     """
 
     top_k: List[int]
@@ -87,7 +86,6 @@ class EvaluationConfig(BaseModel):
     strategy: Optional[str] = "full"  # or "sampled"
     num_negatives: Optional[int] = 99
     seed: Optional[int] = 42
-    compute_per_user: Optional[bool] = False
     stat_significance: Optional[StatSignificance] = Field(
         default_factory=StatSignificance
     )
@@ -96,6 +94,7 @@ class EvaluationConfig(BaseModel):
     beta: Optional[float] = 1.0
     pop_ratio: Optional[float] = 0.8
     save_evaluation: Optional[bool] = True
+    save_per_user: Optional[bool] = False
 
     @field_validator("top_k")
     @classmethod
