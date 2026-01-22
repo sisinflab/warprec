@@ -91,6 +91,7 @@ def retrieve_evaluation_dataloader(
     dataset: "Dataset",
     model: "Recommender",
     strategy: str,
+    max_seq_len: int = None,
     num_negatives: int = 99,
     seed: int = 42,
 ) -> DataLoader:
@@ -100,6 +101,7 @@ def retrieve_evaluation_dataloader(
         dataset (Dataset): The dataset containing train, val, and test sets.
         model (Recommender): The model that needs to be evaluated.
         strategy (str): The evaluation strategy ('full' or 'sampled').
+        max_seq_len (int, optional): Maximum sequence length for sequential models. Defaults to None.
         num_negatives (int): The number of negative samples per positive instance.
         seed (int): Random seed for negative sampling.
 
@@ -109,28 +111,66 @@ def retrieve_evaluation_dataloader(
     Raises:
         ValueError: If an unknown evaluation strategy is provided.
     """
-    from warprec.recommenders.base_recommender import ContextRecommenderUtils  # pylint: disable = import-outside-toplevel
+    m_type = model_type(model)
 
-    # Determine if the model uses context-aware information
-    is_context = isinstance(model, ContextRecommenderUtils)
-    use_context = (
-        is_context and hasattr(model, "context_dims") and bool(model.context_dims)
-    )
-
-    match (strategy, use_context):
-        case ("full", False):
+    match (strategy, m_type):
+        case ("full", "general"):
             return dataset.get_evaluation_dataloader()
-        case ("sampled", False):
+        case ("full", "contextual"):
+            return dataset.get_contextual_evaluation_dataloader()
+        case ("full", "sequential"):
+            if max_seq_len is not None:
+                return dataset.get_sequential_evaluation_dataloader(
+                    max_seq_len=max_seq_len,
+                )
+        case ("sampled", "general"):
             return dataset.get_sampled_evaluation_dataloader(
                 num_negatives=num_negatives,
                 seed=seed,
             )
-        case ("full", True):
-            return dataset.get_contextual_evaluation_dataloader()
-        case ("sampled", True):
+        case ("sampled", "contextual"):
             return dataset.get_sampled_contextual_evaluation_dataloader(
                 num_negatives=num_negatives,
                 seed=seed,
             )
+        case ("sampled", "sequential"):
+            if max_seq_len is not None:
+                return dataset.get_sampled_sequential_evaluation_dataloader(
+                    max_seq_len=max_seq_len,
+                    num_negatives=num_negatives,
+                    seed=seed,
+                )
         case _:
-            raise ValueError(f"Unknown evaluation strategy: {strategy}")
+            raise ValueError(
+                f"Unexpected combination of strategy '{strategy}' and model type '{m_type}'."
+            )
+
+    # NOTE: This line is reached only if max_seq_len is None for sequential models.
+    # This happens during the pre-computation phase as we cannot determine the max_seq_len,
+    # which is an hyperparameter of teh model.
+    return None
+
+
+def model_type(model: "Recommender") -> str:
+    """Get the type of the recommender model.
+
+    Args:
+        model (Recommender): The recommender model instance.
+
+    Returns:
+        str: The type of the model as a string.
+    """
+    from warprec.recommenders.base_recommender import (
+        ContextRecommenderUtils,
+        SequentialRecommenderUtils,
+    )  # pylint: disable = import-outside-toplevel
+
+    if (
+        isinstance(model, ContextRecommenderUtils)
+        and hasattr(model, "context_dims")
+        and bool(model.context_dims)
+    ):
+        return "contextual"
+    if isinstance(model, SequentialRecommenderUtils):
+        return "sequential"
+    return "general"

@@ -17,6 +17,7 @@ from .helpers import (
     load_custom_modules,
     is_python_module,
     retrieve_evaluation_dataloader,
+    model_type,
 )
 from .registry import (
     splitting_registry,
@@ -50,6 +51,7 @@ __all__ = [
     "load_custom_modules",
     "is_python_module",
     "retrieve_evaluation_dataloader",
+    "model_type",
     "splitting_registry",
     "metric_registry",
     "params_registry",
