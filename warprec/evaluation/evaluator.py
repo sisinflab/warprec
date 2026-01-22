@@ -34,6 +34,8 @@ class Evaluator:
             be evaluated.
         k_values (List[int]): The cutoffs.
         train_set (csr_matrix): The train set sparse matrix.
+        additional_data (Optional[Dict[str, Any]]): Additional data
+            passed in the initialization of metrics.
         compute_per_user (bool): Wether or not to compute the metric
             per user or globally.
         beta (float): The beta value used in some metrics.
@@ -49,6 +51,7 @@ class Evaluator:
         metric_list: List[str],
         k_values: List[int],
         train_set: csr_matrix,
+        additional_data: Optional[Dict[str, Any]] = None,
         compute_per_user: bool = False,
         beta: float = 1.0,
         pop_ratio: float = 0.8,
@@ -78,6 +81,7 @@ class Evaluator:
             "pop_ratio": pop_ratio,
             "user_cluster": user_cluster,
             "item_cluster": item_cluster,
+            **additional_data,
         }
         self._init_metrics(metric_list)
 

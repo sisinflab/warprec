@@ -72,6 +72,7 @@ def eval_pipeline(path: str):
         list(config.evaluation.metrics),
         list(config.evaluation.top_k),
         train_set=main_dataset.train_set.get_sparse(),
+        additional_data=main_dataset.get_stash(),
         beta=config.evaluation.beta,
         pop_ratio=config.evaluation.pop_ratio,
         compute_per_user=requires_per_user_evaluation,
