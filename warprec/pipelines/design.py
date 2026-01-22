@@ -52,7 +52,6 @@ def design_pipeline(path: str):
         additional_data=main_dataset.get_stash(),
         beta=config.evaluation.beta,
         pop_ratio=config.evaluation.pop_ratio,
-        compute_per_user=False,
         feature_lookup=main_dataset.get_features_lookup(),
         user_cluster=main_dataset.get_user_cluster(),
         item_cluster=main_dataset.get_item_cluster(),
