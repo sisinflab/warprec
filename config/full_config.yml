@@ -172,7 +172,6 @@ evaluation:
   strategy: [full, sampled]
   num_negatives: 99
   seed: 42
-  compute_per_user: [True, False]
   stat_significance:
     paired_t_test: [True, False]
     wilcoxon_test: [True, False]
@@ -188,6 +187,7 @@ evaluation:
   beta: 1.0
   pop_ratio: 0.8
   save_evaluation: [True, False]
+  save_per_user: [True, False]
 general:
   precision: [float32, float64]
   device: [cpu, cuda]
