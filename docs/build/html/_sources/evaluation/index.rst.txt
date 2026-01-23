@@ -22,14 +22,14 @@ Traditional frameworks often rely on a **dictionary-based approach** for represe
 .. code-block:: json
 
     {
-      "user_id_1": {
-        "relevant_item_id_1": 1,
-        "relevant_item_id_2": 1,
-      },
-      "user_id_2": {
-        "relevant_item_id_30": 1,
-        "relevant_item_id_15": 1,
-      },
+      "user_id_1": [
+        ("relevant_item_id_1", 1),
+        ("relevant_item_id_2", 1),
+      ],
+      "user_id_2": [
+        ("relevant_item_id_30", 1),
+        ("relevant_item_id_15", 1),
+      ],
       // ... more users
     }
 
@@ -50,7 +50,7 @@ Example of Evaluation Flow (HitRate@k - Full Evaluation):
 Assume a scenario with a batch of size :math:`B=10` and a universe of :math:`N=10` items. Let the model's raw prediction scores and the binary ground-truth relevance be represented as tensors:
 
 .. math::
-    \mathbf{P} =
+    Pred =
     \begin{bmatrix}
     9.1 & 1.2 & 5.5 & 3.8 & 4.0 & 7.9 & 2.1 & 6.3 & 8.8 & 0.5 \\
     1.5 & 8.2 & 3.0 & 4.4 & 7.1 & 0.9 & 6.6 & 2.5 & 5.7 & 9.9 \\
@@ -58,7 +58,7 @@ Assume a scenario with a batch of size :math:`B=10` and a universe of :math:`N=1
     \end{bmatrix} \in \mathbb{R}^{B \times N}
 
 .. math::
-    \mathbf{T} =
+    Target =
     \begin{bmatrix}
     1 & 0 & 1 & 0 & 0 & 0 & 0 & 0 & 1 & 0 \\
     0 & 1 & 0 & 0 & 0 & 0 & 1 & 0 & 0 & 0 \\

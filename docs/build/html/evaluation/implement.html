@@ -247,7 +247,6 @@
 <li class="toctree-l2 current has-children current-page"><a class="current reference internal" href="#">Implementation Guide</a><input checked="" class="toctree-checkbox" id="toctree-checkbox-7" name="toctree-checkbox-7" role="switch" type="checkbox"/><label for="toctree-checkbox-7"><div class="visually-hidden">Toggle navigation of Implementation Guide</div><i class="icon"><svg><use href="#svg-arrow-right"></use></svg></i></label><ul>
 <li class="toctree-l3"><a class="reference internal" href="guide/block.html">Metric Blocks</a></li>
 <li class="toctree-l3"><a class="reference internal" href="guide/sample.html">Sampled Evaluation</a></li>
-<li class="toctree-l3"><a class="reference internal" href="guide/user.html">Per-User Evaluation</a></li>
 </ul>
 </li>
 </ul>
@@ -327,19 +326,27 @@
 <section id="metric-interfaces">
 <h2>Metric Interfaces<a class="headerlink" href="#metric-interfaces" title="Link to this heading">¶</a></h2>
 <p>First, import the main metric interfaces:</p>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">warprec.evaluation.metrics.base_metric</span><span class="w"> </span><span class="kn">import</span> <span class="n">TopKMetric</span><span class="p">,</span> <span class="n">BaseMetric</span>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">warprec.evaluation.metrics.base_metric</span><span class="w"> </span><span class="kn">import</span> <span class="n">UserAverageTopKMetric</span><span class="p">,</span> <span class="n">TopKMetric</span><span class="p">,</span> <span class="n">BaseMetric</span>
 </pre></div>
 </div>
-<p>The <strong>BaseMetric</strong> interface is sufficient for metrics that <strong>do not depend on the cutoff (K)</strong>. If your metric is ranking-based and requires a cutoff, use the <strong>TopKMetric</strong> interface.</p>
-<p>We’ll use the interfaces to implement a simple metric: <strong>Precision&#64;K</strong>.</p>
+<p>The <strong>BaseMetric</strong> interface is sufficient for metrics that <strong>do not depend on the cutoff (K)</strong>.</p>
+<p>If your metric is ranking-based and requires a cutoff, use the <strong>TopKMetric</strong> interface.</p>
+<p>Moreover, if your metric needs to be computed on a per-user basis before aggregating to a system-wide value (e.g., average over users), use the <strong>UserAverageTopKMetric</strong> interface.</p>
+<p>We’ll use the <strong>UserAverageTopKMetric</strong> interface to implement a simple metric: <strong>Precision&#64;K</strong>.</p>
 <p>For a single user, Precision&#64;K is the number of relevant items actually recommended divided by the cutoff K. The system-wide Precision&#64;K is the sum of all individual Precision&#64;K values divided by the number of users.</p>
 </section>
 <section id="defining-accumulators">
 <h2>Defining Accumulators<a class="headerlink" href="#defining-accumulators" title="Link to this heading">¶</a></h2>
 <p>Before starting the implementation, we need to define the variables we need to <em>accumulate</em> across batch iterations.</p>
+<p>For <strong>Precision&#64;K</strong>, we need to accumulate two values:</p>
 <ul class="simple">
 <li><p>The number of <strong>hits</strong> (relevant items recommended) is not fixed and must be accumulated.</p></li>
 <li><p>The number of <strong>users</strong> involved in the calculation is also not fixed and must be accumulated.</p></li>
+</ul>
+<p>Both these accumulators will be defines as tensors. This is important for two reasons:</p>
+<ul class="simple">
+<li><p>Save metric state per-user.</p></li>
+<li><p>Enable evaluation of contextual models where users appear multiple times in batches.</p></li>
 </ul>
 <div class="admonition note">
 <p class="admonition-title">Note</p>
@@ -364,7 +371,6 @@
         <span class="n">k</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
         <span class="n">num_users</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
         <span class="o">*</span><span class="n">args</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span>
-        <span class="n">compute_per_user</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
         <span class="n">dist_sync_on_step</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
         <span class="o">**</span><span class="n">kwargs</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span>
     <span class="p">):</span>
@@ -372,8 +378,8 @@
         <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">k</span><span class="p">,</span> <span class="n">dist_sync_on_step</span><span class="p">)</span>
 
         <span class="c1"># Initialize accumulators. dist_reduce_fx=&quot;sum&quot; handles accumulation across devices.</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">add_state</span><span class="p">(</span><span class="s2">&quot;hits&quot;</span><span class="p">,</span> <span class="n">default</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">(</span><span class="mf">0.0</span><span class="p">),</span> <span class="n">dist_reduce_fx</span><span class="o">=</span><span class="s2">&quot;sum&quot;</span><span class="p">)</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">add_state</span><span class="p">(</span><span class="s2">&quot;users&quot;</span><span class="p">,</span> <span class="n">default</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">(</span><span class="mf">0.0</span><span class="p">),</span> <span class="n">dist_reduce_fx</span><span class="o">=</span><span class="s2">&quot;sum&quot;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">add_state</span><span class="p">(</span><span class="s2">&quot;hits&quot;</span><span class="p">,</span> <span class="n">default</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="n">num_users</span><span class="p">),</span> <span class="n">dist_reduce_fx</span><span class="o">=</span><span class="s2">&quot;sum&quot;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">add_state</span><span class="p">(</span><span class="s2">&quot;users&quot;</span><span class="p">,</span> <span class="n">default</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="n">num_users</span><span class="p">),</span> <span class="n">dist_reduce_fx</span><span class="o">=</span><span class="s2">&quot;sum&quot;</span><span class="p">)</span>
 </pre></div>
 </div>
 </section>
@@ -384,7 +390,7 @@
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="k">def</span><span class="w"> </span><span class="nf">update</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">preds</span><span class="p">:</span> <span class="n">Tensor</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">:</span> <span class="n">Any</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Updates the metric state with the new batch of predictions.&quot;&quot;&quot;</span>
     <span class="c1"># 1. Get ground truth and ensure binary relevance</span>
-    <span class="n">target</span><span class="p">:</span> <span class="n">Tensor</span> <span class="o">=</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;ground&quot;</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">zeros_like</span><span class="p">(</span><span class="n">preds</span><span class="p">))</span>
+    <span class="n">target</span> <span class="o">=</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;ground&quot;</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">zeros_like</span><span class="p">(</span><span class="n">preds</span><span class="p">))</span>
     <span class="n">target</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">binary_relevance</span><span class="p">(</span><span class="n">target</span><span class="p">)</span>
 
     <span class="c1"># 2. Compute hits: a [batch_size, top_k] tensor of 1s (hits) and 0s (misses)</span>
@@ -392,10 +398,12 @@
 
     <span class="c1"># 3. Accumulate results</span>
     <span class="c1"># Sum the hits across all users and ranks</span>
-    <span class="bp">self</span><span class="o">.</span><span class="n">hits</span> <span class="o">+=</span> <span class="n">top_k_rel</span><span class="o">.</span><span class="n">sum</span><span class="p">()</span>
+    <span class="n">hits</span> <span class="o">+=</span> <span class="n">top_k_rel</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">dim</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span> <span class="o">/</span> <span class="bp">self</span><span class="o">.</span><span class="n">k</span> <span class="c1"># Precision contribution per user</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">hits</span><span class="o">.</span><span class="n">index_add_</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">user_indices</span><span class="p">,</span> <span class="n">hits</span><span class="p">)</span>
 
     <span class="c1"># Count only valid users (those with at least one relevant item)</span>
-    <span class="bp">self</span><span class="o">.</span><span class="n">users</span> <span class="o">+=</span> <span class="bp">self</span><span class="o">.</span><span class="n">valid_users</span><span class="p">(</span><span class="n">target</span><span class="p">)</span>
+    <span class="n">users</span> <span class="o">+=</span> <span class="bp">self</span><span class="o">.</span><span class="n">valid_users</span><span class="p">(</span><span class="n">target</span><span class="p">)</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">users</span><span class="o">.</span><span class="n">index_add_</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">user_indices</span><span class="p">,</span> <span class="n">users</span><span class="p">)</span>
 </pre></div>
 </div>
 </section>
@@ -404,15 +412,11 @@
 <p>The <code class="docutils literal notranslate"><span class="pre">.compute()</span></code> method is called to calculate the final metric value based on the accumulated states. WarpRec expects this method to return a <strong>dictionary</strong> where the key is the metric’s name and the value is the computed result.</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="k">def</span><span class="w"> </span><span class="nf">compute</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Computes the final metric value.&quot;&quot;&quot;</span>
-    <span class="c1"># Precision@K = Total Hits / (Total Users * K)</span>
-    <span class="n">precision</span> <span class="o">=</span> <span class="p">(</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">hits</span> <span class="o">/</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">users</span> <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">k</span><span class="p">)</span>
-        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">users</span> <span class="o">&gt;</span> <span class="mi">0</span>
-        <span class="k">else</span> <span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">(</span><span class="mf">0.0</span><span class="p">)</span>
-    <span class="p">)</span>
-
-    <span class="c1"># Return the final value as a dictionary</span>
-    <span class="k">return</span> <span class="p">{</span><span class="bp">self</span><span class="o">.</span><span class="n">name</span><span class="p">:</span> <span class="n">precision</span><span class="o">.</span><span class="n">item</span><span class="p">()}</span>
+    <span class="n">scores</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">scores</span> <span class="o">/</span> <span class="bp">self</span><span class="o">.</span><span class="n">user_interactions</span> <span class="c1"># Normalize the metric score</span>
+    <span class="n">scores</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">user_interactions</span> <span class="o">==</span> <span class="mi">0</span><span class="p">]</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span>
+        <span class="s2">&quot;nan&quot;</span>
+    <span class="p">)</span>  <span class="c1"># Set nan for users with no interactions</span>
+    <span class="k">return</span> <span class="p">{</span><span class="bp">self</span><span class="o">.</span><span class="n">name</span><span class="p">:</span> <span class="n">scores</span><span class="p">}</span>
 </pre></div>
 </div>
 <p>And that’s it! Your custom <strong>Precision&#64;K</strong> metric is complete. You can now register it in the <em>metric_registry</em> to make it available for configuration during training.</p>

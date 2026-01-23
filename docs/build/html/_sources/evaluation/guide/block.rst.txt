@@ -43,8 +43,10 @@ An example implementation is shown below:
         )
 
         # 2. Update internal accumulators
-        self.hits += top_k_rel.sum()
-        self.users += users
+        hits += top_k_rel.sum(dim=1) / self.k # Precision contribution per user
+        self.hits.index_add_(0, user_indices, batch_scores)
+        users += self.valid_users(target)
+        self.users.index_add_(0, user_indices, users)
 
 With these adjustments, the metric now operates on shared data structures, eliminating redundant computations and improving evaluation efficiency.
 
