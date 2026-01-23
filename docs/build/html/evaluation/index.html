@@ -247,7 +247,6 @@
 <li class="toctree-l2 has-children"><a class="reference internal" href="implement.html">Implementation Guide</a><input class="toctree-checkbox" id="toctree-checkbox-7" name="toctree-checkbox-7" role="switch" type="checkbox"/><label for="toctree-checkbox-7"><div class="visually-hidden">Toggle navigation of Implementation Guide</div><i class="icon"><svg><use href="#svg-arrow-right"></use></svg></i></label><ul>
 <li class="toctree-l3"><a class="reference internal" href="guide/block.html">Metric Blocks</a></li>
 <li class="toctree-l3"><a class="reference internal" href="guide/sample.html">Sampled Evaluation</a></li>
-<li class="toctree-l3"><a class="reference internal" href="guide/user.html">Per-User Evaluation</a></li>
 </ul>
 </li>
 </ul>
@@ -328,14 +327,14 @@
 <h2>Optimizing Metric Computation: Batch-Oriented Architecture<a class="headerlink" href="#optimizing-metric-computation-batch-oriented-architecture" title="Link to this heading">¶</a></h2>
 <p>Traditional frameworks often rely on a <strong>dictionary-based approach</strong> for representing ground-truth relevance, typically structured as follows:</p>
 <div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
-<span class="w">  </span><span class="nt">&quot;user_id_1&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
-<span class="w">    </span><span class="nt">&quot;relevant_item_id_1&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span>
-<span class="w">    </span><span class="nt">&quot;relevant_item_id_2&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span>
-<span class="w">  </span><span class="p">},</span>
-<span class="w">  </span><span class="nt">&quot;user_id_2&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
-<span class="w">    </span><span class="nt">&quot;relevant_item_id_30&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span>
-<span class="w">    </span><span class="nt">&quot;relevant_item_id_15&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span>
-<span class="w">  </span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;user_id_1&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
+<span class="w">    </span><span class="err">(</span><span class="s2">&quot;relevant_item_id_1&quot;</span><span class="p">,</span><span class="w"> </span><span class="mi">1</span><span class="err">)</span><span class="p">,</span>
+<span class="w">    </span><span class="err">(</span><span class="s2">&quot;relevant_item_id_2&quot;</span><span class="p">,</span><span class="w"> </span><span class="mi">1</span><span class="err">)</span><span class="p">,</span>
+<span class="w">  </span><span class="p">],</span>
+<span class="w">  </span><span class="nt">&quot;user_id_2&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
+<span class="w">    </span><span class="err">(</span><span class="s2">&quot;relevant_item_id_30&quot;</span><span class="p">,</span><span class="w"> </span><span class="mi">1</span><span class="err">)</span><span class="p">,</span>
+<span class="w">    </span><span class="err">(</span><span class="s2">&quot;relevant_item_id_15&quot;</span><span class="p">,</span><span class="w"> </span><span class="mi">1</span><span class="err">)</span><span class="p">,</span>
+<span class="w">  </span><span class="p">],</span>
 <span class="w">  </span><span class="c1">// ... more users</span>
 <span class="p">}</span>
 </pre></div>
@@ -351,7 +350,7 @@
 <p>Assume a scenario with a batch of size <span class="math notranslate nohighlight">\(B=10\)</span> and a universe of <span class="math notranslate nohighlight">\(N=10\)</span> items. Let the model’s raw prediction scores and the binary ground-truth relevance be represented as tensors:</p>
 <div class="math-wrapper docutils container">
 <div class="math notranslate nohighlight">
-\[\begin{split}\mathbf{P} =
+\[\begin{split}Pred =
 \begin{bmatrix}
 9.1 &amp; 1.2 &amp; 5.5 &amp; 3.8 &amp; 4.0 &amp; 7.9 &amp; 2.1 &amp; 6.3 &amp; 8.8 &amp; 0.5 \\
 1.5 &amp; 8.2 &amp; 3.0 &amp; 4.4 &amp; 7.1 &amp; 0.9 &amp; 6.6 &amp; 2.5 &amp; 5.7 &amp; 9.9 \\
@@ -360,7 +359,7 @@
 </div>
 <div class="math-wrapper docutils container">
 <div class="math notranslate nohighlight">
-\[\begin{split}\mathbf{T} =
+\[\begin{split}Target =
 \begin{bmatrix}
 1 &amp; 0 &amp; 1 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 1 &amp; 0 \\
 0 &amp; 1 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 1 &amp; 0 &amp; 0 &amp; 0 \\

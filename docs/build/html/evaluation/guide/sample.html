@@ -3,7 +3,7 @@
   <head><meta charset="utf-8"/>
     <meta name="viewport" content="width=device-width,initial-scale=1"/>
     <meta name="color-scheme" content="light dark"><meta name="viewport" content="width=device-width, initial-scale=1" />
-<link rel="index" title="Index" href="../../genindex.html" /><link rel="search" title="Search" href="../../search.html" /><link rel="next" title="Per-User Evaluation" href="user.html" /><link rel="prev" title="Metric Blocks" href="block.html" />
+<link rel="index" title="Index" href="../../genindex.html" /><link rel="search" title="Search" href="../../search.html" /><link rel="next" title="Callbacks" href="../../callback/index.html" /><link rel="prev" title="Metric Blocks" href="block.html" />
 
     <!-- Generated with Sphinx 8.2.3 and Furo 2025.07.19 -->
         <title>Sampled Evaluation - WarpRec</title>
@@ -247,7 +247,6 @@
 <li class="toctree-l2 current has-children"><a class="reference internal" href="../implement.html">Implementation Guide</a><input checked="" class="toctree-checkbox" id="toctree-checkbox-7" name="toctree-checkbox-7" role="switch" type="checkbox"/><label for="toctree-checkbox-7"><div class="visually-hidden">Toggle navigation of Implementation Guide</div><i class="icon"><svg><use href="#svg-arrow-right"></use></svg></i></label><ul class="current">
 <li class="toctree-l3"><a class="reference internal" href="block.html">Metric Blocks</a></li>
 <li class="toctree-l3 current current-page"><a class="current reference internal" href="#">Sampled Evaluation</a></li>
-<li class="toctree-l3"><a class="reference internal" href="user.html">Per-User Evaluation</a></li>
 </ul>
 </li>
 </ul>
@@ -369,6 +368,11 @@
 </div>
 <p>In this setting, <span class="math notranslate nohighlight">\(-\infty\)</span> is used for <strong>padding</strong>. Since WarpRec requires rectangular tensors, the number of positive labels must be padded to match across users.</p>
 <p>The final evaluation results will differ from those obtained with full evaluation, but the main advantages of sampled evaluation are <strong>reduced computational cost and lower memory usage</strong>.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>WarpRec during the sampled evaluation applies a <em>random shuffling</em> of positives and negatives. This prevents any bias that could arise from the ordering of items in the sampled tensors.
+The shuffling is seeded for reproducibility, ensuring consistent results across multiple runs and <em>removing any ordering bias</em>. For simplicity, this is not shown in the equations above.</p>
+</div>
 <section id="implementation-details">
 <h2>Implementation details<a class="headerlink" href="#implementation-details" title="Link to this heading">¶</a></h2>
 <p>When implementing a new metric, it is important to account for the possibility of sampled evaluation.</p>
@@ -393,12 +397,12 @@
       <footer>
 
         <div class="related-pages">
-          <a class="next-page" href="user.html">
+          <a class="next-page" href="../../callback/index.html">
               <div class="page-info">
                 <div class="context">
                   <span>Next</span>
                 </div>
-                <div class="title">Per-User Evaluation</div>
+                <div class="title">Callbacks</div>
               </div>
               <svg class="furo-related-icon"><use href="#svg-arrow-right"></use></svg>
             </a>

@@ -54,6 +54,10 @@ In this setting, :math:`-\infty` is used for **padding**. Since WarpRec requires
 
 The final evaluation results will differ from those obtained with full evaluation, but the main advantages of sampled evaluation are **reduced computational cost and lower memory usage**.
 
+.. note::
+    WarpRec during the sampled evaluation applies a *random shuffling* of positives and negatives. This prevents any bias that could arise from the ordering of items in the sampled tensors.
+    The shuffling is seeded for reproducibility, ensuring consistent results across multiple runs and *removing any ordering bias*. For simplicity, this is not shown in the equations above.
+
 Implementation details
 ----------------------
 

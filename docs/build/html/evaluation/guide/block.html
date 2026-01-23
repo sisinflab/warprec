@@ -247,7 +247,6 @@
 <li class="toctree-l2 current has-children"><a class="reference internal" href="../implement.html">Implementation Guide</a><input checked="" class="toctree-checkbox" id="toctree-checkbox-7" name="toctree-checkbox-7" role="switch" type="checkbox"/><label for="toctree-checkbox-7"><div class="visually-hidden">Toggle navigation of Implementation Guide</div><i class="icon"><svg><use href="#svg-arrow-right"></use></svg></i></label><ul class="current">
 <li class="toctree-l3 current current-page"><a class="current reference internal" href="#">Metric Blocks</a></li>
 <li class="toctree-l3"><a class="reference internal" href="sample.html">Sampled Evaluation</a></li>
-<li class="toctree-l3"><a class="reference internal" href="user.html">Per-User Evaluation</a></li>
 </ul>
 </li>
 </ul>
@@ -353,8 +352,10 @@ An example implementation is shown below:</p>
     <span class="p">)</span>
 
     <span class="c1"># 2. Update internal accumulators</span>
-    <span class="bp">self</span><span class="o">.</span><span class="n">hits</span> <span class="o">+=</span> <span class="n">top_k_rel</span><span class="o">.</span><span class="n">sum</span><span class="p">()</span>
-    <span class="bp">self</span><span class="o">.</span><span class="n">users</span> <span class="o">+=</span> <span class="n">users</span>
+    <span class="n">hits</span> <span class="o">+=</span> <span class="n">top_k_rel</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">dim</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span> <span class="o">/</span> <span class="bp">self</span><span class="o">.</span><span class="n">k</span> <span class="c1"># Precision contribution per user</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">hits</span><span class="o">.</span><span class="n">index_add_</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">user_indices</span><span class="p">,</span> <span class="n">batch_scores</span><span class="p">)</span>
+    <span class="n">users</span> <span class="o">+=</span> <span class="bp">self</span><span class="o">.</span><span class="n">valid_users</span><span class="p">(</span><span class="n">target</span><span class="p">)</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">users</span><span class="o">.</span><span class="n">index_add_</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">user_indices</span><span class="p">,</span> <span class="n">users</span><span class="p">)</span>
 </pre></div>
 </div>
 <p>With these adjustments, the metric now operates on shared data structures, eliminating redundant computations and improving evaluation efficiency.</p>
