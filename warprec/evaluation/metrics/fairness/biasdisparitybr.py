@@ -94,10 +94,9 @@ class BiasDisparityBR(TopKMetric):
     def update(self, preds: Tensor, user_indices: Tensor, **kwargs: Any):
         top_k_indices = kwargs.get(f"top_{self.k}_indices")
 
-        # Handle sampled item indices if provided (map local batch indices to global item IDs)
+        # Remap top_k_indices to global
         item_indices = kwargs.get("item_indices")
-        if item_indices is not None:
-            top_k_indices = torch.gather(item_indices, 1, top_k_indices)
+        top_k_indices = self.remap_indices(top_k_indices, item_indices)
 
         # Get User Clusters (expanded to match top-k shape)
         # user_indices: [Batch] -> [Batch, 1] -> [Batch, K] -> [Batch * K]

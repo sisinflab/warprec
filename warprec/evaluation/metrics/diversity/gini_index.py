@@ -59,10 +59,9 @@ class Gini(TopKMetric):
         # Retrieve top_k_indices from kwargs
         top_k_indices = kwargs.get(f"top_{self.k}_indices")
 
-        # Handle sampled item indices if provided (map local batch indices to global item IDs)
+        # Remap top_k_indices to global
         item_indices = kwargs.get("item_indices")
-        if item_indices is not None:
-            top_k_indices = torch.gather(item_indices, 1, top_k_indices)
+        top_k_indices = self.remap_indices(top_k_indices, item_indices)
 
         batch_size = top_k_indices.size(0)
         self.free_norm += torch.tensor(batch_size * self.k, dtype=torch.float)

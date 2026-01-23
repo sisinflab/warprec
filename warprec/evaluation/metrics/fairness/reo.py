@@ -120,18 +120,20 @@ class REO(TopKMetric):
         top_k_rel = kwargs.get(f"top_{self.k}_binary_relevance")
         item_indices = kwargs.get("item_indices")
 
+        # Remap top_k_indices to global
+        item_indices = kwargs.get("item_indices")
+        top_k_indices = self.remap_indices(top_k_indices, item_indices)
+
         # Identify Global Indices for Recommendations
         if item_indices is not None:
-            top_k_indices_global = torch.gather(item_indices, 1, top_k_indices)
             rows, cols = target.nonzero(as_tuple=True)
             positive_indices_global = item_indices[rows, cols]
         else:
-            top_k_indices_global = top_k_indices
             _, positive_indices_global = target.nonzero(as_tuple=True)
 
         # Identify Relevant Recommended Items
         rel_mask = top_k_rel > 0
-        relevant_rec_indices_global = top_k_indices_global[rel_mask]
+        relevant_rec_indices_global = top_k_indices[rel_mask]
 
         # Map to Clusters
         rec_clusters = self.item_clusters[relevant_rec_indices_global]
