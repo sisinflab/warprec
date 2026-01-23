@@ -236,6 +236,8 @@ class NeuMF(RecomModel):
         epochs (INT_FIELD): List of values for epochs.
         learning_rate (FLOAT_FIELD): List of values for learning rate.
         neg_samples (INT_FIELD): List of values for negative sampling.
+        need_single_trial_validation (ClassVar[bool]): Whether or not to check if a Ray Tune
+            trial parameter are valid.
     """
 
     mf_embedding_size: INT_FIELD
@@ -250,6 +252,7 @@ class NeuMF(RecomModel):
     epochs: INT_FIELD
     learning_rate: FLOAT_FIELD
     neg_samples: INT_FIELD
+    need_single_trial_validation: ClassVar[bool] = True
 
     @field_validator("mf_embedding_size")
     @classmethod
@@ -322,3 +325,60 @@ class NeuMF(RecomModel):
     def check_neg_samples(cls, v: list):
         """Validate neg_samples."""
         return validate_greater_equal_than_zero(cls, v, "neg_samples")
+
+    def validate_all_combinations(self):
+        """Validates if at least one valid combination of hyperparameters exists.
+        For NeuMF, checks that there is at least one combination where either
+        mf_train or mlp_train is True.
+
+        Raises:
+            ValueError: If no valid combination of hyperparameters can be formed.
+        """
+        # Extract parameters to check, removing searching strategy strings
+        mf_train_list = self._clean_param_list(self.mf_train)
+        mlp_train_list = self._clean_param_list(self.mlp_train)
+
+        # Iter over all possible combinations of the boolean flags
+        has_valid_combination = False
+        for mf_val, mlp_val in product(mf_train_list, mlp_train_list):
+            # Check if at least one part of the network is trained
+            if mf_val or mlp_val:
+                has_valid_combination = True
+                break
+
+        if not has_valid_combination:
+            raise ValueError(
+                "No valid hyperparameter combination found for NeuMF. "
+                "Ensure there's at least one combination where 'mf_train' or 'mlp_train' is True. "
+                "Currently, all defined combinations have both flags set to False."
+            )
+
+    def validate_single_trial_params(self):
+        """Validates that at least one training path (MF or MLP) is enabled
+        for a single trial's parameter set.
+
+        Raises:
+            ValueError: If both mf_train and mlp_train are False.
+        """
+        # Clean parameters from search space information (e.g. remove 'choice', 'grid_search')
+        mf_train_clean = (
+            self.mf_train[1:]
+            if self.mf_train and isinstance(self.mf_train[0], str)
+            else self.mf_train
+        )
+        mlp_train_clean = (
+            self.mlp_train[1:]
+            if self.mlp_train and isinstance(self.mlp_train[0], str)
+            else self.mlp_train
+        )
+
+        # Extract the actual boolean values for the current trial
+        is_mf_train = mf_train_clean[0]
+        is_mlp_train = mlp_train_clean[0]
+
+        # Check if at least one is True
+        if not is_mf_train and not is_mlp_train:
+            raise ValueError(
+                "Invalid NeuMF configuration: Both 'mf_train' and 'mlp_train' are False. "
+                "At least one part of the model (Matrix Factorization or MLP) must be trained."
+            )
