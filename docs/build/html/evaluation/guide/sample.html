@@ -382,10 +382,9 @@ The shuffling is seeded for reproducibility, ensuring consistent results across 
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Updates the metric state with the new batch of predictions.&quot;&quot;&quot;</span>
     <span class="c1"># Standard metric update code here</span>
 
-    <span class="c1"># Handle sampled item indices if provided</span>
-    <span class="n">item_indices</span> <span class="o">=</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;item_indices&quot;</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
-    <span class="k">if</span> <span class="n">item_indices</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
-        <span class="n">top_k_indices</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">gather</span><span class="p">(</span><span class="n">item_indices</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="n">top_k_indices</span><span class="p">)</span>
+    <span class="c1"># Remap top_k_indices to global</span>
+    <span class="n">item_indices</span> <span class="o">=</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;item_indices&quot;</span><span class="p">)</span>
+    <span class="n">top_k_indices</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">remap_indices</span><span class="p">(</span><span class="n">top_k_indices</span><span class="p">,</span> <span class="n">item_indices</span><span class="p">)</span>
 </pre></div>
 </div>
 <p>With this adjustment, the metric can correctly handle both full and sampled evaluation.</p>
