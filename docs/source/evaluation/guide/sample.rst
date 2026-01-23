@@ -73,9 +73,8 @@ Conversely, if a metric depends on the actual indices of recommended items, the 
         """Updates the metric state with the new batch of predictions."""
         # Standard metric update code here
 
-        # Handle sampled item indices if provided
-        item_indices = kwargs.get("item_indices", None)
-        if item_indices is not None:
-            top_k_indices = torch.gather(item_indices, 1, top_k_indices)
+        # Remap top_k_indices to global
+        item_indices = kwargs.get("item_indices")
+        top_k_indices = self.remap_indices(top_k_indices, item_indices)
 
 With this adjustment, the metric can correctly handle both full and sampled evaluation.

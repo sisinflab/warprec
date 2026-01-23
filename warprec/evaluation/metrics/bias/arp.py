@@ -1,6 +1,5 @@
 from typing import Any, Set
 
-import torch
 from torch import Tensor
 from warprec.evaluation.metrics.base_metric import UserAverageTopKMetric
 from warprec.utils.enums import MetricBlock
@@ -90,10 +89,9 @@ class ARP(UserAverageTopKMetric):
         # Retrieve top_k_indices from kwargs
         top_k_indices = kwargs.get(f"top_{self.k}_indices")
 
-        # Handle sampled item indices if provided (map local batch indices to global item IDs)
+        # Remap top_k_indices to global
         item_indices = kwargs.get("item_indices")
-        if item_indices is not None:
-            top_k_indices = torch.gather(item_indices, 1, top_k_indices)
+        top_k_indices = self.remap_indices(top_k_indices, item_indices)
 
         # Retrieve popularity for the recommended items
         # Shape: [batch_size, k]

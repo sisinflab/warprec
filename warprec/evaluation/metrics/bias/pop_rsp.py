@@ -108,10 +108,9 @@ class PopRSP(TopKMetric):
         top_k_indices = kwargs.get(f"top_{self.k}_indices")
         item_indices = kwargs.get("item_indices")
 
-        # Handle sampled item indices if provided
-        item_indices = kwargs.get("item_indices", None)
-        if item_indices is not None:
-            top_k_indices = torch.gather(item_indices, 1, top_k_indices)
+        # Remap top_k_indices to global
+        item_indices = kwargs.get("item_indices")
+        top_k_indices = self.remap_indices(top_k_indices, item_indices)
 
         # Accumulate short head and long tail recommendations
         self.short_recs += torch.isin(top_k_indices, self.short_head).sum().float()

@@ -358,6 +358,20 @@ class TopKMetric(BaseMetric):
         ranks = torch.arange(k)
         return torch.sum(1.0 / torch.log2(ranks.float() + 2))
 
+    def remap_indices(self, top_k_indices: Tensor, item_indices: Tensor) -> Tensor:
+        """Remap local batch indices to global item IDs if item_indices is provided.
+
+        Args:
+            top_k_indices (Tensor): The top k indices tensor.
+            item_indices (Tensor): The global item indices tensor.
+
+        Returns:
+            Tensor: The remapped top k indices tensor.
+        """
+        if item_indices is not None:
+            return torch.gather(item_indices, 1, top_k_indices)
+        return top_k_indices
+
 
 class UserAverageTopKMetric(TopKMetric):
     """The definition of a User Average Top-K metric.
