@@ -1,15 +1,14 @@
 import os
 import uuid
 import math
-from typing import List, Tuple, Optional, Dict, Any, Callable
-from copy import deepcopy
+from typing import List, Tuple, Optional, Dict, Callable, Union, Any
+from pathlib import Path
 
 import torch
 import numpy as np
 import ray
 from ray import tune
-from ray.tune import Tuner, TuneConfig, CheckpointConfig
-from ray.tune import RunConfig
+from ray.tune import Tuner, TuneConfig, CheckpointConfig, RunConfig
 from ray.tune.stopper import Stopper
 from ray.tune.experiment import Trial
 
@@ -19,20 +18,10 @@ from warprec.recommenders.trainer.objectives import (
     objective_function,
     driver_function_ddp,
 )
-from warprec.recommenders.trainer.search_algorithm_wrapper import (
-    BaseSearchWrapper,
-)
-from warprec.recommenders.trainer.scheduler_wrapper import (
-    BaseSchedulerWrapper,
-)
 from warprec.utils.config import (
     TrainConfiguration,
     RecomModel,
     DashboardConfig,
-    Wandb,
-    CodeCarbon,
-    MLflow,
-    LRScheduler,
 )
 from warprec.utils.helpers import validation_metric
 from warprec.utils.callback import WarpRecCallback
@@ -45,127 +34,36 @@ from warprec.utils.registry import (
     search_space_registry,
 )
 
+# Optional imports handling
 try:
-    # pylint: disable = ungrouped-imports
     from ray.air.integrations.wandb import WandbLoggerCallback
     from ray.air.integrations.mlflow import MLflowLoggerCallback
     from codecarbon import EmissionsTracker
 
     DASHBOARD_AVAILABLE = True
-
 except ImportError:
     DASHBOARD_AVAILABLE = False
 
 
 class Trainer:
-    """This class will be used to train a model and optimize the hyperparameters.
+    """Trainer class for training and hyperparameter optimization using Ray Tune.
+    Delegates configuration details to TrainConfiguration object.
 
     Args:
-        custom_callback (WarpRecCallback): The custom callback to use
-            during training and evaluation. Default is an empty
-            WarpRecCallback instance.
-        custom_models (Optional[str | List[str]]): The list of custom models to load.
-        enable_wandb (bool): Wether or not to enable Wandb.
-        team_wandb (Optional[str]): The name of the Wandb team.
-        project_wandb (str): The name of the Wandb project.
-        group_wandb (Optional[str]): The name of the Wandb group.
-        api_key_file_wandb (Optional[str]): The path to the Wandb
-            API key file.
-        api_key_wandb (Optional[str]): The Wandb API key.
-        excludes_wandb (Optional[List[str]] ): The list of parameters to exclude
-            from Wandb logging.
-        log_config_wandb (bool): Wether or not to log the config
-            in Wandb.
-        upload_checkpoints_wandb (bool): Wether or not to upload
-            checkpoints to Wandb.
-        enable_codecarbon (bool): Wether or not to enable CodeCarbon.
-        save_to_api_codecarbon (bool): Wether or not to save
-            CodeCarbon results to API.
-        save_to_file_codecarbon (bool): Wether or not to save
-            CodeCarbon results to file.
-        output_dir_codecarbon (str): The directory to save
-            CodeCarbon results.
-        tracking_mode_codecarbon (str): The tracking mode for
-            CodeCarbon. Either "machine" or "process".
-        enable_mlflow (bool): Wether or not to enable MLflow.
-        tracking_uri_mlflow (str): The URI of the MLflow tracking server.
-        registry_uri_mlflow (str): The URI of the MLflow model registry.
-        experiment_name_mlflow (Optional[str]): The name of the MLflow experiment.
-        tags_mlflow (Optional[dict]): The tags to be added to the MLflow run.
-        tracking_token_mlflow (Optional[str]): The token for MLflow tracking.
-        save_artifacts_mlflow (bool): Wether or not to save artifacts
-            in MLflow.
-        config (TrainConfiguration): The configuration of the experiment.
+        config (TrainConfiguration): The complete configuration object.
+        custom_callback (WarpRecCallback): Custom callback for training/eval.
+        custom_models (Optional[Union[str, List[str]]]): List of custom models to load.
     """
 
     def __init__(
         self,
+        config: TrainConfiguration,
         custom_callback: WarpRecCallback = WarpRecCallback(),
-        custom_models: Optional[str | List[str]] = None,
-        enable_wandb: bool = False,
-        team_wandb: Optional[str] = None,
-        project_wandb: str = "WarpRec",
-        group_wandb: Optional[str] = None,
-        api_key_file_wandb: Optional[str] = None,
-        api_key_wandb: Optional[str] = None,
-        excludes_wandb: Optional[List[str]] = None,
-        log_config_wandb: bool = False,
-        upload_checkpoints_wandb: bool = False,
-        enable_codecarbon: bool = False,
-        save_to_api_codecarbon: bool = False,
-        save_to_file_codecarbon: bool = False,
-        output_dir_codecarbon: str = "./",
-        tracking_mode_codecarbon: str = "machine",
-        enable_mlflow: bool = False,
-        tracking_uri_mlflow: str = "mlruns/",
-        registry_uri_mlflow: str = "mlruns/",
-        experiment_name_mlflow: Optional[str] = None,
-        tags_mlflow: Optional[dict] = None,
-        tracking_token_mlflow: Optional[str] = None,
-        save_artifacts_mlflow: bool = False,
-        config: TrainConfiguration = None,
+        custom_models: Optional[Union[str, List[str]]] = None,
     ):
-        if custom_models is None:
-            custom_models = []
-        if excludes_wandb is None:
-            excludes_wandb = []
-        if tags_mlflow is None:
-            tags_mlflow = {}
-        if config:
-            dashboard = config.dashboard
-        else:
-            dashboard = DashboardConfig(
-                wandb=Wandb(
-                    enabled=enable_wandb,
-                    team=team_wandb,
-                    project=project_wandb,
-                    group=group_wandb,
-                    api_key_file=api_key_file_wandb,
-                    api_key=api_key_wandb,
-                    excludes=excludes_wandb,
-                    log_config=log_config_wandb,
-                    upload_checkpoints=upload_checkpoints_wandb,
-                ),
-                codecarbon=CodeCarbon(
-                    enabled=enable_codecarbon,
-                    save_to_api=save_to_api_codecarbon,
-                    save_to_file=save_to_file_codecarbon,
-                    output_dir=output_dir_codecarbon,
-                    tracking_mode=tracking_mode_codecarbon,
-                ),
-                mlflow=MLflow(
-                    enabled=enable_mlflow,
-                    tracking_uri=tracking_uri_mlflow,
-                    registry_uri=registry_uri_mlflow,
-                    experiment_name=experiment_name_mlflow,
-                    tags=tags_mlflow,
-                    tracking_token=tracking_token_mlflow,
-                    save_artifacts=save_artifacts_mlflow,
-                ),
-            )
-
-        self._callbacks = self._setup_callbacks(dashboard, custom_callback)
-        self._custom_models = custom_models
+        self.config = config
+        self._custom_models = custom_models or []
+        self._callbacks = self._setup_callbacks(config.dashboard, custom_callback)
 
     def train_single_fold(
         self,
@@ -210,16 +108,10 @@ class Trainer:
                 - Recommender: The model trained.
                 - dict: Summary report of the training.
         """
-        # Retrieve common parameters
+
         mode = params.optimization.properties.mode
-        seed = params.optimization.properties.seed
-        low_memory = params.meta.low_memory
 
-        # Retrieve lr scheduling
-        lr_scheduler = params.optimization.lr_scheduler
-
-        # Prepare the Tuner
-        tuner = self._prepare_trainable(
+        tuner = self._setup_tuner(
             model_name=model_name,
             params=params,
             dataset=dataset,
@@ -227,112 +119,52 @@ class Trainer:
             topk=topk,
             validation_score=validation_score,
             storage_path=storage_path,
-            low_memory=low_memory,
             num_gpus=num_gpus,
             device=device,
             evaluation_strategy=evaluation_strategy,
             num_negatives=num_negatives,
-            lr_scheduler=lr_scheduler,
             beta=beta,
             pop_ratio=pop_ratio,
             ray_verbose=ray_verbose,
         )
 
-        # Run the hyperparameter tuning
         results = tuner.fit()
 
-        # Retrieve results
-        result_df = results.get_dataframe(
-            filter_metric=validation_score, filter_mode=mode
-        )
-        analysis = results._experiment_analysis  # pylint: disable = protected-access
-
-        # Retrieve the correct DF row
-        if mode == "max":
-            best_iteration_row = result_df.loc[result_df[validation_score].idxmax()]
-        else:
-            best_iteration_row = result_df.loc[result_df[validation_score].idxmin()]
-
-        # Extract best trial information
-        best_trial_id = best_iteration_row["trial_id"]
-        best_iter = best_iteration_row["training_iteration"]
-        best_params = best_iteration_row.filter(regex="^config/").to_dict()
-        best_params = {k.replace("config/", ""): v for k, v in best_params.items()}
-        best_score = best_iteration_row[validation_score]
-
-        # Find the best checkpoint through ExperimentAnalysis object
-        for trial in analysis.trials:
-            if trial.trial_id == best_trial_id:
-                checkpoints = analysis._get_trial_checkpoints_with_metric(trial)  # pylint: disable = protected-access
-                best_checkpoint, _ = max(checkpoints, key=lambda item: item[1])  # type: ignore[arg-type, return-value]
-
-                break  # Nothing more to do
-
-        # Early check for no successful trials
-        if (
-            mode == "max"
-            and best_score == -torch.inf
-            or mode == "min"
-            and best_score == torch.inf
-        ):
-            logger.negative(
-                f"All trials failed during training for {model_name}. Shutting down the Trainer."
-            )
+        # Check if any trial succeeded
+        if results.errors and len(results) == len(results.errors):
+            logger.negative(f"All trials failed for {model_name}.")
             return None, {}
 
-        # Memory report
-        result_df = results.get_dataframe()
-        if "ram_peak_mb" in result_df.columns and "vram_peak_mb" in result_df.columns:
-            additional_report = {
-                "RAM Mean Usage (MB)": result_df["ram_peak_mb"].mean(),
-                "RAM STD Usage (MB)": result_df["ram_peak_mb"].std(),
-                "RAM Max Usage (MB)": result_df["ram_peak_mb"].max(),
-                "RAM Min Usage (MB)": result_df["ram_peak_mb"].min(),
-                "VRAM Mean Usage (MB)": result_df["vram_peak_mb"].mean(),
-                "VRAM STD Usage (MB)": result_df["vram_peak_mb"].std(),
-                "VRAM Max Usage (MB)": result_df["vram_peak_mb"].max(),
-                "VRAM Min Usage (MB)": result_df["vram_peak_mb"].min(),
-            }
-        else:
-            additional_report = {}
+        # Retrieve best result using Ray API
+        best_result = results.get_best_result(metric=validation_score, mode=mode)
+
+        if not best_result:
+            logger.negative(f"Could not determine best result for {model_name}.")
+            return None, {}
+
+        best_params = best_result.config
+        # Remove internal ray config keys if present
+        best_params = {k: v for k, v in best_params.items() if not k.startswith("_")}
+        best_score = best_result.metrics.get(validation_score)
+        best_iter = best_result.metrics.get("training_iteration")
 
         logger.msg(
-            f"Best params combination: {best_params} with a score of "
-            f"{validation_score}: {best_score} "
-            f"during iteration {best_iter}."
+            f"Best params: {best_params} | Score ({validation_score}): {best_score} "
+            f"| Iteration: {best_iter}"
         )
-        logger.positive(f"Hyperparameter tuning for {model_name} ended successfully.")
+        logger.positive(f"HPO for {model_name} ended successfully.")
 
-        # Retrieve best model from checkpoint
-        if best_checkpoint is not None:
-            checkpoint_path = os.path.join(
-                best_checkpoint.to_directory(), "checkpoint.pt"
-            )
-        else:
-            # In this case we are interfacing with the Trainer API
-            checkpoint_path = os.path.join(
-                results.get_best_result(metric=validation_score, mode=mode).metrics[
-                    "checkpoint_path"
-                ],
-                "checkpoint.pt",
-            )
-
-        checkpoint_data = torch.load(checkpoint_path, weights_only=True)
-        model_state = checkpoint_data["model_state"]
-
-        best_model = model_registry.get(
-            name=model_name,
-            params=best_params,
-            interactions=dataset.train_set,
-            device=device,
-            seed=seed,
-            info=dataset.info(),
-            **dataset.get_stash(),
+        # Load Best Model
+        best_model = self._load_best_model(
+            model_name,
+            best_result,
+            best_params,
+            dataset,
+            device,
+            params.optimization.properties.seed,
         )
-        best_model.load_state_dict(model_state)
 
-        report = self._create_report(results, additional_report, best_model)
-
+        report = self._create_report(results, best_model)
         return best_model, report
 
     def train_multiple_fold(
@@ -380,15 +212,10 @@ class Trainer:
                 - Dict: The best hyperparameters found.
                 - Dict: Summary report of the training.
         """
-        # Retrieve common parameters
+
         mode = params.optimization.properties.mode
-        low_memory = params.meta.low_memory
 
-        # Retrieve lr scheduling
-        lr_scheduler = params.optimization.lr_scheduler
-
-        # Prepare the Tuner
-        tuner = self._prepare_trainable(
+        tuner = self._setup_tuner(
             model_name=model_name,
             params=params,
             dataset=datasets,
@@ -396,281 +223,114 @@ class Trainer:
             topk=topk,
             validation_score=validation_score,
             storage_path=storage_path,
-            low_memory=low_memory,
             num_gpus=num_gpus,
             device=device,
             evaluation_strategy=evaluation_strategy,
             num_negatives=num_negatives,
-            lr_scheduler=lr_scheduler,
             beta=beta,
             pop_ratio=pop_ratio,
             ray_verbose=ray_verbose,
         )
 
-        # Run the hyperparameter tuning
         results = tuner.fit()
-
-        # Find the hyperparameter configuration that performed better
         result_df = results.get_dataframe(
-            filter_metric=validation_score,
-            filter_mode=mode,
+            filter_metric=validation_score, filter_mode=mode
         )
 
-        # Early check for no successful trials
-        if (
-            mode == "max"
-            and result_df[validation_score].max() == -torch.inf
-            or mode == "min"
-            and result_df[validation_score].min() == torch.inf
+        if result_df.empty or (
+            mode == "max" and result_df[validation_score].max() == -torch.inf
         ):
-            logger.negative(
-                f"All trials failed during training for {model_name}. Shutting down the Trainer."
-            )
+            logger.negative(f"All trials failed for {model_name}.")
             return None, {}
 
-        hyperparam_cols = [
-            col
-            for col in result_df.columns
-            if col.startswith("config/") and col != "config/fold"
-        ]
-
-        # WarpRec params with be treated as lists, we need
-        # to convert them to tuple in order to hash them
-        for col in hyperparam_cols:
-            if col in result_df.columns and result_df[col].dtype == "object":
-                result_df[col] = result_df[col].apply(
-                    lambda x: tuple(x) if isinstance(x, list) else x
-                )
-
-        # Aggregate results over hyperparameter combinations and compute mean and std
-        agg_df = (
-            result_df.groupby(hyperparam_cols)
-            .agg(
-                mean_score=(validation_score, "mean"),
-                std_score=(validation_score, "std"),
-                num_folds_completed=(validation_score, "size"),
-                desired_training_iterations=("training_iteration", desired_training_it),
-            )
-            .reset_index()
+        # Aggregate results logic
+        best_hyperparameters, best_stats = self._aggregate_cv_results(
+            result_df, validation_score, mode, desired_training_it
         )
-
-        # Order by mean to find best hyperparameters (ordering will be dependent on mode)
-        best_config_df = agg_df.sort_values(by="mean_score", ascending=mode == "min")
-        best_hyperparameters_row = best_config_df.iloc[0]
-        best_mean_score = best_hyperparameters_row["mean_score"]
-        best_std_score = best_hyperparameters_row["std_score"]
-        desired_iteration = math.ceil(
-            best_hyperparameters_row["desired_training_iterations"]
-        )
-
-        # Memory report
-        additional_report = {
-            "RAM Mean Usage (MB)": result_df["ram_peak_mb"].mean(),
-            "RAM STD Usage (MB)": result_df["ram_peak_mb"].std(),
-            "RAM Max Usage (MB)": result_df["ram_peak_mb"].max(),
-            "RAM Min Usage (MB)": result_df["ram_peak_mb"].min(),
-            "VRAM Mean Usage (MB)": result_df["vram_peak_mb"].mean(),
-            "VRAM STD Usage (MB)": result_df["vram_peak_mb"].std(),
-            "VRAM Max Usage (MB)": result_df["vram_peak_mb"].max(),
-            "VRAM Min Usage (MB)": result_df["vram_peak_mb"].min(),
-        }
-
-        # Clear hyperparam format and create the clean dictionary
-        best_hyperparameters: Dict[str, Any] = {}
-        best_hyperparameters["iterations"] = desired_iteration
-        for col in hyperparam_cols:
-            param_name = col.replace("config/", "")
-            value = best_hyperparameters_row[col]
-
-            if isinstance(value, np.floating) and value == int(value):
-                # This check converts aggregated hyperparameters that
-                # can become floating values back to integers
-                best_hyperparameters[param_name] = int(value)
-            elif isinstance(value, np.integer):
-                best_hyperparameters[param_name] = int(value)
-            elif isinstance(value, np.floating):
-                best_hyperparameters[param_name] = float(value)
-            elif isinstance(value, np.bool_):
-                best_hyperparameters[param_name] = bool(value)
-            else:
-                best_hyperparameters[param_name] = value
 
         logger.msg(
-            f"Best params combination: {best_hyperparameters} with an average score of "
-            f"{validation_score}: {best_mean_score} and "
-            f"STD: {best_std_score} on validation set. "
-            f"The {desired_training_it} of training iteration is: {desired_iteration}"
+            f"Best params: {best_hyperparameters} | Avg Score: {best_stats['mean']} "
+            f"| Std: {best_stats['std']} | Iterations: {best_hyperparameters['iterations']}"
         )
-        logger.positive(f"Hyperparameter tuning for {model_name} ended successfully.")
+        logger.positive(f"CV HPO for {model_name} ended successfully.")
 
-        report = self._create_report(results, additional_report)
-
+        report = self._create_report(results)
         return best_hyperparameters, report
 
-    def parse_params(self, params: RecomModel, num_folds: int = 0) -> dict:
-        """This method parses the parameters of a model.
-
-        From simple lists it creates the correct data format for
-        Ray Tune hyperparameter optimization. The correct format depends
-        on the search space desired. An example could be:
-        ['uniform', 5.0, 100.0] -> tune.uniform(5.0, 100.0)
-
-        Args:
-            params (RecomModel): The parameters of the model.
-            num_folds (int): The number of cross-validation folds.
-
-        Returns:
-            dict: The parameters in the Ray Tune format.
-        """
-        tune_params = {}
-        params_copy = deepcopy(params.model_dump())
-        if "meta" in params_copy:
-            params_copy.pop("meta")
-        if "optimization" in params_copy:
-            params_copy.pop("optimization")
-        if "early_stopping" in params_copy:
-            params_copy.pop("early_stopping")
-
-        for k, v in params_copy.items():
-            if v[0] is not SearchSpace.CHOICE:
-                tune_params[k] = search_space_registry.get(v[0])(*v[1:])
-            else:
-                tune_params[k] = search_space_registry.get(v[0])(v[1:])
-
-        if num_folds > 0:
-            tune_params["fold"] = tune.grid_search(list(range(num_folds)))
-
-        return tune_params
-
-    def trail_name(self, model_name: str):
-        """Custom name generator function."""
-
-        def _trial_name_creator(trial: Trial):  # pylint: disable = unused-argument
-            random_id = str(uuid.uuid4())[:8]
-
-            return f"{model_name}_{random_id}"
-
-        return _trial_name_creator
-
-    def _prepare_trainable(
+    def _setup_tuner(
         self,
         model_name: str,
         params: RecomModel,
-        dataset: Dataset | List[Dataset],
+        dataset: Union[Dataset, List[Dataset]],
         metrics: List[str],
         topk: List[int],
         validation_score: str,
         storage_path: str,
-        low_memory: bool = False,
-        num_gpus: Optional[int] = None,
-        device: str = "cpu",
-        evaluation_strategy: str = "full",
-        num_negatives: int = 99,
-        lr_scheduler: Optional[LRScheduler] = None,
-        beta: float = 1.0,
-        pop_ratio: float = 0.8,
-        ray_verbose: int = 1,
+        num_gpus: Optional[int],
+        device: str,
+        evaluation_strategy: str,
+        num_negatives: int,
+        beta: float,
+        pop_ratio: float,
+        ray_verbose: int,
     ) -> Tuner:
-        # Retrieve common information
-        properties = params.optimization.properties.model_dump()
-        optimization = params.optimization
-        mode = params.optimization.properties.mode
-        validation_metric_name, validation_top_k = validation_metric(validation_score)
+        """Prepares the Ray Tuner instance.
 
-        # Log the start of HPO setup
-        logger.separator()
-        num_folds = 0
-        if isinstance(dataset, list):
-            num_folds = len(dataset)
-            logger.msg(
-                f"Starting hyperparameter tuning for {model_name} "
-                f"with {optimization.strategy.name} strategy "
-                f"and with {optimization.scheduler.name} scheduler. "
-                f"Number of validation folds: {num_folds}"
-            )
-        else:
-            logger.msg(
-                f"Starting hyperparameter tuning for {model_name} "
-                f"with {optimization.strategy.name} strategy "
-                f"and with {optimization.scheduler.name} scheduler."
-            )
+        Args:
+            model_name (str): The name of the model to optimize.
+            params (RecomModel): The parameters of the model.
+            dataset (Union[Dataset, List[Dataset]]): The dataset(s) to use during
+                training.
+            metrics (List[str]): List of metrics to compute on each report.
+            topk (List[int]): List of cutoffs for metrics.
+            validation_score (str): The metric to monitor during training.
+            storage_path (str): Path to store Ray results.
+            num_gpus (Optional[int]): The number of gpus per trial.
+            device (str): The device that will be used for tensor operations.
+            evaluation_strategy (str): Evaluation strategy, either "full" or "sampled".
+            num_negatives (int): Number of negative samples to use in "sampled" strategy.
+            beta (float): The beta value for the evaluation.
+            pop_ratio (float): The pop ratio value for the evaluation.
+            ray_verbose (int): The Ray level of verbosity.
 
-        # Check for multi-gpu scenario
-        trainable: Callable
-        if num_gpus is not None and num_gpus > 1:
-            logger.msg(
-                f"Detected multi-GPU scenario with {num_gpus} GPUs. "
-                f"Using Distributed Data Parallel training."
-            )
-            obj_function = tune.with_parameters(
-                driver_function_ddp,
-                model_name=model_name,
-                dataset_folds=ray.put(dataset),
-                metrics=metrics,
-                topk=topk,
-                validation_top_k=validation_top_k,
-                validation_metric_name=validation_metric_name,
-                mode=mode,
-                low_memory=low_memory,
-                num_gpus=num_gpus,
-                storage_path=storage_path,
-                num_to_keep=optimization.checkpoint_to_keep,
-                strategy=evaluation_strategy,
-                num_negatives=num_negatives,
-                lr_scheduler=lr_scheduler,
-                seed=optimization.properties.seed,
-                block_size=optimization.block_size,
-                chunk_size=optimization.chunk_size,
-                beta=beta,
-                pop_ratio=pop_ratio,
-                custom_models=self._custom_models,
-            )
-            trainable = tune.with_resources(
-                obj_function,
-                resources={"cpu": optimization.max_cpu_count},
-            )
-        else:
-            obj_function = tune.with_parameters(
-                objective_function,
-                model_name=model_name,
-                dataset_folds=ray.put(dataset),
-                metrics=metrics,
-                topk=topk,
-                validation_top_k=validation_top_k,
-                validation_metric_name=validation_metric_name,
-                mode=mode,
-                device=device,
-                low_memory=low_memory,
-                strategy=evaluation_strategy,
-                num_negatives=num_negatives,
-                lr_scheduler=lr_scheduler,
-                seed=optimization.properties.seed,
-                block_size=optimization.block_size,
-                chunk_size=optimization.chunk_size,
-                beta=beta,
-                pop_ratio=pop_ratio,
-                custom_models=self._custom_models,
-            )
-            trainable = tune.with_resources(
-                obj_function,
-                resources={
-                    "cpu": optimization.max_cpu_count // optimization.parallel_trials,
-                    "gpu": min(
-                        torch.cuda.device_count() / optimization.parallel_trials, 1.0
-                    ),
-                },
-            )
+        Returns:
+            Tuner: The configured Ray Tuner instance.
+        """
 
-        search_alg: BaseSearchWrapper = search_algorithm_registry.get(
-            optimization.strategy, **properties
-        )
-        scheduler: BaseSchedulerWrapper = scheduler_registry.get(
-            optimization.scheduler, **properties
+        opt_config = params.optimization
+        mode = opt_config.properties.mode
+
+        # Determine resources and objective function
+        resources = self._get_resources(opt_config.parallel_trials, num_gpus)
+        trainable = self._get_objective_function(
+            model_name=model_name,
+            params=params,
+            dataset=dataset,
+            metrics=metrics,
+            topk=topk,
+            validation_score=validation_score,
+            storage_path=storage_path,
+            num_gpus=num_gpus,
+            device=device,
+            evaluation_strategy=evaluation_strategy,
+            num_negatives=num_negatives,
+            beta=beta,
+            pop_ratio=pop_ratio,
+            resources=resources,
         )
 
-        early_stopping: Stopper = None
-        if params.early_stopping is not None:
-            early_stopping = EarlyStopping(
+        # Search Algorithm & Scheduler
+        search_alg = search_algorithm_registry.get(
+            opt_config.strategy, **opt_config.properties.model_dump()
+        )
+        scheduler = scheduler_registry.get(
+            opt_config.scheduler, **opt_config.properties.model_dump()
+        )
+
+        # Early Stopping
+        stopper = None
+        if params.early_stopping:
+            stopper = EarlyStopping(
                 metric=validation_score,
                 mode=mode,
                 patience=params.early_stopping.patience,
@@ -678,14 +338,14 @@ class Trainer:
                 min_delta=params.early_stopping.min_delta,
             )
 
-        # Configure Ray Tune Tuner
+        # Configs
         run_config = RunConfig(
-            stop=early_stopping,
+            stop=stopper,
             callbacks=self._callbacks,
             verbose=ray_verbose,
             storage_path=storage_path,
             checkpoint_config=CheckpointConfig(
-                num_to_keep=optimization.checkpoint_to_keep,
+                num_to_keep=opt_config.checkpoint_to_keep,
                 checkpoint_score_attribute=validation_score,
                 checkpoint_score_order=mode,
             ),
@@ -696,87 +356,292 @@ class Trainer:
             mode=mode,
             search_alg=search_alg,  # type: ignore[arg-type]
             scheduler=scheduler,  # type: ignore[arg-type]
-            num_samples=optimization.num_samples,
-            trial_name_creator=self.trail_name(model_name),
+            num_samples=opt_config.num_samples,
+            trial_name_creator=self._trial_name_creator(model_name),
         )
 
-        tuner = Tuner(
+        num_folds = len(dataset) if isinstance(dataset, list) else 0
+        param_space = self._parse_params(params, num_folds)
+
+        return Tuner(
             trainable,
-            param_space=self.parse_params(params, num_folds),
+            param_space=param_space,
             tune_config=tune_config,
             run_config=run_config,
         )
 
-        return tuner
+    def _get_resources(
+        self, num_trials: int, num_gpus: Optional[int]
+    ) -> Dict[str, float]:
+        """Calculates resource allocation per trial.
+
+        Args:
+            num_trials (int): The number of parallel trials.
+            num_gpus (Optional[int]): The number of gpus per trial.
+
+        Returns:
+            Dict[str, float]: Resources dictionary for Ray Tune.
+        """
+        # Get available resources
+        resources = ray.available_resources()
+        available_cpus = resources.get("CPU", 0)
+        available_gpus = resources.get("GPU", 0)
+
+        if num_gpus is not None and num_gpus > 1:
+            return {"cpu": available_cpus}
+
+        return {
+            "cpu": available_cpus / num_trials,
+            "gpu": min(available_gpus / num_trials, 1.0) if num_gpus else 0.0,
+        }
+
+    def _get_objective_function(self, **kwargs: Any) -> Callable:
+        """Selects and wraps the appropriate objective function (Standard or DDP).
+
+        Args:
+            **kwargs (Any): Keyword arguments for the objective functions.
+
+        Returns:
+            Callable: The wrapped objective function.
+        """
+        num_gpus = kwargs.get("num_gpus")
+        params = kwargs.get("params")
+        opt_config = params.optimization
+        validation_metric_name, validation_top_k = validation_metric(
+            kwargs["validation_score"]
+        )
+
+        common_args = {
+            "model_name": kwargs["model_name"],
+            "dataset_folds": ray.put(kwargs["dataset"]),
+            "metrics": kwargs["metrics"],
+            "topk": kwargs["topk"],
+            "validation_top_k": validation_top_k,
+            "validation_metric_name": validation_metric_name,
+            "mode": opt_config.properties.mode,
+            "low_memory": params.meta.low_memory,
+            "strategy": kwargs["evaluation_strategy"],
+            "num_negatives": kwargs["num_negatives"],
+            "lr_scheduler": opt_config.lr_scheduler,
+            "seed": opt_config.properties.seed,
+            "block_size": opt_config.block_size,
+            "chunk_size": opt_config.chunk_size,
+            "beta": kwargs["beta"],
+            "pop_ratio": kwargs["pop_ratio"],
+            "custom_models": self._custom_models,
+        }
+
+        if num_gpus is not None and num_gpus > 1:
+            logger.msg(f"Using Distributed Data Parallel with {num_gpus} GPUs.")
+            obj_func = tune.with_parameters(
+                driver_function_ddp,
+                num_gpus=num_gpus,
+                storage_path=kwargs["storage_path"],
+                num_to_keep=opt_config.checkpoint_to_keep,
+                **common_args,
+            )
+        else:
+            obj_func = tune.with_parameters(
+                objective_function, device=kwargs["device"], **common_args
+            )
+
+        return tune.with_resources(obj_func, resources=kwargs["resources"])
+
+    def _load_best_model(
+        self, model_name, best_result, best_params, dataset, device, seed
+    ):
+        """Loads the model state from the best checkpoint."""
+        checkpoint = best_result.checkpoint
+        if not checkpoint:
+            # Fallback if checkpoint object is missing but path exists in metrics
+            ckpt_path = (
+                Path(best_result.metrics.get("checkpoint_path", "")) / "checkpoint.pt"
+            )
+        else:
+            ckpt_path = Path(checkpoint.to_directory()) / "checkpoint.pt"
+
+        if not ckpt_path.exists():
+            logger.warning(f"Checkpoint not found at {ckpt_path}")
+            return None
+
+        # Load checkpoint on CPU, move model later
+        checkpoint_data = torch.load(ckpt_path, weights_only=True, map_location="cpu")
+
+        # Retrieve state dict
+        if "model_state" in checkpoint_data:
+            state_dict = checkpoint_data["model_state"]
+        elif "state_dict" in checkpoint_data:
+            state_dict = checkpoint_data["state_dict"]
+        else:
+            state_dict = checkpoint_data
+
+        # Initialize the model and load checkpoint
+        model = model_registry.get(
+            name=model_name,
+            params=best_params,
+            interactions=dataset.train_set,
+            device=device,
+            seed=seed,
+            info=dataset.info(),
+            **dataset.get_stash(),
+        )
+        model.load_state_dict(state_dict)
+        return model
+
+    def _aggregate_cv_results(self, df, metric, mode, desired_it_stat):
+        """Aggregates Cross-Validation results to find best hyperparameters."""
+        hyperparam_cols = [
+            c for c in df.columns if c.startswith("config/") and c != "config/fold"
+        ]
+
+        # Fix list hashing for groupby
+        for col in hyperparam_cols:
+            if df[col].dtype == "object":
+                df[col] = df[col].apply(
+                    lambda x: tuple(x) if isinstance(x, list) else x
+                )
+
+        agg_df = (
+            df.groupby(hyperparam_cols)
+            .agg(
+                mean_score=(metric, "mean"),
+                std_score=(metric, "std"),
+                desired_training_iterations=("training_iteration", desired_it_stat),
+            )
+            .reset_index()
+        )
+
+        best_row = agg_df.sort_values(by="mean_score", ascending=(mode == "min")).iloc[
+            0
+        ]
+
+        # Reconstruct clean params dict
+        best_params = {"iterations": math.ceil(best_row["desired_training_iterations"])}
+        for col in hyperparam_cols:
+            key = col.replace("config/", "")
+            val = best_row[col]
+            # Type restoration logic
+            if isinstance(val, (np.integer, int)):
+                best_params[key] = int(val)
+            elif isinstance(val, (np.floating, float)):
+                best_params[key] = int(val) if val.is_integer() else float(val)
+            elif isinstance(val, (np.bool_, bool)):
+                best_params[key] = bool(val)
+            else:
+                best_params[key] = val
+
+        stats = {"mean": best_row["mean_score"], "std": best_row["std_score"]}
+        return best_params, stats
+
+    def _parse_params(self, params: RecomModel, num_folds: int = 0) -> dict:
+        """Parses model parameters into Ray Tune search space."""
+        tune_params = {}
+        # Exclude metadata fields
+        exclude = {"meta", "optimization", "early_stopping"}
+        clean_params = {
+            k: v for k, v in params.model_dump().items() if k not in exclude
+        }
+
+        for k, v in clean_params.items():
+            if isinstance(v, list) and len(v) > 0:
+                space_type = v[0]
+                args = v[1:]
+                if space_type == SearchSpace.CHOICE:
+                    tune_params[k] = search_space_registry.get(space_type)(args)
+                else:
+                    tune_params[k] = search_space_registry.get(space_type)(*args)
+            else:
+                tune_params[k] = v  # Static parameter
+
+        if num_folds > 0:
+            tune_params["fold"] = tune.grid_search(list(range(num_folds)))
+
+        return tune_params
+
+    def _trial_name_creator(self, model_name: str):
+        def _creator(trial: Trial):
+            return f"{model_name}_{str(uuid.uuid4())[:8]}"
+
+        return _creator
 
     def _setup_callbacks(
         self, dashboard: DashboardConfig, custom_callback: WarpRecCallback
-    ) -> List[tune.Callback]:
-        callbacks: List[tune.Callback] = [custom_callback]
+    ) -> List[tune.Callback | WarpRecCallback]:
+        callbacks: List[tune.Callback | WarpRecCallback] = [custom_callback]
+        if not DASHBOARD_AVAILABLE:
+            if any(
+                [
+                    dashboard.wandb.enabled,
+                    dashboard.codecarbon.enabled,
+                    dashboard.mlflow.enabled,
+                ]
+            ):
+                logger.attention(
+                    "WarpRec dashboard extra has not been installed. "
+                    "Dashboards will not be available during training."
+                )
+            return callbacks
 
-        if DASHBOARD_AVAILABLE:
-            if dashboard.wandb.enabled:
-                callbacks.append(
-                    WandbLoggerCallback(
-                        project=dashboard.wandb.project,
-                        group=dashboard.wandb.group,
-                        api_key_file=dashboard.wandb.api_key_file,
-                        api_key=dashboard.wandb.api_key,
-                        excludes=dashboard.wandb.excludes,
-                        log_config=dashboard.wandb.log_config,
-                        upload_checkpoints=dashboard.wandb.upload_checkpoints,
-                        entity=dashboard.wandb.team,  # Will be passed to wandb.init()
-                    )
+        if dashboard.wandb.enabled:
+            callbacks.append(
+                WandbLoggerCallback(
+                    project=dashboard.wandb.project,
+                    group=dashboard.wandb.group,
+                    api_key_file=dashboard.wandb.api_key_file,
+                    api_key=dashboard.wandb.api_key,
+                    excludes=dashboard.wandb.excludes,
+                    log_config=dashboard.wandb.log_config,
+                    upload_checkpoints=dashboard.wandb.upload_checkpoints,
+                    entity=dashboard.wandb.team,
                 )
-            if dashboard.codecarbon.enabled:
-                callbacks.append(
-                    CodeCarbonCallback(
-                        save_to_api=dashboard.codecarbon.save_to_api,
-                        save_to_file=dashboard.codecarbon.save_to_file,
-                        output_dir=dashboard.codecarbon.output_dir,
-                        tracking_mode=dashboard.codecarbon.tracking_mode,
-                    )
+            )
+        if dashboard.codecarbon.enabled:
+            callbacks.append(
+                CodeCarbonCallback(
+                    save_to_api=dashboard.codecarbon.save_to_api,
+                    save_to_file=dashboard.codecarbon.save_to_file,
+                    output_dir=dashboard.codecarbon.output_dir,
+                    tracking_mode=dashboard.codecarbon.tracking_mode,
                 )
-            if dashboard.mlflow.enabled:
-                callbacks.append(
-                    MLflowLoggerCallback(
-                        tracking_uri=dashboard.mlflow.tracking_uri,
-                        registry_uri=dashboard.mlflow.registry_uri,
-                        experiment_name=dashboard.mlflow.experiment_name,
-                        tags=dashboard.mlflow.tags,
-                        tracking_token=dashboard.mlflow.tracking_token,
-                        save_artifact=dashboard.mlflow.save_artifacts,
-                    )
+            )
+        if dashboard.mlflow.enabled:
+            callbacks.append(
+                MLflowLoggerCallback(
+                    tracking_uri=dashboard.mlflow.tracking_uri,
+                    registry_uri=dashboard.mlflow.registry_uri,
+                    experiment_name=dashboard.mlflow.experiment_name,
+                    tags=dashboard.mlflow.tags,
+                    tracking_token=dashboard.mlflow.tracking_token,
+                    save_artifact=dashboard.mlflow.save_artifacts,
                 )
-        elif any(
-            [
-                dashboard.wandb.enabled,
-                dashboard.codecarbon.enabled,
-                dashboard.mlflow.enabled,
-            ]
-        ):
-            logger.attention(
-                "WarpRec dashboard extra has not been installed. "
-                "Dashboards will not be available during training."
             )
         return callbacks
 
     def _create_report(
-        self,
-        results: tune.ResultGrid,
-        additional_reports: Dict[str, float],
-        model: Optional[Recommender] = None,
+        self, results: tune.ResultGrid, model: Optional[Recommender] = None
     ) -> dict:
-        # Produce the report of the training
-        successful_trials = [r for r in results if not r.error]  # type: ignore[attr-defined]
         report = {}
-        if successful_trials:
-            total_trial_times = [r.metrics["time_total_s"] for r in successful_trials]
-            report["Average Trial Time"] = sum(total_trial_times) / len(
-                total_trial_times
-            )
 
-        if model is not None:
+        # Memory stats from dataframe
+        df = results.get_dataframe()
+        mem_cols = ["ram_peak_mb", "vram_peak_mb"]
+        for col in mem_cols:
+            if col in df.columns:
+                prefix = "RAM" if "ram" in col and "vram" not in col else "VRAM"
+                report[f"{prefix} Mean Usage (MB)"] = df[col].mean()
+                report[f"{prefix} Max Usage (MB)"] = df[col].max()
+
+        # Time stats
+        successful_trials = [r for r in results if not r.error]  # type: ignore[attr-defined]
+        if successful_trials:
+            times = [r.metrics.get("time_total_s", 0) for r in successful_trials]
+            report["Average Trial Time (s)"] = sum(times) / len(times)
+
+        # Model stats
+        report["Total Params (Best Model)"] = np.nan
+        report["Trainable Params (Best Model)"] = np.nan
+
+        if model:
             report["Total Params (Best Model)"] = sum(
                 p.numel() for p in model.parameters()
             )
@@ -784,79 +649,51 @@ class Trainer:
                 p.numel() for p in model.parameters() if p.requires_grad
             )
 
-        # Add additional reports
-        report.update(additional_reports)
-
         return report
 
 
 class CodeCarbonCallback(tune.Callback):
-    """Custom CodeCarbon callback for Ray Tune.
-
-    Args:
-        save_to_api (bool): Wether or not to save results to API.
-        save_to_file (bool): Wether or not to save results to file.
-        output_dir (str): The path to the directory where
-            to save results locally.
-        tracking_mode (str): The mode to use during the tracking process.
-    """
+    """Custom CodeCarbon callback for Ray Tune."""
 
     def __init__(
         self,
-        save_to_api: bool = False,
-        save_to_file: bool = False,
-        output_dir: str = "./",
-        tracking_mode: str = "machine",
+        save_to_api=False,
+        save_to_file=False,
+        output_dir="./",
+        tracking_mode="machine",
     ):
-        self.trackers: Dict[str, EmissionsTracker] = {}
         self.save_to_api = save_to_api
         self.save_to_file = save_to_file
         self.output_dir = output_dir
         self.tracking_mode = tracking_mode
-
-        # Check if local output dir exists
+        self.trackers: Dict[str, EmissionsTracker] = {}
         os.makedirs(self.output_dir, exist_ok=True)
 
-    def on_trial_start(self, iteration, trials, trial, **info):  # pylint: disable = unused-argument
+    def on_trial_start(self, iteration, trials, trial, **info):
         tracker = EmissionsTracker(
             save_to_api=self.save_to_api,
             save_to_file=self.save_to_file,
             output_dir=self.output_dir,
             tracking_mode=self.tracking_mode,
+            log_level="error",  # Reduce noise
         )
         tracker.start()
         self.trackers[trial.trial_id] = tracker
 
-    def on_trial_complete(self, iteration, trials, trial, **info):  # pylint: disable = unused-argument
-        tracker = self.trackers.pop(trial.trial_id, None)
-        if tracker:
-            tracker.stop()
+    def on_trial_complete(self, iteration, trials, trial, **info):
+        self._stop_tracker(trial.trial_id)
 
-    def on_trial_fail(self, iteration, trials, trial, **info):  # pylint: disable = unused-argument, missing-function-docstring
-        tracker = self.trackers.pop(trial.trial_id, None)
+    def on_trial_fail(self, iteration, trials, trial, **info):
+        self._stop_tracker(trial.trial_id)
+
+    def _stop_tracker(self, trial_id):
+        tracker = self.trackers.pop(trial_id, None)
         if tracker:
             tracker.stop()
 
 
 class EarlyStopping(Stopper):
-    """Ray Tune Stopper for early stopping based on a validation metric.
-
-    Args:
-        metric (str): The name of the metric to monitor for early stopping.
-        mode (str): One of {"min", "max"}. In "min" mode, training will stop
-            when the quantity monitored has stopped decreasing; in "max" mode
-            it will stop when the quantity monitored has stopped increasing.
-        patience (int): Number of epochs with no improvement after which
-            training will be stopped.
-        grace_period (int): Number of epochs to wait before activating
-            the stopper.
-        min_delta (float): Minimum change in the monitored quantity to qualify
-            as an improvement, i.e. an absolute change of less than min_delta,
-            will count as no improvement.
-
-    Raises:
-        ValueError: If the mode is not 'min' or 'max'.
-    """
+    """Ray Tune Stopper for early stopping based on a validation metric."""
 
     def __init__(
         self,
@@ -868,60 +705,42 @@ class EarlyStopping(Stopper):
     ):
         if mode not in ["min", "max"]:
             raise ValueError("Mode must be 'min' or 'max'.")
-
         self.metric = metric
         self.mode = mode
         self.patience = patience
         self.grace_period = grace_period
         self.min_delta = min_delta
-        self.trial_best_score: Dict[str, Optional[float]] = {}
-        self.trial_wait: Dict[str, int] = {}
+        self.trial_state: Dict[str, Dict] = {}  # Stores best_score and wait_count
 
     def __call__(self, trial_id: str, result: Dict) -> bool:
-        """Callback when a trial reports a result.
+        score = result.get(self.metric)
+        iteration = result.get("training_iteration", 0)
 
-        Args:
-            trial_id (str): The id of the trial.
-            result (Dict): The result dictionary.
-
-        Returns:
-            bool: Wether or not to suppress the trial.
-        """
-
-        current_score = result.get(self.metric, None)
-        iteration = result.get("training_iteration", None)
-
-        if current_score is None:
-            logger.attention(
-                f"Metric '{self.metric}' not found in trial results for trial {trial_id}. "
-                "Early stopping will not be applied to this trial in this iteration."
-            )
+        if score is None:
             return False
 
-        if trial_id not in self.trial_best_score:
-            self.trial_best_score[trial_id] = current_score
-            self.trial_wait[trial_id] = 0
-        elif iteration <= self.grace_period:
+        if trial_id not in self.trial_state:
+            self.trial_state[trial_id] = {"best": score, "wait": 0}
             return False
+
+        if iteration <= self.grace_period:
+            return False
+
+        state = self.trial_state[trial_id]
+        improved = (
+            (score < state["best"] - self.min_delta)
+            if self.mode == "min"
+            else (score > state["best"] + self.min_delta)
+        )
+
+        if improved:
+            state["best"] = score
+            state["wait"] = 0
         else:
-            if self.mode == "min":
-                if current_score < self.trial_best_score[trial_id] - self.min_delta:
-                    self.trial_best_score[trial_id] = current_score
-                    self.trial_wait[trial_id] = 0
-                else:
-                    self.trial_wait[trial_id] += 1
-            elif self.mode == "max":
-                if current_score > self.trial_best_score[trial_id] + self.min_delta:
-                    self.trial_best_score[trial_id] = current_score
-                    self.trial_wait[trial_id] = 0
-                else:
-                    self.trial_wait[trial_id] += 1
+            state["wait"] += 1
 
-        if self.trial_wait[trial_id] >= self.patience:
-            logger.attention(
-                f"Early stopping triggered for trial {trial_id}: "
-                f"No improvement in '{self.metric}' for {self.patience} iterations. "
-            )
+        if state["wait"] >= self.patience:
+            logger.attention(f"Early stopping trial {trial_id} at iter {iteration}.")
             return True
         return False
 
