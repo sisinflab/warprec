@@ -158,12 +158,12 @@ def train_pipeline(path: str):
 
         if val_dataset is not None:
             # CASE 2: Train/Validation/Test
-            best_model, ray_report = single_split_flow(
+            best_model, ray_report, best_iter = single_split_flow(
                 model_name, params, val_dataset, trainer, config
             )
         elif len(fold_dataset) > 0:
             # CASE 3: Cross-validation
-            best_model, ray_report = multiple_fold_validation_flow(
+            best_model, ray_report, best_iter = multiple_fold_validation_flow(
                 model_name,
                 params,
                 main_dataset,
@@ -173,7 +173,7 @@ def train_pipeline(path: str):
             )
         else:
             # CASE 1: Train/Test
-            best_model, ray_report = single_split_flow(
+            best_model, ray_report, best_iter = single_split_flow(
                 model_name, params, main_dataset, trainer, config
             )
 
@@ -254,7 +254,12 @@ def train_pipeline(path: str):
             )
 
         # Save params
-        model_params = {model_name: best_model.get_params()}
+        model_params = {
+            model_name: {
+                "Best Params": best_model.get_params(),
+                "Best Training Iteration": best_iter,
+            }
+        }
         writer.write_params(model_params)
 
         # Model serialization
@@ -381,7 +386,7 @@ def single_split_flow(
     dataset: Dataset,
     trainer: Trainer,
     config: TrainConfiguration,
-) -> Tuple[Recommender, dict]:
+) -> Tuple[Recommender, dict, int]:
     """Hyperparameter optimization over a single split.
 
     The split can either be train/test or train/validation.
@@ -394,10 +399,11 @@ def single_split_flow(
         config (TrainConfiguration): The configuration file.
 
     Returns:
-        Tuple[Recommender, dict]:
+        Tuple[Recommender, dict, int]:
             - Recommender: The best model, validated on the folds and trained on
                 the main data split.
             - dict: Report dictionary.
+            - int: The best training iteration.
     """
     # Check for device
     general_device = config.general.device
@@ -425,7 +431,7 @@ def single_split_flow(
 
     # Start HPO phase on test set,
     # no need of further training
-    best_model, ray_report = trainer.train_single_fold(
+    best_model, ray_report, best_iter = trainer.train_single_fold(
         model_name,
         params,
         dataset,
@@ -442,7 +448,7 @@ def single_split_flow(
         ray_verbose=config.general.ray_verbose,
     )
 
-    return best_model, ray_report
+    return best_model, ray_report, best_iter
 
 
 def multiple_fold_validation_flow(
@@ -452,7 +458,7 @@ def multiple_fold_validation_flow(
     val_datasets: List[Dataset],
     trainer: Trainer,
     config: TrainConfiguration,
-) -> Tuple[Recommender, dict]:
+) -> Tuple[Recommender, dict, int]:
     """Hyperparameter optimization with cross-validation logic.
 
     Args:
@@ -465,10 +471,11 @@ def multiple_fold_validation_flow(
         config (TrainConfiguration): The configuration file.
 
     Returns:
-        Tuple[Recommender, dict]:
+        Tuple[Recommender, dict, int]:
             - Recommender: The best model, validated on the folds and trained on
                 the main data split.
             - dict: Report dictionary.
+            - int: The best training iteration.
     """
     # Check for device
     general_device = config.general.device
@@ -522,7 +529,7 @@ def multiple_fold_validation_flow(
 
     # Check in case the HPO failed
     if best_params is None:
-        return None, report
+        return None, report, 0
 
     logger.msg(f"Initializing {model_name} model for test set evaluation")
 
@@ -555,4 +562,4 @@ def multiple_fold_validation_flow(
         p.numel() for p in best_model.parameters() if p.requires_grad
     )
 
-    return best_model, report
+    return best_model, report, iterations
