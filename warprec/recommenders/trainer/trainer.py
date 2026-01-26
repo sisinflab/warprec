@@ -81,7 +81,7 @@ class Trainer:
         beta: float = 1.0,
         pop_ratio: float = 0.8,
         ray_verbose: int = 1,
-    ) -> Tuple[Optional[Recommender], dict]:
+    ) -> Tuple[Optional[Recommender], dict, int]:
         """Main method of the Trainer class.
 
         This method will execute the training of the model and evaluation,
@@ -104,9 +104,10 @@ class Trainer:
             ray_verbose (int): The Ray level of verbosity.
 
         Returns:
-            Tuple[Optional[Recommender], dict]:
+            Tuple[Optional[Recommender], dict, int]:
                 - Recommender: The model trained.
                 - dict: Summary report of the training.
+                - int: The best training iteration.
         """
 
         mode = params.optimization.properties.mode
@@ -133,14 +134,14 @@ class Trainer:
         # Check if any trial succeeded
         if results.errors and len(results) == len(results.errors):
             logger.negative(f"All trials failed for {model_name}.")
-            return None, {}
+            return None, {}, 0
 
         # Retrieve best result using Ray API
         best_result = results.get_best_result(metric=validation_score, mode=mode)
 
         if not best_result:
             logger.negative(f"Could not determine best result for {model_name}.")
-            return None, {}
+            return None, {}, 0
 
         best_params = best_result.config
         # Remove internal ray config keys if present
@@ -165,7 +166,7 @@ class Trainer:
         )
 
         report = self._create_report(results, best_model)
-        return best_model, report
+        return best_model, report, best_iter
 
     def train_multiple_fold(
         self,
