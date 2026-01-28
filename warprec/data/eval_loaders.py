@@ -2,7 +2,10 @@ from typing import Tuple, List
 
 import torch
 import numpy as np
-from pandas import DataFrame
+
+import narwhals as nw
+from narwhals.typing import FrameT
+
 from torch import Tensor
 from torch.utils.data import DataLoader, Dataset as TorchDataset
 from torch.nn.utils.rnn import pad_sequence
@@ -38,20 +41,20 @@ class ContextualEvaluationDataset(TorchDataset):
 
     def __init__(
         self,
-        eval_data: DataFrame,
+        eval_data: FrameT,
         user_id_label: str,
         item_id_label: str,
         context_labels: List[str],
     ):
         # Pre-convert DataFrames to torch tensor to reduce overhead
         self.user_indices = torch.from_numpy(
-            eval_data[user_id_label].values.astype(np.int64)
+            eval_data.select(user_id_label).to_numpy().flatten().astype(np.int64)
         )
         self.item_indices = torch.from_numpy(
-            eval_data[item_id_label].values.astype(np.int64)
+            eval_data.select(item_id_label).to_numpy().flatten().astype(np.int64)
         )
         self.context_features = torch.from_numpy(
-            eval_data[context_labels].values.astype(np.int64)
+            eval_data.select(context_labels).to_numpy().astype(np.int64)
         )
 
     def __len__(self) -> int:
@@ -169,7 +172,7 @@ class SampledContextualEvaluationDataset(TorchDataset):
     def __init__(
         self,
         train_interactions: csr_matrix,
-        eval_data: DataFrame,
+        eval_data: FrameT,
         user_id_label: str,
         item_id_label: str,
         context_labels: List[str],
@@ -183,13 +186,13 @@ class SampledContextualEvaluationDataset(TorchDataset):
 
         # Pre-convert DataFrames to torch tensor to reduce overhead
         self.user_indices = torch.from_numpy(
-            eval_data[user_id_label].values.astype(np.int64)
+            eval_data.select(user_id_label).to_numpy().flatten().astype(np.int64)
         )
         self.pos_item_indices = torch.from_numpy(
-            eval_data[item_id_label].values.astype(np.int64)
+            eval_data.select(item_id_label).to_numpy().flatten().astype(np.int64)
         )
         self.context_features = torch.from_numpy(
-            eval_data[context_labels].values.astype(np.int64)
+            eval_data.select(context_labels).to_numpy().astype(np.int64)
         )
 
         n_train_users = train_interactions.shape[0]
@@ -275,7 +278,7 @@ class ContextualEvaluationDataLoader(DataLoader):
 
     def __init__(
         self,
-        eval_data: DataFrame,
+        eval_data: FrameT,
         user_id_label: str,
         item_id_label: str,
         context_labels: List[str],
@@ -353,7 +356,7 @@ class SampledContextualEvaluationDataLoader(DataLoader):
     def __init__(
         self,
         train_interactions: csr_matrix,
-        eval_data: DataFrame,
+        eval_data: FrameT,
         user_id_label: str,
         item_id_label: str,
         context_labels: List[str],

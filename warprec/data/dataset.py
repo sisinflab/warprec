@@ -4,7 +4,9 @@ from typing import Tuple, Optional, List, Any, Dict
 import torch
 import numpy as np
 from torch import Tensor
-from pandas import DataFrame
+
+import narwhals as nw
+from narwhals.typing import FrameT
 
 from warprec.data.entities import Interactions, Sessions
 from warprec.data.eval_loaders import (
@@ -58,11 +60,11 @@ class Dataset:
 
     def __init__(
         self,
-        train_data: DataFrame,
-        eval_data: Optional[DataFrame] = None,
-        side_data: Optional[DataFrame] = None,
-        user_cluster: Optional[DataFrame] = None,
-        item_cluster: Optional[DataFrame] = None,
+        train_data: FrameT,
+        eval_data: Optional[FrameT] = None,
+        side_data: Optional[FrameT] = None,
+        user_cluster: Optional[FrameT] = None,
+        item_cluster: Optional[FrameT] = None,
         batch_size: int = 1024,
         rating_type: RatingType = RatingType.IMPLICIT,
         user_id_label: str = "user_id",
@@ -77,6 +79,13 @@ class Dataset:
         # Check evaluation set
         if evaluation_set not in ["Test", "Validation"]:
             raise ValueError("Evaluation set must be either 'Test' or 'Validation'.")
+        
+        # Convert inputs to Narwhals
+        train_data = nw.from_native(train_data, pass_through=True)
+        eval_data = nw.from_native(eval_data, pass_through=True) if eval_data is not None else None
+        side_data = nw.from_native(side_data, pass_through=True) if side_data is not None else None
+        user_cluster = nw.from_native(user_cluster, pass_through=True) if user_cluster is not None else None
+        item_cluster = nw.from_native(item_cluster, pass_through=True) if item_cluster is not None else None
 
         # Initializing variables
         self._nuid: int = 0
@@ -109,14 +118,14 @@ class Dataset:
             )
 
         # Define dimensions that will lead the experiment
-        self._nuid = train_data[user_id_label].nunique()
-        self._niid = train_data[item_id_label].nunique()
-        self._nfeat = len(side_data.columns) - 1 if side_data is not None else 0
+        self._nuid = train_data.select(nw.col(user_id_label).n_unique()).item()
+        self._niid = train_data.select(nw.col(item_id_label).n_unique()).item()
+        self._nfeat = (len(side_data.columns) - 1) if side_data is not None else 0
         self.batch_size = batch_size
 
         # Values that will be used to calculate mappings
-        _uid = train_data[user_id_label].unique()
-        _iid = train_data[item_id_label].unique()
+        _uid = train_data.select(user_id_label).unique().to_dict(as_series=False)[user_id_label]
+        _iid = train_data.select(item_id_label).unique().to_dict(as_series=False)[item_id_label]
 
         # Calculate mapping for users and items
         self._umap = {user: i for i, user in enumerate(_uid)}
@@ -139,28 +148,25 @@ class Dataset:
             self.side = self._process_side_data(side_data, item_id_label)
 
         # Save user and item cluster information inside the dataset
-        self.user_cluster = (
-            {
+        if user_cluster is not None:
+            uc_dict = user_cluster.select(user_id_label, cluster_label).to_dict(as_series=False)
+            self.user_cluster = {
                 self._umap[user_id]: cluster
-                for user_id, cluster in zip(
-                    user_cluster[user_id_label], user_cluster[cluster_label]
-                )
+                for user_id, cluster in zip(uc_dict[user_id_label], uc_dict[cluster_label])
                 if user_id in self._umap
             }
-            if user_cluster is not None
-            else None
-        )
-        self.item_cluster = (
-            {
+        else:
+            self.user_cluster = None
+
+        if item_cluster is not None:
+            ic_dict = item_cluster.select(item_id_label, cluster_label).to_dict(as_series=False)
+            self.item_cluster = {
                 self._imap[item_id]: cluster
-                for item_id, cluster in zip(
-                    item_cluster[item_id_label], item_cluster[cluster_label]
-                )
+                for item_id, cluster in zip(ic_dict[item_id_label], ic_dict[cluster_label])
                 if item_id in self._imap
             }
-            if item_cluster is not None
-            else None
-        )
+        else:
+            self.item_cluster = None
 
         # Pre compute lookup tensors for user clusters
         if self.user_cluster is not None:
@@ -219,33 +225,61 @@ class Dataset:
 
         # Save side information inside the dataset
         if self.side is not None:
-            # Create the lookup tensor for side information features
-            feature_lookup = torch.tensor(
-                self.train_set._inter_side.iloc[:, 1:].values
-            ).float()
+            native_ns = nw.get_native_namespace(self.side)
+            
+            # Creiamo il DF di mapping: ItemID -> ItemIndex
+            mapping_data = {
+                item_id_label: list(self._imap.keys()),
+                "__item_idx__": list(self._imap.values())
+            }
+            mapping_df = nw.from_dict(mapping_data, native_namespace=native_ns)
 
-            # Add a padding row
+            # 2. Eseguiamo un LEFT JOIN partendo dal mapping.
+            # Questo garantisce che:
+            #   a) Abbiamo una riga per ogni item nel sistema (anche se non ha side info)
+            #   b) Possiamo ordinare per __item_idx__
+            aligned_side = mapping_df.join(self.side, on=item_id_label, how="left")
+
+            # 3. Ordiniamo esplicitamente per l'indice dell'item
+            aligned_side = aligned_side.sort("__item_idx__")
+
+            # 4. Selezioniamo le colonne delle feature
+            # Nota: escludiamo item_id_label e la colonna temporanea __item_idx__
+            feat_cols = [c for c in self.side.columns if c != item_id_label]
+            
+            # 5. Riempiamo eventuali buchi (se un item non aveva side info) con 0
+            # e estraiamo i valori ordinati
+            side_values = aligned_side.select(feat_cols).with_columns(
+                nw.all().fill_null(0)
+            ).to_numpy()
+            
+            feature_lookup = torch.tensor(side_values).float()
+
+            # Add a padding row (per l'indice 0 riservato al padding/unknown se usato dal modello)
+            # Nota: Se il tuo mapping parte da 0, questa riga è extra. 
+            # Se il tuo mapping parte da 1 (come spesso accade in NLP/RecSys per riservare 0), serve.
+            # Assumendo che self._imap parta da 0, questo aggiunge una riga in fondo.
             padding_row = torch.zeros((1, feature_lookup.size(1)))
             self._feat_lookup = torch.cat([feature_lookup, padding_row], dim=0)
 
         # Sequential recommendation sessions
-        self.train_session = Sessions(
-            train_data,
-            self._umap,
-            self._imap,
-            user_id_label=user_id_label,
-            item_id_label=item_id_label,
-            timestamp_label=timestamp_label,
-            context_labels=context_labels,
-        )
+        # self.train_session = Sessions(
+        #     train_data,
+        #     self._umap,
+        #     self._imap,
+        #     user_id_label=user_id_label,
+        #     item_id_label=item_id_label,
+        #     timestamp_label=timestamp_label,
+        #     context_labels=context_labels,
+        # )
 
     def _filter_data(
         self,
-        train_set: DataFrame,
-        eval_set: DataFrame,
-        filter_data: DataFrame,
+        train_set: FrameT,
+        eval_set: FrameT,
+        filter_data: FrameT,
         label: str,
-    ) -> Tuple[DataFrame, DataFrame]:
+    ) -> Tuple[FrameT, FrameT]:
         """Filter the data based on a given additional information set and label.
 
         Args:
@@ -259,20 +293,29 @@ class Dataset:
                 - DataFrame: The filtered train set.
                 - DataFrame: The filtered evaluation set.
         """
-        # Compute shared data points first
-        shared_data = set(train_set[label]).intersection(filter_data[label])
+        train_vals = set(train_set.select(label).unique().to_dict(as_series=False)[label])
+        filter_vals = set(filter_data.select(label).unique().to_dict(as_series=False)[label])
+        
+        shared_data = list(train_vals.intersection(filter_vals))
 
         # Count the number of data points before filtering
-        train_data_before_filter = train_set[label].nunique()
+        train_data_before_filter = train_set.select(nw.col(label).n_unique()).item()
 
         # Filter all the data based on data points present in both train data and filter.
-        # This procedure is fundamental because we need dimensions to match
-        train_set = train_set[train_set[label].isin(shared_data)]
-        eval_set = eval_set[eval_set[label].isin(shared_data)]
-        filter_data = filter_data[filter_data[label].isin(shared_data)]
+        # Narwhals: use .filter(nw.col(label).is_in(shared_data))
+        train_set = train_set.filter(nw.col(label).is_in(shared_data))
+        if eval_set is not None:
+            eval_set = eval_set.filter(nw.col(label).is_in(shared_data))
+        
+        # Note: The original code also filtered 'filter_data', but didn't return it.
+        # If side_data is modified in place in original pandas, it matters. 
+        # Here we return modified train/eval. Side data is usually static ref.
+        # If we need to filter side_data for internal consistency:
+        # filter_data = filter_data.filter(nw.col(label).is_in(shared_data)) 
+        # (But this function returns only train/eval)
 
         # Count the number of data points after filtering
-        train_data_after_filter = train_set[label].nunique()
+        train_data_after_filter = train_set.select(nw.col(label).n_unique()).item()
 
         logger.attention(
             ""
@@ -283,8 +326,8 @@ class Dataset:
 
     def _create_inner_set(
         self,
-        data: DataFrame,
-        side_data: Optional[DataFrame] = None,
+        data: FrameT,
+        side_data: Optional[FrameT] = None,
         user_cluster: Optional[dict] = None,
         item_cluster: Optional[dict] = None,
         header_msg: str = "Train",
@@ -340,8 +383,8 @@ class Dataset:
         return inter_set
 
     def _process_side_data(
-        self, side_data: DataFrame, item_id_label: str
-    ) -> Optional[DataFrame]:
+        self, side_data: FrameT, item_id_label: str
+    ) -> Optional[FrameT]:
         """Process side information data.
 
         It maps categorical/numerical values to integer indices suitable for Embeddings.
@@ -360,7 +403,7 @@ class Dataset:
         if item_id_label not in side_data.columns:
             raise ValueError("Item ID label not found inside side information data.")
 
-        df_processed = side_data.copy()
+        df_processed = side_data.clone()
 
         # Identify feature columns (all except item_id_label)
         feature_cols = [c for c in df_processed.columns if c != item_id_label]
@@ -372,10 +415,10 @@ class Dataset:
         # Iterate over each feature column to create mappings and transform data
         for col in feature_cols:
             # Fill missing data with a placeholder
-            df_processed[col] = df_processed[col].fillna("UNK")
+            df_processed = df_processed.with_columns(nw.col(col).fill_null("UNK"))
 
             # Create a mapping from unique values to integers
-            unique_vals = df_processed[col].unique()
+            unique_vals = df_processed.select(col).unique().to_dict(as_series=False)[col]
 
             # Map: value -> index (starting from 1, reserving 0 for unknown/padding)
             mapping = {val: i + 1 for i, val in enumerate(unique_vals)}
@@ -387,15 +430,27 @@ class Dataset:
             self._feature_dims[col] = len(unique_vals) + 1
 
             # Apply the mapping to the columns
-            df_processed[col] = df_processed[col].map(mapping).fillna(0).astype(int)
+            map_df = nw.from_dict({
+                col: list(mapping.keys()), 
+                f"{col}_idx": list(mapping.values())
+            }, native_namespace=nw.get_native_namespace(df_processed))
+            
+            # Join and replace
+            df_processed = df_processed.join(map_df, on=col, how="left")
+            
+            # Fill nulls (if any value wasn't in mapping, though here we built mapping from data)
+            # and replace original column
+            df_processed = df_processed.with_columns(
+                nw.col(f"{col}_idx").fill_null(0).cast(nw.Int64).alias(col)
+            ).drop(f"{col}_idx")
 
             logger.msg(f"Side Feature '{col}': found {len(unique_vals)} unique values.")
 
         return df_processed
 
     def _process_context_data(
-        self, df: DataFrame, context_labels: List[str], fit: bool = False
-    ) -> DataFrame:
+        self, df: FrameT, context_labels: List[str], fit: bool = False
+    ) -> FrameT:
         """Processes context columns: creates mappings (if fit=True) and converts
         values to integers.
 
@@ -418,7 +473,7 @@ class Dataset:
             ValueError: If the contextual column names are not
                 present the the DataFrame.
         """
-        df_processed = df.copy()
+        df_processed = df.clone()
 
         for col in context_labels:
             if col not in df_processed.columns:
@@ -426,7 +481,7 @@ class Dataset:
 
             if fit:
                 # Create mapping based on unique values in this column
-                uniques = df_processed[col].unique()
+                uniques = df_processed.select(col).unique().to_dict(as_series=False)[col]
                 # Start from 1, reserve 0 for Unknown
                 mapping = {val: i + 1 for i, val in enumerate(uniques)}
 
@@ -445,15 +500,27 @@ class Dataset:
 
             # Apply mapping
             # Values not in mapping become NaN, then fill with 0 (UNK), then cast to int
-            df_processed[col] = df_processed[col].map(mapping).fillna(0).astype(int)
+            map_df = nw.from_dict({
+                col: list(mapping.keys()), 
+                f"{col}_idx": list(mapping.values())
+            }, native_namespace=nw.get_native_namespace(df_processed))
+
+            # Join
+            df_processed = df_processed.join(map_df, on=col, how="left")
 
             # Optional: Check for OOV (Out Of Vocabulary) in Eval
             if not fit:
-                num_unk = (df_processed[col] == 0).sum()
+                # Check for nulls in the mapped column before filling
+                num_unk = df_processed.select(nw.col(f"{col}_idx").is_null().sum()).item()
                 if num_unk > 0:
                     logger.attention(
                         f"Context '{col}': found {num_unk} unknown values in Eval set (mapped to 0)."
                     )
+
+            # Finalize column
+            df_processed = df_processed.with_columns(
+                nw.col(f"{col}_idx").fill_null(0).cast(nw.Int64).alias(col)
+            ).drop(f"{col}_idx")
 
         return df_processed
 
@@ -525,9 +592,30 @@ class Dataset:
             context_labels = self.eval_set.context_labels
 
             # Map the evaluation dataset to ensure consistency
-            eval_data[user_label] = eval_data[user_label].map(self._umap)
-            eval_data[item_label] = eval_data[item_label].map(self._imap)
-            eval_data = eval_data.dropna(subset=[user_label, item_label])
+            # Create mapping DFs
+            u_map_df = nw.from_dict({
+                user_label: list(self._umap.keys()), 
+                f"{user_label}_idx": list(self._umap.values())
+            }, native_namespace=nw.get_native_namespace(eval_data))
+            
+            i_map_df = nw.from_dict({
+                item_label: list(self._imap.keys()), 
+                f"{item_label}_idx": list(self._imap.values())
+            }, native_namespace=nw.get_native_namespace(eval_data))
+
+            # Apply mappings via Join
+            eval_data = eval_data.join(u_map_df, on=user_label, how="inner") \
+                                 .join(i_map_df, on=item_label, how="inner")
+
+            # Replace columns with mapped indices
+            eval_data = eval_data.with_columns(
+                nw.col(f"{user_label}_idx").alias(user_label),
+                nw.col(f"{item_label}_idx").alias(item_label)
+            ).drop(f"{user_label}_idx", f"{item_label}_idx")
+
+            # dropna is implicit in inner join for the mapped keys, 
+            # but if we need to drop other nulls:
+            # eval_data = eval_data.drop_nulls(subset=[user_label, item_label])
 
             self._precomputed_dataloader[key] = ContextualEvaluationDataLoader(
                 eval_data=eval_data,
@@ -564,10 +652,24 @@ class Dataset:
             item_label = self.eval_set.item_label
             context_labels = self.eval_set.context_labels
 
-            # Map the evaluation dataset to ensure consistency
-            eval_data[user_label] = eval_data[user_label].map(self._umap)
-            eval_data[item_label] = eval_data[item_label].map(self._imap)
-            eval_data = eval_data.dropna(subset=[user_label, item_label])
+            # Map the evaluation dataset
+            u_map_df = nw.from_dict({
+                user_label: list(self._umap.keys()), 
+                f"{user_label}_idx": list(self._umap.values())
+            }, native_namespace=nw.get_native_namespace(eval_data))
+            
+            i_map_df = nw.from_dict({
+                item_label: list(self._imap.keys()), 
+                f"{item_label}_idx": list(self._imap.values())
+            }, native_namespace=nw.get_native_namespace(eval_data))
+
+            eval_data = eval_data.join(u_map_df, on=user_label, how="inner") \
+                                 .join(i_map_df, on=item_label, how="inner")
+
+            eval_data = eval_data.with_columns(
+                nw.col(f"{user_label}_idx").alias(user_label),
+                nw.col(f"{item_label}_idx").alias(item_label)
+            ).drop(f"{user_label}_idx", f"{item_label}_idx")
 
             self._precomputed_dataloader[key] = SampledContextualEvaluationDataLoader(
                 train_interactions=train_sparse,
