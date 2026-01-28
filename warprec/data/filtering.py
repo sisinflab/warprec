@@ -5,6 +5,7 @@ from abc import ABC
 import time
 import narwhals as nw
 from narwhals.typing import FrameT
+from narwhals.dataframe import DataFrame
 
 from warprec.utils.logger import logger
 from warprec.utils.registry import filter_registry
@@ -37,7 +38,7 @@ class Filter(ABC):
         self.rating_label = rating_label
         self.timestamp_label = timestamp_label
 
-    def __call__(self, dataset: FrameT) -> FrameT:
+    def __call__(self, dataset: DataFrame[Any]) -> DataFrame[Any]:
         """Apply the filter to the dataset."""
         raise NotImplementedError("Subclasses should implement this method.")
 
@@ -60,14 +61,14 @@ class MinRating(Filter):
             raise ValueError("min_rating must be a positive float.")
         self.min_rating = min_rating
 
-    def __call__(self, dataset: FrameT) -> FrameT:
+    def __call__(self, dataset: DataFrame[Any]) -> DataFrame[Any]:
         """Select rows where the 'rating' column is greater than or equal to min_rating.
 
         Args:
-            dataset (DataFrame): The dataset to filter.
+            dataset (DataFrame[Any]): The dataset to filter.
 
         Returns:
-            DataFrame: Filtered dataset containing only rows with 'rating' >= min_rating.
+            DataFrame[Any]: Filtered dataset containing only rows with 'rating' >= min_rating.
         """
         return dataset.filter(nw.col(self.rating_label) >= self.min_rating)
 
@@ -83,17 +84,18 @@ class UserAverage(Filter):
     def __init__(self, **kwargs: Any):
         super().__init__(**kwargs)
 
-    def __call__(self, dataset: FrameT) -> FrameT:
+    def __call__(self, dataset: DataFrame[Any]) -> DataFrame[Any]:
         """Select rows where the 'rating' column is greater than the user average.
 
         Args:
-            dataset (DataFrame): The dataset to filter.
+            dataset (DataFrame[Any]): The dataset to filter.
 
         Returns:
-            DataFrame: Filtered dataset containing only rows with 'rating' > user average.
+            DataFrame[Any]: Filtered dataset containing only rows with 'rating' > user average.
         """
         return dataset.filter(
-            nw.col(self.rating_label) > nw.col(self.rating_label).mean().over(self.user_label)
+            nw.col(self.rating_label)
+            > nw.col(self.rating_label).mean().over(self.user_label)
         )
 
 
@@ -108,17 +110,18 @@ class ItemAverage(Filter):
     def __init__(self, **kwargs: Any):
         super().__init__(**kwargs)
 
-    def __call__(self, dataset: FrameT) -> FrameT:
+    def __call__(self, dataset: DataFrame[Any]) -> DataFrame[Any]:
         """Select rows where the 'rating' column is greater than the item average.
 
         Args:
-            dataset (DataFrame): The dataset to filter.
+            dataset (DataFrame[Any]): The dataset to filter.
 
         Returns:
-            DataFrame: Filtered dataset containing only rows with 'rating' > item average.
+            DataFrame[Any]: Filtered dataset containing only rows with 'rating' > item average.
         """
         return dataset.filter(
-            nw.col(self.rating_label) > nw.col(self.rating_label).mean().over(self.item_label)
+            nw.col(self.rating_label)
+            > nw.col(self.rating_label).mean().over(self.item_label)
         )
 
 
@@ -140,18 +143,16 @@ class UserMin(Filter):
             raise ValueError("min_interactions must be a positive integer.")
         self.min_interactions = min_interactions
 
-    def __call__(self, dataset: FrameT) -> FrameT:
+    def __call__(self, dataset: DataFrame[Any]) -> DataFrame[Any]:
         """Select users with at least min_interactions.
 
         Args:
-            dataset (DataFrame): The dataset to filter.
+            dataset (DataFrame[Any]): The dataset to filter.
 
         Returns:
-            DataFrame: Filtered dataset containing only users with interactions >= min_interactions.
-        """    
-        return dataset.filter(
-            nw.len().over(self.user_label) >= self.min_interactions
-        )
+            DataFrame[Any]: Filtered dataset containing only users with interactions >= min_interactions.
+        """
+        return dataset.filter(nw.len().over(self.user_label) >= self.min_interactions)
 
 
 @filter_registry.register("UserMax")
@@ -172,18 +173,16 @@ class UserMax(Filter):
             raise ValueError("max_interactions must be a positive integer.")
         self.max_interactions = max_interactions
 
-    def __call__(self, dataset: FrameT) -> FrameT:
+    def __call__(self, dataset: DataFrame[Any]) -> DataFrame[Any]:
         """Select users with at most max_interactions.
 
         Args:
-            dataset (DataFrame): The dataset to filter.
+            dataset (DataFrame[Any]): The dataset to filter.
 
         Returns:
-            DataFrame: Filtered dataset containing only users with interactions <= max_interactions.
+            DataFrame[Any]: Filtered dataset containing only users with interactions <= max_interactions.
         """
-        return dataset.filter(
-            nw.len().over(self.user_label) <= self.max_interactions
-        )
+        return dataset.filter(nw.len().over(self.user_label) <= self.max_interactions)
 
 
 @filter_registry.register("ItemMin")
@@ -204,18 +203,16 @@ class ItemMin(Filter):
             raise ValueError("min_interactions must be a positive integer.")
         self.min_interactions = min_interactions
 
-    def __call__(self, dataset: FrameT) -> FrameT:
+    def __call__(self, dataset: DataFrame[Any]) -> DataFrame[Any]:
         """Select items with at least min_interactions.
 
         Args:
-            dataset (DataFrame): The dataset to filter.
+            dataset (DataFrame[Any]): The dataset to filter.
 
         Returns:
-            DataFrame: Filtered dataset containing only items with interactions >= min_interactions.
+            DataFrame[Any]: Filtered dataset containing only items with interactions >= min_interactions.
         """
-        return dataset.filter(
-            nw.len().over(self.item_label) >= self.min_interactions
-        )
+        return dataset.filter(nw.len().over(self.item_label) >= self.min_interactions)
 
 
 @filter_registry.register("ItemMax")
@@ -236,18 +233,16 @@ class ItemMax(Filter):
             raise ValueError("max_interactions must be a positive integer.")
         self.max_interactions = max_interactions
 
-    def __call__(self, dataset: FrameT) -> FrameT:
+    def __call__(self, dataset: DataFrame[Any]) -> DataFrame[Any]:
         """Select items with at most max_interactions.
 
         Args:
-            dataset (DataFrame): The dataset to filter.
+            dataset (DataFrame[Any]): The dataset to filter.
 
         Returns:
-            DataFrame: Filtered dataset containing only items with interactions <= max_interactions.
+            DataFrame[Any]: Filtered dataset containing only items with interactions <= max_interactions.
         """
-        return dataset.filter(
-            nw.len().over(self.item_label) <= self.max_interactions
-        )
+        return dataset.filter(nw.len().over(self.item_label) <= self.max_interactions)
 
 
 @filter_registry.register("IterativeKCore")
@@ -269,22 +264,22 @@ class IterativeKCore(Filter):
         self.user_core = UserMin(min_interactions, **kwargs)
         self.item_core = ItemMin(min_interactions, **kwargs)
 
-    def __call__(self, dataset: FrameT) -> FrameT:
+    def __call__(self, dataset: DataFrame[Any]) -> DataFrame[Any]:
         """Apply k-core filtering iteratively until no more users or items can be removed.
 
         Args:
-            dataset (DataFrame): The dataset to filter.
+            dataset (DataFrame[Any]): The dataset to filter.
 
         Returns:
-            DataFrame: Filtered dataset after applying k-core filtering.
+            DataFrame[Any]: Filtered dataset after applying k-core filtering.
         """
         while True:
             # Get current size
             start_len = dataset.select(nw.len()).item()
-            
+
             dataset = self.user_core(dataset)
             dataset = self.item_core(dataset)
-            
+
             end_len = dataset.select(nw.len()).item()
 
             if end_len == start_len:
@@ -316,21 +311,21 @@ class NRoundsKCore(Filter):
         self.item_core = ItemMin(min_interactions, **kwargs)
         self.rounds = rounds
 
-    def __call__(self, dataset: FrameT) -> FrameT:
+    def __call__(self, dataset: DataFrame[Any]) -> DataFrame[Any]:
         """Apply k-core filtering for the specified number of rounds.
 
         Args:
-            dataset (DataFrame): The dataset to filter.
+            dataset (DataFrame[Any]): The dataset to filter.
 
         Returns:
-            DataFrame: Filtered dataset after applying k-core filtering for the specified rounds.
+            DataFrame[Any]: Filtered dataset after applying k-core filtering for the specified rounds.
         """
         for _ in range(self.rounds):
             start_len = dataset.select(nw.len()).item()
-            
+
             dataset = self.user_core(dataset)
             dataset = self.item_core(dataset)
-            
+
             end_len = dataset.select(nw.len()).item()
 
             if end_len == start_len:
@@ -357,34 +352,34 @@ class UserHeadN(Filter):
             raise ValueError("num_interactions must be a positive integer.")
         self.num_interactions = num_interactions
 
-    def __call__(self, dataset: FrameT) -> FrameT:
+    def __call__(self, dataset: DataFrame[Any]) -> DataFrame[Any]:
         """Select the first num_interactions for each user.
 
         Args:
-            dataset (DataFrame): The dataset to filter.
+            dataset (DataFrame[Any]): The dataset to filter.
 
         Returns:
-            DataFrame: Filtered dataset containing only the first num_interactions for each user.
+            DataFrame[Any]: Filtered dataset containing only the first num_interactions for each user.
         """
-        # Check if timestamp is available
-        is_timestamp_available = self.timestamp_label in dataset.columns
+        idx_col = "__stable_row_idx__"
+        dataset = dataset.with_row_index(name=idx_col)
 
         if self.timestamp_label in dataset.columns:
-            sort_col = nw.col(self.timestamp_label)
+            # Sort by User -> Timestamp -> Original Index (Tie-breaker)
+            dataset = dataset.sort(by=[self.user_label, self.timestamp_label, idx_col])
+            rank_target = self.timestamp_label
         else:
-            dataset = dataset.with_row_index(name="__row_idx__")
-            sort_col = nw.col("__row_idx__")
+            # Sort by User -> Original Index
+            dataset = dataset.sort(by=[self.user_label, idx_col])
+            rank_target = idx_col
 
-        # Calculate cumulative count per user (starts at 0)
-        # Filter where count < N
+        # Rank is now stable because data is sorted
         dataset = dataset.filter(
-            sort_col.rank(method="ordinal").over(self.user_label) <= self.num_interactions
+            nw.col(rank_target).rank(method="ordinal").over(self.user_label)
+            <= self.num_interactions
         )
 
-        if "__row_idx__" in dataset.columns:
-            dataset = dataset.drop("__row_idx__")
-
-        return dataset
+        return dataset.drop(idx_col)
 
 
 @filter_registry.register("UserTailN")
@@ -406,35 +401,38 @@ class UserTailN(Filter):
             raise ValueError("num_interactions must be a positive integer.")
         self.num_interactions = num_interactions
 
-    def __call__(self, dataset: FrameT) -> FrameT:
+    def __call__(self, dataset: DataFrame[Any]) -> DataFrame[Any]:
         """Select the last num_interactions for each user.
 
         Args:
-            dataset (DataFrame): The dataset to filter.
+            dataset (DataFrame[Any]): The dataset to filter.
 
         Returns:
-            DataFrame: Filtered dataset containing only the last
+            DataFrame[Any]: Filtered dataset containing only the last
                        num_interactions for each user.
         """
-        is_timestamp_available = self.timestamp_label in dataset.columns
+        idx_col = "__stable_row_idx__"
+        dataset = dataset.with_row_index(name=idx_col)
 
-        if is_timestamp_available:
-            sort_col = nw.col(self.timestamp_label)
+        if self.timestamp_label in dataset.columns:
+            # Sort by User -> Timestamp -> Original Index (Tie-breaker)
+            dataset = dataset.sort(by=[self.user_label, self.timestamp_label, idx_col])
+            rank_target = self.timestamp_label
         else:
-            dataset = dataset.with_row_index(name="__row_idx__")
-            sort_col = nw.col("__row_idx__")
-        # Logic: Keep if row_index >= (total_count - N)
-        # cum_count goes 0..Total-1
-        
+            # Sort by User -> Original Index
+            dataset = dataset.sort(by=[self.user_label, idx_col])
+            rank_target = idx_col
+
+        # Rank is now stable because data is sorted
         dataset = dataset.filter(
-            sort_col.rank(method="ordinal", descending=True).over(self.user_label) <= self.num_interactions
+            nw.col(rank_target)
+            .rank(method="ordinal", descending=True)
+            .over(self.user_label)
+            <= self.num_interactions
         )
-        
 
-        if "__row_idx__" in dataset.columns:
-            dataset = dataset.drop("__row_idx__")
+        return dataset.drop(idx_col)
 
-        return dataset
 
 @filter_registry.register("DropUser")
 class DropUser(Filter):
@@ -452,16 +450,17 @@ class DropUser(Filter):
             user_ids_to_filter = [user_ids_to_filter]
         self.user_ids_to_filter = user_ids_to_filter
 
-    def __call__(self, dataset: FrameT) -> FrameT:
+    def __call__(self, dataset: DataFrame[Any]) -> DataFrame[Any]:
         """Exclude rows corresponding to the specified user IDs.
 
         Args:
-            dataset (DataFrame): The dataset to filter.
+            dataset (DataFrame[Any]): The dataset to filter.
 
         Returns:
-            DataFrame: Filtered dataset without the specified users.
+            DataFrame[Any]: Filtered dataset without the specified users.
         """
         return dataset.filter(~nw.col(self.user_label).is_in(self.user_ids_to_filter))
+
 
 @filter_registry.register("DropItem")
 class DropItem(Filter):
@@ -479,43 +478,51 @@ class DropItem(Filter):
             item_ids_to_filter = [item_ids_to_filter]
         self.item_ids_to_filter = item_ids_to_filter
 
-    def __call__(self, dataset: FrameT) -> FrameT:
+    def __call__(self, dataset: DataFrame[Any]) -> DataFrame[Any]:
         """Exclude rows corresponding to the specified item IDs.
 
         Args:
-            dataset (DataFrame): The dataset to filter.
+            dataset (DataFrame[Any]): The dataset to filter.
 
         Returns:
-            DataFrame: Filtered dataset without the specified items.
+            DataFrame[Any]: Filtered dataset without the specified items.
         """
         return dataset.filter(~nw.col(self.item_label).is_in(self.item_ids_to_filter))
 
-def apply_filtering(dataset: FrameT, filters: List[Filter]) -> FrameT:
+
+def apply_filtering(data: FrameT, filters: List[Filter]) -> DataFrame[Any]:
     """Apply a list of filters to the dataset.
 
     Args:
-        dataset (DataFrame): The dataset to filter.
+        data (FrameT): The dataset to filter.
         filters (List[Filter]): List of filters to apply.
 
     Returns:
-        DataFrame: The filtered dataset after applying all filters.
+        DataFrame[Any]: The filtered dataset after applying all filters.
 
     Raises:
         ValueError: If the dataset becomes empty after applying any filter.
     """
+    if isinstance(data, nw.LazyFrame):
+        mat_data = data.collect()
+    else:
+        mat_data = data
+
     if len(filters) == 0:
         logger.attention("No filters provided. Returning the original dataset.")
-        return dataset
+        return mat_data
 
-    initial_len = dataset.select(nw.len()).item()
-    logger.msg(f"Applying filters to the dataset. Initial dataset size: {initial_len} rows.")
+    initial_len = mat_data.select(nw.len()).item()
+    logger.msg(
+        f"Applying filters to the dataset. Initial dataset size: {initial_len} rows."
+    )
     start = time.time()
 
     for i, single_filter in enumerate(filters):
-        dataset = single_filter(dataset)
-        
+        mat_data = single_filter(mat_data)
+
         # Check if empty
-        current_len = dataset.select(nw.len()).item()
+        current_len = mat_data.select(nw.len()).item()
 
         # Check if the dataset post filtering is empty
         if current_len == 0:
@@ -533,4 +540,4 @@ def apply_filtering(dataset: FrameT, filters: List[Filter]) -> FrameT:
         f"Filtering process completed. Final dataset size after filtering: {current_len}. "
         f"Total filtering time: {time.time() - start:.2f} seconds."
     )
-    return dataset
+    return mat_data
