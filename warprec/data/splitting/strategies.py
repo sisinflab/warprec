@@ -4,10 +4,10 @@ from typing import Tuple, Any, Union, List
 from abc import ABC
 
 import numpy as np
-# import pandas as pd
-# from pandas import DataFrame
 import narwhals as nw
 from narwhals.typing import FrameT
+from narwhals.dataframe import DataFrame
+
 from warprec.utils.enums import SplittingStrategies
 from warprec.utils.registry import splitting_registry
 
@@ -15,23 +15,33 @@ from warprec.utils.registry import splitting_registry
 class SplittingStrategy(ABC):
     """Abstract definition of a splitting strategy."""
 
-    def __call__(
-        self, 
-        data: FrameT, # DataFrame, 
-        **kwargs: Any
-    ) -> List[Tuple[FrameT, FrameT]]: # List[Tuple[DataFrame, DataFrame]]:
-        """This method will split the data in train/test/validation splits.
+    def _prepare_stable_data(self, data: FrameT) -> Tuple[DataFrame[Any], str]:
+        """Helper method to ensure data has a stable row index for tie-breaking.
+        Returns the modified data and the name of the index column.
+        """
+        # Make the DataFrame eager in case of LazyFrames
+        if isinstance(data, nw.LazyFrame):
+            materialized_data = data.collect()  # type: ignore[assignment]
+        else:
+            materialized_data = data
 
-        If the validation split was not set then it will be None.
+        index_col = "__original_row_index__"
+        if index_col in materialized_data.columns:
+            index_col = "__original_row_index_v2__"
+
+        return materialized_data.with_row_index(name=index_col), index_col
+
+    def __call__(self, data: FrameT, **kwargs: Any) -> List[Tuple[FrameT, FrameT]]:
+        """This method will split the data in train/eval split.
 
         Args:
-            data (DataFrame): The DataFrame to be splitted.
+            data (FrameT): The FrameT to be splitted.
             **kwargs (Any): The additional keyword arguments.
 
         Returns:
-            List[Tuple[DataFrame, DataFrame]]:
-                - DataFrame: First partition of splitted data.
-                - DataFrame: Second partition of splitted data.
+            List[Tuple[FrameT, FrameT]]:
+                - FrameT: First partition of splitted data.
+                - FrameT: Second partition of splitted data.
         """
 
 
@@ -45,12 +55,12 @@ class TemporalHoldoutSplit(SplittingStrategy):
 
     def __call__(
         self,
-        data: FrameT, # DataFrame,
+        data: FrameT,
         user_id_label: str = "user_id",
         timestamp_label: str = "timestamp",
         ratio: float = 0.2,
         **kwargs: Any,
-    ) -> List[Tuple[FrameT, FrameT]]: # List[Tuple[DataFrame, DataFrame]]:
+    ) -> List[Tuple[DataFrame[Any], DataFrame[Any]]]:
         """Method to split data in two partitions, using a timestamp or the
         original order.
 
@@ -58,34 +68,44 @@ class TemporalHoldoutSplit(SplittingStrategy):
         samples the more recent transactions.
 
         Args:
-            data (DataFrame): The original data in DataFrame format.
+            data (FrameT): The original data in FrameT format.
             user_id_label (str): The user_id label.
             timestamp_label (str): The timestamp label.
             ratio (float): Percentage of data that will end up in the second partition.
             **kwargs (Any): The additional keyword arguments.
 
         Returns:
-            List[Tuple[DataFrame, DataFrame]]:
-                - DataFrame: First partition of splitted data.
-                - DataFrame: Second partition of splitted data.
+            List[Tuple[DataFrame[Any], DataFrame[Any]]]:
+                - DataFrame[Any]: First partition of splitted data.
+                - DataFrame[Any]: Second partition of splitted data.
         """
-        if timestamp_label in data.columns:
-            # Single sorting by user and timestamp
-            data = data.sort(by=[user_id_label, timestamp_label])
-        
-        data_with_stats = data.with_columns(
-            n_items=nw.len().over(user_id_label),
-            rank=nw.col(timestamp_label).rank(method="ordinal").over(user_id_label)
-        )
-        
-        train_mask = nw.col("rank") <= (nw.col("n_items") * (1 - ratio)).floor().cast(nw.Int64)
-        
-        train_mask = train_mask | (nw.col("rank") == 1)
+        data_prep, idx_col = self._prepare_stable_data(data)
 
-        train = data_with_stats.filter(train_mask).drop("n_items", "rank")
-        test = data_with_stats.filter(~train_mask).drop("n_items", "rank")
+        # Deterministic sorting
+        if timestamp_label in data_prep.columns:
+            data_prep = data_prep.sort(by=[user_id_label, timestamp_label, idx_col])
+            rank_target_col = timestamp_label
+        else:
+            data_prep = data_prep.sort(by=[user_id_label, idx_col])
+            rank_target_col = idx_col
+
+        # Compute the cumulative count
+        data_with_stats = data_prep.with_columns(
+            n_items=nw.len().over(user_id_label),
+            rank=nw.col(rank_target_col).rank(method="ordinal").over(user_id_label),
+        )
+
+        # Masking
+        cutoff = (nw.col("n_items") * (1 - ratio)).floor().cast(nw.Int64)
+        train_mask = (nw.col("rank") <= cutoff) | (nw.col("rank") == 1)
+
+        # Clean the output
+        cols_to_drop = ["n_items", "rank", idx_col]
+        train = data_with_stats.filter(train_mask).drop(cols_to_drop)
+        test = data_with_stats.filter(~train_mask).drop(cols_to_drop)
 
         return [(train, test)]
+
 
 @splitting_registry.register(SplittingStrategies.TEMPORAL_LEAVE_K_OUT)
 class TemporalLeaveKOutSplit(SplittingStrategy):
@@ -97,12 +117,12 @@ class TemporalLeaveKOutSplit(SplittingStrategy):
 
     def __call__(
         self,
-        data: FrameT, # DataFrame,
+        data: FrameT,
         user_id_label: str = "user_id",
         timestamp_label: str = "timestamp",
         k: int = 1,
         **kwargs: Any,
-    ) -> List[Tuple[FrameT, FrameT]]: # List[Tuple[DataFrame, DataFrame]]:
+    ) -> List[Tuple[DataFrame[Any], DataFrame[Any]]]:
         """Method to split data in two partitions, using a timestamp or the
         original order.
 
@@ -110,47 +130,45 @@ class TemporalLeaveKOutSplit(SplittingStrategy):
         samples the more recent transactions.
 
         Args:
-            data (DataFrame): The original data in DataFrame format.
+            data (FrameT): The original data in FrameT format.
             user_id_label (str): The user_id label.
             timestamp_label (str): The timestamp label.
             k (int): Number of transaction that will end up in the second partition.
             **kwargs (Any): The additional keyword arguments.
 
         Returns:
-            List[Tuple[DataFrame, DataFrame]]:
-                - DataFrame: First partition of splitted data.
-                - DataFrame: Second partition of splitted data.
+            List[Tuple[DataFrame[Any], DataFrame[Any]]]:
+                - DataFrame[Any]: First partition of splitted data.
+                - DataFrame[Any]: Second partition of splitted data.
         """
+        data_prep, idx_col = self._prepare_stable_data(data)
+
+        # Deterministic sorting
         if timestamp_label in data.columns:
-            # Single sorting by user and timestamp
-            data = data.sort(by=[user_id_label, timestamp_label])
+            data_prep = data_prep.sort(by=[user_id_label, timestamp_label, idx_col])
+            rank_target_col = timestamp_label
+        else:
+            data_prep = data_prep.sort(by=[user_id_label, idx_col])
+            rank_target_col = idx_col
 
-        # # Determine the split indices for each user
-        # user_counts = data[user_id_label].value_counts().sort_index()
-        # valid_users = user_counts[user_counts > k].index  # Users with enough data
+        # Pre-filtering
+        data_prep = data_prep.with_columns(n_items=nw.len().over(user_id_label))
+        data_prep = data_prep.filter(nw.col("n_items") > k)
 
-        # # Filter out users with insufficient transactions
-        # data = data[data[user_id_label].isin(valid_users)]
-
-        # # Determine the split indices for each user
-        # split_indices = user_counts - k
-
-        # # Create a split mask: True for training, False for test
-        # split_mask = (
-        #     data.groupby(user_id_label).cumcount()
-        #     < split_indices.loc[data[user_id_label]].values
-        # )
-        data = data.with_columns(n_items=nw.len().over(user_id_label))
-        data = data.filter(nw.col("n_items") > k)
-        
-        data = data.with_columns(
-            rank_desc=nw.col(timestamp_label).rank(method="ordinal", descending=True).over(user_id_label)
+        # Descending sorting
+        data_prep = data_prep.with_columns(
+            rank_desc=nw.col(rank_target_col)
+            .rank(method="ordinal", descending=True)
+            .over(user_id_label)
         )
-        
+
+        # Masking
         test_mask = nw.col("rank_desc") <= k
-        
-        train = data.filter(~test_mask).drop("n_items", "rank_desc")
-        test = data.filter(test_mask).drop("n_items", "rank_desc")
+
+        # Clean the output
+        cols_to_drop = ["n_items", "rank_desc", idx_col]
+        train = data_prep.filter(~test_mask).drop(cols_to_drop)
+        test = data_prep.filter(test_mask).drop(cols_to_drop)
 
         return [(train, test)]
 
@@ -173,50 +191,72 @@ class TimestampSlicingSplit(SplittingStrategy):
 
     def __call__(
         self,
-        data: FrameT, # DataFrame,
+        data: FrameT,
         user_id_label: str = "user_id",
         timestamp_label: str = "timestamp",
         timestamp: Union[int, str] = 0,
         **kwargs: Any,
-    ) -> List[Tuple[FrameT, FrameT]]: # List[Tuple[DataFrame, DataFrame]]:
+    ) -> List[Tuple[DataFrame[Any], DataFrame[Any]]]:
         """Implementation of the fixed timestamp splitting.
 
         Args:
-            data (DataFrame): The DataFrame to be split.
+            data (FrameT): The FrameT to be split.
             user_id_label (str): The user_id label.
             timestamp_label (str): The timestamp label.
             timestamp (Union[int, str]): The timestamp to split data for test set.
             **kwargs (Any): The additional keyword arguments.
 
         Returns:
-            List[Tuple[DataFrame, DataFrame]]:
-                - DataFrame: First partition of splitted data.
-                - DataFrame: Second partition of splitted data.
+            List[Tuple[DataFrame[Any], DataFrame[Any]]]:
+                - DataFrame[Any]: First partition of splitted data.
+                - DataFrame[Any]: Second partition of splitted data.
+
+        Raises:
+            ValueError: If the timestamp column is not present in the FrameT.
         """
+        if timestamp_label not in data.columns:
+            raise ValueError(
+                "The timestamp column must be present inside the data "
+                "to apply TimestampSlicing splitting strategy. Timestamp column "
+                f"provided: {timestamp_label} not found."
+            )
+
+        data_prep, idx_col = self._prepare_stable_data(data)
+
         if timestamp == "best":
-            best_timestamp = self._best_split(data, user_id_label, timestamp_label)
+            # Deterministic sorting
+            data_prep = data_prep.sort(by=[user_id_label, timestamp_label, idx_col])
+
+            # Find the best timestamp
+            best_timestamp = self._best_split(data_prep, user_id_label, timestamp_label)
+
+            # Clean the output
+            data_prep = data_prep.drop(idx_col)
+
+            # Apply the split
             first_partition, second_partition = self._fixed_split(
-                data, best_timestamp, timestamp_label
+                data_prep, best_timestamp, timestamp_label
             )
         else:
+            # Apply the split
             first_partition, second_partition = self._fixed_split(
-                data, int(timestamp), timestamp_label
+                data_prep, int(timestamp), timestamp_label
             )
 
         return [(first_partition, second_partition)]
 
     def _best_split(
         self,
-        data: FrameT, # DataFrame,
-        user_id_label: str = "user_id",
-        timestamp_label: str = "timestamp",
+        data: DataFrame[Any],
+        user_id_label: str,
+        timestamp_label: str,
         min_below: int = 1,
         min_over: int = 1,
     ) -> int:
         """Optimized method to find the best split timestamp for partitioning data.
 
         Args:
-            data (DataFrame): The original data in DataFrame format.
+            data (DataFrame[Any]): The original data in DataFrame[Any] format.
             user_id_label (str): The user_id label.
             timestamp_label (str): The timestamp label.
             min_below (int): Minimum number of transactions below the timestamp.
@@ -225,44 +265,21 @@ class TimestampSlicingSplit(SplittingStrategy):
         Returns:
             int: Best timestamp for splitting user transactions.
         """
-        # unique_timestamps = np.sort(data[timestamp_label].unique())
-        # n_candidates = unique_timestamps.shape[0]
-
-        # candidate_scores = np.zeros(n_candidates, dtype=int)
-
-        # user_groups = data.groupby(user_id_label)
-
-        # for _, group in user_groups:
-        #     user_ts = np.sort(group[timestamp_label].values)
-        #     total_events = user_ts.shape[0]
-        #     below_counts = np.searchsorted(user_ts, unique_timestamps, side="left")
-        #     over_counts = total_events - below_counts
-
-        #     valid = (below_counts >= min_below) & (over_counts >= min_over)
-        #     candidate_scores += valid.astype(int)
-
-        # max_score = candidate_scores.max()
-
-        # valid_candidates = unique_timestamps[candidate_scores == max_score]
-        # best_timestamp = valid_candidates.max()
-
+        # Conversion to numpy
         df_dict = data.select(user_id_label, timestamp_label).to_dict(as_series=False)
         u_ids = np.array(df_dict[user_id_label])
         ts_vals = np.array(df_dict[timestamp_label])
-        
+
+        # Create the candidate set
         unique_timestamps = np.unique(np.sort(ts_vals))
         n_candidates = unique_timestamps.shape[0]
         candidate_scores = np.zeros(n_candidates, dtype=int)
-        
-        sort_idxs = np.lexsort((ts_vals, u_ids))
-        u_ids_sorted = u_ids[sort_idxs]
-        ts_vals_sorted = ts_vals[sort_idxs]
-        
-        user_change_indices = np.where(u_ids_sorted[:-1] != u_ids_sorted[1:])[0] + 1
-        user_splits = np.split(ts_vals_sorted, user_change_indices)
-        
+
+        # Search for the optimal timestamp
+        user_change_indices = np.where(u_ids[:-1] != u_ids[1:])[0] + 1
+        user_splits = np.split(ts_vals, user_change_indices)
+
         for user_ts in user_splits:
-            # user_ts is already sorted because we sorted global arrays
             total_events = user_ts.shape[0]
             below_counts = np.searchsorted(user_ts, unique_timestamps, side="left")
             over_counts = total_events - below_counts
@@ -270,6 +287,7 @@ class TimestampSlicingSplit(SplittingStrategy):
             valid = (below_counts >= min_below) & (over_counts >= min_over)
             candidate_scores += valid.astype(int)
 
+        # Define the timestamp and return it
         max_score = candidate_scores.max()
         valid_candidates = unique_timestamps[candidate_scores == max_score]
         best_timestamp = valid_candidates.max()
@@ -277,28 +295,22 @@ class TimestampSlicingSplit(SplittingStrategy):
         return best_timestamp
 
     def _fixed_split(
-        self, 
-        data: FrameT, # DataFrame, 
-        timestamp: int, 
-        timestamp_label: str = "timestamp"
-    ) -> Tuple[FrameT, FrameT]: # Tuple[DataFrame, DataFrame]:
+        self, data: DataFrame[Any], timestamp: int, timestamp_label: str = "timestamp"
+    ) -> Tuple[DataFrame[Any], DataFrame[Any]]:
         """Method to split data in two partitions, using a fixed timestamp.
 
         This method will split data based on the timestamp provided.
 
         Args:
-            data (DataFrame): The original data in DataFrame format.
+            data (DataFrame[Any]): The original data in DataFrame[Any] format.
             timestamp (int): The timestamp to be used for splitting.
             timestamp_label (str): The timestamp label.
 
         Returns:
-            Tuple[DataFrame, DataFrame]:
-                - DataFrame: First partition of splitted data.
-                - DataFrame: Second partition of splitted data.
+            Tuple[DataFrame[Any], DataFrame[Any]]:
+                - DataFrame[Any]: First partition of splitted data.
+                - DataFrame[Any]: Second partition of splitted data.
         """
-        # Create a boolean mask for the split
-        # split_mask = data[timestamp_label] < timestamp  # True for train, False for test
-        
         split_mask = nw.col(timestamp_label) < timestamp
         return data.filter(split_mask), data.filter(~split_mask)
 
@@ -309,59 +321,57 @@ class RandomHoldoutSplit(SplittingStrategy):
 
     def __call__(
         self,
-        data: FrameT, # DataFrame,
+        data: FrameT,
         ratio: float = 0.2,
         seed: int = 42,
         **kwargs: Any,
-    ) -> List[Tuple[FrameT, FrameT]]: # List[Tuple[DataFrame, DataFrame]]:
+    ) -> List[Tuple[DataFrame[Any], DataFrame[Any]]]:
         """Method to split data in two partitions, using a ratio.
 
         This method will split data based on the ratio provided.
 
         Args:
-            data (DataFrame): The original data in DataFrame format.
+            data (FrameT): The original data in FrameT format.
             ratio (float): Percentage of data that will end up in the second partition.
             seed (int): The seed used for the random number generator.
             **kwargs (Any): The additional keyword arguments.
 
         Returns:
-            List[Tuple[DataFrame, DataFrame]]:
-                - DataFrame: First partition of splitted data.
-                - DataFrame: Second partition of splitted data.
+            List[Tuple[DataFrame[Any], DataFrame[Any]]]:
+                - DataFrame[Any]: First partition of splitted data.
+                - DataFrame[Any]: Second partition of splitted data.
         """
-        # np.random.seed(seed)
-        # all_indices = data.index.to_numpy()
-        # permuted = np.random.permutation(all_indices)
-        # n_total = len(permuted)
-        # n_partition = int(n_total * ratio)
+        data_prep, idx_col = self._prepare_stable_data(data)
 
-        # first_partition_idxs = permuted[n_partition:]
-        # second_partition_idxs = permuted[:n_partition]
+        # Deterministic sorting before the random part
+        data_prep = data_prep.sort(idx_col)
 
-        # # Split the data using pre-compute indices
-        # first_split = data.loc[first_partition_idxs]
-        # second_split = data.loc[second_partition_idxs]
-        # return [(first_split, second_split)]
-        
-        n_rows = data.select(nw.col(data.columns[0])).shape[0] # Eager length check
+        # Random sampling
+        n_rows = data_prep.select(nw.col(data_prep.columns[0])).shape[0]
         np.random.seed(seed)
         random_vals = np.random.rand(n_rows)
-        
-        # Add random column
-        data_rand = data.with_columns(rand_col=random_vals)
-        
-        # Sort by random column
-        data_rand = data_rand.sort("rand_col")
-        
-        # Split by index/row count
+
+        # Assign the random values
+        rand_series = nw.new_series(
+            name="rand_col",
+            values=random_vals,
+            backend=nw.get_native_namespace(data_prep),
+        )
+        data_rand = data_prep.with_columns(rand_col=rand_series)
+
+        # Sort again based on random column
+        # NOTE: Using the our indexing as a tie-breaker
+        data_rand = data_rand.sort("rand_col", idx_col)
+
+        # Positional split
+        data_rand = data_rand.with_row_index(name="__pos_idx__")
         split_idx = int(n_rows * (1 - ratio))
-        
-        # Since we don't have generic iloc, we can use head/tail or add a row_index
-        data_rand = data_rand.with_row_index(name="row_idx")
-        
-        train = data_rand.filter(nw.col("row_idx") < split_idx).drop("rand_col", "row_idx")
-        test = data_rand.filter(nw.col("row_idx") >= split_idx).drop("rand_col", "row_idx")
-        
+
+        # Clean the output
+        cols_to_drop = ["rand_col", "__pos_idx__", idx_col]
+        train = data_rand.filter(nw.col("__pos_idx__") < split_idx).drop(cols_to_drop)
+        test = data_rand.filter(nw.col("__pos_idx__") >= split_idx).drop(cols_to_drop)
+
         return [(train, test)]
 
 
@@ -371,75 +381,65 @@ class RandomLeaveKOutSplit(SplittingStrategy):
 
     def __call__(
         self,
-        data: FrameT, # DataFrame,
+        data: FrameT,
         user_id_label: str = "user_id",
         k: int = 1,
         seed: int = 42,
         **kwargs: Any,
-    ) -> List[Tuple[FrameT, FrameT]]: # List[Tuple[DataFrame, DataFrame]]:
+    ) -> List[Tuple[DataFrame[Any], DataFrame[Any]]]:
         """Method to split data in two partitions, using a ratio.
 
         This method will split data based on the ratio provided.
 
         Args:
-            data (DataFrame): The original data in DataFrame format.
+            data (FrameT): The original data in FrameT format.
             user_id_label (str): The user_id label.
             k (int): Number of transaction that will end up in the second partition.
             seed (int): The seed used for the random number generator.
             **kwargs (Any): The additional keyword arguments.
 
         Returns:
-            List[Tuple[DataFrame, DataFrame]]:
-                - DataFrame: First partition of splitted data.
-                - DataFrame: Second partition of splitted data.
+            List[Tuple[DataFrame[Any], DataFrame[Any]]]:
+                - DataFrame[Any]: First partition of splitted data.
+                - DataFrame[Any]: Second partition of splitted data.
         """
-        # first_partition_all: list[Any] = []
-        # second_partition_all: list[Any] = []
+        data_prep, idx_col = self._prepare_stable_data(data)
 
-        # # Process each user group separately
-        # for _, group in data.groupby(user_id_label):
-        #     indices = group.index.tolist()
-        #     # Proceed only if the user has more than test_k interactions
-        #     if len(indices) <= k:
-        #         continue
+        # Pre-filtering
+        data_prep = data_prep.with_columns(n_items=nw.len().over(user_id_label))
+        data_prep = data_prep.filter(nw.col("n_items") > k)
 
-        #     # Shuffle the indices for the current user
-        #     permuted = np.random.permutation(indices).tolist()
+        # Deterministic sorting before the random part
+        data_prep = data_prep.sort(idx_col)
 
-        #     # Select first test_k indices for the second partition and the rest for the first partition
-        #     first_partition_idxs = permuted[k:]
-        #     second_partition_idxs = permuted[:k]
-
-        #     first_partition_all.extend(first_partition_idxs)
-        #     second_partition_all.extend(second_partition_idxs)
-
-        # return [(data.loc[first_partition_all], data.loc[second_partition_all])]
-        
-        # 1. Filter users with <= k interactions
-        data = data.with_columns(n_items=nw.len().over(user_id_label))
-        data = data.filter(nw.col("n_items") > k)
-        
-        # 2. Shuffle per user? Or Global shuffle then group?
-        # To simulate "Random Leave K Out", we pick K random items per user for test.
-        # We can assign a random float to every row, then rank over user.
-        
-        n_rows = data.select(nw.col(data.columns[0])).shape[0]
+        # Random sampling
+        n_rows = data_prep.select(nw.col(data_prep.columns[0])).shape[0]
         np.random.seed(seed)
         random_vals = np.random.rand(n_rows)
-        
-        data = data.with_columns(rand_col=random_vals)
-        
-        # Rank items per user based on random value
-        data = data.with_columns(
+
+        # Assign the random values
+        rand_series = nw.new_series(
+            name="rand_col",
+            values=random_vals,
+            backend=nw.get_native_namespace(data_prep),
+        )
+        data_prep = data_prep.with_columns(rand_col=rand_series)
+
+        # Sort again based on random column
+        # NOTE: Using the our indexing as a tie-breaker
+        data_prep = data_prep.sort(by=[user_id_label, "rand_col", idx_col])
+        data_prep = data_prep.with_columns(
             rnd_rank=nw.col("rand_col").rank(method="ordinal").over(user_id_label)
         )
-        
-        # Test: rank <= k (The first k random items)
+
+        # Masking
         test_mask = nw.col("rnd_rank") <= k
-        
-        train = data.filter(~test_mask).drop("n_items", "rand_col", "rnd_rank")
-        test = data.filter(test_mask).drop("n_items", "rand_col", "rnd_rank")
-        
+
+        # Clean the output
+        cols_to_drop = ["n_items", "rand_col", "rnd_rank", idx_col]
+        train = data_prep.filter(~test_mask).drop(cols_to_drop)
+        test = data_prep.filter(test_mask).drop(cols_to_drop)
+
         return [(train, test)]
 
 
@@ -449,69 +449,51 @@ class KFoldCrossValidation(SplittingStrategy):
 
     def __call__(
         self,
-        data: FrameT, # DataFrame,
+        data: FrameT,
         folds: int,
         user_id_label: str = "user_id",
         **kwargs: Any,
-    ) -> List[Tuple[FrameT, FrameT]]: # List[Tuple[DataFrame, DataFrame]]:
+    ) -> List[Tuple[DataFrame[Any], DataFrame[Any]]]:
         """Method to split data in 'folds' times.
 
         Args:
-            data (DataFrame): The original data in DataFrame format.
+            data (FrameT): The original data in FrameT format.
             folds (int): The number of folds to create.
             user_id_label (str): The user_id label.
             **kwargs (Any): The additional keyword arguments.
 
         Returns:
-            List[Tuple[DataFrame, DataFrame]]:
-                - DataFrame: First partition of splitted data.
-                - DataFrame: Second partition of splitted data.
+            List[Tuple[DataFrame[Any], DataFrame[Any]]]:
+                - DataFrame[Any]: First partition of splitted data.
+                - DataFrame[Any]: Second partition of splitted data.
         """
-        # for _, group in data.groupby(user_id_label):
-        #     data.loc[group.index, "fold"] = self.fold_list_generator(len(group), folds)
+        data_prep, idx_col = self._prepare_stable_data(data)
 
-        # data["fold"] = pd.to_numeric(data["fold"], downcast="integer")
-        # tuple_list = []
-        # for i in range(folds):
-        #     test = data[data["fold"] == i].drop(columns=["fold"]).reset_index(drop=True)
-        #     train = (
-        #         data[data["fold"] != i].drop(columns=["fold"]).reset_index(drop=True)
-        #     )
-        #     tuple_list.append((train, test))
-        # return tuple_list
-        
-        data_with_folds = data.with_columns(
-            row_n=nw.col(user_id_label).cum_count().over(user_id_label)
+        # Deterministic sorting
+        data_prep = data_prep.sort(by=[user_id_label, idx_col])
+
+        # Generate fold index
+        data_with_folds = data_prep.with_columns(
+            seq_id=nw.col(idx_col).rank(method="ordinal").over(user_id_label)
         )
-        
-        # cum_count usually starts at 0 or 1 depending on backend, but modulo works anyway.
-        # Let's ensure we have a fold column
         data_with_folds = data_with_folds.with_columns(
-            fold=(nw.col("row_n") % folds)
+            fold=(nw.col("seq_id") - 1) % folds
         )
-        
+
         tuple_list = []
+        cols_to_drop = ["seq_id", "fold", idx_col]
+
+        # Iterate through the folds
         for i in range(folds):
-            test = data_with_folds.filter(nw.col("fold") == i).drop("row_n", "fold")
-            train = data_with_folds.filter(nw.col("fold") != i).drop("row_n", "fold")
+            # Filter
+            test = data_with_folds.filter(nw.col("fold") == i)
+            train = data_with_folds.filter(nw.col("fold") != i)
+
+            # Explicit sorting to ensure the ordering of the tuples
+            # NOTE: Some backends might lose the order during the filtering process
+            train = train.sort(idx_col).drop(cols_to_drop)
+            test = test.sort(idx_col).drop(cols_to_drop)
+
             tuple_list.append((train, test))
-            
+
         return tuple_list
-
-    # def fold_list_generator(self, length: int, folds: int = 5) -> List[int]:
-    #     """Utility method to create the fold column for transaction data.
-
-    #     Args:
-    #         length (int): The length of the list.
-    #         folds (int): The number of folds to create.
-
-    #     Returns:
-    #         List[int]: The list of repetitive folds indices.
-    #     """
-
-    #     def infinite_looper(folds: int = 5):
-    #         while True:
-    #             yield from range(folds)
-
-    #     looper = infinite_looper(folds)
-    #     return [next(looper) for _ in range(length)]
