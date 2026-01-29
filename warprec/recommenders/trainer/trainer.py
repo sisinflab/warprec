@@ -479,14 +479,6 @@ class Trainer:
         # Load checkpoint on CPU, move model later
         checkpoint_data = torch.load(ckpt_path, weights_only=True, map_location="cpu")
 
-        # Retrieve state dict
-        if "model_state" in checkpoint_data:
-            state_dict = checkpoint_data["model_state"]
-        elif "state_dict" in checkpoint_data:
-            state_dict = checkpoint_data["state_dict"]
-        else:
-            state_dict = checkpoint_data
-
         # Initialize the model and load checkpoint
         model = model_registry.get(
             name=model_name,
@@ -497,7 +489,7 @@ class Trainer:
             info=dataset.info(),
             **dataset.get_stash(),
         )
-        model.load_state_dict(state_dict)
+        model.load_state_dict(checkpoint_data["state_dict"])
         return model
 
     def _aggregate_cv_results(self, df, metric, mode, desired_it_stat):
