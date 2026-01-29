@@ -19,7 +19,7 @@ model = "SASRec"
 
 # Load the models checkpoints
 #TODO Model for Movielens sequential recommendations
-movielens_model = torch.load(f"{checkpoints_directory}/{model}_movielens.pth")
+# movielens_model = torch.load(f"{checkpoints_directory}/{model}_movielens.pth")
 # movielens_model = SASRec.from_checkpoint(checkpoint=movielens_model)
 
 #! ...
