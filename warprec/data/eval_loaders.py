@@ -1,10 +1,9 @@
-from typing import Tuple, List
+from typing import Tuple, List, Any
 
 import torch
 import numpy as np
 
-import narwhals as nw
-from narwhals.typing import FrameT
+from narwhals.dataframe import DataFrame
 
 from torch import Tensor
 from torch.utils.data import DataLoader, Dataset as TorchDataset
@@ -41,7 +40,7 @@ class ContextualEvaluationDataset(TorchDataset):
 
     def __init__(
         self,
-        eval_data: FrameT,
+        eval_data: DataFrame[Any],
         user_id_label: str,
         item_id_label: str,
         context_labels: List[str],
@@ -96,7 +95,6 @@ class SampledEvaluationDataset(TorchDataset):
             self.all_positives.append(np.union1d(train_indices, eval_indices))
 
         # Identify users who actually have evaluation data
-        # (We only want to iterate over these)
         self.users_with_eval = [
             u
             for u in range(self.num_users)
@@ -130,8 +128,6 @@ class SampledEvaluationDataset(TorchDataset):
             candidates = np.random.randint(0, self.num_items, size=num_to_generate)
 
             # Fast filtering using numpy boolean masking
-            # Note: For very large item sets, np.isin can be slow.
-            # If num_items > 1M, consider Bloom Filters or just the 'while' loop.
             mask = np.isin(candidates, seen_items, invert=True)
             valid_negatives = candidates[mask]
 
@@ -172,7 +168,7 @@ class SampledContextualEvaluationDataset(TorchDataset):
     def __init__(
         self,
         train_interactions: csr_matrix,
-        eval_data: FrameT,
+        eval_data: DataFrame[Any],
         user_id_label: str,
         item_id_label: str,
         context_labels: List[str],
@@ -278,7 +274,7 @@ class ContextualEvaluationDataLoader(DataLoader):
 
     def __init__(
         self,
-        eval_data: FrameT,
+        eval_data: DataFrame[Any],
         user_id_label: str,
         item_id_label: str,
         context_labels: List[str],
@@ -356,7 +352,7 @@ class SampledContextualEvaluationDataLoader(DataLoader):
     def __init__(
         self,
         train_interactions: csr_matrix,
-        eval_data: FrameT,
+        eval_data: DataFrame[Any],
         user_id_label: str,
         item_id_label: str,
         context_labels: List[str],
