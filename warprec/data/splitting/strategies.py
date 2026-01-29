@@ -31,7 +31,9 @@ class SplittingStrategy(ABC):
 
         return materialized_data.with_row_index(name=index_col), index_col
 
-    def __call__(self, data: FrameT, **kwargs: Any) -> List[Tuple[FrameT, FrameT]]:
+    def __call__(
+        self, data: FrameT, **kwargs: Any
+    ) -> List[Tuple[DataFrame[Any], DataFrame[Any]]]:
         """This method will split the data in train/eval split.
 
         Args:
@@ -39,9 +41,9 @@ class SplittingStrategy(ABC):
             **kwargs (Any): The additional keyword arguments.
 
         Returns:
-            List[Tuple[FrameT, FrameT]]:
-                - FrameT: First partition of splitted data.
-                - FrameT: Second partition of splitted data.
+            List[Tuple[DataFrame[Any], DataFrame[Any]]]:
+                - DataFrame[Any]: First partition of splitted data.
+                - DataFrame[Any]: Second partition of splitted data.
         """
 
 

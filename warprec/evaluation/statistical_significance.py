@@ -1,10 +1,11 @@
 # pylint: disable = too-few-public-methods
-from typing import Dict, Tuple, Optional, Set
+from typing import Dict, Tuple, Optional, Set, Any
 from abc import ABC, abstractmethod
 from itertools import combinations
 
 import numpy as np
-from pandas import DataFrame
+import narwhals as nw
+from narwhals.dataframe import DataFrame
 from torch import Tensor
 from scipy.stats import wilcoxon, ttest_rel, kruskal, mannwhitneyu
 
@@ -121,61 +122,95 @@ class WhitneyUTest(StatisticalTest):
         return stat, p
 
 
-def apply_bonferroni_correction(results: DataFrame, alpha: float = 0.05) -> DataFrame:
+def apply_bonferroni_correction(
+    results: DataFrame[Any], alpha: float = 0.05
+) -> DataFrame[Any]:
     """Apply Bonferroni correction to p-values in the results DataFrame.
 
     Args:
-        results (DataFrame): The DataFrame containing p-values.
+        results (DataFrame[Any]): The DataFrame containing p-values.
         alpha (float): The significance level for the correction.
 
     Returns:
-        DataFrame: The DataFrame with corrected significance values.
+        DataFrame[Any]: The DataFrame with corrected significance values.
     """
-    corrected_alpha = alpha / len(results)
-    results[f"Significance (Bonferroni α={corrected_alpha})"] = (
-        results["p-value"] < corrected_alpha
-    ).map({True: "Accepted", False: "Rejected"})
-    return results
+    n_tests = results.select(nw.len()).item()
+    corrected_alpha = alpha / n_tests
+
+    return results.with_columns(
+        nw.when(nw.col("p-value") < corrected_alpha)
+        .then(nw.lit("Accepted"))
+        .otherwise(nw.lit("Rejected"))
+        .alias(f"Significance (Bonferroni α={corrected_alpha:.2e})")
+    )
 
 
 def apply_holm_bonferroni_correction(
-    results: DataFrame, alpha: float = 0.05
-) -> DataFrame:
+    results: DataFrame[Any], alpha: float = 0.05
+) -> DataFrame[Any]:
     """Apply Holm-Bonferroni correction to p-values in the results DataFrame.
 
     Args:
-        results (DataFrame): The DataFrame containing p-values.
+        results (DataFrame[Any]): The DataFrame containing p-values.
         alpha (float): The significance level for the correction.
 
     Returns:
-        DataFrame: The DataFrame with corrected significance values.
+        DataFrame[Any]: The DataFrame with corrected significance values.
     """
-    results.sort_values("p-value", inplace=True)
-    results["Holm-Bonferroni Rank"] = range(1, len(results) + 1)
-    results["Significance (Holm-Bonferroni)"] = (
-        results["p-value"] < (alpha / results["Holm-Bonferroni Rank"])
-    ).map({True: "Accepted", False: "Rejected"})
-    results.drop(columns=["Holm-Bonferroni Rank"], inplace=True)
-    return results
+    results = results.sort("p-value")
+
+    # Create a rank column (1-based)
+    # We use 'ordinal' rank to get a simple 1..N sequence matching the sort
+    results = results.with_columns(
+        nw.col("p-value").rank(method="ordinal").alias("Holm-Bonferroni Rank")
+    )
+
+    # Apply logic
+    results = results.with_columns(
+        nw.when(
+            nw.col("p-value")
+            < (alpha / (nw.len() - nw.col("Holm-Bonferroni Rank") + 1))
+        )
+        .then(nw.lit("Accepted"))
+        .otherwise(nw.lit("Rejected"))
+        .alias("Significance (Holm-Bonferroni)")
+    )
+
+    return results.drop("Holm-Bonferroni Rank")
 
 
-def apply_fdr_correction(results: DataFrame, alpha: float = 0.05) -> DataFrame:
+def apply_fdr_correction(
+    results: DataFrame[Any], alpha: float = 0.05
+) -> DataFrame[Any]:
     """Apply False Discovery Rate (FDR) correction to p-values in the results DataFrame.
 
     Args:
-        results (DataFrame): The DataFrame containing p-values.
+        results (DataFrame[Any]): The DataFrame containing p-values.
         alpha (float): The significance level for the correction.
 
     Returns:
-        DataFrame: The DataFrame with corrected significance values.
+        DataFrame[Any]: The DataFrame with corrected significance values.
     """
-    results["FDR Rank"] = results["p-value"].rank(method="first")
-    results["FDR Threshold"] = alpha * results["FDR Rank"] / len(results)
-    results["Significance (FDR)"] = (results["p-value"] < results["FDR Threshold"]).map(
-        {True: "Accepted", False: "Rejected"}
+    results = results.sort("p-value")
+
+    results = results.with_columns(
+        nw.col("p-value").rank(method="ordinal").alias("FDR Rank")
     )
-    results.drop(columns=["FDR Rank", "FDR Threshold"], inplace=True)
-    return results
+
+    # Calculate Threshold
+    # Threshold = (Rank / Total) * Alpha
+    results = results.with_columns(
+        (alpha * nw.col("FDR Rank") / nw.len()).alias("FDR Threshold")
+    )
+
+    results = results.with_columns(
+        nw.when(nw.col("p-value") < nw.col("FDR Threshold"))
+        .then(nw.lit("Accepted"))
+        .otherwise(nw.lit("Rejected"))
+        .alias("Significance (FDR)")
+    )
+
+    return results.drop(["FDR Rank", "FDR Threshold"])
 
 
 def compute_paired_statistical_test(
@@ -185,7 +220,7 @@ def compute_paired_statistical_test(
     bonferroni: bool = False,
     holm_bonferroni: bool = False,
     fdr: bool = False,
-) -> DataFrame:
+) -> DataFrame[Any]:
     """Compute pairwise statistical significance tests on evaluation results.
 
     Args:
@@ -205,7 +240,7 @@ def compute_paired_statistical_test(
         fdr (bool): Whether to apply False Discovery Rate correction.
 
     Returns:
-        DataFrame: A DataFrame containing the results of the pairwise statistical tests.
+        DataFrame[Any]: A DataFrame containing the results of the pairwise statistical tests.
     """
     # Initialize information for pairwise statistical test
     rows = []
@@ -273,12 +308,16 @@ def compute_paired_statistical_test(
                         f"Error on {model_a} vs {model_b} | {metric} @ {cutoff}: {e}"
                     )
 
-    # Apply correction to statistical test results
-    stat_test_df = DataFrame(rows)
+    # Convert to DataFrame
+    data_dict = {k: [r[k] for r in rows] for k in rows[0].keys()}
+    stat_test_df = nw.from_dict(data_dict)
+
+    # Apply corrections
     if bonferroni:
         stat_test_df = apply_bonferroni_correction(stat_test_df, alpha)
     if holm_bonferroni:
         stat_test_df = apply_holm_bonferroni_correction(stat_test_df, alpha)
     if fdr:
         stat_test_df = apply_fdr_correction(stat_test_df, alpha)
+
     return stat_test_df
