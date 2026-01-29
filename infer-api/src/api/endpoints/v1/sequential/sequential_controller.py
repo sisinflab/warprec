@@ -53,6 +53,9 @@ def get_movielens_recommendations(data: SequentialDataRequest):
         user_seq=sequence,
         seq_len=torch.tensor([len(data.sequence)], device=movielens_model.device),
     )
-
-    return SequentialDataResponse(recommendations=predictions)
+    
+    # Get top-k recommendations
+    top_k_indices = torch.topk(predictions, k=data.top_k).indices.squeeze().tolist()
+    
+    return SequentialDataResponse(recommendations=top_k_indices)
     

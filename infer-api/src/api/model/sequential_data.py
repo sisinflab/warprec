@@ -9,6 +9,7 @@ class SequentialDataRequest(BaseModelCustom):
     Attributes:
         sequence (List[int]): A list of numerical values representing the sequential data.
     """
+    top_k: int = 10
     sequence: List[int]
 
 class SequentialDataResponse(BaseModelCustom):

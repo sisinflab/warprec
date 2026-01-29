@@ -4,7 +4,6 @@ from fastapi.security.api_key import APIKeyHeader
 from src.config import BaseConfig
 
 
-
 # Get API key from environment variables
 config = BaseConfig()
 

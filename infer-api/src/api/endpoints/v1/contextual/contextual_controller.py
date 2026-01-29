@@ -2,6 +2,8 @@ import torch
 
 from fastapi import APIRouter, Depends
 
+from warprec.recommenders.context_aware_recommender import FM
+
 from ....security import get_api_key
 
 
@@ -12,7 +14,7 @@ router = APIRouter(
 )
 
 checkpoints_directory = "checkpoints/contextual"
-model = ""
+model = "FM"
 
 # Load the models checkpoints
 #! Model for Movielens contextual recommendations

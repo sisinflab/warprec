@@ -2,6 +2,8 @@ import torch
 
 from fastapi import APIRouter, Depends
 
+from warprec.recommenders.collaborative_filtering_recommender.latent_factor import BPR
+
 from ....security import get_api_key
 
 
@@ -12,7 +14,7 @@ router = APIRouter(
 )
 
 checkpoints_directory = "checkpoints/collaborative"
-model = ""
+model = "BPR"
 
 # Load the models checkpoints
 #! Model for Movielens collaborative recommendations

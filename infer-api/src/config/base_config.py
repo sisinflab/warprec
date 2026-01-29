@@ -18,7 +18,8 @@ class BaseConfig(BaseModel):
     
     def __init__(self, **data):
         
-        load_dotenv()  # Load environment variables from .env file
+        # Load environment variables from .env file
+        load_dotenv()
         
         super().__init__(
             SERVER_HOST     = os.getenv('SERVER_HOST', "0.0.0.0"),

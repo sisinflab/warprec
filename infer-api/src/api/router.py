@@ -20,5 +20,5 @@ def health():
         message="healthy"
     )
 
-# Include individual routers
+# Include warprec routers
 router.include_router(router=warprec_router)

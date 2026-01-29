@@ -10,7 +10,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 from src.config import BaseConfig
 from src.api import router
 
-
+# Create FastAPI app
 app = FastAPI(
     title="Warprec Inference API",
     description="API for Warprec model inference",
@@ -18,8 +18,10 @@ app = FastAPI(
     swagger_ui_parameters={"defaultModelsExpandDepth": 0},
 )
 
+# Load configuration
 config = BaseConfig()
 
+# Include the main router
 app.include_router(router=router)
 
 if __name__ == "__main__":
