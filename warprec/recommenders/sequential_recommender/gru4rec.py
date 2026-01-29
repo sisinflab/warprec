@@ -21,7 +21,6 @@ class GRU4Rec(IterativeRecommender, SequentialRecommenderUtils):
 
     Args:
         params (dict): Model parameters.
-        interactions (Interactions): The training interactions.
         info (dict): The dictionary containing dataset information.
         *args (Any): Variable length argument list.
         seed (int): The seed to use for reproducibility.
@@ -61,13 +60,12 @@ class GRU4Rec(IterativeRecommender, SequentialRecommenderUtils):
     def __init__(
         self,
         params: dict,
-        interactions: Interactions,
         info: dict,
         *args: Any,
         seed: int = 42,
         **kwargs: Any,
     ):
-        super().__init__(params, interactions, info, *args, seed=seed, **kwargs)
+        super().__init__(params, info, *args, seed=seed, **kwargs)
 
         self.item_embedding = nn.Embedding(
             self.n_items + 1,
