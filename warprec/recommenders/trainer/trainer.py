@@ -477,7 +477,7 @@ class Trainer:
             return None
 
         # Load checkpoint on CPU, move model later
-        checkpoint_data = torch.load(ckpt_path, weights_only=True, map_location="cpu")
+        checkpoint_data = torch.load(ckpt_path, weights_only=False, map_location="cpu")
 
         # Initialize the model and load checkpoint
         model = model_registry.get(

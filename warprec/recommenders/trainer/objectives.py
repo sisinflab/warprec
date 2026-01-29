@@ -521,7 +521,7 @@ def objective_function_ddp(config: dict) -> None:
             # Save checkpoint only on rank 0 to prevent race conditions
             if train.get_context().get_world_rank() == 0:
                 torch.save(
-                    {"model_state": unwrapped_model.get_state()},
+                    unwrapped_model.get_state(),
                     os.path.join(tmpdir, "checkpoint.pt"),
                 )
             # Ensure rank 0 has saved before other ranks try to access it
@@ -648,7 +648,7 @@ def validation_report(model: Recommender, **kwargs: Any):
 
     with tempfile.TemporaryDirectory() as tmpdir:
         torch.save(
-            {"model_state": model.get_state()},
+            model.get_state(),
             os.path.join(tmpdir, "checkpoint.pt"),
         )
         tune.report(
