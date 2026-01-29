@@ -155,9 +155,9 @@ class Recommender(nn.Module, ABC):
         Raises:
             ValueError: When trying to load a model checkpoint of a different model.
         """
-        if checkpoint["name"] != cls.name:
+        if checkpoint["name"] != cls.__name__:
             raise ValueError(
-                f"Warning: Loading a {checkpoint['name']} checkpoint into {cls.name} class."
+                f"Warning: Loading a {checkpoint['name']} checkpoint into {cls.__name__} class."
             )
 
         # Common initialization params + additional parameters
