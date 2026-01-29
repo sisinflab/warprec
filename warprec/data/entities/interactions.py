@@ -7,7 +7,7 @@ from torch import Tensor
 from torch.utils.data import DataLoader, TensorDataset
 
 import narwhals as nw
-from narwhals.typing import FrameT
+from narwhals.dataframe import DataFrame
 
 from scipy.sparse import csr_matrix, coo_matrix
 
@@ -23,13 +23,13 @@ class Interactions:
     """Interactions class will handle the data of the transactions.
 
     Args:
-        data (DataFrame): Transaction data in DataFrame format.
+        data (DataFrame[Any]): Transaction data in DataFrame format.
         original_dims (Tuple[int, int]):
             int: Number of users.
             int: Number of items.
         user_mapping (dict): Mapping of user ID -> user idx.
         item_mapping (dict): Mapping of item ID -> item idx.
-        side_data (Optional[DataFrame]): The side information features in DataFrame format.
+        side_data (Optional[DataFrame[Any]]): The side information features in DataFrame format.
         user_cluster (Optional[dict]): The user cluster information.
         item_cluster (Optional[dict]): The item cluster information.
         batch_size (int): The batch size that will be used to
@@ -39,18 +39,15 @@ class Interactions:
         context_labels (Optional[List[str]]): The list of labels of the
             contextual data.
         precision (Any): The precision of the internal representation of the data.
-
-    Raises:
-        ValueError: If the rating type is not supported.
     """
 
     def __init__(
         self,
-        data: FrameT,
+        data: DataFrame[Any],
         original_dims: Tuple[int, int],
         user_mapping: dict,
         item_mapping: dict,
-        side_data: Optional[FrameT] = None,
+        side_data: Optional[DataFrame[Any]] = None,
         user_cluster: Optional[dict] = None,
         item_cluster: Optional[dict] = None,
         batch_size: int = 1024,
@@ -71,7 +68,7 @@ class Interactions:
         # Setup the training variables
         self._cached_dataset: Dict[str, TensorDataset] = {}
         self._cached_tensor: Dict[str, Tensor] = {}
-        self._inter_dict: dict = {}
+        self._inter_dict: Optional[dict] = None
         self._inter_sparse: csr_matrix = None
         self._inter_side_sparse: csr_matrix = None
         self._inter_side_tensor: Tensor = None
@@ -85,7 +82,7 @@ class Interactions:
         self.item_label = data.columns[1]
         self.rating_label = rating_label if rating_type == RatingType.EXPLICIT else None
         self.context_labels = context_labels if context_labels else []
-        
+
         # Set mappings
         self._umap = user_mapping
         self._imap = item_mapping
@@ -94,14 +91,19 @@ class Interactions:
         if self._inter_side is not None:
             valid_items = self._inter_df.select(self.item_label).unique()
             # We use inner join on unique items to filter
-            self._inter_side = self._inter_side.join(valid_items, on=self.item_label, how="inner")
+            self._inter_side = self._inter_side.join(
+                valid_items, on=self.item_label, how="inner"
+            )
 
             # Order side information to be in the same order of the dataset (by item index)
             # Create mapping DF for items
-            imap_df = nw.from_dict({
-                self.item_label: list(item_mapping.keys()),
-                "__order__": list(item_mapping.values())
-            }, native_namespace=nw.get_native_namespace(self._inter_side))
+            imap_df = nw.from_dict(
+                {
+                    self.item_label: list(item_mapping.keys()),
+                    "__order__": list(item_mapping.values()),
+                },
+                native_namespace=nw.get_native_namespace(self._inter_side),
+            )
 
             # Join to get the order, sort, and drop temp column
             self._inter_side = (
@@ -134,32 +136,6 @@ class Interactions:
         self._og_nuid, self._og_niid = original_dims
         self._transactions = self._inter_df.select(nw.len()).item()
 
-        # Set the index
-        self._index = 0
-        
-        u_vals = self._inter_df.select(self.user_label).to_numpy().flatten()
-        i_vals = self._inter_df.select(self.item_label).to_numpy().flatten()
-
-        # Define the interaction dictionary, based on the RatingType selected
-        if rating_type == RatingType.EXPLICIT:
-            r_vals = self._inter_df.select(self.rating_label).to_numpy().flatten()
-            # Build dict: {user: {item: rating}}
-            # Iterating numpy arrays is faster than pandas apply/groupby for this specific structure
-            self._inter_dict = {}
-            for u, i, r in zip(u_vals, i_vals, r_vals):
-                if u not in self._inter_dict:
-                    self._inter_dict[u] = {}
-                self._inter_dict[u][i] = r
-                
-        elif rating_type == RatingType.IMPLICIT:
-            self._inter_dict = {}
-            for u, i in zip(u_vals, i_vals):
-                if u not in self._inter_dict:
-                    self._inter_dict[u] = {}
-                self._inter_dict[u][i] = 1
-        else:
-            raise ValueError(f"Rating type {rating_type} not supported.")
-
     def clear_dataset_cache(self):
         """This method will clear the cached Dataset objects."""
         del self._cached_dataset
@@ -175,13 +151,33 @@ class Interactions:
             dict: The transaction information in the current
                 representation {user ID: {item ID: rating}}.
         """
+        if self._inter_dict is not None:
+            return self._inter_dict
+
+        u_vals = self._inter_df.select(self.user_label).to_numpy().flatten()
+        i_vals = self._inter_df.select(self.item_label).to_numpy().flatten()
+
+        self._inter_dict = {}
+
+        if self.rating_type == RatingType.EXPLICIT:
+            r_vals = self._inter_df.select(self.rating_label).to_numpy().flatten()
+            for u, i, r in zip(u_vals, i_vals, r_vals):
+                if u not in self._inter_dict:
+                    self._inter_dict[u] = {}
+                self._inter_dict[u][i] = r
+        elif self.rating_type == RatingType.IMPLICIT:
+            for u, i in zip(u_vals, i_vals):
+                if u not in self._inter_dict:
+                    self._inter_dict[u] = {}
+                self._inter_dict[u][i] = 1
+
         return self._inter_dict
 
-    def get_df(self) -> FrameT:
+    def get_df(self) -> DataFrame[Any]:
         """This method will return the raw data.
 
         Returns:
-            DataFrame: The raw data in tabular format.
+            DataFrame[Any]: The raw data in tabular format.
         """
         return self._inter_df
 
@@ -224,19 +220,29 @@ class Interactions:
         if rating_df.select(nw.len()).item() == 0:
             return coo_matrix((self._og_nuid, self._og_niid), dtype=self.precision)
 
-        umap_df = nw.from_dict({
-            self.user_label: list(self._umap.keys()),
-            "__uidx__": list(self._umap.values())
-        }, native_namespace=nw.get_native_namespace(rating_df))
-        
-        imap_df = nw.from_dict({
-            self.item_label: list(self._imap.keys()),
-            "__iidx__": list(self._imap.values())
-        }, native_namespace=nw.get_native_namespace(rating_df))
+        umap_df = nw.from_dict(
+            {
+                self.user_label: list(self._umap.keys()),
+                "__uidx__": list(self._umap.values()),
+            },
+            native_namespace=nw.get_native_namespace(rating_df),
+        )
+
+        imap_df = nw.from_dict(
+            {
+                self.item_label: list(self._imap.keys()),
+                "__iidx__": list(self._imap.values()),
+            },
+            native_namespace=nw.get_native_namespace(rating_df),
+        )
 
         # Join to map
-        mapped_df = rating_df.join(umap_df, on=self.user_label, how="inner") \
-                             .join(imap_df, on=self.item_label, how="inner")
+        mapped_df = rating_df.join(umap_df, on=self.user_label, how="inner").join(
+            imap_df, on=self.item_label, how="inner"
+        )
+
+        # Sort to ensure reproducibility
+        mapped_df = mapped_df.sort(["__uidx__", "__iidx__"])
 
         # Extract indices
         users = mapped_df.select("__uidx__").to_numpy().flatten()
@@ -264,15 +270,13 @@ class Interactions:
             return self._inter_side_sparse
         if self._inter_side is None:
             return None
-        
+
         # Drop item label and convert to sparse
         side_features = self._inter_side.drop(self.item_label)
         # Convert to numpy first
         side_np = side_features.to_numpy()
-        
-        self._inter_side_sparse = csr_matrix(
-            side_np, dtype=self.precision
-        )
+
+        self._inter_side_sparse = csr_matrix(side_np, dtype=self.precision)
         return self._inter_side_sparse
 
     def get_side_tensor(self) -> Tensor:
@@ -371,35 +375,45 @@ class Interactions:
             ValueError: If context flag has been set but no context
                 information is present in the DataFrame.
         """
-        
+
         # Helper to get mapped indices
         def get_mapped_indices():
             # Create mapping DFs
-            umap_df = nw.from_dict({
-                self.user_label: list(self._umap.keys()),
-                "__uidx__": list(self._umap.values())
-            }, native_namespace=nw.get_native_namespace(self._inter_df))
-            
-            imap_df = nw.from_dict({
-                self.item_label: list(self._imap.keys()),
-                "__iidx__": list(self._imap.values())
-            }, native_namespace=nw.get_native_namespace(self._inter_df))
+            umap_df = nw.from_dict(
+                {
+                    self.user_label: list(self._umap.keys()),
+                    "__uidx__": list(self._umap.values()),
+                },
+                native_namespace=nw.get_native_namespace(self._inter_df),
+            )
+
+            imap_df = nw.from_dict(
+                {
+                    self.item_label: list(self._imap.keys()),
+                    "__iidx__": list(self._imap.values()),
+                },
+                native_namespace=nw.get_native_namespace(self._inter_df),
+            )
 
             # Join
-            mapped_df = self._inter_df.join(umap_df, on=self.user_label, how="inner") \
-                                      .join(imap_df, on=self.item_label, how="inner")
-            
+            mapped_df = self._inter_df.join(
+                umap_df, on=self.user_label, how="inner"
+            ).join(imap_df, on=self.item_label, how="inner")
+
+            # Sort to ensure reproducibility
+            mapped_df = mapped_df.sort(["__uidx__", "__iidx__"])
+
             u_idx = mapped_df.select("__uidx__").to_numpy().flatten().astype(np.int64)
             i_idx = mapped_df.select("__iidx__").to_numpy().flatten().astype(np.int64)
             return u_idx, i_idx
-        
+
         # pylint: disable=too-many-branches, too-many-statements
         if low_memory:
             sparse_matrix = self.get_sparse()
 
             # Extract positive interaction information
             pos_users_np, pos_items_np = get_mapped_indices()
-            
+
             # Prepare side information
             side_info_tensor = None
             if include_side_info:
@@ -733,8 +747,9 @@ class Interactions:
         if self.rating_type != RatingType.EXPLICIT or self.rating_label is None:
             return np.array([])
 
-        return np.sort(self._inter_df.select(self.rating_label).unique().to_numpy().flatten())
-
+        return np.sort(
+            self._inter_df.select(self.rating_label).unique().to_numpy().flatten()
+        )
 
     def _to_sparse(self) -> csr_matrix:
         """This method will create the sparse representation of the data contained.
@@ -744,28 +759,33 @@ class Interactions:
         Returns:
             csr_matrix: Sparse representation of the transactions (CSR Format).
         """
-        umap_df = nw.from_dict({
-            self.user_label: list(self._umap.keys()),
-            "__uidx__": list(self._umap.values())
-        }, native_namespace=nw.get_native_namespace(self._inter_df))
-        
-        imap_df = nw.from_dict({
-            self.item_label: list(self._imap.keys()),
-            "__iidx__": list(self._imap.values())
-        }, native_namespace=nw.get_native_namespace(self._inter_df))
+        umap_df = nw.from_dict(
+            {
+                self.user_label: list(self._umap.keys()),
+                "__uidx__": list(self._umap.values()),
+            },
+            native_namespace=nw.get_native_namespace(self._inter_df),
+        )
+
+        imap_df = nw.from_dict(
+            {
+                self.item_label: list(self._imap.keys()),
+                "__iidx__": list(self._imap.values()),
+            },
+            native_namespace=nw.get_native_namespace(self._inter_df),
+        )
 
         # Join
-        mapped_df = self._inter_df.join(umap_df, on=self.user_label, how="inner") \
-                                  .join(imap_df, on=self.item_label, how="inner")
+        mapped_df = self._inter_df.join(umap_df, on=self.user_label, how="inner").join(
+            imap_df, on=self.item_label, how="inner"
+        )
 
-        # FIX: Ordinamento deterministico.
-        # Polars non garantisce l'ordine dopo un join, Pandas spesso sì.
-        # Ordinando per User Index e Item Index rendiamo i dati identici per entrambi i backend.
+        # Sort to ensure reproducibility
         mapped_df = mapped_df.sort(["__uidx__", "__iidx__"])
 
         users = mapped_df.select("__uidx__").to_numpy().flatten()
         items = mapped_df.select("__iidx__").to_numpy().flatten()
-        
+
         if self.rating_type == RatingType.EXPLICIT:
             ratings = mapped_df.select(self.rating_label).to_numpy().flatten()
         else:
@@ -776,7 +796,7 @@ class Interactions:
             shape=(self._og_nuid, self._og_niid),
             dtype=self.precision,
         ).tocsr()
-        
+
         return self._inter_sparse
 
     def _to_history(self) -> Tuple[Tensor, Tensor, Tensor]:
@@ -794,70 +814,32 @@ class Interactions:
         """
         # Get sparse interaction matrix
         sparse_matrix = self.get_sparse()
+        n_users = sparse_matrix.shape[0]
         n_items = sparse_matrix.shape[1]
+        indptr = sparse_matrix.indptr
+        indices = sparse_matrix.indices
 
-        # Get user_ids and item_ids from interactions
-        user_ids, item_ids = sparse_matrix.nonzero()
-
-        # Create a dictionary to store history for each user
-        user_history_dict: dict[int, list] = {}
-        for u, i in zip(user_ids, item_ids):
-            if u not in user_history_dict:
-                user_history_dict[u] = []
-            user_history_dict[u].append(i)
-
-        # Determine max history length for padding
-        max_history_len = 0
-        for user_id in range(self._nuid):
-            if user_id in user_history_dict:
-                max_history_len = max(max_history_len, len(user_history_dict[user_id]))
+        # Calculate lengths for each user
+        lens = indptr[1:] - indptr[:-1]
+        max_history_len = int(lens.max()) if len(lens) > 0 else 0
 
         # Initialize matrices
         self._history_matrix = torch.full(
-            (self._nuid, max_history_len), fill_value=n_items, dtype=torch.long
+            (n_users, max_history_len), fill_value=n_items, dtype=torch.long
         )
-        self._history_lens = torch.zeros(self._nuid, dtype=torch.long)
-        self._history_mask = torch.zeros(self._nuid, max_history_len, dtype=torch.float)
+        self._history_lens = torch.from_numpy(lens.astype(np.int64))
+        self._history_mask = torch.zeros(n_users, max_history_len, dtype=torch.float)
 
-        # Populate matrices
-        for user_id in range(self._nuid):
-            if user_id in user_history_dict:
-                items = torch.tensor(user_history_dict[user_id], dtype=torch.long)
-                self._history_matrix[user_id, : len(items)] = items
-                self._history_lens[user_id] = len(items)
-                self._history_mask[user_id, : len(items)] = 1.0
+        # Populate matrices using slicing
+        for u in range(n_users):
+            start, end = indptr[u], indptr[u + 1]
+            if end > start:
+                length = end - start
+                items = torch.from_numpy(indices[start:end].astype(np.int64))
+                self._history_matrix[u, :length] = items
+                self._history_mask[u, :length] = 1.0
 
         return self._history_matrix, self._history_lens, self._history_mask
-
-    def __iter__(self) -> "Interactions":
-        """This method will return the iterator of the interactions.
-
-        Returns:
-            Interactions: The iterator of the interactions.
-        """
-        self._index = 0
-        if not isinstance(self._inter_sparse, csr_matrix):
-            self._to_sparse()
-        return self
-
-    def __next__(self) -> csr_matrix:
-        """This method will iterate over the sparse data.
-
-        Returns:
-            csr_matrix: The csr representation of data.
-        Raises:
-            StopIteration: If the end of the data is reached.
-            ValueError: If the sparse matrix is None.
-        """
-        if self._index >= self._og_nuid:
-            raise StopIteration
-        if self._inter_sparse is None:
-            raise ValueError("The sparse matrix is None.")
-
-        start = self._index
-        end = min(start + self.batch_size, self._og_nuid)
-        self._index = end
-        return self._inter_sparse[start:end]
 
     def __len__(self) -> int:
         """This method calculates the length of the interactions.
@@ -867,4 +849,4 @@ class Interactions:
         Returns:
             int: number of ratings present in the structure.
         """
-        return sum(len(ir) for _, ir in self._inter_dict.items())
+        return self._transactions
