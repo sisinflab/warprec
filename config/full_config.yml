@@ -191,6 +191,7 @@ evaluation:
 general:
   precision: [float32, float64]
   device: [cpu, cuda]
+  backend: [polars, pandas]
   ray_verbose: [0, 1, 2, 3]
   time_report: [True, False]
   train_data_preparation: [conservative, experiment]
