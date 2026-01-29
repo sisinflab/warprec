@@ -9,7 +9,6 @@ from torch import Tensor
 from scipy.sparse import coo_matrix
 
 from warprec.recommenders.base_recommender import Recommender
-from warprec.data.entities import Interactions
 from warprec.utils.registry import model_registry
 
 
@@ -20,7 +19,6 @@ class ProxyRecommender(Recommender):
 
     Args:
         params (dict): The dictionary with the model params.
-        interactions (Interactions): The training interactions.
         info (dict): The dictionary containing dataset information.
         *args (Any): Argument for PyTorch nn.Module.
         seed (int): The seed to use for reproducibility.
@@ -45,13 +43,12 @@ class ProxyRecommender(Recommender):
     def __init__(
         self,
         params: dict,
-        interactions: Interactions,
         info: dict,
         *args: Any,
         seed: int = 42,
         **kwargs: Any,
     ):
-        super().__init__(params, interactions, info, *args, seed=seed, **kwargs)
+        super().__init__(params, info, *args, seed=seed, **kwargs)
 
         imap: dict = info.get("item_mapping", None)
         umap: dict = info.get("user_mapping", None)

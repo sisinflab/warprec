@@ -103,9 +103,9 @@ def eval_pipeline(path: str):
             if params.meta.load_from is not None:
                 # Load model weights
                 checkpoint = torch.load(
-                    params.meta.load_from, weights_only=True, map_location="cpu"
+                    params.meta.load_from, weights_only=False, map_location="cpu"
                 )
-                model.load_state_dict(checkpoint)
+                model.load_state_dict(checkpoint["state_dict"])
                 logger.positive("Successfully loaded model previous checkpoint.")
             else:
                 logger.negative(
