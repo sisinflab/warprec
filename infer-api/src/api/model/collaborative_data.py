@@ -7,10 +7,10 @@ class CollaborativeDataRequest(BaseModelCustom):
     """Model for collaborative data request.
     
     Attributes:
-        user_id (int): The ID of the user for whom recommendations are requested.
+        user_index (int): The index of the user for whom recommendations are requested.
     """
     top_k: int = 10
-    user_id: int
+    user_index: int
     
 
 class CollaborativeDataResponse(BaseModelCustom):

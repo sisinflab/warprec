@@ -10,10 +10,11 @@ from ....security import get_api_key
 router = APIRouter(
     prefix="/contextual",
     tags=["Contextual Models"],
+    include_in_schema=False,
     # dependencies=[Depends(get_api_key)],
 )
 
-checkpoints_directory = "checkpoints/contextual"
+checkpoints_directory = "checkpoints"
 model = "FM"
 
 # Load the models checkpoints

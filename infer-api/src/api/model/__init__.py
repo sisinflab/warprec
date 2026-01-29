@@ -1,1 +1,2 @@
+from .collaborative_data import CollaborativeDataRequest, CollaborativeDataResponse
 from .sequential_data import SequentialDataRequest, SequentialDataResponse
