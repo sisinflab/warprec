@@ -1,10 +1,10 @@
-from typing import Optional, Tuple
+from typing import Optional, Tuple, List, Any
 
 import numpy as np
 import torch
 from torch import Tensor
 from torch.utils.data import Dataset
-from pandas import DataFrame, Series
+from narwhals.dataframe import DataFrame
 
 
 class SessionDataset(Dataset):
@@ -79,7 +79,7 @@ class LazySessionDataset(Dataset):
     training batch creation.
 
     Args:
-        sorted_df (DataFrame): The input DataFrame containing interaction data.
+        sorted_df (DataFrame[Any]): The input DataFrame containing interaction data.
             It must be sorted by user ID and then by timestamp.
         user_label (str): The column name for user IDs in `sorted_df`.
         item_label (str): The column name for item IDs in `sorted_df`.
@@ -93,7 +93,7 @@ class LazySessionDataset(Dataset):
 
     def __init__(
         self,
-        sorted_df: DataFrame,
+        sorted_df: DataFrame[Any],
         user_label: str,
         item_label: str,
         max_seq_len: int,
@@ -109,9 +109,9 @@ class LazySessionDataset(Dataset):
         self.include_user_id = include_user_id
         self.seed = seed
 
-        # Working with NumPy arrays is significantly faster than pandas Series
-        self.all_users = sorted_df[user_label].values
-        self.all_items_0_indexed = sorted_df[item_label].values
+        # Retrieve user indices and make them 0-index
+        self.all_users = sorted_df.select(user_label).to_numpy().flatten()
+        self.all_items_0_indexed = sorted_df.select(item_label).to_numpy().flatten()
 
         # A new session begins where the user ID changes
         is_new_session = np.diff(self.all_users, prepend=-1) != 0
@@ -122,8 +122,6 @@ class LazySessionDataset(Dataset):
         valid_session_mask = session_lengths >= 2
         self.valid_session_starts = session_starts_idx[valid_session_mask]
         valid_session_lengths = session_lengths[valid_session_mask]
-
-        # --- Create a lightweight index map ---
 
         # For a session of length L, we can generate L-1 training samples
         num_samples_per_session = valid_session_lengths - 1
@@ -264,8 +262,8 @@ class LazyUserHistoryDataset(Dataset):
     timestamp in a user's history, which can lead to very large tensors.
 
     Args:
-        user_sessions (Series): A Series where the index is the user ID and the
-            value is a list of their 0-indexed item interactions.
+        user_sessions (List[List[int]]): A list where each element is a list of
+            0-indexed item interactions for a user.
         max_seq_len (int): The maximum length of the user history sequence.
         neg_samples (int): The number of negative items to sample for each positive item
             in the sequence.
@@ -275,7 +273,7 @@ class LazyUserHistoryDataset(Dataset):
 
     def __init__(
         self,
-        user_sessions: Series,
+        user_sessions: List[List[int]],
         max_seq_len: int,
         neg_samples: int,
         niid: int,
@@ -285,10 +283,7 @@ class LazyUserHistoryDataset(Dataset):
         self.neg_samples = neg_samples
         self.niid = niid
         self.seed = seed
-
-        # Filter for sessions long enough to have at least one target item (len >= 2)
-        # and store them as a list for efficient indexing
-        self.sessions = user_sessions[user_sessions.str.len() >= 2].tolist()
+        self.sessions = [s for s in user_sessions if len(s) >= 2]
 
     def __len__(self) -> int:
         """Returns the total number of users with valid histories."""
@@ -395,8 +390,8 @@ class LazyClozeMaskDataset(Dataset):
     negative sampling dynamically.
 
     Args:
-        user_sessions (Series): A Series where the index is the user ID and the
-            value is a list of their 0-indexed item interactions.
+        user_sessions (List[List[int]]): A list where each element is a list of
+            0-indexed item interactions for a user.
         max_seq_len (int): The maximum length of the user history sequence.
         mask_prob (float): The probability of an item being masked.
         mask_token_id (int): The special token ID used for masking.
@@ -408,7 +403,7 @@ class LazyClozeMaskDataset(Dataset):
 
     def __init__(
         self,
-        user_sessions: Series,
+        user_sessions: List[List[int]],
         max_seq_len: int,
         mask_prob: float,
         mask_token_id: int,
@@ -424,9 +419,7 @@ class LazyClozeMaskDataset(Dataset):
         self.niid = niid
         self.padding_token_id = padding_token_id
         self.seed = seed
-
-        # Filter for sessions with at least one item and store as a list
-        self.sessions = user_sessions[user_sessions.str.len() >= 1].tolist()
+        self.sessions = [s for s in user_sessions if len(s) >= 1]
 
         # Pre-calculate sets for faster negative sampling
         self.session_sets = [set(s) for s in self.sessions]

@@ -273,15 +273,15 @@ class Dataset:
             self._feat_lookup = torch.cat([feature_lookup, padding_row], dim=0)
 
         # Sequential recommendation sessions
-        # self.train_session = Sessions(
-        #     mat_train_data,
-        #     self._umap,
-        #     self._imap,
-        #     user_id_label=user_id_label,
-        #     item_id_label=item_id_label,
-        #     timestamp_label=timestamp_label,
-        #     context_labels=context_labels,
-        # )
+        self.train_session = Sessions(
+            mat_train_data,
+            self._umap,
+            self._imap,
+            user_id_label=user_id_label,
+            item_id_label=item_id_label,
+            timestamp_label=timestamp_label,
+            context_labels=context_labels,
+        )
 
     def _materialize(self, data: Optional[FrameT]) -> Optional[DataFrame[Any]]:
         """Utility method to correctly materialize the input data.
