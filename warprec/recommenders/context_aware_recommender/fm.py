@@ -24,9 +24,9 @@ class FM(ContextRecommenderUtils, IterativeRecommender):
 
     Args:
         params (dict): Model parameters.
-        interactions (Interactions): The training interactions.
         info (dict): The dictionary containing dataset information.
         *args (Any): Variable length argument list.
+        interactions (Optional[Interactions]): The training interactions.
         seed (int): The seed to use for reproducibility.
         **kwargs (Any): Arbitrary keyword arguments.
 
@@ -52,13 +52,15 @@ class FM(ContextRecommenderUtils, IterativeRecommender):
     def __init__(
         self,
         params: dict,
-        interactions: Interactions,
         info: dict,
         *args: Any,
+        interactions: Optional[Interactions] = None,
         seed: int = 42,
         **kwargs: Any,
     ):
-        super().__init__(params, interactions, info, *args, seed=seed, **kwargs)
+        super().__init__(
+            params, info, *args, interactions=interactions, seed=seed, **kwargs
+        )
 
         # FM Layer (Interaction Part - Second Order)
         self.fm = FactorizationMachine(reduce_sum=True)

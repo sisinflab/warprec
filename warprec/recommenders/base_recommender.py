@@ -1,6 +1,6 @@
 # pylint: disable = unused-argument
 import random
-from typing import Any, Optional, List
+from typing import Any, Optional, List, Dict
 from abc import ABC, abstractmethod
 
 import torch
@@ -19,7 +19,6 @@ class Recommender(nn.Module, ABC):
 
     Args:
         params (dict): The dictionary with the model params.
-        interactions (Interactions): The training interactions.
         info (dict): The dictionary containing dataset information.
         *args (Any): Argument for PyTorch nn.Module.
         seed (int): The seed to use for reproducibility.
@@ -40,7 +39,6 @@ class Recommender(nn.Module, ABC):
     def __init__(
         self,
         params: dict,
-        interactions: Interactions,
         info: dict,
         *args: Any,
         seed: int = 42,
@@ -49,6 +47,7 @@ class Recommender(nn.Module, ABC):
         super().__init__()
         self.init_params(params)
         self.set_seed(seed)
+        self.info = info
 
         # Initialize the dataset dimensions
         self.n_users = info.get("n_users")
@@ -119,6 +118,59 @@ class Recommender(nn.Module, ABC):
             torch.cuda.manual_seed_all(seed)
         torch.backends.cudnn.deterministic = True
         torch.backends.cudnn.benchmark = False
+
+    def get_state(self) -> Dict[str, Any]:
+        """Returns the enriched state_dict of the WarpRec model.
+
+        The returned dictionary contains all the information required to
+        fully restore the model state, including additional metadata
+        beyond the standard PyTorch state_dict.
+
+        Returns:
+            Dict[str, Any]: An enriched dictionary representing the model state.
+        """
+        state = {
+            "name": self.name,
+            "params": self.get_params(),
+            "info": self.info,
+            "state_dict": self.state_dict(),
+        }
+        return state
+
+    @classmethod
+    def from_checkpoint(
+        cls, checkpoint: Any, strict: bool = True, **kwargs: Any
+    ) -> "Recommender":
+        """Load a WarpRec checkpoint model state with custom parameters.
+
+        Args:
+            checkpoint (Any): The checkpoint containing the model state and
+                other parameter required for initialization.
+            strict (bool): Wether or not to load the model using strict mode.
+            **kwargs (Any): The additional keyword arguments.
+
+        Returns:
+            Recommender: The Recommender model instance.
+
+        Raises:
+            ValueError: When trying to load a model checkpoint of a different model.
+        """
+        if checkpoint["name"] != cls.__name__:
+            raise ValueError(
+                f"Warning: Loading a {checkpoint['name']} checkpoint into {cls.__name__} class."
+            )
+
+        # Common initialization params + additional parameters
+        init_args = {
+            "params": checkpoint["params"],
+            "info": checkpoint["info"],
+            **kwargs,
+        }
+
+        # Initialize the model and return the instance
+        model = cls(**init_args)
+        model.load_state_dict(checkpoint["state_dict"], strict=strict)
+        return model
 
     def _apply_topk_filtering(self, sim_matrix: Tensor, k: int) -> Tensor:
         """Keep only top-k similarities per item.
@@ -292,9 +344,9 @@ class ContextRecommenderUtils(nn.Module, ABC):
 
     Args:
         params (dict): Model parameters.
-        interactions (Interactions): The training interactions.
         info (dict): The dictionary containing dataset information.
         *args (Any): Variable length argument list.
+        interactions (Optional[Interactions]): The training interactions.
         **kwargs (Any): Arbitrary keyword arguments.
 
     Attributes:
@@ -330,9 +382,9 @@ class ContextRecommenderUtils(nn.Module, ABC):
     def __init__(
         self,
         params: dict,
-        interactions: Interactions,
         info: dict,
         *args: Any,
+        interactions: Optional[Interactions] = None,
         **kwargs: Any,
     ):
         # Feature info extraction
@@ -344,7 +396,7 @@ class ContextRecommenderUtils(nn.Module, ABC):
         self.context_labels = list(self.context_dims.keys())
 
         # Call super init to populate n_users, n_items, embedding_size
-        super().__init__(params, interactions, info, *args, **kwargs)  # type: ignore[call-arg]
+        super().__init__(params, info, *args, **kwargs)  # type: ignore[call-arg]
 
         # Define Embeddings (Latent Factors)
         self.user_embedding = nn.Embedding(self.n_users, self.embedding_size)
@@ -393,7 +445,13 @@ class ContextRecommenderUtils(nn.Module, ABC):
         self.item_bias = nn.Embedding(self.n_items + 1, 1, padding_idx=self.n_items)
 
         # Fixed feature lookup Tensor
-        self.item_features = interactions.get_side_tensor()
+        if interactions is not None:
+            item_features = interactions.get_side_tensor()
+            self.register_buffer("item_features", item_features)
+        else:
+            self.register_buffer(
+                "item_features", torch.zeros(self.n_items + 1, dtype=torch.long)
+            )
 
     def get_dataloader(
         self,
@@ -506,7 +564,7 @@ class ContextRecommenderUtils(nn.Module, ABC):
 
         # Indices Lookup
         flat_items = target_items.view(-1).cpu()
-        raw_indices = self.item_features[flat_items].to(target_items.device)
+        raw_indices = self.item_features[flat_items].to(target_items.device)  # type: ignore[index]
 
         # Apply Offsets
         global_indices = raw_indices + self.feature_offsets
@@ -534,7 +592,7 @@ class ContextRecommenderUtils(nn.Module, ABC):
             return torch.zeros(target_items.shape, device=target_items.device)
 
         flat_items = target_items.view(-1).cpu()
-        raw_indices = self.item_features[flat_items].to(target_items.device)
+        raw_indices = self.item_features[flat_items].to(target_items.device)  # type: ignore[index]
 
         global_indices = raw_indices + self.feature_offsets
 
@@ -607,10 +665,8 @@ class ItemSimRecommender(Recommender):
 
     Args:
         params (dict): The dictionary with the model params.
-        interactions (Interactions): The training interactions.
         info (dict): The dictionary containing dataset information.
         *args (Any): Argument for PyTorch nn.Module.
-        device (str): The device used for tensor operations.
         seed (int): The seed to use for reproducibility.
         **kwargs (Any): Keyword argument for PyTorch nn.Module.
 
@@ -621,16 +677,12 @@ class ItemSimRecommender(Recommender):
     def __init__(
         self,
         params: dict,
-        interactions: Interactions,
         info: dict,
         *args: Any,
-        device: str = "cpu",
         seed: int = 42,
         **kwargs: Any,
     ):
-        super().__init__(
-            params, interactions, info, device=device, seed=seed, *args, **kwargs
-        )
+        super().__init__(params, info, seed=seed, *args, **kwargs)
         self.n_items = info.get("n_items", None)
         if not self.n_items:
             raise ValueError(

@@ -24,9 +24,9 @@ class DeepFM(ContextRecommenderUtils, IterativeRecommender):
 
     Args:
         params (dict): Model parameters.
-        interactions (Interactions): The training interactions.
         info (dict): The dictionary containing dataset information.
         *args (Any): Variable length argument list.
+        interactions (Optional[Interactions]): The training interactions.
         seed (int): The seed to use for reproducibility.
         **kwargs (Any): Arbitrary keyword arguments.
 
@@ -58,13 +58,15 @@ class DeepFM(ContextRecommenderUtils, IterativeRecommender):
     def __init__(
         self,
         params: dict,
-        interactions: Interactions,
         info: dict,
         *args: Any,
+        interactions: Optional[Interactions] = None,
         seed: int = 42,
         **kwargs: Any,
     ):
-        super().__init__(params, interactions, info, *args, seed=seed, **kwargs)
+        super().__init__(
+            params, info, *args, interactions=interactions, seed=seed, **kwargs
+        )
 
         # Check for optional value of block size
         self.block_size = kwargs.get("block_size", 50)
