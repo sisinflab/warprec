@@ -16,8 +16,8 @@ class AddEASE(ItemSimRecommender):
 
     Args:
         params (dict): The dictionary with the model params.
-        interactions (Interactions): The training interactions.
         info (dict): The dictionary containing dataset information.
+        interactions (Interactions): The training interactions.
         *args (Any): Argument for PyTorch nn.Module.
         seed (int): The seed to use for reproducibility.
         **kwargs (Any): Keyword argument for PyTorch nn.Module.
@@ -33,13 +33,13 @@ class AddEASE(ItemSimRecommender):
     def __init__(
         self,
         params: dict,
-        interactions: Interactions,
         info: dict,
+        interactions: Interactions,
         *args: Any,
         seed: int = 42,
         **kwargs: Any,
     ):
-        super().__init__(params, interactions, info, *args, seed=seed, **kwargs)
+        super().__init__(params, info, *args, seed=seed, **kwargs)
 
         X = interactions.get_sparse()
         item_profile = interactions.get_side_sparse()
