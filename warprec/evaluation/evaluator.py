@@ -93,6 +93,9 @@ class Evaluator:
                 # Parsing complex metric names (e.g., F1[Precision, Recall])
                 match_f1 = re.match(r"F1\[\s*(.*?)\s*,\s*(.*?)\s*\]", metric_string)
                 match_efd_epc = re.match(r"(EFD|EPC)\[\s*(.*?)\s*\]", metric_string)
+                match_hv = re.match(r"Hypervolume\s*\[(.*?)\]\s*\((.*?)\)\s*\((.*?)\)", metric_string)
+                match_ed = re.match(r"EucDistance\s*\[(.*?)\]\s*\((.*?)\)\s*\((.*?)\)", metric_string)
+                match_var = re.match(r"Variance\[\s*(.*?)\s*\]", metric_string)
 
                 if match_f1:
                     metric_name = "F1"
@@ -102,6 +105,28 @@ class Evaluator:
                 if match_efd_epc:
                     metric_name = match_efd_epc.group(1)
                     metric_params["relevance"] = match_efd_epc.group(2)
+
+                if match_hv:
+                    metric_name = "Hypervolume"
+                    metric_params["metric_names"] = [m.strip() for m in match_hv.group(1).split(",")]
+                    metric_params["nadir_points"] = [float(n.strip()) for n in match_hv.group(2).split(",")]
+                    metric_params["higher_is_better"] = [d.strip().lower() == "true" for d in match_hv.group(3).split(",")]
+
+                if match_hv:
+                    metric_name = "Hypervolume"
+                    metric_params["metric_names"] = [m.strip() for m in match_hv.group(1).split(",")]
+                    metric_params["nadir_points"] = [float(n.strip()) for n in match_hv.group(2).split(",")]
+                    metric_params["higher_is_better"] = [d.strip().lower() == "true" for d in match_hv.group(3).split(",")]
+
+                if match_ed:
+                    metric_name = "EucDistance"
+                    metric_params["metric_names"] = [m.strip() for m in match_ed.group(1).split(",")]
+                    metric_params["utopia_points"] = [float(n.strip()) for n in match_ed.group(2).split(",")]
+                    metric_params["higher_is_better"] = [d.strip().lower() == "true" for d in match_ed.group(3).split(",")]
+
+                if match_var:
+                    metric_name = "Variance"
+                    metric_params["metric_name"] = match_var.group(1)
 
                 metric_instance = metric_registry.get(
                     metric_name,

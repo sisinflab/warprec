@@ -5,5 +5,6 @@ from . import diversity
 from . import fairness
 from . import novelty
 from . import rating
+from . import multiobjective
 
-__all__ = ["accuracy", "bias", "coverage", "diversity", "fairness", "novelty", "rating"]
+__all__ = ["accuracy", "bias", "coverage", "diversity", "fairness", "novelty", "rating", "multiobjective"]

@@ -1,4 +1,5 @@
 from typing import Any
+import inspect
 
 import torch
 from torch import Tensor
@@ -88,12 +89,47 @@ class F1(TopKMetric):
         )
 
     def update(self, preds: Tensor, user_indices: Tensor, **kwargs: Any):
+        """
+        Aggiorna le sottometriche filtrando i parametri in base alla loro firma.
+        """
+        for metric in [self.metric_1, self.metric_2]:
+            # Otteniamo la lista dei parametri accettati dal metodo update della sottometrica
+            sig = inspect.signature(metric.update).parameters
+
+            # Prepariamo un dizionario con tutti i possibili input che abbiamo a disposizione
+            available_data = {
+                "preds": preds,
+                "user_indices": user_indices,
+                **kwargs  # qui dentro potrebbero esserci 'target', 'label', ecc.
+            }
+
+            # Creiamo il set di argomenti da passare effettivamente
+            args_to_pass = {}
+
+            # Caso 1: La metrica accetta il parametro con nome specifico (es. 'preds' o 'user_indices')
+            for param_name in sig.keys():
+                if param_name in available_data:
+                    args_to_pass[param_name] = available_data[param_name]
+
+            # Caso 2: La metrica ha il catch-all **kwargs (VAR_KEYWORD)
+            # Se presente, le passiamo tutto ciò che non abbiamo già passato esplicitamente
+            has_kwargs_catchall = any(p.kind == p.VAR_KEYWORD for p in sig.values())
+            if has_kwargs_catchall:
+                for k, v in available_data.items():
+                    if k not in args_to_pass:
+                        args_to_pass[k] = v
+
+            # Chiamata sicura
+            metric.update(**args_to_pass)
+    '''
+    def update(self, preds: Tensor, user_indices: Tensor, **kwargs: Any):
         """Updates the metric state with the new batch of predictions."""
         # Update first metric
         self.metric_1.update(preds, user_indices, **kwargs)
 
         # Update second metric
         self.metric_2.update(preds, user_indices, **kwargs)
+    '''
 
     def compute(self):
         """Computes the F1 score using the two custom metrics."""

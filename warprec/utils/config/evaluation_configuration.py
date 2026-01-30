@@ -122,6 +122,19 @@ class EvaluationConfig(BaseModel):
                 r"(EFD|EPC)\[\s*(.*?)\s*\]", metric
             )  # Expected syntax: EFD[value] or EPC[value]
 
+            # Check for Hypervolume metric
+            match_hv = re.match(
+                r"Hypervolume\s*\[(.*?)\]\s*\((.*?)\)\s*\((.*?)\)", metric
+            )
+
+            match_ed = re.match(
+                r"EucDistance\s*\[(.*?)\]\s*\((.*?)\)\s*\((.*?)\)", metric
+            )
+
+            match_var = re.match(
+                r"Variance\[\s*(.*?)\s*\]", metric
+            )
+
             if match_f1:
                 # Extract sub metrics
                 metric_1 = match_f1.group(1)
@@ -142,6 +155,23 @@ class EvaluationConfig(BaseModel):
 
                 continue  # Skip normal metric check
 
+            if match_hv or match_ed:
+                # Extract sub metrics list
+                try:
+                    metric_list = [m.strip() for m in match_hv.group(1).split(",")]
+                except AttributeError:
+                    metric_list = [m.strip() for m in match_ed.group(1).split(",")]
+
+                # Check if sub metrics exists inside registry
+                for ml in metric_list:
+                    if ml.upper() not in metric_registry.list_registered():
+                        raise ValueError(
+                            f"In {metric} the sub metric {ml} not in metric registry. This is the list"
+                            f"of supported metrics: {metric_registry.list_registered()}"
+                        )
+
+                continue
+
             if match_efd_epc:
                 relevance = match_efd_epc.group(2)
 
@@ -149,6 +179,19 @@ class EvaluationConfig(BaseModel):
                     raise ValueError(
                         f"In {metric} the relevance score {relevance} is not supported. "
                         f"These are the supported relevance scores: {supported_relevance}."
+                    )
+
+                continue  # Skip normal metric check
+
+            if match_var:
+                # Extract sub metrics
+                metric_1 = match_var.group(1)
+
+                # Check if sub metrics exists inside registry
+                if metric_1.upper() not in metric_registry.list_registered():
+                    raise ValueError(
+                        f"In {metric} the sub metric {metric_1} not in metric registry. This is the list"
+                        f"of supported metrics: {metric_registry.list_registered()}"
                     )
 
                 continue  # Skip normal metric check

@@ -7,6 +7,7 @@ from .reo import REO
 from .rsp import RSP
 from .usermadranking import UserMADRanking
 from .usermadrating import UserMADRating
+from .variance import Variance
 
 __all__ = [
     "BiasDisparityBD",
@@ -18,4 +19,5 @@ __all__ = [
     "RSP",
     "UserMADRanking",
     "UserMADRating",
+    "Variance"
 ]
