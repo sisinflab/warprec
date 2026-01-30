@@ -4,6 +4,7 @@ from typing import Any, List, Tuple, Optional, Dict, Union
 from pathlib import Path
 from io import StringIO, BytesIO
 
+import numpy as np
 import pandas as pd
 import polars as pl
 import narwhals as nw
@@ -72,54 +73,119 @@ class Reader(ABC):
     ) -> DataFrame[Any]:
         """Internal method to read using Pandas."""
 
-        # Helper for empty DF
-        def _empty_nw_df(cols=None):
-            cols = cols if cols is not None else []
-            return nw.from_native(pd.DataFrame(columns=cols).astype(desired_dtypes))
+        def _get_pandas_dtype(dtype_str: str) -> Any:
+            mapping = {
+                "int16": np.int16,
+                "int32": np.int32,
+                "int64": np.int64,
+                "float32": np.float32,
+                "float64": np.float64,
+                "str": np.str_,
+            }
+            return mapping.get(dtype_str, "object")
 
-        header_arg = 0 if header else None
+        # Prepare dtype mapping
+        pandas_dtypes = {}
+        if desired_dtypes:
+            for col_name, dtype_str in desired_dtypes.items():
+                pandas_dtypes[col_name] = _get_pandas_dtype(dtype_str)
 
         try:
-            usecols = desired_cols if (header and desired_cols) else None
+            # Case 1: The tabular file has a header row
+            if header:
+                # Peek at the header to validate columns
+                # We use nrows=0 to just get the header
+                if hasattr(source, "seek"):
+                    source.seek(0)
 
-            # Basic read
-            pd_df = pd.read_csv(
-                source,
-                sep=sep,
-                header=header_arg,
-                usecols=usecols,
-                dtype=desired_dtypes
-                if header
-                else None,  # Dtypes apply easily if names match
-            )
+                schema_df = pd.read_csv(source, sep=sep, header=0, nrows=0)
+                file_cols = schema_df.columns.tolist()
+
+                # Reset stream for the actual read
+                if hasattr(source, "seek"):
+                    source.seek(0)
+
+                usecols = None
+                if desired_cols:
+                    # Intersect desired columns with those actually present
+                    usecols = [col for col in desired_cols if col in file_cols]
+
+                    if not usecols:
+                        logger.attention(
+                            "None of the desired columns were found in Pandas read. Returning empty."
+                        )
+                        # Return empty DF with correct schema
+                        empty_df = pd.DataFrame(columns=desired_cols or [])
+                        if pandas_dtypes:
+                            # Apply dtypes to empty df to ensure schema correctness
+                            valid_dtypes = {
+                                k: v
+                                for k, v in pandas_dtypes.items()
+                                if k in empty_df.columns
+                            }
+                            empty_df = empty_df.astype(valid_dtypes)
+                        return nw.from_native(empty_df)
+
+                pd_df = pd.read_csv(
+                    source,
+                    sep=sep,
+                    header=0,
+                    usecols=usecols,
+                    dtype=pandas_dtypes,
+                )
+
+            # Case 2: The tabular file does not have a header row
+            else:
+                # Read without header (columns will be 0, 1, 2...)
+                pd_df = pd.read_csv(
+                    source,
+                    sep=sep,
+                    header=None,
+                )
+
+                if pd_df.empty:
+                    return nw.from_native(pd.DataFrame(columns=desired_cols or []))
+
+                if desired_cols:
+                    # Rename positional columns (0, 1...) to desired names
+                    current_cols = pd_df.columns
+                    num_cols = min(len(current_cols), len(desired_cols))
+                    rename_map = {
+                        current_cols[i]: desired_cols[i] for i in range(num_cols)
+                    }
+
+                    pd_df = pd_df.rename(columns=rename_map)
+
+                    # Select only the renamed columns
+                    pd_df = pd_df[list(rename_map.values())]
+
+                    # Apply dtypes NOW, after renaming
+                    if pandas_dtypes:
+                        # Filter dtypes to only existing columns in the dataframe
+                        valid_dtypes = {
+                            k: v for k, v in pandas_dtypes.items() if k in pd_df.columns
+                        }
+                        try:
+                            pd_df = pd_df.astype(valid_dtypes)
+                        except Exception as e:
+                            logger.negative(f"Error casting types in Pandas: {e}")
 
             if pd_df.empty:
-                return _empty_nw_df(desired_cols)
+                return nw.from_native(pd.DataFrame(columns=desired_cols or []))
 
         except pd.errors.EmptyDataError:
-            return _empty_nw_df(desired_cols)
+            return nw.from_native(pd.DataFrame(columns=desired_cols or []))
         except Exception as e:
             logger.negative(f"Error reading with Pandas: {e}")
-            return _empty_nw_df(desired_cols)
+            return nw.from_native(pd.DataFrame())
 
         nw_df = nw.from_native(pd_df)
 
-        # Post-processing for header=False or column filtering
-        if not header and desired_cols:
-            # Rename columns 0, 1, 2... to desired_cols
-            current_cols = nw_df.columns
-            num_cols = min(len(current_cols), len(desired_cols))
-            rename_map = {current_cols[i]: desired_cols[i] for i in range(num_cols)}
-            nw_df = nw_df.rename(rename_map)
-
+        # Final check to ensure column order matches desired_cols if provided
         if desired_cols:
-            # Filter columns (robust check)
             existing_cols = [c for c in desired_cols if c in nw_df.columns]
-            if not existing_cols:
-                return _empty_nw_df()
-
-            # Select only desired columns after renaming
-            nw_df = nw_df.select(existing_cols)
+            if existing_cols:
+                nw_df = nw_df.select(existing_cols)
 
         return nw_df
 
@@ -132,20 +198,93 @@ class Reader(ABC):
         desired_dtypes: Dict[str, str],
     ) -> DataFrame[Any]:
         """Internal method to read using Polars."""
+
+        def _get_polars_dtype(dtype_str: str) -> Any:
+            mapping = {
+                "int16": pl.Int16,
+                "int32": pl.Int32,
+                "int64": pl.Int64,
+                "float32": pl.Float32,
+                "float64": pl.Float64,
+                "str": pl.String,
+            }
+            return mapping.get(dtype_str, pl.String)
+
+        # Polars requires BytesIO for in-memory streams
         if isinstance(source, StringIO):
             source = BytesIO(source.getvalue().encode("utf-8"))
 
-        try:
-            columns_arg = desired_cols if (header and desired_cols) else None
+        # Parse the schema to override
+        schema_overrides = {}
+        if desired_dtypes:
+            for col_name, dtype_str in desired_dtypes.items():
+                schema_overrides[col_name] = _get_polars_dtype(dtype_str)
 
-            pl_df = pl.read_csv(
-                source,
-                separator=sep,
-                has_header=header,
-                columns=columns_arg,
-                infer_schema_length=10000,
-                truncate_ragged_lines=True,
-            )
+        try:
+            # Case 1: The tabular file has a header row
+            if header:
+                # Peek at the header using n_rows=0
+                schema_df = pl.read_csv(
+                    source, separator=sep, has_header=True, n_rows=0
+                )
+                file_cols = schema_df.columns
+
+                # Reset stream for the actual read
+                if hasattr(source, "seek"):
+                    source.seek(0)
+
+                columns_arg = None
+                if desired_cols:
+                    # Intersect desired columns with those actually present
+                    columns_arg = [col for col in desired_cols if col in file_cols]
+
+                    if not columns_arg:
+                        logger.attention(
+                            "None of the desired columns were found. Returning empty."
+                        )
+                        return nw.from_native(
+                            pl.DataFrame(schema={c: pl.Utf8 for c in desired_cols})
+                        )
+
+                pl_df = pl.read_csv(
+                    source,
+                    separator=sep,
+                    has_header=True,
+                    columns=columns_arg,
+                    schema_overrides=schema_overrides,
+                    infer_schema_length=10000,
+                    truncate_ragged_lines=True,
+                    rechunk=True,
+                )
+
+            # Case 2: The tabular file does not have a header row
+            else:
+                pl_df = pl.read_csv(
+                    source,
+                    separator=sep,
+                    has_header=False,
+                    schema_overrides=schema_overrides,
+                    infer_schema_length=10000,
+                    truncate_ragged_lines=True,
+                    rechunk=True,
+                )
+
+                if pl_df.height == 0:
+                    return nw.from_native(
+                        pl.DataFrame(schema={c: pl.Utf8 for c in (desired_cols or [])})
+                    )
+
+                if desired_cols:
+                    # Rename positional columns (column_1, column_2...)
+                    current_cols = pl_df.columns
+                    num_cols = min(len(current_cols), len(desired_cols))
+                    rename_map = {
+                        current_cols[i]: desired_cols[i] for i in range(num_cols)
+                    }
+
+                    pl_df = pl_df.rename(rename_map)
+                    # Select only the renamed columns
+                    pl_df = pl_df.select(list(rename_map.values()))
 
             if pl_df.height == 0:
                 return nw.from_native(
@@ -158,18 +297,11 @@ class Reader(ABC):
 
         nw_df = nw.from_native(pl_df)
 
-        # Post-processing
-        if not header and desired_cols:
-            current_cols = nw_df.columns
-            num_cols = min(len(current_cols), len(desired_cols))
-            rename_map = {current_cols[i]: desired_cols[i] for i in range(num_cols)}
-            nw_df = nw_df.rename(rename_map)
-
+        # Final check to ensure column order matches desired_cols if provided
         if desired_cols:
             existing_cols = [c for c in desired_cols if c in nw_df.columns]
-            if not existing_cols:
-                return nw.from_native(pl.DataFrame())
-            nw_df = nw_df.select(existing_cols)
+            if existing_cols:
+                nw_df = nw_df.select(existing_cols)
 
         return nw_df
 
