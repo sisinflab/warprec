@@ -196,7 +196,7 @@ def initialize_datasets(
         )
 
     # Dataset common information
-    common_params = {
+    common_params: Dict[str, Any] = {
         "side_data": side_data,
         "user_cluster": user_cluster,
         "item_cluster": item_cluster,
