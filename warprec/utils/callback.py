@@ -1,6 +1,6 @@
 from typing import Any, List, TYPE_CHECKING
 
-from pandas import DataFrame
+from narwhals.dataframe import DataFrame
 from ray.tune import Callback
 
 if TYPE_CHECKING:
@@ -24,18 +24,18 @@ class WarpRecCallback(Callback):
 
     def on_data_reading(
         self,
-        data: DataFrame,
-    ) -> DataFrame:
+        data: DataFrame[Any],
+    ) -> DataFrame[Any]:
         """Callback method to be called after the data reading.
 
         This method can be overridden in custom callbacks to
         perform actions after the data has been read.
 
         Args:
-            data (DataFrame): The raw data read from source.
+            data (DataFrame[Any]): The raw data read from source.
 
         Returns:
-            DataFrame: The data processed by this callback.
+            DataFrame[Any]: The data processed by this callback.
         """
         return data
 

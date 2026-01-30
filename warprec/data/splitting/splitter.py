@@ -1,7 +1,10 @@
 import time
-from typing import Tuple, Optional, Union, List
+from typing import Tuple, Optional, Union, List, Any
 
-from pandas import DataFrame
+import narwhals as nw
+from narwhals.typing import FrameT
+from narwhals.dataframe import DataFrame
+
 from warprec.utils.enums import SplittingStrategies
 from warprec.utils.registry import splitting_registry
 from warprec.utils.logger import logger
@@ -12,7 +15,7 @@ class Splitter:
 
     def split_transaction(
         self,
-        data: DataFrame,
+        data: FrameT,
         user_id_label: str = "user_id",
         item_id_label: str = "item_id",
         rating_label: str = "rating",
@@ -30,7 +33,9 @@ class Splitter:
         val_timestamp: Optional[Union[int, str]] = None,
         val_seed: int = 42,
     ) -> Tuple[
-        DataFrame, Optional[List[Tuple[DataFrame, DataFrame]] | DataFrame], DataFrame
+        DataFrame[Any],
+        Optional[List[Tuple[DataFrame[Any], DataFrame[Any]]] | DataFrame[Any]],
+        DataFrame[Any],
     ]:
         """The main method of the class. This method must be called to split the data.
 
@@ -42,7 +47,7 @@ class Splitter:
         A transaction is defined by at least a user_id, an item_id.
 
         Args:
-            data (DataFrame): The DataFrame to be splitted.
+            data (FrameT): The DataFrame to be splitted.
             user_id_label (str): The user_id label.
             item_id_label (str): The item_id label.
             rating_label (str): The rating label.
@@ -63,17 +68,19 @@ class Splitter:
             val_seed (int): The seed value for validation set.  Defaults to 42.
 
         Returns:
-            Tuple[DataFrame, Optional[List[Tuple[DataFrame, DataFrame]] | DataFrame], DataFrame]:
-                - DataFrame: The original train data, used to train
+            Tuple[DataFrame[Any], Optional[List[Tuple[DataFrame[Any], DataFrame[Any]]] | DataFrame[Any]], DataFrame[Any]]:
+                - DataFrame[Any]: The original train data, used to train
                     the final model of the experiment.
-                - Optional[List[Tuple[DataFrame, DataFrame]] | DataFrame]: Either return a list of tuples
-                    - DataFrame: The train data used to train the model.
-                    - DataFrame: The validation data used to evaluate
+                - Optional[List[Tuple[DataFrame[Any], DataFrame[Any]]] | DataFrame[Any]]: Either return a list of tuples
+                    - DataFrame[Any]: The train data used to train the model.
+                    - DataFrame[Any]: The validation data used to evaluate
                         the model during training.
                     or just a single DataFrame representing the validation set.
-                - DataFrame: The unique test data, used at the end of
+                - DataFrame[Any]: The unique test data, used at the end of
                     the experiment to evaluate the model.
         """
+        data = nw.from_native(data, pass_through=True)
+
         # Test set
         split_process_start_time = time.time()
         logger.msg(
@@ -97,7 +104,7 @@ class Splitter:
         logger.msg(f"Test splitting completed in : {test_split_time:.2f}s")
 
         # Optional validation folding
-        validation_folds: List[Tuple[DataFrame, Optional[DataFrame]]] = []
+        validation_folds: List[Tuple[DataFrame[Any], Optional[DataFrame[Any]]]] = []
         if val_strategy is not None:
             logger.msg(
                 f"Starting validation splitting process with {val_strategy.value} splitting strategy."
@@ -128,7 +135,9 @@ class Splitter:
         logger.positive(f"Splitting process over in {split_process_time:.2f}s.")
 
         # Filter out the test set
-        self.filter_sets(original_train_set, test_set)
+        test_set = self.filter_sets(
+            original_train_set, test_set, user_id_label, item_id_label
+        )
 
         if len(validation_folds) == 0:
             # CASE 1: Only train and test set
@@ -137,20 +146,24 @@ class Splitter:
         if len(validation_folds) == 1:
             # CASE 2: Train/Validation/Test
             train_set, validation_set = validation_folds[0]
-            self.filter_sets(train_set, test_set)
+            test_set = self.filter_sets(
+                train_set, test_set, user_id_label, item_id_label
+            )
             return (train_set, validation_set, test_set)
 
         # Filter out each validation set based on
         # corresponding train set
         for train, validation in validation_folds:
-            self.filter_sets(train, validation)
+            validation = self.filter_sets(
+                train, validation, user_id_label, item_id_label
+            )
 
         # CASE 3: N folds of train and validation + the test set
         return (original_train_set, validation_folds, test_set)
 
     def process_split(
         self,
-        data: DataFrame,
+        data: FrameT,
         strategy: SplittingStrategies,
         user_id_label: str = "user_id",
         item_id_label: str = "item_id",
@@ -161,11 +174,11 @@ class Splitter:
         folds: Optional[int] = None,
         timestamp: Optional[Union[int, str]] = None,
         seed: int = 42,
-    ) -> List[Tuple[DataFrame, DataFrame]]:
+    ) -> List[Tuple[DataFrame[Any], DataFrame[Any]]]:
         """Process the splitting based on the selected strategy.
 
         Args:
-            data (DataFrame): The DataFrame to be splitted.
+            data (FrameT): The DataFrame to be splitted.
             strategy (SplittingStrategies): The splitting strategy to use.
             user_id_label (str): The user_id label.
             item_id_label (str): The item_id label.
@@ -179,7 +192,7 @@ class Splitter:
             seed (int): The seed value. Defaults to 42.
 
         Returns:
-            List[Tuple[DataFrame, DataFrame]]: A list of tuples containing the train and evaluation sets.
+            List[Tuple[DataFrame[Any], DataFrame[Any]]]: A list of tuples containing the train and evaluation sets.
         """
         splitting_strategy = splitting_registry.get(strategy.value)
         split = splitting_strategy(
@@ -196,14 +209,33 @@ class Splitter:
         )
         return split
 
-    def filter_sets(self, train_set: DataFrame, evaluation_set: DataFrame):
+    def filter_sets(
+        self,
+        train_set: DataFrame[Any],
+        evaluation_set: DataFrame[Any],
+        user_id_label: str = "user_id",
+        item_id_label: str = "item_id",
+    ) -> DataFrame[Any]:
         """Filter the evaluation set based on the train set.
 
         Args:
-            train_set (DataFrame): The training set.
-            evaluation_set (DataFrame): The evaluation set to be filtered.
+            train_set (DataFrame[Any]): The training set.
+            evaluation_set (DataFrame[Any]): The evaluation set to be filtered.
+            user_id_label (str): The user ID label.
+            item_id_label (str): The item ID label.
+
+        Returns:
+            DataFrame[Any]: The filtered evaluation set.
         """
-        mask = evaluation_set.iloc[:, 0].isin(
-            train_set.iloc[:, 0]
-        ) & evaluation_set.iloc[:, 1].isin(train_set.iloc[:, 1])
-        evaluation_set.drop(index=evaluation_set.index[~mask], inplace=True)
+        train_users = train_set.select(user_id_label).unique()
+        train_items = train_set.select(item_id_label).unique()
+
+        filtered_by_users = evaluation_set.join(
+            train_users, on=user_id_label, how="inner"
+        )
+
+        filtered_final = filtered_by_users.join(
+            train_items, on=item_id_label, how="inner"
+        )
+
+        return filtered_final

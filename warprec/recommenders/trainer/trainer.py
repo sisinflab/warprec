@@ -12,7 +12,7 @@ from ray.tune import Tuner, TuneConfig, CheckpointConfig, RunConfig
 from ray.tune.stopper import Stopper
 from ray.tune.experiment import Trial
 
-from warprec.recommenders.base_recommender import Recommender
+from warprec.recommenders.base_recommender import Recommender, IterativeRecommender
 from warprec.data import Dataset
 from warprec.recommenders.trainer.objectives import (
     objective_function,
@@ -463,23 +463,6 @@ class Trainer:
         self, model_name, best_result, best_params, dataset, device, seed
     ):
         """Loads the model state from the best checkpoint."""
-        checkpoint = best_result.checkpoint
-        if not checkpoint:
-            # Fallback if checkpoint object is missing but path exists in metrics
-            ckpt_path = (
-                Path(best_result.metrics.get("checkpoint_path", "")) / "checkpoint.pt"
-            )
-        else:
-            ckpt_path = Path(checkpoint.to_directory()) / "checkpoint.pt"
-
-        if not ckpt_path.exists():
-            logger.warning(f"Checkpoint not found at {ckpt_path}")
-            return None
-
-        # Load checkpoint on CPU, move model later
-        checkpoint_data = torch.load(ckpt_path, weights_only=False, map_location="cpu")
-
-        # Initialize the model and load checkpoint
         model = model_registry.get(
             name=model_name,
             params=best_params,
@@ -489,7 +472,16 @@ class Trainer:
             info=dataset.info(),
             **dataset.get_stash(),
         )
-        model.load_state_dict(checkpoint_data["state_dict"])
+
+        # Load the model checkpoint
+        if isinstance(model, IterativeRecommender):
+            checkpoint_path = (
+                Path(best_result.checkpoint.to_directory()) / "checkpoint.pt"
+            )
+            checkpoint = torch.load(
+                checkpoint_path, weights_only=False, map_location="cpu"
+            )
+            model.load_state_dict(checkpoint["state_dict"])
         return model
 
     def _aggregate_cv_results(self, df, metric, mode, desired_it_stat):

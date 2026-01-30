@@ -1,10 +1,10 @@
-from typing import Optional, Tuple, Dict, List
+from typing import Optional, Tuple, Dict, List, Any
 from functools import partial
 
 import torch
-import pandas as pd
 import numpy as np
-from pandas import DataFrame
+import narwhals as nw
+from narwhals.dataframe import DataFrame
 from torch import Tensor
 from torch.utils.data import DataLoader, Dataset
 from torch.nn.utils.rnn import pad_sequence
@@ -31,7 +31,7 @@ class Sessions:
     sampling and caching for efficiency.
 
     Args:
-        data (DataFrame): Transaction data.
+        data (DataFrame[Any]): Transaction data (Narwhals compatible).
         user_mapping (dict): Mapping of original user ID -> integer index.
         item_mapping (dict): Mapping of original item ID -> integer index.
         user_id_label (str): The name of the user ID column in the DataFrame.
@@ -47,7 +47,7 @@ class Sessions:
 
     def __init__(
         self,
-        data: DataFrame,
+        data: DataFrame[Any],
         user_mapping: dict,
         item_mapping: dict,
         user_id_label: str = "user_id",
@@ -70,7 +70,7 @@ class Sessions:
         self._imap = item_mapping
         self._niid = len(self._imap)
         self._context_labels = context_labels if context_labels else []
-        self._processed_df = None
+        self._processed_df: Optional[DataFrame[Any]] = None
 
         # Initialize the cache
         self._cached_dataset: Dict[str, Dataset] = {}
@@ -84,7 +84,7 @@ class Sessions:
         del self._cached_user_histories
         self._cached_user_histories = {}
 
-    def _get_processed_data(self) -> DataFrame:
+    def _get_processed_data(self) -> DataFrame[Any]:
         """Centralized method to map, clean, and sort interaction data.
 
         This method maps user and item IDs to their integer indices,
@@ -93,68 +93,113 @@ class Sessions:
         The result is cached in self._processed_df to avoid redundant processing.
 
         Returns:
-            DataFrame: The processed and sorted interaction data.
+            DataFrame[Any]: The processed and sorted interaction data.
         """
         # Return from cache if already processed
         if self._processed_df is not None:
             return self._processed_df
 
-        # Prepare columns for the new DataFrame
-        cols_to_map = {
-            self._user_label: self._inter_df[self._user_label].map(self._umap),
-            self._item_label: self._inter_df[self._item_label].map(self._imap),
-        }
+        # Create mapping DataFrames for Narwhals join operations
+        # We use the native namespace of the input dataframe to ensure compatibility
+        native_ns = nw.get_native_namespace(self._inter_df)
 
-        # Remove not mapped users/items
-        mapped_df = pd.DataFrame(cols_to_map).dropna()
+        umap_df = nw.from_dict(
+            {
+                self._user_label: list(self._umap.keys()),
+                "__uidx__": list(self._umap.values()),
+            },
+            native_namespace=native_ns,
+        )
 
-        # Include timestamp if it's relevant and exists
+        imap_df = nw.from_dict(
+            {
+                self._item_label: list(self._imap.keys()),
+                "__iidx__": list(self._imap.values()),
+            },
+            native_namespace=native_ns,
+        )
+
+        # Perform joins to map IDs and drop the original columns
+        # We use inner join to automatically filter out unseen users/items (equivalent to dropna after map)
+        mapped_df = (
+            self._inter_df.join(umap_df, on=self._user_label, how="inner")
+            .join(imap_df, on=self._item_label, how="inner")
+            .drop([self._user_label, self._item_label])
+            .rename({"__uidx__": self._user_label, "__iidx__": self._item_label})
+        )
+
+        # Select columns to keep: mapped IDs, timestamp (if exists), and context
+        cols_to_select = [self._user_label, self._item_label]
+
         has_timestamp = (
             self._timestamp_label and self._timestamp_label in self._inter_df.columns
         )
         if has_timestamp:
-            timestamp_col = self._inter_df.loc[mapped_df.index, self._timestamp_label]
-            mapped_df[self._timestamp_label] = timestamp_col
+            cols_to_select.append(self._timestamp_label)
 
-        # Include contextual data if provided
+        # Add context labels if they exist in the original dataframe
+        # Note: If context labels are missing in original df, we might need to add them as 0s.
+        # Narwhals requires explicit column creation.
         for ctx_col in self._context_labels:
             if ctx_col in self._inter_df.columns:
-                mapped_df[ctx_col] = self._inter_df.loc[mapped_df.index, ctx_col]
+                cols_to_select.append(ctx_col)
             else:
-                mapped_df[ctx_col] = 0
+                # If context is missing, we add a literal 0 column
+                mapped_df = mapped_df.with_columns(
+                    nw.lit(0, dtype=nw.Int64).alias(ctx_col)
+                )
+                cols_to_select.append(ctx_col)
 
-        # Create, clean, and cast types
+        mapped_df = mapped_df.select(cols_to_select)
+
+        # Cast types to Int64 for IDs and Context
         cols_to_cast = [self._user_label, self._item_label] + self._context_labels
-        mapped_df[cols_to_cast] = mapped_df[cols_to_cast].astype(np.int64)
+        # We construct a dict for casting if needed, or chain with_columns
+        # Here we iterate to cast
+        for col in cols_to_cast:
+            mapped_df = mapped_df.with_columns(nw.col(col).cast(nw.Int64))
 
         # Sort the data. If timestamp is available, use it for sorting
         if has_timestamp:
-            sorted_df = mapped_df.sort_values(
-                by=[self._user_label, self._timestamp_label]
-            ).reset_index(drop=True)
+            sorted_df = mapped_df.sort([self._user_label, self._timestamp_label])
         else:
             # Fallback sort if no timestamp
-            sorted_df = mapped_df.sort_values(by=self._user_label).reset_index(
-                drop=True
-            )
+            sorted_df = mapped_df.sort(self._user_label)
 
         # Cache and return
         self._processed_df = sorted_df
         return self._processed_df
 
-    def _get_user_sessions(self) -> pd.Series:
+    def _get_user_sessions(self) -> Dict[int, List[int]]:
         """Maps, sorts (if timestamp is available), and groups interactions by user.
-        This centralized helper method prevents code duplication.
+
+        This helper method extracts data to Numpy to perform the grouping, ensuring
+        cross-backend compatibility (as list aggregation is not universally supported
+        in lazy execution modes).
 
         Returns:
-            pd.Series: A Series where the index is user IDs and the values are lists of item
-                interactions in chronological order.
+            Dict[int, List[int]]: A dictionary where keys are user IDs and values
+            are lists of item interactions in chronological order.
         """
         # Get the centralized, processed, and sorted data
         processed_df = self._get_processed_data()
 
-        # Group by user and aggregate item interactions into a list
-        return processed_df.groupby(self._user_label)[self._item_label].agg(list)
+        # Extract columns to numpy arrays
+        # Since processed_df is already sorted by user (and time), we can use this property
+        users = processed_df.select(self._user_label).to_numpy().flatten()
+        items = processed_df.select(self._item_label).to_numpy().flatten()
+
+        # Identify changes in user IDs to split the item array
+        # np.unique on sorted data returns unique elements and their starting indices
+        unique_users, start_indices = np.unique(users, return_index=True)
+
+        # Split items into a list of arrays based on user boundaries
+        # We skip the first index (0) as np.split expects split points
+        split_items = np.split(items, start_indices[1:])
+
+        # Construct the dictionary
+        # Converting numpy arrays to lists for consistency with previous behavior
+        return {u: i.tolist() for u, i in zip(unique_users, split_items)}
 
     def get_sequential_dataloader(
         self,
@@ -188,7 +233,8 @@ class Sessions:
             sorted_df = self._get_processed_data()
 
             # Edge case: No valid session
-            if sorted_df.empty:
+            # Narwhals check for empty dataframe
+            if sorted_df.select(nw.len()).item() == 0:
                 logger.negative("No valid session found in the data.")
                 return DataLoader(torch.utils.data.TensorDataset(torch.empty(0)))
 
@@ -261,7 +307,7 @@ class Sessions:
     ) -> Tuple[Optional[Tensor], Tensor, Tensor, Tensor, Optional[Tensor]]:
         """Core logic for transforming interaction data into sequential training samples.
 
-        This function uses pandas and numpy for efficient processing.
+        This function uses numpy for efficient processing after extracting data via Narwhals.
 
         Args:
             neg_samples (int): Number of negative samples per user.
@@ -282,7 +328,7 @@ class Sessions:
         sorted_df = self._get_processed_data()
 
         # Handle edge case where no data exists after processing
-        if sorted_df.empty:
+        if sorted_df.select(nw.len()).item() == 0:
             return (
                 None if not include_user_id else torch.empty(0, dtype=torch.long),
                 torch.empty((0, max_seq_len), dtype=torch.long),
@@ -292,8 +338,9 @@ class Sessions:
             )
 
         # Extract numpy arrays for efficient processing
-        all_items_0_indexed = sorted_df[self._item_label].values
-        all_users = sorted_df[self._user_label].values
+        # Narwhals .to_numpy() returns numpy array, flatten ensures 1D
+        all_items_0_indexed = sorted_df.select(self._item_label).to_numpy().flatten()
+        all_users = sorted_df.select(self._user_label).to_numpy().flatten()
 
         # Identify user sessions by detecting changes in the user ID column
         is_new_session = np.diff(all_users, prepend=-1) != 0
@@ -469,10 +516,8 @@ class Sessions:
 
     def _compute_cache_user_history(self):
         """Computes and caches the complete interaction history for every user."""
-        user_sessions = self._get_user_sessions()
-        self._cached_user_histories = user_sessions.apply(
-            lambda x: np.array(x).tolist()
-        ).to_dict()
+        # _get_user_sessions now returns Dict[int, List[int]] directly
+        self._cached_user_histories = self._get_user_sessions()
 
     def get_user_history_dataloader(
         self,
@@ -497,10 +542,11 @@ class Sessions:
             DataLoader: A DataLoader yielding user history sequences with negative samples.
         """
         if low_memory:
-            user_sessions = self._get_user_sessions()
+            user_sessions_dict = self._get_user_sessions()
+            user_sessions_list = list(user_sessions_dict.values())
 
             lazy_dataset = LazyUserHistoryDataset(
-                user_sessions=user_sessions,
+                user_sessions=user_sessions_list,
                 max_seq_len=max_seq_len,
                 neg_samples=neg_samples,
                 niid=self._niid,
@@ -562,17 +608,22 @@ class Sessions:
                 - Tensor: Padded negative item samples.
         """
         # pylint: disable=too-many-statements
-        user_sessions = self._get_user_sessions()
+        user_sessions_dict = self._get_user_sessions()
+
+        # Convert to list of arrays for processing
+        # We use numpy arrays for the values to support vectorized length checks
+        user_sessions = [np.array(s) for s in user_sessions_dict.values()]
 
         # Compute lengths and filter out sessions too short for training (< 2 items)
-        lengths = user_sessions.str.len().values
+        lengths = np.array([len(s) for s in user_sessions])
         valid_mask = lengths >= 2
 
         if not np.any(valid_mask):
             logger.attention("No valid user history samples generated.")
             return torch.empty(0), torch.empty(0)
 
-        valid_sessions = user_sessions[valid_mask].values
+        # Filter valid sessions
+        valid_sessions = [s for s, valid in zip(user_sessions, valid_mask) if valid]
         lengths = lengths[valid_mask]
 
         # Flatten all sessions into a single 1D array for vectorized indexing.
@@ -733,10 +784,11 @@ class Sessions:
             DataLoader: A DataLoader yielding (masked_seq, pos_items, neg_items, masked_indices).
         """
         if low_memory:
-            user_sessions = self._get_user_sessions()
+            user_sessions_dict = self._get_user_sessions()
+            user_sessions_list = list(user_sessions_dict.values())
 
             lazy_dataset = LazyClozeMaskDataset(
-                user_sessions=user_sessions,
+                user_sessions=user_sessions_list,
                 max_seq_len=max_seq_len,
                 mask_prob=mask_prob,
                 mask_token_id=mask_token_id,
@@ -810,14 +862,13 @@ class Sessions:
                 - Tensor: Indices of masked items in the sequences.
         """
         np.random.seed(seed)
-        user_sessions = self._get_user_sessions()
+        user_sessions_dict = self._get_user_sessions()
 
-        # Filter sessions with at less than 2 items
-        valid_sessions = (
-            user_sessions[user_sessions.str.len() >= 2]
-            .apply(lambda s: s[-max_seq_len:])
-            .tolist()
-        )
+        # Filter sessions with at less than 2 items and truncate to max_seq_len
+        valid_sessions = []
+        for s in user_sessions_dict.values():
+            if len(s) >= 2:
+                valid_sessions.append(s[-max_seq_len:])
 
         # Edge case: no valid sessions
         if not valid_sessions:

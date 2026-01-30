@@ -1,8 +1,8 @@
 # pylint: disable=too-many-branches, too-many-statements
-from typing import Tuple, List, Optional, Dict, Union
+from typing import Tuple, List, Optional, Dict, Union, Any
 from itertools import product
 
-from pandas import DataFrame
+from narwhals.dataframe import DataFrame
 
 from warprec.data import Dataset
 from warprec.data.reader import Reader
@@ -43,9 +43,9 @@ def initialize_datasets(
     """
     # Dataset loading
     main_dataset: Dataset = None
-    val_data: List[Tuple[DataFrame, DataFrame]] | DataFrame = None
-    train_data: DataFrame = None
-    test_data: DataFrame = None
+    val_data: List[Tuple[DataFrame[Any], DataFrame[Any]]] | DataFrame[Any] = None
+    train_data: DataFrame[Any] = None
+    test_data: DataFrame[Any] = None
     side_data = None
     user_cluster = None
     item_cluster = None
@@ -117,7 +117,7 @@ def initialize_datasets(
             common_cluster_label: str,
             common_cluster_type: str,
             reader: Reader,
-        ) -> DataFrame:
+        ) -> DataFrame[Any]:
             """Reads clustering data using a pre-prepared specific configuration (User or Item).
 
             Args:
@@ -127,7 +127,7 @@ def initialize_datasets(
                 reader (Reader): Object or module with the read_tabular method.
 
             Returns:
-                DataFrame: A Pandas DataFrame containing the cluster data.
+                DataFrame[Any]: A DataFrame containing the cluster data.
             """
 
             # Define column names
@@ -196,7 +196,7 @@ def initialize_datasets(
         )
 
     # Dataset common information
-    common_params = {
+    common_params: Dict[str, Any] = {
         "side_data": side_data,
         "user_cluster": user_cluster,
         "item_cluster": item_cluster,
