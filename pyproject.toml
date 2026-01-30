@@ -23,6 +23,8 @@ tensorboardx = "^2.6.2.2"
 torch = "~2.7"
 torchmetrics = "^1.8.2"
 optuna = "^4.5.0"
+polars = "1.36.1"
+narwhals = "^2.15.0"
 
 
 [tool.poetry.group.dev.dependencies]
