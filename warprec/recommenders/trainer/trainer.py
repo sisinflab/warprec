@@ -302,7 +302,7 @@ class Trainer:
         mode = opt_config.properties.mode
 
         # Determine resources and objective function
-        resources = self._get_resources(opt_config.parallel_trials, num_gpus)
+        resources = self._get_resources(opt_config.parallel_trials, device, num_gpus)
         trainable = self._get_objective_function(
             model_name=model_name,
             params=params,
@@ -372,12 +372,16 @@ class Trainer:
         )
 
     def _get_resources(
-        self, num_trials: int, num_gpus: Optional[int]
+        self,
+        num_trials: int,
+        device: str,
+        num_gpus: Optional[int],
     ) -> Dict[str, float]:
         """Calculates resource allocation per trial.
 
         Args:
             num_trials (int): The number of parallel trials.
+            device (str): The device of the experiment.
             num_gpus (Optional[int]): The number of gpus per trial.
 
         Returns:
@@ -385,16 +389,23 @@ class Trainer:
         """
         # Get available resources
         resources = ray.available_resources()
-        available_cpus = resources.get("CPU", 0)
+        available_cpus = resources.get("CPU", 1)
         available_gpus = resources.get("GPU", 0)
 
-        if num_gpus is not None and num_gpus > 1:
-            return {"cpu": available_cpus}
+        # Fixed CPU per trial compute
+        cpu_per_trial = available_cpus / num_trials
 
-        return {
-            "cpu": available_cpus / num_trials,
-            "gpu": min(available_gpus / num_trials, 1.0) if num_gpus else 0.0,
-        }
+        # CASE 1: Multi-GPU scenario
+        if num_gpus is not None and num_gpus > 1:
+            return {"cpu": cpu_per_trial, "gpu": num_gpus}
+
+        # CASE 2: Single-GPU scenario
+        if device == "cuda":
+            gpu_per_trial = min(1.0, available_gpus / num_trials)
+            return {"cpu": cpu_per_trial, "gpu": gpu_per_trial}
+
+        # CASE 3: CPU-only scenario
+        return {"cpu": cpu_per_trial, "gpu": 0.0}
 
     def _get_objective_function(self, **kwargs: Any) -> Callable:
         """Selects and wraps the appropriate objective function (Standard or DDP).
@@ -466,15 +477,7 @@ class Trainer:
             return None
 
         # Load checkpoint on CPU, move model later
-        checkpoint_data = torch.load(ckpt_path, weights_only=True, map_location="cpu")
-
-        # Retrieve state dict
-        if "model_state" in checkpoint_data:
-            state_dict = checkpoint_data["model_state"]
-        elif "state_dict" in checkpoint_data:
-            state_dict = checkpoint_data["state_dict"]
-        else:
-            state_dict = checkpoint_data
+        checkpoint_data = torch.load(ckpt_path, weights_only=False, map_location="cpu")
 
         # Initialize the model and load checkpoint
         model = model_registry.get(
@@ -486,7 +489,7 @@ class Trainer:
             info=dataset.info(),
             **dataset.get_stash(),
         )
-        model.load_state_dict(state_dict)
+        model.load_state_dict(checkpoint_data["state_dict"])
         return model
 
     def _aggregate_cv_results(self, df, metric, mode, desired_it_stat):

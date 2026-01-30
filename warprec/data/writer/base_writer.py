@@ -286,7 +286,7 @@ class Writer(ABC):
         )
         try:
             buffer = BytesIO()
-            torch.save(model.state_dict(), buffer)
+            torch.save(model.get_state(), buffer)
             buffer.seek(0)
             self._write_bytes(path, buffer.read())
             logger.msg(f"Model state successfully written to {path}")

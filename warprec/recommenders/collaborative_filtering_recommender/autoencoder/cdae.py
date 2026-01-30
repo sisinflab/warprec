@@ -25,7 +25,6 @@ class CDAE(IterativeRecommender):
 
     Args:
         params (dict): Model parameters.
-        interactions (Interactions): The training interactions.
         info (dict): The dictionary containing dataset information.
         *args (Any): Variable length argument list.
         seed (int): The seed to use for reproducibility.
@@ -66,13 +65,12 @@ class CDAE(IterativeRecommender):
     def __init__(
         self,
         params: dict,
-        interactions: Interactions,
         info: dict,
         *args: Any,
         seed: int = 42,
         **kwargs: Any,
     ):
-        super().__init__(params, interactions, info, *args, seed=seed, **kwargs)
+        super().__init__(params, info, *args, seed=seed, **kwargs)
 
         # User-specific embedding
         self.user_embedding = nn.Embedding(self.n_users, self.embedding_size)

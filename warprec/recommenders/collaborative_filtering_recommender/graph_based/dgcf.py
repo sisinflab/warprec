@@ -24,8 +24,8 @@ class DGCF(IterativeRecommender, GraphRecommenderUtils):
 
     Args:
         params (dict): Model parameters.
-        interactions (Interactions): The training interactions.
         info (dict): The dictionary containing dataset information.
+        interactions (Interactions): The training interactions.
         *args (Any): Variable length argument list.
         seed (int): The seed to use for reproducibility.
         **kwargs (Any): Arbitrary keyword arguments.
@@ -62,13 +62,13 @@ class DGCF(IterativeRecommender, GraphRecommenderUtils):
     def __init__(
         self,
         params: dict,
-        interactions: Interactions,
         info: dict,
+        interactions: Interactions,
         *args: Any,
         seed: int = 42,
         **kwargs: Any,
     ):
-        super().__init__(params, interactions, info, seed=seed, *args, **kwargs)
+        super().__init__(params, info, seed=seed, *args, **kwargs)
 
         if self.embedding_size % self.n_factors != 0:
             raise ValueError(
