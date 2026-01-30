@@ -7,9 +7,10 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
+import polars as pl
 import torch
+from narwhals.dataframe import DataFrame
 from torch import Tensor
-from pandas import DataFrame
 from tqdm import tqdm
 
 from warprec.data import Dataset
@@ -63,6 +64,36 @@ class Writer(ABC):
         Consumes the recommendation generator and writes the data to the destination
         in a memory-efficient, streaming fashion.
         """
+
+    def _df_to_csv_string(
+        self, df: DataFrame[Any], sep: str = "\t", header: bool = True
+    ) -> str:
+        """Helper method to convert a DataFrame to a CSV string
+        using Narwhals for backend detection.
+
+        Args:
+            df (DataFrame[Any]): The DataFrame to write.
+            sep (str): The separator to use.
+            header (bool): Wether or not to save with header.
+
+        Returns:
+            str: The converted DataFrame to string.
+
+        Raises:
+            ValueError: If the DataFrame is in a format not supported.
+        """
+        native_df = df.to_native()
+
+        if isinstance(native_df, pl.DataFrame):
+            return native_df.write_csv(None, separator=sep, include_header=header)
+
+        if isinstance(native_df, pd.DataFrame):
+            return native_df.to_csv(sep=sep, header=header, index=False)
+
+        raise ValueError(
+            "The DataFrame is in a format not compatible with the writer. "
+            f"DataFrame type: {type(native_df)}"
+        )
 
     def _generate_recommendation_batches(
         self, model: Recommender, dataset: Dataset, k: int
@@ -305,15 +336,15 @@ class Writer(ABC):
             try:
                 # Write train set
                 train_path = self._path_join(path_prefix, f"train{ext}")
-                train_csv = dataset.train_set.get_df().to_csv(
-                    sep=sep, header=header, index=False
+                train_csv = self._df_to_csv_string(
+                    dataset.train_set.get_df(), sep=sep, header=header
                 )
                 self._write_text(train_path, train_csv)
 
                 # Write eval set
                 eval_path = self._path_join(path_prefix, f"{eval_set_name}{ext}")
-                eval_csv = dataset.eval_set.get_df().to_csv(
-                    sep=sep, header=header, index=False
+                eval_csv = self._df_to_csv_string(
+                    dataset.eval_set.get_df(), sep=sep, header=header
                 )
                 self._write_text(eval_path, eval_csv)
             except (pd.errors.ParserError, ValueError, pd.errors.EmptyDataError) as e:
@@ -397,7 +428,7 @@ class Writer(ABC):
             f"{test_name.capitalize()}_{self._timestamp}{ext}",
         )
         try:
-            output_csv = test_results.to_csv(sep=sep, index=False)
+            output_csv = self._df_to_csv_string(test_results, sep=sep)
             self._write_text(path, output_csv)
             logger.msg(f"Statistical significance test results written to {path}")
         except (pd.errors.ParserError, ValueError, pd.errors.EmptyDataError) as e:
