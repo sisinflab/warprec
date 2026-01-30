@@ -26,9 +26,6 @@ class SplittingStrategy(ABC):
             materialized_data = data
 
         index_col = "__original_row_index__"
-        if index_col in materialized_data.columns:
-            index_col = "__original_row_index_v2__"
-
         return materialized_data.with_row_index(name=index_col), index_col
 
     def __call__(
