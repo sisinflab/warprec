@@ -2,6 +2,7 @@
 from typing import Any
 
 import numpy as np
+import scipy
 from warprec.recommenders.base_recommender import ItemSimRecommender
 from warprec.data.entities import Interactions
 from warprec.utils.registry import model_registry
@@ -42,7 +43,8 @@ class EASE(ItemSimRecommender):
         X = interactions.get_sparse()
 
         G = X.T @ X + self.l2 * np.identity(X.shape[1])
-        B = np.linalg.inv(G)
+        # B = np.linalg.inv(G)
+        B = scipy.linalg.inv(G, check_finite=False)
         B /= -np.diag(B)
         np.fill_diagonal(B, 0.0)
 

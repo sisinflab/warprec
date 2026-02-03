@@ -1,0 +1,89 @@
+reader:
+  loading_strategy: dataset
+  data_type: transaction
+  reading_method: local
+  local_path: ../dataset/movielens-1m/ratings.csv
+  rating_type: explicit
+  sep: ','
+  labels:
+    user_id_label: user_id
+    item_id_label: item_id
+    rating_label: rating
+    timestamp_label: timestamp
+writer:
+  dataset_name: MovieLens
+  writing_method: local
+  local_experiment_path: experiments/
+splitter:
+  test_splitting:
+    strategy: random_holdout
+    ratio: 0.1
+dashboard:
+  wandb:
+    enabled: False
+    team: wideverse-ai
+    project: warprec
+    group: warprec-movielens-1m
+    api_key: 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 #! TODO REMOVE
+    upload_checkpoints: False
+  codecarbon:
+    enabled: True
+    save_to_file: True
+    output_dir: experiments/codecarbon/movielens
+models:
+  EASE:
+    meta:
+      save_model: True
+    l2: [100, 200, 500, 750, 1000, 2000]
+  NeuMF:
+    meta:
+      save_model: True
+    mf_embedding_size: [64, 128, 256]
+    mlp_embedding_size: 64
+    mlp_hidden_size: [[64, 32]]
+    mf_train: True
+    mlp_train: True
+    dropout: 0.1
+    reg_weight: 0.001
+    weight_decay: 0.0001
+    batch_size: 8192
+    epochs: 50
+    learning_rate: 0.001
+    neg_samples: [4, 8]
+  LightGCN:
+    meta:
+      save_model: True
+    embedding_size: [64, 128, 256]
+    n_layers: [2, 3]
+    reg_weight: 0.001
+    batch_size: 8192
+    epochs: 50
+    learning_rate: 0.001
+  ItemKNN:
+    meta:
+      save_model: True
+    k: [50, 100, 200, 500, 1000, 2000]
+    similarity: cosine
+  SASRec:
+    meta:
+      save_model: True
+    embedding_size: [64, 128, 256]
+    n_layers: [2, 3]
+    n_heads: 8
+    inner_size: 512
+    dropout_prob: 0.1
+    attn_dropout_prob: 0.1
+    reg_weight: 0.001
+    weight_decay: 0.0001
+    batch_size: 8192
+    epochs: 50
+    learning_rate: 0.0001
+    neg_samples: 4
+    max_seq_len: 50
+evaluation:
+  top_k: [10]
+  metrics: [nDCG, Precision, Recall, HitRate, MAP]
+  strategy: full
+  batch_size: 7000
+general:
+  device: cuda
