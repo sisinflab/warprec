@@ -95,6 +95,33 @@ class Writer(ABC):
             f"DataFrame type: {type(native_df)}"
         )
 
+    def _df_to_parquet_bytes(self, df: DataFrame[Any]) -> bytes:
+        """Helper method to convert a DataFrame to Parquet bytes.
+
+        Args:
+            df (DataFrame[Any]): The DataFrame to write.
+
+        Returns:
+            bytes: The DataFrame converted to parquet bytes.
+
+        Raises:
+            ValueError: If the DataFrame type is not supported.
+        """
+        native_df = df.to_native()
+        buffer = BytesIO()
+
+        if isinstance(native_df, pl.DataFrame):
+            native_df.write_parquet(buffer)
+        elif isinstance(native_df, pd.DataFrame):
+            native_df.to_parquet(buffer, index=False)
+        else:
+            raise ValueError(
+                "The DataFrame is in a format not compatible with the writer. "
+                f"DataFrame type: {type(native_df)}"
+            )
+
+        return buffer.getvalue()
+
     def _generate_recommendation_batches(
         self, model: Recommender, dataset: Dataset, k: int
     ) -> Generator[list[tuple], None, None]:
@@ -321,7 +348,7 @@ class Writer(ABC):
         except Exception as e:  # pylint: disable=broad-exception-caught
             logger.negative(f"Error writing parameters to {path}: {e}")
 
-    def write_split(
+    def write_tabular_split(
         self,
         main_dataset: Dataset,
         val_dataset: Optional[Dataset],
@@ -330,9 +357,9 @@ class Writer(ABC):
         ext: str = ".tsv",
         header: bool = True,
     ):
-        """Writes the dataset splits."""
+        """Writes the dataset splits in tabular format (CSV/TSV)."""
 
-        def write_dataset_split(dataset: Dataset, path_prefix: str, eval_set_name: str):
+        def _write_dataset(dataset: Dataset, path_prefix: str, eval_set_name: str):
             try:
                 # Write train set
                 train_path = self._path_join(path_prefix, f"train{ext}")
@@ -347,21 +374,65 @@ class Writer(ABC):
                     dataset.eval_set.get_df(), sep=sep, header=header
                 )
                 self._write_text(eval_path, eval_csv)
-            except (pd.errors.ParserError, ValueError, pd.errors.EmptyDataError) as e:
-                logger.negative(f"Failed to write dataset split to {path_prefix}: {e}")
+            except Exception as e:
+                logger.negative(f"Failed to write tabular split to {path_prefix}: {e}")
 
         main_split_path = str(self.experiment_split_path)
-        write_dataset_split(main_dataset, main_split_path, "test")
 
+        # Main Split
+        _write_dataset(main_dataset, main_split_path, "test")
+
+        # Validation Split (if exists)
         if val_dataset:
-            write_dataset_split(val_dataset, main_split_path, "validation")
+            _write_dataset(val_dataset, main_split_path, "validation")
 
+        # Folds (if exist)
         if fold_dataset:
             for i, fold in enumerate(fold_dataset):
                 fold_path = self._path_join(main_split_path, str(i + 1))
-                write_dataset_split(fold, fold_path, "validation")
+                _write_dataset(fold, fold_path, "validation")
 
-        logger.msg(f"Split data written to {main_split_path}")
+        logger.msg(f"Tabular split data written to {main_split_path}")
+
+    def write_parquet_split(
+        self,
+        main_dataset: Dataset,
+        val_dataset: Optional[Dataset],
+        fold_dataset: Optional[List[Dataset]],
+        ext: str = ".parquet",
+    ):
+        """Writes the dataset splits in Parquet format."""
+
+        def _write_dataset(dataset: Dataset, path_prefix: str, eval_set_name: str):
+            try:
+                # Write train set
+                train_path = self._path_join(path_prefix, f"train{ext}")
+                train_bytes = self._df_to_parquet_bytes(dataset.train_set.get_df())
+                self._write_bytes(train_path, train_bytes)
+
+                # Write eval set
+                eval_path = self._path_join(path_prefix, f"{eval_set_name}{ext}")
+                eval_bytes = self._df_to_parquet_bytes(dataset.eval_set.get_df())
+                self._write_bytes(eval_path, eval_bytes)
+            except Exception as e:
+                logger.negative(f"Failed to write parquet split to {path_prefix}: {e}")
+
+        main_split_path = str(self.experiment_split_path)
+
+        # Main Split
+        _write_dataset(main_dataset, main_split_path, "test")
+
+        # Validation Split (if exists)
+        if val_dataset:
+            _write_dataset(val_dataset, main_split_path, "validation")
+
+        # Folds (if exist)
+        if fold_dataset:
+            for i, fold in enumerate(fold_dataset):
+                fold_path = self._path_join(main_split_path, str(i + 1))
+                _write_dataset(fold, fold_path, "validation")
+
+        logger.msg(f"Parquet split data written to {main_split_path}")
 
     def write_time_report(
         self, time_report: List[Dict[str, Any]], sep: str = "\t", ext: str = ".tsv"
