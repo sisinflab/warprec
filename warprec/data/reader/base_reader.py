@@ -33,6 +33,10 @@ class Reader(ABC):
                 f"Initializing reader module with a not supported backend: {self.backend}."
             )
 
+    @abstractmethod
+    def read_tabular(self, *args: Any, **kwargs: Any) -> DataFrame[Any]:
+        """This method will read the tabular data from the source."""
+
     def _process_tabular_data(
         self,
         source: Union[str, Path, StringIO, BytesIO],
@@ -306,10 +310,6 @@ class Reader(ABC):
         return nw_df
 
     @abstractmethod
-    def read_tabular(self, *args: Any, **kwargs: Any) -> DataFrame[Any]:
-        """This method will read the tabular data from the source."""
-
-    @abstractmethod
     def read_tabular_split(
         self, *args: Any, **kwargs: Any
     ) -> Tuple[
@@ -392,6 +392,112 @@ class Reader(ABC):
                 break
 
         logger.positive("Reading process completed successfully.")
+        return (train_data, fold_data if fold_data else None, test_data)
+
+    @abstractmethod
+    def read_parquet(self, *args: Any, **kwargs: Any) -> DataFrame[Any]:
+        """This method will read the parquet data from the source."""
+
+    def _process_parquet_data(
+        self,
+        source: Union[str, Path, BytesIO],
+        desired_cols: Optional[List[str]] = None,
+    ) -> DataFrame[Any]:
+        """Internal method to process parquet data based on the selected backend.
+
+        Args:
+            source (Union[str, Path, BytesIO]): File path or stream.
+            desired_cols (Optional[List[str]]): List of columns to read.
+
+        Returns:
+            DataFrame[Any]: A Narwhals DataFrame.
+        """
+        try:
+            if self.backend == "polars":
+                # Polars read_parquet
+                pl_df = pl.read_parquet(source, columns=desired_cols)
+                return nw.from_native(pl_df)
+            else:
+                # Pandas read_parquet
+                pd_df = pd.read_parquet(source, columns=desired_cols)
+                return nw.from_native(pd_df)
+        except Exception as e:
+            logger.negative(f"Error reading Parquet with {self.backend}: {e}")
+            return nw.from_native(pd.DataFrame())
+
+    @abstractmethod
+    def read_parquet_split(
+        self, *args: Any, **kwargs: Any
+    ) -> Tuple[
+        DataFrame[Any],
+        Optional[List[Tuple[DataFrame[Any], DataFrame[Any]]] | DataFrame[Any]],
+        DataFrame[Any],
+    ]:
+        """This method will read the parquet split data from the source."""
+
+    def _process_parquet_split(
+        self,
+        base_location: str,
+        column_names: Optional[List[str]] = None,
+        ext: str = ".parquet",
+        is_remote: bool = False,
+        *args: Any,
+        **kwargs: Any,
+    ) -> Tuple[
+        DataFrame[Any],
+        Optional[List[Tuple[DataFrame[Any], DataFrame[Any]]] | DataFrame[Any]],
+        DataFrame[Any],
+    ]:
+        """Reads split data (Train/Validation/Test) from Parquet files."""
+
+        path_joiner = posixpath.join if is_remote else lambda *a: str(Path(*a))
+
+        path_main_train = path_joiner(base_location, f"train{ext}")
+        path_main_val = path_joiner(base_location, f"validation{ext}")
+        path_main_test = path_joiner(base_location, f"test{ext}")
+
+        logger.msg(
+            f"Starting reading parquet split process from: {base_location} using {self.backend}"
+        )
+
+        train_data = self.read_parquet(path_main_train, column_names)
+        test_data = self.read_parquet(path_main_test, column_names)
+
+        if (
+            train_data.select(nw.len()).item() == 0
+            or test_data.select(nw.len()).item() == 0
+        ):
+            raise FileNotFoundError(
+                f"Train/Test parquet data not found or empty in '{base_location}'."
+            )
+
+        val_data = self.read_parquet(path_main_val, column_names)
+
+        if val_data.select(nw.len()).item() > 0:
+            return (train_data, val_data, test_data)
+
+        # Iterate over the folds
+        fold_data = []
+        fold_number = 1
+        while True:
+            fold_path = path_joiner(base_location, str(fold_number))
+            path_fold_train = path_joiner(fold_path, f"train{ext}")
+
+            fold_train = self.read_parquet(path_fold_train, column_names)
+
+            if fold_train.select(nw.len()).item() == 0:
+                break
+
+            path_fold_val = path_joiner(fold_path, f"validation{ext}")
+            fold_val = self.read_parquet(path_fold_val, column_names)
+
+            if fold_val.select(nw.len()).item() > 0:
+                fold_data.append((fold_train, fold_val))
+                fold_number += 1
+            else:
+                break
+
+        logger.positive("Parquet reading process completed successfully.")
         return (train_data, fold_data if fold_data else None, test_data)
 
     @abstractmethod
