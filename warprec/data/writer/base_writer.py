@@ -356,6 +356,8 @@ class Writer(ABC):
         sep: str = "\t",
         ext: str = ".tsv",
         header: bool = True,
+        *args: Any,
+        **kwargs: Any,
     ):
         """Writes the dataset splits in tabular format (CSV/TSV)."""
 
@@ -400,6 +402,8 @@ class Writer(ABC):
         val_dataset: Optional[Dataset],
         fold_dataset: Optional[List[Dataset]],
         ext: str = ".parquet",
+        *args: Any,
+        **kwargs: Any,
     ):
         """Writes the dataset splits in Parquet format."""
 
