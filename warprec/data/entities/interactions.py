@@ -1,22 +1,25 @@
-import typing
-from typing import Tuple, Any, Optional, Dict, List
+from typing import Tuple, Any, Optional, List
 
-import torch
 import numpy as np
-from torch import Tensor
-from torch.utils.data import DataLoader, TensorDataset
-
 import narwhals as nw
+import torch
+from torch import Tensor
+from torch.utils.data import DataLoader
 from narwhals.dataframe import DataFrame
-
 from scipy.sparse import csr_matrix, coo_matrix
 
 from warprec.data.entities.train_structures import (
-    LazyInteractionDataset,
-    LazyItemRatingDataset,
-    LazyTripletDataset,
+    InteractionDataset,
+    PointWiseDataset,
+    ContrastiveDataset,
 )
 from warprec.utils.enums import RatingType
+
+
+# Worker seed function for reproducibility
+def seed_worker(worker_id):
+    worker_seed = torch.initial_seed() % 2**32
+    np.random.seed(worker_seed)
 
 
 class Interactions:
@@ -66,8 +69,6 @@ class Interactions:
         self.precision = precision
 
         # Setup the training variables
-        self._cached_dataset: Dict[str, TensorDataset] = {}
-        self._cached_tensor: Dict[str, Tensor] = {}
         self._inter_dict: Optional[dict] = None
         self._inter_sparse: csr_matrix = None
         self._inter_side_sparse: csr_matrix = None
@@ -136,13 +137,27 @@ class Interactions:
         self._og_nuid, self._og_niid = original_dims
         self._transactions = self._inter_df.select(nw.len()).item()
 
-    def clear_dataset_cache(self):
-        """This method will clear the cached Dataset objects."""
-        del self._cached_dataset
-        self._cached_dataset = {}
+    def _get_mapped_indices(self) -> Tuple[Tensor, Tensor]:
+        """Retrieves mapped user and item indices directly from the sparse matrix structure.
 
-        del self._cached_tensor
-        self._cached_tensor = {}
+        Returns:
+            Tuple[Tensor, Tensor]: (user_indices, item_indices) aligned as LongTensors.
+        """
+        mat = self.get_sparse()
+
+        if not mat.has_sorted_indices:
+            mat.sort_indices()
+
+        # Extract the positive items
+        pos_items = mat.indices.astype(np.int64)
+
+        # Reconstruct the users
+        n_users = mat.shape[0]
+        interactions_per_user = np.diff(mat.indptr)
+        users = np.repeat(np.arange(n_users), interactions_per_user).astype(np.int64)
+
+        # Return Tensors directly
+        return torch.from_numpy(users), torch.from_numpy(pos_items)
 
     def get_dict(self) -> dict:
         """This method will return the transaction information in dict format.
@@ -287,12 +302,12 @@ class Interactions:
         """
         return self._inter_side_tensor
 
-    def get_interaction_loader(
+    def get_interaction_dataloader(
         self,
         include_user_id: bool = False,
         batch_size: int = 1024,
         shuffle: bool = True,
-        low_memory: bool = False,
+        **kwargs: Any,
     ) -> DataLoader:
         """Create a PyTorch DataLoader that yields dense tensors of interaction batches.
 
@@ -304,49 +319,23 @@ class Interactions:
             include_user_id (bool): Whether to include user IDs in the output.
             batch_size (int): The batch size to be used for the DataLoader.
             shuffle (bool): Whether to shuffle the data when loading.
-            low_memory (bool): Whether to create the dataloader with a lazy approach.
+            **kwargs (Any): The additional keyword arguments to pass the Dataloader.
 
         Returns:
             DataLoader: A DataLoader that yields batches of dense interaction tensors.
         """
-        if low_memory:
-            # Get the sparse matrix, which is memory-efficient.
-            sparse_matrix = self.get_sparse()
-
-            # Create the lazy dataset which just holds a reference to the sparse matrix.
-            lazy_dataset = LazyInteractionDataset(
-                sparse_matrix, include_user_id=include_user_id
-            )
-            return DataLoader(lazy_dataset, batch_size=batch_size, shuffle=shuffle)
-
-        # Check if interactions have been cached
-        cache_key = f"interaction_user_{include_user_id}"
-        if cache_key in self._cached_dataset:
-            dataset = self._cached_dataset[cache_key]
-            return DataLoader(dataset, batch_size=batch_size, shuffle=shuffle)
-
-        # Get the sparse interaction matrix. This ensures it's created if it doesn't exist.
+        # Get the sparse matrix, which is memory-efficient.
         sparse_matrix = self.get_sparse()
 
-        # Convert the sparse matrix to a dense tensor.
-        dense_tensor = torch.from_numpy(sparse_matrix.todense()).to(dtype=torch.float32)
+        # Create the lazy dataset which just holds a reference to the sparse matrix.
+        lazy_dataset = InteractionDataset(
+            sparse_matrix, include_user_id=include_user_id
+        )
+        return DataLoader(
+            lazy_dataset, batch_size=batch_size, shuffle=shuffle, **kwargs
+        )
 
-        # Create a TensorDataset from the dense tensor.
-        # If requested also the user indices tensor will be yielded
-        if include_user_id:
-            indices_tensor = torch.arange(sparse_matrix.shape[0], dtype=torch.long)
-            dataset = TensorDataset(indices_tensor, dense_tensor)
-        else:
-            dataset = TensorDataset(dense_tensor)
-
-        # Cache the dataset
-        self._cached_dataset[cache_key] = dataset
-
-        # Wrap the dataset in a DataLoader.
-        # The DataLoader will handle batching and shuffling.
-        return DataLoader(dataset, batch_size=batch_size, shuffle=shuffle)
-
-    def get_item_rating_dataloader(
+    def get_pointwise_dataloader(
         self,
         neg_samples: int = 0,
         include_side_info: bool = False,
@@ -354,7 +343,7 @@ class Interactions:
         batch_size: int = 1024,
         shuffle: bool = True,
         seed: int = 42,
-        low_memory: bool = False,
+        **kwargs: Any,
     ) -> DataLoader:
         """Create a PyTorch DataLoader with implicit feedback and negative sampling.
 
@@ -365,336 +354,88 @@ class Interactions:
             batch_size (int): The batch size that will be used to
             shuffle (bool): Whether to shuffle the data.
             seed (int): Seed for Numpy random number generator for reproducibility.
-            low_memory (bool): Whether to create the dataloader with a lazy approach.
+            **kwargs (Any): The additional keyword arguments to pass the Dataloader.
 
         Returns:
             DataLoader: Yields (user, item, rating) with negative samples or
                 (user, item, rating, context) if flagged.
-
-        Raises:
-            ValueError: If context flag has been set but no context
-                information is present in the DataFrame.
         """
+        pos_users, pos_items = self._get_mapped_indices()
 
-        # Helper to get mapped indices
-        def get_mapped_indices():
-            # Create mapping DFs
-            umap_df = nw.from_dict(
-                {
-                    self.user_label: list(self._umap.keys()),
-                    "__uidx__": list(self._umap.values()),
-                },
-                native_namespace=nw.get_native_namespace(self._inter_df),
-            )
+        # Prepare side information and context if requested
+        side_info_tensor = None
+        if include_side_info and self._inter_side_tensor is not None:
+            side_info_tensor = self._inter_side_tensor
 
-            imap_df = nw.from_dict(
-                {
-                    self.item_label: list(self._imap.keys()),
-                    "__iidx__": list(self._imap.values()),
-                },
-                native_namespace=nw.get_native_namespace(self._inter_df),
-            )
+        context_tensor = None
+        if include_context and self.context_labels:
+            ctx_vals = self._inter_df.select(self.context_labels).to_numpy()
+            context_tensor = torch.tensor(ctx_vals, dtype=torch.long)
 
-            # Join
-            mapped_df = self._inter_df.join(
-                umap_df, on=self.user_label, how="inner"
-            ).join(imap_df, on=self.item_label, how="inner")
+        # Create the Dataset
+        dataset = PointWiseDataset(
+            user_ids=pos_users,
+            item_ids=pos_items,
+            sparse_matrix=self.get_sparse(),
+            neg_samples=neg_samples,
+            niid=self._niid,
+            side_information=side_info_tensor,
+            contexts=context_tensor,
+        )
 
-            # Sort to ensure reproducibility
-            mapped_df = mapped_df.sort(["__uidx__", "__iidx__"])
+        # Set the generator for the Dataloader for reproducibility
+        g = torch.Generator()
+        g.manual_seed(seed)
 
-            u_idx = mapped_df.select("__uidx__").to_numpy().flatten().astype(np.int64)
-            i_idx = mapped_df.select("__iidx__").to_numpy().flatten().astype(np.int64)
-            return u_idx, i_idx
+        return DataLoader(
+            dataset,
+            batch_size=batch_size,
+            shuffle=shuffle,
+            worker_init_fn=seed_worker,
+            generator=g,
+            **kwargs,
+        )
 
-        # pylint: disable=too-many-branches, too-many-statements
-        if low_memory:
-            sparse_matrix = self.get_sparse()
-
-            # Extract positive interaction information
-            pos_users_np, pos_items_np = get_mapped_indices()
-
-            # Prepare side information
-            side_info_tensor = None
-            if include_side_info:
-                if self._inter_side_tensor is not None:
-                    side_info_tensor = self._inter_side_tensor
-                else:
-                    raise ValueError(
-                        "Requested side information but none provided in init."
-                    )
-
-            # Prepare the context
-            context_tensor = None
-            if include_context:
-                if not self.context_labels:
-                    raise ValueError(
-                        "Requested context information but none provided in init."
-                    )
-
-                context_values = self._inter_df.select(self.context_labels).to_numpy()
-                context_tensor = torch.tensor(context_values, dtype=torch.long)
-
-            # Create the lazy dataset
-            lazy_dataset = LazyItemRatingDataset(
-                user_ids=pos_users_np,
-                item_ids=pos_items_np,
-                sparse_matrix=sparse_matrix,
-                neg_samples=neg_samples,
-                niid=self._niid,
-                seed=seed,
-                side_information=side_info_tensor,
-                contexts=context_tensor,
-            )
-
-            # Edge case: No interactions
-            if len(lazy_dataset) == 0:
-                return DataLoader(
-                    TensorDataset(
-                        torch.LongTensor([]),
-                        torch.LongTensor([]),
-                        torch.FloatTensor([]),
-                    )
-                )
-
-            return DataLoader(lazy_dataset, batch_size=batch_size, shuffle=shuffle)
-
-        # Check if dataloader has been cached
-        cache_key = f"item_rating_neg_{neg_samples}_context_{include_context}"
-        if cache_key in self._cached_dataset:
-            dataset = self._cached_dataset[cache_key]
-            return DataLoader(dataset, batch_size=batch_size, shuffle=shuffle)
-
-        # Extract the positive interactions
-        pos_users_np, pos_items_np = get_mapped_indices()
-
-        pos_users = torch.from_numpy(pos_users_np)
-        pos_items = torch.from_numpy(pos_items_np)
-        pos_ratings = torch.ones(len(pos_users), dtype=torch.float)
-
-        # Extract side information if flagged
-        pos_features = None
-        if include_side_info:
-            if self._inter_side_tensor is not None:
-                pos_features = self._inter_side_tensor[pos_items]
-            else:
-                raise ValueError(
-                    "Requested side information but none provided in init."
-                )
-
-        # Extract positive context data if flagged
-        pos_contexts = None
-        if include_context:
-            if self.context_labels:
-                ctx_vals = self._inter_df.select(self.context_labels).to_numpy()
-                pos_contexts = torch.tensor(ctx_vals, dtype=torch.long)
-            else:
-                raise ValueError(
-                    "Requested context information but none provided in init."
-                )
-
-        # Negative sampling
-        if neg_samples > 0:
-            np.random.seed(seed)
-            num_positives = len(pos_users)
-            total_neg = num_positives * neg_samples
-
-            # Same users for the negative part
-            neg_users = pos_users.repeat_interleave(neg_samples)
-            neg_users_np = neg_users.numpy()  # View numpy for faster collision check
-
-            # Sample initial candidates
-            neg_items_np = np.random.randint(
-                0, self._niid, size=total_neg, dtype=np.int64
-            )
-
-            # Create a set for faster lookup O(1)
-            positive_pairs = set(zip(pos_users_np, pos_items_np))
-
-            # Helper function to check for collisions
-            def get_invalid_indices(indices_subset):
-                return np.array(
-                    [
-                        idx
-                        for idx in indices_subset
-                        if (neg_users_np[idx], neg_items_np[idx]) in positive_pairs
-                    ],
-                    dtype=np.int64,
-                )
-
-            # First check on entire set
-            all_indices = np.arange(total_neg)
-            invalid_indices = get_invalid_indices(all_indices)
-
-            while len(invalid_indices) > 0:
-                num_invalid = len(invalid_indices)
-
-                # Generate new candidates only for invalid samples
-                new_candidates = np.random.randint(
-                    0, self._niid, size=num_invalid, dtype=np.int64
-                )
-                neg_items_np[invalid_indices] = new_candidates
-
-                # Check new samples candidates
-                invalid_indices = get_invalid_indices(invalid_indices)
-
-            # Convert final tensors
-            neg_items = torch.from_numpy(neg_items_np)
-            neg_ratings = torch.zeros(total_neg, dtype=torch.float)
-
-            # Extract side information for negatives if flagged
-            neg_features = None
-            if include_side_info and pos_features is not None:
-                neg_features = self._inter_side_tensor[neg_items]
-
-            # Repeat the context if flagged
-            neg_contexts = None
-            if include_context and pos_contexts is not None:
-                # Negatives have the same context as the positive
-                neg_contexts = pos_contexts.repeat_interleave(neg_samples, dim=0)
-
-            # Final concatenation
-            all_users = torch.cat([pos_users, neg_users])
-            all_items = torch.cat([pos_items, neg_items])
-            all_ratings = torch.cat([pos_ratings, neg_ratings])
-
-            # Construct the final dataset
-            tensors = [all_users, all_items, all_ratings]
-            if include_side_info:
-                all_features = torch.cat([pos_features, neg_features])
-                tensors.append(all_features)
-            if include_context:
-                all_contexts = torch.cat([pos_contexts, neg_contexts])
-                tensors.append(all_contexts)
-
-            dataset = TensorDataset(*tensors)
-
-        else:
-            # Only positive interactions
-            tensors = [pos_users, pos_items, pos_ratings]
-            if include_side_info:
-                tensors.append(pos_features)
-            if include_context:
-                tensors.append(pos_contexts)
-
-            dataset = TensorDataset(*tensors)
-
-        # Cache the dataset and return the dataloader
-        self._cached_dataset[cache_key] = dataset
-        return DataLoader(dataset, batch_size=batch_size, shuffle=shuffle)
-
-    @typing.no_type_check
-    def get_pos_neg_dataloader(
+    def get_contrastive_dataloader(
         self,
         batch_size: int = 1024,
         shuffle: bool = True,
         seed: int = 42,
-        low_memory: bool = False,
+        **kwargs: Any,
     ) -> DataLoader:
         """Create a PyTorch DataLoader with triplets for implicit feedback.
 
         Args:
-            batch_size (int): The batch size that will be used to
-                iterate over the interactions.
+            batch_size (int): The batch size.
             shuffle (bool): Whether to shuffle the data.
-            seed (int): Seed for Numpy random number generator for reproducibility.
-            low_memory (bool): Whether to create the dataloader with a lazy approach.
+            seed (int): Seed for reproducibility.
+            **kwargs (Any): The additional keyword arguments to pass the Dataloader.
 
         Returns:
             DataLoader: Yields triplets of (user, positive_item, negative_item).
         """
-        if low_memory:
-            sparse_matrix = self.get_sparse()
+        pos_users, pos_items = self._get_mapped_indices()
 
-            lazy_dataset = LazyTripletDataset(
-                sparse_matrix=sparse_matrix,
-                niid=self._niid,
-                seed=seed,
-            )
+        # Create the Dataset
+        dataset = ContrastiveDataset(
+            user_ids=pos_users,
+            item_ids=pos_items,
+            sparse_matrix=self.get_sparse(),
+            niid=self._niid,
+        )
 
-            # Edge case: No interactions
-            if len(lazy_dataset) == 0:
-                return DataLoader(
-                    TensorDataset(
-                        torch.LongTensor([]), torch.LongTensor([]), torch.LongTensor([])
-                    )
-                )
+        # Set the generator for the Dataloader for reproducibility
+        g = torch.Generator()
+        g.manual_seed(seed)
 
-            return DataLoader(lazy_dataset, batch_size=batch_size, shuffle=shuffle)
-
-        # Check if dataloader has been cached
-        cache_key = "pos_neg"
-        if cache_key in self._cached_dataset:
-            dataset = self._cached_dataset[cache_key]
-            return DataLoader(dataset, batch_size=batch_size, shuffle=shuffle)
-
-        # Define main variables
-        sparse_matrix = self.get_sparse()
-        num_users = self._nuid
-        num_items = self._niid
-        num_positives = sparse_matrix.nnz
-
-        # Preallocate arrays for triplets
-        users_triplet = np.empty(num_positives, dtype=np.int64)
-        positives_triplet = np.empty_like(users_triplet)
-        negatives_triplet = np.empty_like(users_triplet)
-
-        # Single call of module for efficiency
-        np.random.seed(seed)  # Set the seed for reproducibility
-        rint = np.random.randint  # Storing the module call is ever so slightly faster
-
-        current_idx = 0
-        for u in range(num_users):
-            # Using sparse CSR matrix, get the indices of nnz columns
-            # these will be the positive items
-            start_ptr = sparse_matrix.indptr[u]
-            end_ptr = sparse_matrix.indptr[u + 1]
-
-            # Get indices of items interacted (positive items)
-            user_pos = sparse_matrix.indices[start_ptr:end_ptr]
-            user_count = len(user_pos)
-            if user_count == 0:  # Skip the user if it has 0 interactions
-                continue
-
-            user_pos_set = set(user_pos)  # Efficient control using sets
-
-            # Edge case: the user interacted with all the items
-            if user_count == num_items:
-                continue  # Skip the user if it interacted with all items
-
-            # Iter through all the positive items
-            for pos_item in user_pos:
-                # Assign user and positive item to arrays
-                users_triplet[current_idx] = u
-                positives_triplet[current_idx] = pos_item
-
-                # Until we find a valid negative, keep searching
-                while True:
-                    candidate_neg_item = rint(0, num_items)
-
-                    if (
-                        candidate_neg_item not in user_pos_set
-                    ):  # If found save and break loop
-                        negatives_triplet[current_idx] = candidate_neg_item
-                        break
-
-                current_idx += 1
-
-        # Trim length based on possible triplets skipped
-        users_triplet_trimmed = users_triplet[:current_idx]
-        positives_triplet_trimmed = positives_triplet[:current_idx]
-        negatives_triplet_trimmed = negatives_triplet[:current_idx]
-
-        # Create Tensors for efficient data loading
-        users_tensor = torch.LongTensor(users_triplet_trimmed)
-        positives_tensor = torch.LongTensor(positives_triplet_trimmed)
-        negatives_tensor = torch.LongTensor(negatives_triplet_trimmed)
-
-        # Create final dataset
-        dataset = TensorDataset(users_tensor, positives_tensor, negatives_tensor)
-        self._cached_dataset[cache_key] = dataset
-        dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=shuffle)
-        return dataloader
+        return DataLoader(
+            dataset,
+            batch_size=batch_size,
+            shuffle=shuffle,
+            worker_init_fn=seed_worker,
+            generator=g,
+            **kwargs,
+        )
 
     def get_history(self) -> Tuple[Tensor, Tensor, Tensor]:
         """Return the history representation as three Tensors.
