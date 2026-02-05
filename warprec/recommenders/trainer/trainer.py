@@ -411,7 +411,7 @@ class Trainer:
             Callable: The wrapped objective function.
         """
         params = kwargs.get("params")
-        gpu_per_trial = kwargs.get("resources", {}).get("gpu_per_trial", 0)
+        gpu_per_trial = kwargs.get("resources", {}).get("gpu", 0)
         opt_config = params.optimization
         validation_metric_name, validation_top_k = validation_metric(
             kwargs["validation_score"]
