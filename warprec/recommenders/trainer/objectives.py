@@ -65,7 +65,6 @@ def objective_function(
     validation_metric_name: str,
     mode: str,
     device: str,
-    low_memory: bool = False,
     strategy: str = "full",
     num_negatives: int = 99,
     lr_scheduler: Optional[LRScheduler] = None,
@@ -89,8 +88,6 @@ def objective_function(
         validation_metric_name (str): The name of the metric to optimize.
         mode (str): Whether or not to maximize or minimize the metric.
         device (str): The device used for tensor operations.
-        low_memory (bool): Whether or not to train model on
-            lazy dataloader.
         strategy (str): Evaluation strategy, either "full" or "sampled".
             Defaults to "full".
         num_negatives (int): Number of negative samples to use in "sampled" strategy.
@@ -186,11 +183,30 @@ def objective_function(
         )
 
         if isinstance(model, IterativeRecommender):
+            # Retrieve resources
+            try:
+                resources = train.get_context().get_trial_resources()
+                allocated_cpus = int(resources.get("CPU", 1))
+            except Exception:
+                allocated_cpus = os.cpu_count() or 1
+
+            # Compute optimization parameters
+            num_workers = 0
+            pin_memory = False
+            persistent_workers = False
+            if device == "cuda":
+                allocated_cpus = os.cpu_count() or 1
+                num_workers = max(allocated_cpus - 1, 1)
+                pin_memory = True
+                persistent_workers = True
+
             # Proceed with standard training loop
             train_dataloader = model.get_dataloader(
                 interactions=dataset.train_set,
                 sessions=dataset.train_session,
-                low_memory=low_memory,
+                num_workers=num_workers,
+                pin_memory=pin_memory,
+                persistent_workers=persistent_workers,
             )
             optimizer = standard_optimizer(model)
             epochs = model.epochs
@@ -339,7 +355,6 @@ def objective_function_ddp(config: dict) -> None:
     params = config["params"]
     dataset_folds = config["dataset_folds"]
     mode = config["mode"]
-    low_memory = config["low_memory"]
     validation_metric_name = config["validation_metric_name"]
     validation_top_k = config["validation_top_k"]
     lr_scheduler: LRScheduler = config["lr_scheduler"]
@@ -406,7 +421,6 @@ def objective_function_ddp(config: dict) -> None:
     train_dataloader = unwrapped_model.get_dataloader(
         interactions=dataset.train_set,
         sessions=dataset.train_session,
-        low_memory=low_memory,
     )
     train_dataloader = train.torch.prepare_data_loader(train_dataloader)
 
@@ -555,7 +569,6 @@ def driver_function_ddp(
     mode: str,
     num_gpus: int,
     storage_path: str,
-    low_memory: bool = False,
     num_to_keep: int = 5,
     strategy: str = "full",
     num_negatives: int = 99,
@@ -582,8 +595,6 @@ def driver_function_ddp(
         mode (str): Whether or not to maximize or minimize the metric.
         num_gpus (int): The number of GPUs to use during the DDP training.
         storage_path (str): The storage path used by Ray.
-        low_memory (bool): Whether or not to train model on
-            lazy dataloader.
         num_to_keep (int): The number of checkpoint to keep of the model.
         strategy (str): Evaluation strategy, either "full" or "sampled".
             Defaults to "full".
@@ -615,7 +626,6 @@ def driver_function_ddp(
             "validation_top_k": validation_top_k,
             "validation_metric_name": validation_metric_name,
             "mode": mode,
-            "low_memory": low_memory,
             "strategy": strategy,
             "num_negatives": num_negatives,
             "lr_scheduler": lr_scheduler,

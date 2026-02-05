@@ -1,3 +1,4 @@
+import os
 from typing import Optional
 from tqdm.auto import tqdm
 
@@ -17,7 +18,6 @@ def train_loop(
     dataset: Dataset,
     epochs: int,
     lr_scheduler: Optional[LRScheduler] = None,
-    low_memory: bool = False,
     device: str = "cpu",
 ):
     """Simple training loop decorated with tqdm.
@@ -27,18 +27,28 @@ def train_loop(
         dataset (Dataset): The dataset used to train the model.
         epochs (int): The number of epochs of the training.
         lr_scheduler (Optional[LRScheduler]): The learning rate scheduler configuration.
-        low_memory (bool): Wether or not to compute dataloader in
-            lazy mode.
         device (str): The device used for training. Defaults to "cpu".
     """
     logger.msg(f"Starting the training of model {model.name}")
 
     model.to(device)
 
+    # Compute optimization parameters
+    num_workers = 0
+    pin_memory = False
+    persistent_workers = False
+    if device == "cuda":
+        allocated_cpus = os.cpu_count() or 1
+        num_workers = max(allocated_cpus - 1, 1)
+        pin_memory = True
+        persistent_workers = True
+
     train_dataloader = model.get_dataloader(
         interactions=dataset.train_set,
         sessions=dataset.train_session,
-        low_memory=low_memory,
+        num_workers=num_workers,
+        pin_memory=pin_memory,
+        persistent_workers=persistent_workers,
     )
 
     optimizer = standard_optimizer(model)

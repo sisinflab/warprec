@@ -91,10 +91,7 @@ def design_pipeline(path: str):
                 if lr_scheduler_params is not None
                 else None
             )
-            low_memory = params.get("meta", {}).get("low_memory", False)
-            train_loop(
-                model, main_dataset, model.epochs, lr_scheduler, low_memory, device
-            )
+            train_loop(model, main_dataset, model.epochs, lr_scheduler, device)
 
         # Callback on training complete
         callback.on_training_complete(model=model)
