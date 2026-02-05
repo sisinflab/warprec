@@ -146,8 +146,6 @@ class Optimization(BaseModel):
             each trial. Defaults to 1.
         gpu_per_trial (Optional[float]): The number of GPU to assign to
             each trial. Defaults to 0.
-        num_gpus (Optional[int]): The number of gpus to assign to each trial.
-            Defaults to None. If multi_gpu is set to False, this value will be ignored.
         block_size (Optional[int]): The number of items to process during prediction.
             Used by some neural models, increasing this value will affect memory usage.
         chunk_size (Optional[int]): The size of the chunk processed during prediction.
@@ -165,7 +163,6 @@ class Optimization(BaseModel):
     device: Optional[str] = None
     cpu_per_trial: Optional[int] = 1
     gpu_per_trial: Optional[float] = 0
-    num_gpus: Optional[int] = None
     block_size: Optional[int] = 50
     chunk_size: Optional[int] = 4096
     num_samples: Optional[int] = 1
@@ -213,7 +210,7 @@ class Optimization(BaseModel):
             logger.attention("Found a value of 'gpu_per_trial' < 0. Defaulting to 0.")
             v = 0
 
-        if v > 0 and not v.is_integer():
+        if v > 1 and not v.is_integer():
             raise ValueError(
                 "Number of 'gpu_per_trial' not supported. Supported values must be "
                 "in the range (0, 1] or integer values > 1, like 2, 3, ..."
