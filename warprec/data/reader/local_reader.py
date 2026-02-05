@@ -52,6 +52,30 @@ class LocalReader(Reader):
             desired_dtypes=dtypes,
         )
 
+    def read_parquet(
+        self,
+        local_path: str,
+        column_names: Optional[List[str]] = None,
+        *args: Any,
+        **kwargs: Any,
+    ) -> DataFrame[Any]:
+        """Reads data from a local parquet file.
+
+        Args:
+            local_path (str): The local file path to the parquet data.
+            column_names (Optional[List[str]]): A list of specific columns to read.
+            *args (Any): The additional arguments.
+            **kwargs (Any): The additional keyword arguments.
+
+        Returns:
+            DataFrame[Any]: A Narwhals DataFrame containing the data.
+        """
+        path = Path(local_path)
+        if not path.exists():
+            # Return empty compatible with the backend
+            return nw.from_native(pd.DataFrame())
+        return self._process_parquet_data(source=path, desired_cols=column_names)
+
     def read_tabular_split(
         self,
         local_path: str,
@@ -74,6 +98,25 @@ class LocalReader(Reader):
             sep=sep,
             ext=ext,
             header=header,
+            is_remote=False,  # Specify local path handling
+        )
+
+    def read_parquet_split(
+        self,
+        local_path: str,
+        column_names: Optional[List[str]] = None,
+        ext: str = ".parquet",
+        *args: Any,
+        **kwargs: Any,
+    ) -> Tuple[
+        DataFrame[Any],
+        Optional[List[Tuple[DataFrame[Any], DataFrame[Any]]] | DataFrame[Any]],
+        DataFrame[Any],
+    ]:
+        return super()._process_parquet_split(
+            base_location=local_path,
+            column_names=column_names,
+            ext=ext,
             is_remote=False,  # Specify local path handling
         )
 

@@ -5,6 +5,8 @@ from warprec.utils.enums import RatingType, ReadingMethods
 from warprec.utils.config.common import check_separator, Labels
 from warprec.utils.logger import logger
 
+FileFormat = Literal["tabular", "parquet"]
+
 
 class SplitReading(BaseModel):
     """Definition of the split reading sub-configuration.
@@ -14,6 +16,7 @@ class SplitReading(BaseModel):
     Attributes:
         local_path (Optional[str]): The directory where the splits are saved.
         azure_blob_prefix (Optional[str]): The prefix of the Azure Blob to read the splits from.
+        file_format (Optional[FileFormat]): The file format to use during the reading process.
         ext (Optional[str]): The extension of the split files.
         sep (Optional[str]): The separator of the split files.
         header (Optional[bool]): Whether the file has a header or not. Defaults to True.
@@ -21,6 +24,7 @@ class SplitReading(BaseModel):
 
     local_path: Optional[str] = None
     azure_blob_prefix: Optional[str] = None
+    file_format: Optional[FileFormat] = "tabular"
     ext: Optional[str] = ".tsv"
     sep: Optional[str] = "\t"
     header: Optional[bool] = True
@@ -31,6 +35,14 @@ class SplitReading(BaseModel):
         """Validates the separator."""
         return check_separator(v)
 
+    @model_validator(mode="after")
+    def check_model(self):
+        # Default the extension to '.parquet'
+        if self.file_format == "parquet":
+            if self.ext is None or self.ext == ".tsv":
+                self.ext = ".parquet"
+        return self
+
 
 class SideInformationReading(BaseModel):
     """Definition of the side information reading sub-configuration.
@@ -40,12 +52,14 @@ class SideInformationReading(BaseModel):
     Attributes:
         local_path (Optional[str]): The directory where the side information are saved.
         azure_blob_name (Optional[str]): The name of the Azure Blob to read the side information from.
+        file_format (Optional[FileFormat]): The file format to use during the reading process.
         sep (Optional[str]): The separator of the split files.
         header (Optional[bool]): Whether the file has a header or not. Defaults to True.
     """
 
     local_path: Optional[str] = None
     azure_blob_name: Optional[str] = None
+    file_format: Optional[FileFormat] = "tabular"
     sep: Optional[str] = "\t"
     header: Optional[bool] = True
 
@@ -66,6 +80,8 @@ class ClusteringInformationReading(BaseModel):
         item_local_path (Optional[str]): The path to the item clustering information.
         user_azure_blob_name (Optional[str]): The name of the Azure Blob to read the user clustering information from.
         item_azure_blob_name (Optional[str]): The name of the Azure Blob to read the item clustering information from.
+        user_file_format (Optional[FileFormat]): The file format to use during the user clustering reading process.
+        item_file_format (Optional[FileFormat]): The file format to use during the item clustering reading process.
         user_sep (Optional[str]): The separator of the user clustering file.
         item_sep (Optional[str]): The separator of the item clustering file.
         user_header (Optional[bool]): Whether the user clustering file has a header. Defaults to True.
@@ -76,6 +92,8 @@ class ClusteringInformationReading(BaseModel):
     item_local_path: Optional[str] = None
     user_azure_blob_name: Optional[str] = None
     item_azure_blob_name: Optional[str] = None
+    user_file_format: Optional[FileFormat] = "tabular"
+    item_file_format: Optional[FileFormat] = "tabular"
     user_sep: Optional[str] = "\t"
     item_sep: Optional[str] = "\t"
     user_header: Optional[bool] = True
@@ -123,6 +141,7 @@ class ReaderConfig(BaseModel):
         reading_method (ReadingMethods): The strategy used to read the data.
         local_path (Optional[str | None]): The path to the local dataset.
         azure_blob_name (Optional[str]): The name of the Azure Blob to read.
+        file_format (Optional[FileFormat]): The file format to use during the reading process.
         sep (Optional[str]): The separator of the file to read.
         header (Optional[bool]): Whether the file has a header or not. Defaults to True.
         rating_type (RatingType): The type of rating to be used. If 'implicit' is chosen,
@@ -140,6 +159,7 @@ class ReaderConfig(BaseModel):
     reading_method: ReadingMethods
     local_path: Optional[str | None] = None
     azure_blob_name: Optional[str] = None
+    file_format: Optional[FileFormat] = "tabular"
     sep: Optional[str] = "\t"
     header: Optional[bool] = True
     rating_type: RatingType

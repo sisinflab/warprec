@@ -127,6 +127,40 @@ class AzureBlobReader(Reader):
             desired_dtypes=dtypes,
         )
 
+    def read_parquet(
+        self,
+        blob_name: str,
+        column_names: Optional[List[str]] = None,
+        *args: Any,
+        **kwargs: Any,
+    ) -> DataFrame[Any]:
+        """Reads parquet data from a blob.
+
+        Downloads the blob content as bytes and uses the inherited `_process_parquet_data`
+        for parsing.
+
+        Args:
+            blob_name (str): The path/name of the blob containing the parquet data.
+            column_names (Optional[List[str]]): A list of specific columns to read.
+            *args (Any): The additional arguments.
+            **kwargs (Any): The additional keyword arguments.
+
+        Returns:
+            DataFrame[Any]: A Narwhals DataFrame containing the data.
+        """
+        content = self._download_blob_content(blob_name, as_bytes=True)
+
+        if content is None:
+            if self.backend == "polars":
+                import polars as pl
+
+                return nw.from_native(pl.DataFrame())
+            return nw.from_native(pd.DataFrame())
+
+        stream = BytesIO(content)  # type: ignore[arg-type]
+
+        return self._process_parquet_data(source=stream, desired_cols=column_names)
+
     def read_tabular_split(
         self,
         blob_prefix: str,
@@ -147,6 +181,25 @@ class AzureBlobReader(Reader):
             sep=sep,
             ext=ext,
             header=header,
+            is_remote=True,  # Specify remote path handling
+        )
+
+    def read_parquet_split(
+        self,
+        blob_prefix: str,
+        column_names: Optional[List[str]] = None,
+        ext: str = ".parquet",
+        *args: Any,
+        **kwargs: Any,
+    ) -> Tuple[
+        DataFrame[Any],
+        Optional[List[Tuple[DataFrame[Any], DataFrame[Any]]] | DataFrame[Any]],
+        DataFrame[Any],
+    ]:
+        return super()._process_parquet_split(
+            base_location=blob_prefix,
+            column_names=column_names,
+            ext=ext,
             is_remote=True,  # Specify remote path handling
         )
 
