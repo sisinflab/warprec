@@ -50,11 +50,21 @@ def initialize_datasets(
     user_cluster = None
     item_cluster = None
     if config.reader.loading_strategy == "dataset":
-        data = reader.read_tabular(
-            **config.reader.model_dump(exclude=["labels", "dtypes"]),  # type: ignore[arg-type]
-            column_names=config.reader.column_names(),
-            dtypes=config.reader.column_dtype(),
-        )
+        file_format = config.reader.file_format
+
+        match file_format:
+            case "tabular":
+                data = reader.read_tabular(
+                    **config.reader.model_dump(exclude=["labels", "dtypes"]),  # type: ignore[arg-type]
+                    column_names=config.reader.column_names(),
+                    dtypes=config.reader.column_dtype(),
+                )
+            case "parquet":
+                data = reader.read_parquet(
+                    **config.reader.model_dump(exclude=["labels", "dtypes"]),  # type: ignore[arg-type]
+                )
+            case _:
+                raise ValueError(f"File format '{file_format}'not supported.")
         data = callback.on_data_reading(data)
 
         # Check for optional filtering
@@ -94,20 +104,40 @@ def initialize_datasets(
 
     elif config.reader.loading_strategy == "split":
         if config.reader.data_type == "transaction":
-            train_data, val_data, test_data = reader.read_tabular_split(
-                **config.reader.split.model_dump(),
-                column_names=config.reader.column_names(),
-                dtypes=config.reader.column_dtype(),
-            )
+            file_format = config.reader.split.file_format
 
+            match file_format:
+                case "tabular":
+                    train_data, val_data, test_data = reader.read_tabular_split(
+                        **config.reader.split.model_dump(),
+                        column_names=config.reader.column_names(),
+                        dtypes=config.reader.column_dtype(),
+                    )
+                case "parquet":
+                    train_data, val_data, test_data = reader.read_parquet_split(
+                        **config.reader.split.model_dump(),
+                        column_names=config.reader.column_names(),
+                    )
+                case _:
+                    raise ValueError(f"File format '{file_format}'not supported.")
         else:
             raise ValueError("Data type not yet supported.")
 
     # Side information reading
     if config.reader.side:
-        side_data = reader.read_tabular(
-            **config.reader.side.model_dump(),
-        )
+        file_format = config.reader.split.file_format
+
+        match file_format:
+            case "tabular":
+                side_data = reader.read_tabular(
+                    **config.reader.side.model_dump(),
+                )
+            case "parquet":
+                side_data = reader.read_parquet(
+                    **config.reader.side.model_dump(),
+                )
+            case _:
+                raise ValueError(f"File format '{file_format}'not supported.")
 
     # Cluster information reading
     if config.reader.clustering:
@@ -128,6 +158,9 @@ def initialize_datasets(
 
             Returns:
                 DataFrame[Any]: A DataFrame containing the cluster data.
+
+            Raises:
+                ValueError: If the file format is not supported.
             """
 
             # Define column names
@@ -143,15 +176,29 @@ def initialize_datasets(
             ]
             dtype_map = zip(column_names, dtypes_list)
 
-            # Read tabular data using the custom reader
-            cluster_data = reader.read_tabular(
-                local_path=specific_config["local_path"],
-                blob_name=specific_config["blob_name"],
-                column_names=column_names,
-                dtypes=dtype_map,
-                sep=specific_config["sep"],
-                header=specific_config["header"],
-            )
+            # Read data using the custom reader
+            file_format = specific_config["file_format"]
+
+            match file_format:
+                case "tabular":
+                    cluster_data = reader.read_tabular(
+                        local_path=specific_config["local_path"],
+                        blob_name=specific_config["blob_name"],
+                        column_names=column_names,
+                        dtypes=dtype_map,
+                        sep=specific_config["sep"],
+                        header=specific_config["header"],
+                    )
+
+                case "parquet":
+                    cluster_data = reader.read_parquet(
+                        local_path=specific_config["local_path"],
+                        blob_name=specific_config["blob_name"],
+                        column_names=column_names,
+                    )
+
+                case _:
+                    raise ValueError(f"File format '{file_format}'not supported.")
 
             return cluster_data
 
@@ -165,6 +212,7 @@ def initialize_datasets(
             "id_type": config.reader.dtypes.user_id_type,
             "local_path": config.reader.clustering.user_local_path,
             "blob_name": config.reader.clustering.user_azure_blob_name,
+            "file_format": config.reader.clustering.user_file_format,
             "sep": config.reader.clustering.user_sep,
             "header": config.reader.clustering.user_header,
         }
@@ -175,6 +223,7 @@ def initialize_datasets(
             "id_type": config.reader.dtypes.item_id_type,
             "local_path": config.reader.clustering.item_local_path,
             "blob_name": config.reader.clustering.item_azure_blob_name,
+            "file_format": config.reader.clustering.item_file_format,
             "sep": config.reader.clustering.item_sep,
             "header": config.reader.clustering.item_header,
         }

@@ -50,6 +50,7 @@ def train_pipeline(path: str):
 
     Raises:
         ConnectionError: If unable to connect to Ray cluster.
+        ValueError: If the file format is not supported.
     """
     logger.msg("Starting experiment.")
     experiment_start_time = time.time()
@@ -80,12 +81,25 @@ def train_pipeline(path: str):
 
     # Write split information if required
     if config.splitter and config.writer.save_split:
-        writer.write_split(
-            main_dataset,
-            val_dataset,
-            fold_dataset,
-            **config.writer.split.model_dump(),
-        )
+        file_format = config.writer.split.file_format
+
+        match file_format:
+            case "tabular":
+                writer.write_tabular_split(
+                    main_dataset,
+                    val_dataset,
+                    fold_dataset,
+                    **config.writer.split.model_dump(),
+                )
+            case "parquet":
+                writer.write_parquet_split(
+                    main_dataset,
+                    val_dataset,
+                    fold_dataset,
+                    **config.writer.split.model_dump(),
+                )
+            case _:
+                raise ValueError(f"File format '{file_format}'not supported.")
 
     # Trainer testing
     models = list(config.models.keys())
