@@ -477,11 +477,12 @@ def objective_function_ddp(config: dict) -> None:
         # All workers call compute(). torchmetrics handles synchronization.
         # The `results` dictionary will be identical on all workers.
         results = evaluator.compute_results()
-        metric_report = {
-            f"{metric_name}@{k}": value
-            for k, metrics_results in results.items()
-            for metric_name, value in metrics_results.items()
-        }
+        metric_report = {}
+        for k, metrics_results in results.items():
+            for metric_name, value in metrics_results.items():
+                if isinstance(value, Tensor):
+                    value = value.nanmean().item()
+                metric_report[f"{metric_name}@{k}"] = value
 
         # Add the loss averaged over the train sample size
         metric_report["loss"] = epoch_loss / (len(train_dataloader) * world_size)
@@ -554,9 +555,11 @@ def driver_function_ddp(
     mode: str,
     num_gpus: int,
     storage_path: str,
+    low_memory: bool = False,
     num_to_keep: int = 5,
     strategy: str = "full",
     num_negatives: int = 99,
+    lr_scheduler: Optional[LRScheduler] = None,
     seed: int = 42,
     block_size: int = 50,
     chunk_size: int = 4096,
@@ -579,11 +582,15 @@ def driver_function_ddp(
         mode (str): Whether or not to maximize or minimize the metric.
         num_gpus (int): The number of GPUs to use during the DDP training.
         storage_path (str): The storage path used by Ray.
+        low_memory (bool): Whether or not to train model on
+            lazy dataloader.
         num_to_keep (int): The number of checkpoint to keep of the model.
         strategy (str): Evaluation strategy, either "full" or "sampled".
             Defaults to "full".
         num_negatives (int): Number of negative samples to use in "sampled" strategy.
             Defaults to 99.
+        lr_scheduler (Optional[LRScheduler]): The custom learning rate scheduler
+            configuration. Defaults to None.
         seed (int): The seed for reproducibility. Defaults to 42.
         block_size (int): The block size for the model evaluation.
             Defaults to 50.
@@ -608,8 +615,10 @@ def driver_function_ddp(
             "validation_top_k": validation_top_k,
             "validation_metric_name": validation_metric_name,
             "mode": mode,
+            "low_memory": low_memory,
             "strategy": strategy,
             "num_negatives": num_negatives,
+            "lr_scheduler": lr_scheduler,
             "seed": seed,
             "block_size": block_size,
             "chunk_size": chunk_size,
