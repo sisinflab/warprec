@@ -88,13 +88,12 @@ class SGCL(IterativeRecommender, GraphRecommenderUtils):
         self,
         interactions: Interactions,
         sessions: Sessions,
-        low_memory: bool = False,
         **kwargs: Any,
     ):
-        return interactions.get_item_rating_dataloader(
+        return interactions.get_pointwise_dataloader(
             neg_samples=0,
             batch_size=self.batch_size,
-            low_memory=low_memory,
+            **kwargs,
         )
 
     def forward(self) -> Tuple[Tensor, Tensor]:

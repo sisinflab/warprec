@@ -115,13 +115,12 @@ class CDAE(IterativeRecommender):
         self,
         interactions: Interactions,
         sessions: Sessions,
-        low_memory: bool = False,
-        **kwargs,
+        **kwargs: Any,
     ):
-        return interactions.get_interaction_loader(
+        return interactions.get_interaction_dataloader(
             batch_size=self.batch_size,
             include_user_id=True,
-            low_memory=low_memory,
+            **kwargs,
         )
 
     def forward(self, user_history: Tensor, user_indices: Tensor) -> Tensor:
