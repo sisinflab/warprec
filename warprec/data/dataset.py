@@ -277,6 +277,7 @@ class Dataset:
             mat_train_data,
             self._umap,
             self._imap,
+            self.train_set.get_sparse(),
             user_id_label=user_id_label,
             item_id_label=item_id_label,
             timestamp_label=timestamp_label,
@@ -872,8 +873,3 @@ class Dataset:
         """
         self._umap = user_mapping
         self._imap = item_mapping
-
-    def clear_cache(self):
-        """Clear the cache of inner data structures."""
-        self.train_set.clear_dataset_cache()
-        self.train_session.clear_dataset_cache()
