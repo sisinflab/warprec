@@ -142,11 +142,11 @@ class MultiDAE(IterativeRecommender):
         self,
         interactions: Interactions,
         sessions: Sessions,
-        low_memory: bool = False,
-        **kwargs,
+        **kwargs: Any,
     ):
-        return interactions.get_interaction_loader(
-            batch_size=self.batch_size, low_memory=low_memory
+        return interactions.get_interaction_dataloader(
+            batch_size=self.batch_size,
+            **kwargs,
         )
 
     def train_step(self, batch: Any, *args: Any, **kwargs: Any):

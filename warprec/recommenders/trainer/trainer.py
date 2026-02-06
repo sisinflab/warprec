@@ -425,7 +425,6 @@ class Trainer:
             "validation_top_k": validation_top_k,
             "validation_metric_name": validation_metric_name,
             "mode": opt_config.properties.mode,
-            "low_memory": params.meta.low_memory,
             "strategy": kwargs["evaluation_strategy"],
             "num_negatives": kwargs["num_negatives"],
             "lr_scheduler": opt_config.lr_scheduler,
@@ -448,7 +447,10 @@ class Trainer:
             )
         else:
             obj_func = tune.with_parameters(
-                objective_function, device=kwargs["device"], **common_args
+                objective_function,
+                device=kwargs["device"],
+                num_workers=opt_config.num_workers,
+                **common_args,
             )
 
         return tune.with_resources(obj_func, resources=kwargs["resources"])

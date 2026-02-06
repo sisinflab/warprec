@@ -69,6 +69,7 @@ def design_pipeline(path: str):
         # Evaluation params
         block_size = params.get("optimization", {}).get("block_size", 50)
         chunk_size = params.get("optimization", {}).get("chunk_size", 4096)
+        num_workers = params.get("optimization", {}).get("num_workers")
 
         model = model_registry.get(
             name=model_name,
@@ -91,9 +92,8 @@ def design_pipeline(path: str):
                 if lr_scheduler_params is not None
                 else None
             )
-            low_memory = params.get("meta", {}).get("low_memory", False)
             train_loop(
-                model, main_dataset, model.epochs, lr_scheduler, low_memory, device
+                model, main_dataset, model.epochs, num_workers, lr_scheduler, device
             )
 
         # Callback on training complete

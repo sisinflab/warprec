@@ -198,19 +198,19 @@ class DataLoaderType(Enum):
     )
     ITEM_RATING_LOADER = DataLoaderRequirements(
         dataloader_source="train_set",
-        method_name="get_item_rating_dataloader",
+        method_name="get_pointwise_dataloader",
         construction_params=["neg_samples"],
         fixed_params={},
     )
     ITEM_RATING_LOADER_WITH_CONTEXT = DataLoaderRequirements(
         dataloader_source="train_set",
-        method_name="get_item_rating_dataloader",
+        method_name="get_pointwise_dataloader",
         construction_params=["neg_samples"],
         fixed_params={"include_context": True},
     )
     POS_NEG_LOADER = DataLoaderRequirements(
         dataloader_source="train_set",
-        method_name="get_pos_neg_dataloader",
+        method_name="get_contrastive_dataloader",
         construction_params=[],
         fixed_params={},
     )
@@ -236,7 +236,7 @@ class DataLoaderType(Enum):
     )
     USER_HISTORY_LOADER = DataLoaderRequirements(
         dataloader_source="train_session",
-        method_name="get_user_history_dataloader",
+        method_name="get_sliding_window_dataloader",
         construction_params=["max_seq_len", "neg_samples"],
         fixed_params={},
     )
