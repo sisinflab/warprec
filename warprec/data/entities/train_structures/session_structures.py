@@ -85,8 +85,6 @@ class SequentialDataset(Dataset):
                 neg_items.append(cand)
 
             neg_tensor = torch.tensor(neg_items, dtype=torch.long)
-            if self.neg_samples == 1:
-                neg_tensor = neg_tensor.squeeze(0)
             ret.append(neg_tensor)
 
         return tuple(ret)
