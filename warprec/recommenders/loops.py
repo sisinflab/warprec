@@ -17,6 +17,7 @@ def train_loop(
     model: IterativeRecommender,
     dataset: Dataset,
     epochs: int,
+    num_workers: Optional[int] = None,
     lr_scheduler: Optional[LRScheduler] = None,
     device: str = "cpu",
 ):
@@ -26,6 +27,7 @@ def train_loop(
         model (IterativeRecommender): The model to train.
         dataset (Dataset): The dataset used to train the model.
         epochs (int): The number of epochs of the training.
+        num_workers (Optional[int]): The number of workers to assign to the train dataloader.
         lr_scheduler (Optional[LRScheduler]): The learning rate scheduler configuration.
         device (str): The device used for training. Defaults to "cpu".
     """
@@ -34,14 +36,22 @@ def train_loop(
     model.to(device)
 
     # Compute optimization parameters
-    num_workers = 0
-    pin_memory = False
-    persistent_workers = False
-    if device == "cuda":
-        allocated_cpus = os.cpu_count() or 1
-        num_workers = max(allocated_cpus - 1, 1)
-        pin_memory = True
-        persistent_workers = True
+    match (num_workers is not None, device == "cuda"):
+        case (True, True):
+            persistent_workers = True
+            pin_memory = True
+        case (True, False):
+            persistent_workers = True
+            pin_memory = False
+        case (False, True):
+            allocated_cpus = os.cpu_count() or 1
+            num_workers = max(allocated_cpus - 1, 1)
+            persistent_workers = True
+            pin_memory = True
+        case (False, False):
+            num_workers = 0
+            persistent_workers = False
+            pin_memory = False
 
     train_dataloader = model.get_dataloader(
         interactions=dataset.train_set,

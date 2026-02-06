@@ -474,6 +474,7 @@ def multiple_fold_validation_flow(
     # Retrieve common params
     block_size = params.optimization.block_size
     chunk_size = params.optimization.chunk_size
+    num_workers = params.optimization.num_workers
     validation_score = config.evaluation.validation_metric
     desired_training_it = params.optimization.properties.desired_training_it
     seed = params.optimization.properties.seed
@@ -535,7 +536,7 @@ def multiple_fold_validation_flow(
     # is iterative
     if isinstance(best_model, IterativeRecommender):
         # Training loop decorated with tqdm for a better visualization
-        train_loop(best_model, main_dataset, iterations, device=device)
+        train_loop(best_model, main_dataset, iterations, num_workers, device=device)
 
     # Final reporting
     report["Total Params (Best Model)"] = sum(
