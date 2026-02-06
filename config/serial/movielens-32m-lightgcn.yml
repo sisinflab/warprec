@@ -1,0 +1,47 @@
+reader:
+  loading_strategy: dataset
+  data_type: transaction
+  reading_method: local
+  local_path: ../dataset/ml-32m/ratings.csv
+  rating_type: explicit
+  sep: ','
+  labels:
+    user_id_label: userId
+    item_id_label: movieId
+writer:
+  dataset_name: MovieLens32M-LightGCN-Serial
+  writing_method: local
+  local_experiment_path: experiments/
+splitter:
+  test_splitting:
+    strategy: random_holdout
+    ratio: 0.1
+dashboard:
+  wandb:
+    enabled: True
+    team: wideverse-ai
+    project: warprec
+    group: warprec-movielens-32m
+    api_key: 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 #! TODO REMOVE
+    upload_checkpoints: False
+  codecarbon:
+    enabled: True
+    save_to_file: True
+    output_dir: experiments/MovieLens32M-LightGCN-Serial/codecarbon/
+models:
+  LightGCN:
+    meta:
+      save_model: True
+    embedding_size: [64, 128, 256]
+    n_layers: [2, 3]
+    reg_weight: 0.001
+    batch_size: 8192
+    epochs: 10
+    learning_rate: 0.001
+evaluation:
+  top_k: [10]
+  metrics: [nDCG, Precision, Recall, HitRate, MAP]
+  validation_metric: nDCG@10
+  strategy: full
+general:
+  device: cuda

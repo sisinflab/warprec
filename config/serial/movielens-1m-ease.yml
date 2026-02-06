@@ -1,0 +1,42 @@
+reader:
+  loading_strategy: dataset
+  data_type: transaction
+  reading_method: local
+  local_path: ../dataset/movielens-1m/ratings.csv
+  rating_type: explicit
+  sep: ','
+  labels:
+    user_id_label: user_id
+    item_id_label: item_id
+    rating_label: rating
+    timestamp_label: timestamp
+writer:
+  dataset_name: MovieLens1M-EASE-Serial
+  writing_method: local
+  local_experiment_path: experiments/
+splitter:
+  test_splitting:
+    strategy: random_holdout
+    ratio: 0.1
+dashboard:
+  wandb:
+    enabled: True
+    team: wideverse-ai
+    project: warprec
+    group: warprec-movielens-1m
+    api_key: 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 #! TODO REMOVE
+    upload_checkpoints: False
+  codecarbon:
+    enabled: True
+    save_to_file: True
+    output_dir: experiments/MovieLens1M-EASE-Serial/codecarbon/
+models:
+  EASE:
+    l2: [100, 200, 500, 750, 1000, 2000]
+evaluation:
+  top_k: [10]
+  metrics: [nDCG, Precision, Recall, HitRate, MAP]
+  validation_metric: nDCG@10
+  strategy: full
+general:
+  device: cuda

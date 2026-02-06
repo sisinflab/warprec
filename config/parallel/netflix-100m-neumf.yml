@@ -1,0 +1,59 @@
+reader:
+  loading_strategy: dataset
+  data_type: transaction
+  reading_method: local
+  local_path: ../dataset/netflix-prize-100m/ratings_processed.csv
+  rating_type: explicit
+  sep: ','
+  labels:
+    user_id_label: user_id
+    item_id_label: item_id
+    rating_label: rating
+    timestamp_label: timestamp
+writer:
+  dataset_name: Netflix100M-NeuMF-Parallel
+  writing_method: local
+  local_experiment_path: experiments/
+splitter:
+  test_splitting:
+    strategy: random_holdout
+    ratio: 0.1
+dashboard:
+  wandb:
+    enabled: True
+    team: wideverse-ai
+    project: warprec
+    group: warprec-netflix-100m
+    api_key: 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 #! TODO REMOVE
+    upload_checkpoints: False
+  codecarbon:
+    enabled: True
+    save_to_file: True
+    output_dir: experiments/Netflix100M-NeuMF-Parallel/codecarbon/
+models:
+  NeuMF:
+    optimization:
+      gpu_per_trial: 0.5
+      cpu_per_trial: 8
+      block_size: 3000
+    meta:
+      save_model: True
+    mf_embedding_size: [64, 128, 256]
+    mlp_embedding_size: 64
+    mlp_hidden_size: [[64, 32]]
+    mf_train: True
+    mlp_train: True
+    dropout: 0.1
+    reg_weight: 0.001
+    weight_decay: 0.0001
+    batch_size: 8192
+    epochs: 2
+    learning_rate: 0.001
+    neg_samples: [0, 1]
+evaluation:
+  top_k: [10]
+  metrics: [nDCG, Precision, Recall, HitRate, MAP]
+  validation_metric: nDCG@10
+  strategy: full
+general:
+  device: cuda

@@ -1,0 +1,56 @@
+reader:
+  loading_strategy: dataset
+  data_type: transaction
+  reading_method: local
+  local_path: ../dataset/netflix-prize-100m/ratings_processed.csv
+  rating_type: explicit
+  sep: ','
+  labels:
+    user_id_label: user_id
+    item_id_label: item_id
+    rating_label: rating
+    timestamp_label: timestamp
+writer:
+  dataset_name: Netflix100M-SASRec-Serial
+  writing_method: local
+  local_experiment_path: experiments/
+splitter:
+  test_splitting:
+    strategy: temporal_holdout
+    ratio: 0.1
+dashboard:
+  wandb:
+    enabled: True
+    team: wideverse-ai
+    project: warprec
+    group: warprec-netflix-100m
+    api_key: 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 #! TODO REMOVE
+    upload_checkpoints: False
+  codecarbon:
+    enabled: True
+    save_to_file: True
+    output_dir: experiments/Netflix100M-SASRec-Serial/codecarbon/
+models:
+  SASRec:
+    meta:
+      save_model: True
+    embedding_size: [64, 128, 256]
+    n_layers: [2, 3]
+    n_heads: 8
+    inner_size: 512
+    dropout_prob: 0.1
+    attn_dropout_prob: 0.1
+    reg_weight: 0.001
+    weight_decay: 0.0001
+    batch_size: 8192
+    epochs: 2
+    learning_rate: 0.0001
+    neg_samples: 1
+    max_seq_len: 20
+evaluation:
+  top_k: [10]
+  metrics: [nDCG, Precision, Recall, HitRate, MAP]
+  validation_metric: nDCG@10
+  strategy: full
+general:
+  device: cuda
