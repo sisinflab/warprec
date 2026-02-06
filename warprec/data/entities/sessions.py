@@ -1,3 +1,5 @@
+import os
+import tempfile
 from typing import Optional, List, Any, Tuple, Dict
 
 import torch
@@ -132,29 +134,50 @@ class Sessions:
 
     def _build_flat_structures(self):
         """
-        Converts the processed DataFrame into flat Numpy arrays ("The Tape")
-        and calculates user offsets for O(1) access to any user's history.
+        Converts DataFrame to memory-mapped Numpy arrays to save RAM across workers.
         """
         df = self._get_processed_data()
 
-        # Extract columns to numpy (The Tape)
-        self._flat_users = df.select(self.user_label).to_numpy().flatten()
-        self._flat_items = df.select(self.item_label).to_numpy().flatten()
+        # Create temporary files for flat users/items
+        self._temp_dir = tempfile.TemporaryDirectory()
+        users_path = os.path.join(self._temp_dir.name, "flat_users.dat")
+        items_path = os.path.join(self._temp_dir.name, "flat_items.dat")
 
-        # Calculate Offsets
-        # unique_users are sorted because df is sorted by user
+        # Extract data in RAM
+        raw_users = df.select(self.user_label).to_numpy().flatten().astype(np.int64)
+        raw_items = df.select(self.item_label).to_numpy().flatten().astype(np.int64)
+        n_samples = len(raw_users)
+
+        # Write on disk for faster access
+        mm_users = np.memmap(users_path, dtype=np.int64, mode="w+", shape=(n_samples,))
+        mm_items = np.memmap(items_path, dtype=np.int64, mode="w+", shape=(n_samples,))
+
+        mm_users[:] = raw_users[:]
+        mm_items[:] = raw_items[:]
+
+        # Flush on disk
+        mm_users.flush()
+        mm_items.flush()
+
+        # Read the uses using read-only (Shared Memory)
+        self._flat_users = np.memmap(
+            users_path, dtype=np.int64, mode="r", shape=(n_samples,)
+        )
+        self._flat_items = np.memmap(
+            items_path, dtype=np.int64, mode="r", shape=(n_samples,)
+        )
+
+        # Free the RAM
+        del raw_users
+        del raw_items
+
+        # Compute offsets (they can be stored in RAM)
         unique_users, start_indices = np.unique(self._flat_users, return_index=True)
-
         self._user_offsets = np.zeros(self._nuid + 1, dtype=np.int64)
-
-        # Set starts
         self._user_offsets[unique_users] = start_indices
-        # Set ends (start of next user)
         self._user_offsets[unique_users + 1] = np.roll(start_indices, -1)
-        self._user_offsets[-1] = len(self._flat_items)
+        self._user_offsets[-1] = n_samples
 
-        # Fill gaps for users with no interactions (propagate previous offset)
-        # This ensures user_offsets[u] == user_offsets[u+1] for empty users
         for i in range(1, len(self._user_offsets)):
             if self._user_offsets[i] == 0 and self._user_offsets[i - 1] > 0:
                 self._user_offsets[i] = self._user_offsets[i - 1]
@@ -216,12 +239,17 @@ class Sessions:
                 "No valid sequences found (min 2 interactions per user needed)."
             )
 
+        # Extract indices
+        sparse_indptr = self._inter_sparse.indptr
+        sparse_indices = self._inter_sparse.indices
+
         dataset = SequentialDataset(
             flat_items=self._flat_items,
             flat_users=self._flat_users,
             user_offsets=self._user_offsets,
             valid_target_indices=self._valid_sample_indices,
-            sparse_matrix=self._inter_sparse,
+            interaction_indptr=sparse_indptr,
+            interaction_indices=sparse_indices,
             max_seq_len=max_seq_len,
             neg_samples=neg_samples,
             niid=self._niid,

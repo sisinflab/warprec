@@ -19,7 +19,8 @@ class SequentialDataset(Dataset):
         flat_users: np.ndarray,
         user_offsets: np.ndarray,
         valid_target_indices: np.ndarray,
-        sparse_matrix: csr_matrix,
+        interaction_indptr: np.ndarray,
+        interaction_indices: np.ndarray,
         max_seq_len: int,
         neg_samples: int,
         niid: int,
@@ -29,7 +30,8 @@ class SequentialDataset(Dataset):
         self.flat_users = flat_users
         self.user_offsets = user_offsets
         self.sample_indices = valid_target_indices
-        self.sparse_matrix = sparse_matrix
+        self.inter_indptr = interaction_indptr
+        self.inter_indices = interaction_indices
         self.max_seq_len = max_seq_len
         self.neg_samples = neg_samples
         self.niid = niid
@@ -49,14 +51,14 @@ class SequentialDataset(Dataset):
         seq_end_idx = target_flat_idx
         seq_start_idx = max(user_start_idx, seq_end_idx - self.max_seq_len)
 
-        seq_array = self.flat_items[seq_start_idx:seq_end_idx].copy()
+        seq_array = self.flat_items[seq_start_idx:seq_end_idx]
         seq_len = len(seq_array)
 
         # Pad Sequence (Left-aligned data)
         seq_tensor = torch.full(
             (self.max_seq_len,), self.padding_token, dtype=torch.long
         )
-        seq_tensor[:seq_len] = torch.from_numpy(seq_array)
+        seq_tensor[:seq_len] = torch.from_numpy(np.array(seq_array))
 
         ret = [
             seq_tensor,
@@ -70,9 +72,9 @@ class SequentialDataset(Dataset):
         # Negative Sampling
         if self.neg_samples > 0:
             neg_items: list[Any] = []
-            u_start = self.sparse_matrix.indptr[user_idx]
-            u_end = self.sparse_matrix.indptr[user_idx + 1]
-            seen_items = self.sparse_matrix.indices[u_start:u_end]
+            u_start = self.inter_indptr[user_idx]
+            u_end = self.inter_indptr[user_idx + 1]
+            seen_items = self.inter_indices[u_start:u_end]
 
             while len(neg_items) < self.neg_samples:
                 cand = np.random.randint(0, self.niid)
