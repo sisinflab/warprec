@@ -222,7 +222,7 @@ class Optimization(BaseModel):
     @classmethod
     def check_num_workers(cls, v: int):
         """Validate num_workers."""
-        if v < 0:
+        if v is not None and v < 0:
             logger.attention("Found a value of 'num_workers' < 0. Defaulting to None.")
             v = None
 
