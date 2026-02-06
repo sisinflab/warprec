@@ -447,7 +447,10 @@ class Trainer:
             )
         else:
             obj_func = tune.with_parameters(
-                objective_function, device=kwargs["device"], **common_args
+                objective_function,
+                device=kwargs["device"],
+                num_workers=opt_config.num_workers,
+                **common_args,
             )
 
         return tune.with_resources(obj_func, resources=kwargs["resources"])

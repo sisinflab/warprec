@@ -65,6 +65,7 @@ def objective_function(
     validation_metric_name: str,
     mode: str,
     device: str,
+    num_workers: Optional[int] = None,
     strategy: str = "full",
     num_negatives: int = 99,
     lr_scheduler: Optional[LRScheduler] = None,
@@ -88,6 +89,7 @@ def objective_function(
         validation_metric_name (str): The name of the metric to optimize.
         mode (str): Whether or not to maximize or minimize the metric.
         device (str): The device used for tensor operations.
+        num_workers (Optional[int]): The number of workers to assign to the train dataloader.
         strategy (str): Evaluation strategy, either "full" or "sampled".
             Defaults to "full".
         num_negatives (int): Number of negative samples to use in "sampled" strategy.
@@ -183,22 +185,28 @@ def objective_function(
         )
 
         if isinstance(model, IterativeRecommender):
-            # Retrieve resources
-            try:
-                resources = train.get_context().get_trial_resources()
-                allocated_cpus = int(resources.get("CPU", 1))
-            except Exception:
-                allocated_cpus = os.cpu_count() or 1
-
             # Compute optimization parameters
-            num_workers = 0
-            pin_memory = False
-            persistent_workers = False
-            if device == "cuda":
-                allocated_cpus = os.cpu_count() or 1
-                num_workers = max(allocated_cpus - 1, 1)
-                pin_memory = True
-                persistent_workers = True
+            match (num_workers is not None, device == "cuda"):
+                case (True, True):
+                    persistent_workers = True
+                    pin_memory = True
+                case (True, False):
+                    persistent_workers = True
+                    pin_memory = False
+                case (False, True):
+                    # Retrieve resources
+                    try:
+                        resources = train.get_context().get_trial_resources()
+                        allocated_cpus = int(resources.get("CPU", 1))
+                    except Exception:
+                        allocated_cpus = os.cpu_count() or 1
+                    num_workers = max(allocated_cpus - 1, 1)
+                    persistent_workers = True
+                    pin_memory = True
+                case (False, False):
+                    num_workers = 0
+                    persistent_workers = False
+                    pin_memory = False
 
             # Proceed with standard training loop
             train_dataloader = model.get_dataloader(
