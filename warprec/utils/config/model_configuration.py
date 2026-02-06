@@ -143,6 +143,8 @@ class Optimization(BaseModel):
             each trial. Defaults to 1.
         gpu_per_trial (Optional[float]): The number of GPU to assign to
             each trial. Defaults to 0.
+        num_workers (Optional[int]): The number of workers to assign to the training dataloader.
+            Defaults to None.
         block_size (Optional[int]): The number of items to process during prediction.
             Used by some neural models, increasing this value will affect memory usage.
         chunk_size (Optional[int]): The size of the chunk processed during prediction.
@@ -160,6 +162,7 @@ class Optimization(BaseModel):
     device: Optional[str] = None
     cpu_per_trial: Optional[int] = 1
     gpu_per_trial: Optional[float] = 0
+    num_workers: Optional[int] = None
     block_size: Optional[int] = 50
     chunk_size: Optional[int] = 4096
     num_samples: Optional[int] = 1
@@ -212,6 +215,16 @@ class Optimization(BaseModel):
                 "Number of 'gpu_per_trial' not supported. Supported values must be "
                 "in the range (0, 1] or integer values > 1, like 2, 3, ..."
             )
+
+        return v
+
+    @field_validator("num_workers")
+    @classmethod
+    def check_num_workers(cls, v: int):
+        """Validate num_workers."""
+        if v < 0:
+            logger.attention("Found a value of 'num_workers' < 0. Defaulting to None.")
+            v = None
 
         return v
 
