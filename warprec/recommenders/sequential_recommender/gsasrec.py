@@ -127,14 +127,13 @@ class gSASRec(IterativeRecommender, SequentialRecommenderUtils):
         self,
         interactions: Interactions,
         sessions: Sessions,
-        low_memory: bool = False,
-        **kwargs,
+        **kwargs: Any,
     ):
-        return sessions.get_user_history_dataloader(
+        return sessions.get_sliding_window_dataloader(
             max_seq_len=self.max_seq_len,
             neg_samples=self.neg_samples,
             batch_size=self.batch_size,
-            low_memory=low_memory,
+            **kwargs,
         )
 
     def forward(self, item_seq: Tensor) -> Tensor:
@@ -233,6 +232,7 @@ class gSASRec(IterativeRecommender, SequentialRecommenderUtils):
 
         model_input = positives[:, :-1]
         labels = positives[:, 1:]
+        negatives = negatives[:, 1:, :]
 
         if model_input.shape[1] == 0:
             return torch.tensor(0.0, requires_grad=True).to(positives.device)

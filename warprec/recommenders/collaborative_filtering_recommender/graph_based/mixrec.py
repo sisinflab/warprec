@@ -104,11 +104,11 @@ class MixRec(IterativeRecommender, GraphRecommenderUtils):
         self,
         interactions: Interactions,
         sessions: Sessions,
-        low_memory: bool = False,
         **kwargs: Any,
     ):
-        return interactions.get_pos_neg_dataloader(
-            batch_size=self.batch_size, low_memory=low_memory
+        return interactions.get_contrastive_dataloader(
+            batch_size=self.batch_size,
+            **kwargs,
         )
 
     def forward(self) -> Tuple[Tensor, Tensor]:

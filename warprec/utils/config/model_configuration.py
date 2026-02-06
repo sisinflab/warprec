@@ -1,4 +1,3 @@
-import os
 from typing import List, Optional, Union, ClassVar, Any, Dict
 from abc import ABC
 
@@ -33,14 +32,11 @@ class Meta(BaseModel):
         save_model (Optional[bool]): Whether save or not the model state after training.
         save_recs (Optional[bool]): Whether save or not the recommendations after training.
         load_from (Optional[str]): The path where a previous model state has been saved.
-        low_memory (Optional[bool]): Wether or not to compute data needed for the model to
-            train in lazy mode. Defaults to False.
     """
 
     save_model: Optional[bool] = False
     save_recs: Optional[bool] = False
     load_from: Optional[str] = None
-    low_memory: Optional[bool] = False
 
 
 class Properties(BaseModel):
@@ -143,14 +139,12 @@ class Optimization(BaseModel):
         properties (Optional[Properties]): The attributes required for Ray Tune to work.
         device (Optional[str]): The device that will be used for tensor operations.
             Overrides general device.
-        max_cpu_count (Optional[int]): The maximum number of CPU cores to assign to
-            the experiments. Defaults to the maximum number of cores.
-        parallel_trials (Optional[int]): The number of trials to execute in parallel.
-            Defaults to 1. Increasing this number will require more computational resources.
-        multi_gpu (Optional[bool]): Wether or not to train models on multi-gpu.
-            Defaults to False.
-        num_gpus (Optional[int]): The number of gpus to assign to each trial.
-            Defaults to None. If multi_gpu is set to False, this value will be ignored.
+        cpu_per_trial (Optional[int]): The number of CPU cores to assign to
+            each trial. Defaults to 1.
+        gpu_per_trial (Optional[float]): The number of GPU to assign to
+            each trial. Defaults to 0.
+        num_workers (Optional[int]): The number of workers to assign to the training dataloader.
+            Defaults to None.
         block_size (Optional[int]): The number of items to process during prediction.
             Used by some neural models, increasing this value will affect memory usage.
         chunk_size (Optional[int]): The size of the chunk processed during prediction.
@@ -166,10 +160,9 @@ class Optimization(BaseModel):
     lr_scheduler: Optional[LRScheduler] = None
     properties: Optional[Properties] = Field(default_factory=Properties)
     device: Optional[str] = None
-    max_cpu_count: Optional[int] = os.cpu_count()
-    parallel_trials: Optional[int] = 1
-    multi_gpu: Optional[bool] = False
-    num_gpus: Optional[int] = None
+    cpu_per_trial: Optional[int] = 1
+    gpu_per_trial: Optional[float] = 0
+    num_workers: Optional[int] = None
     block_size: Optional[int] = 50
     chunk_size: Optional[int] = 4096
     num_samples: Optional[int] = 1
@@ -201,22 +194,38 @@ class Optimization(BaseModel):
             return v
         raise ValueError(f'Device {v} is not supported. Use "cpu" or "cuda".')
 
-    @field_validator("max_cpu_count")
+    @field_validator("cpu_per_trial")
     @classmethod
-    def check_max_cpu_count(cls, v: int):
-        """Validate max_cpu_count."""
-        if v > os.cpu_count():
-            raise ValueError(
-                "Requested a number of CPU cores higher than the available ones."
-            )
+    def check_cpu_per_trial(cls, v: int):
+        """Validate cpu_per_trial."""
+        if v <= 0:
+            raise ValueError("Requested a number of CPU cores less or equal to zero.")
         return v
 
-    @field_validator("parallel_trials")
+    @field_validator("gpu_per_trial")
     @classmethod
-    def check_parallel_trials(cls, v: int):
-        """Validate parallel_trials."""
-        if v < 1:
-            raise ValueError("Number of parallel trials must be >= 1.")
+    def check_gpu_per_trial(cls, v: int):
+        """Validate gpu_per_trial."""
+        if v < 0:
+            logger.attention("Found a value of 'gpu_per_trial' < 0. Defaulting to 0.")
+            v = 0
+
+        if v > 1 and not v.is_integer():
+            raise ValueError(
+                "Number of 'gpu_per_trial' not supported. Supported values must be "
+                "in the range (0, 1] or integer values > 1, like 2, 3, ..."
+            )
+
+        return v
+
+    @field_validator("num_workers")
+    @classmethod
+    def check_num_workers(cls, v: int):
+        """Validate num_workers."""
+        if v is not None and v < 0:
+            logger.attention("Found a value of 'num_workers' < 0. Defaulting to None.")
+            v = None
+
         return v
 
     @model_validator(mode="after")

@@ -65,7 +65,7 @@ def objective_function(
     validation_metric_name: str,
     mode: str,
     device: str,
-    low_memory: bool = False,
+    num_workers: Optional[int] = None,
     strategy: str = "full",
     num_negatives: int = 99,
     lr_scheduler: Optional[LRScheduler] = None,
@@ -89,8 +89,7 @@ def objective_function(
         validation_metric_name (str): The name of the metric to optimize.
         mode (str): Whether or not to maximize or minimize the metric.
         device (str): The device used for tensor operations.
-        low_memory (bool): Whether or not to train model on
-            lazy dataloader.
+        num_workers (Optional[int]): The number of workers to assign to the train dataloader.
         strategy (str): Evaluation strategy, either "full" or "sampled".
             Defaults to "full".
         num_negatives (int): Number of negative samples to use in "sampled" strategy.
@@ -186,11 +185,36 @@ def objective_function(
         )
 
         if isinstance(model, IterativeRecommender):
+            # Compute optimization parameters
+            match (num_workers is not None, device == "cuda"):
+                case (True, True):
+                    persistent_workers = True
+                    pin_memory = True
+                case (True, False):
+                    persistent_workers = True
+                    pin_memory = False
+                case (False, True):
+                    # Retrieve resources
+                    try:
+                        resources = train.get_context().get_trial_resources()
+                        allocated_cpus = int(resources.get("CPU", 1))
+                    except Exception:
+                        allocated_cpus = os.cpu_count() or 1
+                    num_workers = max(allocated_cpus - 1, 1)
+                    persistent_workers = True
+                    pin_memory = True
+                case (False, False):
+                    num_workers = 0
+                    persistent_workers = False
+                    pin_memory = False
+
             # Proceed with standard training loop
             train_dataloader = model.get_dataloader(
                 interactions=dataset.train_set,
                 sessions=dataset.train_session,
-                low_memory=low_memory,
+                num_workers=num_workers,
+                pin_memory=pin_memory,
+                persistent_workers=persistent_workers,
             )
             optimizer = standard_optimizer(model)
             epochs = model.epochs
@@ -339,7 +363,6 @@ def objective_function_ddp(config: dict) -> None:
     params = config["params"]
     dataset_folds = config["dataset_folds"]
     mode = config["mode"]
-    low_memory = config["low_memory"]
     validation_metric_name = config["validation_metric_name"]
     validation_top_k = config["validation_top_k"]
     lr_scheduler: LRScheduler = config["lr_scheduler"]
@@ -406,7 +429,6 @@ def objective_function_ddp(config: dict) -> None:
     train_dataloader = unwrapped_model.get_dataloader(
         interactions=dataset.train_set,
         sessions=dataset.train_session,
-        low_memory=low_memory,
     )
     train_dataloader = train.torch.prepare_data_loader(train_dataloader)
 
@@ -477,11 +499,12 @@ def objective_function_ddp(config: dict) -> None:
         # All workers call compute(). torchmetrics handles synchronization.
         # The `results` dictionary will be identical on all workers.
         results = evaluator.compute_results()
-        metric_report = {
-            f"{metric_name}@{k}": value
-            for k, metrics_results in results.items()
-            for metric_name, value in metrics_results.items()
-        }
+        metric_report = {}
+        for k, metrics_results in results.items():
+            for metric_name, value in metrics_results.items():
+                if isinstance(value, Tensor):
+                    value = value.nanmean().item()
+                metric_report[f"{metric_name}@{k}"] = value
 
         # Add the loss averaged over the train sample size
         metric_report["loss"] = epoch_loss / (len(train_dataloader) * world_size)
@@ -557,6 +580,7 @@ def driver_function_ddp(
     num_to_keep: int = 5,
     strategy: str = "full",
     num_negatives: int = 99,
+    lr_scheduler: Optional[LRScheduler] = None,
     seed: int = 42,
     block_size: int = 50,
     chunk_size: int = 4096,
@@ -584,6 +608,8 @@ def driver_function_ddp(
             Defaults to "full".
         num_negatives (int): Number of negative samples to use in "sampled" strategy.
             Defaults to 99.
+        lr_scheduler (Optional[LRScheduler]): The custom learning rate scheduler
+            configuration. Defaults to None.
         seed (int): The seed for reproducibility. Defaults to 42.
         block_size (int): The block size for the model evaluation.
             Defaults to 50.
@@ -610,6 +636,7 @@ def driver_function_ddp(
             "mode": mode,
             "strategy": strategy,
             "num_negatives": num_negatives,
+            "lr_scheduler": lr_scheduler,
             "seed": seed,
             "block_size": block_size,
             "chunk_size": chunk_size,

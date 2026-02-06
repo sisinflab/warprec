@@ -8,7 +8,6 @@ import torch
 
 from warprec.common import (
     initialize_datasets,
-    prepare_train_loaders,
     dataset_preparation,
 )
 from warprec.data.reader import ReaderFactory
@@ -50,6 +49,7 @@ def train_pipeline(path: str):
 
     Raises:
         ConnectionError: If unable to connect to Ray cluster.
+        ValueError: If the file format is not supported.
     """
     logger.msg("Starting experiment.")
     experiment_start_time = time.time()
@@ -80,12 +80,25 @@ def train_pipeline(path: str):
 
     # Write split information if required
     if config.splitter and config.writer.save_split:
-        writer.write_split(
-            main_dataset,
-            val_dataset,
-            fold_dataset,
-            **config.writer.split.model_dump(),
-        )
+        file_format = config.writer.split.file_format
+
+        match file_format:
+            case "tabular":
+                writer.write_tabular_split(
+                    main_dataset,
+                    val_dataset,
+                    fold_dataset,
+                    **config.writer.split.model_dump(),
+                )
+            case "parquet":
+                writer.write_parquet_split(
+                    main_dataset,
+                    val_dataset,
+                    fold_dataset,
+                    **config.writer.split.model_dump(),
+                )
+            case _:
+                raise ValueError(f"File format '{file_format}'not supported.")
 
     # Trainer testing
     models = list(config.models.keys())
@@ -115,8 +128,7 @@ def train_pipeline(path: str):
     )
 
     # Prepare dataloaders for evaluation
-    preparation_strategy = config.general.train_data_preparation
-    dataset_preparation(main_dataset, fold_dataset, preparation_strategy, config)
+    dataset_preparation(main_dataset, fold_dataset, config)
 
     data_preparation_time = time.time() - experiment_start_time
     logger.positive(
@@ -140,14 +152,6 @@ def train_pipeline(path: str):
 
     for model_name in models:
         model_exploration_start_time = time.time()
-
-        # Check if dataloader requirements is in 'model' mode
-        if preparation_strategy == "conservative":
-            model_dict = {model_name: config.models[model_name]}
-            prepare_train_loaders(main_dataset, model_dict)
-
-            for fold in fold_dataset:
-                prepare_train_loaders(fold, model_dict)
 
         params = model_param_from_dict(model_name, config.models[model_name])
         trainer = Trainer(
@@ -343,15 +347,6 @@ def train_pipeline(path: str):
             # Update time report
             writer.write_time_report(model_timing_report)
 
-        # Clear out the dataset cache if in 'conservative' mode
-        if preparation_strategy == "conservative":
-            main_dataset.clear_cache()
-
-            for fold in fold_dataset:
-                fold.clear_cache()
-
-            logger.positive("Dataset cache cleared.")
-
     if requires_stat_significance:
         # Check if enough models have been evaluated
         if len(model_results) >= 2:
@@ -410,11 +405,6 @@ def single_split_flow(
     model_device = params.optimization.device
     device = general_device if model_device is None else model_device
 
-    # Check for multi-gpu scenario
-    num_gpus = None
-    if params.optimization.multi_gpu:
-        num_gpus = params.optimization.num_gpus
-
     # Evaluation on report
     eval_config = config.evaluation
     val_metric, val_k = validation_metric(config.evaluation.validation_metric)
@@ -439,7 +429,6 @@ def single_split_flow(
         topk=topk,
         validation_score=config.evaluation.validation_metric,
         storage_path=storage_path,
-        num_gpus=num_gpus,
         device=device,
         evaluation_strategy=config.evaluation.strategy,
         num_negatives=config.evaluation.num_negatives,
@@ -482,14 +471,10 @@ def multiple_fold_validation_flow(
     model_device = params.optimization.device
     device = general_device if model_device is None else model_device
 
-    # Check for multi-gpu scenario
-    num_gpus = None
-    if params.optimization.multi_gpu:
-        num_gpus = params.optimization.num_gpus
-
     # Retrieve common params
     block_size = params.optimization.block_size
     chunk_size = params.optimization.chunk_size
+    num_workers = params.optimization.num_workers
     validation_score = config.evaluation.validation_metric
     desired_training_it = params.optimization.properties.desired_training_it
     seed = params.optimization.properties.seed
@@ -517,7 +502,6 @@ def multiple_fold_validation_flow(
         topk=topk,
         validation_score=validation_score,
         storage_path=storage_path,
-        num_gpus=num_gpus,
         device=device,
         evaluation_strategy=config.evaluation.strategy,
         num_negatives=config.evaluation.num_negatives,
@@ -552,7 +536,7 @@ def multiple_fold_validation_flow(
     # is iterative
     if isinstance(best_model, IterativeRecommender):
         # Training loop decorated with tqdm for a better visualization
-        train_loop(best_model, main_dataset, iterations, device=device)
+        train_loop(best_model, main_dataset, iterations, num_workers, device=device)
 
     # Final reporting
     report["Total Params (Best Model)"] = sum(

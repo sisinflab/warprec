@@ -74,7 +74,6 @@ class Trainer:
         topk: List[int],
         validation_score: str,
         storage_path: str,
-        num_gpus: Optional[int] = None,
         device: str = "cpu",
         evaluation_strategy: str = "full",
         num_negatives: int = 99,
@@ -95,7 +94,6 @@ class Trainer:
             topk (List[int]): List of cutoffs for metrics.
             validation_score (str): The metric to monitor during training.
             storage_path (str): Path to store Ray results.
-            num_gpus (Optional[int]): The number of gpus per trial.
             device (str): The device that will be used for tensor operations.
             evaluation_strategy (str): Evaluation strategy, either "full" or "sampled".
             num_negatives (int): Number of negative samples to use in "sampled" strategy.
@@ -120,7 +118,6 @@ class Trainer:
             topk=topk,
             validation_score=validation_score,
             storage_path=storage_path,
-            num_gpus=num_gpus,
             device=device,
             evaluation_strategy=evaluation_strategy,
             num_negatives=num_negatives,
@@ -177,7 +174,6 @@ class Trainer:
         topk: List[int],
         validation_score: str,
         storage_path: str,
-        num_gpus: Optional[int] = None,
         device: str = "cpu",
         evaluation_strategy: str = "full",
         num_negatives: int = 99,
@@ -196,7 +192,6 @@ class Trainer:
             topk (List[int]): List of cutoffs for metrics.
             validation_score (str): The metric to monitor during training.
             storage_path (str): Path to store Ray results.
-            num_gpus (Optional[int]): The number of gpus per trial.
             device (str): The device that will be used for tensor operations.
             evaluation_strategy (str): Evaluation strategy, either "full" or "sampled".
             num_negatives (int): Number of negative samples to use in "sampled" strategy.
@@ -224,7 +219,6 @@ class Trainer:
             topk=topk,
             validation_score=validation_score,
             storage_path=storage_path,
-            num_gpus=num_gpus,
             device=device,
             evaluation_strategy=evaluation_strategy,
             num_negatives=num_negatives,
@@ -267,7 +261,6 @@ class Trainer:
         topk: List[int],
         validation_score: str,
         storage_path: str,
-        num_gpus: Optional[int],
         device: str,
         evaluation_strategy: str,
         num_negatives: int,
@@ -286,7 +279,6 @@ class Trainer:
             topk (List[int]): List of cutoffs for metrics.
             validation_score (str): The metric to monitor during training.
             storage_path (str): Path to store Ray results.
-            num_gpus (Optional[int]): The number of gpus per trial.
             device (str): The device that will be used for tensor operations.
             evaluation_strategy (str): Evaluation strategy, either "full" or "sampled".
             num_negatives (int): Number of negative samples to use in "sampled" strategy.
@@ -302,7 +294,9 @@ class Trainer:
         mode = opt_config.properties.mode
 
         # Determine resources and objective function
-        resources = self._get_resources(opt_config.parallel_trials, device, num_gpus)
+        resources = self._get_resources(
+            opt_config.cpu_per_trial, opt_config.gpu_per_trial, device
+        )
         trainable = self._get_objective_function(
             model_name=model_name,
             params=params,
@@ -311,7 +305,6 @@ class Trainer:
             topk=topk,
             validation_score=validation_score,
             storage_path=storage_path,
-            num_gpus=num_gpus,
             device=device,
             evaluation_strategy=evaluation_strategy,
             num_negatives=num_negatives,
@@ -373,39 +366,40 @@ class Trainer:
 
     def _get_resources(
         self,
-        num_trials: int,
+        cpu_per_trial: int,
+        gpu_per_trial: float,
         device: str,
-        num_gpus: Optional[int],
     ) -> Dict[str, float]:
         """Calculates resource allocation per trial.
 
         Args:
-            num_trials (int): The number of parallel trials.
+            cpu_per_trial (int): The number of cpu per trial.
+            gpu_per_trial (float): The number of gpu per trial.
             device (str): The device of the experiment.
-            num_gpus (Optional[int]): The number of gpus per trial.
 
         Returns:
             Dict[str, float]: Resources dictionary for Ray Tune.
+
+        Raises:
+            ValueError: If the number of resources requested is higher
+                than the one available in the Ray Cluster.
         """
         # Get available resources
         resources = ray.available_resources()
         available_cpus = resources.get("CPU", 1)
         available_gpus = resources.get("GPU", 0)
 
-        # Fixed CPU per trial compute
-        cpu_per_trial = available_cpus / num_trials
+        # Check resources are available
+        if cpu_per_trial > available_cpus or gpu_per_trial > available_gpus:
+            raise ValueError(
+                "Not enough resources in the cluster to allocate to the trial."
+            )
 
-        # CASE 1: Multi-GPU scenario
-        if num_gpus is not None and num_gpus > 1:
-            return {"cpu": cpu_per_trial, "gpu": num_gpus}
+        # Fallback to 1 gpu_per_trial in case of device set to CUDA
+        if device == "cuda" and gpu_per_trial == 0:
+            gpu_per_trial = 1
 
-        # CASE 2: Single-GPU scenario
-        if device == "cuda":
-            gpu_per_trial = min(1.0, available_gpus / num_trials)
-            return {"cpu": cpu_per_trial, "gpu": gpu_per_trial}
-
-        # CASE 3: CPU-only scenario
-        return {"cpu": cpu_per_trial, "gpu": 0.0}
+        return {"cpu": cpu_per_trial, "gpu": gpu_per_trial}
 
     def _get_objective_function(self, **kwargs: Any) -> Callable:
         """Selects and wraps the appropriate objective function (Standard or DDP).
@@ -416,8 +410,8 @@ class Trainer:
         Returns:
             Callable: The wrapped objective function.
         """
-        num_gpus = kwargs.get("num_gpus")
         params = kwargs.get("params")
+        gpu_per_trial = kwargs.get("resources", {}).get("gpu", 0)
         opt_config = params.optimization
         validation_metric_name, validation_top_k = validation_metric(
             kwargs["validation_score"]
@@ -431,7 +425,6 @@ class Trainer:
             "validation_top_k": validation_top_k,
             "validation_metric_name": validation_metric_name,
             "mode": opt_config.properties.mode,
-            "low_memory": params.meta.low_memory,
             "strategy": kwargs["evaluation_strategy"],
             "num_negatives": kwargs["num_negatives"],
             "lr_scheduler": opt_config.lr_scheduler,
@@ -443,18 +436,21 @@ class Trainer:
             "custom_models": self._custom_models,
         }
 
-        if num_gpus is not None and num_gpus > 1:
-            logger.msg(f"Using Distributed Data Parallel with {num_gpus} GPUs.")
+        if gpu_per_trial > 1:
+            logger.msg(f"Using Distributed Data Parallel with {gpu_per_trial} GPUs.")
             obj_func = tune.with_parameters(
                 driver_function_ddp,
-                num_gpus=num_gpus,
+                num_gpus=gpu_per_trial,
                 storage_path=kwargs["storage_path"],
                 num_to_keep=opt_config.checkpoint_to_keep,
                 **common_args,
             )
         else:
             obj_func = tune.with_parameters(
-                objective_function, device=kwargs["device"], **common_args
+                objective_function,
+                device=kwargs["device"],
+                num_workers=opt_config.num_workers,
+                **common_args,
             )
 
         return tune.with_resources(obj_func, resources=kwargs["resources"])

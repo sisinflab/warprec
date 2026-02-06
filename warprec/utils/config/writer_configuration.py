@@ -1,9 +1,11 @@
 import os
-from typing import Optional, List
+from typing import Optional, List, Literal
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 from warprec.utils.config.common import check_separator
 from warprec.utils.enums import WritingMethods
+
+FileFormat = Literal["tabular", "parquet"]
 
 
 class RecommendationWriting(BaseModel):
@@ -62,11 +64,13 @@ class SplitWriting(BaseModel):
     """Definition of the split sub-configuration part of the configuration file.
 
     Attributes:
+        file_format (Optional[FileFormat]): The file format to use during the writing process.
         sep (str): The separator to use for the split files.
         ext (str): The extension of the split files.
         header (bool): Whether or not to write the header in the split files.
     """
 
+    file_format: Optional[FileFormat] = "tabular"
     sep: str = "\t"
     ext: str = ".tsv"
     header: bool = True
@@ -76,6 +80,14 @@ class SplitWriting(BaseModel):
     def check_sep(cls, v: str):
         """Validates the separator."""
         return check_separator(v)
+
+    @model_validator(mode="after")
+    def check_model(self):
+        # Default the extension to '.parquet'
+        if self.file_format == "parquet":
+            if self.ext is None or self.ext == ".tsv":
+                self.ext = ".parquet"
+        return self
 
 
 class WriterConfig(BaseModel):
