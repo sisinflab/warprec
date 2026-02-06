@@ -8,7 +8,6 @@ import torch
 
 from warprec.common import (
     initialize_datasets,
-    prepare_train_loaders,
     dataset_preparation,
 )
 from warprec.data.reader import ReaderFactory
@@ -129,8 +128,7 @@ def train_pipeline(path: str):
     )
 
     # Prepare dataloaders for evaluation
-    preparation_strategy = config.general.train_data_preparation
-    dataset_preparation(main_dataset, fold_dataset, preparation_strategy, config)
+    dataset_preparation(main_dataset, fold_dataset, config)
 
     data_preparation_time = time.time() - experiment_start_time
     logger.positive(
@@ -154,14 +152,6 @@ def train_pipeline(path: str):
 
     for model_name in models:
         model_exploration_start_time = time.time()
-
-        # Check if dataloader requirements is in 'model' mode
-        if preparation_strategy == "conservative":
-            model_dict = {model_name: config.models[model_name]}
-            prepare_train_loaders(main_dataset, model_dict)
-
-            for fold in fold_dataset:
-                prepare_train_loaders(fold, model_dict)
 
         params = model_param_from_dict(model_name, config.models[model_name])
         trainer = Trainer(
@@ -356,15 +346,6 @@ def train_pipeline(path: str):
 
             # Update time report
             writer.write_time_report(model_timing_report)
-
-        # Clear out the dataset cache if in 'conservative' mode
-        if preparation_strategy == "conservative":
-            main_dataset.clear_cache()
-
-            for fold in fold_dataset:
-                fold.clear_cache()
-
-            logger.positive("Dataset cache cleared.")
 
     if requires_stat_significance:
         # Check if enough models have been evaluated
