@@ -1,4 +1,4 @@
-from abc import ABC
+from typing import Optional, Tuple
 
 import torch
 import numpy as np
@@ -7,11 +7,47 @@ from scipy.sparse import coo_matrix
 from torch_sparse import SparseTensor
 
 
-class GraphRecommenderUtils(ABC):
+class GraphRecommenderUtils(nn.Module):
     """Common definition for graph recommenders.
 
     Collection of common method used by all graph recommenders.
     """
+
+    # Cache storage
+    _cached_user_emb: Optional[Tensor] = None
+    _cached_item_emb: Optional[Tensor] = None
+
+    def train(self, mode=True):
+        """Override train mode to empty the cache when switching to training."""
+        super().train(mode)
+
+        if mode:
+            # We are in training mode, embeddings will change. Empty the cache
+            self._cached_user_emb = None
+            self._cached_item_emb = None
+
+    def propagate_embeddings(self) -> Tuple[Tensor, Tensor]:
+        """Retrieve the propagate user and item embeddings.
+
+        Subsequent calls will return the cached values, speeding up the
+        evaluation process.
+
+        Returns:
+            Tuple[Tensor, Tensor]: (User Embeddings, Item Embeddings)
+        """
+        # Safety check
+        if self.training:
+            return self.forward()[:2]
+
+        # Check if values are cached
+        if self._cached_user_emb is None or self._cached_item_emb is None:
+            with torch.no_grad():
+                # Unpack the forward
+                ret = self.forward()
+                self._cached_user_emb = ret[0]
+                self._cached_item_emb = ret[1]
+
+        return self._cached_user_emb, self._cached_item_emb
 
     def get_adj_mat(
         self,

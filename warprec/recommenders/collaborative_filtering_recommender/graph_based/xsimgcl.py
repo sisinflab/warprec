@@ -217,8 +217,8 @@ class XSimGCL(IterativeRecommender, GraphRecommenderUtils):
         Returns:
             Tensor: The score matrix {user x item}.
         """
-        # Forward the propagation network without perturbation
-        user_all_embeddings, item_all_embeddings, _, _ = self.forward(perturbed=False)
+        # Retrieve all user and item embeddings from the propagation network
+        user_all_embeddings, item_all_embeddings = self.propagate_embeddings()
 
         # Get the embeddings for the specific users in the batch
         user_embeddings = user_all_embeddings[
