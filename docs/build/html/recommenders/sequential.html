@@ -423,6 +423,35 @@ Instead of predicting the next item, it is trained on a “cloze” task, where 
 </pre></div>
 </div>
 <ul class="simple">
+<li><p>CORE (Consistent Representation Encoder):
+A session-based recommendation framework that unifies the representation space for both encoding and decoding.
+Unlike standard deep encoders that project session embeddings into a different space than item embeddings, CORE encodes sessions as a weighted sum of item embeddings (using a Transformer to learn the weights).
+It also employs Robust Distance Measuring (RDM) based on cosine similarity to prevent overfitting.</p></li>
+</ul>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">models</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">CORE</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">embedding_size</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">64</span>
+<span class="w">    </span><span class="nt">dnn_type</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;trm&quot;</span>
+<span class="w">    </span><span class="nt">n_layers</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">2</span>
+<span class="w">    </span><span class="nt">n_heads</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">8</span>
+<span class="w">    </span><span class="nt">inner_size</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">256</span>
+<span class="w">    </span><span class="nt">hidden_dropout_prob</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0.1</span>
+<span class="w">    </span><span class="nt">attn_dropout_prob</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0.1</span>
+<span class="w">    </span><span class="nt">layer_norm_eps</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">1e-12</span>
+<span class="w">    </span><span class="nt">initializer_range</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0.02</span>
+<span class="w">    </span><span class="nt">session_dropout</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0.1</span>
+<span class="w">    </span><span class="nt">item_dropout</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0.1</span>
+<span class="w">    </span><span class="nt">temperature</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0.07</span>
+<span class="w">    </span><span class="nt">reg_weight</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0.001</span>
+<span class="w">    </span><span class="nt">weight_decay</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0.0001</span>
+<span class="w">    </span><span class="nt">batch_size</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">2048</span>
+<span class="w">    </span><span class="nt">epochs</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">200</span>
+<span class="w">    </span><span class="nt">learning_rate</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0.001</span>
+<span class="w">    </span><span class="nt">neg_samples</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">1</span>
+<span class="w">    </span><span class="nt">max_seq_len</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">50</span>
+</pre></div>
+</div>
+<ul class="simple">
 <li><p>gSASRec (General Self-Attentive Sequential Recommendation):
 Extends SASRec by introducing general self-attention.
 This enables better modeling of diverse or evolving user interests.</p></li>
@@ -524,14 +553,18 @@ SASRec effectively models dynamic user preferences in sparse datasets, learning 
 <td><p>Bidirectional Transformer model trained on a masked item prediction task.</p></td>
 </tr>
 <tr class="row-even"><td></td>
+<td><p>CORE</p></td>
+<td><p>Unifies encoding/decoding spaces using linear combination of embeddings and RDM.</p></td>
+</tr>
+<tr class="row-odd"><td></td>
 <td><p>gSASRec</p></td>
 <td><p>General self-attention model for diverse and evolving user behaviors.</p></td>
 </tr>
-<tr class="row-odd"><td></td>
+<tr class="row-even"><td></td>
 <td><p>LightSANs</p></td>
 <td><p>Efficient self-attention with low-rank decomposition and decoupled positioning.</p></td>
 </tr>
-<tr class="row-even"><td></td>
+<tr class="row-odd"><td></td>
 <td><p>SASRec</p></td>
 <td><p>Transformer-inspired model learning short- and long-term user preferences.</p></td>
 </tr>
