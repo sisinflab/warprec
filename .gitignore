@@ -65,3 +65,5 @@ junit_result.xml
 .coverage
 experiment/
 tests/
+data/
+results/

@@ -49,7 +49,7 @@ class GRU4Rec(IterativeRecommender, SequentialRecommenderUtils):
     embedding_size: int
     hidden_size: int
     num_layers: int
-    dropout_prob: float
+    dropout_probs: float
     reg_weight: float
     weight_decay: float
     batch_size: int
