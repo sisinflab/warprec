@@ -2,6 +2,21 @@ from enum import Enum
 from collections import namedtuple
 
 
+class MetricDefault(float, Enum):
+    """Represents the default value to be used during the report
+    of the metrics.
+
+    This enum is used to track the possible default values to report:
+        -METRIC_MIN: An high value to use when the validation metric
+            must be minimized.
+        -METRIC_MAX: A low value to use when the validation metric
+            must be maximized.
+    """
+
+    METRIC_MIN = 1e9
+    METRIC_MAX = -1.0
+
+
 class RatingType(str, Enum):
     """Represents the types of rating supported.
 
