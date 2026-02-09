@@ -407,7 +407,11 @@ def single_split_flow(
 
     # Evaluation on report
     eval_config = config.evaluation
-    val_metric, val_k = validation_metric(config.evaluation.validation_metric)
+    validation_score = config.evaluation.validation_metric
+    val_metric, val_k = validation_metric(validation_score)
+    logger.attention(
+        f"Validation metric for this experiment has been set to: {validation_score}"
+    )
     if eval_config.full_evaluation_on_report:
         metrics = eval_config.metrics
         topk = eval_config.top_k
@@ -427,7 +431,7 @@ def single_split_flow(
         dataset,
         metrics=metrics,
         topk=topk,
-        validation_score=config.evaluation.validation_metric,
+        validation_score=validation_score,
         storage_path=storage_path,
         device=device,
         evaluation_strategy=config.evaluation.strategy,
@@ -481,7 +485,10 @@ def multiple_fold_validation_flow(
 
     # Evaluation on report
     eval_config = config.evaluation
-    val_metric, val_k = validation_metric(config.evaluation.validation_metric)
+    val_metric, val_k = validation_metric(validation_score)
+    logger.attention(
+        f"Validation metric for this experiment has been set to: {validation_score}"
+    )
     if eval_config.full_evaluation_on_report:
         metrics = eval_config.metrics
         topk = eval_config.top_k
