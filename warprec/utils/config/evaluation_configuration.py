@@ -81,7 +81,7 @@ class EvaluationConfig(BaseModel):
 
     top_k: List[int]
     metrics: List[str]
-    validation_metric: Optional[str] = "nDCG@5"
+    validation_metric: Optional[str] = "nDCG@10"
     batch_size: Optional[int] = 1024
     strategy: Optional[str] = "full"  # or "sampled"
     num_negatives: Optional[int] = 99
