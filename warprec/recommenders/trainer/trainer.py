@@ -425,6 +425,7 @@ class Trainer:
             "validation_top_k": validation_top_k,
             "validation_metric_name": validation_metric_name,
             "mode": opt_config.properties.mode,
+            "eval_every_n": opt_config.eval_every_n,
             "strategy": kwargs["evaluation_strategy"],
             "num_negatives": kwargs["num_negatives"],
             "lr_scheduler": opt_config.lr_scheduler,

@@ -23,6 +23,7 @@ from warprec.common import standard_optimizer
 from warprec.evaluation.evaluator import Evaluator
 from warprec.recommenders.base_recommender import Recommender, IterativeRecommender
 from warprec.utils.config import RecomModel, LRScheduler
+from warprec.utils.enums import MetricDefault
 from warprec.utils.helpers import load_custom_modules, retrieve_evaluation_dataloader
 from warprec.utils.registry import (
     model_registry,
@@ -66,6 +67,7 @@ def objective_function(
     mode: str,
     device: str,
     num_workers: Optional[int] = None,
+    eval_every_n: int = 1,
     strategy: str = "full",
     num_negatives: int = 99,
     lr_scheduler: Optional[LRScheduler] = None,
@@ -90,6 +92,8 @@ def objective_function(
         mode (str): Whether or not to maximize or minimize the metric.
         device (str): The device used for tensor operations.
         num_workers (Optional[int]): The number of workers to assign to the train dataloader.
+        eval_every_n (int): The evaluation step will be executed every N training steps.
+            Defaults to 1.
         strategy (str): Evaluation strategy, either "full" or "sampled".
             Defaults to "full".
         num_negatives (int): Number of negative samples to use in "sampled" strategy.
@@ -121,7 +125,13 @@ def objective_function(
 
     # Validation metric in the correct format
     validation_score = f"{validation_metric_name}@{validation_top_k}"
-    best_validation_score = -torch.inf if mode == "max" else torch.inf
+    best_validation_score = (
+        MetricDefault.METRIC_MAX.value
+        if mode == "max"
+        else MetricDefault.METRIC_MIN.value
+    )
+    latest_metrics = {}
+    latest_metrics[validation_score] = best_validation_score  # Default value
 
     # Load custom modules if provided
     load_custom_modules(custom_models)
@@ -241,52 +251,68 @@ def objective_function(
                     optimizer.step()
                     epoch_loss += loss.item()
 
-                # Set model to eval mode for the evaluation step
-                model.eval()
+                avg_epoch_loss = epoch_loss / len(train_dataloader)
 
-                # Evaluation at the end of each training epoch
-                evaluator.evaluate(
-                    model=model,
-                    dataloader=dataloader,
-                    strategy=strategy,
-                    dataset=dataset,
-                    device=device,
-                )
-                results = evaluator.compute_results()
+                # Check if the model should be evaluated
+                if ((epoch + 1) % eval_every_n == 0) or ((epoch + 1) == epochs):
+                    # Set model to eval mode for the evaluation step
+                    model.eval()
 
-                # Metrics to report
-                metric_report = {
-                    f"{metric_name}@{k}": value
-                    for k, metrics_results in results.items()
-                    for metric_name, value in metrics_results.items()
-                }
-                metric_report["loss"] = epoch_loss / len(train_dataloader)
-
-                # Check for best validation score
-                score = metric_report[validation_score]
-                if isinstance(score, Tensor):
-                    current_validation_score = score.nanmean().item()
-                else:
-                    current_validation_score = score
-
-                # Maximize case
-                if mode == "max" and current_validation_score > best_validation_score:
-                    best_validation_score = (
-                        current_validation_score.nanmean().item()
-                        if isinstance(current_validation_score, Tensor)
-                        else current_validation_score
+                    # Evaluation at the end of each training epoch
+                    evaluator.evaluate(
+                        model=model,
+                        dataloader=dataloader,
+                        strategy=strategy,
+                        dataset=dataset,
+                        device=device,
                     )
+                    results = evaluator.compute_results()
 
-                # Minimize case
-                if mode == "min" and current_validation_score < best_validation_score:
-                    best_validation_score = (
-                        current_validation_score.nanmean().item()
-                        if isinstance(current_validation_score, Tensor)
-                        else current_validation_score
-                    )
+                    # Metrics to report
+                    current_metrics = {
+                        f"{metric_name}@{k}": value
+                        for k, metrics_results in results.items()
+                        for metric_name, value in metrics_results.items()
+                    }
 
+                    # Check for best validation score
+                    score = current_metrics[validation_score]
+                    if isinstance(score, Tensor):
+                        current_validation_score = score.nanmean().item()
+                    else:
+                        current_validation_score = score
+
+                    # Maximize case
+                    if (
+                        mode == "max"
+                        and current_validation_score > best_validation_score
+                    ):
+                        best_validation_score = (
+                            current_validation_score.nanmean().item()
+                            if isinstance(current_validation_score, Tensor)
+                            else current_validation_score
+                        )
+
+                    # Minimize case
+                    if (
+                        mode == "min"
+                        and current_validation_score < best_validation_score
+                    ):
+                        best_validation_score = (
+                            current_validation_score.nanmean().item()
+                            if isinstance(current_validation_score, Tensor)
+                            else current_validation_score
+                        )
+
+                    latest_metrics = current_metrics.copy()  # type: ignore[assignment]
+
+                # Compute the metric report
+                metric_report = {}
+                metric_report["loss"] = avg_epoch_loss
+                metric_report.update(latest_metrics)
                 metric_report[f"best_{validation_score}"] = best_validation_score
 
+                # Compute the memory report
                 memory_report = _get_memory_report(process, initial_ram_mb, device)
 
                 validation_report(
@@ -317,7 +343,7 @@ def objective_function(
 
             # Metrics to report
             metric_report = {
-                f"{metric_name}@{k}": value
+                f"{metric_name}@{k}": value  # type: ignore[misc]
                 for k, metrics_results in results.items()
                 for metric_name, value in metrics_results.items()
             }
@@ -363,6 +389,7 @@ def objective_function_ddp(config: dict) -> None:
     params = config["params"]
     dataset_folds = config["dataset_folds"]
     mode = config["mode"]
+    eval_every_n = config["eval_every_n"]
     validation_metric_name = config["validation_metric_name"]
     validation_top_k = config["validation_top_k"]
     lr_scheduler: LRScheduler = config["lr_scheduler"]
@@ -370,7 +397,13 @@ def objective_function_ddp(config: dict) -> None:
 
     # Validation metric in the correct format
     validation_score = f"{validation_metric_name}@{validation_top_k}"
-    best_validation_score = -torch.inf if mode == "max" else torch.inf
+    best_validation_score = (
+        MetricDefault.METRIC_MAX.value
+        if mode == "max"
+        else MetricDefault.METRIC_MIN.value
+    )
+    latest_metrics = {}
+    latest_metrics[validation_score] = best_validation_score  # Default value
 
     # Define world size for metric reporting
     world_size = dist.get_world_size() if dist.is_initialized() else 1
@@ -484,54 +517,61 @@ def objective_function_ddp(config: dict) -> None:
             optimizer.step()
             epoch_loss += loss.item()
 
-        # Set model to eval mode for the evaluation step
-        model.eval()
+        avg_epoch_loss = epoch_loss / len(train_dataloader) * world_size
 
-        # Evaluation step distributed across all workers
-        evaluator.evaluate(
-            model=unwrapped_model,
-            dataloader=eval_dataloader,
-            strategy=config["strategy"],
-            dataset=dataset,
-            device=device,
-        )
+        # Check if the model should be evaluated
+        if ((epoch + 1) % eval_every_n == 0) or ((epoch + 1) == unwrapped_model.epochs):
+            # Set model to eval mode for the evaluation step
+            model.eval()
 
-        # All workers call compute(). torchmetrics handles synchronization.
-        # The `results` dictionary will be identical on all workers.
-        results = evaluator.compute_results()
+            # Evaluation step distributed across all workers
+            evaluator.evaluate(
+                model=unwrapped_model,
+                dataloader=eval_dataloader,
+                strategy=config["strategy"],
+                dataset=dataset,
+                device=device,
+            )
+
+            # All workers call compute(). torchmetrics handles synchronization.
+            # The `results` dictionary will be identical on all workers.
+            results = evaluator.compute_results()
+            current_metrics = {}
+            for k, metrics_results in results.items():
+                for metric_name, value in metrics_results.items():
+                    if isinstance(value, Tensor):
+                        value = value.nanmean().item()
+                    current_metrics[f"{metric_name}@{k}"] = value
+
+            # Check for best validation score
+            score = current_metrics[validation_score]
+            if isinstance(score, Tensor):
+                current_validation_score = score.nanmean().item()
+            else:
+                current_validation_score = score
+
+            # Maximize case
+            if mode == "max" and current_validation_score > best_validation_score:
+                best_validation_score = (
+                    current_validation_score.nanmean().item()
+                    if isinstance(current_validation_score, Tensor)
+                    else current_validation_score
+                )
+
+            # Minimize case
+            if mode == "min" and current_validation_score < best_validation_score:
+                best_validation_score = (
+                    current_validation_score.nanmean().item()
+                    if isinstance(current_validation_score, Tensor)
+                    else current_validation_score
+                )
+
+            latest_metrics = current_metrics.copy()
+
+        # Compute the metric report
         metric_report = {}
-        for k, metrics_results in results.items():
-            for metric_name, value in metrics_results.items():
-                if isinstance(value, Tensor):
-                    value = value.nanmean().item()
-                metric_report[f"{metric_name}@{k}"] = value
-
-        # Add the loss averaged over the train sample size
-        metric_report["loss"] = epoch_loss / (len(train_dataloader) * world_size)
-
-        # Check for best validation score
-        score = metric_report[validation_score]
-        if isinstance(score, Tensor):
-            current_validation_score = score.nanmean().item()
-        else:
-            current_validation_score = score
-
-        # Maximize case
-        if mode == "max" and current_validation_score > best_validation_score:
-            best_validation_score = (
-                current_validation_score.nanmean().item()
-                if isinstance(current_validation_score, Tensor)
-                else current_validation_score
-            )
-
-        # Minimize case
-        if mode == "min" and current_validation_score < best_validation_score:
-            best_validation_score = (
-                current_validation_score.nanmean().item()
-                if isinstance(current_validation_score, Tensor)
-                else current_validation_score
-            )
-
+        metric_report["loss"] = avg_epoch_loss
+        metric_report.update(latest_metrics)
         metric_report[f"best_{validation_score}"] = best_validation_score
 
         # Memory reporting on rank 0

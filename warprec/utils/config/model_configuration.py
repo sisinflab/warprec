@@ -135,6 +135,8 @@ class Optimization(BaseModel):
             - fifo: Classic First In First Out trial optimization.
             - asha: ASHA Scheduler, more information can be found at:
                 https://docs.ray.io/en/latest/tune/api/doc/ray.tune.schedulers.ASHAScheduler.html.
+        eval_every_n (Optional[int]): The number of epochs to wait before evaluating the model.
+            Defaults to 1.
         lr_scheduler (Optional[LRScheduler]): The learning rate scheduling options.
         properties (Optional[Properties]): The attributes required for Ray Tune to work.
         device (Optional[str]): The device that will be used for tensor operations.
@@ -157,6 +159,7 @@ class Optimization(BaseModel):
 
     strategy: Optional[SearchAlgorithms] = SearchAlgorithms.GRID
     scheduler: Optional[Schedulers] = Schedulers.FIFO
+    eval_every_n: Optional[int] = 1
     lr_scheduler: Optional[LRScheduler] = None
     properties: Optional[Properties] = Field(default_factory=Properties)
     device: Optional[str] = None
@@ -177,6 +180,15 @@ class Optimization(BaseModel):
                 "The strategy provided is not supported. These are the "
                 f"supported strategies: {search_algorithm_registry.list_registered()}"
             )
+        return v
+
+    @field_validator("eval_every_n")
+    @classmethod
+    def check_eval_every_n(cls, v: int):
+        """Validate eval_every_n."""
+        if v < 1:
+            logger.attention("The 'eval_every_n' value must be >= 1. Defaulting to 1.")
+            v = 1
         return v
 
     @field_validator("device")
