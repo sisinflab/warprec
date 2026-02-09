@@ -339,7 +339,8 @@ def train_pipeline(path: str):
                     **ray_report,
                     "Evaluation Time": model_evaluation_total_time,
                     "Inference Time": inference_time,
-                    "Total Time": model_exploration_total_time
+                    "Total Time": data_preparation_time
+                    + model_exploration_total_time
                     + model_evaluation_total_time,
                 }
             )
