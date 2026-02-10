@@ -1093,12 +1093,6 @@ class LinRec(RecomModel):
         """Validate dropout_prob."""
         return validate_between_zero_and_one(cls, v, "dropout_prob")
 
-    @field_validator("attn_dropout_prob")
-    @classmethod
-    def check_attn_dropout_prob(cls, v: list):
-        """Validate attn_dropout_prob."""
-        return validate_between_zero_and_one(cls, v, "attn_dropout_prob")
-
     @field_validator("reg_weight")
     @classmethod
     def check_reg_weight(cls, v: list):
