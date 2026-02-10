@@ -394,6 +394,28 @@ It leverages GRUs to model user interaction sequences, focusing on short-term be
 <span class="w">    </span><span class="nt">max_seq_len</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">200</span>
 </pre></div>
 </div>
+<ul class="simple">
+<li><p>NARM (Neural Attentive Session-based Recommendation):
+A hybrid encoder-decoder model that improves upon standard RNNs by incorporating an attention mechanism.
+It uses a Global Encoder (GRU) to model the user’s sequential behavior and a Local Encoder (Attention) to capture the user’s main purpose in the current session.
+These features are combined into a unified session representation for bi-linear matching with candidate items.</p></li>
+</ul>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">models</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">NARM</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">embedding_size</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">128</span>
+<span class="w">    </span><span class="nt">hidden_size</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">64</span>
+<span class="w">    </span><span class="nt">n_layers</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">2</span>
+<span class="w">    </span><span class="nt">hidden_dropout_prob</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0.1</span>
+<span class="w">    </span><span class="nt">attn_dropout_prob</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0.1</span>
+<span class="w">    </span><span class="nt">reg_weight</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0.001</span>
+<span class="w">    </span><span class="nt">weight_decay</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0.0001</span>
+<span class="w">    </span><span class="nt">batch_size</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">2048</span>
+<span class="w">    </span><span class="nt">epochs</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">200</span>
+<span class="w">    </span><span class="nt">learning_rate</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0.001</span>
+<span class="w">    </span><span class="nt">neg_samples</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">1</span>
+<span class="w">    </span><span class="nt">max_seq_len</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">200</span>
+</pre></div>
+</div>
 </section>
 <section id="transformer-based">
 <h2>Transformer-Based<a class="headerlink" href="#transformer-based" title="Link to this heading">¶</a></h2>
@@ -570,27 +592,31 @@ SASRec effectively models dynamic user preferences in sparse datasets, learning 
 <td><p>GRU4Rec</p></td>
 <td><p>Session-based recommender using GRUs for short-term preference modeling.</p></td>
 </tr>
-<tr class="row-odd"><td><p>Transformer-Based</p></td>
+<tr class="row-odd"><td></td>
+<td><p>NARM</p></td>
+<td><p>Hybrid encoder (GRU + Attention) capturing sequential behavior and main purpose.</p></td>
+</tr>
+<tr class="row-even"><td><p>Transformer-Based</p></td>
 <td><p>BERT4Rec</p></td>
 <td><p>Bidirectional Transformer model trained on a masked item prediction task.</p></td>
 </tr>
-<tr class="row-even"><td></td>
+<tr class="row-odd"><td></td>
 <td><p>CORE</p></td>
 <td><p>Unifies encoding/decoding spaces using linear combination of embeddings and RDM.</p></td>
 </tr>
-<tr class="row-odd"><td></td>
+<tr class="row-even"><td></td>
 <td><p>gSASRec</p></td>
 <td><p>General self-attention model for diverse and evolving user behaviors.</p></td>
 </tr>
-<tr class="row-even"><td></td>
+<tr class="row-odd"><td></td>
 <td><p>LightSANs</p></td>
 <td><p>Efficient self-attention with low-rank decomposition and decoupled positioning.</p></td>
 </tr>
-<tr class="row-odd"><td></td>
+<tr class="row-even"><td></td>
 <td><p>LinRec</p></td>
 <td><p>Linear attention mechanism (O(N)) for efficient long-term recommendation.</p></td>
 </tr>
-<tr class="row-even"><td></td>
+<tr class="row-odd"><td></td>
 <td><p>SASRec</p></td>
 <td><p>Transformer-inspired model learning short- and long-term user preferences.</p></td>
 </tr>

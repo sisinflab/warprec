@@ -84,6 +84,28 @@ They are effective for modeling evolving user interests within sessions.
         neg_samples: 1
         max_seq_len: 200
 
+- NARM (Neural Attentive Session-based Recommendation):
+  A hybrid encoder-decoder model that improves upon standard RNNs by incorporating an attention mechanism.
+  It uses a Global Encoder (GRU) to model the user's sequential behavior and a Local Encoder (Attention) to capture the user's main purpose in the current session.
+  These features are combined into a unified session representation for bi-linear matching with candidate items.
+
+.. code-block:: yaml
+
+  models:
+    NARM:
+      embedding_size: 128
+      hidden_size: 64
+      n_layers: 2
+      hidden_dropout_prob: 0.1
+      attn_dropout_prob: 0.1
+      reg_weight: 0.001
+      weight_decay: 0.0001
+      batch_size: 2048
+      epochs: 200
+      learning_rate: 0.001
+      neg_samples: 1
+      max_seq_len: 200
+
 =============
 Transformer-Based
 =============
@@ -253,6 +275,9 @@ Summary of Available Sequential Models
    * - RNN-Based
      - GRU4Rec
      - Session-based recommender using GRUs for short-term preference modeling.
+   * -
+     - NARM
+     - Hybrid encoder (GRU + Attention) capturing sequential behavior and main purpose.
    * - Transformer-Based
      - BERT4Rec
      - Bidirectional Transformer model trained on a masked item prediction task.

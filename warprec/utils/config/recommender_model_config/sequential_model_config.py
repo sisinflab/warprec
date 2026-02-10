@@ -1190,6 +1190,111 @@ class LinRec(RecomModel):
             )
 
 
+@params_registry.register("NARM")
+class NARM(RecomModel):
+    """Definition of the model NARM.
+
+    Attributes:
+        embedding_size (INT_FIELD): List of values for embedding_size.
+        hidden_size (INT_FIELD): List of values for hidden_size.
+        n_layers (INT_FIELD):  List of values for n_layers.
+        hidden_dropout_prob (FLOAT_FIELD): List of values for hidden_dropout_prob.
+        attn_dropout_prob (FLOAT_FIELD): List of values for attn_dropout_prob.
+        reg_weight (FLOAT_FIELD): List of values for reg_weight.
+        weight_decay (FLOAT_FIELD): List of values for weight_decay.
+        batch_size (INT_FIELD): List of values for batch_size.
+        epochs (INT_FIELD): List of values for epochs.
+        learning_rate (FLOAT_FIELD): List of values for learning rate.
+        neg_samples (INT_FIELD): List of values for neg_samples.
+        max_seq_len (INT_FIELD): List of values for max_seq_len.
+    """
+
+    embedding_size: INT_FIELD
+    hidden_size: INT_FIELD
+    n_layers: INT_FIELD
+    hidden_dropout_prob: FLOAT_FIELD
+    attn_dropout_prob: FLOAT_FIELD
+    reg_weight: FLOAT_FIELD
+    weight_decay: FLOAT_FIELD
+    batch_size: INT_FIELD
+    epochs: INT_FIELD
+    learning_rate: FLOAT_FIELD
+    neg_samples: INT_FIELD
+    max_seq_len: INT_FIELD
+
+    @field_validator("embedding_size")
+    @classmethod
+    def check_embedding_size(cls, v: list):
+        """Validate embedding_size."""
+        return validate_greater_than_zero(cls, v, "embedding_size")
+
+    @field_validator("hidden_size")
+    @classmethod
+    def check_hidden_size(cls, v: list):
+        """Validate hidden_size."""
+        return validate_greater_than_zero(cls, v, "hidden_size")
+
+    @field_validator("n_layers")
+    @classmethod
+    def check_n_layers(cls, v: list):
+        """Validate n_layers."""
+        return validate_greater_than_zero(cls, v, "n_layers")
+
+    @field_validator("hidden_dropout_prob")
+    @classmethod
+    def check_hidden_dropout_prob(cls, v: list):
+        """Validate hidden_dropout_prob."""
+        return validate_between_zero_and_one(cls, v, "hidden_dropout_prob")
+
+    @field_validator("attn_dropout_prob")
+    @classmethod
+    def check_attn_dropout_prob(cls, v: list):
+        """Validate attn_dropout_prob."""
+        return validate_between_zero_and_one(cls, v, "attn_dropout_prob")
+
+    @field_validator("reg_weight")
+    @classmethod
+    def check_reg_weight(cls, v: list):
+        """Validate reg_weight"""
+        return validate_greater_equal_than_zero(cls, v, "reg_weight")
+
+    @field_validator("weight_decay")
+    @classmethod
+    def check_weight_decay(cls, v: list):
+        """Validate weight_decay."""
+        return validate_greater_equal_than_zero(cls, v, "weight_decay")
+
+    @field_validator("batch_size")
+    @classmethod
+    def check_batch_size(cls, v: list):
+        """Validate batch_size."""
+        return validate_greater_than_zero(cls, v, "batch_size")
+
+    @field_validator("epochs")
+    @classmethod
+    def check_epochs(cls, v: list):
+        """Validate epochs."""
+        return validate_greater_than_zero(cls, v, "epochs")
+
+    @field_validator("learning_rate")
+    @classmethod
+    def check_learning_rate(cls, v: list):
+        """Validate learning_rate."""
+        return validate_greater_than_zero(cls, v, "learning_rate")
+
+    @field_validator("neg_samples")
+    @classmethod
+    def check_neg_samples(cls, v: list):
+        """Validate neg_samples."""
+        return validate_greater_equal_than_zero(cls, v, "neg_samples")
+
+    @field_validator("max_seq_len")
+    @classmethod
+    def check_max_seq_len(cls, v: list):
+        """Validate max_seq_len."""
+        return validate_greater_than_zero(cls, v, "max_seq_len")
+
+
 @params_registry.register("SASRec")
 class SASRec(RecomModel):
     """Definition of the model SASRec.

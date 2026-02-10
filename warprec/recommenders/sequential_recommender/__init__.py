@@ -6,6 +6,7 @@ from .gru4rec import GRU4Rec
 from .gsasrec import gSASRec
 from .lightsans import LightSANs
 from .linrec import LinRec
+from .narm import NARM
 from .sasrec import SASRec
 
 __all__ = [
@@ -17,5 +18,6 @@ __all__ = [
     "gSASRec",
     "LightSANs",
     "LinRec",
+    "NARM",
     "SASRec",
 ]
