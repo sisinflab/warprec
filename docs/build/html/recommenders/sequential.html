@@ -498,6 +498,28 @@ A sequential recommender that improves upon standard self-attention (like SASRec
 </pre></div>
 </div>
 <ul class="simple">
+<li><p>LinRec (Linear Attention Mechanism for Long-term Sequential Recommender Systems):
+Proposed to address the quadratic complexity of standard Transformers.
+LinRec employs a linear attention mechanism (O(N)) using L2 normalization and ELU activation.
+This allows for efficient modeling of long-term user sequences while maintaining the ability to capture complex dependencies, making it significantly faster than standard SASRec on long sequences.</p></li>
+</ul>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">models</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">LinRec</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">embedding_size</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">128</span>
+<span class="w">    </span><span class="nt">n_layers</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">2</span>
+<span class="w">    </span><span class="nt">n_heads</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">8</span>
+<span class="w">    </span><span class="nt">inner_size</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">512</span>
+<span class="w">    </span><span class="nt">dropout_prob</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0.1</span>
+<span class="w">    </span><span class="nt">reg_weight</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0.001</span>
+<span class="w">    </span><span class="nt">weight_decay</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0.0001</span>
+<span class="w">    </span><span class="nt">batch_size</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">2048</span>
+<span class="w">    </span><span class="nt">epochs</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">200</span>
+<span class="w">    </span><span class="nt">learning_rate</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0.001</span>
+<span class="w">    </span><span class="nt">neg_samples</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">1</span>
+<span class="w">    </span><span class="nt">max_seq_len</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">200</span>
+</pre></div>
+</div>
+<ul class="simple">
 <li><p>SASRec (Self-Attentive Sequential Recommendation):
 A Transformer-based model that uses stacked self-attention blocks to capture item dependencies in user sequences.
 SASRec effectively models dynamic user preferences in sparse datasets, learning both short- and long-term interests.</p></li>
@@ -565,6 +587,10 @@ SASRec effectively models dynamic user preferences in sparse datasets, learning 
 <td><p>Efficient self-attention with low-rank decomposition and decoupled positioning.</p></td>
 </tr>
 <tr class="row-odd"><td></td>
+<td><p>LinRec</p></td>
+<td><p>Linear attention mechanism (O(N)) for efficient long-term recommendation.</p></td>
+</tr>
+<tr class="row-even"><td></td>
 <td><p>SASRec</p></td>
 <td><p>Transformer-inspired model learning short- and long-term user preferences.</p></td>
 </tr>

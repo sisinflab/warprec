@@ -189,6 +189,28 @@ They excel at modeling both short-term and long-term user preferences without re
       neg_samples: 1
       max_seq_len: 200
 
+- LinRec (Linear Attention Mechanism for Long-term Sequential Recommender Systems):
+  Proposed to address the quadratic complexity of standard Transformers.
+  LinRec employs a linear attention mechanism (O(N)) using L2 normalization and ELU activation.
+  This allows for efficient modeling of long-term user sequences while maintaining the ability to capture complex dependencies, making it significantly faster than standard SASRec on long sequences.
+
+.. code-block:: yaml
+
+    models:
+      LinRec:
+        embedding_size: 128
+        n_layers: 2
+        n_heads: 8
+        inner_size: 512
+        dropout_prob: 0.1
+        reg_weight: 0.001
+        weight_decay: 0.0001
+        batch_size: 2048
+        epochs: 200
+        learning_rate: 0.001
+        neg_samples: 1
+        max_seq_len: 200
+
 - SASRec (Self-Attentive Sequential Recommendation):
   A Transformer-based model that uses stacked self-attention blocks to capture item dependencies in user sequences.
   SASRec effectively models dynamic user preferences in sparse datasets, learning both short- and long-term interests.
@@ -243,6 +265,9 @@ Summary of Available Sequential Models
    * -
      - LightSANs
      - Efficient self-attention with low-rank decomposition and decoupled positioning.
+   * -
+     - LinRec
+     - Linear attention mechanism (O(N)) for efficient long-term recommendation.
    * -
      - SASRec
      - Transformer-inspired model learning short- and long-term user preferences.
