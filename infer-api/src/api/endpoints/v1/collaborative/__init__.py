@@ -1,0 +1,1 @@
+from .collaborative_controller import router as collaborative_router
