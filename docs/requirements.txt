@@ -1,0 +1,4 @@
+sphinx>=8.2.3
+pydata-sphinx-theme>=0.16.1
+furo>=2025.7.19
+mypy>=1.14.1
