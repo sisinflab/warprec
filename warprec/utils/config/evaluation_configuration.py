@@ -1,6 +1,5 @@
-from typing import List, Optional
+from typing import List, Optional, Dict, Any
 
-import re
 from pydantic import BaseModel, field_validator, Field
 from warprec.utils.registry import metric_registry
 from warprec.utils.logger import logger
@@ -56,12 +55,26 @@ class StatSignificance(BaseModel):
         return any(self.model_dump(exclude=["corrections"]).values())  # type: ignore[arg-type]
 
 
+class ComplexMetricConfig(BaseModel):
+    name: str
+    params: Dict[str, Any] = Field(default_factory=dict)
+
+    @field_validator("name")
+    @classmethod
+    def validate_name(cls, v: str):
+        if v.upper() not in metric_registry.list_registered():
+            raise ValueError(f"Metric {v} not found in registry.")
+        return v
+
+
 class EvaluationConfig(BaseModel):
     """Definition of Evaluation configuration.
 
     Attributes:
         top_k (List[int]): List of cutoffs to evaluate.
         metrics (List[str]): List of metrics to compute during evaluation.
+        complex_metrics (List[ComplexMetricConfig]): List of metrics
+            which requires further parameters to be instantiated.
         validation_metric (Optional[str]): The metric/loss that will
             validate each trial in Ray Tune.
         batch_size (Optional[int]): Batch size used during evaluation.
@@ -81,6 +94,7 @@ class EvaluationConfig(BaseModel):
 
     top_k: List[int]
     metrics: List[str]
+    complex_metrics: List[ComplexMetricConfig] = Field(default_factory=list)
     validation_metric: Optional[str] = "nDCG@10"
     batch_size: Optional[int] = 1024
     strategy: Optional[str] = "full"  # or "sampled"
@@ -109,50 +123,7 @@ class EvaluationConfig(BaseModel):
     @classmethod
     def metrics_validator(cls, v: List[str]):
         """Validate metrics."""
-        supported_relevance = ["binary", "discounted"]
-
         for metric in v:
-            # Check for F1-extended metric
-            match_f1 = re.match(
-                r"F1\[\s*(.*?)\s*,\s*(.*?)\s*\]", metric
-            )  # Expected syntax: F1[metric_1, metric_2]
-
-            # Check for EFD or EPC extended metric
-            match_efd_epc = re.match(
-                r"(EFD|EPC)\[\s*(.*?)\s*\]", metric
-            )  # Expected syntax: EFD[value] or EPC[value]
-
-            if match_f1:
-                # Extract sub metrics
-                metric_1 = match_f1.group(1)
-                metric_2 = match_f1.group(2)
-
-                # Check if sub metrics exists inside registry
-                if metric_1.upper() not in metric_registry.list_registered():
-                    raise ValueError(
-                        f"In {metric} the sub metric {metric_1} not in metric registry. This is the list"
-                        f"of supported metrics: {metric_registry.list_registered()}"
-                    )
-
-                if metric_2.upper() not in metric_registry.list_registered():
-                    raise ValueError(
-                        f"In {metric} the sub metric {metric_2} not in metric registry. This is the list"
-                        f"of supported metrics: {metric_registry.list_registered()}"
-                    )
-
-                continue  # Skip normal metric check
-
-            if match_efd_epc:
-                relevance = match_efd_epc.group(2)
-
-                if relevance.lower() not in supported_relevance:
-                    raise ValueError(
-                        f"In {metric} the relevance score {relevance} is not supported. "
-                        f"These are the supported relevance scores: {supported_relevance}."
-                    )
-
-                continue  # Skip normal metric check
-
             # Check for normal metrics
             if metric.upper() not in metric_registry.list_registered():
                 raise ValueError(
