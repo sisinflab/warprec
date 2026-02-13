@@ -2,6 +2,7 @@
 from typing import Any, Optional
 
 import torch
+import torch.nn.functional as F
 from torch import nn, Tensor
 
 from warprec.recommenders.base_recommender import (
@@ -14,10 +15,16 @@ from warprec.utils.enums import DataLoaderType
 from warprec.utils.registry import model_registry
 
 
-@model_registry.register(name="GRU4Rec")
-class GRU4Rec(IterativeRecommender, SequentialRecommenderUtils):
-    """Implementation of GRU4Rec algorithm from
-    "Improved Recurrent Neural Networks for Session-based Recommendations." in DLRS 2016.
+@model_registry.register(name="NARM")
+class NARM(IterativeRecommender, SequentialRecommenderUtils):
+    """Implementation of NARM algorithm from
+    "Neural Attentive Session-based Recommendation." in CIKM 2017.
+
+    NARM explores a hybrid encoder with an attention mechanism to model the
+    user’s sequential behavior (Global Encoder) and capture the user’s
+    main purpose in the current session (Local Encoder).
+
+    For further details, check the `paper <https://arxiv.org/abs/1711.04725>`_.
 
     Args:
         params (dict): Model parameters.
@@ -30,10 +37,11 @@ class GRU4Rec(IterativeRecommender, SequentialRecommenderUtils):
         DATALOADER_TYPE: The type of dataloader used.
         embedding_size (int): The dimension of the item embeddings.
         hidden_size (int): The number of features in the hidden state of the GRU.
-        num_layers (int): The number of recurrent layers.
-        dropout_prob (float): The probability of dropout for the embeddings.
+        n_layers (int): The number of recurrent layers in the GRU.
+        hidden_dropout_prob (float): Dropout probability for the item embeddings.
+        attn_dropout_prob (float): Dropout probability for the hybrid session representation.
         reg_weight (float): The L2 regularization weight.
-        weight_decay (float): The value of weight decay used in optimizer.
+        weight_decay (float): The value of weight decay used in the optimizer.
         batch_size (int): The batch size used for training.
         epochs (int): The number of training epochs.
         learning_rate (float): The learning rate value.
@@ -47,8 +55,9 @@ class GRU4Rec(IterativeRecommender, SequentialRecommenderUtils):
     # Model hyperparameters
     embedding_size: int
     hidden_size: int
-    num_layers: int
-    dropout_prob: float
+    n_layers: int
+    hidden_dropout_prob: float
+    attn_dropout_prob: float
     reg_weight: float
     weight_decay: float
     batch_size: int
@@ -67,29 +76,36 @@ class GRU4Rec(IterativeRecommender, SequentialRecommenderUtils):
     ):
         super().__init__(params, info, *args, seed=seed, **kwargs)
 
+        # Item embedding
         self.item_embedding = nn.Embedding(
             self.n_items + 1,
             self.embedding_size,
             padding_idx=self.n_items,
         )
-        self.emb_dropout = nn.Dropout(self.dropout_prob)
-        self.gru_layers = nn.GRU(
+        self.emb_dropout = nn.Dropout(self.hidden_dropout_prob)
+
+        # Sequential Encoder (GRU)
+        self.gru = nn.GRU(
             input_size=self.embedding_size,
             hidden_size=self.hidden_size,
-            num_layers=self.num_layers,
+            num_layers=self.n_layers,
             bias=False,
-            batch_first=True,  # Input tensors are (batch, seq_len, features)
+            batch_first=True,
         )
 
-        # Dense layer to project GRU output back to embedding_size
-        # Used for prediction
-        self.dense = nn.Linear(self.hidden_size, self.embedding_size)
+        # Attention layers for Local Encoder
+        self.a_1 = nn.Linear(self.hidden_size, self.hidden_size, bias=False)
+        self.a_2 = nn.Linear(self.hidden_size, self.hidden_size, bias=False)
+        self.v_t = nn.Linear(self.hidden_size, 1, bias=False)
+        self.ct_dropout = nn.Dropout(self.attn_dropout_prob)
 
-        # Initialize weights
+        # Final projection to align hybrid representation with item embedding space
+        self.b = nn.Linear(2 * self.hidden_size, self.embedding_size, bias=False)
+
+        # Initialize weights using Xavier Normal (recommended in NARM paper)
         self.apply(self._init_weights)
 
-        # Loss function will be based on number of
-        # negative samples
+        # Loss function setup
         self.main_loss: nn.Module
         if self.neg_samples > 0:
             self.main_loss = BPRLoss()
@@ -118,34 +134,28 @@ class GRU4Rec(IterativeRecommender, SequentialRecommenderUtils):
             neg_item = None
 
         seq_output = self.forward(item_seq, item_seq_len)
-        pos_items_emb = self.item_embedding(pos_item)  # [batch_size, embedding_size]
+        pos_items_emb = self.item_embedding(pos_item)
 
-        # Calculate main loss and L2 regularization
         if self.neg_samples > 0:
-            neg_items_emb = self.item_embedding(
-                neg_item
-            )  # [batch_size, embedding_size]
-
-            pos_score = torch.sum(seq_output * pos_items_emb, dim=-1)  # [batch_size]
-            neg_score = torch.sum(
-                seq_output.unsqueeze(1) * neg_items_emb, dim=-1
-            )  # [batch_size]
+            # Pairwise BPR Loss
+            neg_items_emb = self.item_embedding(neg_item)
+            pos_score = torch.sum(seq_output * pos_items_emb, dim=-1)
+            neg_score = torch.sum(seq_output.unsqueeze(1) * neg_items_emb, dim=-1)
             main_loss = self.main_loss(pos_score, neg_score)
 
-            # L2 regularization
+            # L2 Regularization
             reg_loss = self.reg_weight * self.reg_loss(
                 self.item_embedding(item_seq),
                 pos_items_emb,
                 neg_items_emb,
             )
         else:
-            test_item_emb = self.item_embedding.weight  # [n_items, embedding_size]
-            logits = torch.matmul(
-                seq_output, test_item_emb.transpose(0, 1)
-            )  # [batch_size, n_items]
+            # Pointwise Cross Entropy Loss
+            test_item_emb = self.item_embedding.weight[:-1, :]
+            logits = torch.matmul(seq_output, test_item_emb.transpose(0, 1))
             main_loss = self.main_loss(logits, pos_item)
 
-            # L2 regularization
+            # L2 Regularization
             reg_loss = self.reg_weight * self.reg_loss(
                 self.item_embedding(item_seq),
                 pos_items_emb,
@@ -154,31 +164,53 @@ class GRU4Rec(IterativeRecommender, SequentialRecommenderUtils):
         return main_loss + reg_loss
 
     def forward(self, item_seq: Tensor, item_seq_len: Tensor) -> Tensor:
-        """Forward pass of the GRU4Rec model.
+        """Forward pass of the NARM model.
 
         Args:
             item_seq (Tensor): Padded sequences of item IDs [batch_size, max_seq_len].
-            item_seq_len (Tensor): Actual lengths of sequences [batch_size,].
+            item_seq_len (Tensor): Actual lengths of sequences.
 
         Returns:
-            Tensor: The embedding of the predicted item (last session state)
-                    [batch_size, embedding_size].
+            Tensor: The hybrid session representation [batch_size, embedding_size].
         """
-        item_seq_emb = self.item_embedding(
-            item_seq
-        )  # [batch_size, max_seq_len, embedding_size]
+        item_seq_emb = self.item_embedding(item_seq)
         item_seq_emb_dropout = self.emb_dropout(item_seq_emb)
 
-        # GRU layers
-        # NOTE: Only the output sequence is used in the forward pass
-        gru_output, _ = self.gru_layers(item_seq_emb_dropout)
-        gru_output = self.dense(gru_output)  # [batch_size, max_seq_len, embedding_size]
+        # GRU encoding
+        gru_out, _ = self.gru(item_seq_emb_dropout)
 
-        # Use the utility method to gather the last index of
-        # the predicted sequence (the next item)
-        seq_output = self._gather_indexes(
-            gru_output, item_seq_len - 1
-        )  # [batch_size, embedding_size]
+        # Global Encoder (c_global): The last hidden state of the GRU
+        c_global = self._gather_indexes(gru_out, item_seq_len - 1)
+
+        # Local Encoder (c_local): Attention mechanism over all hidden states
+        # Avoid influence of padding tokens in attention
+        mask = (item_seq != self.n_items).unsqueeze(2).expand_as(gru_out)
+        q1 = self.a_1(gru_out)
+        q2 = self.a_2(c_global).unsqueeze(1)
+
+        # Calculate attention weights alpha
+
+        # Compute non-normalized logits
+        # q1: [B, S, H]
+        # q2: [B, 1, H]
+        # v_t output: [B, S, 1]
+        alpha_logits = self.v_t(torch.sigmoid(q1 + q2))
+
+        # Apply masking: [B, S, 1]
+        mask = (item_seq != self.n_items).unsqueeze(2)
+        alpha_logits = alpha_logits.masked_fill(mask == 0, -1e9)
+
+        # Apply softmax over temporal dimension
+        alpha = F.softmax(alpha_logits, dim=1)
+        c_local = torch.sum(alpha * gru_out, dim=1)  # Weighted sum
+
+        # Hybrid Representation: Concatenate Local and Global vectors
+        c_t = torch.cat([c_local, c_global], dim=1)
+        c_t = self.ct_dropout(c_t)
+
+        # Final projection to the item embedding space
+        seq_output = self.b(c_t)
+
         return seq_output
 
     @torch.no_grad()

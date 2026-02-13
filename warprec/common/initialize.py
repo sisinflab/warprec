@@ -1,8 +1,7 @@
 # pylint: disable=too-many-branches, too-many-statements
-from typing import Tuple, List, Optional, Dict, Union
-from itertools import product
+from typing import Tuple, List, Optional, Dict, Union, Any
 
-from pandas import DataFrame
+from narwhals.dataframe import DataFrame
 
 from warprec.data import Dataset
 from warprec.data.reader import Reader
@@ -15,7 +14,6 @@ from warprec.utils.config import (
     EvalConfiguration,
 )
 from warprec.utils.callback import WarpRecCallback
-from warprec.utils.enums import SearchSpace
 from warprec.utils.registry import model_registry
 from warprec.utils.logger import logger
 
@@ -43,18 +41,28 @@ def initialize_datasets(
     """
     # Dataset loading
     main_dataset: Dataset = None
-    val_data: List[Tuple[DataFrame, DataFrame]] | DataFrame = None
-    train_data: DataFrame = None
-    test_data: DataFrame = None
+    val_data: List[Tuple[DataFrame[Any], DataFrame[Any]]] | DataFrame[Any] = None
+    train_data: DataFrame[Any] = None
+    test_data: DataFrame[Any] = None
     side_data = None
     user_cluster = None
     item_cluster = None
     if config.reader.loading_strategy == "dataset":
-        data = reader.read_tabular(
-            **config.reader.model_dump(exclude=["labels", "dtypes"]),  # type: ignore[arg-type]
-            column_names=config.reader.column_names(),
-            dtypes=config.reader.column_dtype(),
-        )
+        file_format = config.reader.file_format
+
+        match file_format:
+            case "tabular":
+                data = reader.read_tabular(
+                    **config.reader.model_dump(exclude=["labels", "dtypes"]),  # type: ignore[arg-type]
+                    column_names=config.reader.column_names(),
+                    dtypes=config.reader.column_dtype(),
+                )
+            case "parquet":
+                data = reader.read_parquet(
+                    **config.reader.model_dump(exclude=["labels", "dtypes"]),  # type: ignore[arg-type]
+                )
+            case _:
+                raise ValueError(f"File format '{file_format}'not supported.")
         data = callback.on_data_reading(data)
 
         # Check for optional filtering
@@ -94,20 +102,40 @@ def initialize_datasets(
 
     elif config.reader.loading_strategy == "split":
         if config.reader.data_type == "transaction":
-            train_data, val_data, test_data = reader.read_tabular_split(
-                **config.reader.split.model_dump(),
-                column_names=config.reader.column_names(),
-                dtypes=config.reader.column_dtype(),
-            )
+            file_format = config.reader.split.file_format
 
+            match file_format:
+                case "tabular":
+                    train_data, val_data, test_data = reader.read_tabular_split(
+                        **config.reader.split.model_dump(),
+                        column_names=config.reader.column_names(),
+                        dtypes=config.reader.column_dtype(),
+                    )
+                case "parquet":
+                    train_data, val_data, test_data = reader.read_parquet_split(
+                        **config.reader.split.model_dump(),
+                        column_names=config.reader.column_names(),
+                    )
+                case _:
+                    raise ValueError(f"File format '{file_format}'not supported.")
         else:
             raise ValueError("Data type not yet supported.")
 
     # Side information reading
     if config.reader.side:
-        side_data = reader.read_tabular(
-            **config.reader.side.model_dump(),
-        )
+        file_format = config.reader.split.file_format
+
+        match file_format:
+            case "tabular":
+                side_data = reader.read_tabular(
+                    **config.reader.side.model_dump(),
+                )
+            case "parquet":
+                side_data = reader.read_parquet(
+                    **config.reader.side.model_dump(),
+                )
+            case _:
+                raise ValueError(f"File format '{file_format}'not supported.")
 
     # Cluster information reading
     if config.reader.clustering:
@@ -117,7 +145,7 @@ def initialize_datasets(
             common_cluster_label: str,
             common_cluster_type: str,
             reader: Reader,
-        ) -> DataFrame:
+        ) -> DataFrame[Any]:
             """Reads clustering data using a pre-prepared specific configuration (User or Item).
 
             Args:
@@ -127,7 +155,10 @@ def initialize_datasets(
                 reader (Reader): Object or module with the read_tabular method.
 
             Returns:
-                DataFrame: A Pandas DataFrame containing the cluster data.
+                DataFrame[Any]: A DataFrame containing the cluster data.
+
+            Raises:
+                ValueError: If the file format is not supported.
             """
 
             # Define column names
@@ -143,15 +174,29 @@ def initialize_datasets(
             ]
             dtype_map = zip(column_names, dtypes_list)
 
-            # Read tabular data using the custom reader
-            cluster_data = reader.read_tabular(
-                local_path=specific_config["local_path"],
-                blob_name=specific_config["blob_name"],
-                column_names=column_names,
-                dtypes=dtype_map,
-                sep=specific_config["sep"],
-                header=specific_config["header"],
-            )
+            # Read data using the custom reader
+            file_format = specific_config["file_format"]
+
+            match file_format:
+                case "tabular":
+                    cluster_data = reader.read_tabular(
+                        local_path=specific_config["local_path"],
+                        blob_name=specific_config["blob_name"],
+                        column_names=column_names,
+                        dtypes=dtype_map,
+                        sep=specific_config["sep"],
+                        header=specific_config["header"],
+                    )
+
+                case "parquet":
+                    cluster_data = reader.read_parquet(
+                        local_path=specific_config["local_path"],
+                        blob_name=specific_config["blob_name"],
+                        column_names=column_names,
+                    )
+
+                case _:
+                    raise ValueError(f"File format '{file_format}'not supported.")
 
             return cluster_data
 
@@ -165,6 +210,7 @@ def initialize_datasets(
             "id_type": config.reader.dtypes.user_id_type,
             "local_path": config.reader.clustering.user_local_path,
             "blob_name": config.reader.clustering.user_azure_blob_name,
+            "file_format": config.reader.clustering.user_file_format,
             "sep": config.reader.clustering.user_sep,
             "header": config.reader.clustering.user_header,
         }
@@ -175,6 +221,7 @@ def initialize_datasets(
             "id_type": config.reader.dtypes.item_id_type,
             "local_path": config.reader.clustering.item_local_path,
             "blob_name": config.reader.clustering.item_azure_blob_name,
+            "file_format": config.reader.clustering.item_file_format,
             "sep": config.reader.clustering.item_sep,
             "header": config.reader.clustering.item_header,
         }
@@ -196,7 +243,7 @@ def initialize_datasets(
         )
 
     # Dataset common information
-    common_params = {
+    common_params: Dict[str, Any] = {
         "side_data": side_data,
         "user_cluster": user_cluster,
         "item_cluster": item_cluster,
@@ -256,90 +303,9 @@ def initialize_datasets(
     return main_dataset, val_dataset, fold_dataset
 
 
-def prepare_train_loaders(dataset: Dataset, models_configuration: Dict[str, dict]):
-    """Prepare train dataloader structure.
-
-    Args:
-        dataset (Dataset): The dataset used to train the model.
-        models_configuration (Dict[str, dict]): The model experiment configuration.
-
-    Raises:
-        ValueError: If the dataloader initialization fails.
-    """
-    # Check each model requirements
-    for model_name, params in models_configuration.items():
-        logger.msg(f"Preparing data structures for model {model_name}")
-
-        # Retrieve dataloader requirement
-        model_class = model_registry.get_class(model_name)
-        dataloader_requirement = model_class.DATALOADER_TYPE
-
-        if dataloader_requirement is not None:
-            loader_source = getattr(dataset, dataloader_requirement.source)
-            loader_method = getattr(loader_source, dataloader_requirement.method)
-
-            # Retrieve fixed parameters
-            fixed_params = dataloader_requirement.fixed_params
-
-            # Retrieve specific method parameter required
-            construction_params = {}
-            if len(dataloader_requirement.construction_params) > 0:
-                for con_param in dataloader_requirement.construction_params:
-                    param_list = params[con_param]
-
-                    # If the parameter is a grid or a choice, add it to the dict
-                    if (
-                        param_list[0] == SearchSpace.GRID
-                        or param_list[0] == SearchSpace.CHOICE
-                    ):
-                        param_list = param_list[1:]
-
-                    # If sampling from a specific search space, skip
-                    if any(
-                        param_list[0] == space
-                        for space in [
-                            SearchSpace.LOGRANDINT,
-                            SearchSpace.LOGUNIFORM,
-                            SearchSpace.QLOGRANDINT,
-                            SearchSpace.QLOGUNIFORM,
-                            SearchSpace.QRANDINT,
-                            SearchSpace.QRANDN,
-                            SearchSpace.QUNIFORM,
-                            SearchSpace.RANDINT,
-                            SearchSpace.RANDN,
-                            SearchSpace.UNIFORM,
-                        ]
-                    ):
-                        continue
-                    construction_params[con_param] = param_list
-
-            if construction_params:
-                # Create the product of all combinations
-                keys = list(construction_params.keys())
-                values = list(construction_params.values())
-
-                all_combination = product(*values)
-
-                # For each combination, call the constructor method
-                for combination in all_combination:
-                    call_params = dict(zip(keys, combination))
-
-                    # Try to call the method, ignore possible errors
-                    try:
-                        loader_method(**call_params, **fixed_params)
-                    except Exception as e:
-                        raise ValueError(
-                            f"During dataset initialization a method failed with the following error: {e}"
-                        ) from e
-            else:
-                # No specific parameters to pass to the method
-                loader_method(**fixed_params)
-
-
 def dataset_preparation(
     main_dataset: Dataset,
     fold_dataset: Optional[List[Dataset]],
-    preparation_strategy: Optional[str],
     config: TrainConfiguration,
 ):
     """This method prepares the dataloaders inside the dataset
@@ -351,7 +317,6 @@ def dataset_preparation(
         main_dataset (Dataset): The main dataset of train/test split.
         fold_dataset (Optional[List[Dataset]]): The list of validation datasets
             of train/val splits.
-        preparation_strategy (Optional[str]): The strategy to use to prepare the dataset.
         config (TrainConfiguration): The configuration file used for the experiment.
     """
 
@@ -417,16 +382,3 @@ def dataset_preparation(
                 f"Preparing fold dataset {i + 1}/{len(fold_dataset)} inner structures for evaluation."
             )
             prepare_evaluation_loaders(dataset, has_classic, has_context)
-
-    if preparation_strategy is not None and preparation_strategy == "experiment":
-        logger.msg("Preparing main dataset inner structures for training.")
-
-        prepare_train_loaders(main_dataset, config.models)
-        if fold_dataset is not None and isinstance(fold_dataset, list):
-            for i, dataset in enumerate(fold_dataset):
-                logger.msg(
-                    f"Preparing fold dataset {i + 1}/{len(fold_dataset)} inner structures for training."
-                )
-                prepare_train_loaders(dataset, config.models)
-
-        logger.positive("All dataset inner structures ready.")

@@ -84,6 +84,28 @@ They are effective for modeling evolving user interests within sessions.
         neg_samples: 1
         max_seq_len: 200
 
+- NARM (Neural Attentive Session-based Recommendation):
+  A hybrid encoder-decoder model that improves upon standard RNNs by incorporating an attention mechanism.
+  It uses a Global Encoder (GRU) to model the user's sequential behavior and a Local Encoder (Attention) to capture the user's main purpose in the current session.
+  These features are combined into a unified session representation for bi-linear matching with candidate items.
+
+.. code-block:: yaml
+
+  models:
+    NARM:
+      embedding_size: 128
+      hidden_size: 64
+      n_layers: 2
+      hidden_dropout_prob: 0.1
+      attn_dropout_prob: 0.1
+      reg_weight: 0.001
+      weight_decay: 0.0001
+      batch_size: 2048
+      epochs: 200
+      learning_rate: 0.001
+      neg_samples: 1
+      max_seq_len: 200
+
 =============
 Transformer-Based
 =============
@@ -113,6 +135,35 @@ They excel at modeling both short-term and long-term user preferences without re
       learning_rate: 0.001
       neg_samples: 1
       max_seq_len: 200
+
+- CORE (Consistent Representation Encoder):
+  A session-based recommendation framework that unifies the representation space for both encoding and decoding.
+  Unlike standard deep encoders that project session embeddings into a different space than item embeddings, CORE encodes sessions as a weighted sum of item embeddings (using a Transformer to learn the weights).
+  It also employs Robust Distance Measuring (RDM) based on cosine similarity to prevent overfitting.
+
+.. code-block:: yaml
+
+    models:
+      CORE:
+        embedding_size: 64
+        dnn_type: "trm"
+        n_layers: 2
+        n_heads: 8
+        inner_size: 256
+        hidden_dropout_prob: 0.1
+        attn_dropout_prob: 0.1
+        layer_norm_eps: 1e-12
+        initializer_range: 0.02
+        session_dropout: 0.1
+        item_dropout: 0.1
+        temperature: 0.07
+        reg_weight: 0.001
+        weight_decay: 0.0001
+        batch_size: 2048
+        epochs: 200
+        learning_rate: 0.001
+        neg_samples: 1
+        max_seq_len: 50
 
 - gSASRec (General Self-Attentive Sequential Recommendation):
   Extends SASRec by introducing general self-attention.
@@ -160,6 +211,28 @@ They excel at modeling both short-term and long-term user preferences without re
       neg_samples: 1
       max_seq_len: 200
 
+- LinRec (Linear Attention Mechanism for Long-term Sequential Recommender Systems):
+  Proposed to address the quadratic complexity of standard Transformers.
+  LinRec employs a linear attention mechanism (O(N)) using L2 normalization and ELU activation.
+  This allows for efficient modeling of long-term user sequences while maintaining the ability to capture complex dependencies, making it significantly faster than standard SASRec on long sequences.
+
+.. code-block:: yaml
+
+    models:
+      LinRec:
+        embedding_size: 128
+        n_layers: 2
+        n_heads: 8
+        inner_size: 512
+        dropout_prob: 0.1
+        reg_weight: 0.001
+        weight_decay: 0.0001
+        batch_size: 2048
+        epochs: 200
+        learning_rate: 0.001
+        neg_samples: 1
+        max_seq_len: 200
+
 - SASRec (Self-Attentive Sequential Recommendation):
   A Transformer-based model that uses stacked self-attention blocks to capture item dependencies in user sequences.
   SASRec effectively models dynamic user preferences in sparse datasets, learning both short- and long-term interests.
@@ -202,15 +275,24 @@ Summary of Available Sequential Models
    * - RNN-Based
      - GRU4Rec
      - Session-based recommender using GRUs for short-term preference modeling.
+   * -
+     - NARM
+     - Hybrid encoder (GRU + Attention) capturing sequential behavior and main purpose.
    * - Transformer-Based
      - BERT4Rec
      - Bidirectional Transformer model trained on a masked item prediction task.
+   * -
+     - CORE
+     - Unifies encoding/decoding spaces using linear combination of embeddings and RDM.
    * -
      - gSASRec
      - General self-attention model for diverse and evolving user behaviors.
    * -
      - LightSANs
      - Efficient self-attention with low-rank decomposition and decoupled positioning.
+   * -
+     - LinRec
+     - Linear attention mechanism (O(N)) for efficient long-term recommendation.
    * -
      - SASRec
      - Transformer-inspired model learning short- and long-term user preferences.

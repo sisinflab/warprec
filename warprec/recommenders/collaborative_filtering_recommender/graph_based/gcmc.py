@@ -176,11 +176,12 @@ class GCMC(IterativeRecommender, GraphRecommenderUtils):
         self,
         interactions: Interactions,
         sessions: Sessions,
-        low_memory: bool = False,
-        **kwargs,
+        **kwargs: Any,
     ):
-        return interactions.get_item_rating_dataloader(
-            neg_samples=0, batch_size=self.batch_size, low_memory=low_memory
+        return interactions.get_pointwise_dataloader(
+            neg_samples=0,
+            batch_size=self.batch_size,
+            **kwargs,
         )
 
     def propagate_embeddings(self) -> Tuple[Tensor, Tensor]:

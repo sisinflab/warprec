@@ -1,13 +1,14 @@
 # pylint: disable = R0801
 from io import StringIO, BytesIO
-from typing import List, Dict, Tuple, Optional, Any
+from typing import List, Dict, Tuple, Optional, Any, Union
 
 import pandas as pd
 import joblib
+import narwhals as nw
+from narwhals.dataframe import DataFrame
 from azure.identity import DefaultAzureCredential
 from azure.core.exceptions import ResourceNotFoundError
 from azure.storage.blob import BlobServiceClient
-from pandas import DataFrame
 
 from warprec.data.reader.base_reader import Reader
 from warprec.utils.logger import logger
@@ -22,13 +23,17 @@ class AzureBlobReader(Reader):
     Args:
         storage_account_name (str): The name of the Azure Storage Account.
         container_name (str): The name of the container where data is stored.
+        backend (str): The backend to use for reading data.
     """
 
     def __init__(
         self,
         storage_account_name: str,
         container_name: str,
+        backend: str = "polars",
     ) -> None:
+        super().__init__(backend=backend)
+
         # Retrieve Azure credentials from the environment
         credential = DefaultAzureCredential()
 
@@ -101,22 +106,62 @@ class AzureBlobReader(Reader):
             DataFrame: A Pandas DataFrame containing the tabular data. Returns an empty DataFrame
                 if the blob is not found.
         """
-        content = self._download_blob_content(blob_name)
+        as_bytes = self.backend == "polars"
+
+        content = self._download_blob_content(blob_name, as_bytes=as_bytes)
+
         if content is None:
-            # Return an empty df that the split logic can check
-            return pd.DataFrame()
+            return nw.from_native(pd.DataFrame())
 
-        stream = StringIO(content)  # type: ignore[arg-type]
+        stream: Union[BytesIO, StringIO]
+        if isinstance(content, bytes):
+            stream = BytesIO(content)
+        else:
+            stream = StringIO(content)
 
-        return self._process_tabular_stream(
-            stream=stream,
+        return self._process_tabular_data(
+            source=stream,
             sep=sep,
             header=header,
             desired_cols=column_names,
             desired_dtypes=dtypes,
         )
 
-    def read_tabular_split(  # type: ignore[override]
+    def read_parquet(
+        self,
+        blob_name: str,
+        column_names: Optional[List[str]] = None,
+        *args: Any,
+        **kwargs: Any,
+    ) -> DataFrame[Any]:
+        """Reads parquet data from a blob.
+
+        Downloads the blob content as bytes and uses the inherited `_process_parquet_data`
+        for parsing.
+
+        Args:
+            blob_name (str): The path/name of the blob containing the parquet data.
+            column_names (Optional[List[str]]): A list of specific columns to read.
+            *args (Any): The additional arguments.
+            **kwargs (Any): The additional keyword arguments.
+
+        Returns:
+            DataFrame[Any]: A Narwhals DataFrame containing the data.
+        """
+        content = self._download_blob_content(blob_name, as_bytes=True)
+
+        if content is None:
+            if self.backend == "polars":
+                import polars as pl
+
+                return nw.from_native(pl.DataFrame())
+            return nw.from_native(pd.DataFrame())
+
+        stream = BytesIO(content)  # type: ignore[arg-type]
+
+        return self._process_parquet_data(source=stream, desired_cols=column_names)
+
+    def read_tabular_split(
         self,
         blob_prefix: str,
         column_names: Optional[List[str]],
@@ -136,6 +181,25 @@ class AzureBlobReader(Reader):
             sep=sep,
             ext=ext,
             header=header,
+            is_remote=True,  # Specify remote path handling
+        )
+
+    def read_parquet_split(
+        self,
+        blob_prefix: str,
+        column_names: Optional[List[str]] = None,
+        ext: str = ".parquet",
+        *args: Any,
+        **kwargs: Any,
+    ) -> Tuple[
+        DataFrame[Any],
+        Optional[List[Tuple[DataFrame[Any], DataFrame[Any]]] | DataFrame[Any]],
+        DataFrame[Any],
+    ]:
+        return super()._process_parquet_split(
+            base_location=blob_prefix,
+            column_names=column_names,
+            ext=ext,
             is_remote=True,  # Specify remote path handling
         )
 

@@ -91,7 +91,8 @@ class Recommender(nn.Module, ABC):
             params (dict): The dictionary with the model params.
         """
         for ann, _ in self.__class__.__annotations__.items():
-            setattr(self, ann, params[ann])
+            if ann in params:
+                setattr(self, ann, params[ann])
 
     def get_params(self) -> dict:
         """Get the model parameters as a dictionary.
@@ -457,7 +458,6 @@ class ContextRecommenderUtils(nn.Module, ABC):
         self,
         interactions: Interactions,
         sessions: Sessions,
-        low_memory: bool = False,
         **kwargs: Any,
     ) -> DataLoader:
         """Common dataloader retrieval used by contextual models.
@@ -465,19 +465,17 @@ class ContextRecommenderUtils(nn.Module, ABC):
         Args:
             interactions (Interactions): The interaction of users with items.
             sessions (Sessions): The sessions of the users.
-            low_memory (bool): Wether or not to retrieve the lazy
-                version of the dataloader.
             **kwargs (Any): Additional keyword arguments.
 
         Returns:
             DataLoader: The appropriate dataloader for the training.
         """
-        return interactions.get_item_rating_dataloader(
+        return interactions.get_pointwise_dataloader(
             neg_samples=self.neg_samples,
             include_side_info=bool(self.feature_dims),
             include_context=bool(self.context_dims),
             batch_size=self.batch_size,
-            low_memory=low_memory,
+            **kwargs,
         )
 
     def compute_first_order(

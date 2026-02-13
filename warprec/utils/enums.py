@@ -2,6 +2,21 @@ from enum import Enum
 from collections import namedtuple
 
 
+class MetricDefault(float, Enum):
+    """Represents the default value to be used during the report
+    of the metrics.
+
+    This enum is used to track the possible default values to report:
+        -METRIC_MIN: An high value to use when the validation metric
+            must be minimized.
+        -METRIC_MAX: A low value to use when the validation metric
+            must be maximized.
+    """
+
+    METRIC_MIN = 1e9
+    METRIC_MAX = -1.0
+
+
 class RatingType(str, Enum):
     """Represents the types of rating supported.
 
@@ -198,19 +213,19 @@ class DataLoaderType(Enum):
     )
     ITEM_RATING_LOADER = DataLoaderRequirements(
         dataloader_source="train_set",
-        method_name="get_item_rating_dataloader",
+        method_name="get_pointwise_dataloader",
         construction_params=["neg_samples"],
         fixed_params={},
     )
     ITEM_RATING_LOADER_WITH_CONTEXT = DataLoaderRequirements(
         dataloader_source="train_set",
-        method_name="get_item_rating_dataloader",
+        method_name="get_pointwise_dataloader",
         construction_params=["neg_samples"],
         fixed_params={"include_context": True},
     )
     POS_NEG_LOADER = DataLoaderRequirements(
         dataloader_source="train_set",
-        method_name="get_pos_neg_dataloader",
+        method_name="get_contrastive_dataloader",
         construction_params=[],
         fixed_params={},
     )
@@ -236,7 +251,7 @@ class DataLoaderType(Enum):
     )
     USER_HISTORY_LOADER = DataLoaderRequirements(
         dataloader_source="train_session",
-        method_name="get_user_history_dataloader",
+        method_name="get_sliding_window_dataloader",
         construction_params=["max_seq_len", "neg_samples"],
         fixed_params={},
     )

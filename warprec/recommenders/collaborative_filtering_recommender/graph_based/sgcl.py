@@ -88,13 +88,12 @@ class SGCL(IterativeRecommender, GraphRecommenderUtils):
         self,
         interactions: Interactions,
         sessions: Sessions,
-        low_memory: bool = False,
         **kwargs: Any,
     ):
-        return interactions.get_item_rating_dataloader(
+        return interactions.get_pointwise_dataloader(
             neg_samples=0,
             batch_size=self.batch_size,
-            low_memory=low_memory,
+            **kwargs,
         )
 
     def forward(self) -> Tuple[Tensor, Tensor]:
@@ -181,7 +180,7 @@ class SGCL(IterativeRecommender, GraphRecommenderUtils):
             Tensor: The score matrix {user x item}.
         """
         # Retrieve all user and item embeddings from the propagation network
-        user_all_embeddings, item_all_embeddings = self.forward()
+        user_all_embeddings, item_all_embeddings = self.propagate_embeddings()
 
         # Get the embeddings for the specific users in the batch
         user_embeddings = user_all_embeddings[

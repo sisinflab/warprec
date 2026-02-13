@@ -142,15 +142,10 @@ class GeneralConfig(BaseModel):
     Attributes:
         precision (Optional[str]): The precision to use during computation.
         device (Optional[str]): The device that will be used for tensor operations.
+        backend (Optional[str]): The backend to utilize for reading and writing data.
+            Defaults to 'polars'.
         ray_verbose (Optional[int]): The Ray level of verbosity.
         time_report (Optional[bool]): Whether to report the time taken by each step.
-        train_data_preparation (Optional[str]): Defines how to prepare training data structures.
-            Can either be:
-            - None: No preparation will be executed.
-            - "conservative": Data structures will be prepared only for the current model, then
-                the cache will be cleared.
-            - "experiment": Data structures will be prepared for the whole experiment.
-                Will require more memory.
         custom_models (Optional[str | List[str]]): List of custom model paths to load.
             This is useful for loading custom models that are not part of the
             standard Warprec framework.
@@ -160,9 +155,9 @@ class GeneralConfig(BaseModel):
 
     precision: Optional[str] = "float32"
     device: Optional[str] = "cpu"
+    backend: Optional[str] = "polars"
     ray_verbose: Optional[int] = 1
     time_report: Optional[bool] = True
-    train_data_preparation: Optional[str] = None
     custom_models: Optional[str | List[str]] = None
     callback: Optional[WarpRecCallbackConfig] = Field(
         default_factory=WarpRecCallbackConfig
@@ -181,18 +176,13 @@ class GeneralConfig(BaseModel):
             return v
         raise ValueError(f'Device {v} is not supported. Use "cpu" or "cuda".')
 
-    @field_validator("train_data_preparation")
+    @field_validator("backend")
     @classmethod
-    def check_train_data_preparation(cls, v: str):
-        """Validate train_data_preparation."""
-        if v is None:
+    def check_backend(cls, v: str):
+        """Validate backend."""
+        if v in ("polars", "pandas"):
             return v
-        if v in ["conservative", "experiment"]:
-            return v
-        raise ValueError(
-            f"Train data preparation value can either be: None, 'conservative' or 'experiment'. "
-            f"Value received: {v}"
-        )
+        raise ValueError(f'Backend {v} is not supported. Use "polars" or "pandas".')
 
     @field_validator("custom_models")
     @classmethod

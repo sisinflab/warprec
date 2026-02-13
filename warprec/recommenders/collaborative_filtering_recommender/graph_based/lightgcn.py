@@ -19,7 +19,7 @@ from warprec.utils.registry import model_registry
 
 
 @model_registry.register(name="LightGCN")
-class LightGCN(IterativeRecommender, GraphRecommenderUtils):
+class LightGCN(GraphRecommenderUtils, IterativeRecommender):
     """Implementation of LightGCN algorithm from
         LightGCN: Simplifying and Powering Graph Convolution Network for Recommendation (SIGIR 2020)
 
@@ -96,11 +96,11 @@ class LightGCN(IterativeRecommender, GraphRecommenderUtils):
         self,
         interactions: Interactions,
         sessions: Sessions,
-        low_memory: bool = False,
-        **kwargs,
+        **kwargs: Any,
     ):
-        return interactions.get_pos_neg_dataloader(
-            batch_size=self.batch_size, low_memory=low_memory
+        return interactions.get_contrastive_dataloader(
+            batch_size=self.batch_size,
+            **kwargs,
         )
 
     def train_step(self, batch: Any, *args, **kwargs):
@@ -187,7 +187,7 @@ class LightGCN(IterativeRecommender, GraphRecommenderUtils):
             Tensor: The score matrix {user x item}.
         """
         # Retrieve all user and item embeddings from the propagation network
-        user_all_embeddings, item_all_embeddings = self.forward()
+        user_all_embeddings, item_all_embeddings = self.propagate_embeddings()
 
         # Get the embeddings for the specific users in the batch
         user_embeddings = user_all_embeddings[

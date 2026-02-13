@@ -23,6 +23,8 @@ tensorboardx = "^2.6.2.2"
 torch = "~2.7"
 torchmetrics = "^1.8.2"
 optuna = "^4.5.0"
+polars = "1.36.1"
+narwhals = "^2.15.0"
 
 
 [tool.poetry.group.dev.dependencies]
@@ -35,9 +37,6 @@ pylint = "^3.3.3"
 bandit = "^1.8.2"
 nvitop = "^1.4.2"
 matplotlib = "^3.10.3"
-sphinx = "^8.2.3"
-pydata-sphinx-theme = "^0.16.1"
-furo = "^2025.7.19"
 
 
 [tool.poetry.group.dashboard.dependencies]
