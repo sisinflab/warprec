@@ -1,40 +1,46 @@
 import torch
 import torch.nn.functional as F
 
-from fastapi import APIRouter, Depends
+from typing import Dict
 
-from warprec.recommenders.sequential_recommender import SASRec
+from fastapi import APIRouter, Depends
+from pandas import DataFrame
+
+from warprec.recommenders import Recommender
+from warprec.utils.logger import logger
 
 from ....security import get_api_key
 from ....model import SequentialDataRequest, SequentialDataResponse
-from .....utils import match_sequence_length
+from .....utils import check_models_existance, init_controller, match_sequence_length, get_external_ids_from_item, get_items_from_external_ids
 
-
+# Define the router for sequential models
 router = APIRouter(
     prefix="/sequential",
     tags=["Sequential Models"],
     # dependencies=[Depends(get_api_key)],
 )
 
+# Define model parameters
 checkpoints_directory = "checkpoints"
-model = "SASRec"
+models = [
+    "SASRec",
+    #! ... Add any additional dataset parameters if needed
+]
 
-# Load the models checkpoints
-# Model for Movielens sequential recommendations
-movielens_model = torch.load(f"{checkpoints_directory}/{model}_movielens.pth", weights_only=False, map_location='cpu')
-movielens_model = SASRec.from_checkpoint(checkpoint=movielens_model)
-movielens_model = movielens_model.to("cuda:1")
+# Define dataset parameters
+datasets_directory = "datasets"
+datasets = [
+    "movielens",
+    #! ... Add any additional dataset parameters if needed
+]
 
-# Store user and item mappings
-movielens_model_user_mapping: dict = movielens_model.info['user_mapping']
-movielens_model_item_mapping: dict = movielens_model.info['item_mapping']
+# Initialize the controller by loading models and datasets
+models, datasets = init_controller(
+    models=models,
+    datasets=datasets,
+)
 
-# Invert the mappings
-inv_movielens_model_user_mapping = {v: k for k, v in movielens_model_user_mapping.items()}
-inv_movielens_model_item_mapping = {v: k for k, v in movielens_model_item_mapping.items()}
-
-#! ...
-
+print("[INFO] Sequential controller initialized with models and datasets.")
 
 @router.post(
     "/movielens",
@@ -54,27 +60,55 @@ def get_movielens_recommendations(data: SequentialDataRequest):
     Returns:
         SequentialDataResponse: Sequential data response model
     """
+    #! Note: Now the model is hardcoded, but in the future it should be selected based on the request data
+    model: Recommender = models["SASRec_movielens"]
+    dataset: Dict[str, int] = datasets["movielens"]
+    
+    # Get the sequence from the request
+    sequence = data.sequence
+    
+    #! Considering the sequence, map the id from the original dataset
+    # external_ids = get_external_ids_from_item(sequence, dataset)
+    
+    #! Map the sequence to the model's internal indices
+    # internal_indices = []
+    # item_mapping = model.info['item_mapping']
+    # for ext_id in external_ids:
+    #     if ext_id in item_mapping:
+    #         internal_indices.append(item_mapping[ext_id])
+    #     else:
+    #         logger.attention(f"External ID {ext_id} not found in item mapping. Skipping.")
+    
+    # For each item in the sequence, map it to the internal index using the dataset mapping
+    internal_indices = []
+    for item in sequence:
+        if item in dataset:
+            internal_indices.append(dataset[item])
+        else:
+            logger.attention(f"Item {item} not found in dataset mapping. Skipping.")
+    
     # Create the tensor from the input data
-    sequence = torch.tensor(data.sequence, device=movielens_model.device).unsqueeze(0)
+    sequence = torch.tensor(internal_indices, device=model.device).unsqueeze(0)
     
     # Adjust the sequence length
     padded_sequence = match_sequence_length(
         sequence=sequence,
-        model=movielens_model,
+        model=model,
     )
         
     # Get predictions from the model
-    predictions = movielens_model.predict(
+    predictions = model.predict(
         user_indices=None,
         item_indices=None,
         user_seq=padded_sequence,
-        seq_len=torch.tensor([len(data.sequence)], device=movielens_model.device),
+        seq_len=torch.tensor([len(data.sequence)], device=model.device),
     )
     
     # Get top-k recommendations
     top_k_indices = torch.topk(predictions, k=data.top_k).indices.squeeze().tolist()
+
+    # Map internal indices back to original item strings
+    inv_dataset_mapping = {v: k for k, v in dataset.items()}
+    top_k_items = [inv_dataset_mapping[idx] for idx in top_k_indices if idx in inv_dataset_mapping]
     
-    #! Map back to original item indices
-    top_k_indices = [inv_movielens_model_item_mapping[idx] for idx in top_k_indices]
-    
-    return SequentialDataResponse(recommendations=top_k_indices)
+    return SequentialDataResponse(recommendations=top_k_items)

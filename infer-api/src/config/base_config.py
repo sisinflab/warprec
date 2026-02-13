@@ -23,7 +23,7 @@ class BaseConfig(BaseModel):
         
         super().__init__(
             SERVER_HOST     = os.getenv('SERVER_HOST', "0.0.0.0"),
-            SERVER_PORT     = int(os.getenv('SERVER_PORT', "8000")),
+            SERVER_PORT     = int(os.getenv('SERVER_PORT', "8081")),
             SERVER_API_KEY  = os.getenv('SERVER_API_KEY', ""),
             **data
         )

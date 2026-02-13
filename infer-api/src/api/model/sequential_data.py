@@ -7,15 +7,15 @@ class SequentialDataRequest(BaseModelCustom):
     """Model for sequential data request.
     
     Attributes:
-        sequence (List[int]): A list of numerical values representing the sequential data.
+        sequence (List[str]): A list of numerical values representing the sequential data.
     """
     top_k: int = 10
-    sequence: List[int]
+    sequence: List[str]
 
 class SequentialDataResponse(BaseModelCustom):
     """Model for sequential data response.
     
     Attributes:
-        recommendations (List[int]): A list of recommended item IDs.    
+        recommendations (List[str]): A list of recommended item IDs.    
     """
-    recommendations: List[int]
+    recommendations: List[str]
