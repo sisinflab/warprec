@@ -22,7 +22,7 @@ from warprec.data import Dataset
 from warprec.common import standard_optimizer
 from warprec.evaluation.evaluator import Evaluator
 from warprec.recommenders.base_recommender import Recommender, IterativeRecommender
-from warprec.utils.config import RecomModel, LRScheduler
+from warprec.utils.config import RecomModel, LRScheduler, ComplexMetricConfig
 from warprec.utils.enums import MetricDefault
 from warprec.utils.helpers import load_custom_modules, retrieve_evaluation_dataloader
 from warprec.utils.registry import (
@@ -70,12 +70,11 @@ def objective_function(
     eval_every_n: int = 1,
     strategy: str = "full",
     num_negatives: int = 99,
+    complex_metrics: List[ComplexMetricConfig] = None,
     lr_scheduler: Optional[LRScheduler] = None,
     seed: int = 42,
     block_size: int = 50,
     chunk_size: int = 4096,
-    beta: float = 1.0,
-    pop_ratio: float = 0.8,
     custom_models: Optional[List[str]] = None,
 ) -> None:
     """Objective function to optimize the hyperparameters.
@@ -98,6 +97,7 @@ def objective_function(
             Defaults to "full".
         num_negatives (int): Number of negative samples to use in "sampled" strategy.
             Defaults to 99.
+        complex_metrics (List[ComplexMetricConfig]): The list of complex metrics to compute.
         lr_scheduler (Optional[LRScheduler]): The custom learning rate scheduler
             configuration. Defaults to None.
         seed (int): The seed for reproducibility. Defaults to 42.
@@ -105,8 +105,6 @@ def objective_function(
             Defaults to 50.
         chunk_size (int): The chunk size for the model evaluation.
             Defaults to 4096.
-        beta (float): The beta value to initialize the Evaluator.
-        pop_ratio (float): The pop_ratio value to initialize the Evaluator.
         custom_models (Optional[List[str]]): List of custom models to import.
             Defaults to None.
 
@@ -149,8 +147,7 @@ def objective_function(
         topk,
         train_set=dataset.train_set.get_sparse(),
         additional_data=dataset.get_stash(),
-        beta=beta,
-        pop_ratio=pop_ratio,
+        complex_metrics=complex_metrics,
         feature_lookup=dataset.get_features_lookup(),
         user_cluster=dataset.get_user_cluster(),
         item_cluster=dataset.get_item_cluster(),
@@ -491,8 +488,7 @@ def objective_function_ddp(config: dict) -> None:
         config["topk"],
         train_set=dataset.train_set.get_sparse(),
         additional_data=dataset.get_stash(),
-        beta=config["beta"],
-        pop_ratio=config["pop_ratio"],
+        complex_metrics=config["complex_metrics"],
         feature_lookup=dataset.get_features_lookup(),
         user_cluster=dataset.get_user_cluster(),
         item_cluster=dataset.get_item_cluster(),
