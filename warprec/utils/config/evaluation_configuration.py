@@ -85,9 +85,6 @@ class EvaluationConfig(BaseModel):
         full_evaluation_on_report (Optional[bool]): Wether or not to compute all metric
             for each report produced.
         max_metric_per_row (Optional[int]): Number of metrics to show in each row on console.
-        beta (Optional[float]): The beta value used in some metrics like F1 score.
-        pop_ratio (Optional[float]): The percentage of item transactions that
-            will be considered popular.
         save_evaluation (Optional[bool]): Wether or not to save the evaluation.
         save_per_user (Optional[bool]): Wether or not to save per-user evaluation.
     """
@@ -105,8 +102,6 @@ class EvaluationConfig(BaseModel):
     )
     full_evaluation_on_report: Optional[bool] = False
     max_metric_per_row: Optional[int] = 4
-    beta: Optional[float] = 1.0
-    pop_ratio: Optional[float] = 0.8
     save_evaluation: Optional[bool] = True
     save_per_user: Optional[bool] = False
 
@@ -187,26 +182,6 @@ class EvaluationConfig(BaseModel):
         if v is not None and v <= 0:
             raise ValueError(
                 f"The num_negatives value should be a positive integer. Value provided: {v}"
-            )
-        return v
-
-    @field_validator("beta")
-    @classmethod
-    def beta_validator(cls, v: float):
-        """Validate beta."""
-        if not 0 <= v <= 1:
-            raise ValueError(
-                f"The beta value should be between 0 and 1. Value provided: {v}"
-            )
-        return v
-
-    @field_validator("pop_ratio")
-    @classmethod
-    def pop_ratio_validator(cls, v: float):
-        """Validate pop_ratio."""
-        if not 0 <= v <= 1:
-            raise ValueError(
-                f"The pop ratio value should be between 0 and 1. Value provided: {v}"
             )
         return v
 
