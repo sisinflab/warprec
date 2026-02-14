@@ -22,6 +22,7 @@ from warprec.utils.config import (
     TrainConfiguration,
     RecomModel,
     DashboardConfig,
+    ComplexMetricConfig,
 )
 from warprec.utils.helpers import validation_metric
 from warprec.utils.callback import WarpRecCallback
@@ -77,8 +78,7 @@ class Trainer:
         device: str = "cpu",
         evaluation_strategy: str = "full",
         num_negatives: int = 99,
-        beta: float = 1.0,
-        pop_ratio: float = 0.8,
+        complex_metrics: List[ComplexMetricConfig] = None,
         ray_verbose: int = 1,
     ) -> Tuple[Optional[Recommender], dict, int]:
         """Main method of the Trainer class.
@@ -97,8 +97,8 @@ class Trainer:
             device (str): The device that will be used for tensor operations.
             evaluation_strategy (str): Evaluation strategy, either "full" or "sampled".
             num_negatives (int): Number of negative samples to use in "sampled" strategy.
-            beta (float): The beta value for the evaluation.
-            pop_ratio (float): The pop ratio value for the evaluation.
+            complex_metrics (List[ComplexMetricConfig]): List of complex metrics
+                to compute.
             ray_verbose (int): The Ray level of verbosity.
 
         Returns:
@@ -121,8 +121,7 @@ class Trainer:
             device=device,
             evaluation_strategy=evaluation_strategy,
             num_negatives=num_negatives,
-            beta=beta,
-            pop_ratio=pop_ratio,
+            complex_metrics=complex_metrics,
             ray_verbose=ray_verbose,
         )
 
@@ -177,8 +176,7 @@ class Trainer:
         device: str = "cpu",
         evaluation_strategy: str = "full",
         num_negatives: int = 99,
-        beta: float = 1.0,
-        pop_ratio: float = 0.8,
+        complex_metrics: List[ComplexMetricConfig] = None,
         desired_training_it: str = "median",
         ray_verbose: int = 1,
     ) -> Tuple[Optional[Dict], Dict]:
@@ -195,8 +193,8 @@ class Trainer:
             device (str): The device that will be used for tensor operations.
             evaluation_strategy (str): Evaluation strategy, either "full" or "sampled".
             num_negatives (int): Number of negative samples to use in "sampled" strategy.
-            beta (float): The beta value for the evaluation.
-            pop_ratio (float): The pop ratio value for the evaluation.
+            complex_metrics (List[ComplexMetricConfig]): List of complex metrics
+                to compute.
             desired_training_it (str): The type of statistic to use to
                 select the number of training iterations to use
                 when training on the full dataset. Either "min", "max",
@@ -222,8 +220,7 @@ class Trainer:
             device=device,
             evaluation_strategy=evaluation_strategy,
             num_negatives=num_negatives,
-            beta=beta,
-            pop_ratio=pop_ratio,
+            complex_metrics=complex_metrics,
             ray_verbose=ray_verbose,
         )
 
@@ -264,8 +261,7 @@ class Trainer:
         device: str,
         evaluation_strategy: str,
         num_negatives: int,
-        beta: float,
-        pop_ratio: float,
+        complex_metrics: List[ComplexMetricConfig],
         ray_verbose: int,
     ) -> Tuner:
         """Prepares the Ray Tuner instance.
@@ -282,8 +278,7 @@ class Trainer:
             device (str): The device that will be used for tensor operations.
             evaluation_strategy (str): Evaluation strategy, either "full" or "sampled".
             num_negatives (int): Number of negative samples to use in "sampled" strategy.
-            beta (float): The beta value for the evaluation.
-            pop_ratio (float): The pop ratio value for the evaluation.
+            complex_metrics (List[ComplexMetricConfig]): List of complex metrics to compute.
             ray_verbose (int): The Ray level of verbosity.
 
         Returns:
@@ -308,8 +303,7 @@ class Trainer:
             device=device,
             evaluation_strategy=evaluation_strategy,
             num_negatives=num_negatives,
-            beta=beta,
-            pop_ratio=pop_ratio,
+            complex_metrics=complex_metrics,
             resources=resources,
         )
 
@@ -428,12 +422,11 @@ class Trainer:
             "eval_every_n": opt_config.eval_every_n,
             "strategy": kwargs["evaluation_strategy"],
             "num_negatives": kwargs["num_negatives"],
+            "complex_metrics": kwargs["complex_metrics"],
             "lr_scheduler": opt_config.lr_scheduler,
             "seed": opt_config.properties.seed,
             "block_size": opt_config.block_size,
             "chunk_size": opt_config.chunk_size,
-            "beta": kwargs["beta"],
-            "pop_ratio": kwargs["pop_ratio"],
             "custom_models": self._custom_models,
         }
 

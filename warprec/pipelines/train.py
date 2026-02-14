@@ -120,8 +120,7 @@ def train_pipeline(path: str):
         list(config.evaluation.top_k),
         train_set=main_dataset.train_set.get_sparse(),
         additional_data=main_dataset.get_stash(),
-        beta=config.evaluation.beta,
-        pop_ratio=config.evaluation.pop_ratio,
+        complex_metrics=config.evaluation.complex_metrics,
         feature_lookup=main_dataset.get_features_lookup(),
         user_cluster=main_dataset.get_user_cluster(),
         item_cluster=main_dataset.get_item_cluster(),
@@ -416,9 +415,11 @@ def single_split_flow(
     if eval_config.full_evaluation_on_report:
         metrics = eval_config.metrics
         topk = eval_config.top_k
+        complex_metrics = eval_config.complex_metrics
     else:
         metrics = [val_metric]
         topk = [val_k]
+        complex_metrics = []
 
     # Retrieve storage path for Ray results
     # based on the writer configuration
@@ -437,8 +438,7 @@ def single_split_flow(
         device=device,
         evaluation_strategy=config.evaluation.strategy,
         num_negatives=config.evaluation.num_negatives,
-        beta=config.evaluation.beta,
-        pop_ratio=config.evaluation.pop_ratio,
+        complex_metrics=complex_metrics,
         ray_verbose=config.general.ray_verbose,
     )
 
@@ -493,9 +493,11 @@ def multiple_fold_validation_flow(
     if eval_config.full_evaluation_on_report:
         metrics = eval_config.metrics
         topk = eval_config.top_k
+        complex_metrics = eval_config.complex_metrics
     else:
         metrics = [val_metric]
         topk = [val_k]
+        complex_metrics = []
 
     # Retrieve storage path for Ray results
     # based on the writer configuration
@@ -513,8 +515,7 @@ def multiple_fold_validation_flow(
         device=device,
         evaluation_strategy=config.evaluation.strategy,
         num_negatives=config.evaluation.num_negatives,
-        beta=config.evaluation.beta,
-        pop_ratio=config.evaluation.pop_ratio,
+        complex_metrics=complex_metrics,
         desired_training_it=desired_training_it,
         ray_verbose=config.general.ray_verbose,
     )
