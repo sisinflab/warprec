@@ -16,6 +16,7 @@ Available Keywords
 
 - **top_k**: Cutoff values used to compute ranking metrics. Can be a single integer or a list.
 - **metrics**: List of evaluation metrics to compute, e.g., ``nDCG``, ``Precision``, ``Recall``, ``HitRate``.
+- **complex_metrics** List of metrics and their parameters. Check the metrics documentation for more information.
 - **validation_metric**: Metric used for model validation during training. Defaults to ``nDCG@5``.
 - **batch_size**: Batch size used during evaluation. Defaults to ``1024``.
 - **strategy**: Evaluation strategy: ``full`` or ``sampled``. ``sampled`` is recommended for large datasets. Defaults to ``full``.
@@ -24,13 +25,8 @@ Available Keywords
 - **stat_significance**: Nested section defining statistical significance tests.
 - **full_evaluation_on_report**: Whether to perform full evaluation each epoch. Defaults to ``False``.
 - **max_metric_per_row**: Number of metrics logged per row. Defaults to ``4``.
-- **beta**: Beta value for F1-score computation. Defaults to ``1.0``.
-- **pop_ratio**: Fraction of transactions considered popular. Defaults to ``0.8``.
 - **save_evaluation**: Whether to save evaluation results. Defaults to ``True``.
 - **save_per_user**: Whether to save per-user evaluation results. Defaults to ``False``.
-
-.. note::
-    The Beta and Popularity ratio parameters are set to default values commonly used in typical experimental setups. Modifying these values may affect the results of certain metrics.
 
 .. _configuration_stat_significance:
 

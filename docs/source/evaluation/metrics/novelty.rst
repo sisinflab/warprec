@@ -21,7 +21,10 @@ Estimates the likelihood that users discover relevant but less popular (**unexpe
 
     evaluation:
         top_k: [10, 20, 50]
-        metrics: ["EFD[discounted]"]
+        complex_metrics:
+            - name: EFD
+              params:
+                  relevance: discounted
 
 EPC (Expected Popularity Complement)
 ====================================
@@ -40,4 +43,7 @@ Measures the average **complement of item popularity** in the top-K recommendati
 
     evaluation:
         top_k: [10, 20, 50]
-        metrics: ["EPC[discounted]"]
+        complex_metrics:
+            - name: EPC
+              params:
+                  relevance: discounted

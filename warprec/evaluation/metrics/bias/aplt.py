@@ -74,12 +74,13 @@ class APLT(UserAverageTopKMetric):
         k: int,
         num_users: int,
         item_interactions: Tensor,
-        pop_ratio: float,
+        pop_ratio: float = 0.8,
         dist_sync_on_step: bool = False,
         **kwargs: Any,
     ):
         super().__init__(k=k, num_users=num_users, dist_sync_on_step=dist_sync_on_step)
-        _, lt = self.compute_head_tail(item_interactions, pop_ratio)
+        self.pop_ratio = pop_ratio
+        _, lt = self.compute_head_tail(item_interactions, self.pop_ratio)
         self.register_buffer("long_tail", lt)
 
     def compute_scores(
@@ -97,3 +98,10 @@ class APLT(UserAverageTopKMetric):
 
         # Proportion: Count / k
         return is_long_tail.sum(dim=1).float() / self.k
+
+    @property
+    def name(self):
+        """The name of the metric."""
+        if self.pop_ratio == 0.8:
+            return self.__class__.__name__
+        return f"APLT[Pop{int(self.pop_ratio * 100)}%]"

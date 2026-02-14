@@ -27,8 +27,8 @@ class F1(TopKMetric):
     and this `link <https://en.wikipedia.org/wiki/Precision_and_recall>`_.
 
     Attributes:
-        metric_1 (BaseMetric): First metric to use inside F1-score computation.
-        metric_2 (BaseMetric): Second metric to use inside F1-score computation.
+        metric_instance_1 (BaseMetric): First metric to use inside F1-score computation.
+        metric_instance_2 (BaseMetric): Second metric to use inside F1-score computation.
 
     Args:
         k (int): The number of top recommendations to consider (cutoff).
@@ -37,13 +37,13 @@ class F1(TopKMetric):
         *args (Any): Additional arguments to pass to the parent class.
         beta (float): The weight of recall in the harmonic mean. Default is 1.0.
         dist_sync_on_step (bool): Torchmetrics parameter.
-        metric_name_1 (str): The name of the first metric. Defaults to Precision.
-        metric_name_2 (str): The name of the second metric. Defaults to Recall.
+        metric_1 (str): The name of the first metric. Defaults to Precision.
+        metric_2 (str): The name of the second metric. Defaults to Recall.
         **kwargs (Any): Additional keyword arguments to pass to the parent class.
     """
 
-    metric_1: BaseMetric
-    metric_2: BaseMetric
+    metric_instance_1: BaseMetric
+    metric_instance_2: BaseMetric
 
     def __init__(
         self,
@@ -53,27 +53,27 @@ class F1(TopKMetric):
         *args: Any,
         beta: float = 1.0,
         dist_sync_on_step: bool = False,
-        metric_name_1: str = "Precision",
-        metric_name_2: str = "Recall",
+        metric_1: str = "Precision",
+        metric_2: str = "Recall",
         **kwargs: Any,
     ):
         super().__init__(k, dist_sync_on_step)
         self.num_users = num_users
         self.beta = beta
-        self.metric_name_1 = metric_name_1
-        self.metric_name_2 = metric_name_2
+        self.metric_1 = metric_1
+        self.metric_2 = metric_2
 
         # Set up metrics
-        self.metric_1 = metric_registry.get(
-            metric_name_1,
+        self.metric_instance_1 = metric_registry.get(
+            metric_1,
             k=k,
             num_users=num_users,
             num_items=num_items,
             dist_sync_on_step=dist_sync_on_step,
             **kwargs,
         )
-        self.metric_2 = metric_registry.get(
-            metric_name_2,
+        self.metric_instance_2 = metric_registry.get(
+            metric_2,
             k=k,
             num_users=num_users,
             num_items=num_items,
@@ -84,25 +84,26 @@ class F1(TopKMetric):
         # Update needed blocks to be the union of the blocks
         # of the two metrics
         self._REQUIRED_COMPONENTS = (
-            self.metric_1._REQUIRED_COMPONENTS | self.metric_2._REQUIRED_COMPONENTS
+            self.metric_instance_1._REQUIRED_COMPONENTS
+            | self.metric_instance_2._REQUIRED_COMPONENTS
         )
 
     def update(self, preds: Tensor, user_indices: Tensor, **kwargs: Any):
         """Updates the metric state with the new batch of predictions."""
         # Update first metric
-        self.metric_1.update(preds, user_indices, **kwargs)
+        self.metric_instance_1.update(preds, user_indices, **kwargs)
 
         # Update second metric
-        self.metric_2.update(preds, user_indices, **kwargs)
+        self.metric_instance_2.update(preds, user_indices, **kwargs)
 
     def compute(self):
         """Computes the F1 score using the two custom metrics."""
         # Get scores from both metrics
-        score_1 = self.metric_1.compute().get(
-            self.metric_name_1, torch.zeros(self.num_users)
+        score_1 = self.metric_instance_1.compute().get(
+            self.metric_1, torch.zeros(self.num_users)
         )
-        score_2 = self.metric_2.compute().get(
-            self.metric_name_2, torch.zeros(self.num_users)
+        score_2 = self.metric_instance_2.compute().get(
+            self.metric_2, torch.zeros(self.num_users)
         )
 
         # Compute the final F1 score
@@ -116,6 +117,6 @@ class F1(TopKMetric):
     @property
     def name(self):
         """The name of the metric customized based on the metrics compared."""
-        if self.metric_name_1 == "Precision" and self.metric_name_2 == "Recall":
+        if self.metric_1 == "Precision" and self.metric_2 == "Recall":
             return self.__class__.__name__
-        return f"F1[{self.metric_name_1}, {self.metric_name_2}]"
+        return f"F1[{self.metric_1}, {self.metric_2}]"

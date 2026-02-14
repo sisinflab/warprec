@@ -88,18 +88,19 @@ class PopREO(TopKMetric):
         self,
         k: int,
         item_interactions: Tensor,
-        pop_ratio: float,
+        pop_ratio: float = 0.8,
         dist_sync_on_step: bool = False,
         **kwargs: Any,
     ):
         super().__init__(k, dist_sync_on_step)
+        self.pop_ratio = pop_ratio
         self.add_state("short_recs", default=torch.tensor(0.0), dist_reduce_fx="sum")
         self.add_state("long_recs", default=torch.tensor(0.0), dist_reduce_fx="sum")
         self.add_state("short_gt", default=torch.tensor(0.0), dist_reduce_fx="sum")
         self.add_state("long_gt", default=torch.tensor(0.0), dist_reduce_fx="sum")
 
         # Add short head and long tail items as buffer
-        sh, lt = self.compute_head_tail(item_interactions, pop_ratio)
+        sh, lt = self.compute_head_tail(item_interactions, self.pop_ratio)
         self.register_buffer("short_head", sh)
         self.register_buffer("long_tail", lt)
 
@@ -139,3 +140,10 @@ class PopREO(TopKMetric):
         # std(unbiased=False) matches numpy std by default for population std
         pop_reo = (torch.std(pr, unbiased=False) / torch.mean(pr)).item()
         return {self.name: pop_reo}
+
+    @property
+    def name(self):
+        """The name of the metric."""
+        if self.pop_ratio == 0.8:
+            return self.__class__.__name__
+        return f"PopREO[Pop{int(self.pop_ratio * 100)}%]"
