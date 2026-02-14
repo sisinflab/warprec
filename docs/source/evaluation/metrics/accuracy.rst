@@ -43,7 +43,12 @@ The harmonic mean of Precision@K and Recall@K, providing a balanced measure of a
 
     evaluation:
         top_k: [10, 20, 50]
-        metrics: ["F1[nDCG, MAP]"]
+        complex_metrics:
+            - name: F1
+              params:
+                  metric_name_1: nDCG
+                  metric_name_2: MAP
+                  beta: 0.5
 
 HitRate@K
 =========
