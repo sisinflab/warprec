@@ -11,6 +11,7 @@ Metrics
    metrics/coverage
    metrics/diversity
    metrics/fairness
+   metrics/multiobjective
    metrics/novelty
    metrics/rating
    metrics/implement
