@@ -4,6 +4,10 @@ Bias
 
 **Bias metrics** are designed to identify and measure systematic deviations or unfair tendencies in recommender system outputs. These metrics help uncover whether the system disproportionately favors or disfavors certain items, users, or groups, potentially leading to a lack of **diversity** or **equitability** in recommendations.
 
+.. note::
+
+    Some metrics support a custom value for the computation of the short-head/long-tail. The default proportion is: 0.8.
+
 ACLT (Average Coverage of Long-Tail items)
 =========================================
 
@@ -15,6 +19,17 @@ Measures the proportion of **long-tail items** recommended across all users, ind
         top_k: [10, 20, 50]
         metrics: [ACLT]
 
+You can also compute this metric using a different proportion of popularity for the short-head/long-tail computation as follows:
+
+.. code-block:: yaml
+
+    evaluation:
+        top_k: [10, 20, 50]
+        complex_metrics:
+            - name: ACLT
+              params:
+                  pop_ratio: 0.9
+
 APLT (Average Proportion of Long-Tail items)
 ===========================================
 
@@ -25,6 +40,17 @@ Measures the average proportion of **long-tail items** in each user's recommenda
     evaluation:
         top_k: [10, 20, 50]
         metrics: [APLT]
+
+You can also compute this metric using a different proportion of popularity for the short-head/long-tail computation as follows:
+
+.. code-block:: yaml
+
+    evaluation:
+        top_k: [10, 20, 50]
+        complex_metrics:
+            - name: APLT
+              params:
+                  pop_ratio: 0.9
 
 ARP (Average Recommendation Popularity)
 ======================================
@@ -48,6 +74,17 @@ Measures whether users receive similar ranks for **long-tail items** regardless 
         top_k: [10, 20, 50]
         metrics: [PopREO]
 
+You can also compute this metric using a different proportion of popularity for the short-head/long-tail computation as follows:
+
+.. code-block:: yaml
+
+    evaluation:
+        top_k: [10, 20, 50]
+        complex_metrics:
+            - name: PopREO
+              params:
+                  pop_ratio: 0.9
+
 PopRSP (Popularity-based Ranking-based Statistical Parity)
 ==========================================================
 
@@ -58,3 +95,14 @@ Evaluates whether the average ranks of **long-tail items** are balanced across u
     evaluation:
         top_k: [10, 20, 50]
         metrics: [PopRSP]
+
+You can also compute this metric using a different proportion of popularity for the short-head/long-tail computation as follows:
+
+.. code-block:: yaml
+
+    evaluation:
+        top_k: [10, 20, 50]
+        complex_metrics:
+            - name: PopRSP
+              params:
+                  pop_ratio: 0.9
