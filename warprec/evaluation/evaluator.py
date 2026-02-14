@@ -1,4 +1,3 @@
-import re
 import time
 from math import ceil
 from typing import List, Dict, Optional, Set, Any, Tuple
@@ -15,6 +14,7 @@ from warprec.recommenders.base_recommender import (
     Recommender,
     SequentialRecommenderUtils,
 )
+from warprec.utils.config import ComplexMetricConfig
 from warprec.utils.enums import MetricBlock
 from warprec.utils.logger import logger
 from warprec.utils.registry import metric_registry
@@ -34,10 +34,10 @@ class Evaluator:
             be evaluated.
         k_values (List[int]): The cutoffs.
         train_set (csr_matrix): The train set sparse matrix.
+        complex_metrics (List[ComplexMetricConfig]): List of complex
+            metrics to compute.
         additional_data (Optional[Dict[str, Any]]): Additional data
             passed in the initialization of metrics.
-        beta (float): The beta value used in some metrics.
-        pop_ratio (float): The percentile considered popular.
         feature_lookup (Optional[Tensor]): The feature lookup tensor.
         user_cluster (Optional[Tensor]): The user cluster lookup tensor.
         item_cluster (Optional[Tensor]): The item cluster lookup tensor.
@@ -49,9 +49,8 @@ class Evaluator:
         metric_list: List[str],
         k_values: List[int],
         train_set: csr_matrix,
+        complex_metrics: List[ComplexMetricConfig] = None,
         additional_data: Optional[Dict[str, Any]] = None,
-        beta: float = 1.0,
-        pop_ratio: float = 0.8,
         feature_lookup: Optional[Tensor] = None,
         user_cluster: Optional[Tensor] = None,
         item_cluster: Optional[Tensor] = None,
@@ -73,44 +72,52 @@ class Evaluator:
             "item_interactions": torch.tensor(train_set.getnnz(axis=0)).float(),
             "item_indices": torch.tensor(train_set.indices, dtype=torch.long),
             "feature_lookup": feature_lookup,
-            "beta": beta,
-            "pop_ratio": pop_ratio,
             "user_cluster": user_cluster,
             "item_cluster": item_cluster,
             **additional_data,
         }
-        self._init_metrics(metric_list)
+        self._init_metrics(metric_list, complex_metrics)
 
-    def _init_metrics(self, metric_list: List[str]):
+    def _init_metrics(
+        self, metric_list: List[str], complex_metrics: List[ComplexMetricConfig] = None
+    ):
         """Initializes metric instances from the registry."""
         for k in self.k_values:
             self.metrics[k] = []
             self.required_blocks[k] = set()
-            for metric_string in metric_list:
-                metric_name = metric_string
-                metric_params = {}
 
-                # Parsing complex metric names (e.g., F1[Precision, Recall])
-                match_f1 = re.match(r"F1\[\s*(.*?)\s*,\s*(.*?)\s*\]", metric_string)
-                match_efd_epc = re.match(r"(EFD|EPC)\[\s*(.*?)\s*\]", metric_string)
+            # Initialize Simple Metrics
+            for metric_name in metric_list:
+                self._instantiate_and_add_metric(metric_name, k, {})
 
-                if match_f1:
-                    metric_name = "F1"
-                    metric_params["metric_name_1"] = match_f1.group(1)
-                    metric_params["metric_name_2"] = match_f1.group(2)
+            # Initialize Complex Metrics
+            if complex_metrics is not None:
+                for complex_metric in complex_metrics:
+                    self._instantiate_and_add_metric(
+                        complex_metric.name, k, complex_metric.params
+                    )
 
-                if match_efd_epc:
-                    metric_name = match_efd_epc.group(1)
-                    metric_params["relevance"] = match_efd_epc.group(2)
+    def _instantiate_and_add_metric(
+        self, name: str, k: int, specific_params: Dict[str, Any]
+    ):
+        """Helper to instantiate a single metric and update requirements."""
+        try:
+            metric_instance = metric_registry.get(
+                name,
+                k=k,
+                **self.common_params,
+                **specific_params,
+            )
 
-                metric_instance = metric_registry.get(
-                    metric_name,
-                    k=k,
-                    **self.common_params,
-                    **metric_params,
-                )
-                self.metrics[k].append(metric_instance)
-                self.required_blocks[k].update(metric_instance.components)
+            self.metrics[k].append(metric_instance)
+            self.required_blocks[k].update(metric_instance.components)
+
+        except Exception as e:
+            logger.negative(
+                f"Failed to instantiate metric '{name}' at "
+                f"k={k} with extra params={specific_params}. Error: {e}"
+            )
+            raise e
 
     def evaluate(
         self,
