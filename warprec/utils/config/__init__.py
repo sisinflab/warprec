@@ -1,7 +1,7 @@
 from . import recommender_model_config
 from .common import Labels
 from .dashboard_configuration import DashboardConfig, Wandb, CodeCarbon, MLflow
-from .evaluation_configuration import EvaluationConfig
+from .evaluation_configuration import EvaluationConfig, ComplexMetricConfig
 from .general_configuration import GeneralConfig, WarpRecCallbackConfig, AzureConfig
 from .model_configuration import RecomModel, LRScheduler
 from .reader_configuration import (
@@ -38,6 +38,7 @@ __all__ = [
     "CodeCarbon",
     "MLflow",
     "EvaluationConfig",
+    "ComplexMetricConfig",
     "GeneralConfig",
     "WarpRecCallbackConfig",
     "AzureConfig",
