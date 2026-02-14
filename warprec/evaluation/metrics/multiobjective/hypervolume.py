@@ -48,7 +48,6 @@ class Hypervolume(TopKMetric):
     ):
         super().__init__(k, dist_sync_on_step)
         self.num_users = num_users
-        self.metric_names = metric_names
         self.higher_better = higher_is_better
 
         # Ensure all input lists have the same length to avoid indexing errors
@@ -66,7 +65,7 @@ class Hypervolume(TopKMetric):
         self.sub_metrics: List[BaseMetric] = []
         required_blocks = set()
 
-        for m_name in self.metric_names:
+        for m_name in metric_names:
             m_inst = metric_registry.get(
                 m_name,
                 k=k,
