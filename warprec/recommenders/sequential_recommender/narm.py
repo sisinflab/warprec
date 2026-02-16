@@ -24,7 +24,7 @@ class NARM(IterativeRecommender, SequentialRecommenderUtils):
     user’s sequential behavior (Global Encoder) and capture the user’s
     main purpose in the current session (Local Encoder).
 
-    For further details, check the `paper <https://arxiv.org/abs/1711.04725>`_.
+    For further details, please refer to the `paper <https://arxiv.org/abs/1711.04725>`_.
 
     Args:
         params (dict): Model parameters.

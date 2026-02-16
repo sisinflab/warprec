@@ -20,7 +20,7 @@ class XSimGCL(IterativeRecommender, GraphRecommenderUtils):
     """Implementation of XSimGCL algorithm from
         XSimGCL: Towards Extremely Simple Graph Contrastive Learning for Recommendation (TKDE 2023).
 
-    For further details, check the `paper <https://arxiv.org/abs/2209.02544>`_.
+    For further details, please refer to the `paper <https://arxiv.org/abs/2209.02544>`_.
 
     Args:
         params (dict): Model parameters.

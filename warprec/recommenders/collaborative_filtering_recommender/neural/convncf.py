@@ -17,7 +17,7 @@ class ConvNCF(IterativeRecommender):
     """Implementation of ConvNCF algorithm from
         Outer Product-based Neural Collaborative Filtering 2018.
 
-    For further details, check the `paper <https://arxiv.org/abs/1808.03912>`_.
+    For further details, please refer to the `paper <https://arxiv.org/abs/1808.03912>`_.
 
     Args:
         params (dict): Model parameters.

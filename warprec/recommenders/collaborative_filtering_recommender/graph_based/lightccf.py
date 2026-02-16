@@ -24,7 +24,7 @@ class LightCCF(IterativeRecommender, GraphRecommenderUtils):
     all their interacted items while pushing them away from other positive pairs.
     It can operate with a simple Base Encoder (MF) or a GCN Encoder.
 
-    For further details, check the `paper <https://arxiv.org/abs/2504.10113>`_.
+    For further details, please refer to the `paper <https://arxiv.org/abs/2504.10113>`_.
 
     Args:
         params (dict): Model parameters.

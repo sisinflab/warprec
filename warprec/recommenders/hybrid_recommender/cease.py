@@ -13,7 +13,7 @@ class CEASE(ItemSimRecommender):
     """Implementation of CEASE algorithm from
         Closed-Form Models for Collaborative Filtering with Side-Information 2020.
 
-    For further details, check the `paper <https://dl.acm.org/doi/10.1145/3383313.3418480>`_.
+    For further details, please refer to the `paper <https://dl.acm.org/doi/10.1145/3383313.3418480>`_.
 
     Args:
         params (dict): The dictionary with the model params.

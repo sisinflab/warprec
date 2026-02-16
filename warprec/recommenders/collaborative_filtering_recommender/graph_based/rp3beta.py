@@ -14,7 +14,7 @@ class RP3Beta(ItemSimRecommender):
     """Implementation of RP3Beta algorithm from
         Updatable, accurate, diverse, and scalable recommendations for interactive applications 2016.
 
-    For further details, check the `paper <https://www.zora.uzh.ch/id/eprint/131338/1/TiiS_2016.pdf>`_.
+    For further details, please refer to the `paper <https://www.zora.uzh.ch/id/eprint/131338/1/TiiS_2016.pdf>`_.
 
     Args:
         params (dict): Model parameters.

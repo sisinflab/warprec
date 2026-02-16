@@ -20,7 +20,7 @@ class FM(ContextRecommenderUtils, IterativeRecommender):
     """Implementation of FM algorithm from
         Factorization Machines ICDM 2010.
 
-    For further details, check the `paper <https://ieeexplore.ieee.org/document/5694074>`_.
+    For further details, please refer to the `paper <https://ieeexplore.ieee.org/document/5694074>`_.
 
     Args:
         params (dict): Model parameters.

@@ -75,11 +75,11 @@ class GCMC(IterativeRecommender, GraphRecommenderUtils):
     """Implementation of GCMC algorithm from
         Graph Convolutional Matrix Completion (KDD 2018).
 
-    For further details, check the `paper <https://arxiv.org/abs/1706.02263>`_.
-
     This model is a graph autoencoder for explicit feedback. It uses a graph
     convolutional encoder to learn user/item embeddings and a decoder to
     predict rating probabilities.
+
+    For further details, please refer to the `paper <https://arxiv.org/abs/1706.02263>`_.
 
     Args:
         params (dict): Model parameters.

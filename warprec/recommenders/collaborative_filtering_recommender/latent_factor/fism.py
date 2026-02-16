@@ -16,7 +16,7 @@ class FISM(IterativeRecommender):
     r"""Implementation of FISM model from
     FISM: Factored Item Similarity Models for Top-N Recommender Systems (KDD 2013).
 
-    For further details, check the `paper <https://dl.acm.org/doi/10.1145/2487575.2487589>`_.
+    For further details, please refer to the `paper <https://dl.acm.org/doi/10.1145/2487575.2487589>`_.
 
     Args:
         params (dict): Model parameters.

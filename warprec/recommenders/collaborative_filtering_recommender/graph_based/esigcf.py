@@ -20,6 +20,8 @@ class ESIGCF(IterativeRecommender, GraphRecommenderUtils):
     """Implementation of ESIGCF algorithm from
         Extremely Simplified but Intent-enhanced Graph Collaborative Filtering.
 
+    For further details, please refer to the `paper <https://www.sciencedirect.com/science/article/abs/pii/S0952197625025266>`_.
+
     Args:
         params (dict): Model parameters.
         info (dict): The dictionary containing dataset information.
