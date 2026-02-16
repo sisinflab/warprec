@@ -57,7 +57,7 @@ def design_pipeline(path: str):
     )
 
     # Experiment device
-    device = config.general.device
+    general_device = config.general.device
 
     data_preparation_time = time.time() - experiment_start_time
     logger.positive(
@@ -70,17 +70,21 @@ def design_pipeline(path: str):
         chunk_size = params.get("optimization", {}).get("chunk_size", 4096)
         num_workers = params.get("optimization", {}).get("num_workers")
 
+        # Model device
+        model_device = params.get("optimization", {}).get("device", "cpu")
+        device = general_device if model_device is None else model_device
+
         model = model_registry.get(
             name=model_name,
             params=params,
             interactions=main_dataset.train_set,
-            device=device,
             seed=42,
             info=main_dataset.info(),
             **main_dataset.get_stash(),
             block_size=block_size,
             chunk_size=chunk_size,
         )
+        model.to(device)
 
         if isinstance(model, IterativeRecommender):
             lr_scheduler_params = params.get("optimization", {}).get(

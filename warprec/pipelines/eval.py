@@ -75,6 +75,9 @@ def eval_pipeline(path: str):
         item_cluster=main_dataset.get_item_cluster(),
     )
 
+    # Experiment device
+    general_device = config.general.device
+
     data_preparation_time = time.time() - experiment_start_time
     logger.positive(
         f"Data preparation completed in {data_preparation_time:.2f} seconds."
@@ -123,7 +126,6 @@ def eval_pipeline(path: str):
         )
 
         # Move model to device
-        general_device = config.general.device
         model_device = params.optimization.device
         device = general_device if model_device is None else model_device
         model.to(device)

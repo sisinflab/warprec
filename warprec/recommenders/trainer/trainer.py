@@ -157,9 +157,9 @@ class Trainer:
             best_result,
             best_params,
             dataset,
-            device,
             params.optimization.properties.seed,
         )
+        best_model.to(device)
 
         report = self._create_report(results, best_model)
         return best_model, report, best_iter
@@ -449,15 +449,12 @@ class Trainer:
 
         return tune.with_resources(obj_func, resources=kwargs["resources"])
 
-    def _load_best_model(
-        self, model_name, best_result, best_params, dataset, device, seed
-    ):
+    def _load_best_model(self, model_name, best_result, best_params, dataset, seed):
         """Loads the model state from the best checkpoint."""
         model = model_registry.get(
             name=model_name,
             params=best_params,
             interactions=dataset.train_set,
-            device=device,
             seed=seed,
             info=dataset.info(),
             **dataset.get_stash(),
