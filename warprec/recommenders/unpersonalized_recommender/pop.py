@@ -22,7 +22,13 @@ class Pop(Recommender):
         *args (Any): Argument for PyTorch nn.Module.
         seed (int): The seed to use for reproducibility.
         **kwargs (Any): Keyword argument for PyTorch nn.Module.
+
+    Attributes:
+        normalized_popularity (Tensor): The lookup tensor for normalized
+            popularity.
     """
+
+    normalized_popularity: Tensor
 
     def __init__(
         self,
@@ -44,7 +50,8 @@ class Pop(Recommender):
 
         # Normalize popularity by the total number of interactions
         # Add epsilon to avoid division by zero if there are no interactions
-        self.normalized_popularity = popularity / (item_count + 1e-6)
+        norm_pop = popularity / (item_count + 1e-6)
+        self.register_buffer("normalized_popularity", norm_pop)
 
     @torch.no_grad()
     def predict(
