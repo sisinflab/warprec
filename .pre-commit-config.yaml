@@ -59,14 +59,6 @@ repos:
         types: [python]
         exclude: ^tests/|^src/pipelines/
 
-  - repo: local
-    hooks:
-      - id: export-environment
-        name: Generate environment files
-        entry: poetry run python hooks/update_env_files.py
-        language: system
-        always_run: true
-
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v5.0.0
     hooks:
