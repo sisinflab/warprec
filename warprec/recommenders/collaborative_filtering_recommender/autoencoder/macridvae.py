@@ -90,7 +90,7 @@ class MacridVAE(IterativeRecommender):
     """Implementation of MacridVAE algorithm from
         Learning Disentangled Representations for Recommendation (NeurIPS 2019).
 
-    For further details, check the `paper <https://arxiv.org/abs/1910.14238>`_.
+    For further details, please refer to the `paper <https://arxiv.org/abs/1910.14238>`_.
 
     Args:
         params (dict): Model parameters.

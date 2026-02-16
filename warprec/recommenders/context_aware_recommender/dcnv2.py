@@ -20,7 +20,7 @@ class DCNv2(ContextRecommenderUtils, IterativeRecommender):
     """Implementation of Deep & Cross Network V2 (DCNv2) from
         Dcn v2: Improved deep & cross network and practical lessons for web-scale, WWW 2021.
 
-    For further details, check the `paper <https://arxiv.org/abs/2008.13535>`_.
+    For further details, please refer to the `paper <https://arxiv.org/abs/2008.13535>`_.
 
     Args:
         params (dict): Model parameters.

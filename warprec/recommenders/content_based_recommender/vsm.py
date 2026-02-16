@@ -17,7 +17,7 @@ class VSM(Recommender):
     """Implementation of VSM algorithm from
         Linked Open Data to support Content-based Recommender Systems 2012.
 
-    For further details, check the `paper <https://dl.acm.org/doi/10.1145/2362499.2362501>`_.
+    For further details, please refer to the `paper <https://dl.acm.org/doi/10.1145/2362499.2362501>`_.
 
     Args:
         params (dict): Model parameters.

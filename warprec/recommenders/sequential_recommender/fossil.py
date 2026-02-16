@@ -22,6 +22,8 @@ class FOSSIL(IterativeRecommender, SequentialRecommenderUtils):
     FOSSIL uses similarity of the items as main purpose and uses high MC as a way of sequential preference improve of
     ability of sequential recommendation.
 
+    For further details, please refer to the `paper <https://arxiv.org/abs/1609.09152>`_.
+
     Args:
         params (dict): Model parameters.
         info (dict): The dictionary containing dataset information.

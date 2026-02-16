@@ -9,6 +9,8 @@ EFD (Expected Free Discovery)
 
 Estimates the likelihood that users discover relevant but less popular (**unexpected**) items in their top-K recommendations, promoting **serendipity**.
 
+For further details, please refer to this `link <https://dl.acm.org/doi/abs/10.1145/2043932.2043955>`_.
+
 .. code-block:: yaml
 
     evaluation:
@@ -30,6 +32,8 @@ EPC (Expected Popularity Complement)
 ====================================
 
 Measures the average **complement of item popularity** in the top-K recommendations, encouraging exposure to less popular content.
+
+For further details, please refer to this `link <https://dl.acm.org/doi/abs/10.1145/2043932.2043955>`_.
 
 .. code-block:: yaml
 

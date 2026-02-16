@@ -24,6 +24,8 @@ class BERT4Rec(IterativeRecommender, SequentialRecommenderUtils):
     masked item prediction task (cloze task). For next-item prediction, a special [MASK]
     token is appended to the sequence.
 
+    For further details, please refer to the `paper <https://arxiv.org/abs/1904.06690>`_.
+
     Args:
         params (dict): Model parameters.
         info (dict): The dictionary containing dataset information.

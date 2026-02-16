@@ -120,7 +120,7 @@ class LinRec(IterativeRecommender, SequentialRecommenderUtils):
     LinRec replaces the quadratic Dot-Product Attention with an O(N) Linear Attention
     mechanism based on L2 Normalization and ELU activation.
 
-    For further details, check the `paper <https://arxiv.org/abs/2411.01537>`_.
+    For further details, please refer to the `paper <https://arxiv.org/abs/2411.01537>`_.
 
     Args:
         params (dict): Model parameters.

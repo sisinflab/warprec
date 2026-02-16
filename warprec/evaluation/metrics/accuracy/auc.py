@@ -60,7 +60,7 @@ class AUC(BaseMetric):
     The final AUC is the sum of all AUC scores divided by the number of positive samples:
         AUC = sum_{u=1}^{n_users} sum_{i=1}^{items} AUC_{ui} / positives
 
-    For further details,please refer
+    For further details, please refer
         to this `link <https://en.wikipedia.org/wiki/Receiver_operating_characteristic#Area_under_the_curve>`_.
 
     Attributes:

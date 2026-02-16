@@ -12,7 +12,7 @@ class ADMMSlim(ItemSimRecommender):
     """Implementation of ADMMSlim algorithm from
         ADMM SLIM: Sparse Recommendations for Many Users 2020.
 
-    For further details, check the `paper <https://doi.org/10.1145/3336191.3371774>`_.
+    For further details, please refer to the `paper <https://doi.org/10.1145/3336191.3371774>`_.
 
     Args:
         params (dict): Model parameters.

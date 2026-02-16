@@ -20,7 +20,7 @@ class WideAndDeep(ContextRecommenderUtils, IterativeRecommender):
     """Implementation of Wide & Deep algorithm from
         Wide & Deep Learning for Recommender Systems, DLRS 2016.
 
-    For further details, check the `paper <https://arxiv.org/abs/1606.07792>`_.
+    For further details, please refer to the `paper <https://arxiv.org/abs/1606.07792>`_.
 
     Args:
         params (dict): Model parameters.

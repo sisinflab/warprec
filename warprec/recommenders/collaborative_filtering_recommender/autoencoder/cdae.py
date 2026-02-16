@@ -17,11 +17,11 @@ class CDAE(IterativeRecommender):
     """Implementation of CDAE algorithm from
     "Collaborative Denoising Auto-Encoders for Top-N Recommender Systems." in WSDM 2016.
 
-    For further details, check the `paper <https://dl.acm.org/doi/10.1145/2835776.2835837>`_.
-
     This model learns latent representations by training a denoising autoencoder on corrupted
     user-item interaction vectors, incorporating a user-specific embedding to guide the
     reconstruction.
+
+    For further details, please refer to the `paper <https://dl.acm.org/doi/10.1145/2835776.2835837>`_.
 
     Args:
         params (dict): Model parameters.
