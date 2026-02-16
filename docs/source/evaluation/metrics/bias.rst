@@ -13,6 +13,8 @@ ACLT (Average Coverage of Long-Tail items)
 
 Measures the proportion of **long-tail items** recommended across all users, indicating the extent of long-tail exposure.
 
+For further details, please refer to this `paper <https://arxiv.org/abs/1901.07555>`_.
+
 .. code-block:: yaml
 
     evaluation:
@@ -34,6 +36,8 @@ APLT (Average Proportion of Long-Tail items)
 ===========================================
 
 Measures the average proportion of **long-tail items** in each user's recommendation list, which captures individual-level diversity.
+
+For further details, please refer to this `paper <https://arxiv.org/abs/1901.07555>`_.
 
 .. code-block:: yaml
 
@@ -57,6 +61,8 @@ ARP (Average Recommendation Popularity)
 
 Calculates the **average popularity** of recommended items, indicating the system’s tendency to favor popular content.
 
+For further details, please refer to this `paper <https://arxiv.org/abs/1901.07555>`_.
+
 .. code-block:: yaml
 
     evaluation:
@@ -67,6 +73,8 @@ PopREO (Popularity-based Ranking-based Equal Opportunity)
 =========================================================
 
 Measures whether users receive similar ranks for **long-tail items** regardless of their group membership, focusing on **fairness in exposure**.
+
+For further details, please refer to this `paper <https://dl.acm.org/doi/abs/10.1145/3397271.3401177>`_.
 
 .. code-block:: yaml
 
@@ -89,6 +97,8 @@ PopRSP (Popularity-based Ranking-based Statistical Parity)
 ==========================================================
 
 Evaluates whether the average ranks of **long-tail items** are balanced across user groups, promoting **fairness in recommendation ranking**.
+
+For further details, please refer to this `paper <https://dl.acm.org/doi/abs/10.1145/3397271.3401177>`_.
 
 .. code-block:: yaml
 
