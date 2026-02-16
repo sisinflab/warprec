@@ -9,6 +9,8 @@ MAE (Mean Absolute Error)
 
 The **average absolute difference** between predicted and actual ratings.
 
+For further details, please refer to this `link <https://en.wikipedia.org/wiki/Mean_absolute_error>`_.
+
 .. code-block:: yaml
 
     evaluation:
@@ -19,6 +21,8 @@ MSE (Mean Squared Error)
 
 The **average of the squared differences** between predicted and actual ratings.
 
+For further details, please refer to this `link <https://en.wikipedia.org/wiki/Mean_squared_error>`_.
+
 .. code-block:: yaml
 
     evaluation:
@@ -28,6 +32,8 @@ RMSE (Root Mean Squared Error)
 ==============================
 
 The **square root of the MSE**, providing an error measure in the same units as the ratings.
+
+For further details, please refer to this `link <https://en.wikipedia.org/wiki/Root_mean_square_deviation>`_.
 
 .. code-block:: yaml
 

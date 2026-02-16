@@ -31,6 +31,8 @@ NumRetrieved@k
 
 Counts the **total number of distinct items** retrieved in the top-k recommendations across all users.
 
+For further details, please refer to the `link <https://github.com/RankSys/RankSys/blob/master/RankSys-metrics/src/main/java/es/uam/eps/ir/ranksys/metrics/basic/NumRetrieved.java>`_
+
 .. code-block:: yaml
 
     evaluation:
