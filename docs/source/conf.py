@@ -7,8 +7,10 @@
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#project-information
 
 project = "WarpRec"
-copyright = "2025, Marco Avolio, Joseph Trotta"
-author = "Marco Avolio, Joseph Trotta"
+copyright = "2025, Marco Avolio, Potito Aghilar, Sabino Roccotelli, Vito Walter Anelli, Joseph Trotta"
+author = (
+    "Marco Avolio, Potito Aghilar, Sabino Roccotelli, Vito Walter Anelli, Joseph Trotta"
+)
 release = "0.1.0"
 
 # -- General configuration ---------------------------------------------------
