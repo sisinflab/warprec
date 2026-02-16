@@ -19,7 +19,7 @@ Optimizing Metric Computation: Batch-Oriented Architecture
 
 Traditional frameworks often rely on a **dictionary-based approach** for representing ground-truth relevance, typically structured as follows:
 
-.. code-block:: json
+.. code-block:: python
 
     {
       "user_id_1": [
@@ -70,7 +70,7 @@ For **HitRate@k** with :math:`k=3`, the evaluation proceeds as follows:
 1. **Top-K Index Extraction:** Use tensor operations to retrieve indices of the top-:math:`k` predictions for each user:
 
 .. math::
-    \text{TOP_K_INDICES} =
+    \texttt{TOP\_K\_INDICES} =
     \begin{bmatrix}
     0 & 8 & 5 \\
     9 & 1 & 6 \\
@@ -90,7 +90,7 @@ For **HitRate@k** with :math:`k=3`, the evaluation proceeds as follows:
 3. **Hit Calculation:** A user registers a hit if at least one of the top-:math:`k` items is relevant:
 
 .. math::
-    \text{HITS_PER_USER} = [\text{True}, \text{True}, \dots] \in \{0,1\}^B
+    \texttt{HITS\_PER\_USER} = [\text{True}, \text{True}, \dots] \in \{0,1\}^B
 
 4. **State Update:** Accumulate hits across the batch to update the metric's internal state.
 
@@ -107,4 +107,4 @@ WarpRec mitigates this inefficiency by implementing a **single-pass metric compu
 
 These partial results are accumulated until the entire dataset has been processed, at which point the final, aggregated metric values are reported. This method significantly reduces the total execution time by eliminating repetitive data traversal.
 
-As you can see in the example above, some intermediate values (e.g., TOP\_K\_INDICES, REL) are computed before evaluating the final value of a metric. These values are shared across the computation of different metrics, which means that evaluating multiple metrics will not slow down the overall process.
+As you can see in the example above, some intermediate values (e.g., TOP_K_INDICES, REL) are computed before evaluating the final value of a metric. These values are shared across the computation of different metrics, which means that evaluating multiple metrics will not slow down the overall process.
