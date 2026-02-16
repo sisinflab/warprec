@@ -18,24 +18,24 @@ Hybrid Autoencoders extend standard autoencoder architectures by injecting side 
 
   For further details, please refer to the `paper <https://dl.acm.org/doi/10.1145/3383313.3418480>`_.
 
-.. code-block:: yaml
+  .. code-block:: yaml
 
-    models:
-      AddEASE:
-        l2: 10
-        alpha: 0.1
+      models:
+        AddEASE:
+          l2: 10
+          alpha: 0.1
 
 - CEASE:
   An extension of the EASE model using side information. Extends the EASE problem without adding more complexity. **This model requires side information to function properly**.
 
   For further details, please refer to the `paper <https://dl.acm.org/doi/10.1145/3383313.3418480>`_.
 
-.. code-block:: yaml
+  .. code-block:: yaml
 
-    models:
-      CEASE:
-        l2: 10
-        alpha: 0.1
+      models:
+        CEASE:
+          l2: 10
+          alpha: 0.1
 
 ===========
 Hybrid KNN
@@ -48,25 +48,25 @@ Hybrid KNN models enhance standard Nearest Neighbor approaches by incorporating 
 
   For further details, please refer to the `paper <https://www.researchgate.net/publication/221141162_MyMediaLite_A_free_recommender_system_library>`_.
 
-.. code-block:: yaml
+  .. code-block:: yaml
 
-    models:
-      AttributeItemKNN:
-        k: 10
-        similarity: cosine
+      models:
+        AttributeItemKNN:
+          k: 10
+          similarity: cosine
 
 - AttributeUserKNN:
   A user-based KNN model that uses content-based profiles (e.g., TF-IDF) to define user similarity. **This model requires side information to function properly**.
 
   For further details, please refer to the `paper <https://www.researchgate.net/publication/221141162_MyMediaLite_A_free_recommender_system_library>`_.
 
-.. code-block:: yaml
+  .. code-block:: yaml
 
-    models:
-      AttributeUserKNN:
-        k: 10
-        similarity: cosine
-        user_profile: tfidf
+      models:
+        AttributeUserKNN:
+          k: 10
+          similarity: cosine
+          user_profile: tfidf
 
 ==================================
 Summary of Available Hybrid Models
