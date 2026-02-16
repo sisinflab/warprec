@@ -19,6 +19,8 @@ class GRU4Rec(IterativeRecommender, SequentialRecommenderUtils):
     """Implementation of GRU4Rec algorithm from
     "Improved Recurrent Neural Networks for Session-based Recommendations." in DLRS 2016.
 
+    For further details, please refer to the `paper <https://arxiv.org/abs/1606.08117>`_.
+
     Args:
         params (dict): Model parameters.
         info (dict): The dictionary containing dataset information.

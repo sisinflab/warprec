@@ -125,7 +125,7 @@ class xDeepFM(ContextRecommenderUtils, IterativeRecommender):
     """Implementation of xDeepFM algorithm from
         xDeepFM: Combining Explicit and Implicit Feature Interactions for Recommender Systems, KDD 2018.
 
-    For further details, check the `paper <https://arxiv.org/abs/1803.05170>`_.
+    For further details, please refer to the `paper <https://arxiv.org/abs/1803.05170>`_.
 
     Args:
         params (dict): Model parameters.

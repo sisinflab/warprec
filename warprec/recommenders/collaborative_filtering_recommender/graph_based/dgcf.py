@@ -20,7 +20,7 @@ class DGCF(IterativeRecommender, GraphRecommenderUtils):
     """Implementation of DGCF algorithm from
     "Disentangled Graph Collaborative Filtering" (SIGIR 2020).
 
-    For further details, check the `paper <https://arxiv.org/abs/2007.01764>`_.
+    For further details, please refer to the `paper <https://arxiv.org/abs/2007.01764>`_.
 
     Args:
         params (dict): Model parameters.

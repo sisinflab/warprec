@@ -16,10 +16,13 @@ from warprec.utils.registry import model_registry
 
 @model_registry.register(name="gSASRec")
 class gSASRec(IterativeRecommender, SequentialRecommenderUtils):
-    """Implementation of gSASRec (generalized SASRec).
+    """Implementation of gSASRec algorithm from
+    "gSASRec: Reducing Overconfidence in Sequential Recommendation Trained with Negative Sampling." in RecSys 2023.
 
     This model adapts the SASRec architecture to predict the next item at every
     step of the sequence, using a Group-wise Binary Cross-Entropy (GBCE) loss function.
+
+    For further details, please refer to the `paper <https://arxiv.org/abs/2308.07192>`_.
 
     Args:
         params (dict): Model parameters.

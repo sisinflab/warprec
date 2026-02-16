@@ -21,7 +21,7 @@ class Caser(IterativeRecommender, SequentialRecommenderUtils):
     "Personalized Top-N Sequential Recommendation via Convolutional Sequence Embedding"
     in WSDM 2018.
 
-    For further details, check the `paper <https://arxiv.org/abs/1809.07426>`_.
+    For further details, please refer to the `paper <https://arxiv.org/abs/1809.07426>`_.
 
     Args:
         params (dict): Model parameters.

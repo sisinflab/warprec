@@ -100,7 +100,7 @@ class CORE(IterativeRecommender, SequentialRecommenderUtils):
     CORE unifies the representation space for both encoding and decoding processes,
     using a Representation-Consistent Encoder (RCE) and Robust Distance Measuring (RDM).
 
-    For further details, check the `paper <https://arxiv.org/abs/2204.11067>`_.
+    For further details, please refer to the `paper <https://arxiv.org/abs/2204.11067>`_.
 
     Args:
         params (dict): Model parameters.

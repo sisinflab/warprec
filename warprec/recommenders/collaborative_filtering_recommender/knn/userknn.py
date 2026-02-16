@@ -14,7 +14,7 @@ class UserKNN(Recommender):
     """Implementation of UserKNN algorithm from
         GroupLens: an open architecture for collaborative filtering of netnews 1994.
 
-    For further details, check the `paper <https://dl.acm.org/doi/10.1145/192844.192905>`_.
+    For further details, please refer to the `paper <https://dl.acm.org/doi/10.1145/192844.192905>`_.
 
     Args:
         params (dict): Model parameters.

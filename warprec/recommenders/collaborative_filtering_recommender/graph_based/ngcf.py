@@ -98,7 +98,7 @@ class NGCF(IterativeRecommender, GraphRecommenderUtils):
     """Implementation of NGCF algorithm from
         Neural Graph Collaborative Filtering (SIGIR 2019)
 
-    For further details, check the `paper <https://arxiv.org/abs/1905.08166>`_.
+    For further details, please refer to the `paper <https://arxiv.org/abs/1905.08166>`_.
 
     Args:
         params (dict): Model parameters.

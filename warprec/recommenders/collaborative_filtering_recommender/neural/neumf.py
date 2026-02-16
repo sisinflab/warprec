@@ -17,7 +17,7 @@ class NeuMF(IterativeRecommender):
     """Implementation of NeuMF algorithm from
         Neural Collaborative Filtering 2017.
 
-    For further details, check the `paper <https://arxiv.org/abs/1708.05031>`_.
+    For further details, please refer to the `paper <https://arxiv.org/abs/1708.05031>`_.
 
     Args:
         params (dict): Model parameters.

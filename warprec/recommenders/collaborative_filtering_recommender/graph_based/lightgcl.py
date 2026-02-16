@@ -26,7 +26,7 @@ class LightGCL(IterativeRecommender, GraphRecommenderUtils):
     contrastive view, which is contrasted with the local graph view (GCN) to
     enhance representation learning.
 
-    For further details, check the `paper <https://arxiv.org/abs/2302.08191>`_.
+    For further details, please refer to the `paper <https://arxiv.org/abs/2302.08191>`_.
 
     Args:
         params (dict): Model parameters.

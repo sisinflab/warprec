@@ -13,7 +13,7 @@ class Slim(ItemSimRecommender):
     """Implementation of Slim model from
         Sparse Linear Methods for Top-N Recommender Systems 2011.
 
-    For further details, check the `paper <https://ieeexplore.ieee.org/document/6137254>`_.
+    For further details, please refer to the `paper <https://ieeexplore.ieee.org/document/6137254>`_.
 
     Args:
         params (dict): The dictionary with the model params.

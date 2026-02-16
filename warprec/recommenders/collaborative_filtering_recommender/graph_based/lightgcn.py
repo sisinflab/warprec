@@ -23,7 +23,7 @@ class LightGCN(GraphRecommenderUtils, IterativeRecommender):
     """Implementation of LightGCN algorithm from
         LightGCN: Simplifying and Powering Graph Convolution Network for Recommendation (SIGIR 2020)
 
-    For further details, check the `paper <https://arxiv.org/abs/2002.02126>`_.
+    For further details, please refer to the `paper <https://arxiv.org/abs/2002.02126>`_.
 
     Args:
         params (dict): Model parameters.

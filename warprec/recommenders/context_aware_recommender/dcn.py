@@ -20,7 +20,7 @@ class DCN(ContextRecommenderUtils, IterativeRecommender):
     """Implementation of Deep & Cross Network (DCN) from
         Deep & Cross Network for Ad Click Predictions, ADKDD 2017.
 
-    For further details, check the `paper <https://arxiv.org/abs/1708.05123>`_.
+    For further details, please refer to the `paper <https://arxiv.org/abs/1708.05123>`_.
 
     Args:
         params (dict): Model parameters.

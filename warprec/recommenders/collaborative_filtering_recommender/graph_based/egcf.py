@@ -20,7 +20,7 @@ class EGCF(IterativeRecommender, GraphRecommenderUtils):
     """Implementation of EGCF algorithm from
     "Simplify to the Limit! Embedding-Less Graph Collaborative Filtering for Recommender Systems" (TOIS 2024).
 
-    For further details, check the `paper <https://dl.acm.org/doi/10.1145/3701230>`_.
+    For further details, please refer to the `paper <https://dl.acm.org/doi/10.1145/3701230>`_.
 
     Args:
         params (dict): Model parameters.

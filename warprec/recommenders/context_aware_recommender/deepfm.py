@@ -20,7 +20,7 @@ class DeepFM(ContextRecommenderUtils, IterativeRecommender):
     """Implementation of DeepFM algorithm from
         DeepFM: A Factorization-Machine based Neural Network for CTR Prediction, IJCAI 2017.
 
-    For further details, check the `paper <https://arxiv.org/abs/1703.04247>`_.
+    For further details, please refer to the `paper <https://arxiv.org/abs/1703.04247>`_.
 
     Args:
         params (dict): Model parameters.

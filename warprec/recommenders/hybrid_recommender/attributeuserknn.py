@@ -16,7 +16,8 @@ class AttributeUserKNN(Recommender):
     """Implementation of AttributeUserKNN algorithm from
         MyMediaLite: A free recommender system library 2011.
 
-    For further details, check the `paper <https://www.researchgate.net/publication/221141162_MyMediaLite_A_free_recommender_system_library>`_.
+    For further details, please refer to the
+        `paper <https://www.researchgate.net/publication/221141162_MyMediaLite_A_free_recommender_system_library>`_.
 
     Args:
         params (dict): Model parameters.

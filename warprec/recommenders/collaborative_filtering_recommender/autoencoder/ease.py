@@ -12,7 +12,7 @@ class EASE(ItemSimRecommender):
     """Implementation of EASE algorithm from
         Embarrassingly Shallow Autoencoders for Sparse Data 2019.
 
-    For further details, check the `paper <https://arxiv.org/abs/1905.03375>`_.
+    For further details, please refer to the `paper <https://arxiv.org/abs/1905.03375>`_.
 
     Args:
         params (dict): The dictionary with the model params.

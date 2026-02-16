@@ -22,6 +22,8 @@ class SASRec(IterativeRecommender, SequentialRecommenderUtils):
     This implementation is adapted to the WarpRec framework, using PyTorch's
     native nn.TransformerEncoder for the self-attention mechanism.
 
+    For further details, please refer to the `paper <https://arxiv.org/abs/1808.09781>`_.
+
     Args:
         params (dict): Model parameters.
         info (dict): The dictionary containing dataset information.

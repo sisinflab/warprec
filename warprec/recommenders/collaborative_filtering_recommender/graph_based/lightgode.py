@@ -25,6 +25,8 @@ class LightGODE(IterativeRecommender, GraphRecommenderUtils):
     During inference, it applies a continuous Graph-ODE solver to inject high-order
     connectivity information.
 
+    For further details, please refer to the `paper <https://arxiv.org/abs/2407.18910>`_.
+
     Args:
         params (dict): Model parameters.
         info (dict): The dictionary containing dataset information.

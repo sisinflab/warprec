@@ -22,7 +22,7 @@ class UltraGCN(IterativeRecommender, GraphRecommenderUtils):
     """Implementation of UltraGCN algorithm from
     "UltraGCN: Ultra Simplification of Graph Convolutional Networks for Recommendation" (CIKM 2021).
 
-    For further details, check the `paper <https://arxiv.org/abs/2110.15114>`_.
+    For further details, please refer to the `paper <https://arxiv.org/abs/2110.15114>`_.
 
     Args:
         params (dict): Model parameters.
