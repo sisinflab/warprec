@@ -17,6 +17,8 @@ These models can capture both short-term dependencies and long-term patterns thr
   Treats a user’s interaction history as a 2D "image" and applies horizontal and vertical convolutional filters.
   Caser models local patterns (short-term interests) as well as long-term user preferences, making it effective in session-based recommendation scenarios.
 
+  For further details, please refer to the `paper <https://arxiv.org/abs/1809.07426>`_.
+
 .. code-block:: yaml
 
     models:
@@ -43,6 +45,8 @@ These models are especially suited to scenarios where user behavior exhibits bot
 - FOSSIL (FactOrized Sequential Prediction with Item SImilarity ModeLs):
   Integrates a first-order Markov Chain for short-term user behavior with a factored item similarity model (inspired by SLIM) to address data sparsity and capture long-term dependencies.
 
+  For further details, please refer to the `paper <https://arxiv.org/abs/1609.09152>`_.
+
 .. code-block:: yaml
 
     models:
@@ -68,6 +72,8 @@ They are effective for modeling evolving user interests within sessions.
   One of the earliest deep learning approaches for session-based recommendation.
   It leverages GRUs to model user interaction sequences, focusing on short-term behavior and next-item prediction.
 
+  For further details, please refer to the `paper <https://arxiv.org/abs/1606.08117>`_.
+
 .. code-block:: yaml
 
     models:
@@ -88,6 +94,8 @@ They are effective for modeling evolving user interests within sessions.
   A hybrid encoder-decoder model that improves upon standard RNNs by incorporating an attention mechanism.
   It uses a Global Encoder (GRU) to model the user's sequential behavior and a Local Encoder (Attention) to capture the user's main purpose in the current session.
   These features are combined into a unified session representation for bi-linear matching with candidate items.
+
+  For further details, please refer to the `paper <https://arxiv.org/abs/1711.04725>`_.
 
 .. code-block:: yaml
 
@@ -117,6 +125,8 @@ They excel at modeling both short-term and long-term user preferences without re
   Applies a bidirectional Transformer architecture to sequential recommendation.
   Instead of predicting the next item, it is trained on a "cloze" task, where it predicts randomly masked items in a sequence, allowing it to learn context from both past and future interactions.
 
+  For further details, please refer to the `paper <https://arxiv.org/abs/1904.06690>`_.
+
 .. code-block:: yaml
 
   models:
@@ -140,6 +150,8 @@ They excel at modeling both short-term and long-term user preferences without re
   A session-based recommendation framework that unifies the representation space for both encoding and decoding.
   Unlike standard deep encoders that project session embeddings into a different space than item embeddings, CORE encodes sessions as a weighted sum of item embeddings (using a Transformer to learn the weights).
   It also employs Robust Distance Measuring (RDM) based on cosine similarity to prevent overfitting.
+
+  For further details, please refer to the `paper <https://arxiv.org/abs/2204.11067>`_.
 
 .. code-block:: yaml
 
@@ -169,6 +181,8 @@ They excel at modeling both short-term and long-term user preferences without re
   Extends SASRec by introducing general self-attention.
   This enables better modeling of diverse or evolving user interests.
 
+  For further details, please refer to the `paper <https://arxiv.org/abs/2308.07192>`_.
+
 .. code-block:: yaml
 
     models:
@@ -191,6 +205,8 @@ They excel at modeling both short-term and long-term user preferences without re
 
 - LightSANs (Low-Rank Decomposed Self-Attention Networks):
   A sequential recommender that improves upon standard self-attention (like SASRec) by introducing low-rank decomposed self-attention to reduce complexity and decoupled position encoding to better model sequential relations.
+
+  For further details, please refer to the `paper <https://dl.acm.org/doi/10.1145/3404835.3462978>`_.
 
 .. code-block:: yaml
 
@@ -216,6 +232,8 @@ They excel at modeling both short-term and long-term user preferences without re
   LinRec employs a linear attention mechanism (O(N)) using L2 normalization and ELU activation.
   This allows for efficient modeling of long-term user sequences while maintaining the ability to capture complex dependencies, making it significantly faster than standard SASRec on long sequences.
 
+  For further details, please refer to the `paper <https://arxiv.org/abs/2411.01537>`_.
+
 .. code-block:: yaml
 
     models:
@@ -236,6 +254,8 @@ They excel at modeling both short-term and long-term user preferences without re
 - SASRec (Self-Attentive Sequential Recommendation):
   A Transformer-based model that uses stacked self-attention blocks to capture item dependencies in user sequences.
   SASRec effectively models dynamic user preferences in sparse datasets, learning both short- and long-term interests.
+
+  For further details, please refer to the `paper <https://arxiv.org/abs/1808.09781>`_.
 
 .. code-block:: yaml
 

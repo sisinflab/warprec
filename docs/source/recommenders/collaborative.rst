@@ -16,6 +16,8 @@ These models are particularly effective in sparse recommendation settings.
 - EASE (Embarrassingly Shallow Autoencoder):
   A simple, closed-form linear model that uses ridge regression to learn item-item similarities. Highly efficient and effective as a collaborative filtering baseline.
 
+  For further details, please refer to the `paper <https://arxiv.org/abs/1905.03375>`_.
+
 .. code-block:: yaml
 
     models:
@@ -24,6 +26,8 @@ These models are particularly effective in sparse recommendation settings.
 
 - CDAE (Collaborative Denoising Auto-Encoder):
   A denoising autoencoder that specifically incorporates a user-specific latent vector (bias) into the hidden layer. This allows the model to capture user-specific patterns more effectively than standard autoencoders, making it highly effective for top-N recommendation tasks.
+
+  For further details, please refer to the `paper <https://dl.acm.org/doi/10.1145/2835776.2835837>`_.
 
 .. code-block:: yaml
 
@@ -42,6 +46,8 @@ These models are particularly effective in sparse recommendation settings.
 
 - MacridVAE (Macro-Disentangled Variational Autoencoder):
   A disentangled representation learning model that assumes user intentions are driven by a few macro concepts. It uses a VAE architecture with a specific encoder to separate these high-level concepts, improving interpretability and robustness.
+
+  For further details, please refer to the `paper <https://arxiv.org/abs/1910.14238>`_.
 
 .. code-block:: yaml
 
@@ -65,6 +71,8 @@ These models are particularly effective in sparse recommendation settings.
 - MultiDAE (Multinomial Denoising Autoencoder):
   A deep autoencoder trained with dropout for denoising input data. Learns robust latent representations from implicit feedback using a multinomial loss.
 
+  For further details, please refer to the `paper <https://dl.acm.org/doi/10.1145/3178876.3186150>`_.
+
 .. code-block:: yaml
 
     models:
@@ -79,6 +87,8 @@ These models are particularly effective in sparse recommendation settings.
 
 - MultiVAE (Multinomial Variational Autoencoder):
   A probabilistic variant of MultiDAE that models uncertainty in user preferences via variational inference. Useful for capturing diverse user behaviors and providing more personalized recommendations.
+
+  For further details, please refer to the `paper <https://dl.acm.org/doi/10.1145/3178876.3186150>`_.
 
 .. code-block:: yaml
 
@@ -109,6 +119,8 @@ They are well-suited for uncovering complex patterns in sparse datasets.
 - DGCF (Disentangled Graph Collaborative Filtering):
   A graph-based model that disentangles user and item embeddings into multiple latent intents (factors) using an iterative routing mechanism. It encourages independence between factors via a distance correlation loss.
 
+  For further details, please refer to the `paper <https://arxiv.org/abs/2007.01764>`_.
+
 .. code-block:: yaml
 
   models:
@@ -125,6 +137,8 @@ They are well-suited for uncovering complex patterns in sparse datasets.
 
 - EGCF (Embedding-Less Graph Collaborative Filtering):
   A simplified graph model that removes user embeddings, learning only item embeddings to reduce complexity. It employs a joint loss combining BPR and contrastive learning (InfoNCE) to ensure alignment and uniformity without data augmentation. Supports 'parallel' and 'alternating' propagation modes.
+
+  For further details, please refer to the `paper <https://dl.acm.org/doi/10.1145/3701230>`_.
 
 .. code-block:: yaml
 
@@ -143,6 +157,8 @@ They are well-suited for uncovering complex patterns in sparse datasets.
 - ESIGCF (Extremely Simplified but Intent-enhanced Graph Collaborative Filtering):
   A simplified graph model that removes explicit user embeddings and utilizes Joint Graph Convolution (JoGCN) with hybrid normalization. It integrates intent-aware contrastive learning to capture user intents without requiring data augmentation.
 
+  For further details, please refer to the `paper <https://www.sciencedirect.com/science/article/abs/pii/S0952197625025266>`_.
+
 .. code-block:: yaml
 
   models:
@@ -160,6 +176,8 @@ They are well-suited for uncovering complex patterns in sparse datasets.
 - GCMC (Graph Convolutional Matrix Completion):
   A graph autoencoder designed for explicit feedback. It treats different rating values as distinct edge types in the user-item graph and learns embeddings using a graph convolutional encoder. A decoder then predicts rating probabilities. **This model requires explicit ratings to function properly**.
 
+  For further details, please refer to the `paper <https://arxiv.org/abs/1706.02263>`_.
+
 .. code-block:: yaml
 
   models:
@@ -173,6 +191,8 @@ They are well-suited for uncovering complex patterns in sparse datasets.
 
 - LightCCF (Light Contrastive Collaborative Filtering):
   A contrastive learning model that introduces a Neighborhood Aggregation (NA) loss. It brings users closer to their interacted items while pushing them away from other positive pairs (users and items) in the batch. It can work with a standard MF encoder (n_layers=0) or a GCN encoder.
+
+  For further details, please refer to the `paper <https://arxiv.org/abs/2504.10113>`_.
 
 .. code-block:: yaml
 
@@ -189,6 +209,8 @@ They are well-suited for uncovering complex patterns in sparse datasets.
 
 - LightGCL (Simple Yet Effective Graph Contrastive Learning):
   A graph contrastive learning model that uses Singular Value Decomposition (SVD) to construct a global contrastive view. It contrasts the local graph view (GCN) with the global SVD view to enhance representation learning and robustness against noise.
+
+  For further details, please refer to the `paper <https://arxiv.org/abs/2302.08191>`_.
 
 .. code-block:: yaml
 
@@ -208,6 +230,8 @@ They are well-suited for uncovering complex patterns in sparse datasets.
 - LightGCN:
   A simplified graph convolutional network designed for collaborative filtering. It eliminates feature transformations and nonlinear activations, focusing solely on neighborhood aggregation.
 
+  For further details, please refer to the `paper <https://arxiv.org/abs/2002.02126>`_.
+
 .. code-block:: yaml
 
     models:
@@ -221,6 +245,8 @@ They are well-suited for uncovering complex patterns in sparse datasets.
 
 - LightGCN++:
   An enhanced version of LightGCN that introduces asymmetric normalization (controlled by alpha and beta) and a residual connection to the initial embeddings (controlled by gamma). This allows the model to better adapt to the specific structural properties of the dataset.
+
+  For further details, please refer to the `paper <https://dl.acm.org/doi/10.1145/3640457.3688176>`_.
 
 .. code-block:: yaml
 
@@ -239,6 +265,8 @@ They are well-suited for uncovering complex patterns in sparse datasets.
 - LightGODE (Light Post-Training Graph-ODE):
   A highly efficient model that trains embeddings without graph convolution using alignment and uniformity losses. It applies a continuous Graph-ODE solver only during inference to incorporate high-order connectivity.
 
+  For further details, please refer to the `paper <https://arxiv.org/abs/2407.18910>`_.
+
 .. code-block:: yaml
 
   models:
@@ -254,6 +282,8 @@ They are well-suited for uncovering complex patterns in sparse datasets.
 
 - MixRec (Individual and Collective Mixing):
   A graph-based model that employs dual mixing strategies (Individual and Collective) to augment embeddings. It uses a dual-mixing contrastive learning objective to enhance consistency between positive pairs while leveraging mixed negatives.
+
+  For further details, please refer to the `paper <https://doi.org/10.1145/3696410.3714565>`_.
 
 .. code-block:: yaml
 
@@ -272,6 +302,8 @@ They are well-suited for uncovering complex patterns in sparse datasets.
 - NGCF (Neural Graph-based Collaborative Filtering):
   A neural graph-based collaborative filtering model that explicitly captures high-order connectivity by propagating embeddings through the user-item interaction graph.
 
+  For further details, please refer to the `paper <https://arxiv.org/abs/1905.08166>`_.
+
 .. code-block:: yaml
 
     models:
@@ -288,6 +320,8 @@ They are well-suited for uncovering complex patterns in sparse datasets.
 - RP3Beta:
   A graph-based collaborative filtering model that performs a biased random walk of length 3 on the user-item bipartite graph.
 
+  For further details, please refer to the `paper <https://www.zora.uzh.ch/id/eprint/131338/1/TiiS_2016.pdf>`_.
+
 .. code-block:: yaml
 
     models:
@@ -299,6 +333,8 @@ They are well-suited for uncovering complex patterns in sparse datasets.
 
 - SGCL (Supervised Graph Contrastive Learning):
   A unified framework that merges the recommendation task and self-supervised learning into a single supervised contrastive loss. It simplifies the training pipeline by removing the need for negative sampling and data augmentation.
+
+  For further details, please refer to the `paper <https://arxiv.org/abs/2507.13336>`_.
 
 .. code-block:: yaml
 
@@ -314,6 +350,8 @@ They are well-suited for uncovering complex patterns in sparse datasets.
 
 - SGL (Self-supervised Graph Learning):
   A graph-based model that augments the user-item graph structure (via Node Dropout, Edge Dropout, or Random Walk) to create auxiliary views for contrastive learning, improving robustness and accuracy.
+
+  For further details, please refer to the `paper <https://arxiv.org/abs/2010.10783>`_.
 
 .. code-block:: yaml
 
@@ -333,6 +371,8 @@ They are well-suited for uncovering complex patterns in sparse datasets.
 - UltraGCN:
   A simplified GCN model that skips explicit message passing during training. It approximates infinite-layer graph convolutions using a constraint loss objective that models both user-item and item-item relationships, resulting in high efficiency and scalability.
 
+  For further details, please refer to the `paper <https://arxiv.org/abs/2110.15114>`_.
+
 .. code-block:: yaml
 
   models:
@@ -349,6 +389,8 @@ They are well-suited for uncovering complex patterns in sparse datasets.
 
 - XSimGCL:
   A graph contrastive learning model that simplifies graph augmentations by adding uniform noise to embeddings. It achieves state-of-the-art performance by regulating the uniformity of the learned representation.
+
+  For further details, please refer to the `paper <https://arxiv.org/abs/2209.02544>`_.
 
 .. code-block:: yaml
 
@@ -374,6 +416,8 @@ KNN-based models generate recommendations by identifying the most similar users 
 - ItemKNN:
   A collaborative item-based KNN model that recommends items similar to those the user has already interacted with.
 
+  For further details, please refer to the `paper <http://ieeexplore.ieee.org/document/1167344/>`_.
+
 .. code-block:: yaml
 
     models:
@@ -383,6 +427,8 @@ KNN-based models generate recommendations by identifying the most similar users 
 
 - UserKNN:
   A collaborative user-based KNN model that recommends items liked by similar users.
+
+  For further details, please refer to the `paper <https://dl.acm.org/doi/10.1145/192844.192905>`_.
 
 .. code-block:: yaml
 
@@ -402,6 +448,8 @@ They include factorization-based approaches, pairwise ranking models, and sparse
 - ADMMSlim:
   An efficient implementation of SLIM using the ADMM optimization algorithm. It learns a sparse item-to-item similarity matrix for the top-N recommendation, balancing interpretability and performance.
 
+  For further details, please refer to the `paper <https://doi.org/10.1145/3336191.3371774>`_.
+
 .. code-block:: yaml
 
     models:
@@ -417,6 +465,8 @@ They include factorization-based approaches, pairwise ranking models, and sparse
 - BPR:
   A pairwise ranking model that optimizes the ordering of items for each user. BPR is particularly effective for implicit feedback and is trained to maximize the margin between positive and negative item pairs.
 
+  For further details, please refer to the `paper <https://arxiv.org/abs/1205.2618>`_.
+
 .. code-block:: yaml
 
     models:
@@ -429,6 +479,8 @@ They include factorization-based approaches, pairwise ranking models, and sparse
 
 - FISM:
   A recommendation algorithm that models item-to-item similarity by learning latent representations of items. Instead of explicitly learning user embeddings, FISM represents each user as the weighted average of the items they have interacted with, enabling efficient and accurate personalized recommendations.
+
+  For further details, please refer to the `paper <https://dl.acm.org/doi/10.1145/2487575.2487589>`_.
 
 .. code-block:: yaml
 
@@ -445,6 +497,8 @@ They include factorization-based approaches, pairwise ranking models, and sparse
 - Slim:
   A collaborative filtering model that learns a sparse item similarity matrix using L1 and L2 regularization. SLIM directly models the relationship between items, making it highly interpretable and effective for top-N recommendation.
 
+  For further details, please refer to the `paper <https://ieeexplore.ieee.org/document/6137254>`_.
+
 .. code-block:: yaml
 
     models:
@@ -460,6 +514,8 @@ Neural recommenders leverage deep learning architectures to model complex, non-l
 
 - ConvNCF:
   Utilizes the outer product of user and item embeddings to construct a 2D interaction map, which is processed by Convolutional Neural Networks (CNNs) to capture complex and localized patterns in user-item interactions. ConvNCF enhances the expressive power of neural collaborative filtering by modeling structured relationships, making it well-suited for scenarios where fine-grained interaction modeling is critical.
+
+  For further details, please refer to the `paper <https://arxiv.org/abs/1808.03912>`_.
 
 .. code-block:: yaml
 
@@ -478,6 +534,8 @@ Neural recommenders leverage deep learning architectures to model complex, non-l
 
 - NeuMF:
   Combines Generalized Matrix Factorization (GMF) with a Multi-Layer Perceptron (MLP) to capture both linear and non-linear user-item interactions. NeuMF is a highly expressive model that can adapt to various patterns in user behavior, making it suitable for both implicit and explicit feedback scenarios.
+
+  For further details, please refer to the `paper <https://arxiv.org/abs/1708.05031>`_.
 
 .. code-block:: yaml
 

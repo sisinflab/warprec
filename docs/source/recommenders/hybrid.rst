@@ -16,6 +16,8 @@ Hybrid Autoencoders extend standard autoencoder architectures by injecting side 
 - AddEASE:
   An extension of the EASE model using side information. It solves two linear problems, increasing the complexity of the underlying task. **This model requires side information to function properly**.
 
+  For further details, please refer to the `paper <https://dl.acm.org/doi/10.1145/3383313.3418480>`_.
+
 .. code-block:: yaml
 
     models:
@@ -25,6 +27,8 @@ Hybrid Autoencoders extend standard autoencoder architectures by injecting side 
 
 - CEASE:
   An extension of the EASE model using side information. Extends the EASE problem without adding more complexity. **This model requires side information to function properly**.
+
+  For further details, please refer to the `paper <https://dl.acm.org/doi/10.1145/3383313.3418480>`_.
 
 .. code-block:: yaml
 
@@ -42,6 +46,8 @@ Hybrid KNN models enhance standard Nearest Neighbor approaches by incorporating 
 - AttributeItemKNN:
   An item-based KNN variant that incorporates item content to compute similarities. **This model requires side information to function properly**.
 
+  For further details, please refer to the `paper <https://www.researchgate.net/publication/221141162_MyMediaLite_A_free_recommender_system_library>`_.
+
 .. code-block:: yaml
 
     models:
@@ -51,6 +57,8 @@ Hybrid KNN models enhance standard Nearest Neighbor approaches by incorporating 
 
 - AttributeUserKNN:
   A user-based KNN model that uses content-based profiles (e.g., TF-IDF) to define user similarity. **This model requires side information to function properly**.
+
+  For further details, please refer to the `paper <https://www.researchgate.net/publication/221141162_MyMediaLite_A_free_recommender_system_library>`_.
 
 .. code-block:: yaml
 
