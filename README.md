@@ -172,8 +172,8 @@ Citation details will be provided in an upcoming release. Stay tuned!
 ## 📧 Contact
 For questions or suggestions, feel free to contact us at:
 
-**Marco Avolio** - marco.avolio@wideverse.com
-**Potito Aghilar** - potito.aghilar@wideverse.com
-**Sabino Roccotelli** - sabino.roccotelli@wideverse.com
-**Vito Walter Anelli** - vitowalter.anelli@poliba.it
-**Joseph Trotta** - joseph.trotta@ovs.it
+* **Marco Avolio** - marco.avolio@wideverse.com
+* **Potito Aghilar** - potito.aghilar@wideverse.com
+* **Sabino Roccotelli** - sabino.roccotelli@wideverse.com
+* **Vito Walter Anelli** - vitowalter.anelli@poliba.it
+* **Joseph Trotta** - joseph.trotta@ovs.it
