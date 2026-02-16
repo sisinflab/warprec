@@ -46,6 +46,8 @@ class MRR(UserAverageTopKMetric):
     +----+---+
 
     MRR@2 = (0.5 + 1) / 2 = 0.75
+
+    For further details, please refer to this `link <https://en.wikipedia.org/wiki/Mean_reciprocal_rank>`_.
     """
 
     _REQUIRED_COMPONENTS: Set[MetricBlock] = {

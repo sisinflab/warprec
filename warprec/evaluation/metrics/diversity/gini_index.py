@@ -16,6 +16,8 @@ class Gini(TopKMetric):
     The metric formula is defines as:
         Gini = (sum_{j=1}^{n_rec} (2*(j + offset) - num_items - 1) * (count_j / free_norm)) / (num_items - 1)
 
+    For further details, please refer to this `book <https://link.springer.com/rwe/10.1007/978-1-4939-7131-2_110158>`_.
+
     where:
         - n_rec is the number of items that were recommended at least once,
         - offset = num_items - n_rec (to account for items with zero recommendations),
