@@ -19,21 +19,21 @@ These models can capture both short-term dependencies and long-term patterns thr
 
   For further details, please refer to the `paper <https://arxiv.org/abs/1809.07426>`_.
 
-.. code-block:: yaml
+  .. code-block:: yaml
 
-    models:
-      Caser:
-        embedding_size: 64
-        n_h: 8
-        n_v: 4
-        dropout_prob: 0.5
-        reg_weight: 0.001
-        weight_decay: 0.0001
-        batch_size: 2048
-        epochs: 200
-        learning_rate: 0.001
-        neg_samples: 1
-        max_seq_len: 20
+      models:
+        Caser:
+          embedding_size: 64
+          n_h: 8
+          n_v: 4
+          dropout_prob: 0.5
+          reg_weight: 0.001
+          weight_decay: 0.0001
+          batch_size: 2048
+          epochs: 200
+          learning_rate: 0.001
+          neg_samples: 1
+          max_seq_len: 20
 
 =============
 Markov-Chains
@@ -47,19 +47,19 @@ These models are especially suited to scenarios where user behavior exhibits bot
 
   For further details, please refer to the `paper <https://arxiv.org/abs/1609.09152>`_.
 
-.. code-block:: yaml
+  .. code-block:: yaml
 
-    models:
-      FOSSIL:
-        embedding_size: 64
-        order_len: 8
-        alpha: 0.001
-        reg_weight: 0.001
-        batch_size: 2048
-        epochs: 200
-        learning_rate: 0.001
-        neg_samples: 1
-        max_seq_len: 200
+      models:
+        FOSSIL:
+          embedding_size: 64
+          order_len: 8
+          alpha: 0.001
+          reg_weight: 0.001
+          batch_size: 2048
+          epochs: 200
+          learning_rate: 0.001
+          neg_samples: 1
+          max_seq_len: 200
 
 =============
 RNN-Based
@@ -74,21 +74,21 @@ They are effective for modeling evolving user interests within sessions.
 
   For further details, please refer to the `paper <https://arxiv.org/abs/1606.08117>`_.
 
-.. code-block:: yaml
+  .. code-block:: yaml
 
-    models:
-      GRU4Rec:
-        embedding_size: 128
-        hidden_size: 64
-        num_layers: 2
-        dropout_prob: 0.1
-        reg_weight: 0.001
-        weight_decay: 0.0001
-        batch_size: 2048
-        epochs: 200
-        learning_rate: 0.001
-        neg_samples: 1
-        max_seq_len: 200
+      models:
+        GRU4Rec:
+          embedding_size: 128
+          hidden_size: 64
+          num_layers: 2
+          dropout_prob: 0.1
+          reg_weight: 0.001
+          weight_decay: 0.0001
+          batch_size: 2048
+          epochs: 200
+          learning_rate: 0.001
+          neg_samples: 1
+          max_seq_len: 200
 
 - NARM (Neural Attentive Session-based Recommendation):
   A hybrid encoder-decoder model that improves upon standard RNNs by incorporating an attention mechanism.
@@ -97,22 +97,22 @@ They are effective for modeling evolving user interests within sessions.
 
   For further details, please refer to the `paper <https://arxiv.org/abs/1711.04725>`_.
 
-.. code-block:: yaml
+  .. code-block:: yaml
 
-  models:
-    NARM:
-      embedding_size: 128
-      hidden_size: 64
-      n_layers: 2
-      hidden_dropout_prob: 0.1
-      attn_dropout_prob: 0.1
-      reg_weight: 0.001
-      weight_decay: 0.0001
-      batch_size: 2048
-      epochs: 200
-      learning_rate: 0.001
-      neg_samples: 1
-      max_seq_len: 200
+    models:
+      NARM:
+        embedding_size: 128
+        hidden_size: 64
+        n_layers: 2
+        hidden_dropout_prob: 0.1
+        attn_dropout_prob: 0.1
+        reg_weight: 0.001
+        weight_decay: 0.0001
+        batch_size: 2048
+        epochs: 200
+        learning_rate: 0.001
+        neg_samples: 1
+        max_seq_len: 200
 
 =============
 Transformer-Based
@@ -127,24 +127,24 @@ They excel at modeling both short-term and long-term user preferences without re
 
   For further details, please refer to the `paper <https://arxiv.org/abs/1904.06690>`_.
 
-.. code-block:: yaml
+  .. code-block:: yaml
 
-  models:
-    BERT4Rec:
-      embedding_size: 128
-      n_layers: 2
-      n_heads: 8
-      inner_size: 512
-      dropout_prob: 0.1
-      attn_dropout_prob: 0.1
-      mask_prob: 0.2
-      reg_weight: 0.001
-      weight_decay: 0.0001
-      batch_size: 2048
-      epochs: 200
-      learning_rate: 0.001
-      neg_samples: 1
-      max_seq_len: 200
+    models:
+      BERT4Rec:
+        embedding_size: 128
+        n_layers: 2
+        n_heads: 8
+        inner_size: 512
+        dropout_prob: 0.1
+        attn_dropout_prob: 0.1
+        mask_prob: 0.2
+        reg_weight: 0.001
+        weight_decay: 0.0001
+        batch_size: 2048
+        epochs: 200
+        learning_rate: 0.001
+        neg_samples: 1
+        max_seq_len: 200
 
 - CORE (Consistent Representation Encoder):
   A session-based recommendation framework that unifies the representation space for both encoding and decoding.
@@ -153,29 +153,29 @@ They excel at modeling both short-term and long-term user preferences without re
 
   For further details, please refer to the `paper <https://arxiv.org/abs/2204.11067>`_.
 
-.. code-block:: yaml
+  .. code-block:: yaml
 
-    models:
-      CORE:
-        embedding_size: 64
-        dnn_type: "trm"
-        n_layers: 2
-        n_heads: 8
-        inner_size: 256
-        hidden_dropout_prob: 0.1
-        attn_dropout_prob: 0.1
-        layer_norm_eps: 1e-12
-        initializer_range: 0.02
-        session_dropout: 0.1
-        item_dropout: 0.1
-        temperature: 0.07
-        reg_weight: 0.001
-        weight_decay: 0.0001
-        batch_size: 2048
-        epochs: 200
-        learning_rate: 0.001
-        neg_samples: 1
-        max_seq_len: 50
+      models:
+        CORE:
+          embedding_size: 64
+          dnn_type: "trm"
+          n_layers: 2
+          n_heads: 8
+          inner_size: 256
+          hidden_dropout_prob: 0.1
+          attn_dropout_prob: 0.1
+          layer_norm_eps: 1e-12
+          initializer_range: 0.02
+          session_dropout: 0.1
+          item_dropout: 0.1
+          temperature: 0.07
+          reg_weight: 0.001
+          weight_decay: 0.0001
+          batch_size: 2048
+          epochs: 200
+          learning_rate: 0.001
+          neg_samples: 1
+          max_seq_len: 50
 
 - gSASRec (General Self-Attentive Sequential Recommendation):
   Extends SASRec by introducing general self-attention.
@@ -183,18 +183,42 @@ They excel at modeling both short-term and long-term user preferences without re
 
   For further details, please refer to the `paper <https://arxiv.org/abs/2308.07192>`_.
 
-.. code-block:: yaml
+  .. code-block:: yaml
+
+      models:
+        gSASRec:
+          embedding_size: 128
+          n_layers: 2
+          n_heads: 8
+          inner_size: 512
+          dropout_prob: 0.1
+          attn_dropout_prob: 0.1
+          gbce_t: 0.5
+          reuse_item_embeddings: True
+          reg_weight: 0.001
+          weight_decay: 0.0001
+          batch_size: 2048
+          epochs: 200
+          learning_rate: 0.001
+          neg_samples: 1
+          max_seq_len: 200
+
+- LightSANs (Low-Rank Decomposed Self-Attention Networks):
+  A sequential recommender that improves upon standard self-attention (like SASRec) by introducing low-rank decomposed self-attention to reduce complexity and decoupled position encoding to better model sequential relations.
+
+  For further details, please refer to the `paper <https://dl.acm.org/doi/10.1145/3404835.3462978>`_.
+
+  .. code-block:: yaml
 
     models:
-      gSASRec:
+      LightSANs:
         embedding_size: 128
         n_layers: 2
         n_heads: 8
+        k_interests: 5
         inner_size: 512
-        dropout_prob: 0.1
-        attn_dropout_prob: 0.1
-        gbce_t: 0.5
-        reuse_item_embeddings: True
+        dropout_prob: 0.5
+        attn_dropout_prob: 0.5
         reg_weight: 0.001
         weight_decay: 0.0001
         batch_size: 2048
@@ -202,30 +226,6 @@ They excel at modeling both short-term and long-term user preferences without re
         learning_rate: 0.001
         neg_samples: 1
         max_seq_len: 200
-
-- LightSANs (Low-Rank Decomposed Self-Attention Networks):
-  A sequential recommender that improves upon standard self-attention (like SASRec) by introducing low-rank decomposed self-attention to reduce complexity and decoupled position encoding to better model sequential relations.
-
-  For further details, please refer to the `paper <https://dl.acm.org/doi/10.1145/3404835.3462978>`_.
-
-.. code-block:: yaml
-
-  models:
-    LightSANs:
-      embedding_size: 128
-      n_layers: 2
-      n_heads: 8
-      k_interests: 5
-      inner_size: 512
-      dropout_prob: 0.5
-      attn_dropout_prob: 0.5
-      reg_weight: 0.001
-      weight_decay: 0.0001
-      batch_size: 2048
-      epochs: 200
-      learning_rate: 0.001
-      neg_samples: 1
-      max_seq_len: 200
 
 - LinRec (Linear Attention Mechanism for Long-term Sequential Recommender Systems):
   Proposed to address the quadratic complexity of standard Transformers.
@@ -234,22 +234,22 @@ They excel at modeling both short-term and long-term user preferences without re
 
   For further details, please refer to the `paper <https://arxiv.org/abs/2411.01537>`_.
 
-.. code-block:: yaml
+  .. code-block:: yaml
 
-    models:
-      LinRec:
-        embedding_size: 128
-        n_layers: 2
-        n_heads: 8
-        inner_size: 512
-        dropout_prob: 0.1
-        reg_weight: 0.001
-        weight_decay: 0.0001
-        batch_size: 2048
-        epochs: 200
-        learning_rate: 0.001
-        neg_samples: 1
-        max_seq_len: 200
+      models:
+        LinRec:
+          embedding_size: 128
+          n_layers: 2
+          n_heads: 8
+          inner_size: 512
+          dropout_prob: 0.1
+          reg_weight: 0.001
+          weight_decay: 0.0001
+          batch_size: 2048
+          epochs: 200
+          learning_rate: 0.001
+          neg_samples: 1
+          max_seq_len: 200
 
 - SASRec (Self-Attentive Sequential Recommendation):
   A Transformer-based model that uses stacked self-attention blocks to capture item dependencies in user sequences.
@@ -257,23 +257,23 @@ They excel at modeling both short-term and long-term user preferences without re
 
   For further details, please refer to the `paper <https://arxiv.org/abs/1808.09781>`_.
 
-.. code-block:: yaml
+  .. code-block:: yaml
 
-    models:
-      SASRec:
-        embedding_size: 128
-        n_layers: 2
-        n_heads: 8
-        inner_size: 512
-        dropout_prob: 0.1
-        attn_dropout_prob: 0.1
-        reg_weight: 0.001
-        weight_decay: 0.0001
-        batch_size: 2048
-        epochs: 200
-        learning_rate: 0.001
-        neg_samples: 1
-        max_seq_len: 200
+      models:
+        SASRec:
+          embedding_size: 128
+          n_layers: 2
+          n_heads: 8
+          inner_size: 512
+          dropout_prob: 0.1
+          attn_dropout_prob: 0.1
+          reg_weight: 0.001
+          weight_decay: 0.0001
+          batch_size: 2048
+          epochs: 200
+          learning_rate: 0.001
+          neg_samples: 1
+          max_seq_len: 200
 
 ===============================
 Summary of Available Sequential Models

@@ -19,13 +19,13 @@ Vector Space models represent items and users as vectors in a multi-dimensional 
 
   For further details, please refer to the `paper <https://dl.acm.org/doi/10.1145/2362499.2362501>`_.
 
-.. code-block:: yaml
+  .. code-block:: yaml
 
-    models:
-      VSM:
-        similarity: cosine
-        user_profile: binary
-        item_profile: tfidf
+      models:
+        VSM:
+          similarity: cosine
+          user_profile: binary
+          item_profile: tfidf
 
 ===================================
 Summary of Available Content Models
