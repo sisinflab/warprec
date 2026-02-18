@@ -2,7 +2,13 @@
 name = "WarpRec"
 version = "0.1.0"
 description = ""
-authors = ["JTOVS <joseph.trotta@ovs.it>", "MarcoWV <marco@wideverse.com>"]
+authors = [
+    "MarcoWV <marco.avolio@wideverse.com>",
+    "potitoaghilar <potito.aghilar@wideverse.com>",
+    "SabeeenoGH <sabino.roccotelli@wideverse.com>",
+    "vitowalteranelli <vitowalter.anelli@poliba.it>",
+    "JTOVS <joseph.trotta@ovs.it>"
+]
 readme = "README.md"
 
 [tool.poetry.dependencies]
@@ -23,8 +29,11 @@ tensorboardx = "^2.6.2.2"
 torch = "~2.7"
 torchmetrics = "^1.8.2"
 optuna = "^4.5.0"
-polars = "1.36.1"
+polars = "^1.36"
 narwhals = "^2.15.0"
+torch-scatter = {version = "*", optional = true}
+torch-sparse = {version = "*", optional = true}
+torch-geometric = {version = "*", optional = true}
 
 
 [tool.poetry.group.dev.dependencies]
@@ -54,6 +63,11 @@ poetry-plugin-export = ">=1.8"
 
 
 [tool.poetry.extras]
+graph = [
+    "torch-scatter",
+    "torch-sparse",
+    "torch-geometric",
+]
 dashboard = [
     "wandb",
     "codecarbon",
