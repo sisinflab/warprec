@@ -1,5 +1,5 @@
 [tool.poetry]
-name = "WarpRec"
+name = "warprec"
 version = "0.1.0"
 description = ""
 authors = [
@@ -31,6 +31,11 @@ torchmetrics = "^1.8.2"
 optuna = "^4.5.0"
 polars = "^1.36"
 narwhals = "^2.15.0"
+wandb = {version = "^0.19.10", optional = true}
+codecarbon = {version = "^3.0.0", optional = true}
+mlflow = {version = "^2.22.0", optional = true}
+azure-storage-blob = {version = "^12.26.0", optional = true}
+azure-identity = {version = "^1.25.1", optional = true}
 torch-scatter = {version = "*", optional = true}
 torch-sparse = {version = "*", optional = true}
 torch-geometric = {version = "*", optional = true}
@@ -46,16 +51,6 @@ pylint = "^3.3.3"
 bandit = "^1.8.2"
 nvitop = "^1.4.2"
 matplotlib = "^3.10.3"
-
-
-[tool.poetry.group.dashboard.dependencies]
-wandb = "^0.19.10"
-codecarbon = "^3.0.0"
-mlflow = "^2.22.0"
-
-[tool.poetry.group.remote-io.dependencies]
-azure-storage-blob = "^12.26.0"
-azure-identity = "^1.25.1"
 
 
 [tool.poetry.requires-plugins]
