@@ -1,5 +1,9 @@
 # 🚀 WarpRec
 
+[Docs]
+
+[Docs]: https://warprec.readthedocs.io/en/latest/
+
 WarpRec is a flexible and efficient framework designed for building, training, and evaluating recommendation models. It supports a wide range of configurations, customizable pipelines, and powerful optimization tools to enhance model performance and usability.
 
 WarpRec is designed for both beginners and experienced practitioners. For newcomers, it offers a simple and intuitive interface to explore and experiment with state-of-the-art recommendation models. For advanced users, WarpRec provides a modular and extensible architecture that allows rapid prototyping, complex experiment design, and fine-grained control over every step of the recommendation pipeline.
@@ -18,89 +22,27 @@ Whether you're learning how recommender systems work or conducting high-performa
 
 ## ⚙️ Installation
 
-WarpRec is designed with a modular dependency structure leveraging Poetry to manage a lean core installation and optional extras for advanced functionalities (like experiment tracking or cloud I/O).
+WarpRec is designed to be easily installed and reproducible using **Conda**. This ensures that all dependencies and the Python environment are managed consistently.
 
 ### 📋 Prerequisites
 
-- Python 3.12
-- [Poetry 2.1.2](https://python-poetry.org/) for development and dependency management (highly recommended).
+- **Git**: To clone the repository.
+- **Conda**: You need either [Anaconda](https://www.anaconda.com/) or [Miniconda](https://docs.conda.io/en/latest/miniconda.html) installed on your system.
 
-### 🛠️ Installing WarpRec for different environments
+### 🛠️ Setup Guide
 
-**PyG is only required if you intend to use or develop Graph-based recommendation models.** Due to strict compatibility constraints, you must install PyG manually, ensuring the versions match your specific CUDA setup. To ensure the correct installation, follow the [PyG Installation Guide](https://pytorch-geometric.readthedocs.io/en/latest/install/installation.html).
+Follow these steps to clone the project and set up the environment:
 
-#### 📦 Using Poetry (`pyproject.toml`) - Preferred for Development
+1. **Clone the repository**
+   Open your terminal and clone the WarpRec repository:
+   ```bash
+   git clone <repository_url>
+   cd warprec
 
-Poetry is the recommended tool, as it installs only the core dependencies by default, allowing you to selectively add specialized dependency groups (extras).
-
-1. Create and activate environment:
+2. **Create the Conda environment**
+    Use the provided environment.yml file to create the virtual environment. This will install Python 3.12 and the necessary core dependencies.
     ```bash
-    poetry env use python3.12
-
-    # If you want to install only the core
-    poetry install --only main
-
-    # If you want to install all dependencies
-    poetry install
-
-    # If you want to install a specific subset of utilities
-    poetry install --only main remote-io
-
-2. Install PyTorch Geometric (PyG) - Optional for Graph Models:
-
-    Example (replace with your CUDA version):
-    ```bash
-    # Example for CUDA 11.8
-    poetry run pip install torch-scatter torch-sparse torch-cluster torch-spline-conv \
-    -f https://data.pyg.org/whl/torch-2.7.0+cu118.html
-    poetry run pip install torch-geometric
-
-#### 🧪 Using venv (`requirements.txt`)
-
-When installing via `pip` and `requirements.txt`, all dependencies from the core and all extra groups are installed simultaneously.
-
-1. Create the virtual environment and activate it:
-    ```bash
-    python3.12 -m venv .venv
-    source .venv/bin/activate
-
-2. Install base dependencies:
-    ```bash
-    pip install --upgrade pip
-    pip install -r requirements.txt
-
-3. Manually install compatible versions of PyTorch and PyG (if needed for graph models, see step 3 in the Poetry section).
-
-#### 🐍 Using Conda/Mamba (`environment.yml`)
-
-Similar to `venv`, the Conda environment file typically includes all dependencies (core and extras) for maximum convenience and broader compatibility.
-
-1. Create or update the environment:
-    ```bash
-    conda env create --file environment.yml --name warprec
-    # or, if the env already exists
-    conda env update --file environment.yml --name warprec
-
-2. Activate the environment:
-    ```bash
-    conda activate warprec
-
-3. Manually install compatible PyTorch and PyG (if needed for graph models, see step 3 in the Poetry section). Conda may not always provide the latest compatible versions; for full compatibility, installing with `pip` inside the Conda environment is often required.
-
-### ⚠️ Important Notes
-
-- **PyG is Optional:** Only install PyG (PyTorch Geometric) if you need **Graph Neural Network (GNN)** models.
-
-- **PyG Compatibility:** PyG is highly sensitive to the version of **PyTorch** and **CUDA**. Incorrect combinations may lead to runtime errors or failed builds. Always check the official compatibility matrix before installing:
-    - [PyTorch CUDA Support Matrix](https://pytorch.org/get-started/previous-versions/)
-    - [PyG CUDA Compatibility](https://pytorch-geometric.readthedocs.io/en/latest/install/installation.html)
-
-If you're unsure about your system's CUDA version, run:
-```bash
-nvcc --version
-```
-
-Or fall back to the CPU version of all packages by omitting the CUDA suffixes. Also while these environments are made available for convenience and broader compatibility, **Poetry remains the preferred tool for development**, ensuring consistency with the project's setup.
+   conda env create --file environment.yml
 
 ## 🚂 Usage
 
@@ -164,7 +106,7 @@ To get started:
 If you encounter any issues or have questions, feel free to open an issue in the Issues section of the repository.
 
 ## 📜 License
-License information will be added soon.
+This project is licensed under the MIT License - see the LICENSE file for details.
 
 ## 📖 Citation
 Citation details will be provided in an upcoming release. Stay tuned!
