@@ -9,6 +9,8 @@ Euclidean Distance
 
 Computes the **Euclidean Distance** between the model's performance and an Utopia Point (ideal performance). A lower value indicates the model is closer to the desired objectives.
 
+For further details, please refer to this `link <https://www.sciencedirect.com/science/article/abs/pii/S0020025516318035?fr=RR-2&ref=pdf_download&rr=9d06d2a68bb6e889>`_ and this `paper <https://dl.acm.org/doi/10.1145/3583780.3615010>`_.
+
 .. code-block:: yaml
 
     evaluation:
@@ -23,6 +25,8 @@ Hypervolume
 ======================================================
 
 Measures the **volume of the objective space** dominated by the model's performance relative to a Nadir Point (worst-case reference). A higher volume indicates a better trade-off between metrics.
+
+For further details, please refer to this `book <https://link.springer.com/chapter/10.1007/978-3-540-70928-2_64>`_ and this `paper <https://dl.acm.org/doi/10.1145/3583780.3615010>`_..
 
 .. code-block:: yaml
 
