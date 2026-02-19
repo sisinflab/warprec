@@ -1,8 +1,19 @@
 # 🚀 WarpRec
 
-[Docs]
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Python 3.12](https://img.shields.io/badge/python-3.12-blue.svg)](https://www.python.org/downloads/release/python-3120/)
+[![Documentation Status](https://readthedocs.org/projects/warprec/badge/?version=latest)](https://warprec.readthedocs.io/en/latest/)
+[![PyTorch](https://img.shields.io/badge/PyTorch-2.7-ee4c2c?logo=pytorch&logoColor=white)](https://pytorch.org/)
+[![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
+[![CodeCarbon](https://img.shields.io/badge/carbon%20tracked-CodeCarbon-brightgreen?logo=leaflet&logoColor=white)](https://codecarbon.io/)
+[![MCP Powered](https://img.shields.io/badge/MCP-powered-blueviolet?logo=anthropic&logoColor=white)](https://modelcontextprotocol.io/)
+[![GitHub Stars](https://img.shields.io/github/stars/sisinflab/warprec?style=social)](https://github.com/sisinflab/warprec)
 
-[Docs]: https://warprec.readthedocs.io/en/latest/
+<p align="center">
+  <a href="https://warprec.readthedocs.io/en/latest/">
+    <img src="https://img.shields.io/badge/📖%20Read%20the%20Docs-warprec-blue?style=for-the-badge" alt="Read the Docs"/>
+  </a>
+</p>
 
 WarpRec is a flexible and efficient framework designed for building, training, and evaluating recommendation models. It supports a wide range of configurations, customizable pipelines, and powerful optimization tools to enhance model performance and usability.
 
@@ -10,15 +21,35 @@ WarpRec is designed for both beginners and experienced practitioners. For newcom
 
 Whether you're learning how recommender systems work or conducting high-performance research and development, WarpRec offers the right tools to match your workflow.
 
+## 📚 Table of Contents
+
+- [✨ Key Features](#-key-features)
+- [⚙️ Installation](#️-installation)
+  - [📋 Prerequisites](#-prerequisites)
+  - [🛠️ Setup Guide](#️-setup-guide)
+- [🚂 Usage](#-usage)
+  - [🏋️ Training a model](#️-training-a-model)
+  - [✏️ Design a model](#️-design-a-model)
+  - [🔍 Evaluate a model](#-evaluate-a-model)
+  - [🧰 Makefile Commands](#-makefile-commands)
+- [🤝 Contributing](#-contributing)
+- [📜 License](#-license)
+- [📖 Citation](#-citation)
+- [📧 Contact](#-contact)
+
 ## ✨ Key Features
 
-- **Model Training**: WarpRec includes out-of-the-box support for a variety of recommendation algorithms, including classic models like `ItemKNN` and `EASE`, as well as deep learning approaches such as `MultiDAE`. Each model can be easily configured, trained, and extended, making the framework suitable for both simple baselines and advanced research.
-- **Model Design**: WarpRec provides a flexible API for designing and integrating custom recommendation models. Developers can implement their own architectures by extending standardized base classes, ensuring compatibility with the training, evaluation, and optimization modules of the framework. This feature enables rapid prototyping and experimentation, allowing researchers and practitioners to seamlessly test novel approaches alongside existing baselines.
-- **Evaluation**: The evaluation module offers a wide range of metrics, all of which are configurable and easy to extend. Metrics are computed in batches to ensure scalability and memory efficiency, and GPU acceleration is supported to speed up the evaluation process in large-scale experiments.
-- **Custom Pipelines**: WarpRec allows you to build your own training and evaluation pipelines directly in Python, without relying on external configuration files. This feature is particularly useful for advanced users who want full control over the logic and flow of experiments, enabling faster iterations and experiments.
-- **Hyperparameter Optimization**: The framework integrates seamlessly with Ray Tune, providing access to advanced search and scheduling algorithms. Whether you're running a basic grid search or a complex multi-trial optimization, WarpRec automates and accelerates the tuning process.
-- **Data Management**: WarpRec streamlines data handling with built-in tools for loading, preprocessing, splitting, and exporting datasets. The system supports standard formats and is designed to work smoothly with both small-scale test sets and large real-world datasets.
-- **Experiment Tracking and Visualization**: WarpRec integrates with popular tracking tools such as `TensorBoard`, `MLflow`, and `Weights & Biases`, allowing you to monitor metrics, visualize training dynamics, and manage multiple runs with ease. Additionally, the framework supports `CodeCarbon` to track the environmental impact of your experiments.
+- **55 Built-in Algorithms**: WarpRec ships with 55 state-of-the-art recommendation models spanning 6 paradigms — Unpersonalized, Content-Based, Collaborative Filtering (e.g., `LightGCN`, `EASE`$^R$, `MultiVAE`), Context-Aware (e.g., `DeepFM`, `xDeepFM`), Sequential (e.g., `SASRec`, `BERT4Rec`, `GRU4Rec`), and Hybrid. All models are fully configurable and extend a standardized base class, making it easy to prototype custom architectures within the same pipeline.
+- **Backend-Agnostic Data Engine**: Built on [Narwhals](https://narwhals-dev.github.io/narwhals/), WarpRec operates over Pandas, Polars, and Spark without code changes — enabling a true "write-once, run-anywhere" workflow from laptop to distributed cluster. Data ingestion supports both local filesystems and cloud object storage (Azure Blob Storage).
+- **Comprehensive Data Processing**: The data module provides 13 filtering strategies (filter-by-rating, k-core, cold-start heuristics) and 6 splitting protocols (random/temporal Hold-Out, Leave-k-Out, Fixed Timestamp, k-fold Cross-Validation), for a total of 19 configurable strategies to ensure rigorous and reproducible experimental setups.
+- **40 GPU-Accelerated Metrics**: The evaluation suite covers 40 metrics across 7 families — Accuracy, Rating, Coverage, Novelty, Diversity, Bias, and Fairness — including multi-objective metrics for simultaneous optimization of competing goals. All metrics are computed with full GPU acceleration for large-scale experiments.
+- **Statistical Rigor**: WarpRec automates hypothesis testing with paired (Student's t-test, Wilcoxon signed-rank) and independent-group (Mann-Whitney U) tests, and applies multiple comparison corrections via **Bonferroni** and **FDR (Benjamini-Hochberg)** to prevent p-hacking and ensure statistically robust conclusions.
+- **Distributed Training & HPO**: Seamless vertical and horizontal scaling from single-GPU to multi-node Ray clusters. Hyperparameter optimization supports Grid, Random, Bayesian, HyperOpt, Optuna, and BoHB strategies, with ASHA pruning and model-level early stopping to maximize computational efficiency.
+- **Green AI & Carbon Tracking**: WarpRec is the first recommendation framework with native [CodeCarbon](https://codecarbon.io/) integration, automatically quantifying energy consumption and CO₂ emissions for every experiment and persisting carbon footprint reports alongside standard results.
+- **Agentic AI via MCP**: WarpRec natively implements a [Model Context Protocol](https://modelcontextprotocol.io/) server (`infer-api/mcp_server.py`), exposing trained recommenders as callable tools within LLM and autonomous agent workflows — transforming the framework from a static predictor into an interactive, agent-ready component.
+- **REST API & Model Serving**: Trained models are instantly deployable as RESTful microservices via the built-in FastAPI server (`infer-api/server.py`), decoupling the modeling core from serving infrastructure with zero additional engineering effort.
+- **Experiment Tracking**: Native integrations with `TensorBoard`, `Weights & Biases`, and `MLflow` for real-time monitoring of metrics, training dynamics, and multi-run management.
+- **Custom Pipelines & Callbacks**: Beyond the three standard pipelines (Training, Design, Evaluation), WarpRec exposes an event-driven Callback system for injecting custom logic at any stage — enabling complex experiments without modifying framework internals.
 
 ## ⚙️ Installation
 
