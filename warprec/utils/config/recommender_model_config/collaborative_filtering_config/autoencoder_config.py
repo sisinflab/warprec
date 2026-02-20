@@ -434,3 +434,28 @@ class MultiVAE(RecomModel):
     def check_anneal_step(cls, v: list):
         """Validate anneal_step."""
         return validate_greater_equal_than_zero(cls, v, "anneal_step")
+
+
+@params_registry.register("SANSA")
+class SANSA(RecomModel):
+    """Definition of the model SANSA.
+
+    Attributes:
+        l2 (FLOAT_FIELD): List of values that l2 regularization can take.
+        target_density (FLOAT_FIELD): List of values for target_density.
+    """
+
+    l2: FLOAT_FIELD
+    target_density: FLOAT_FIELD
+
+    @field_validator("l2")
+    @classmethod
+    def check_l2(cls, v: list):
+        """Validate l2."""
+        return validate_greater_than_zero(cls, v, "l2")
+
+    @field_validator("target_density")
+    @classmethod
+    def check_target_density(cls, v: list):
+        """Validate target_density."""
+        return validate_greater_equal_than_zero(cls, v, "target_density")

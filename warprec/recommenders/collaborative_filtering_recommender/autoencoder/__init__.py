@@ -4,5 +4,6 @@ from .elsa import ELSA
 from .macridvae import MacridVAE
 from .multidae import MultiDAE
 from .multivae import MultiVAE
+from .sansa import SANSA
 
-__all__ = ["CDAE", "EASE", "ELSA", "MacridVAE", "MultiDAE", "MultiVAE"]
+__all__ = ["CDAE", "EASE", "ELSA", "MacridVAE", "MultiDAE", "MultiVAE", "SANSA"]
