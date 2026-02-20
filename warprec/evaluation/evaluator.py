@@ -211,7 +211,8 @@ class Evaluator:
                 predict_kwargs["item_indices"] = candidates
 
             # Model prediction
-            predictions = model.predict(**predict_kwargs).to(device)
+            with torch.inference_mode():
+                predictions = model.predict(**predict_kwargs).to(device)
 
             if strategy == "full":
                 if "target_item" in batch_data:

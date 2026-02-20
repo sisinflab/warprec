@@ -318,15 +318,16 @@ def train_pipeline(path: str):
 
             # Test inference time
             inference_time_start = time.time()
-            best_model.predict(
-                user_indices=user_indices,
-                item_indices=item_indices,
-                user_seq=user_seq,
-                seq_len=seq_len,
-                train_batch=train_batch,
-                train_sparse=train_sparse,
-                contexts=contexts,
-            )
+            with torch.inference_mode():
+                best_model.predict(
+                    user_indices=user_indices,
+                    item_indices=item_indices,
+                    user_seq=user_seq,
+                    seq_len=seq_len,
+                    train_batch=train_batch,
+                    train_sparse=train_sparse,
+                    contexts=contexts,
+                )
             inference_time = time.time() - inference_time_start
 
             # Timing report for the current model
