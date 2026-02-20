@@ -118,6 +118,18 @@ These models are particularly effective in sparse recommendation settings.
           epochs: 200
           learning_rate: 0.001
 
+- SANSA (Scalable Approximate NonSymmetric Autoencoder):
+  SANSA is a collaborative filtering algorithm designed to handle massive datasets by bypassing the memory bottlenecks of traditional linear models through sparse matrix approximations and an $LDL^T$ decomposition. It enables the training of high-performance autoencoders on a single machine, even with millions of items, by maintaining a compact, end-to-end sparse end-to-end architecture.
+
+  For further details, please refer to the `paper <https://dl.acm.org/doi/10.1145/3604915.3608827>`_.
+
+  .. code-block:: yaml
+
+      models:
+        SANSA:
+          l2: 10
+          target_density: 0.01
+
 ==============
 Graph Based
 ==============
