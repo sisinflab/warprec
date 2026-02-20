@@ -313,8 +313,6 @@ def train_pipeline(path: str):
             seq_len = torch.randint(1, max_seq_len + 1, (n_users_to_predict,)).to(
                 device=device
             )
-            train_sparse = main_dataset.train_set.get_sparse()
-            train_batch = train_sparse[user_indices.tolist(), :]
 
             # Test inference time
             inference_time_start = time.time()
@@ -324,8 +322,6 @@ def train_pipeline(path: str):
                     item_indices=item_indices,
                     user_seq=user_seq,
                     seq_len=seq_len,
-                    train_batch=train_batch,
-                    train_sparse=train_sparse,
                     contexts=contexts,
                 )
             inference_time = time.time() - inference_time_start

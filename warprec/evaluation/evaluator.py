@@ -170,11 +170,7 @@ class Evaluator:
 
             # Prepare the model input
             train_batch = train_sparse[user_indices.tolist(), :]
-            predict_kwargs = {
-                "user_indices": user_indices,
-                "train_sparse": train_sparse,  # Some models might need it internally
-                "train_batch": train_batch,
-            }
+            predict_kwargs = {"user_indices": user_indices}
 
             # A. Sequential Models Support
             if isinstance(model, SequentialRecommenderUtils):
