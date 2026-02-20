@@ -227,7 +227,6 @@ class BERT4Rec(IterativeRecommender, SequentialRecommenderUtils):
 
         return pred_seq
 
-    @torch.no_grad()
     def predict(
         self,
         user_seq: Tensor,

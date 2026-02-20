@@ -172,7 +172,6 @@ class NeuMF(IterativeRecommender):
 
         return output.squeeze(-1)
 
-    @torch.no_grad()
     def predict(
         self,
         user_indices: Tensor,

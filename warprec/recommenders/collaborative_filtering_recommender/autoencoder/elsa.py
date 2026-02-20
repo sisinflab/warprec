@@ -102,7 +102,6 @@ class ELSA(IterativeRecommender):
         # Diagonal constraint: x - xAA^T
         return reconstruction - x
 
-    @torch.no_grad()
     def predict(
         self,
         train_batch: csr_matrix,

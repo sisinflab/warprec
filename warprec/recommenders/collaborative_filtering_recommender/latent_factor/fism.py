@@ -153,7 +153,6 @@ class FISM(IterativeRecommender):
         scores = coeff * torch.sum(similarity, dim=1) + user_bias + item_bias
         return scores
 
-    @torch.no_grad()
     def predict(
         self,
         user_indices: Tensor,

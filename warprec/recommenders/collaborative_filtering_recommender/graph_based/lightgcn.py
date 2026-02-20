@@ -166,7 +166,6 @@ class LightGCN(GraphRecommenderUtils, IterativeRecommender):
         )
         return user_all_embeddings, item_all_embeddings
 
-    @torch.no_grad()
     def predict(
         self,
         user_indices: Tensor,

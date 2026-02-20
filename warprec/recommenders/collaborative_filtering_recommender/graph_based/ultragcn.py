@@ -226,7 +226,6 @@ class UltraGCN(IterativeRecommender, GraphRecommenderUtils):
 
         return loss_O + (self.w_lambda * loss_C) + (self.w_gamma * loss_I) + reg_loss
 
-    @torch.no_grad()
     def predict(
         self,
         user_indices: Tensor,

@@ -294,7 +294,6 @@ class DGCF(IterativeRecommender, GraphRecommenderUtils):
 
         return loss
 
-    @torch.no_grad()
     def predict(
         self,
         user_indices: Tensor,

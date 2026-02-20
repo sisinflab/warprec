@@ -306,7 +306,6 @@ class NGCF(IterativeRecommender, GraphRecommenderUtils):
 
         return torch.sparse_coo_tensor(indices, values, shape).coalesce()
 
-    @torch.no_grad()
     def predict(
         self,
         user_indices: Tensor,

@@ -173,7 +173,6 @@ class NFM(ContextRecommenderUtils, IterativeRecommender):
 
         return linear_part + prediction_score
 
-    @torch.no_grad()
     def predict(
         self,
         user_indices: Tensor,

@@ -85,7 +85,6 @@ class AttributeUserKNN(Recommender):
         # L2 normalize
         return normalize(user_profile, norm="l2", axis=1)
 
-    @torch.no_grad()
     def predict(
         self,
         user_indices: Tensor,

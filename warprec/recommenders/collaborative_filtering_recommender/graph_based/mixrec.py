@@ -304,7 +304,6 @@ class MixRec(IterativeRecommender, GraphRecommenderUtils):
 
         return main_loss + cl_loss + reg_loss
 
-    @torch.no_grad()
     def predict(
         self,
         user_indices: Tensor,

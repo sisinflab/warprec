@@ -174,7 +174,6 @@ class LightCCF(IterativeRecommender, GraphRecommenderUtils):
         # Base Encoder (MF)
         return ego_user_emb, ego_item_emb
 
-    @torch.no_grad()
     def predict(
         self,
         user_indices: Tensor,

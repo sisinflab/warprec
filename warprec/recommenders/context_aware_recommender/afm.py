@@ -289,7 +289,6 @@ class AFM(ContextRecommenderUtils, IterativeRecommender):
 
         return all_scores.view(batch_size, num_items)
 
-    @torch.no_grad()
     def predict(
         self,
         user_indices: Tensor,

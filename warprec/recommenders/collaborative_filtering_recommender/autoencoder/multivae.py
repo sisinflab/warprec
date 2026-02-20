@@ -215,7 +215,6 @@ class MultiVAE(IterativeRecommender):
         )
         return reconstructed, kl_loss
 
-    @torch.no_grad()
     def predict(
         self,
         train_batch: csr_matrix,

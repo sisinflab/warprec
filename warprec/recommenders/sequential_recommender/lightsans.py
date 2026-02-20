@@ -357,7 +357,6 @@ class LightSANs(IterativeRecommender, SequentialRecommenderUtils):
 
         return seq_output
 
-    @torch.no_grad()
     def predict(
         self,
         user_seq: Tensor,

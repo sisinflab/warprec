@@ -244,7 +244,6 @@ class CORE(IterativeRecommender, SequentialRecommenderUtils):
 
         return main_loss + reg_loss
 
-    @torch.no_grad()
     def predict(
         self,
         user_seq: Tensor,
