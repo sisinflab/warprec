@@ -5,7 +5,6 @@ import numpy as np
 import scipy.sparse as sp
 import torch
 from torch import Tensor
-from scipy.sparse import csr_matrix
 
 try:
     from sksparse.cholmod import cholesky
@@ -55,9 +54,9 @@ class SANSA(ItemSimRecommender):
         seed: int = 42,
         **kwargs: Any,
     ):
-        super().__init__(params, info, *args, seed=seed, **kwargs)
+        super().__init__(params, info, interactions, *args, seed=seed, **kwargs)
 
-        X = interactions.get_sparse()
+        X = self.train_matrix
 
         # Compute Sparse Gram Matrix: G = X^T X
         G = (X.T @ X).tocsc()
@@ -161,7 +160,7 @@ class SANSA(ItemSimRecommender):
 
     def predict(
         self,
-        train_batch: csr_matrix,
+        user_indices: Tensor,
         *args: Any,
         item_indices: Optional[Tensor] = None,
         **kwargs: Any,
@@ -169,7 +168,7 @@ class SANSA(ItemSimRecommender):
         """Prediction override to handle Sparse Matrix multiplication.
 
         Args:
-            train_batch (csr_matrix): The batch of user interaction vectors in sparse format.
+            user_indices (Tensor): The batch of user indices.
             *args (Any): List of arguments.
             item_indices (Optional[Tensor]): The batch of item indices. If None,
                 full prediction will be produced.
@@ -180,6 +179,7 @@ class SANSA(ItemSimRecommender):
         """
         # Compute predictions: Sparse (Batch x Items) @ Sparse (Items x Items)
         # Result is Sparse (Batch x Items)
+        train_batch = self.train_matrix[user_indices.tolist(), :]
         predictions_sparse = train_batch @ self.item_similarity
 
         # Convert to dense Tensor

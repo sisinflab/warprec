@@ -2,8 +2,9 @@
 from typing import Any
 
 import numpy as np
-from warprec.recommenders.base_recommender import ItemSimRecommender
+
 from warprec.data.entities import Interactions
+from warprec.recommenders.base_recommender import ItemSimRecommender
 from warprec.utils.registry import model_registry
 
 
@@ -37,10 +38,9 @@ class EASE(ItemSimRecommender):
         seed: int = 42,
         **kwargs: Any,
     ):
-        super().__init__(params, info, *args, seed=seed, **kwargs)
+        super().__init__(params, info, interactions, *args, seed=seed, **kwargs)
 
-        X = interactions.get_sparse()
-
+        X = self.train_matrix
         G = X.T @ X + self.l2 * np.identity(X.shape[1])
         B = np.linalg.inv(G)
         B /= -np.diag(B)

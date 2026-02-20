@@ -40,11 +40,10 @@ class Slim(ItemSimRecommender):
         seed: int = 42,
         **kwargs: Any,
     ):
-        super().__init__(params, info, *args, seed=seed, **kwargs)
+        super().__init__(params, info, interactions, *args, seed=seed, **kwargs)
 
         # Predefine the number of items, similarity matrix and ElasticNet
-        X = interactions.get_sparse()
-        X = X.tolil()
+        X = self.train_matrix.tolil()
 
         num_items = X.shape[1]
         item_coeffs = []

@@ -3,7 +3,6 @@ from typing import Any, Optional
 
 import torch
 from torch import nn, Tensor
-from scipy.sparse import csr_matrix
 
 from warprec.data.entities import Interactions, Sessions
 from warprec.recommenders.base_recommender import IterativeRecommender
@@ -26,6 +25,7 @@ class CDAE(IterativeRecommender):
     Args:
         params (dict): Model parameters.
         info (dict): The dictionary containing dataset information.
+        interactions (Interactions): The training interactions.
         *args (Any): Variable length argument list.
         seed (int): The seed to use for reproducibility.
         **kwargs (Any): Arbitrary keyword arguments.
@@ -66,11 +66,15 @@ class CDAE(IterativeRecommender):
         self,
         params: dict,
         info: dict,
+        interactions: Interactions,
         *args: Any,
         seed: int = 42,
         **kwargs: Any,
     ):
         super().__init__(params, info, *args, seed=seed, **kwargs)
+
+        # Store the training matrix for prediction
+        self.train_matrix = interactions.get_sparse()
 
         # User-specific embedding
         self.user_embedding = nn.Embedding(self.n_users, self.embedding_size)
@@ -177,7 +181,6 @@ class CDAE(IterativeRecommender):
     def predict(
         self,
         user_indices: Tensor,
-        train_batch: csr_matrix,
         *args: Any,
         item_indices: Optional[Tensor] = None,
         **kwargs: Any,
@@ -186,7 +189,6 @@ class CDAE(IterativeRecommender):
 
         Args:
             user_indices (Tensor): The batch of user indices.
-            train_batch (csr_matrix): The batch of user interaction vectors in sparse format.
             *args (Any): List of arguments.
             item_indices (Optional[Tensor]): The batch of item indices. If None,
                 full prediction will be produced.
@@ -196,8 +198,9 @@ class CDAE(IterativeRecommender):
             Tensor: The score matrix {user x item}.
         """
         # Compute predictions and convert to Tensor
+        train_batch = self.train_matrix[user_indices.tolist(), :].toarray()
         predictions_logits = self.forward(
-            torch.from_numpy(train_batch.toarray()).float().to(self.device),
+            torch.from_numpy(train_batch).float().to(self.device),
             user_indices,
         )
 

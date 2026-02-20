@@ -5,7 +5,6 @@ import torch
 import torch.nn.functional as F
 from torch import nn
 from torch import Tensor
-from scipy.sparse import csr_matrix
 
 from warprec.data.entities import Interactions, Sessions
 from warprec.recommenders.base_recommender import IterativeRecommender
@@ -95,6 +94,7 @@ class MacridVAE(IterativeRecommender):
     Args:
         params (dict): Model parameters.
         info (dict): The dictionary containing dataset information.
+        interactions (Interactions): The training interactions.
         *args (Any): Variable length argument list.
         seed (int): The seed to use for reproducibility.
         **kwargs (Any): Arbitrary keyword arguments.
@@ -140,11 +140,15 @@ class MacridVAE(IterativeRecommender):
         self,
         params: dict,
         info: dict,
+        interactions: Interactions,
         *args: Any,
         seed: int = 42,
         **kwargs: Any,
     ):
         super().__init__(params, info, *args, seed=seed, **kwargs)
+
+        # Store the training matrix for prediction
+        self.train_matrix = interactions.get_sparse()
 
         self.item_embedding = nn.Embedding(self.n_items, self.embedding_size)
         self.k_embedding = nn.Embedding(self.k_fac, self.embedding_size)
@@ -286,7 +290,7 @@ class MacridVAE(IterativeRecommender):
 
     def predict(
         self,
-        train_batch: csr_matrix,
+        user_indices: Tensor,
         *args: Any,
         item_indices: Optional[Tensor] = None,
         **kwargs: Any,
@@ -294,7 +298,7 @@ class MacridVAE(IterativeRecommender):
         """Prediction using the the encoder and decoder modules.
 
         Args:
-            train_batch (csr_matrix): The batch of user interaction vectors in sparse format.
+            user_indices (Tensor): The batch of user indices.
             *args (Any): List of arguments.
             item_indices (Optional[Tensor]): The batch of item indices. If None,
                 full prediction will be produced.
@@ -304,8 +308,9 @@ class MacridVAE(IterativeRecommender):
             Tensor: The score matrix {user x item}.
         """
         # Compute predictions and convert to Tensor
+        train_batch = self.train_matrix[user_indices.tolist(), :].toarray()
         predictions, _, _ = self.forward(
-            torch.from_numpy(train_batch.toarray()).float().to(self.device)
+            torch.from_numpy(train_batch).float().to(self.device)
         )
 
         if item_indices is None:
