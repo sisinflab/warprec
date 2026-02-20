@@ -160,8 +160,6 @@ class Writer(ABC):
                     user_indices=user_indices,
                     user_seq=user_seq,
                     seq_len=seq_len,
-                    train_batch=train_batch,
-                    train_sparse=train_sparse,
                 )
                 predictions[train_batch.nonzero()] = -torch.inf
                 top_k_scores, top_k_items = torch.topk(predictions, k, dim=1)
