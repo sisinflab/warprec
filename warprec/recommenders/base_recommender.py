@@ -8,7 +8,6 @@ import numpy as np
 from torch import nn, Tensor
 from torch.nn.init import xavier_normal_, xavier_uniform_, constant_
 from torch.utils.data import DataLoader
-from scipy.sparse import csr_matrix
 
 from warprec.data.entities import Interactions, Sessions
 from warprec.utils.enums import DataLoaderType
@@ -659,6 +658,7 @@ class ItemSimRecommender(Recommender):
     Args:
         params (dict): The dictionary with the model params.
         info (dict): The dictionary containing dataset information.
+        interactions (Interactions): The training interactions.
         *args (Any): Argument for PyTorch nn.Module.
         seed (int): The seed to use for reproducibility.
         **kwargs (Any): Keyword argument for PyTorch nn.Module.
@@ -671,6 +671,7 @@ class ItemSimRecommender(Recommender):
         self,
         params: dict,
         info: dict,
+        interactions: Interactions,
         *args: Any,
         seed: int = 42,
         **kwargs: Any,
@@ -681,11 +682,12 @@ class ItemSimRecommender(Recommender):
             raise ValueError(
                 "Items value must be provided to correctly initialize the model."
             )
+        self.train_matrix = interactions.get_sparse()
         self.item_similarity = np.zeros(self.n_items)
 
     def predict(
         self,
-        train_batch: csr_matrix,
+        user_indices: Tensor,
         *args: Any,
         item_indices: Optional[Tensor] = None,
         **kwargs: Any,
@@ -693,7 +695,7 @@ class ItemSimRecommender(Recommender):
         """Prediction in the form of X@B where B is a {item x item} similarity matrix.
 
         Args:
-            train_batch (csr_matrix): The batch of user interaction vectors in sparse format.
+            user_indices (Tensor): The batch of user indices.
             *args (Any): List of arguments.
             item_indices (Optional[Tensor]): The batch of item indices. If None,
                 full prediction will be produced.
@@ -703,7 +705,7 @@ class ItemSimRecommender(Recommender):
             Tensor: The score matrix {user x item}.
         """
         # Compute predictions and convert to Tensor
-        predictions = train_batch @ self.item_similarity  # pylint: disable=not-callable
+        predictions = self.train_matrix[user_indices.tolist(), :] @ self.item_similarity
         predictions = torch.from_numpy(predictions)
 
         # Return full or sampled predictions

@@ -3,7 +3,7 @@ from typing import Any, Optional
 
 import torch
 from torch import Tensor
-from scipy.sparse import csr_matrix
+
 from warprec.data.entities import Interactions
 from warprec.recommenders.base_recommender import Recommender
 from warprec.utils.registry import model_registry, similarities_registry
@@ -43,7 +43,10 @@ class UserKNN(Recommender):
     ):
         super().__init__(params, info, *args, seed=seed, **kwargs)
 
-        X = interactions.get_sparse()
+        # Store the training matrix for prediction
+        self.train_matrix = interactions.get_sparse()
+
+        X = self.train_matrix
         similarity = similarities_registry.get(self.similarity)
 
         # Compute similarity matrix
@@ -58,7 +61,6 @@ class UserKNN(Recommender):
     def predict(
         self,
         user_indices: Tensor,
-        train_sparse: csr_matrix,
         *args: Any,
         item_indices: Optional[Tensor] = None,
         **kwargs: Any,
@@ -67,7 +69,6 @@ class UserKNN(Recommender):
 
         Args:
             user_indices (Tensor): The batch of user indices.
-            train_sparse (csr_matrix): The batch of user interaction vectors in sparse format.
             *args (Any): List of arguments.
             item_indices (Optional[Tensor]): The batch of item indices. If None,
                 full prediction will be produced.
@@ -77,7 +78,7 @@ class UserKNN(Recommender):
             Tensor: The score matrix {user x item}.
         """
         # Compute predictions and convert to Tensor
-        predictions = self.user_similarity[user_indices.cpu(), :] @ train_sparse
+        predictions = self.user_similarity[user_indices.cpu(), :] @ self.train_matrix
         predictions = torch.from_numpy(predictions)
 
         if item_indices is None:

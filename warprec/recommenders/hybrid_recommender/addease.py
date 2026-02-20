@@ -2,8 +2,9 @@
 from typing import Any
 
 import numpy as np
-from warprec.recommenders.base_recommender import ItemSimRecommender
+
 from warprec.data.entities import Interactions
+from warprec.recommenders.base_recommender import ItemSimRecommender
 from warprec.utils.registry import model_registry
 
 
@@ -39,10 +40,9 @@ class AddEASE(ItemSimRecommender):
         seed: int = 42,
         **kwargs: Any,
     ):
-        super().__init__(params, info, *args, seed=seed, **kwargs)
+        super().__init__(params, info, interactions, *args, seed=seed, **kwargs)
 
-        X = interactions.get_sparse()
-        item_profile = interactions.get_side_sparse()
+        X = self.train_matrix
 
         # Fist solution
         G = X.T @ X + self.l2 * np.identity(X.shape[1])
@@ -51,6 +51,7 @@ class AddEASE(ItemSimRecommender):
         np.fill_diagonal(B, 0.0)
 
         # Second solution
+        item_profile = interactions.get_side_sparse()
         P = item_profile @ item_profile.T + self.l2 * np.identity(item_profile.shape[0])
         U = np.linalg.inv(P)
         U /= -np.diag(U)
