@@ -59,6 +59,7 @@ class UserKNN(Recommender):
     def predict(
         self,
         user_indices: Tensor,
+        train_sparse: csr_matrix,
         *args: Any,
         item_indices: Optional[Tensor] = None,
         **kwargs: Any,
@@ -67,6 +68,7 @@ class UserKNN(Recommender):
 
         Args:
             user_indices (Tensor): The batch of user indices.
+            train_sparse (csr_matrix): The batch of user interaction vectors in sparse format.
             *args (Any): List of arguments.
             item_indices (Optional[Tensor]): The batch of item indices. If None,
                 full prediction will be produced.
@@ -74,17 +76,7 @@ class UserKNN(Recommender):
 
         Returns:
             Tensor: The score matrix {user x item}.
-
-        Raises:
-            ValueError: If the 'train_sparse' keyword argument is not provided.
         """
-        # Get train batch from kwargs
-        train_sparse: Optional[csr_matrix] = kwargs.get("train_sparse")
-        if train_sparse is None:
-            raise ValueError(
-                "predict() for UserKNN requires 'train_sparse' as a keyword argument."
-            )
-
         # Compute predictions and convert to Tensor
         predictions = self.user_similarity[user_indices.cpu(), :] @ train_sparse
         predictions = torch.from_numpy(predictions)
