@@ -244,7 +244,6 @@ class GCMC(IterativeRecommender, GraphRecommenderUtils):
         logits = self.decoder(combined_e)
         return logits
 
-    @torch.no_grad()
     def predict(
         self,
         user_indices: Tensor,

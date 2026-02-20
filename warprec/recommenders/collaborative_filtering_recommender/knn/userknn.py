@@ -55,7 +55,6 @@ class UserKNN(Recommender):
         # Update item_similarity
         self.user_similarity = filtered_sim_matrix.numpy()
 
-    @torch.no_grad()
     def predict(
         self,
         user_indices: Tensor,

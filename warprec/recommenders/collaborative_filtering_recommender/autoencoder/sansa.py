@@ -159,7 +159,6 @@ class SANSA(ItemSimRecommender):
 
         return sp.csr_matrix((new_data, (new_row, new_col)), shape=matrix.shape)
 
-    @torch.no_grad()
     def predict(
         self,
         train_batch: csr_matrix,

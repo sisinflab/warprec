@@ -230,7 +230,6 @@ class Caser(IterativeRecommender, SequentialRecommenderUtils):
 
         return seq_output
 
-    @torch.no_grad()
     def predict(
         self,
         user_indices: Tensor,

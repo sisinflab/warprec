@@ -176,7 +176,6 @@ class MultiDAE(IterativeRecommender):
         h = self.encoder(h)
         return self.decoder(h)
 
-    @torch.no_grad()
     def predict(
         self,
         train_batch: csr_matrix,

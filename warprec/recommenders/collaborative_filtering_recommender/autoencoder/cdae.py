@@ -174,7 +174,6 @@ class CDAE(IterativeRecommender):
 
         return main_loss + reg_loss
 
-    @torch.no_grad()
     def predict(
         self,
         user_indices: Tensor,

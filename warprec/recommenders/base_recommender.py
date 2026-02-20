@@ -683,7 +683,6 @@ class ItemSimRecommender(Recommender):
             )
         self.item_similarity = np.zeros(self.n_items)
 
-    @torch.no_grad()
     def predict(
         self,
         train_batch: csr_matrix,

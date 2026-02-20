@@ -284,7 +284,6 @@ class MacridVAE(IterativeRecommender):
 
         return logits, z_mean, z_log_var
 
-    @torch.no_grad()
     def predict(
         self,
         train_batch: csr_matrix,

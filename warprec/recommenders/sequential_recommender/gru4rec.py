@@ -183,7 +183,6 @@ class GRU4Rec(IterativeRecommender, SequentialRecommenderUtils):
         )  # [batch_size, embedding_size]
         return seq_output
 
-    @torch.no_grad()
     def predict(
         self,
         user_seq: Tensor,

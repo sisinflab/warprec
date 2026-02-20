@@ -299,7 +299,6 @@ class FOSSIL(IterativeRecommender, SequentialRecommenderUtils):
 
         return high_order + similarity
 
-    @torch.no_grad()
     def predict(
         self,
         user_indices: Tensor,

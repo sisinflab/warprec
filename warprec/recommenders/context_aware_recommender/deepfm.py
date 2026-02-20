@@ -175,7 +175,6 @@ class DeepFM(ContextRecommenderUtils, IterativeRecommender):
 
         return linear_part + fm_part + deep_part
 
-    @torch.no_grad()
     def predict(
         self,
         user_indices: Tensor,

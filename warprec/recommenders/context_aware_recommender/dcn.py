@@ -228,7 +228,6 @@ class DCN(ContextRecommenderUtils, IterativeRecommender):
 
         return linear_part + output.squeeze(-1)
 
-    @torch.no_grad()
     def predict(
         self,
         user_indices: Tensor,
