@@ -128,6 +128,47 @@ class EASE(RecomModel):
         return validate_greater_than_zero(cls, v, "l2")
 
 
+@params_registry.register("ELSA")
+class ELSA(RecomModel):
+    """Definition of the model ELSA.
+
+    Attributes:
+        n_dims (INT_FIELD): List of values for n_dims.
+        batch_size (INT_FIELD): List of values for batch_size.
+        epochs (INT_FIELD): List of values for epochs.
+        learning_rate (FLOAT_FIELD): List of values for learning rate.
+    """
+
+    n_dims: INT_FIELD
+    batch_size: INT_FIELD
+    epochs: INT_FIELD
+    learning_rate: FLOAT_FIELD
+
+    @field_validator("n_dims")
+    @classmethod
+    def check_n_dims(cls, v: list):
+        """Validate n_dims."""
+        return validate_greater_than_zero(cls, v, "n_dims")
+
+    @field_validator("batch_size")
+    @classmethod
+    def check_batch_size(cls, v: list):
+        """Validate batch_size."""
+        return validate_greater_than_zero(cls, v, "batch_size")
+
+    @field_validator("epochs")
+    @classmethod
+    def check_epochs(cls, v: list):
+        """Validate epochs."""
+        return validate_greater_than_zero(cls, v, "epochs")
+
+    @field_validator("learning_rate")
+    @classmethod
+    def check_learning_rate(cls, v: list):
+        """Validate learning_rate."""
+        return validate_greater_than_zero(cls, v, "learning_rate")
+
+
 @params_registry.register("MacridVAE")
 class MacridVAE(RecomModel):
     """Definition of the model MacridVAE.

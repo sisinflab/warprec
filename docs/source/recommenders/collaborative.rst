@@ -24,6 +24,20 @@ These models are particularly effective in sparse recommendation settings.
         EASE:
           l2: 10
 
+- ELSA (Efficient Linear Sparse Autoencoder):
+  ELSA is a scalable approximation of the EASE algorithm that replaces the computationally expensive $O(I^3)$ matrix inversion with a sparse, low-rank decomposition optimized via stochastic gradient descent. This allows it to deliver EASE-level recommendation quality for massive item catalogs while significantly reducing memory usage and training time.
+
+  For further details, please refer to the `paper <https://dl.acm.org/doi/10.1145/3523227.3551482>`_.
+
+  .. code-block:: yaml
+
+      models:
+        ELSA:
+          n_dims: 64
+          batch_size: 2048
+          epochs: 200
+          learning_rate: 0.001
+
 - CDAE (Collaborative Denoising Auto-Encoder):
   A denoising autoencoder that specifically incorporates a user-specific latent vector (bias) into the hidden layer. This allows the model to capture user-specific patterns more effectively than standard autoencoders, making it highly effective for top-N recommendation tasks.
 
