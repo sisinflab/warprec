@@ -123,12 +123,16 @@ class CDAE(IterativeRecommender):
             **kwargs,
         )
 
-    def forward(self, user_history: Tensor, user_indices: Tensor) -> Tensor:
+    def forward(
+        self, user_history: Tensor, user_indices: Tensor, *args: Any, **kwargs: Any
+    ) -> Tensor:
         """Performs the forward pass of the CDAE model.
 
         Args:
             user_history (Tensor): The user-item interaction vector [batch_size, n_items].
             user_indices (Tensor): The user indices for the batch [batch_size].
+            *args (Any): List of arguments.
+            **kwargs (Any): The dictionary of keyword arguments.
 
         Returns:
             Tensor: The reconstructed interaction vector (logits) [batch_size, n_items].
@@ -174,6 +178,7 @@ class CDAE(IterativeRecommender):
     def predict(
         self,
         user_indices: Tensor,
+        train_batch: csr_matrix,
         *args: Any,
         item_indices: Optional[Tensor] = None,
         **kwargs: Any,
@@ -182,6 +187,7 @@ class CDAE(IterativeRecommender):
 
         Args:
             user_indices (Tensor): The batch of user indices.
+            train_batch (csr_matrix): The batch of user interaction vectors in sparse format.
             *args (Any): List of arguments.
             item_indices (Optional[Tensor]): The batch of item indices. If None,
                 full prediction will be produced.
@@ -189,22 +195,12 @@ class CDAE(IterativeRecommender):
 
         Returns:
             Tensor: The score matrix {user x item}.
-
-        Raises:
-            ValueError: If the 'train_batch' keyword argument is not provided.
         """
-        # Get train batch from kwargs
-        train_batch_sparse: Optional[csr_matrix] = kwargs.get("train_batch")
-        if train_batch_sparse is None:
-            raise ValueError(
-                "predict() for MultiDAE requires 'train_batch' as a keyword argument."
-            )
-
         # Compute predictions and convert to Tensor
-        train_batch = (
-            torch.from_numpy(train_batch_sparse.toarray()).float().to(self.device)
+        predictions_logits = self.forward(
+            torch.from_numpy(train_batch.toarray()).float().to(self.device),
+            user_indices,
         )
-        predictions_logits = self.forward(train_batch, user_indices)
 
         # Apply the final activation function to get scores
         predictions: Tensor = self.o_act(predictions_logits)

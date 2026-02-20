@@ -287,7 +287,7 @@ class MacridVAE(IterativeRecommender):
     @torch.no_grad()
     def predict(
         self,
-        user_indices: Tensor,
+        train_batch: csr_matrix,
         *args: Any,
         item_indices: Optional[Tensor] = None,
         **kwargs: Any,
@@ -295,7 +295,7 @@ class MacridVAE(IterativeRecommender):
         """Prediction using the the encoder and decoder modules.
 
         Args:
-            user_indices (Tensor): The batch of user indices.
+            train_batch (csr_matrix): The batch of user interaction vectors in sparse format.
             *args (Any): List of arguments.
             item_indices (Optional[Tensor]): The batch of item indices. If None,
                 full prediction will be produced.
@@ -303,23 +303,11 @@ class MacridVAE(IterativeRecommender):
 
         Returns:
             Tensor: The score matrix {user x item}.
-
-        Raises:
-            ValueError: If the 'train_batch' keyword argument is not provided.
         """
-        # Get train batch from kwargs
-        train_batch_sparse: Optional[csr_matrix] = kwargs.get("train_batch")
-        if train_batch_sparse is None:
-            raise ValueError(
-                "predict() for MultiVAE requires 'train_batch' as a keyword argument."
-            )
-
         # Compute predictions and convert to Tensor
-        train_batch = (
-            torch.from_numpy(train_batch_sparse.toarray()).float().to(self.device)
+        predictions, _, _ = self.forward(
+            torch.from_numpy(train_batch.toarray()).float().to(self.device)
         )
-
-        predictions, _, _ = self.forward(train_batch)
 
         if item_indices is None:
             # Case 'full': prediction on all items

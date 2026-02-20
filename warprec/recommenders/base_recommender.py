@@ -1,6 +1,6 @@
 # pylint: disable = unused-argument
 import random
-from typing import Any, Optional, List, Dict
+from typing import Any, Optional, List, Dict, no_type_check
 from abc import ABC, abstractmethod
 
 import torch
@@ -58,26 +58,21 @@ class Recommender(nn.Module, ABC):
                 "must be present in the 'info' dictionary."
             )
 
+    @no_type_check
     @abstractmethod
     def predict(
         self,
-        user_indices: Tensor,
         *args: Any,
         item_indices: Optional[Tensor] = None,
-        user_seq: Optional[Tensor] = None,
-        seq_len: Optional[Tensor] = None,
         **kwargs: Any,
     ) -> Tensor:
         """This method will produce the final predictions in the form of
         a dense Tensor.
 
         Args:
-            user_indices (Tensor): The batch of user indices.
             *args (Any): List of arguments.
             item_indices (Optional[Tensor]): The batch of item indices. If None,
                 full prediction will be produced.
-            user_seq (Optional[Tensor]): Padded sequences of item IDs for users to predict for.
-            seq_len (Optional[Tensor]): Actual lengths of these sequences, before padding.
             **kwargs (Any): The dictionary of keyword arguments.
 
         Returns:
@@ -691,7 +686,7 @@ class ItemSimRecommender(Recommender):
     @torch.no_grad()
     def predict(
         self,
-        user_indices: Tensor,
+        train_batch: csr_matrix,
         *args: Any,
         item_indices: Optional[Tensor] = None,
         **kwargs: Any,
@@ -699,7 +694,7 @@ class ItemSimRecommender(Recommender):
         """Prediction in the form of X@B where B is a {item x item} similarity matrix.
 
         Args:
-            user_indices (Tensor): The batch of user indices.
+            train_batch (csr_matrix): The batch of user interaction vectors in sparse format.
             *args (Any): List of arguments.
             item_indices (Optional[Tensor]): The batch of item indices. If None,
                 full prediction will be produced.
@@ -707,17 +702,7 @@ class ItemSimRecommender(Recommender):
 
         Returns:
             Tensor: The score matrix {user x item}.
-
-        Raises:
-            ValueError: If 'train_batch' is not provided in kwargs.
         """
-        # Get train batch from kwargs
-        train_batch: Optional[csr_matrix] = kwargs.get("train_batch")
-        if train_batch is None:
-            raise ValueError(
-                f"predict() for {self.name} requires 'train_batch' as a keyword argument."
-            )
-
         # Compute predictions and convert to Tensor
         predictions = train_batch @ self.item_similarity  # pylint: disable=not-callable
         predictions = torch.from_numpy(predictions)

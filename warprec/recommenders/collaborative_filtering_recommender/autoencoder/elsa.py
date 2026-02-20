@@ -105,7 +105,7 @@ class ELSA(IterativeRecommender):
     @torch.no_grad()
     def predict(
         self,
-        user_indices: Tensor,
+        train_batch: csr_matrix,
         *args: Any,
         item_indices: Optional[Tensor] = None,
         **kwargs: Any,
@@ -113,7 +113,7 @@ class ELSA(IterativeRecommender):
         """Prediction in the form of X@B where B is a {item x item} similarity matrix.
 
         Args:
-            user_indices (Tensor): The batch of user indices.
+            train_batch (csr_matrix): The batch of user interaction vectors in sparse format.
             *args (Any): List of arguments.
             item_indices (Optional[Tensor]): The batch of item indices. If None,
                 full prediction will be produced.
@@ -121,17 +121,7 @@ class ELSA(IterativeRecommender):
 
         Returns:
             Tensor: The score matrix {user x item}.
-
-        Raises:
-            ValueError: If 'train_batch' is not provided in kwargs.
         """
-        # Get train batch from kwargs
-        train_batch: Optional[csr_matrix] = kwargs.get("train_batch")
-        if train_batch is None:
-            raise ValueError(
-                f"predict() for {self.name} requires 'train_batch' as a keyword argument."
-            )
-
         # Convert sparse batch to dense tensor and compute predictions
         x = torch.from_numpy(train_batch.toarray()).to(self.device).float()
         predictions = self.forward(x)

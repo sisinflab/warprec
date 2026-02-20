@@ -5,6 +5,7 @@ import numpy as np
 import scipy.sparse as sp
 import torch
 from torch import Tensor
+from scipy.sparse import csr_matrix
 
 try:
     from sksparse.cholmod import cholesky
@@ -161,7 +162,7 @@ class SANSA(ItemSimRecommender):
     @torch.no_grad()
     def predict(
         self,
-        user_indices: Tensor,
+        train_batch: csr_matrix,
         *args: Any,
         item_indices: Optional[Tensor] = None,
         **kwargs: Any,
@@ -169,7 +170,7 @@ class SANSA(ItemSimRecommender):
         """Prediction override to handle Sparse Matrix multiplication.
 
         Args:
-            user_indices (Tensor): The batch of user indices.
+            train_batch (csr_matrix): The batch of user interaction vectors in sparse format.
             *args (Any): List of arguments.
             item_indices (Optional[Tensor]): The batch of item indices. If None,
                 full prediction will be produced.
@@ -177,17 +178,7 @@ class SANSA(ItemSimRecommender):
 
         Returns:
             Tensor: The score matrix.
-
-        Raises:
-            ValueError: If 'train_batch' is not provided in kwargs.
         """
-        # Get train batch from kwargs
-        train_batch: Optional[sp.csr_matrix] = kwargs.get("train_batch")
-        if train_batch is None:
-            raise ValueError(
-                f"predict() for {self.name} requires 'train_batch' as a keyword argument."
-            )
-
         # Compute predictions: Sparse (Batch x Items) @ Sparse (Items x Items)
         # Result is Sparse (Batch x Items)
         predictions_sparse = train_batch @ self.item_similarity

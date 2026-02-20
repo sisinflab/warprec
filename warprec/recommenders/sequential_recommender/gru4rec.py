@@ -186,23 +186,21 @@ class GRU4Rec(IterativeRecommender, SequentialRecommenderUtils):
     @torch.no_grad()
     def predict(
         self,
-        user_indices: Tensor,
+        user_seq: Tensor,
+        seq_len: Tensor,
         *args: Any,
         item_indices: Optional[Tensor] = None,
-        user_seq: Optional[Tensor] = None,
-        seq_len: Optional[Tensor] = None,
         **kwargs: Any,
     ) -> Tensor:
         """
         Prediction using the learned session embeddings.
 
         Args:
-            user_indices (Tensor): The batch of user indices.
+            user_seq (Tensor): Padded sequences of item IDs for users to predict for.
+            seq_len (Tensor): Actual lengths of these sequences, before padding.
             *args (Any): List of arguments.
             item_indices (Optional[Tensor]): The batch of item indices. If None,
                 full prediction will be produced.
-            user_seq (Optional[Tensor]): Padded sequences of item IDs for users to predict for.
-            seq_len (Optional[Tensor]): Actual lengths of these sequences, before padding.
             **kwargs (Any): The dictionary of keyword arguments.
 
         Returns:
