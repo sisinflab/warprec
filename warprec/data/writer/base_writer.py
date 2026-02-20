@@ -163,8 +163,8 @@ class Writer(ABC):
                     train_batch=train_batch,
                     train_sparse=train_sparse,
                 )
-            predictions[train_batch.nonzero()] = -torch.inf
-            top_k_scores, top_k_items = torch.topk(predictions, k, dim=1)
+                predictions[train_batch.nonzero()] = -torch.inf
+                top_k_scores, top_k_items = torch.topk(predictions, k, dim=1)
 
             batch_users = user_indices.unsqueeze(1).expand(-1, k).flatten()
             user_labels = [umap_i[idx.item()] for idx in batch_users]
