@@ -3,7 +3,6 @@ from typing import Any, Optional
 
 import torch
 from torch import nn, Tensor
-from scipy.sparse import csr_matrix
 
 from warprec.data.entities import Interactions, Sessions
 from warprec.recommenders.base_recommender import IterativeRecommender
@@ -26,6 +25,7 @@ class CDAE(IterativeRecommender):
     Args:
         params (dict): Model parameters.
         info (dict): The dictionary containing dataset information.
+        interactions (Interactions): The training interactions.
         *args (Any): Variable length argument list.
         seed (int): The seed to use for reproducibility.
         **kwargs (Any): Arbitrary keyword arguments.
@@ -66,11 +66,15 @@ class CDAE(IterativeRecommender):
         self,
         params: dict,
         info: dict,
+        interactions: Interactions,
         *args: Any,
         seed: int = 42,
         **kwargs: Any,
     ):
         super().__init__(params, info, *args, seed=seed, **kwargs)
+
+        # Store the training matrix for prediction
+        self.train_matrix = interactions.get_sparse()
 
         # User-specific embedding
         self.user_embedding = nn.Embedding(self.n_users, self.embedding_size)
@@ -123,12 +127,16 @@ class CDAE(IterativeRecommender):
             **kwargs,
         )
 
-    def forward(self, user_history: Tensor, user_indices: Tensor) -> Tensor:
+    def forward(
+        self, user_history: Tensor, user_indices: Tensor, *args: Any, **kwargs: Any
+    ) -> Tensor:
         """Performs the forward pass of the CDAE model.
 
         Args:
             user_history (Tensor): The user-item interaction vector [batch_size, n_items].
             user_indices (Tensor): The user indices for the batch [batch_size].
+            *args (Any): List of arguments.
+            **kwargs (Any): The dictionary of keyword arguments.
 
         Returns:
             Tensor: The reconstructed interaction vector (logits) [batch_size, n_items].
@@ -170,7 +178,6 @@ class CDAE(IterativeRecommender):
 
         return main_loss + reg_loss
 
-    @torch.no_grad()
     def predict(
         self,
         user_indices: Tensor,
@@ -189,22 +196,13 @@ class CDAE(IterativeRecommender):
 
         Returns:
             Tensor: The score matrix {user x item}.
-
-        Raises:
-            ValueError: If the 'train_batch' keyword argument is not provided.
         """
-        # Get train batch from kwargs
-        train_batch_sparse: Optional[csr_matrix] = kwargs.get("train_batch")
-        if train_batch_sparse is None:
-            raise ValueError(
-                "predict() for MultiDAE requires 'train_batch' as a keyword argument."
-            )
-
         # Compute predictions and convert to Tensor
-        train_batch = (
-            torch.from_numpy(train_batch_sparse.toarray()).float().to(self.device)
+        train_batch = self.train_matrix[user_indices.tolist(), :].toarray()
+        predictions_logits = self.forward(
+            torch.from_numpy(train_batch).float().to(self.device),
+            user_indices,
         )
-        predictions_logits = self.forward(train_batch, user_indices)
 
         # Apply the final activation function to get scores
         predictions: Tensor = self.o_act(predictions_logits)

@@ -159,7 +159,6 @@ class ConvNCF(IterativeRecommender):
 
         return prediction.squeeze(-1)  # [batch_size]
 
-    @torch.no_grad()
     def predict(
         self,
         user_indices: Tensor,

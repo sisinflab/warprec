@@ -4,7 +4,6 @@ from typing import Any, Optional
 import torch
 import torch.nn.functional as F
 from torch import nn, Tensor
-from scipy.sparse import csr_matrix
 
 from warprec.data.entities import Interactions, Sessions
 from warprec.recommenders.base_recommender import IterativeRecommender
@@ -83,6 +82,7 @@ class MultiDAE(IterativeRecommender):
     Args:
         params (dict): Model parameters.
         info (dict): The dictionary containing dataset information.
+        interactions (Interactions): The training interactions.
         *args (Any): Variable length argument list.
         seed (int): The seed to use for reproducibility.
         **kwargs (Any): Arbitrary keyword arguments.
@@ -113,11 +113,15 @@ class MultiDAE(IterativeRecommender):
         self,
         params: dict,
         info: dict,
+        interactions: Interactions,
         *args: Any,
         seed: int = 42,
         **kwargs: Any,
     ):
         super().__init__(params, info, *args, seed=seed, **kwargs)
+
+        # Store the training matrix for prediction
+        self.train_matrix = interactions.get_sparse()
 
         # Encoder layers
         self.encoder = Encoder(
@@ -176,7 +180,6 @@ class MultiDAE(IterativeRecommender):
         h = self.encoder(h)
         return self.decoder(h)
 
-    @torch.no_grad()
     def predict(
         self,
         user_indices: Tensor,
@@ -195,22 +198,12 @@ class MultiDAE(IterativeRecommender):
 
         Returns:
             Tensor: The score matrix {user x item}.
-
-        Raises:
-            ValueError: If the 'train_batch' keyword argument is not provided.
         """
-        # Get train batch from kwargs
-        train_batch_sparse: Optional[csr_matrix] = kwargs.get("train_batch")
-        if train_batch_sparse is None:
-            raise ValueError(
-                "predict() for MultiDAE requires 'train_batch' as a keyword argument."
-            )
-
         # Compute predictions and convert to Tensor
-        train_batch = (
-            torch.from_numpy(train_batch_sparse.toarray()).float().to(self.device)
+        train_batch = self.train_matrix[user_indices.tolist(), :].toarray()
+        predictions = self.forward(
+            torch.from_numpy(train_batch).float().to(self.device)
         )
-        predictions = self.forward(train_batch)
 
         if item_indices is None:
             # Case 'full': prediction on all items

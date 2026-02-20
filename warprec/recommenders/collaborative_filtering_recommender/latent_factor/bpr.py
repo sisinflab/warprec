@@ -108,7 +108,6 @@ class BPR(IterativeRecommender):
 
         return torch.mul(user_e, item_e).sum(dim=1)
 
-    @torch.no_grad()
     def predict(
         self,
         user_indices: Tensor,

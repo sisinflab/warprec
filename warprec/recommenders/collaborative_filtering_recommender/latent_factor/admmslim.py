@@ -49,9 +49,9 @@ class ADMMSlim(ItemSimRecommender):
         seed: int = 42,
         **kwargs: Any,
     ):
-        super().__init__(params, info, *args, seed=seed, **kwargs)
+        super().__init__(params, info, interactions, *args, seed=seed, **kwargs)
 
-        X = interactions.get_sparse()
+        X = self.train_matrix
 
         # Calculate the item means
         self.item_means = X.mean(axis=0).getA1()

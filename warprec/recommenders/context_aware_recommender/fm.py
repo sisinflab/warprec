@@ -143,7 +143,6 @@ class FM(ContextRecommenderUtils, IterativeRecommender):
 
         return linear_part + interaction_part
 
-    @torch.no_grad()
     def predict(
         self,
         user_indices: Tensor,

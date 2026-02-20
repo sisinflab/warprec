@@ -264,7 +264,6 @@ class SGL(IterativeRecommender, GraphRecommenderUtils):
 
         return bpr_loss + ssl_loss + reg_loss
 
-    @torch.no_grad()
     def predict(
         self,
         user_indices: Tensor,

@@ -246,7 +246,6 @@ class ESIGCF(IterativeRecommender, GraphRecommenderUtils):
 
         return users_emb, items_emb
 
-    @torch.no_grad()
     def predict(
         self,
         user_indices: Tensor,

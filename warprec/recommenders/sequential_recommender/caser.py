@@ -230,14 +230,12 @@ class Caser(IterativeRecommender, SequentialRecommenderUtils):
 
         return seq_output
 
-    @torch.no_grad()
     def predict(
         self,
         user_indices: Tensor,
+        user_seq: Tensor,
         *args: Any,
         item_indices: Optional[Tensor] = None,
-        user_seq: Optional[Tensor] = None,
-        seq_len: Optional[Tensor] = None,
         **kwargs: Any,
     ) -> Tensor:
         """
@@ -245,11 +243,10 @@ class Caser(IterativeRecommender, SequentialRecommenderUtils):
 
         Args:
             user_indices (Tensor): The batch of user indices.
+            user_seq (Tensor): Padded sequences of item IDs for users to predict for.
             *args (Any): List of arguments.
             item_indices (Optional[Tensor]): The batch of item indices. If None,
                 full prediction will be produced.
-            user_seq (Optional[Tensor]): Padded sequences of item IDs for users to predict for.
-            seq_len (Optional[Tensor]): Actual lengths of these sequences, before padding.
             **kwargs (Any): The dictionary of keyword arguments.
 
         Returns:

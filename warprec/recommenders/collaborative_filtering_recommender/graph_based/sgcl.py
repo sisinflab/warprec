@@ -159,7 +159,6 @@ class SGCL(IterativeRecommender, GraphRecommenderUtils):
 
         return sgcl_loss + reg_loss
 
-    @torch.no_grad()
     def predict(
         self,
         user_indices: Tensor,

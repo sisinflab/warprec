@@ -216,7 +216,6 @@ class LightGODE(IterativeRecommender, GraphRecommenderUtils):
             self._cached_inference_emb = self._ode_solver()
         return self._cached_inference_emb
 
-    @torch.no_grad()
     def predict(
         self,
         user_indices: Tensor,

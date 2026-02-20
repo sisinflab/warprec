@@ -14,7 +14,6 @@ class Random(Recommender):
     This model will recommend items based on a random number generator.
     """
 
-    @torch.no_grad()
     def predict(
         self,
         user_indices: Tensor,

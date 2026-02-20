@@ -40,7 +40,7 @@ class AttributeItemKNN(ItemSimRecommender):
         seed: int = 42,
         **kwargs: Any,
     ):
-        super().__init__(params, info, *args, seed=seed, **kwargs)
+        super().__init__(params, info, interactions, *args, seed=seed, **kwargs)
 
         X_feat = interactions.get_side_sparse()
         similarity = similarities_registry.get(self.similarity)

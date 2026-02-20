@@ -167,7 +167,6 @@ class WideAndDeep(ContextRecommenderUtils, IterativeRecommender):
 
         return wide_part + deep_part
 
-    @torch.no_grad()
     def predict(
         self,
         user_indices: Tensor,

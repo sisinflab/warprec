@@ -107,7 +107,6 @@ class ProxyRecommender(Recommender):
                 f"An error occurred while reading the recommendation file: {e}"
             ) from e
 
-    @torch.no_grad()
     def predict(
         self,
         user_indices: Tensor,

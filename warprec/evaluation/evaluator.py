@@ -170,11 +170,7 @@ class Evaluator:
 
             # Prepare the model input
             train_batch = train_sparse[user_indices.tolist(), :]
-            predict_kwargs = {
-                "user_indices": user_indices,
-                "train_sparse": train_sparse,  # Some models might need it internally
-                "train_batch": train_batch,
-            }
+            predict_kwargs = {"user_indices": user_indices}
 
             # A. Sequential Models Support
             if isinstance(model, SequentialRecommenderUtils):
@@ -211,34 +207,35 @@ class Evaluator:
                 predict_kwargs["item_indices"] = candidates
 
             # Model prediction
-            predictions = model.predict(**predict_kwargs).to(device)
+            with torch.inference_mode():
+                predictions = model.predict(**predict_kwargs).to(device)
 
-            if strategy == "full":
-                if "target_item" in batch_data:
-                    # Contextual full evaluation
-                    target_item = batch_data["target_item"]
-                    eval_batch = torch.zeros(
-                        (len(user_indices), self.num_items), device=device
-                    )
-                    eval_batch.scatter_(1, target_item.unsqueeze(1), 1.0)
-                else:
-                    # Classic full evaluation
-                    eval_batch = batch_data["ground_truth"]
+                if strategy == "full":
+                    if "target_item" in batch_data:
+                        # Contextual full evaluation
+                        target_item = batch_data["target_item"]
+                        eval_batch = torch.zeros(
+                            (len(user_indices), self.num_items), device=device
+                        )
+                        eval_batch.scatter_(1, target_item.unsqueeze(1), 1.0)
+                    else:
+                        # Classic full evaluation
+                        eval_batch = batch_data["ground_truth"]
 
-                # Mask seen items
-                predictions[train_batch.nonzero()] = -torch.inf
+                    # Mask seen items
+                    predictions[train_batch.nonzero()] = -torch.inf
 
-            elif strategy == "sampled":
-                # Mask seen items
-                predictions[candidates == padding_idx] = -torch.inf
+                elif strategy == "sampled":
+                    # Mask seen items
+                    predictions[candidates == padding_idx] = -torch.inf
 
-            # Metric computation
-            self._compute_metrics_step(
-                predictions=predictions,
-                eval_batch=eval_batch,
-                user_indices=user_indices,
-                candidates=candidates if strategy == "sampled" else None,
-            )
+                # Metric computation
+                self._compute_metrics_step(
+                    predictions=predictions,
+                    eval_batch=eval_batch,
+                    user_indices=user_indices,
+                    candidates=candidates if strategy == "sampled" else None,
+                )
 
         if verbose:
             self._log_results(eval_start_time, model.name)

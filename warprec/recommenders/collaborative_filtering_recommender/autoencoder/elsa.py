@@ -4,7 +4,6 @@ from typing import Any, Optional
 import torch
 from torch import nn, Tensor
 import torch.nn.functional as F
-from scipy.sparse import csr_matrix
 
 from warprec.data.entities import Interactions, Sessions
 from warprec.recommenders.base_recommender import IterativeRecommender
@@ -22,6 +21,7 @@ class ELSA(IterativeRecommender):
     Args:
         params (dict): The dictionary with the model params.
         info (dict): The dictionary containing dataset information.
+        interactions (Interactions): The training interactions.
         *args (Any): Argument for PyTorch nn.Module.
         seed (int): The seed to use for reproducibility.
         **kwargs (Any): Keyword argument for PyTorch nn.Module.
@@ -45,11 +45,15 @@ class ELSA(IterativeRecommender):
         self,
         params: dict,
         info: dict,
+        interactions: Interactions,
         *args: Any,
         seed: int = 42,
         **kwargs: Any,
     ):
-        super().__init__(params, info, *args, seed=seed, **kwargs)
+        super().__init__(params, info, interactions, *args, seed=seed, **kwargs)
+
+        # Store the training matrix for prediction
+        self.train_matrix = interactions.get_sparse()
 
         # Weight matrix W
         self.W = nn.Parameter(torch.empty([self.n_items, self.n_dims]))
@@ -102,7 +106,6 @@ class ELSA(IterativeRecommender):
         # Diagonal constraint: x - xAA^T
         return reconstruction - x
 
-    @torch.no_grad()
     def predict(
         self,
         user_indices: Tensor,
@@ -121,19 +124,10 @@ class ELSA(IterativeRecommender):
 
         Returns:
             Tensor: The score matrix {user x item}.
-
-        Raises:
-            ValueError: If 'train_batch' is not provided in kwargs.
         """
-        # Get train batch from kwargs
-        train_batch: Optional[csr_matrix] = kwargs.get("train_batch")
-        if train_batch is None:
-            raise ValueError(
-                f"predict() for {self.name} requires 'train_batch' as a keyword argument."
-            )
-
         # Convert sparse batch to dense tensor and compute predictions
-        x = torch.from_numpy(train_batch.toarray()).to(self.device).float()
+        train_batch = self.train_matrix[user_indices.tolist(), :].toarray()
+        x = torch.from_numpy(train_batch).to(self.device).float()
         predictions = self.forward(x)
 
         # Return full or sampled predictions

@@ -54,9 +54,9 @@ class SANSA(ItemSimRecommender):
         seed: int = 42,
         **kwargs: Any,
     ):
-        super().__init__(params, info, *args, seed=seed, **kwargs)
+        super().__init__(params, info, interactions, *args, seed=seed, **kwargs)
 
-        X = interactions.get_sparse()
+        X = self.train_matrix
 
         # Compute Sparse Gram Matrix: G = X^T X
         G = (X.T @ X).tocsc()
@@ -158,7 +158,6 @@ class SANSA(ItemSimRecommender):
 
         return sp.csr_matrix((new_data, (new_row, new_col)), shape=matrix.shape)
 
-    @torch.no_grad()
     def predict(
         self,
         user_indices: Tensor,
@@ -177,19 +176,10 @@ class SANSA(ItemSimRecommender):
 
         Returns:
             Tensor: The score matrix.
-
-        Raises:
-            ValueError: If 'train_batch' is not provided in kwargs.
         """
-        # Get train batch from kwargs
-        train_batch: Optional[sp.csr_matrix] = kwargs.get("train_batch")
-        if train_batch is None:
-            raise ValueError(
-                f"predict() for {self.name} requires 'train_batch' as a keyword argument."
-            )
-
         # Compute predictions: Sparse (Batch x Items) @ Sparse (Items x Items)
         # Result is Sparse (Batch x Items)
+        train_batch = self.train_matrix[user_indices.tolist(), :]
         predictions_sparse = train_batch @ self.item_similarity
 
         # Convert to dense Tensor

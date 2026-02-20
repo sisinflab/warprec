@@ -155,15 +155,14 @@ class Writer(ABC):
                 else (None, None)
             )
 
-            predictions = model.predict(
-                user_indices=user_indices,
-                user_seq=user_seq,
-                seq_len=seq_len,
-                train_batch=train_batch,
-                train_sparse=train_sparse,
-            )
-            predictions[train_batch.nonzero()] = -torch.inf
-            top_k_scores, top_k_items = torch.topk(predictions, k, dim=1)
+            with torch.inference_mode():
+                predictions = model.predict(
+                    user_indices=user_indices,
+                    user_seq=user_seq,
+                    seq_len=seq_len,
+                )
+                predictions[train_batch.nonzero()] = -torch.inf
+                top_k_scores, top_k_items = torch.topk(predictions, k, dim=1)
 
             batch_users = user_indices.unsqueeze(1).expand(-1, k).flatten()
             user_labels = [umap_i[idx.item()] for idx in batch_users]

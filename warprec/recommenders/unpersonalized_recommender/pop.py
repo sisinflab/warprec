@@ -53,7 +53,6 @@ class Pop(Recommender):
         norm_pop = popularity / (item_count + 1e-6)
         self.register_buffer("normalized_popularity", norm_pop)
 
-    @torch.no_grad()
     def predict(
         self,
         user_indices: Tensor,

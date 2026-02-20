@@ -48,7 +48,10 @@ class AttributeUserKNN(Recommender):
     ):
         super().__init__(params, info, *args, seed=seed, **kwargs)
 
-        X_inter = interactions.get_sparse()
+        # Store the training matrix for prediction
+        self.train_matrix = interactions.get_sparse()
+
+        X_inter = self.train_matrix
         X_feat = interactions.get_side_sparse()
         similarity = similarities_registry.get(self.similarity)
 
@@ -85,7 +88,6 @@ class AttributeUserKNN(Recommender):
         # L2 normalize
         return normalize(user_profile, norm="l2", axis=1)
 
-    @torch.no_grad()
     def predict(
         self,
         user_indices: Tensor,
@@ -104,19 +106,9 @@ class AttributeUserKNN(Recommender):
 
         Returns:
             Tensor: The score matrix {user x item}.
-
-        Raises:
-            ValueError: If the 'train_sparse' keyword argument is not provided.
         """
-        # Get train batch from kwargs
-        train_sparse: Optional[csr_matrix] = kwargs.get("train_sparse")
-        if train_sparse is None:
-            raise ValueError(
-                "predict() for AttributeUserKNN requires 'train_sparse' as a keyword argument."
-            )
-
         # Compute predictions and convert to Tensor
-        predictions = self.user_similarity[user_indices.cpu(), :] @ train_sparse
+        predictions = self.user_similarity[user_indices.cpu(), :] @ self.train_matrix
         predictions = torch.from_numpy(predictions)
 
         if item_indices is None:
