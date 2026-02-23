@@ -21,7 +21,6 @@ The **meta** section allows controlling aspects of the model that do not directl
 - **save_model**: Whether to save the model in the experiment directory. Defaults to ``False``.
 - **save_recs**: Whether to save generated recommendations. Defaults to ``False``.
 - **load_from**: Path to pre-trained model weights to load. Defaults to ``None``.
-- **low_memory**: Whether to run the train using a lazy dataloader. Defaults to ``False``.
 
 .. warning::
     The ``low_memory`` option can be beneficial in environments with limited computational resources, such as when training a model on a laptop. However, its use is generally discouraged in other contexts, as it significantly increases training time.
@@ -46,11 +45,9 @@ The **optimization** section defines how hyperparameter optimization is performe
 - **lr_scheduler**: Scheduling algorithm to adjust the learning rate at run time. Defaults to ``None``.
 - **properties**: Nested section for strategy and scheduler parameters.
 - **device**: Training device, e.g., ``cpu`` or ``cuda``. Overrides global device.
-- **max_cpu_count**: Maximum number of CPU cores to use. Defaults to available cores.
-- **num_samples**: Number of samples to generate. For grid search, must be ``1``. Defaults to ``1``.
-- **parallel_trials**: Number of trials to run simultaneously. Defaults to ``1``.
-- **multi_gpu**: Wether to use multiple gpus for each trial. Defaults to ``False``.
-- **num_gpus**: The number of gpus to assign for each trial. This value must be used only in case of multi-GPU train. Defaults to ``None``.
+- **cpu_per_trial**: Number of CPU cores allocated per trial. Defaults to ``1``.
+- **gpu_per_trial**: Number of GPUs allocated per trial. Defaults to ``0``
+- **num_workers**: Number of worker processes for data loading. Defaults to ``None`` (main process).
 - **block_size**: Number of items to predict at once for efficiency. Defaults to ``50``.
 - **checkpoint_to_keep**: Number of checkpoints to retain in Ray. Defaults to ``5``.
 

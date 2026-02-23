@@ -45,6 +45,11 @@ The following keywords are available to configure the reader:
   * ``implicit`` – Each transaction is automatically assigned a score of 1.
   * ``explicit`` – The dataset must contain a numerical score column representing user feedback.
 
+- **file_format**: The format of the input file. Supported values:
+
+  * ``tabular`` – Standard delimited text files (e.g., CSV, TSV).
+  * ``parquet`` – Columnar storage format optimized for performance.
+
 - **split**: A nested configuration block for datasets that are already split.
 
 - **side**: A nested configuration block for loading **side information** associated with items.
@@ -74,6 +79,7 @@ This is achieved through the ``split`` nested configuration block. To enable thi
 - **ext**: Extension of the split files. Defaults to ``.tsv``.
 - **sep**: Column separator used by the split files. Defaults to ``'\t'``.
 - **header**: Whether to treat the first row of the split files as headers. Defaults to ``True``.
+- **file_format**: The format of the split files. Supported values are ``tabular`` and ``parquet``.
 
 .. note::
    Split datasets must be in a **WarpRec-compatible format**.
@@ -93,6 +99,7 @@ This can be configured using the ``side`` nested section:
 - **azure_blob_name**: Name of the Azure Blob containing side information.
 - **sep**: Column separator for the side information file.
 - **header**: Whether the first row of the file is a header. Defaults to ``True``.
+- **file_format**: The format of the side information file. Supported values are ``tabular`` and ``parquet``.
 
 .. tip::
    Side information can improve model performance, especially in **cold-start scenarios**. Not every model uses side information, check the :ref:`Recommenders Documentation <recommender>` for further details on each model.
@@ -112,6 +119,8 @@ This is configured under the ``clustering`` nested section:
 - **item_sep**: Column separator for the item clustering file.
 - **user_header**: Whether the user clustering file contains a header. Defaults to ``True``.
 - **item_header**: Whether the item clustering file contains a header. Defaults to ``True``.
+- **user_file_format**: The format of the user clustering file. Supported values are ``tabular`` and ``parquet``.
+- **item_file_format**: The format of the item clustering file. Supported values are ``tabular`` and ``parquet``.
 
 ----------------
 Labels

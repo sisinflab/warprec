@@ -69,6 +69,7 @@ The ``split`` nested section configures how **data split files** are saved:
 - **sep**: Column separator for split files. Default: ``\t``.
 - **ext**: Extension for split files. Default: ``.tsv``.
 - **header**: Boolean flag indicating whether the first row should contain column names. Defaults to ``True``.
+- **file_format**: The format of the split files. Supported values are ``tabular`` and ``parquet``.
 
 
 -----------------
