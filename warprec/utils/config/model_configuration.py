@@ -481,7 +481,7 @@ class RecomModel(BaseModel, ABC):
             value = self.check_valid_strategy(value[0], typing, value)
         else:
             # If a strategy has not been provided, we use a default one
-            value.insert(0, SearchSpace.CHOICE)
+            value.insert(0, SearchSpace.CHOICE.value)
 
         # If the typing is simple, then we don't need further checks
         if (
