@@ -196,7 +196,6 @@ general:
   backend: [polars, pandas]
   ray_verbose: [0, 1, 2, 3]
   time_report: [True, False]
-  train_data_preparation: [conservative, experiment]
   custom_models: [path/to/python/module, path/to/python/script.py]
   callback:
     callback_path: path/to/python/script.py
