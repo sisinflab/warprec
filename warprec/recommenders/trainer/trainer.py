@@ -26,7 +26,6 @@ from warprec.utils.config import (
 )
 from warprec.utils.helpers import validation_metric
 from warprec.utils.callback import WarpRecCallback
-from warprec.utils.enums import SearchSpace
 from warprec.utils.logger import logger
 from warprec.utils.registry import (
     model_registry,
@@ -529,10 +528,7 @@ class Trainer:
             if isinstance(v, list) and len(v) > 0:
                 space_type = v[0]
                 args = v[1:]
-                if space_type == SearchSpace.CHOICE:
-                    tune_params[k] = search_space_registry.get(space_type)(args)
-                else:
-                    tune_params[k] = search_space_registry.get(space_type)(*args)
+                tune_params[k] = search_space_registry.get(space_type)(*args)
             else:
                 tune_params[k] = v  # Static parameter
 
