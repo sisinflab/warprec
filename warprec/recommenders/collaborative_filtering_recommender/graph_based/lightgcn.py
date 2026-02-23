@@ -83,10 +83,6 @@ class LightGCN(GraphRecommenderUtils, IterativeRecommender):
             "x, edge_index", propagation_network_list
         )
 
-        # Vectorized normalization for embedding
-        alpha_tensor = torch.tensor([1 / (k + 1) for k in range(self.n_layers + 1)])
-        self.register_buffer("alpha", alpha_tensor)
-
         # Init embedding weights
         self.apply(self._init_weights)
         self.bpr_loss = BPRLoss()
@@ -152,12 +148,9 @@ class LightGCN(GraphRecommenderUtils, IterativeRecommender):
             current_embeddings = layer_module(current_embeddings, self.adj)
             embeddings_list.append(current_embeddings)
 
-        # Aggregate embeddings using the alpha value
-        lightgcn_all_embeddings = torch.zeros_like(
-            ego_embeddings, device=ego_embeddings.device
-        )
-        for k, embedding in enumerate(embeddings_list):
-            lightgcn_all_embeddings += embedding * self.alpha[k]  # type: ignore[index]
+        # Stack and average the embeddings (this is equivalent to multiplying by alpha and summing)
+        stacked_embeddings = torch.stack(embeddings_list, dim=0)
+        lightgcn_all_embeddings = torch.mean(stacked_embeddings, dim=0)
 
         # Split into user and item embeddings
         user_all_embeddings, item_all_embeddings = torch.split(
