@@ -397,11 +397,11 @@ class Trainer:
             raise ValueError(
                 "Not enough resources in the cluster to allocate to the trial."
             )
-        if ram_per_trial > available_ram:
+        if ram_per_trial > 0 and ram_per_trial > available_ram:
             raise ValueError(
                 f"Requested RAM per trial ({ram_per_trial} GB) exceeds available RAM ({available_ram} GB)."
             )
-        if vram_per_trial > available_vram:
+        if vram_per_trial > 0 and vram_per_trial > available_vram:
             raise ValueError(
                 f"Requested VRAM per trial ({vram_per_trial} GB) exceeds available VRAM ({available_vram} GB)."
             )
@@ -410,12 +410,16 @@ class Trainer:
         if device == "cuda" and gpu_per_trial == 0:
             gpu_per_trial = 1
 
-        return {
+        resources_dict: Dict[str, float] = {
             "cpu": cpu_per_trial,
             "gpu": gpu_per_trial,
-            "ram_gb": ram_per_trial,
-            "vram_gb": vram_per_trial,
         }
+        if ram_per_trial > 0:
+            resources_dict["ram_gb"] = ram_per_trial
+        if vram_per_trial > 0:
+            resources_dict["vram_gb"] = vram_per_trial
+
+        return resources_dict
 
     def _get_objective_function(self, **kwargs: Any) -> Callable:
         """Selects and wraps the appropriate objective function (Standard or DDP).
