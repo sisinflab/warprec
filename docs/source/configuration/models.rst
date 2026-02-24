@@ -44,6 +44,8 @@ The **optimization** section defines how hyperparameter optimization is performe
 - **device**: Training device, e.g., ``cpu`` or ``cuda``. Overrides global device.
 - **cpu_per_trial**: Number of CPU cores allocated per trial. Defaults to ``1``.
 - **gpu_per_trial**: Number of GPUs allocated per trial. Defaults to ``0``
+- **ram_per_trial**: Amount of RAM allocated per trial in Gigabytes. Defaults to ``0`` (no limit).
+- **vram_per_trial**: Amount of VRAM allocated per trial in Gigabytes. Defaults to ``0`` (no limit).
 - **num_workers**: Number of worker processes for data loading. Defaults to ``None`` (main process).
 - **block_size**: Number of items to predict at once for efficiency. Defaults to ``50``.
 - **checkpoint_to_keep**: Number of checkpoints to retain in Ray. Defaults to ``5``.
