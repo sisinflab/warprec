@@ -152,6 +152,8 @@ models:
       device: [cpu, cuda]
       cpu_per_trial: 1
       gpu_per_trial: 0
+      ram_per_trial: 0
+      vram_per_trial: 0
       num_workers: 0
       block_size: 50
       num_samples: 10
