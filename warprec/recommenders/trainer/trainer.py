@@ -52,17 +52,17 @@ class Trainer:
     Args:
         config (TrainConfiguration): The complete configuration object.
         custom_callback (WarpRecCallback): Custom callback for training/eval.
-        custom_models (Optional[Union[str, List[str]]]): List of custom models to load.
+        custom_modules (Optional[Union[str, List[str]]]): List of custom models to load.
     """
 
     def __init__(
         self,
         config: TrainConfiguration,
         custom_callback: WarpRecCallback = WarpRecCallback(),
-        custom_models: Optional[Union[str, List[str]]] = None,
+        custom_modules: Optional[Union[str, List[str]]] = None,
     ):
         self.config = config
-        self._custom_models = custom_models or []
+        self._custom_modules = custom_modules or []
         self._callbacks = self._setup_callbacks(config.dashboard, custom_callback)
 
     def train_single_fold(
@@ -426,7 +426,7 @@ class Trainer:
             "seed": opt_config.properties.seed,
             "block_size": opt_config.block_size,
             "chunk_size": opt_config.chunk_size,
-            "custom_models": self._custom_models,
+            "custom_modules": self._custom_modules,
         }
 
         if gpu_per_trial > 1:

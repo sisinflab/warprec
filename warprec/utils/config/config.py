@@ -100,7 +100,7 @@ class WarpRecConfiguration(BaseModel):
                 )
 
         # Load custom modules if specified
-        load_custom_modules(self.general.custom_models)
+        load_custom_modules(self.general.custom_modules)
 
         # Check if the filters have been set correctly
         if self.filtering is not None:

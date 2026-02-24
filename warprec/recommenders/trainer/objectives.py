@@ -75,7 +75,7 @@ def objective_function(
     seed: int = 42,
     block_size: int = 50,
     chunk_size: int = 4096,
-    custom_models: Optional[List[str]] = None,
+    custom_modules: Optional[List[str]] = None,
 ) -> None:
     """Objective function to optimize the hyperparameters.
 
@@ -105,15 +105,15 @@ def objective_function(
             Defaults to 50.
         chunk_size (int): The chunk size for the model evaluation.
             Defaults to 4096.
-        custom_models (Optional[List[str]]): List of custom models to import.
+        custom_modules (Optional[List[str]]): List of custom modules to import.
             Defaults to None.
 
     Returns:
         None: This function reports metrics and checkpoints to Ray Tune
             via `tune.report()` and does not explicitly return a value.
     """
-    if custom_models is None:
-        custom_models = []
+    if custom_modules is None:
+        custom_modules = []
 
     # Memory reporting
     process = psutil.Process(os.getpid())
@@ -132,7 +132,7 @@ def objective_function(
     latest_metrics[validation_score] = best_validation_score  # Default value
 
     # Load custom modules if provided
-    load_custom_modules(custom_models)
+    load_custom_modules(custom_modules)
 
     # Extract the correct dataset
     if isinstance(dataset_folds, list):
@@ -377,8 +377,8 @@ def objective_function_ddp(config: dict) -> None:
         torch.cuda.reset_peak_memory_stats(device=device)
 
     # Load custom modules if provided
-    custom_models = config["custom_models"]
-    load_custom_modules(custom_models)
+    custom_modules = config["custom_modules"]
+    load_custom_modules(custom_modules)
 
     # Initialize the model and dataset
     model_name = config["model_name"]
@@ -620,7 +620,7 @@ def driver_function_ddp(
     chunk_size: int = 4096,
     beta: float = 1.0,
     pop_ratio: float = 0.8,
-    custom_models: Optional[List[str]] = None,
+    custom_modules: Optional[List[str]] = None,
 ):
     """The driver function used to run the real objective during
         the tuning process.
@@ -651,11 +651,11 @@ def driver_function_ddp(
             Defaults to 4096.
         beta (float): The beta value to initialize the Evaluator.
         pop_ratio (float): The pop_ratio value to initialize the Evaluator.
-        custom_models (Optional[List[str]]): List of custom models to import.
+        custom_modules (Optional[List[str]]): List of custom modules to import.
             Defaults to None.
     """
-    if custom_models is None:
-        custom_models = []
+    if custom_modules is None:
+        custom_modules = []
 
     trainer = TorchTrainer(
         objective_function_ddp,
@@ -676,7 +676,7 @@ def driver_function_ddp(
             "chunk_size": chunk_size,
             "beta": beta,
             "pop_ratio": pop_ratio,
-            "custom_models": custom_models,
+            "custom_modules": custom_modules,
         },
         scaling_config=ScalingConfig(
             num_workers=num_gpus,

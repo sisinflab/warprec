@@ -32,6 +32,7 @@ WarpRec supports multiple pipelines that leverage the configuration system diffe
 
 1. **Training Pipeline**: Executes full workflow including hyperparameter optimization (HPO), model training, evaluation, and result saving.
 2. **Design Pipeline**: Focuses on testing and evaluating models without HPO. This pipeline is ideal for rapid prototyping and design experiments.
+3. **Evaluation Pipeline**: Evaluates pre-trained models without training, using provided checkpoints.
 
 A single configuration file can be used across multiple pipelines; WarpRec ensures that workflows remain interchangeable, with some sections being ignored or interpreted differently depending on the pipeline.
 

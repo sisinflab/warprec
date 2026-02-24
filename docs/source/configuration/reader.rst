@@ -8,10 +8,6 @@ The **Reader Configuration** module is responsible for handling data loading and
 Data ingested through this configuration is automatically transformed into the internal structures used by WarpRec’s recommendation models.
 This ensures consistency and reproducibility across different datasets and use cases.
 
-.. note::
-   The reader is a **critical entry point** of the framework. Misconfigured parameters can lead to
-   invalid data ingestion, inconsistent training behavior, or unexpected runtime errors.
-
 ---------------------
 Available Keywords
 ---------------------
@@ -84,9 +80,6 @@ This is achieved through the ``split`` nested configuration block. To enable thi
 .. note::
    Split datasets must be in a **WarpRec-compatible format**.
    Mismatched labels or inconsistent file structures will result in errors.
-
-.. warning::
-   Split dataset loading requires **all split files** to be in the same directory, with compatible format and schema.
 
 -----------------------------
 Side Information Reading
@@ -169,14 +162,11 @@ To override these defaults, use the ``dtypes`` section:
 - **timestamp_type**: Datatype for timestamps.
 
 .. note::
-   Supported datatypes include:
+   When ``header=False``, dtype specifications will be **ignored**. Supported datatypes include:
 
    - ``int8``, ``int16``, ``int32``, ``int64``
    - ``float32``, ``float64``
    - ``str``
-
-.. warning::
-   When ``header=False``, dtype specifications will be **ignored**.
 
 ---------------------------
 Example Configuration
