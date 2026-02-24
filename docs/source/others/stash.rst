@@ -82,6 +82,6 @@ access custom data. This is an example on how to retrieve the images inside a cu
 .. code-block:: python
 
     class CustomModel(Recommender):
-        def __init__(self, params, interactions, *args, **kwargs):
-            super().__init__(params, interactions, *args, **kwargs)
+        def __init__(self, params, info, *args, seed=42, **kwargs):
+            super().__init__(params, info, *args, seed=seed, **kwargs)
             self.item_images = kwargs.get("item_images")

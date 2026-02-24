@@ -4,15 +4,6 @@ Azure Reader
 The ``Azure Reader`` of **WarpRec** handles the reading of raw data, pre-split data, and side information directly from **Azure Blob Storage**.
 It provides seamless integration with Azure’s cloud storage while maintaining the same flexibility and configurability of the ``Local Reader``.
 
-.. warning::
-
-    The Azure Reader is part of the extra *remote-io*. You can download it via pip:
-
-    .. code-block:: bash
-
-        pip install warprec[remote-io]
-
-
 Reading from a Single Azure Source
 ----------------------------------
 
