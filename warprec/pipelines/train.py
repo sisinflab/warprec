@@ -62,7 +62,7 @@ def train_pipeline(path: str):
 
     # Before starting training process, initialize Ray
     py_modules = (
-        [] if config.general.custom_models is None else config.general.custom_models
+        [] if config.general.custom_modules is None else config.general.custom_modules
     )
     py_modules.extend(["warprec"])  # type: ignore[union-attr]
 
@@ -155,7 +155,7 @@ def train_pipeline(path: str):
         params = model_param_from_dict(model_name, config.models[model_name])
         trainer = Trainer(
             custom_callback=callback,
-            custom_models=config.general.custom_models,
+            custom_modules=config.general.custom_modules,
             config=config,
         )
 
