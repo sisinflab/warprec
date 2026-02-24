@@ -8,14 +8,6 @@ This includes generated recommendations, evaluation metrics, and data splits cre
 By customizing file formats, paths, and naming conventions, WarpRec allows precise control of output organization.
 This feature is especially useful when running multiple experiments simultaneously or when managing several datasets.
 
-.. note::
-   The writer is essential for **reproducibility** and **traceability**.
-   A properly configured writer ensures that experiment outputs are consistently stored and can be easily compared across runs.
-
-.. warning::
-   Misconfigured writer settings can result in **loss of results** or overwriting previous experiment outputs.
-   Always verify the experiment path and labels before running large-scale experiments.
-
 ---------------------
 Available Keywords
 ---------------------
@@ -56,9 +48,6 @@ The ``results`` nested section defines how **result files** (e.g., evaluation me
 
 - **sep**: Column separator for output files. Default: ``\t``.
 - **ext**: Extension for output files. Default: ``.tsv``.
-
-.. tip::
-   Using a comma (``','``) as separator and ``.csv`` as extension makes outputs compatible with spreadsheet tools such as Excel.
 
 -----------------
 Split

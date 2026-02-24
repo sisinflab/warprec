@@ -4,14 +4,6 @@ Azure Writer
 The ``Azure Writer`` of **WarpRec** is designed to track and persist all experiment results, trained models, and configuration details directly to **Azure Blob Storage**.
 It provides seamless cloud-based persistence while maintaining the same organizational structure and conventions as the ``Local Writer``.
 
-.. warning::
-
-    The Azure Writer is part of the extra *remote-io*. You can download it via pip:
-
-    .. code-block:: bash
-
-        pip install warprec[remote-io]
-
 Writing to Azure Blob Storage
 -----------------------------
 

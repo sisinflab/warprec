@@ -16,12 +16,9 @@ Available Keywords
 - **backend**: Backend to use for data reading and writing. Supports ``polars`` or ``pandas``. Defaults to ``polars``.
 - **ray_verbose**: Verbosity level of Ray Tune. Acceptable values are integers from 0 (silent) to 3 (very verbose). Defaults to ``1``.
 - **time_report**: Whether to report the time taken by each step. Defaults to ``True``.
-- **custom_models**: Python modules to import custom models into WarpRec. Can be a string or a list of strings.
+- **custom_modules**: Python modules to import custom implementations into WarpRec. Can be a string or a list of strings.
 - **callback**: Nested section to configure a custom callback.
 - **azure**: Nested section to configure Azure information needed for reading and writing data from/to Azure Blob Storage.
-
-.. warning::
-    Increasing the **precision** of computations (e.g., using ``float64`` instead of ``float32``) may significantly increase memory usage. For most experiments, ``float32`` is sufficient.
 
 Callback Configuration
 ----------------------

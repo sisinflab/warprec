@@ -26,30 +26,6 @@ The first step is to declare the required blocks within the metric class:
 These components correspond to the same tensors that were explicitly computed in the previous implementation.
 However, when using Metric Blocks, WarpRec manages their computation and storage, and the metric only needs to retrieve them.
 
-The initialization logic remains unchanged.
-The only modification is in the ``.update()`` method, where the metric state is updated by consuming precomputed blocks rather than recalculating them.
-An example implementation is shown below:
-
-.. code-block:: python
-
-    def update(self, preds: Tensor, **kwargs: Any):
-        """Update the metric state with a new batch of predictions."""
-        # 1. Retrieve precomputed blocks
-        target: Tensor = kwargs.get("binary_relevance", torch.zeros_like(preds))
-        users = kwargs.get("valid_users", self.valid_users(target))
-        top_k_rel: Tensor = kwargs.get(
-            f"top_{self.k}_binary_relevance",
-            self.top_k_relevance(preds, target, self.k),
-        )
-
-        # 2. Update internal accumulators
-        hits += top_k_rel.sum(dim=1) / self.k # Precision contribution per user
-        self.hits.index_add_(0, user_indices, batch_scores)
-        users += self.valid_users(target)
-        self.users.index_add_(0, user_indices, users)
-
-With these adjustments, the metric now operates on shared data structures, eliminating redundant computations and improving evaluation efficiency.
-
 Available Metric Blocks
 -----------------------
 

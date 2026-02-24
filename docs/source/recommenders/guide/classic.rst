@@ -46,27 +46,16 @@ Start by creating a new Python class that inherits from **ItemSimRecommender** (
         def __init__(
             self,
             params: dict,
+            info: dict,
             interactions: Interactions,
             *args: Any,
-            device: str = "cpu",
             seed: int = 42,
-            info: dict = None,
             **kwargs: Any,
         ):
-            super().__init__(
-                params, interactions, device=device, seed=seed, info=info, *args, **kwargs
-            )
+            super().__init__(params, info, interactions, *args, seed=seed, **kwargs)
 
 Step 2: Access Dataset Information
 ----------------------------------
-
-WarpRec provides a dictionary named info containing key dataset metadata, such as:
-
-- items: Number of unique items.
-- users: Number of unique users.
-- features: Number of unique features.
-
-For item similarity models, items must be provided (inside WarpRec pipelines this is handled by the framework), as it determines the size of the similarity matrix.
 
 To access the sparse interaction matrix in CSR format, we are gonna use the ``Interactions`` object passed in the constructor:
 
@@ -96,3 +85,30 @@ In code, this is how your Implementation should look like:
     self.item_similarity = B
 
 At this point, the model is fully initialized and ready to produce recommendations.
+
+For reference, this is the complete implementation of the EASE model:
+
+.. code-block:: python
+
+    @model_registry.register(name="MyEASE")
+    class MyEASE(ItemSimRecommender):
+        l2: float
+
+        def __init__(
+            self,
+            params: dict,
+            info: dict,
+            interactions: Interactions,
+            *args: Any,
+            seed: int = 42,
+            **kwargs: Any,
+        ):
+            super().__init__(params, info, interactions, *args, seed=seed, **kwargs)
+
+            X = self.train_matrix
+            G = X.T @ X + self.l2 * np.identity(X.shape[1])
+            B = np.linalg.inv(G)
+            B /= -np.diag(B)
+            np.fill_diagonal(B, 0.0)
+
+            self.item_similarity = B

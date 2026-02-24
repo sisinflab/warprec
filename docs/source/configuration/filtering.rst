@@ -10,16 +10,6 @@ or when its size exceeds the available computational resources.
 By applying filters, WarpRec ensures that the resulting dataset is both computationally manageable
 and more representative of the target recommendation task.
 
-.. note::
-   Filtering strategies are applied **sequentially** in the order they appear in the configuration file.
-   This execution order may significantly affect the resulting dataset, so it must be carefully designed.
-
-.. warning::
-    Some strategies (e.g., ``MinRating`` and ``UserAverage``) are **incompatible** with implicit feedback datasets.
-    Attempting to apply them in such contexts will raise an error.
-
-    Trying to filter an implicit dataset with these strategies may result in unexpected behaviors.
-
 -----------------------------
 General Configuration Format
 -----------------------------
@@ -39,6 +29,7 @@ Each strategy is specified by name, followed by its parameters (if required).
 
 .. important::
    - Strategies are executed **top to bottom** in the exact order they are listed.
+   - Some strategies (e.g., ``MinRating`` and ``UserAverage``) are **incompatible** with implicit feedback datasets.
    - Incorrect strategy names or invalid parameter keys will cause WarpRec to raise an error.
 
 -----------------------------

@@ -595,6 +595,9 @@ Summary of Available General Models
      - EASE
      - Linear autoencoder using ridge regression for item similarity.
    * -
+     - ELSA
+     - Scalable EASE approximation using sparse low-rank decomposition via SGD.
+   * -
      - CDAE
      - Denoising autoencoder with user-specific latent vectors.
    * -
@@ -606,6 +609,9 @@ Summary of Available General Models
    * -
      - MultiVAE
      - Variational autoencoder modeling uncertainty in preferences.
+   * -
+     - SANSA
+     - Scalable autoencoder using sparse matrix approximations and LDLT decomposition.
    * - Graph Based
      - DGCF
      - Disentangles embeddings into latent factors using iterative routing.

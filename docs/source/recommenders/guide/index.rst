@@ -60,7 +60,7 @@ In case you are using configuration files to execute your experiment, you need a
 .. code-block:: yaml
 
     general:
-        custom_models: [my_script.py, my_module]
+        custom_modules: [my_script.py, my_module]
 
 .. note::
 

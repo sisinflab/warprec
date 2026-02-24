@@ -13,14 +13,9 @@ WarpRec provides multiple splitting strategies that can be tailored to your expe
 - Timestamp slicing
 - K-Fold Cross Validation
 
-.. note::
-   Each strategy requires specific parameters, and different strategies may apply to either test or validation sets.
-   Careful configuration is essential to avoid data leakage and ensure reproducible results.
-
 .. important::
   - Temporal strategies require that **timestamps** are present in the dataset loaded by the reader.
   - **Test set** is required for train and design pipelines; **validation set** is optional.
-    - Omitting validation can speed up training but increases the risk of overfitting.
 
 -----------------------------
 Supported Splitting Strategies

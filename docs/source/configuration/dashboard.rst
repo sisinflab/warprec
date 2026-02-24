@@ -17,11 +17,8 @@ The following nested sections can be used to configure dashboards:
 - **mlflow**: Configuration for **MLFlow**.
 - **codecarbon**: Configuration for **CodeCarbon**.
 
-.. note::
-   Each dashboard section can be independently enabled or disabled.
-   Default state for all optional dashboards is **disabled**.
-
 .. important::
+   - Default state for all optional dashboards is **disabled**.
    - TensorBoard is **always active** and can be accessed locally.
    - Ensure all required credentials and API keys are valid; otherwise, dashboard logging may fail.
 
@@ -92,6 +89,4 @@ The following example shows a dashboard configuration enabling **MLFlow** tracki
 
 .. note::
    Other dashboards (wandb, codecarbon) can be similarly enabled by specifying their corresponding nested sections.
-
-.. warning::
    When using remote dashboards (e.g., W&B) with artifact logging, ensure that Ray checkpoints are **not deleted** during training.

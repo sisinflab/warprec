@@ -57,24 +57,3 @@ The final evaluation results will differ from those obtained with full evaluatio
 .. note::
     WarpRec during the sampled evaluation applies a *random shuffling* of positives and negatives. This prevents any bias that could arise from the ordering of items in the sampled tensors.
     The shuffling is seeded for reproducibility, ensuring consistent results across multiple runs and *removing any ordering bias*. For simplicity, this is not shown in the equations above.
-
-Implementation details
-----------------------
-
-When implementing a new metric, it is important to account for the possibility of sampled evaluation.
-
-For instance, in the case of ``Precision@k`` (as implemented in this guide), no additional handling is required. This is because ``Precision@k`` evaluates *whether* a relevant item appears in the top-k predictions, without considering *which* specific items are recommended.
-
-Conversely, if a metric depends on the actual indices of recommended items, the implementation must be adapted. An example modification is shown below:
-
-.. code-block:: python
-
-    def update(self, preds: Tensor, **kwargs: Any):
-        """Updates the metric state with the new batch of predictions."""
-        # Standard metric update code here
-
-        # Remap top_k_indices to global
-        item_indices = kwargs.get("item_indices")
-        top_k_indices = self.remap_indices(top_k_indices, item_indices)
-
-With this adjustment, the metric can correctly handle both full and sampled evaluation.

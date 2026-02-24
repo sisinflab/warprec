@@ -20,9 +20,11 @@ First, import the main metric interfaces:
 
 .. code-block:: python
 
-    from warprec.evaluation.metrics.base_metric import UserAverageTopKMetric, TopKMetric, BaseMetric
+    from warprec.evaluation.metrics.base_metric import UserAverageTopKMetric, TopKMetric, RatingMetric, BaseMetric
 
 The **BaseMetric** interface is sufficient for metrics that **do not depend on the cutoff (K)**.
+
+If your metric is an error metric (e.g., MSE, MAE) that relies on raw ratings rather than ranking, use the **RatingMetric** interface.
 
 If your metric is ranking-based and requires a cutoff, use the **TopKMetric** interface.
 
@@ -32,98 +34,25 @@ We'll use the **UserAverageTopKMetric** interface to implement a simple metric: 
 
 For a single user, Precision@K is the number of relevant items actually recommended divided by the cutoff K. The system-wide Precision@K is the sum of all individual Precision@K values divided by the number of users.
 
-Defining Accumulators
+The implementation
 ---------------------
 
 Before starting the implementation, we need to define the variables we need to *accumulate* across batch iterations.
 
-For **Precision@K**, we need to accumulate two values:
+For **Precision@K**, we need to accumulate just one value: the number of **hits** (relevant items recommended) per user. This value will be stored in a tensor of length **num_users** where each index corresponds to the number of hits for that given user.
 
-- The number of **hits** (relevant items recommended) is not fixed and must be accumulated.
-- The number of **users** involved in the calculation is also not fixed and must be accumulated.
+Using the **UserAverageTopKMetric** this step is *extremely* simplified, we only need to implement the logic to retrieve the number of hits from the  top-k relevant item tensor, which can be implemented like this:
 
-Both these accumulators will be defines as tensors. This is important for two reasons:
+.. code-block:: python
 
-- Save metric state per-user.
-- Enable evaluation of contextual models where users appear multiple times in batches.
+    def compute_scores(
+        self, preds: Tensor, target: Tensor, top_k_rel: Tensor, **kwargs: Any
+    ) -> Tensor:
+        return top_k_rel.sum(dim=1).float() / self.k
+
+In this implementation, `top_k_rel` is a binary tensor of shape [batch_size, k] where each entry is 1 if the recommended item at that position is relevant for the user and 0 otherwise. By summing over the second dimension (k), we get the total number of hits for each user in the batch. Finally, we divide by `self.k` to get the Precision@K for each user.
+
+For the **UserAverageTopKMetric** interface, we don't need to worry about accumulating the hits across batches or computing the final average. The framework will automatically handle the accumulation of scores and the final averaging over users at the end of the evaluation process.
 
 .. note::
     The number of users is not always fixed. We often only consider users who have **at least one relevant item** in the ground truth for evaluation. This ensures the denominator reflects only *valid* evaluation cases.
-
-The initialization
-------------------
-
-We define our metric inheriting from ``TopKMetric`` and use ``self.add_state()`` to define our accumulators. Torchmetrics handles the distributed synchronization and resetting of these states automatically.
-
-.. code-block:: python
-
-    import torch
-    from typing import Any
-    from torch import Tensor
-    from warprec.evaluation.metrics.base_metric import TopKMetric
-
-    class MyMetric(TopKMetric):
-        # Type hints for our accumulated states
-        hits: Tensor
-        users: Tensor
-
-        def __init__(
-            self,
-            k: int,
-            num_users: int,
-            *args: Any,
-            dist_sync_on_step: bool = False,
-            **kwargs: Any,
-        ):
-            # Calls the parent constructor to set self.k and dist_sync_on_step
-            super().__init__(k, dist_sync_on_step)
-
-            # Initialize accumulators. dist_reduce_fx="sum" handles accumulation across devices.
-            self.add_state("hits", default=torch.zeros(num_users), dist_reduce_fx="sum")
-            self.add_state("users", default=torch.zeros(num_users), dist_reduce_fx="sum")
-
-The ``.update()`` method
-------------------------
-
-The ``.update()`` method receives the model's raw prediction tensor, ``preds``, of size ``[batch_size, num_items]``. We need to use this to update our accumulators (``hits`` and ``users``).
-
-We first retrieve the ground truth (labeled ``ground`` in ``kwargs``) and ensure it's in a binary relevance format using the built-in ``self.binary_relevance()``:
-
-.. code-block:: python
-
-    def update(self, preds: Tensor, **kwargs: Any):
-        """Updates the metric state with the new batch of predictions."""
-        # 1. Get ground truth and ensure binary relevance
-        target = kwargs.get("ground", torch.zeros_like(preds))
-        target = self.binary_relevance(target)
-
-        # 2. Compute hits: a [batch_size, top_k] tensor of 1s (hits) and 0s (misses)
-        top_k_rel = self.top_k_relevance(preds, target, self.k)
-
-        # 3. Accumulate results
-        # Sum the hits across all users and ranks
-        hits += top_k_rel.sum(dim=1) / self.k # Precision contribution per user
-        self.hits.index_add_(0, user_indices, hits)
-
-        # Count only valid users (those with at least one relevant item)
-        users += self.valid_users(target)
-        self.users.index_add_(0, user_indices, users)
-
-The ``.compute()`` method
--------------------------
-
-The ``.compute()`` method is called to calculate the final metric value based on the accumulated states. WarpRec expects this method to return a **dictionary** where the key is the metric's name and the value is the computed result.
-
-.. code-block:: python
-
-    def compute(self):
-        """Computes the final metric value."""
-        scores = self.scores / self.user_interactions # Normalize the metric score
-        scores[self.user_interactions == 0] = float(
-            "nan"
-        )  # Set nan for users with no interactions
-        return {self.name: scores}
-
-And that's it! Your custom **Precision@K** metric is complete. You can now register it in the *metric_registry* to make it available for configuration during training.
-
-This is the *basic* concept of metrics inside the WarpRec framework, in the following sections we will guide you through additional layers of complexity that you can add to you metric to make it more robust.
