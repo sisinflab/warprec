@@ -52,17 +52,17 @@ class Trainer:
     Args:
         config (TrainConfiguration): The complete configuration object.
         custom_callback (WarpRecCallback): Custom callback for training/eval.
-        custom_models (Optional[Union[str, List[str]]]): List of custom models to load.
+        custom_modules (Optional[Union[str, List[str]]]): List of custom models to load.
     """
 
     def __init__(
         self,
         config: TrainConfiguration,
         custom_callback: WarpRecCallback = WarpRecCallback(),
-        custom_models: Optional[Union[str, List[str]]] = None,
+        custom_modules: Optional[Union[str, List[str]]] = None,
     ):
         self.config = config
-        self._custom_models = custom_models or []
+        self._custom_modules = custom_modules or []
         self._callbacks = self._setup_callbacks(config.dashboard, custom_callback)
 
     def train_single_fold(
@@ -289,7 +289,11 @@ class Trainer:
 
         # Determine resources and objective function
         resources = self._get_resources(
-            opt_config.cpu_per_trial, opt_config.gpu_per_trial, opt_config.ram_per_trial, opt_config.vram_per_trial, device
+            opt_config.cpu_per_trial,
+            opt_config.gpu_per_trial,
+            opt_config.ram_per_trial,
+            opt_config.vram_per_trial,
+            device,
         )
         trainable = self._get_objective_function(
             model_name=model_name,
@@ -406,7 +410,12 @@ class Trainer:
         if device == "cuda" and gpu_per_trial == 0:
             gpu_per_trial = 1
 
-        return {"cpu": cpu_per_trial, "gpu": gpu_per_trial, "ram_gb": ram_per_trial, "vram_gb": vram_per_trial}
+        return {
+            "cpu": cpu_per_trial,
+            "gpu": gpu_per_trial,
+            "ram_gb": ram_per_trial,
+            "vram_gb": vram_per_trial,
+        }
 
     def _get_objective_function(self, **kwargs: Any) -> Callable:
         """Selects and wraps the appropriate objective function (Standard or DDP).
@@ -440,7 +449,7 @@ class Trainer:
             "seed": opt_config.properties.seed,
             "block_size": opt_config.block_size,
             "chunk_size": opt_config.chunk_size,
-            "custom_models": self._custom_models,
+            "custom_modules": self._custom_modules,
         }
 
         if gpu_per_trial > 1:

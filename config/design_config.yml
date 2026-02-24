@@ -30,4 +30,4 @@ evaluation:
   strategy: sampled
   num_negatives: 99
 general:
-  custom_models: [my_custom_model.py]
+  custom_modules: [my_custom_model.py]
