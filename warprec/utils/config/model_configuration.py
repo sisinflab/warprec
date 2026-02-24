@@ -233,24 +233,28 @@ class Optimization(BaseModel):
             )
 
         return v
-    
+
     @field_validator("ram_per_trial")
     @classmethod
     def check_ram_per_trial(cls, v: int):
         """Validate ram_per_trial."""
         if v > 0:
-            logger.attention("Found a value of 'ram_per_trial' > 0. Make sure to initialize the Ray cluster with \'--resources=\'{\"ram_gb\": <value>}\' parameter set.")
+            logger.attention(
+                "Found a value of 'ram_per_trial' > 0. Make sure to initialize the Ray cluster with '--resources='{\"ram_gb\": <value>}' parameter set."
+            )
         if v < 0:
             logger.attention("Found a value of 'ram_per_trial' < 0. Defaulting to 0.")
             v = 0
         return v
-    
+
     @field_validator("vram_per_trial")
     @classmethod
-    def check_vram_per_trial(cls, v: int):  
+    def check_vram_per_trial(cls, v: int):
         """Validate vram_per_trial."""
         if v > 0:
-            logger.attention("Found a value of 'vram_per_trial' > 0. Make sure to initialize the Ray cluster with \'--resources=\'{\"vram_gb\": <value>}\' parameter set.")
+            logger.attention(
+                "Found a value of 'vram_per_trial' > 0. Make sure to initialize the Ray cluster with '--resources='{\"vram_gb\": <value>}' parameter set."
+            )
         if v < 0:
             logger.attention("Found a value of 'vram_per_trial' < 0. Defaulting to 0.")
             v = 0
