@@ -146,8 +146,8 @@ class GeneralConfig(BaseModel):
             Defaults to 'polars'.
         ray_verbose (Optional[int]): The Ray level of verbosity.
         time_report (Optional[bool]): Whether to report the time taken by each step.
-        custom_models (Optional[str | List[str]]): List of custom model paths to load.
-            This is useful for loading custom models that are not part of the
+        custom_modules (Optional[str | List[str]]): List of custom module paths to load.
+            This is useful for loading custom modules that are not part of the
             standard Warprec framework.
         callback (Optional[WarpRecCallbackConfig]): The custom callback configuration.
         azure (Optional[AzureConfig]): The Azure configuration.
@@ -158,7 +158,7 @@ class GeneralConfig(BaseModel):
     backend: Optional[str] = "polars"
     ray_verbose: Optional[int] = 1
     time_report: Optional[bool] = True
-    custom_models: Optional[str | List[str]] = None
+    custom_modules: Optional[str | List[str]] = None
     callback: Optional[WarpRecCallbackConfig] = Field(
         default_factory=WarpRecCallbackConfig
     )
@@ -184,25 +184,25 @@ class GeneralConfig(BaseModel):
             return v
         raise ValueError(f'Backend {v} is not supported. Use "polars" or "pandas".')
 
-    @field_validator("custom_models")
+    @field_validator("custom_modules")
     @classmethod
-    def check_custom_models(cls, v: None | str | List[str]) -> List[str]:
-        """Validates the custom models list."""
+    def check_custom_modules(cls, v: None | str | List[str]) -> List[str]:
+        """Validates the custom modules list."""
         if v is None:
             return []
 
         if isinstance(v, str):
             if is_python_module(v):
                 return [v]
-            raise ValueError(f"Custom model path '{v}' is not a valid Python module.")
+            raise ValueError(f"Custom module path '{v}' is not a valid Python module.")
 
         for path in v:
             if not isinstance(path, str):
                 raise ValueError(
-                    f"Each custom model path must be a string, got: {path}."
+                    f"Each custom module path must be a string, got: {path}."
                 )
             if not is_python_module(path):
                 raise ValueError(
-                    f"Custom model path '{path}' is not a valid Python module."
+                    f"Custom module path '{path}' is not a valid Python module."
                 )
         return v
