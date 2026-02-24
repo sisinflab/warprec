@@ -123,6 +123,14 @@ Also, in scenarios where multiple users share the same machine, you might want t
 
     CUDA_VISIBLE_DEVICES=0,2 ray start --head --num-cpus=<NUM_CPUS> --num-gpus=2
 
+Moreover if you want a more granular control over the resources allocated to each trial, you can specify the ``ram_per_trial`` and ``vram_per_trial`` parameters in your configuration file. In order to use these parameters, make sure to initialize the Ray cluster with the appropriate resources using the ``--resources`` parameter with the following command:
+
+.. code-block:: bash
+
+    ray start --head --resources='{"ram_gb": <RAM_VALUE>, "vram_gb": <VRAM_VALUE>}'
+
+You can freely combine the above options to fit your specific use case and resource availability.
+
 Finally you can run your experiment using the following command:
 
 .. code-block:: bash
