@@ -2,6 +2,22 @@
 Sequential Recommenders
 ##########################
 
+.. py:module:: warprec.recommenders.sequential_recommender
+
+.. autosummary::
+   :nosignatures:
+
+   bert4rec.BERT4Rec
+   caser.Caser
+   core.CORE
+   fossil.FOSSIL
+   gru4rec.GRU4Rec
+   gsasrec.gSASRec
+   lightsans.LightSANs
+   linrec.LinRec
+   narm.NARM
+   sasrec.SASRec
+
 The **Sequential Recommenders** module of WarpRec focuses on models that leverage the temporal order of user interactions to predict future behaviors.
 Unlike general recommenders, which often treat interactions as independent events, sequential models explicitly capture the dynamics of user preferences within a session or across time.
 These models are particularly effective for tasks such as next-item prediction in e-commerce or personalized content recommendation in streaming services.
@@ -12,6 +28,11 @@ CNN-Based
 
 CNN-based sequential recommenders apply convolutional operations to user interaction histories, treating sequences as structured data.
 These models can capture both short-term dependencies and long-term patterns through different convolutional filters.
+
+.. autoclass:: warprec.recommenders.sequential_recommender.caser.Caser
+   :members:
+   :undoc-members:
+   :show-inheritance:
 
 - Caser (Convolutional Sequence Embedding Recommendation):
   Treats a user’s interaction history as a 2D "image" and applies horizontal and vertical convolutional filters.
@@ -42,6 +63,11 @@ Markov-Chains
 Some sequential recommenders combine Markovian assumptions with item similarity to balance short-term context with long-term personalization.
 These models are especially suited to scenarios where user behavior exhibits both immediate intent and broader preferences.
 
+.. autoclass:: warprec.recommenders.sequential_recommender.fossil.FOSSIL
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
 - FOSSIL (FactOrized Sequential Prediction with Item SImilarity ModeLs):
   Integrates a first-order Markov Chain for short-term user behavior with a factored item similarity model (inspired by SLIM) to address data sparsity and capture long-term dependencies.
 
@@ -68,6 +94,11 @@ RNN-Based
 Recurrent Neural Networks (RNNs) process sequences step by step, maintaining a hidden state to capture temporal dependencies.
 They are effective for modeling evolving user interests within sessions.
 
+.. autoclass:: warprec.recommenders.sequential_recommender.gru4rec.GRU4Rec
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
 - GRU4Rec (Gated Recurrent Unit for Recommendation):
   One of the earliest deep learning approaches for session-based recommendation.
   It leverages GRUs to model user interaction sequences, focusing on short-term behavior and next-item prediction.
@@ -89,6 +120,11 @@ They are effective for modeling evolving user interests within sessions.
           learning_rate: 0.001
           neg_samples: 1
           max_seq_len: 200
+
+.. autoclass:: warprec.recommenders.sequential_recommender.narm.NARM
+   :members:
+   :undoc-members:
+   :show-inheritance:
 
 - NARM (Neural Attentive Session-based Recommendation):
   A hybrid encoder-decoder model that improves upon standard RNNs by incorporating an attention mechanism.
@@ -114,12 +150,17 @@ They are effective for modeling evolving user interests within sessions.
         neg_samples: 1
         max_seq_len: 200
 
-=============
+==================
 Transformer-Based
-=============
+==================
 
 Transformer-inspired recommenders employ self-attention to capture dependencies across an entire sequence simultaneously.
 They excel at modeling both short-term and long-term user preferences without relying on recurrence or convolution.
+
+.. autoclass:: warprec.recommenders.sequential_recommender.bert4rec.BERT4Rec
+   :members:
+   :undoc-members:
+   :show-inheritance:
 
 - BERT4Rec (Bidirectional Encoder Representations from Transformers for Recommendation):
   Applies a bidirectional Transformer architecture to sequential recommendation.
@@ -145,6 +186,11 @@ They excel at modeling both short-term and long-term user preferences without re
         learning_rate: 0.001
         neg_samples: 1
         max_seq_len: 200
+
+.. autoclass:: warprec.recommenders.sequential_recommender.core.CORE
+   :members:
+   :undoc-members:
+   :show-inheritance:
 
 - CORE (Consistent Representation Encoder):
   A session-based recommendation framework that unifies the representation space for both encoding and decoding.
@@ -177,6 +223,11 @@ They excel at modeling both short-term and long-term user preferences without re
           neg_samples: 1
           max_seq_len: 50
 
+.. autoclass:: warprec.recommenders.sequential_recommender.gsasrec.gSASRec
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
 - gSASRec (General Self-Attentive Sequential Recommendation):
   Extends SASRec by introducing general self-attention.
   This enables better modeling of diverse or evolving user interests.
@@ -203,6 +254,11 @@ They excel at modeling both short-term and long-term user preferences without re
           neg_samples: 1
           max_seq_len: 200
 
+.. autoclass:: warprec.recommenders.sequential_recommender.lightsans.LightSANs
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
 - LightSANs (Low-Rank Decomposed Self-Attention Networks):
   A sequential recommender that improves upon standard self-attention (like SASRec) by introducing low-rank decomposed self-attention to reduce complexity and decoupled position encoding to better model sequential relations.
 
@@ -226,6 +282,11 @@ They excel at modeling both short-term and long-term user preferences without re
         learning_rate: 0.001
         neg_samples: 1
         max_seq_len: 200
+
+.. autoclass:: warprec.recommenders.sequential_recommender.linrec.LinRec
+   :members:
+   :undoc-members:
+   :show-inheritance:
 
 - LinRec (Linear Attention Mechanism for Long-term Sequential Recommender Systems):
   Proposed to address the quadratic complexity of standard Transformers.
@@ -251,6 +312,11 @@ They excel at modeling both short-term and long-term user preferences without re
           neg_samples: 1
           max_seq_len: 200
 
+.. autoclass:: warprec.recommenders.sequential_recommender.sasrec.SASRec
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
 - SASRec (Self-Attentive Sequential Recommendation):
   A Transformer-based model that uses stacked self-attention blocks to capture item dependencies in user sequences.
   SASRec effectively models dynamic user preferences in sparse datasets, learning both short- and long-term interests.
@@ -275,9 +341,9 @@ They excel at modeling both short-term and long-term user preferences without re
           neg_samples: 1
           max_seq_len: 200
 
-===============================
+=======================================
 Summary of Available Sequential Models
-===============================
+=======================================
 
 .. list-table::
    :header-rows: 1

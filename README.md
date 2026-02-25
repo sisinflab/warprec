@@ -21,6 +21,22 @@ WarpRec is designed for both beginners and experienced practitioners. For newcom
 
 Whether you're learning how recommender systems work or conducting high-performance research and development, WarpRec offers the right tools to match your workflow.
 
+## 🏗️ Architecture
+
+<p align="center">
+  <img src="imgs/warprec-architecture.png" alt="WarpRec Architecture" width="100%"/>
+</p>
+
+WarpRec is built on **4 foundational pillars** — Scalability, Green AI, Agentic Readiness, and Scientific Rigor — and organized into **5 modular engines** that manage the end-to-end recommendation lifecycle:
+
+1. **Reader** — Ingests user-item interactions and metadata from local or cloud storage via a backend-agnostic Narwhals abstraction layer.
+2. **Data Engine** — Applies configurable filtering and splitting strategies to produce clean, leak-free train/validation/test sets.
+3. **Recommendation Engine** — Trains and optimizes models using PyTorch, with seamless scaling from single-GPU to multi-node Ray clusters.
+4. **Evaluation Engine** — Computes 40 GPU-accelerated metrics in a single pass with automated statistical significance testing.
+5. **Writer** — Serializes results, checkpoints, and carbon reports to local or cloud storage.
+
+An **Application Layer** exposes trained models through a REST API (FastAPI) and an MCP server for agentic AI workflows.
+
 ## 📚 Table of Contents
 
 - [✨ Key Features](#-key-features)

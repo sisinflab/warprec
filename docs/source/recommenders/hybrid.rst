@@ -2,6 +2,16 @@
 Hybrid Recommenders
 ######################
 
+.. py:module:: warprec.recommenders.hybrid_recommender
+
+.. autosummary::
+   :nosignatures:
+
+   addease.AddEASE
+   cease.CEASE
+   attributeitemknn.AttributeItemKNN
+   attributeuserknn.AttributeUserKNN
+
 The **Hybrid Recommenders** module of WarpRec contains models that combine collaborative filtering signals with side information (content).
 By leveraging both user-item interactions and item/user attributes, these models aim to overcome limitations such as data sparsity and the cold-start problem, providing more robust recommendations than pure collaborative or pure content-based approaches.
 
@@ -12,6 +22,11 @@ Hybrid Autoencoders
 ===================
 
 Hybrid Autoencoders extend standard autoencoder architectures by injecting side information into the learning process. This allows the model to reconstruct interactions not just based on historical data, but also influenced by item or user features.
+
+.. autoclass:: warprec.recommenders.hybrid_recommender.addease.AddEASE
+   :members:
+   :undoc-members:
+   :show-inheritance:
 
 - AddEASE:
   An extension of the EASE model using side information. It solves two linear problems, increasing the complexity of the underlying task. **This model requires side information to function properly**.
@@ -24,6 +39,11 @@ Hybrid Autoencoders extend standard autoencoder architectures by injecting side 
         AddEASE:
           l2: 10
           alpha: 0.1
+
+.. autoclass:: warprec.recommenders.hybrid_recommender.cease.CEASE
+   :members:
+   :undoc-members:
+   :show-inheritance:
 
 - CEASE:
   An extension of the EASE model using side information. Extends the EASE problem without adding more complexity. **This model requires side information to function properly**.
@@ -43,6 +63,11 @@ Hybrid KNN
 
 Hybrid KNN models enhance standard Nearest Neighbor approaches by incorporating content data into the similarity computation. Instead of relying solely on interaction overlap, these models use attributes to find similar items or users.
 
+.. autoclass:: warprec.recommenders.hybrid_recommender.attributeitemknn.AttributeItemKNN
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
 - AttributeItemKNN:
   An item-based KNN variant that incorporates item content to compute similarities. **This model requires side information to function properly**.
 
@@ -54,6 +79,11 @@ Hybrid KNN models enhance standard Nearest Neighbor approaches by incorporating 
         AttributeItemKNN:
           k: 10
           similarity: cosine
+
+.. autoclass:: warprec.recommenders.hybrid_recommender.attributeuserknn.AttributeUserKNN
+   :members:
+   :undoc-members:
+   :show-inheritance:
 
 - AttributeUserKNN:
   A user-based KNN model that uses content-based profiles (e.g., TF-IDF) to define user similarity. **This model requires side information to function properly**.

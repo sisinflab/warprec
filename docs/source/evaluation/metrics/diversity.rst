@@ -2,12 +2,35 @@
 Diversity
 ##########
 
+.. py:module:: warprec.evaluation.metrics.diversity
+
+Summary
+~~~~~~~
+
+.. autosummary::
+
+    gini_index.Gini
+    shannon_entropy.ShannonEntropy
+    srecall.SRecall
+
 **Diversity metrics** evaluate the **variety of items** within a user's recommendations or across the recommendations for a set of users. These metrics are crucial for preventing "**filter bubbles**" and ensuring that users are exposed to a broad range of items, potentially increasing serendipity and user satisfaction.
 
 GiniIndex
 =========
 
+.. module:: warprec.evaluation.metrics.diversity.gini_index
+.. autoclass:: Gini
+    :members:
+    :undoc-members:
+    :show-inheritance:
+
 Measures the **inequality** in the distribution of recommended items; lower values indicate more equitable item exposure.
+
+.. math::
+
+    \text{Gini} = \frac{\sum_{j=1}^{|\mathcal{I}|} (2j - |\mathcal{I}| - 1) \cdot c_j}{(|\mathcal{I}| - 1) \cdot \sum_{j} c_j}
+
+where :math:`c_j` is the recommendation count for item :math:`j` (sorted in ascending order).
 
 For further details, please refer to this `book <https://link.springer.com/rwe/10.1007/978-1-4939-7131-2_110158>`_.
 
@@ -20,7 +43,17 @@ For further details, please refer to this `book <https://link.springer.com/rwe/1
 Shannon Entropy
 ===============
 
+.. module:: warprec.evaluation.metrics.diversity.shannon_entropy
+.. autoclass:: ShannonEntropy
+    :members:
+    :undoc-members:
+    :show-inheritance:
+
 Quantifies the **diversity** of recommended items using information entropy; higher values reflect greater item variety.
+
+.. math::
+
+    H = -\sum_{i \in \mathcal{I}} p_i \log p_i, \quad p_i = \frac{c_i}{\sum_{j} c_j}
 
 For further details, please refer to this `book <https://link.springer.com/referenceworkentry/10.1007/978-1-4939-7131-2_110158>`_.
 
@@ -32,6 +65,12 @@ For further details, please refer to this `book <https://link.springer.com/refer
 
 SRecall (Subtopic Recall)
 =========================
+
+.. module:: warprec.evaluation.metrics.diversity.srecall
+.. autoclass:: SRecall
+    :members:
+    :undoc-members:
+    :show-inheritance:
 
 Measures how many **distinct subtopics or categories** are covered in the recommendations compared to the relevant ones, which reflects diversity across semantic dimensions.
 

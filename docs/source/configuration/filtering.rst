@@ -38,6 +38,53 @@ Supported Filtering Strategies
 
 WarpRec currently supports the following filtering strategies:
 
+.. list-table:: Filtering Strategy Taxonomy
+   :header-rows: 1
+   :widths: 25 20 55
+
+   * - Strategy
+     - Category
+     - Description
+   * - ``MinRating``
+     - Rating-based
+     - Remove interactions below a rating threshold.
+   * - ``UserAverage``
+     - Rating-based
+     - Remove interactions below each user's average rating.
+   * - ``ItemAverage``
+     - Rating-based
+     - Remove interactions below each item's average rating.
+   * - ``UserMin``
+     - Frequency-based
+     - Remove users with fewer than N interactions.
+   * - ``UserMax``
+     - Frequency-based
+     - Remove users with more than N interactions.
+   * - ``ItemMin``
+     - Frequency-based
+     - Remove items with fewer than N interactions.
+   * - ``ItemMax``
+     - Frequency-based
+     - Remove items with more than N interactions.
+   * - ``IterativeKCore``
+     - Core-based
+     - Iterative k-core filtering until convergence.
+   * - ``NRoundsKCore``
+     - Core-based
+     - k-core filtering for a fixed number of rounds.
+   * - ``UserHeadN``
+     - Temporal
+     - Retain the first N interactions per user.
+   * - ``UserTailN``
+     - Temporal
+     - Retain the last N interactions per user.
+   * - ``DropUser``
+     - Entity removal
+     - Remove specific users by ID.
+   * - ``DropItem``
+     - Entity removal
+     - Remove specific items by ID.
+
 **1. MinRating**
 
 Removes all interactions where the rating value is strictly below the specified threshold.

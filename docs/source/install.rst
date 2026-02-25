@@ -160,3 +160,65 @@ Similar to ``venv``, the Conda environment file typically includes **all depende
       pip install --upgrade grpcio
 
    If you are using a virtual environment or Poetry, make sure the command is executed **inside the environment**.
+
+-----
+
+Enabling Advanced Features
+--------------------------
+
+Dashboard Extras (Green AI, Experiment Tracking)
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+The ``dashboard`` group installs the tools needed for experiment tracking and Green AI profiling:
+
+- **Weights & Biases** — real-time experiment tracking and visualization
+- **MLflow** — experiment lifecycle management and model registry
+- **CodeCarbon** — energy consumption and carbon emission monitoring
+
+To install with Poetry:
+
+.. code-block:: bash
+
+    poetry install --only main dashboard
+
+Once installed, enable these features in your configuration:
+
+.. code-block:: yaml
+
+    dashboard:
+        wandb:
+            enabled: true
+            project: MyProject
+        codecarbon:
+            enabled: true
+            save_to_file: true
+            output_dir: ./carbon_reports/
+
+For full details on dashboard configuration, see :ref:`Configuration > Dashboard <configuration>`.
+
+Ray Cluster Setup (Distributed Training)
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Ray is included in the core dependencies. For the **Training Pipeline**, a Ray cluster must be initialized before running experiments:
+
+.. code-block:: bash
+
+    ray start --head
+
+To customize available resources:
+
+.. code-block:: bash
+
+    ray start --head --num-cpus <NUM_CPUS> --num-gpus <NUM_GPUS>
+
+For granular per-trial resource control (RAM and VRAM limits), initialize the cluster with custom resources:
+
+.. code-block:: bash
+
+    ray start --head --resources='{"ram_gb": <RAM_VALUE>, "vram_gb": <VRAM_VALUE>}'
+
+For multi-node cluster setup, see the :doc:`clustering guide <clustering>`.
+
+.. note::
+
+   The **Design Pipeline** (``-p design``) does not require a Ray cluster and can run locally without any additional setup.

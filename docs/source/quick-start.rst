@@ -5,7 +5,14 @@ Quick Start
 #################
 
 WarpRec provides a modular and extensible environment designed to support both advanced practitioners and newcomers.
-This quick-start guide demonstrates the minimal steps required to execute a first end-to-end experiment, from dataset preparation to model evaluation.
+This guide demonstrates three distinct workflows: local rapid prototyping, distributed training with hyperparameter optimization, and agentic inference via the Model Context Protocol.
+
+.. contents:: On this page
+   :local:
+   :depth: 2
+   :class: this-will-duplicate-information-and-it-is-still-useful-here
+
+-----
 
 Dataset Preparation
 -------------------
@@ -14,7 +21,7 @@ The first prerequisite is to structure the dataset in a **WarpRec-compatible inp
 By default, WarpRec expects a **tab-separated values (.tsv)** file, where:
 
 - the **first row** specifies the column headers,
-- each **subsequent row** encodes a single user–item interaction event.
+- each **subsequent row** encodes a single user-item interaction event.
 
 At minimum, the dataset must include the following fields:
 
@@ -41,27 +48,27 @@ Optionally, the dataset may also include:
    2, 1357, 5, 978298709
    3, 2393, 4, 978297054
 
-The dataset file can be stored in any location. For simplicity, in this example we assume it is placed in the root directory of your WarpRec clone.
-
 .. note::
 
-    WarpRec provides multiple I/O backends through its **Reader** and **Writer** modules (e.g., local filesystem, remote storage, databases).
+    WarpRec provides multiple I/O backends through its **Reader** and **Writer** modules (e.g., local filesystem, Azure Blob Storage).
     In this guide, we demonstrate the simplest **local I/O workflow**.
 
-    For a complete reference, see ... .
+    For a complete reference, see :ref:`Configuration <configuration>`.
 
-Experiment Configuration
-------------------------
+-----
 
-Once the dataset is available, WarpRec offers two modes of interaction:
+Example 1: The Academic — Local Rapid Prototyping
+---------------------------------------------------
 
-- **Configuration files**: centralize all experimental settings (data loading, preprocessing, models, and evaluation) into a single YAML file, enabling **reproducibility** and **version control**.
-- **Python scripting**: directly use WarpRec APIs to build custom pipelines and integrate the framework into external workflows.
+This example uses the **Design Pipeline** for quick, local experimentation without hyperparameter optimization. It is ideal for testing model implementations, validating configurations, and debugging.
 
-In this example, we provide a **predefined configuration file** located at *config/quick_start.yml*.
-This file defines a complete pipeline: dataset loading, splitting, model training, and evaluation.
+.. important::
 
-Below is the configuration:
+    The Design Pipeline does **not** require a Ray cluster. It runs entirely locally.
+
+**Step 1: Create the configuration file.**
+
+Save the following as ``config/academic.yml``:
 
 .. code-block:: yaml
 
@@ -69,70 +76,266 @@ Below is the configuration:
         loading_strategy: dataset
         data_type: transaction
         reading_method: local
-        local_path: path/to/your/dataset.tsv
-        rating_type: explicit
-    writer:
-        dataset_name: MyDataset
-        writing_method: local
-        local_experiment_path: experiment/test/
+        local_path: data/movielens.tsv
+        rating_type: implicit
     splitter:
         test_splitting:
             strategy: temporal_holdout
             ratio: 0.1
     models:
+        EASE:
+            l2: 10
         ItemKNN:
             k: 100
             similarity: cosine
     evaluation:
-        top_k: [5, 10]
-        metrics: [Precision, Recall, nDCG]
+        top_k: [10, 20]
+        metrics: [nDCG, Precision, Recall, HitRate]
 
-This configuration executes the following workflow:
+.. note::
 
-1. **Reader**: loads the dataset from the local path, interpreting it as explicit feedback.
-2. **Splitter**: partitions the dataset into training and test sets using a temporal holdout strategy (90% train, 10% test).
-3. **Model**: trains an **ItemKNN** recommender with `k=100` neighbors and cosine similarity.
-4. **Evaluator**: computes ranking metrics at different cutoff values.
-5. **Writer**: stores all experiment artifacts (logs, splits, and results) in the specified output directory.
+    In the Design Pipeline, each model must have **single-value hyperparameters** (no search spaces). This is because no HPO is performed: each model is trained exactly once with the specified configuration.
 
-This example provides a **minimal yet complete workflow** covering the essential functionalities of WarpRec.
-From here, you can extend the configuration by:
-
-- Integrating multiple models for comparative evaluation.
-- Using advanced data splitting strategies (e.g., k-fold, user-based splits).
-- Incorporating side information (e.g., item metadata, user demographics).
-- Enabling distributed training and large-scale evaluation.
-
-For a detailed explanation of the configuration system, see :ref:`Configuration Files <configuration>`.
-
-If you wish to start a training experiment, a Ray cluster must be initialized. You can do so using the following command:
+**Step 2: Run the experiment.**
 
 .. code-block:: bash
 
-    ray start --head
+    python -m warprec.run -c config/academic.yml -p design
 
-To customize available resources, you can start your head node manually using the following command:
+WarpRec will:
 
-.. code-block:: bash
+1. Load and parse the dataset from the local path.
+2. Split the data using a temporal holdout (90% train, 10% test).
+3. Train both EASE and ItemKNN with the specified hyperparameters.
+4. Evaluate both models and print the results.
 
-    ray start --head --num-cpus <NUM_CPUS> --num-gpus <NUM_GPUS>
+This workflow is the fastest way to prototype and compare models on small-to-medium datasets.
 
-Also, in scenarios where multiple users share the same machine, you might want to specify which GPU devices to use by setting the ``CUDA_VISIBLE_DEVICES`` environment variable. For example, to use only GPU devices 0 and 2, you can run the following command:
+-----
 
-.. code-block:: bash
+Example 2: The Industrial — Distributed Training with HPO
+------------------------------------------------------------
 
-    CUDA_VISIBLE_DEVICES=0,2 ray start --head --num-cpus=<NUM_CPUS> --num-gpus=2
+This example uses the **Training Pipeline** with Ray-based distributed hyperparameter optimization. It demonstrates how WarpRec scales from a single machine to a multi-GPU cluster.
 
-Moreover if you want a more granular control over the resources allocated to each trial, you can specify the ``ram_per_trial`` and ``vram_per_trial`` parameters in your configuration file. In order to use these parameters, make sure to initialize the Ray cluster with the appropriate resources using the ``--resources`` parameter with the following command:
+**Step 1: Start a Ray cluster.**
 
-.. code-block:: bash
-
-    ray start --head --resources='{"ram_gb": <RAM_VALUE>, "vram_gb": <VRAM_VALUE>}'
-
-You can freely combine the above options to fit your specific use case and resource availability.
-
-Finally you can run your experiment using the following command:
+On your head node:
 
 .. code-block:: bash
 
-    python -m warprec.run -c config/quick_start.yml -p train
+    ray start --head --num-cpus=16 --num-gpus=2
+
+For shared machines, restrict GPU visibility:
+
+.. code-block:: bash
+
+    CUDA_VISIBLE_DEVICES=0,1 ray start --head --num-cpus=16 --num-gpus=2
+
+For granular per-trial resource control (RAM/VRAM limits):
+
+.. code-block:: bash
+
+    ray start --head --num-cpus=16 --num-gpus=2 \
+        --resources='{"ram_gb": 64, "vram_gb": 48}'
+
+**Step 2: Create the configuration file.**
+
+Save the following as ``config/industrial.yml``:
+
+.. code-block:: yaml
+
+    reader:
+        loading_strategy: dataset
+        data_type: transaction
+        reading_method: local
+        local_path: data/movielens.tsv
+        rating_type: implicit
+    writer:
+        dataset_name: IndustrialBenchmark
+        writing_method: local
+        local_experiment_path: experiments/industrial/
+    splitter:
+        test_splitting:
+            strategy: temporal_holdout
+            ratio: 0.1
+        validation_splitting:
+            strategy: temporal_holdout
+            ratio: 0.1
+    models:
+        LightGCN:
+            optimization:
+                strategy: hopt
+                scheduler: asha
+                device: cuda
+                cpu_per_trial: 4
+                gpu_per_trial: 1
+                num_samples: 20
+            early_stopping:
+                monitor: score
+                patience: 10
+                grace_period: 5
+            embedding_size: [64, 128, 256]
+            n_layers: [2, 3, 4]
+            reg_weight: [uniform, 0.0001, 0.01]
+            batch_size: 4096
+            epochs: 200
+            learning_rate: [uniform, 0.0001, 0.01]
+        BPR:
+            optimization:
+                strategy: hopt
+                scheduler: asha
+                device: cuda
+                cpu_per_trial: 4
+                gpu_per_trial: 1
+                num_samples: 20
+            early_stopping:
+                monitor: score
+                patience: 10
+                grace_period: 5
+            embedding_size: [64, 128, 256, 512]
+            reg_weight: [uniform, 0.0001, 0.01]
+            batch_size: 4096
+            epochs: 200
+            learning_rate: [uniform, 0.0001, 0.01]
+    evaluation:
+        top_k: [10, 20, 50]
+        metrics: [nDCG, Precision, Recall, HitRate]
+        validation_metric: nDCG@10
+        strategy: full
+        stat_significance:
+            wilcoxon_test: true
+            corrections:
+                bonferroni: true
+                fdr: true
+                alpha: 0.05
+    dashboard:
+        wandb:
+            enabled: true
+            project: WarpRec-Industrial
+        codecarbon:
+            enabled: true
+            save_to_file: true
+            output_dir: ./carbon_reports/
+
+**Key configuration highlights:**
+
+- **Hyperparameter search spaces:** Lists (e.g., ``[64, 128, 256]``) define discrete choices; ``[uniform, min, max]`` defines continuous ranges sampled by HyperOpt.
+- **HyperOpt + ASHA:** Bayesian optimization with aggressive early stopping of underperforming trials.
+- **Statistical testing:** Wilcoxon signed-rank test with Bonferroni and FDR corrections, automatically applied across all model pairs.
+- **Green AI:** CodeCarbon tracks energy consumption and CO2 emissions per trial.
+
+**Step 3: Run the experiment.**
+
+.. code-block:: bash
+
+    python -m warprec.run -c config/industrial.yml -p train
+
+Ray will distribute the HPO trials across available GPUs, pruning unpromising configurations early via ASHA. Results, carbon reports, and trained checkpoints are saved to the ``experiments/industrial/`` directory.
+
+.. tip::
+
+    For multi-node clusters, connect worker nodes to the head node with ``ray start --address=<HEAD_IP>:6379``.
+    See the :doc:`clustering guide <clustering>` for GCP-specific setup.
+
+-----
+
+Example 3: The Agentic — MCP Server and LLM Interaction
+----------------------------------------------------------
+
+This example demonstrates how to serve a trained WarpRec model as a tool for LLMs and autonomous agents via the **Model Context Protocol (MCP)**.
+
+.. note::
+
+    This example requires a pre-trained model checkpoint. After running Example 2 (or any Training Pipeline), the trained model weights are saved as checkpoints in the experiment directory.
+
+**Step 1: Configure the inference server.**
+
+Copy the example environment file and adjust the paths:
+
+.. code-block:: bash
+
+    cd infer-api
+    cp .env.example .env
+
+Edit ``.env`` to point to your checkpoints and datasets:
+
+.. code-block:: bash
+
+    # Device for PyTorch inference
+    DEVICE=cpu
+
+    # Paths to model checkpoints and dataset files
+    CHECKPOINTS_DIR=checkpoints
+    DATASETS_DIR=datasets
+
+    # Models and datasets to load
+    MODELS=SASRec
+    DATASETS=movielens
+
+    # MCP Server
+    MCP_HOST=0.0.0.0
+    MCP_PORT=8082
+
+**Step 2: Start the MCP server.**
+
+.. code-block:: bash
+
+    python mcp_server.py
+
+The server exposes the ``recommend_movielens_sequential`` tool via the Model Context Protocol. Any MCP-compatible client (Claude Desktop, custom agents, etc.) can discover and invoke this tool.
+
+**Step 3: Interact via an LLM agent.**
+
+The following illustrates how an AI agent uses the WarpRec MCP tool to generate recommendations. This example uses a SASRec model trained on MovieLens-32M:
+
+.. code-block:: text
+
+    User:
+      "I've recently watched Pulp Fiction, Forrest Gump, and Full Metal Jacket.
+       Do you have any suggestions for what I should watch next?"
+
+    Agent (Internal Thought):
+      User requests recommendations based on viewing history.
+      Calling WarpRec SASRec Tool...
+
+    Tool Call:
+      recommend_movielens_sequential(
+          item_sequence=["Pulp Fiction", "Forrest Gump", "Full Metal Jacket"],
+          top_k=3,
+      )
+
+    WarpRec Tool Output:
+      ["Star Wars: Episode IV - A New Hope", "The Godfather", "Schindler's List"]
+
+    Agent Response:
+      "Here are some movies you could like: The Godfather would be an excellent
+       choice given your appreciation for character-driven storytelling and
+       grittier narratives. For something epic and immersive, the original
+       Star Wars IV captures the iconic '70s era you seem to enjoy.
+       Schindler's List shares the historical depth and emotional weight of
+       your recent watches. Do you prefer something more action-adventure
+       oriented, or another powerful drama?"
+
+The agent combines the raw recommendation list from WarpRec with its own reasoning to provide a rich, conversational experience.
+
+**Alternative: REST API.**
+
+For standard microservices integration, WarpRec also provides a FastAPI-based REST server:
+
+.. code-block:: bash
+
+    python server.py
+
+This exposes versioned endpoints at ``/api/warprec/v1/`` for sequential, collaborative, and contextual inference. An interactive Swagger UI is available at ``http://localhost:8081/docs``.
+
+-----
+
+Next Steps
+----------
+
+- **Pipelines:** For a detailed guide to each execution pipeline (Design, Training, Evaluation), see :doc:`/pipelines/index`.
+- **Configuration Reference:** For a complete guide to all configuration keys, see :ref:`Configuration <configuration>`.
+- **Architecture:** For a deep dive into WarpRec's modular design, see :ref:`Architecture <architecture>`.
+- **Models:** For the full catalog of 55 algorithms with hyperparameters, see :ref:`Recommenders <recommender>`.
+- **Evaluation:** For the complete suite of 40 metrics, see :ref:`Evaluation <evaluation>`.

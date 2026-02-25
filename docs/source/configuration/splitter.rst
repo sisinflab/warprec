@@ -21,6 +21,32 @@ WarpRec provides multiple splitting strategies that can be tailored to your expe
 Supported Splitting Strategies
 -----------------------------
 
+.. list-table:: Splitting Strategy Taxonomy
+   :header-rows: 1
+   :widths: 30 20 50
+
+   * - Strategy
+     - Type
+     - Description
+   * - ``temporal_holdout``
+     - Temporal
+     - Split by timestamp; most recent interactions become test set.
+   * - ``temporal_leave_k_out``
+     - Temporal
+     - Leave the last K interactions per user for testing.
+   * - ``random_holdout``
+     - Random
+     - Randomly sample a ratio of interactions for the test set.
+   * - ``random_leave_k_out``
+     - Random
+     - Randomly leave K interactions per user for testing.
+   * - ``timestamp_slicing``
+     - Temporal
+     - Split at a specific timestamp boundary.
+   * - ``k_fold_cross_validation``
+     - Cross-validation
+     - K-fold partitioning (validation only).
+
 **1. Temporal Holdout**
 
 Orders interactions by **timestamp** and reserves a portion of the most recent interactions as the test set.
