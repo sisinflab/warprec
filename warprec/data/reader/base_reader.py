@@ -90,9 +90,13 @@ class Reader(ABC):
 
         # Prepare dtype mapping
         pandas_dtypes = {}
+        parse_dates = []
         if desired_dtypes:
             for col_name, dtype_str in desired_dtypes.items():
-                pandas_dtypes[col_name] = _get_pandas_dtype(dtype_str)
+                if dtype_str == "datetime":
+                    parse_dates.append(col_name)
+                else:
+                    pandas_dtypes[col_name] = _get_pandas_dtype(dtype_str)
 
         try:
             # Case 1: The tabular file has a header row
@@ -130,12 +134,18 @@ class Reader(ABC):
                             empty_df = empty_df.astype(valid_dtypes)
                         return nw.from_native(empty_df)
 
+                # Check for date columns in usecols if header is present
+                actual_parse_dates = [
+                    col for col in parse_dates if usecols is None or col in usecols
+                ]
+
                 pd_df = pd.read_csv(
                     source,
                     sep=sep,
                     header=0,
                     usecols=usecols,
                     dtype=pandas_dtypes,
+                    parse_dates=actual_parse_dates if actual_parse_dates else False,
                 )
 
             # Case 2: The tabular file does not have a header row
@@ -174,6 +184,16 @@ class Reader(ABC):
                         except Exception as e:
                             logger.negative(f"Error casting types in Pandas: {e}")
 
+                    # Manual datetime conversion
+                    for col in parse_dates:
+                        if col in pd_df.columns:
+                            try:
+                                pd_df[col] = pd.to_datetime(pd_df[col])
+                            except Exception as e:
+                                logger.negative(
+                                    f"Error parsing datetime for column {col}: {e}"
+                                )
+
             if pd_df.empty:
                 return nw.from_native(pd.DataFrame(columns=desired_cols or []))
 
@@ -211,6 +231,7 @@ class Reader(ABC):
                 "float32": pl.Float32,
                 "float64": pl.Float64,
                 "str": pl.String,
+                "datetime": pl.Datetime,
             }
             return mapping.get(dtype_str, pl.String)
 
@@ -259,6 +280,7 @@ class Reader(ABC):
                     infer_schema_length=10000,
                     truncate_ragged_lines=True,
                     rechunk=True,
+                    try_parse_dates=True,
                 )
 
             # Case 2: The tabular file does not have a header row
@@ -267,10 +289,10 @@ class Reader(ABC):
                     source,
                     separator=sep,
                     has_header=False,
-                    schema_overrides=schema_overrides,
                     infer_schema_length=10000,
                     truncate_ragged_lines=True,
                     rechunk=True,
+                    try_parse_dates=True,
                 )
 
                 if pl_df.height == 0:
@@ -289,6 +311,16 @@ class Reader(ABC):
                     pl_df = pl_df.rename(rename_map)
                     # Select only the renamed columns
                     pl_df = pl_df.select(list(rename_map.values()))
+
+                    # Apply schema overrides if provided
+                    if schema_overrides:
+                        valid_casts = [
+                            pl.col(col).cast(dtype)
+                            for col, dtype in schema_overrides.items()
+                            if col in pl_df.columns
+                        ]
+                        if valid_casts:
+                            pl_df = pl_df.with_columns(valid_casts)
 
             if pl_df.height == 0:
                 return nw.from_native(
