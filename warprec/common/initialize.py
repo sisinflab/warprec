@@ -47,6 +47,7 @@ def initialize_datasets(
     side_data = None
     user_cluster = None
     item_cluster = None
+    splitter = Splitter()
     if config.reader.loading_strategy == "dataset":
         file_format = config.reader.file_format
 
@@ -72,8 +73,6 @@ def initialize_datasets(
 
         # Splitter testing
         if config.splitter:
-            splitter = Splitter()
-
             if config.reader.data_type == "transaction":
                 # Gather splitting configurations
                 test_configuration = config.splitter.test_splitting.model_dump()
@@ -118,6 +117,41 @@ def initialize_datasets(
                     )
                 case _:
                     raise ValueError(f"File format '{file_format}'not supported.")
+
+            # Filter out train and validation data if not aligned with the training set
+            def _align_set_on_train(
+                train_set: DataFrame[Any], eval_set: DataFrame[Any]
+            ):
+                eval_transactions = len(eval_set)
+                eval_set = splitter.filter_sets(
+                    train_set,
+                    eval_set,
+                    **config.reader.labels.model_dump(
+                        exclude=[
+                            "rating_label",
+                            "timestamp_label",
+                            "cluster_label",
+                            "context_labels",
+                        ]  # type: ignore[arg-type]
+                    ),
+                )
+                if len(eval_set) == 0:
+                    raise ValueError(
+                        "After aligning the split with the training set, it resulted in an empty set. Please check the consistency of your splits and the filtering process."
+                    )
+                if len(eval_set) < eval_transactions:
+                    logger.attention(
+                        f"Eval set was not aligned with the training set. Filtered out {eval_transactions - len(eval_set)} transactions."
+                    )
+                return eval_set
+
+            test_data = _align_set_on_train(train_data, test_data)
+            if val_data is not None:
+                if isinstance(val_data, list):
+                    for idx, (val_train, val_set) in enumerate(val_data):
+                        val_data[idx] = _align_set_on_train(train_data, val_set)
+                else:
+                    val_data = _align_set_on_train(train_data, val_data)
         else:
             raise ValueError("Data type not yet supported.")
 
