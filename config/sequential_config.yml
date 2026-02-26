@@ -9,18 +9,18 @@ reader:
     timestamp_label: timestamp
   dtypes:
     user_id_type: int64          # Gli ID utente sono interi (es. 17454)
-    item_id_type: int64          # CAMBIATO: Gli item ora sono numerici (es. 29569939)
-    timestamp_type: int64        # CAMBIATO: Il timestamp ora è un intero (es. 1262377239)
+    item_id_type:  str  #int64          # CAMBIATO: Gli item ora sono numerici (es. 29569939)
+    timestamp_type: str #int64        # CAMBIATO: Il timestamp ora è un intero (es. 1262377239)
   split:
-    local_path: /home/chiara/projects/warprec/data/yandex_30000
+    local_path: /home/chiara/projects/warprec/data/lastfm1k_30000
     ext: .csv
     sep: ','
     header: True
 
 writer:
-  dataset_name: yandex_30000      # Aggiornato il nome del dataset
+  dataset_name: lastfm1k_30000      # Aggiornato il nome del dataset
   writing_method: local
-  local_experiment_path: experiments/yandex/test/
+  local_experiment_path: experiments/lastfm1k/test/
   results:
     sep: ','
     ext: .csv
@@ -36,61 +36,72 @@ evaluation:
   top_k: [10, 20, 50]
   metrics: [nDCG, Precision, Recall, HitRate]
   validation_metric: nDCG@10     # Specifica la metrica per l'early stopping
-  batch_size: 256
+  batch_size: 512
 
 models:
-  # BERT4Rec_gts: # Assicurati che il nome coincida con @model_registry.register
-  #   embedding_size: 128
+  BERT4Rec: # Assicurati che il nome coincida con @model_registry.register
+    embedding_size: 128
+    n_layers: 3
+    n_heads: 2
+    inner_size: 512      # Modificato: nel primo framework era embedding_size * 4
+    dropout_prob: 0.2
+    attn_dropout_prob: 0.2
+    mask_prob: 0.2
+    reg_weight: 0.0      # Importante: 0.0 perché la Cross-Entropy non usa la reg_loss della BPR
+    weight_decay: 0
+    batch_size: 128
+    epochs: 10000
+    learning_rate: 0.001
+    neg_samples: 0       # Modificato: nella Full Evaluation (Cross-Entropy) non servono negativi campionati
+    max_seq_len: 150
+    early_stopping:
+      monitor: "score"   
+      patience: 500
+      grace_period: 50
+      min_delta: 0.0001
+    optimization:
+        strategy: grid
+        properties:
+          mode: max
+          seed: 42
+        cpu_per_trial: 12
+        gpu_per_trial: 1
+          
+
+
+  # BERT4RecJPQ:                   # <-- Il nome deve coincidere ESATTAMENTE col @model_registry
+  #   embedding_size: 128          # IMPORTANTE: deve essere divisibile per pq_m (128 / 4 = 32. Ok!)
   #   n_layers: 3
   #   n_heads: 2
-  #   inner_size: 512      # Modificato: nel primo framework era embedding_size * 4
+  #   inner_size: 256              
   #   dropout_prob: 0.2
   #   attn_dropout_prob: 0.2
   #   mask_prob: 0.2
-  #   reg_weight: 0.0      # Importante: 0.0 perché la Cross-Entropy non usa la reg_loss della BPR
-  #   weight_decay: 0
-  #   batch_size: 128
+  #   batch_size: 1024
   #   epochs: 10000
   #   learning_rate: 0.001
-  #   neg_samples: 0       # Modificato: nella Full Evaluation (Cross-Entropy) non servono negativi campionati
   #   max_seq_len: 150
+    
+  #   # --- PARAMETRI SPECIFICI PER JPQ ---
+  #   pq_m: 64                  # Numero di bytes/centroidi usati per comprimere ogni item
+  #   centroid_strategy: 'svd'     # Strategia di assegnazione per il "warm-start"
+    
+  #   # --- EARLY STOPPING ---
   #   early_stopping:
   #     monitor: "score"   
   #     patience: 500
   #     grace_period: 50
   #     min_delta: 0.0001
 
-
-  BERT4RecJPQ:                   # <-- Il nome deve coincidere ESATTAMENTE col @model_registry
-    embedding_size: 128          # IMPORTANTE: deve essere divisibile per pq_m (128 / 4 = 32. Ok!)
-    n_layers: 3
-    n_heads: 2
-    inner_size: 512              
-    dropout_prob: 0.2
-    attn_dropout_prob: 0.2
-    mask_prob: 0.2
-    batch_size: 256
-    epochs: 10000
-    learning_rate: 0.001
-    max_seq_len: 150
     
-    # --- PARAMETRI SPECIFICI PER JPQ ---
-    pq_m: [32,64]                    # Numero di bytes/centroidi usati per comprimere ogni item
-    centroid_strategy: 'svd'     # Strategia di assegnazione per il "warm-start"
-    
-    # --- EARLY STOPPING ---
-    early_stopping:
-      monitor: "score"   
-      patience: 500
-      grace_period: 50
-      min_delta: 0.0001
-
-    
-    optimization:
-        strategy: grid
-        properties:
-          mode: max
-          seed: 42
+  #   optimization:
+  #       strategy: grid
+  #       properties:
+  #         mode: max
+  #         seed: 42
+  #       cpu_per_trial: 12
+  #       gpu_per_trial: 1
+          
 
     
 

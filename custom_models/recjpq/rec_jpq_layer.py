@@ -12,6 +12,12 @@ from ..centroid_assignment_strategies.svd_strategy import SVDAssignmentStrategy
 def get_codes_strategy(codes_strategy: str, item_code_bytes: int, num_items: int) -> CentroidAssignmentStragety:
     if codes_strategy == "svd":
         return SVDAssignmentStrategy(item_code_bytes, num_items)
+    if codes_strategy == "bpr":
+        return BPRAssignmentStrategy(item_code_bytes, num_items)
+    if codes_strategy == "random":
+        return RandomAssignmentStrategy(item_code_bytes, num_items)
+    if codes_strategy == "qr":
+        return QuotientRemainder(item_code_bytes, num_items)
     raise ValueError(f"Unknown strategy: {codes_strategy}")
 
 class ItemCodeLayer(nn.Module):
