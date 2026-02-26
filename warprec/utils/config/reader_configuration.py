@@ -106,7 +106,9 @@ class ClusteringInformationReading(BaseModel):
         return check_separator(v)
 
 
-AllowedDtype = Literal["int16", "int32", "int64", "float32", "float64", "str"]
+AllowedDtype = Literal[
+    "int16", "int32", "int64", "float32", "float64", "str", "datetime"
+]
 
 
 class CustomDtype(BaseModel):
