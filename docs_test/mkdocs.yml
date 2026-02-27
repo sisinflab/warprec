@@ -1,10 +1,61 @@
 site_name: WarpRec
+site_description: "Unifying Academic Rigor and Industrial Scale for Responsible, Reproducible, and Efficient Recommendation"
 
 nav:
-  - Get Started: index.md
-  - Evaluation:
-    - Metrics:
-      - Accuracy: evaluation/metrics/accuracy.md
+  - Home: index.md
+  - Getting Started:
+    - Why WarpRec?: getting-started/introduction.md
+    - Installation: getting-started/installation.md
+    - Quick Start: getting-started/quick-start.md
+    - Architecture: getting-started/architecture.md
+    - Pipelines:
+      - Overview: getting-started/pipelines/index.md
+      - Training: getting-started/pipelines/training.md
+      - Design: getting-started/pipelines/design.md
+      - Evaluation: getting-started/pipelines/evaluation.md
+      - Callbacks: getting-started/pipelines/callbacks.md
+  - Core:
+    - Configuration:
+      - Overview: core/configuration/index.md
+      - Reader: core/configuration/reader.md
+      - Writer: core/configuration/writer.md
+      - Filtering: core/configuration/filtering.md
+      - Splitting: core/configuration/splitting.md
+      - Dashboard: core/configuration/dashboard.md
+      - Models: core/configuration/models.md
+      - Evaluation: core/configuration/evaluation.md
+      - General: core/configuration/general.md
+    - Data Management:
+      - Reader: core/data-management/reader.md
+      - Writer: core/data-management/writer.md
+      - Stash: core/data-management/stash.md
+    - Recommenders:
+      - Overview: core/recommenders/index.md
+      - Collaborative Filtering: core/recommenders/collaborative.md
+      - Content-Based Filtering: core/recommenders/content.md
+      - Hybrid: core/recommenders/hybrid.md
+      - Context-Aware: core/recommenders/context.md
+      - Sequential: core/recommenders/sequential.md
+      - Unpersonalized: core/recommenders/unpersonalized.md
+    - Evaluation:
+      - Overview: core/evaluation/index.md
+      - Metrics:
+        - Accuracy: core/evaluation/metrics/accuracy.md
+        - Bias: core/evaluation/metrics/bias.md
+        - Coverage: core/evaluation/metrics/coverage.md
+        - Diversity: core/evaluation/metrics/diversity.md
+        - Fairness: core/evaluation/metrics/fairness.md
+        - Multiobjective: core/evaluation/metrics/multiobjective.md
+        - Novelty: core/evaluation/metrics/novelty.md
+        - Rating: core/evaluation/metrics/rating.md
+      - Statistical Significance: core/evaluation/statistical-significance.md
+  - Cloud & Deployment:
+    - Authentication: cloud/authentication.md
+    - Cluster Management: cloud/cluster-management.md
+  - Guides:
+    - Callbacks: guides/callbacks.md
+    - Models: guides/models.md
+    - Metrics: guides/metrics.md
 
 theme:
   name: material
@@ -22,21 +73,33 @@ theme:
       toggle:
         icon: material/brightness-4
         name: Switch to light mode
-
   features:
     - navigation.tabs
     - navigation.sections
+    - navigation.expand
+    - navigation.top
     - search.suggest
     - search.highlight
+    - content.code.copy
 
 markdown_extensions:
+  - admonition
+  - attr_list
+  - md_in_html
+  - tables
+  - toc:
+      permalink: true
   - pymdownx.arithmatex:
-      generic: True
-  - pymdownx.highlight
+      generic: true
+  - pymdownx.details
+  - pymdownx.highlight:
+      anchor_linenums: true
   - pymdownx.superfences
+  - pymdownx.tabbed:
+      alternate_style: true
 
 extra_javascript:
-  - javascripts/mathjax.js
+  - javascript/mathjax.js
   - https://unpkg.com/mathjax@3/es5/tex-mml-chtml.js
 
 plugins:
@@ -45,9 +108,9 @@ plugins:
       default_handler: python
       handlers:
         python:
-          paths: [warprec]
+          paths: [..]
           options:
             docstring_style: google
-            show_source: True
-            show_root_heading: True
+            show_source: true
+            show_root_heading: true
             heading_level: 3

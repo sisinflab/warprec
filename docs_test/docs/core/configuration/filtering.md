@@ -1,0 +1,208 @@
+# Filtering Configuration
+
+The **Filtering Configuration** module defines the preprocessing strategies applied to the dataset
+*before* the splitting phase.
+Filtering is a fundamental step when the dataset contains redundant or low-quality interactions,
+or when its size exceeds the available computational resources.
+
+By applying filters, WarpRec ensures that the resulting dataset is both computationally manageable
+and more representative of the target recommendation task.
+
+## General Configuration Format
+
+Filtering strategies must be declared under the `filtering` section of the configuration file.
+Each strategy is specified by name, followed by its parameters (if required).
+
+```yaml
+filtering:
+    strategy_name_1:
+        arg_name_1: value_1
+    strategy_name_2:
+        arg_name_1: value_1
+        arg_name_2: value_2
+...
+```
+
+!!! important
+    - Strategies are executed **top to bottom** in the exact order they are listed.
+    - Some strategies (e.g., `MinRating` and `UserAverage`) are **incompatible** with implicit feedback datasets.
+    - Incorrect strategy names or invalid parameter keys will cause WarpRec to raise an error.
+
+## Supported Filtering Strategies
+
+WarpRec currently supports the following filtering strategies:
+
+| Strategy | Category | Description |
+|----------|----------|-------------|
+| `MinRating` | Rating-based | Remove interactions below a rating threshold. |
+| `UserAverage` | Rating-based | Remove interactions below each user's average rating. |
+| `ItemAverage` | Rating-based | Remove interactions below each item's average rating. |
+| `UserMin` | Frequency-based | Remove users with fewer than N interactions. |
+| `UserMax` | Frequency-based | Remove users with more than N interactions. |
+| `ItemMin` | Frequency-based | Remove items with fewer than N interactions. |
+| `ItemMax` | Frequency-based | Remove items with more than N interactions. |
+| `IterativeKCore` | Core-based | Iterative k-core filtering until convergence. |
+| `NRoundsKCore` | Core-based | k-core filtering for a fixed number of rounds. |
+| `UserHeadN` | Temporal | Retain the first N interactions per user. |
+| `UserTailN` | Temporal | Retain the last N interactions per user. |
+| `DropUser` | Entity removal | Remove specific users by ID. |
+| `DropItem` | Entity removal | Remove specific items by ID. |
+
+**1. MinRating**
+
+Removes all interactions where the rating value is strictly below the specified threshold.
+Not compatible with implicit feedback datasets.
+
+```yaml
+filtering:
+    MinRating:
+        min_rating: 3.0
+```
+
+**2. UserAverage**
+
+Removes all interactions for which the rating is below the corresponding user's average rating.
+Not applicable to implicit feedback scenarios.
+
+```yaml
+filtering:
+    UserAverage: {}   # No parameters required
+```
+
+**3. ItemAverage**
+
+Removes all interactions for which the rating is below the corresponding item's average rating.
+Not applicable to implicit feedback scenarios.
+
+```yaml
+filtering:
+    ItemAverage: {}   # No parameters required
+```
+
+**4. UserMin**
+
+Removes all interactions involving users with fewer interactions than the given threshold.
+
+```yaml
+filtering:
+    UserMin:
+        min_interactions: 5
+```
+
+**5. UserMax**
+
+Removes all interactions involving users with more interactions than the given threshold.
+This is particularly useful for **cold-start user analysis**.
+
+```yaml
+filtering:
+    UserMax:
+        max_interactions: 2
+```
+
+**6. ItemMin**
+
+Removes all interactions involving items with fewer interactions than the given threshold.
+
+```yaml
+filtering:
+    ItemMin:
+        min_interactions: 5
+```
+
+**7. ItemMax**
+
+Removes all interactions involving items with more interactions than the given threshold.
+Useful for analyzing **cold-start item scenarios**.
+
+```yaml
+filtering:
+    ItemMax:
+        max_interactions: 2
+```
+
+**8. IterativeKCore**
+
+Applies `UserMin` and `ItemMin` iteratively until no further interactions can be removed
+(i.e., until a stable state is reached).
+
+```yaml
+filtering:
+    IterativeKCore:
+        min_interactions: 5
+```
+
+**9. NRoundsKCore**
+
+Applies `UserMin` and `ItemMin` for a fixed number of iterations.
+This is a simplified variant of `IterativeKCore` that does not require full convergence.
+
+```yaml
+filtering:
+    NRoundsKCore:
+        rounds: 3
+        min_interactions: 5
+```
+
+!!! tip
+    `IterativeKCore` ensures dataset stability, but may be computationally expensive.
+    `NRoundsKCore` is recommended when deterministic runtime is preferred over convergence.
+
+**10. UserHeadN**
+
+Selects and retains the first N interactions for each user.
+If timestamps are available, interactions are sorted chronologically before selection.
+If no timestamps are provided, the original ordering of interactions is preserved.
+
+```yaml
+filtering:
+    UserHeadN:
+        num_interactions: 30
+```
+
+**11. UserTailN**
+
+Selects and retains the last N interactions for each user.
+If timestamps are available, interactions are sorted chronologically before selection.
+If no timestamps are provided, the original ordering of interactions is preserved.
+
+```yaml
+filtering:
+    UserTailN:
+        num_interactions: 30
+```
+
+**12. DropUser**
+
+Filter out all interactions involving specific users identified by their user IDs.
+
+```yaml
+filtering:
+    DropUser:
+        user_ids_to_filter: [123, 456, 789]
+```
+
+**13. DropItem**
+
+Filter out all interactions involving specific items identified by their item IDs.
+
+```yaml
+filtering:
+    DropItem:
+        item_ids_to_filter: [123, 456, 789]
+```
+
+## Example Filtering Pipeline
+
+The following example demonstrates a pipeline where:
+
+1. All ratings below 3.0 are removed.
+2. Users with fewer than 10 interactions are filtered out.
+
+```yaml
+filtering:
+    MinRating:
+        min_rating: 3.0
+    UserMin:
+        min_interactions: 10
+```
