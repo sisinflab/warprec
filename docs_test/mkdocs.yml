@@ -1,0 +1,53 @@
+site_name: WarpRec
+
+nav:
+  - Get Started: index.md
+  - Evaluation:
+    - Metrics:
+      - Accuracy: evaluation/metrics/accuracy.md
+
+theme:
+  name: material
+  language: en
+  palette:
+    - scheme: default
+      primary: purple
+      accent: cyan
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - scheme: slate
+      primary: purple
+      accent: cyan
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+
+  features:
+    - navigation.tabs
+    - navigation.sections
+    - search.suggest
+    - search.highlight
+
+markdown_extensions:
+  - pymdownx.arithmatex:
+      generic: True
+  - pymdownx.highlight
+  - pymdownx.superfences
+
+extra_javascript:
+  - javascripts/mathjax.js
+  - https://unpkg.com/mathjax@3/es5/tex-mml-chtml.js
+
+plugins:
+  - search
+  - mkdocstrings:
+      default_handler: python
+      handlers:
+        python:
+          paths: [warprec]
+          options:
+            docstring_style: google
+            show_source: True
+            show_root_heading: True
+            heading_level: 3
