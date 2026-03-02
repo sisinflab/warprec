@@ -2,13 +2,51 @@
 
 The **Collaborative-Filtering Recommenders** module of WarpRec is a collection of collaborative models. In the following sections you will find the list of available models within WarpRec, together with their respective parameters. These models can be used as-is or customized to fit experimental needs.
 
+!!! info "API Reference"
+
+    For class signatures, parameters, and source code, see the [Collaborative Filtering API Reference](../api-reference/recommenders/collaborative.md).
+
+## Summary of Available Models
+
+| Category | Model | Description |
+|---|---|---|
+| Autoencoders | [EASE](#ease) | Linear autoencoder using ridge regression for item similarity. |
+| | [ELSA](#elsa) | Scalable EASE approximation using sparse low-rank decomposition via SGD. |
+| | [CDAE](#cdae) | Denoising autoencoder with user-specific latent vectors. |
+| | [MacridVAE](#macridvae) | Disentangled VAE modeling macro concepts for user intentions. |
+| | [MultiDAE](#multidae) | Denoising autoencoder optimized for implicit data. |
+| | [MultiVAE](#multivae) | Variational autoencoder modeling uncertainty in preferences. |
+| | [SANSA](#sansa) | Scalable autoencoder using sparse matrix approximations and LDLT decomposition. |
+| Graph Based | [DGCF](#dgcf) | Disentangles embeddings into latent factors using iterative routing. |
+| | [EGCF](#egcf) | Embedding-less graph model using contrastive learning. |
+| | [ESIGCF](#esigcf) | Simplified JoGCN with intent-aware contrastive learning. |
+| | [GCMC](#gcmc) | Graph autoencoder for explicit feedback using multi-relational convolutions. |
+| | [LightCCF](#lightccf) | Contrastive model with Neighborhood Aggregation loss (supports MF/GCN). |
+| | [LightGCL](#lightgcl) | Contrastive learning using SVD for global view augmentation. |
+| | [LightGCN](#lightgcn) | Simplified Graph convolutional neural network. |
+| | [LightGCN++](#lightgcnpp) | Improved LightGCN with asymmetric normalization and residual connections. |
+| | [LightGODE](#lightgode) | Training-free graph convolution using post-training ODE solver. |
+| | [MixRec](#mixrec) | Dual mixing data augmentation with contrastive learning. |
+| | [NGCF](#ngcf) | Complex Graph convolutional neural network. |
+| | [RP3Beta](#rp3beta) | Random walk model with popularity penalization. |
+| | [SGCL](#sgcl) | Unified supervised contrastive learning without negative sampling. |
+| | [SGL](#sgl) | Self-supervised learning with graph structure augmentation (ED, ND, RW). |
+| | [UltraGCN](#ultragcn) | Efficient GCN approximation using constraint losses without message passing. |
+| | [XSimGCL](#xsimgcl) | Graph contrastive learning with noise perturbation. |
+| KNN | [ItemKNN](#itemknn) | Item-based collaborative KNN using similarity metrics. |
+| | [UserKNN](#userknn) | User-based collaborative KNN using historical interactions. |
+| Latent Factor | [ADMMSlim](#admmslim) | Sparse item similarity model optimized via ADMM. |
+| | [BPR](#bpr) | Pairwise ranking model for implicit feedback. |
+| | [FISM](#fism) | Efficient item similarity model using weighted average as user embeddings. |
+| | [SLIM](#slim) | Interpretable item similarity model with L1/L2 regularization. |
+| Neural | [ConvNCF](#convncf) | Applies CNNs to user-item embeddings outer product to capture structured interaction patterns. |
+| | [NeuMF](#neumf) | Hybrid neural model combining GMF and MLP layers. |
+
 ## Autoencoders
 
 Autoencoder models learn compact latent representations of users or items by reconstructing user-item interaction data. These models are particularly effective in sparse recommendation settings.
 
 ### EASE
-
-::: warprec.recommenders.collaborative_filtering_recommender.autoencoder.ease.EASE
 
 EASE (Embarrassingly Shallow Autoencoder): A simple, closed-form linear model that uses ridge regression to learn item-item similarities. Highly efficient and effective as a collaborative filtering baseline.
 
@@ -21,8 +59,6 @@ models:
 ```
 
 ### ELSA
-
-::: warprec.recommenders.collaborative_filtering_recommender.autoencoder.elsa.ELSA
 
 ELSA (Efficient Linear Sparse Autoencoder): ELSA is a scalable approximation of the EASE algorithm that replaces the computationally expensive $O(I^3)$ matrix inversion with a sparse, low-rank decomposition optimized via stochastic gradient descent. This allows it to deliver EASE-level recommendation quality for massive item catalogs while significantly reducing memory usage and training time.
 
@@ -38,8 +74,6 @@ models:
 ```
 
 ### CDAE
-
-::: warprec.recommenders.collaborative_filtering_recommender.autoencoder.cdae.CDAE
 
 CDAE (Collaborative Denoising Auto-Encoder): A denoising autoencoder that specifically incorporates a user-specific latent vector (bias) into the hidden layer. This allows the model to capture user-specific patterns more effectively than standard autoencoders, making it highly effective for top-N recommendation tasks.
 
@@ -61,8 +95,6 @@ models:
 ```
 
 ### MacridVAE
-
-::: warprec.recommenders.collaborative_filtering_recommender.autoencoder.macridvae.MacridVAE
 
 MacridVAE (Macro-Disentangled Variational Autoencoder): A disentangled representation learning model that assumes user intentions are driven by a few macro concepts. It uses a VAE architecture with a specific encoder to separate these high-level concepts, improving interpretability and robustness.
 
@@ -89,8 +121,6 @@ models:
 
 ### MultiDAE
 
-::: warprec.recommenders.collaborative_filtering_recommender.autoencoder.multidae.MultiDAE
-
 MultiDAE (Multinomial Denoising Autoencoder): A deep autoencoder trained with dropout for denoising input data. Learns robust latent representations from implicit feedback using a multinomial loss.
 
 For further details, please refer to the [paper](https://dl.acm.org/doi/10.1145/3178876.3186150).
@@ -108,8 +138,6 @@ models:
 ```
 
 ### MultiVAE
-
-::: warprec.recommenders.collaborative_filtering_recommender.autoencoder.multivae.MultiVAE
 
 MultiVAE (Multinomial Variational Autoencoder): A probabilistic variant of MultiDAE that models uncertainty in user preferences via variational inference. Useful for capturing diverse user behaviors and providing more personalized recommendations.
 
@@ -130,8 +158,6 @@ models:
 ```
 
 ### SANSA
-
-::: warprec.recommenders.collaborative_filtering_recommender.autoencoder.sansa.SANSA
 
 SANSA (Scalable Approximate NonSymmetric Autoencoder): SANSA is a collaborative filtering algorithm designed to handle massive datasets by bypassing the memory bottlenecks of traditional linear models through sparse matrix approximations and an $LDL^T$ decomposition. It enables the training of high-performance autoencoders on a single machine, even with millions of items, by maintaining a compact, end-to-end sparse architecture.
 
@@ -156,8 +182,6 @@ Graph-based recommenders exploit the structure of the user-item interaction grap
 
 ### DGCF
 
-::: warprec.recommenders.collaborative_filtering_recommender.graph_based.dgcf.DGCF
-
 DGCF (Disentangled Graph Collaborative Filtering): A graph-based model that disentangles user and item embeddings into multiple latent intents (factors) using an iterative routing mechanism. It encourages independence between factors via a distance correlation loss.
 
 For further details, please refer to the [paper](https://arxiv.org/abs/2007.01764).
@@ -177,8 +201,6 @@ models:
 ```
 
 ### EGCF
-
-::: warprec.recommenders.collaborative_filtering_recommender.graph_based.egcf.EGCF
 
 EGCF (Embedding-Less Graph Collaborative Filtering): A simplified graph model that removes user embeddings, learning only item embeddings to reduce complexity. It employs a joint loss combining BPR and contrastive learning (InfoNCE) to ensure alignment and uniformity without data augmentation. Supports 'parallel' and 'alternating' propagation modes.
 
@@ -200,8 +222,6 @@ models:
 
 ### ESIGCF
 
-::: warprec.recommenders.collaborative_filtering_recommender.graph_based.esigcf.ESIGCF
-
 ESIGCF (Extremely Simplified but Intent-enhanced Graph Collaborative Filtering): A simplified graph model that removes explicit user embeddings and utilizes Joint Graph Convolution (JoGCN) with hybrid normalization. It integrates intent-aware contrastive learning to capture user intents without requiring data augmentation.
 
 For further details, please refer to the [paper](https://www.sciencedirect.com/science/article/abs/pii/S0952197625025266).
@@ -222,8 +242,6 @@ models:
 
 ### GCMC
 
-::: warprec.recommenders.collaborative_filtering_recommender.graph_based.gcmc.GCMC
-
 GCMC (Graph Convolutional Matrix Completion): A graph autoencoder designed for explicit feedback. It treats different rating values as distinct edge types in the user-item graph and learns embeddings using a graph convolutional encoder. A decoder then predicts rating probabilities. **This model requires explicit ratings to function properly**.
 
 For further details, please refer to the [paper](https://arxiv.org/abs/1706.02263).
@@ -240,8 +258,6 @@ models:
 ```
 
 ### LightCCF
-
-::: warprec.recommenders.collaborative_filtering_recommender.graph_based.lightccf.LightCCF
 
 LightCCF (Light Contrastive Collaborative Filtering): A contrastive learning model that introduces a Neighborhood Aggregation (NA) loss. It brings users closer to their interacted items while pushing them away from other positive pairs (users and items) in the batch. It can work with a standard MF encoder (n_layers=0) or a GCN encoder.
 
@@ -261,8 +277,6 @@ models:
 ```
 
 ### LightGCL
-
-::: warprec.recommenders.collaborative_filtering_recommender.graph_based.lightgcl.LightGCL
 
 LightGCL (Simple Yet Effective Graph Contrastive Learning): A graph contrastive learning model that uses Singular Value Decomposition (SVD) to construct a global contrastive view. It contrasts the local graph view (GCN) with the global SVD view to enhance representation learning and robustness against noise.
 
@@ -285,8 +299,6 @@ models:
 
 ### LightGCN
 
-::: warprec.recommenders.collaborative_filtering_recommender.graph_based.lightgcn.LightGCN
-
 LightGCN: A simplified graph convolutional network designed for collaborative filtering. It eliminates feature transformations and nonlinear activations, focusing solely on neighborhood aggregation.
 
 For further details, please refer to the [paper](https://arxiv.org/abs/2002.02126).
@@ -302,9 +314,7 @@ models:
     learning_rate: 0.001
 ```
 
-### LightGCN++
-
-::: warprec.recommenders.collaborative_filtering_recommender.graph_based.lightgcnpp.LightGCNpp
+### LightGCN++ { #lightgcnpp }
 
 LightGCN++: An enhanced version of LightGCN that introduces asymmetric normalization (controlled by alpha and beta) and a residual connection to the initial embeddings (controlled by gamma). This allows the model to better adapt to the specific structural properties of the dataset.
 
@@ -326,8 +336,6 @@ models:
 
 ### LightGODE
 
-::: warprec.recommenders.collaborative_filtering_recommender.graph_based.lightgode.LightGODE
-
 LightGODE (Light Post-Training Graph-ODE): A highly efficient model that trains embeddings without graph convolution using alignment and uniformity losses. It applies a continuous Graph-ODE solver only during inference to incorporate high-order connectivity.
 
 For further details, please refer to the [paper](https://arxiv.org/abs/2407.18910).
@@ -346,8 +354,6 @@ models:
 ```
 
 ### MixRec
-
-::: warprec.recommenders.collaborative_filtering_recommender.graph_based.mixrec.MixRec
 
 MixRec (Individual and Collective Mixing): A graph-based model that employs dual mixing strategies (Individual and Collective) to augment embeddings. It uses a dual-mixing contrastive learning objective to enhance consistency between positive pairs while leveraging mixed negatives.
 
@@ -369,8 +375,6 @@ models:
 
 ### NGCF
 
-::: warprec.recommenders.collaborative_filtering_recommender.graph_based.ngcf.NGCF
-
 NGCF (Neural Graph-based Collaborative Filtering): A neural graph-based collaborative filtering model that explicitly captures high-order connectivity by propagating embeddings through the user-item interaction graph.
 
 For further details, please refer to the [paper](https://arxiv.org/abs/1905.08166).
@@ -390,8 +394,6 @@ models:
 
 ### RP3Beta
 
-::: warprec.recommenders.collaborative_filtering_recommender.graph_based.rp3beta.RP3Beta
-
 RP3Beta: A graph-based collaborative filtering model that performs a biased random walk of length 3 on the user-item bipartite graph.
 
 For further details, please refer to the [paper](https://www.zora.uzh.ch/id/eprint/131338/1/TiiS_2016.pdf).
@@ -406,8 +408,6 @@ models:
 ```
 
 ### SGCL
-
-::: warprec.recommenders.collaborative_filtering_recommender.graph_based.sgcl.SGCL
 
 SGCL (Supervised Graph Contrastive Learning): A unified framework that merges the recommendation task and self-supervised learning into a single supervised contrastive loss. It simplifies the training pipeline by removing the need for negative sampling and data augmentation.
 
@@ -426,8 +426,6 @@ models:
 ```
 
 ### SGL
-
-::: warprec.recommenders.collaborative_filtering_recommender.graph_based.sgl.SGL
 
 SGL (Self-supervised Graph Learning): A graph-based model that augments the user-item graph structure (via Node Dropout, Edge Dropout, or Random Walk) to create auxiliary views for contrastive learning, improving robustness and accuracy.
 
@@ -450,8 +448,6 @@ models:
 
 ### UltraGCN
 
-::: warprec.recommenders.collaborative_filtering_recommender.graph_based.ultragcn.UltraGCN
-
 UltraGCN: A simplified GCN model that skips explicit message passing during training. It approximates infinite-layer graph convolutions using a constraint loss objective that models both user-item and item-item relationships, resulting in high efficiency and scalability.
 
 For further details, please refer to the [paper](https://arxiv.org/abs/2110.15114).
@@ -471,8 +467,6 @@ models:
 ```
 
 ### XSimGCL
-
-::: warprec.recommenders.collaborative_filtering_recommender.graph_based.xsimgcl.XSimGCL
 
 XSimGCL: A graph contrastive learning model that simplifies graph augmentations by adding uniform noise to embeddings. It achieves state-of-the-art performance by regulating the uniformity of the learned representation.
 
@@ -501,8 +495,6 @@ KNN-based models generate recommendations by identifying the most similar users 
 
 ### ItemKNN
 
-::: warprec.recommenders.collaborative_filtering_recommender.knn.itemknn.ItemKNN
-
 ItemKNN: A collaborative item-based KNN model that recommends items similar to those the user has already interacted with.
 
 For further details, please refer to the [paper](http://ieeexplore.ieee.org/document/1167344/).
@@ -515,8 +507,6 @@ models:
 ```
 
 ### UserKNN
-
-::: warprec.recommenders.collaborative_filtering_recommender.knn.userknn.UserKNN
 
 UserKNN: A collaborative user-based KNN model that recommends items liked by similar users.
 
@@ -537,8 +527,6 @@ Latent factor recommenders decompose the user-item interaction matrix into lower
 
 ### ADMMSlim
 
-::: warprec.recommenders.collaborative_filtering_recommender.latent_factor.admmslim.ADMMSlim
-
 ADMMSlim: An efficient implementation of SLIM using the ADMM optimization algorithm. It learns a sparse item-to-item similarity matrix for the top-N recommendation, balancing interpretability and performance.
 
 For further details, please refer to the [paper](https://doi.org/10.1145/3336191.3371774).
@@ -557,8 +545,6 @@ models:
 
 ### BPR
 
-::: warprec.recommenders.collaborative_filtering_recommender.latent_factor.bpr.BPR
-
 BPR: A pairwise ranking model that optimizes the ordering of items for each user. BPR is particularly effective for implicit feedback and is trained to maximize the margin between positive and negative item pairs.
 
 For further details, please refer to the [paper](https://arxiv.org/abs/1205.2618).
@@ -574,8 +560,6 @@ models:
 ```
 
 ### FISM
-
-::: warprec.recommenders.collaborative_filtering_recommender.latent_factor.fism.FISM
 
 FISM: A recommendation algorithm that models item-to-item similarity by learning latent representations of items. Instead of explicitly learning user embeddings, FISM represents each user as the weighted average of the items they have interacted with, enabling efficient and accurate personalized recommendations.
 
@@ -595,8 +579,6 @@ models:
 
 ### Slim
 
-::: warprec.recommenders.collaborative_filtering_recommender.latent_factor.slim.Slim
-
 Slim: A collaborative filtering model that learns a sparse item similarity matrix using L1 and L2 regularization. SLIM directly models the relationship between items, making it highly interpretable and effective for top-N recommendation.
 
 For further details, please refer to the [paper](https://ieeexplore.ieee.org/document/6137254).
@@ -615,8 +597,6 @@ models:
 Neural recommenders leverage deep learning architectures to model complex, non-linear interactions between users and items.
 
 ### ConvNCF
-
-::: warprec.recommenders.collaborative_filtering_recommender.neural.convncf.ConvNCF
 
 ConvNCF: Utilizes the outer product of user and item embeddings to construct a 2D interaction map, which is processed by Convolutional Neural Networks (CNNs) to capture complex and localized patterns in user-item interactions. ConvNCF enhances the expressive power of neural collaborative filtering by modeling structured relationships, making it well-suited for scenarios where fine-grained interaction modeling is critical.
 
@@ -639,8 +619,6 @@ models:
 
 ### NeuMF
 
-::: warprec.recommenders.collaborative_filtering_recommender.neural.neumf.NeuMF
-
 NeuMF: Combines Generalized Matrix Factorization (GMF) with a Multi-Layer Perceptron (MLP) to capture both linear and non-linear user-item interactions. NeuMF is a highly expressive model that can adapt to various patterns in user behavior, making it suitable for both implicit and explicit feedback scenarios.
 
 For further details, please refer to the [paper](https://arxiv.org/abs/1708.05031).
@@ -662,40 +640,3 @@ models:
     neg_samples: 1
 ```
 
----
-
-## Summary of Available Models
-
-| Category | Model | Description |
-|---|---|---|
-| Autoencoders | EASE | Linear autoencoder using ridge regression for item similarity. |
-| | ELSA | Scalable EASE approximation using sparse low-rank decomposition via SGD. |
-| | CDAE | Denoising autoencoder with user-specific latent vectors. |
-| | MacridVAE | Disentangled VAE modeling macro concepts for user intentions. |
-| | MultiDAE | Denoising autoencoder optimized for implicit data. |
-| | MultiVAE | Variational autoencoder modeling uncertainty in preferences. |
-| | SANSA | Scalable autoencoder using sparse matrix approximations and LDLT decomposition. |
-| Graph Based | DGCF | Disentangles embeddings into latent factors using iterative routing. |
-| | EGCF | Embedding-less graph model using contrastive learning. |
-| | ESIGCF | Simplified JoGCN with intent-aware contrastive learning. |
-| | GCMC | Graph autoencoder for explicit feedback using multi-relational convolutions. |
-| | LightCCF | Contrastive model with Neighborhood Aggregation loss (supports MF/GCN). |
-| | LightGCL | Contrastive learning using SVD for global view augmentation. |
-| | LightGCN | Simplified Graph convolutional neural network. |
-| | LightGCN++ | Improved LightGCN with asymmetric normalization and residual connections. |
-| | LightGODE | Training-free graph convolution using post-training ODE solver. |
-| | MixRec | Dual mixing data augmentation with contrastive learning. |
-| | NGCF | Complex Graph convolutional neural network. |
-| | RP3Beta | Random walk model with popularity penalization. |
-| | SGCL | Unified supervised contrastive learning without negative sampling. |
-| | SGL | Self-supervised learning with graph structure augmentation (ED, ND, RW). |
-| | UltraGCN | Efficient GCN approximation using constraint losses without message passing. |
-| | XSimGCL | Graph contrastive learning with noise perturbation. |
-| KNN | ItemKNN | Item-based collaborative KNN using similarity metrics. |
-| | UserKNN | User-based collaborative KNN using historical interactions. |
-| Latent Factor | ADMMSlim | Sparse item similarity model optimized via ADMM. |
-| | BPR | Pairwise ranking model for implicit feedback. |
-| | FISM | Efficient item similarity model using weighted average as user embeddings. |
-| | SLIM | Interpretable item similarity model with L1/L2 regularization. |
-| Neural | ConvNCF | Applies CNNs to user-item embeddings outer product to capture structured interaction patterns. |
-| | NeuMF | Hybrid neural model combining GMF and MLP layers. |

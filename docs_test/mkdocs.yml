@@ -37,6 +37,7 @@ nav:
       - Context-Aware: recommenders/context.md
       - Sequential: recommenders/sequential.md
       - Unpersonalized: recommenders/unpersonalized.md
+      - Cross-Framework Evaluation: recommenders/cross-framework-evaluation.md
   - Evaluation:
       - Evaluation System: evaluation/index.md
       - Sampled Evaluation: evaluation/sampled.md
@@ -58,6 +59,25 @@ nav:
     - Callbacks: guides/callbacks.md
     - Models: guides/models.md
     - Metrics: guides/metrics.md
+  - API Reference:
+    - Overview: api-reference/index.md
+    - Data Management: api-reference/data-management.md
+    - Recommenders:
+      - Collaborative Filtering: api-reference/recommenders/collaborative.md
+      - Content-Based: api-reference/recommenders/content.md
+      - Hybrid: api-reference/recommenders/hybrid.md
+      - Context-Aware: api-reference/recommenders/context.md
+      - Sequential: api-reference/recommenders/sequential.md
+      - Unpersonalized: api-reference/recommenders/unpersonalized.md
+    - Metrics:
+      - Accuracy: api-reference/metrics/accuracy.md
+      - Bias: api-reference/metrics/bias.md
+      - Coverage: api-reference/metrics/coverage.md
+      - Diversity: api-reference/metrics/diversity.md
+      - Fairness: api-reference/metrics/fairness.md
+      - Novelty: api-reference/metrics/novelty.md
+      - Rating: api-reference/metrics/rating.md
+      - Multiobjective: api-reference/metrics/multiobjective.md
 
 theme:
   name: material

@@ -1,265 +1,205 @@
-##########
-Fairness
-##########
-
-.. py:module:: warprec.evaluation.metrics.fairness
-
-Summary
-~~~~~~~
-
-.. autosummary::
-
-    reo.REO
-    rsp.RSP
-    biasdisparitybd.BiasDisparityBD
-    biasdisparitybr.BiasDisparityBR
-    biasdisparitybs.BiasDisparityBS
-    itemmadranking.ItemMADRanking
-    itemmadrating.ItemMADRating
-    usermadranking.UserMADRanking
-    usermadrating.UserMADRating
+# Fairness
 
 **Fairness metrics** aim to ensure that recommender systems provide **equitable recommendations** across different user groups, particularly those defined by sensitive attributes (e.g., gender, age, socioeconomic status). These metrics help detect and mitigate **disparate impact or treatment** in recommendation outcomes.
 
-BiasDisparityBD
-===============
+!!! info "API Reference"
 
-.. module:: warprec.evaluation.metrics.fairness.biasdisparitybd
-.. autoclass:: BiasDisparityBD
-    :members:
-    :undoc-members:
-    :show-inheritance:
+    For class signatures and source code, see the [Fairness Metrics API Reference](../../api-reference/metrics/fairness.md).
 
-Measures the **difference in recommendation bias** between user groups, indicating how much one group is favored over another.
+## BiasDisparityBD
 
-.. math::
+**Bias Disparity (BiasDisparityBD@K).** Measures the **difference in recommendation bias** between user groups, indicating how much one group is favored over another.
 
-    \text{BD}(u, c) = \frac{\text{BR}(u, c) - \text{BS}(u, c)}{\text{BS}(u, c)}
+$$
+\text{BD}(u, c) = \frac{\text{BR}(u, c) - \text{BS}(u, c)}{\text{BS}(u, c)}
+$$
 
-where :math:`\text{BR}` is the bias in recommendations and :math:`\text{BS}` is the bias in the training source. Positive values indicate bias amplification; negative values indicate bias reduction.
+where $\text{BR}$ is the bias in recommendations and $\text{BS}$ is the bias in the training source. Positive values indicate bias amplification; negative values indicate bias reduction.
 
-**Note:** This metric requires the user to provide clustering information (i.e., user group definitions).
+!!! note
 
-For further details, please refer to this `link <https://arxiv.org/pdf/1811.01461>`_.
+    This metric requires the user to provide clustering information (i.e., user group definitions).
 
-.. code-block:: yaml
+For further details, please refer to this [link](https://arxiv.org/pdf/1811.01461).
 
-    evaluation:
-        top_k: [10, 20, 50]
-        metrics: [BiasDisparityBD]
+```yaml
+evaluation:
+    top_k: [10, 20, 50]
+    metrics: [BiasDisparityBD]
+```
 
-BiasDisparityBR (Bias Disparity -- Bias Recommendations)
-========================================================
+## BiasDisparityBR
 
-.. module:: warprec.evaluation.metrics.fairness.biasdisparitybr
-.. autoclass:: BiasDisparityBR
-    :members:
-    :undoc-members:
-    :show-inheritance:
+**Bias Disparity - Bias Recommendations (BiasDisparityBR@K).** Quantifies the **disparity in the frequency of biased** (e.g., popular) items recommended to different user groups within their top-K recommendations.
 
-Quantifies the **disparity in the frequency of biased** (e.g., popular) items recommended to different user groups within their top-K recommendations.
+$$
+\text{BR}(u, c) = \frac{P_{\text{rec}}(u, c) / P_{\text{rec}}(u)}{P_{\text{global}}(c)}
+$$
 
-.. math::
+where $P_{\text{rec}}(u, c)$ is the proportion of items from cluster $c$ recommended to user cluster $u$, and $P_{\text{global}}(c)$ is the global proportion of items in cluster $c$.
 
-    \text{BR}(u, c) = \frac{P_{\text{rec}}(u, c) / P_{\text{rec}}(u)}{P_{\text{global}}(c)}
+!!! note
 
-where :math:`P_{\text{rec}}(u, c)` is the proportion of items from cluster :math:`c` recommended to user cluster :math:`u`, and :math:`P_{\text{global}}(c)` is the global proportion of items in cluster :math:`c`.
+    This metric requires the user to provide clustering information.
 
-**Note:** This metric requires the user to provide clustering information.
+For further details, please refer to this [link](https://arxiv.org/pdf/1811.01461).
 
-For further details, please refer to this `link <https://arxiv.org/pdf/1811.01461>`_.
+```yaml
+evaluation:
+    top_k: [10, 20, 50]
+    metrics: [BiasDisparityBR]
+```
 
-.. code-block:: yaml
+## BiasDisparityBS
 
-    evaluation:
-        top_k: [10, 20, 50]
-        metrics: [BiasDisparityBR]
+**Bias Disparity - Bias Scores (BiasDisparityBS).** Measures the **disparity in the average bias scores** of recommended items across user groups, assessing score-level bias.
 
-BiasDisparityBS (Bias Disparity -- Bias Scores)
-================================================
+$$
+\text{BS}(u, c) = \frac{P_{\text{train}}(u, c)}{P_{\text{global}}(c)}
+$$
 
-.. module:: warprec.evaluation.metrics.fairness.biasdisparitybs
-.. autoclass:: BiasDisparityBS
-    :members:
-    :undoc-members:
-    :show-inheritance:
+where $P_{\text{train}}(u, c)$ is the proportion of interactions from user cluster $u$ with items in cluster $c$ in the training set.
 
-Measures the **disparity in the average bias scores** of recommended items across user groups, assessing score-level bias.
+!!! note
 
-.. math::
+    This metric requires the user to provide clustering information.
 
-    \text{BS}(u, c) = \frac{P_{\text{train}}(u, c)}{P_{\text{global}}(c)}
+For further details, please refer to this [link](https://arxiv.org/pdf/1811.01461).
 
-where :math:`P_{\text{train}}(u, c)` is the proportion of interactions from user cluster :math:`u` with items in cluster :math:`c` in the training set.
+```yaml
+evaluation:
+    top_k: [10, 20, 50]
+    metrics: [BiasDisparityBS]
+```
 
-**Note:** This metric requires the user to provide clustering information.
+## ItemMADRanking
 
-For further details, please refer to this `link <https://arxiv.org/pdf/1811.01461>`_.
+**Item MAD Ranking (ItemMADRanking@K).** Computes the **Mean Absolute Deviation of item ranks** across user groups, measuring fairness in item exposure in rankings.
 
-.. code-block:: yaml
+$$
+\text{ItemMADRanking} = \frac{1}{\binom{m}{2}} \sum_{i=1}^{m} \sum_{j=i+1}^{m} \left| \bar{g}_i - \bar{g}_j \right|
+$$
 
-    evaluation:
-        top_k: [10, 20, 50]
-        metrics: [BiasDisparityBS]
+where $\bar{g}_c$ is the average discounted gain (DCG) for items in cluster $c$ and $m$ is the number of item clusters.
 
-Item MAD Ranking
-================
+!!! note
 
-.. module:: warprec.evaluation.metrics.fairness.itemmadranking
-.. autoclass:: ItemMADRanking
-    :members:
-    :undoc-members:
-    :show-inheritance:
+    This metric requires the user to provide clustering information.
 
-Computes the **Mean Absolute Deviation of item ranks** across user groups, measuring fairness in item exposure in rankings.
+For further details, please refer to this [link](https://link.springer.com/article/10.1007/s11257-020-09285-1).
 
-.. math::
+```yaml
+evaluation:
+    top_k: [10, 20, 50]
+    metrics: [ItemMADRanking]
+```
 
-    \text{ItemMADRanking} = \frac{1}{\binom{m}{2}} \sum_{i=1}^{m} \sum_{j=i+1}^{m} \left| \bar{g}_i - \bar{g}_j \right|
+## ItemMADRating
 
-where :math:`\bar{g}_c` is the average discounted gain (DCG) for items in cluster :math:`c` and :math:`m` is the number of item clusters.
+**Item MAD Rating (ItemMADRating@K).** Computes the **Mean Absolute Deviation of predicted item ratings** across user groups, assessing fairness in predicted preferences.
 
-**Note:** This metric requires the user to provide clustering information.
+$$
+\text{ItemMADRating} = \frac{1}{\binom{m}{2}} \sum_{i=1}^{m} \sum_{j=i+1}^{m} \left| \bar{r}_i - \bar{r}_j \right|
+$$
 
-For further details, please refer to this `link <https://link.springer.com/article/10.1007/s11257-020-09285-1>`_.
+where $\bar{r}_c$ is the average rating/score for items in cluster $c$.
 
-.. code-block:: yaml
+!!! note
 
-    evaluation:
-        top_k: [10, 20, 50]
-        metrics: [ItemMADRanking]
+    This metric requires the user to provide clustering information.
 
-Item MAD Rating
-===============
+For further details on the concept, please refer to this [link](https://dl.acm.org/doi/abs/10.1145/3269206.3271795).
 
-.. module:: warprec.evaluation.metrics.fairness.itemmadrating
-.. autoclass:: ItemMADRating
-    :members:
-    :undoc-members:
-    :show-inheritance:
+```yaml
+evaluation:
+    top_k: [10, 20, 50]
+    metrics: [ItemMADRating]
+```
 
-Computes the **Mean Absolute Deviation of predicted item ratings** across user groups, assessing fairness in predicted preferences.
+## REO
 
-.. math::
+**Ranking-based Equal Opportunity (REO@K).** Assesses whether relevant items are **ranked similarly across user groups**, ensuring fair visibility of relevant content.
 
-    \text{ItemMADRating} = \frac{1}{\binom{m}{2}} \sum_{i=1}^{m} \sum_{j=i+1}^{m} \left| \bar{r}_i - \bar{r}_j \right|
+$$
+\text{REO} = \frac{\sigma\bigl(P(R@K \mid g_1, y{=}1), \ldots, P(R@K \mid g_A, y{=}1)\bigr)}{\mu\bigl(P(R@K \mid g_1, y{=}1), \ldots, P(R@K \mid g_A, y{=}1)\bigr)}
+$$
 
-where :math:`\bar{r}_c` is the average rating/score for items in cluster :math:`c`.
+where $P(R@K \mid g_a, y{=}1)$ is the probability that a relevant item from group $g_a$ appears in the top-K recommendations.
 
-**Note:** This metric requires the user to provide clustering information.
+!!! note
 
-For further details on the concept, please refer to this `link <https://dl.acm.org/doi/abs/10.1145/3269206.3271795>`_.
+    This metric requires the user to provide clustering information.
 
-.. code-block:: yaml
+For further details, please refer to this [paper](https://dl.acm.org/doi/abs/10.1145/3397271.3401177).
 
-    evaluation:
-        top_k: [10, 20, 50]
-        metrics: [ItemMADRating]
+```yaml
+evaluation:
+    top_k: [10, 20, 50]
+    metrics: [REO]
+```
 
-REO (Ranking-based Equal Opportunity)
-=====================================
+## RSP
 
-.. module:: warprec.evaluation.metrics.fairness.reo
-.. autoclass:: REO
-    :members:
-    :undoc-members:
-    :show-inheritance:
+**Ranking-based Statistical Parity (RSP@K).** Measures whether the **ranking positions of items** (regardless of relevance) are **equally distributed across user groups**, ensuring fairness in exposure.
 
-Assesses whether relevant items are **ranked similarly across user groups**, ensuring fair visibility of relevant content.
+$$
+\text{RSP} = \frac{\sigma\bigl(P(R@K \mid g_1), \ldots, P(R@K \mid g_A)\bigr)}{\mu\bigl(P(R@K \mid g_1), \ldots, P(R@K \mid g_A)\bigr)}
+$$
 
-.. math::
+where $P(R@K \mid g_a)$ is the probability that an item from group $g_a$ is recommended in top-K.
 
-    \text{REO} = \frac{\sigma\bigl(P(R@K \mid g_1, y{=}1), \ldots, P(R@K \mid g_A, y{=}1)\bigr)}{\mu\bigl(P(R@K \mid g_1, y{=}1), \ldots, P(R@K \mid g_A, y{=}1)\bigr)}
+!!! note
 
-where :math:`P(R@K \mid g_a, y{=}1)` is the probability that a relevant item from group :math:`g_a` appears in the top-K recommendations.
+    This metric requires the user to provide clustering information.
 
-**Note:** This metric requires the user to provide clustering information.
+For further details, please refer to this [paper](https://dl.acm.org/doi/abs/10.1145/3397271.3401177).
 
-For further details, please refer to this `paper <https://dl.acm.org/doi/abs/10.1145/3397271.3401177>`_.
+```yaml
+evaluation:
+    top_k: [10, 20, 50]
+    metrics: [RSP]
+```
 
-.. code-block:: yaml
+## UserMADRanking
 
-    evaluation:
-        top_k: [10, 20, 50]
-        metrics: [REO]
+**User MAD Ranking (UserMADRanking@K).** Measures the **Mean Absolute Deviation of item ranking positions** for each user group, focusing on rank consistency across users.
 
-RSP (Ranking-based Statistical Parity)
-======================================
+$$
+\text{UserMADRanking} = \frac{1}{\binom{m}{2}} \sum_{i=1}^{m} \sum_{j=i+1}^{m} \left| \text{nDCG}_i - \text{nDCG}_j \right|
+$$
 
-.. module:: warprec.evaluation.metrics.fairness.rsp
-.. autoclass:: RSP
-    :members:
-    :undoc-members:
-    :show-inheritance:
+where $\text{nDCG}_c$ is the average nDCG score for users in cluster $c$.
 
-Measures whether the **ranking positions of items** (regardless of relevance) are **equally distributed across user groups**, ensuring fairness in exposure.
+!!! note
 
-.. math::
+    This metric requires the user to provide clustering information.
 
-    \text{RSP} = \frac{\sigma\bigl(P(R@K \mid g_1), \ldots, P(R@K \mid g_A)\bigr)}{\mu\bigl(P(R@K \mid g_1), \ldots, P(R@K \mid g_A)\bigr)}
+For further details, please refer to this [link](https://link.springer.com/article/10.1007/s11257-020-09285-1).
 
-where :math:`P(R@K \mid g_a)` is the probability that an item from group :math:`g_a` is recommended in top-K.
+```yaml
+evaluation:
+    top_k: [10, 20, 50]
+    metrics: [UserMADRanking]
+```
 
-**Note:** This metric requires the user to provide clustering information.
+## UserMADRating
 
-For further details, please refer to this `paper <https://dl.acm.org/doi/abs/10.1145/3397271.3401177>`_.
+**User MAD Rating (UserMADRating@K).** Measures the **Mean Absolute Deviation of predicted item ratings** for each user group, capturing disparities in predicted relevance.
 
-.. code-block:: yaml
+$$
+\text{UserMADRating} = \frac{1}{\binom{m}{2}} \sum_{i=1}^{m} \sum_{j=i+1}^{m} \left| \bar{s}_i - \bar{s}_j \right|
+$$
 
-    evaluation:
-        top_k: [10, 20, 50]
-        metrics: [RSP]
+where $\bar{s}_c$ is the average of top-K recommendation scores for users in cluster $c$.
 
-User MAD Ranking
-================
+!!! note
 
-.. module:: warprec.evaluation.metrics.fairness.usermadranking
-.. autoclass:: UserMADRanking
-    :members:
-    :undoc-members:
-    :show-inheritance:
+    This metric requires the user to provide clustering information.
 
-Measures the **Mean Absolute Deviation of item ranking positions** for each user group, focusing on rank consistency across users.
+For further details on the concept, please refer to this [link](https://dl.acm.org/doi/abs/10.1145/3269206.3271795).
 
-.. math::
-
-    \text{UserMADRanking} = \frac{1}{\binom{m}{2}} \sum_{i=1}^{m} \sum_{j=i+1}^{m} \left| \text{nDCG}_i - \text{nDCG}_j \right|
-
-where :math:`\text{nDCG}_c` is the average nDCG score for users in cluster :math:`c`.
-
-**Note:** This metric requires the user to provide clustering information.
-
-For further details, please refer to this `link <https://link.springer.com/article/10.1007/s11257-020-09285-1>`_.
-
-.. code-block:: yaml
-
-    evaluation:
-        top_k: [10, 20, 50]
-        metrics: [UserMADRanking]
-
-User MAD Rating
-===============
-
-.. module:: warprec.evaluation.metrics.fairness.usermadrating
-.. autoclass:: UserMADRating
-    :members:
-    :undoc-members:
-    :show-inheritance:
-
-Measures the **Mean Absolute Deviation of predicted item ratings** for each user group, capturing disparities in predicted relevance.
-
-.. math::
-
-    \text{UserMADRating} = \frac{1}{\binom{m}{2}} \sum_{i=1}^{m} \sum_{j=i+1}^{m} \left| \bar{s}_i - \bar{s}_j \right|
-
-where :math:`\bar{s}_c` is the average of top-K recommendation scores for users in cluster :math:`c`.
-
-**Note:** This metric requires the user to provide clustering information.
-
-For further details on the concept, please refer to this `link <https://dl.acm.org/doi/abs/10.1145/3269206.3271795>`_.
-
-.. code-block:: yaml
-
-    evaluation:
-        top_k: [10, 20, 50]
-        metrics: [UserMADRating]
+```yaml
+evaluation:
+    top_k: [10, 20, 50]
+    metrics: [UserMADRating]
+```

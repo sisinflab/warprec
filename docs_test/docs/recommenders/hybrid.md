@@ -4,13 +4,24 @@ The **Hybrid Recommenders** module of WarpRec contains models that combine colla
 
 In the following sections, you will find the list of available hybrid models within WarpRec, together with their respective parameters.
 
+!!! info "API Reference"
+
+    For class signatures, parameters, and source code, see the [Hybrid API Reference](../api-reference/recommenders/hybrid.md).
+
+## Summary of Available Hybrid Models
+
+| Category | Model | Description |
+|---|---|---|
+| Hybrid Autoencoders | [AddEASE](#addease) | EASE extension solving two linear problems to incorporate side info. |
+| | [CEASE](#cease) | EASE extension incorporating side info without added complexity. |
+| Hybrid KNN | [AttributeItemKNN](#attributeitemknn) | Item-based KNN using content features for similarity. |
+| | [AttributeUserKNN](#attributeuserknn) | User-based KNN using content-derived user profiles. |
+
 ## Hybrid Autoencoders
 
 Hybrid Autoencoders extend standard autoencoder architectures by injecting side information into the learning process. This allows the model to reconstruct interactions not just based on historical data, but also influenced by item or user features.
 
 ### AddEASE
-
-::: warprec.recommenders.hybrid_recommender.addease.AddEASE
 
 AddEASE: An extension of the EASE model using side information. It solves two linear problems, increasing the complexity of the underlying task. **This model requires side information to function properly**.
 
@@ -24,8 +35,6 @@ models:
 ```
 
 ### CEASE
-
-::: warprec.recommenders.hybrid_recommender.cease.CEASE
 
 CEASE: An extension of the EASE model using side information. Extends the EASE problem without adding more complexity. **This model requires side information to function properly**.
 
@@ -46,8 +55,6 @@ Hybrid KNN models enhance standard Nearest Neighbor approaches by incorporating 
 
 ### AttributeItemKNN
 
-::: warprec.recommenders.hybrid_recommender.attributeitemknn.AttributeItemKNN
-
 AttributeItemKNN: An item-based KNN variant that incorporates item content to compute similarities. **This model requires side information to function properly**.
 
 For further details, please refer to the [paper](https://www.researchgate.net/publication/221141162_MyMediaLite_A_free_recommender_system_library).
@@ -61,8 +68,6 @@ models:
 
 ### AttributeUserKNN
 
-::: warprec.recommenders.hybrid_recommender.attributeuserknn.AttributeUserKNN
-
 AttributeUserKNN: A user-based KNN model that uses content-based profiles (e.g., TF-IDF) to define user similarity. **This model requires side information to function properly**.
 
 For further details, please refer to the [paper](https://www.researchgate.net/publication/221141162_MyMediaLite_A_free_recommender_system_library).
@@ -75,13 +80,3 @@ models:
     user_profile: tfidf
 ```
 
----
-
-## Summary of Available Hybrid Models
-
-| Category | Model | Description |
-|---|---|---|
-| Hybrid Autoencoders | AddEASE | EASE extension solving two linear problems to incorporate side info. |
-| | CEASE | EASE extension incorporating side info without added complexity. |
-| Hybrid KNN | AttributeItemKNN | Item-based KNN using content features for similarity. |
-| | AttributeUserKNN | User-based KNN using content-derived user profiles. |

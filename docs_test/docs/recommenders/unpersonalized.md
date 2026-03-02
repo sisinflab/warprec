@@ -4,9 +4,11 @@ The **Unpersonalized Recommenders** module of WarpRec serves as a collection of 
 
 In the following sections, you will find the list of available unpersonalized models within WarpRec.
 
-### Pop
+!!! info "API Reference"
 
-::: warprec.recommenders.unpersonalized_recommender.pop.Pop
+    For class signatures, parameters, and source code, see the [Unpersonalized API Reference](../api-reference/recommenders/unpersonalized.md).
+
+### Pop
 
 Pop: Recommends the most popular items overall. This model helps assess whether other recommenders are biased towards popularity.
 
@@ -17,8 +19,6 @@ models:
 
 ### Random
 
-::: warprec.recommenders.unpersonalized_recommender.random.Random
-
 Random: Recommends items at random. This model defines a lower bound for performance metrics, serving as a sanity check during evaluation.
 
 ```yaml
@@ -26,8 +26,6 @@ models:
     Random: {}
 ```
 
-### ProxyRecommender
+!!! tip "Cross-Framework Evaluation"
 
-::: warprec.recommenders.unpersonalized_recommender.proxy.ProxyRecommender
-
-ProxyRecommender: A recommender that uses precomputed recommendations from an external source.
+    Looking to evaluate recommendation lists from external frameworks? See [Cross-Framework Evaluation](cross-framework-evaluation.md).

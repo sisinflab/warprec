@@ -2,13 +2,30 @@
 
 The **Sequential Recommenders** module of WarpRec focuses on models that leverage the temporal order of user interactions to predict future behaviors. Unlike general recommenders, which often treat interactions as independent events, sequential models explicitly capture the dynamics of user preferences within a session or across time. These models are particularly effective for tasks such as next-item prediction in e-commerce or personalized content recommendation in streaming services.
 
+!!! info "API Reference"
+
+    For class signatures, parameters, and source code, see the [Sequential API Reference](../api-reference/recommenders/sequential.md).
+
+## Summary of Available Sequential Models
+
+| Category | Model | Description |
+|---|---|---|
+| CNN-Based | [Caser](#caser) | Convolutional model capturing local and global sequential patterns. |
+| Markov-Chains | [FOSSIL](#fossil) | Combines Markov Chains with factored item similarity for sequential prediction. |
+| RNN-Based | [GRU4Rec](#gru4rec) | Session-based recommender using GRUs for short-term preference modeling. |
+| | [NARM](#narm) | Hybrid encoder (GRU + Attention) capturing sequential behavior and main purpose. |
+| Transformer-Based | [BERT4Rec](#bert4rec) | Bidirectional Transformer model trained on a masked item prediction task. |
+| | [CORE](#core) | Unifies encoding/decoding spaces using linear combination of embeddings and RDM. |
+| | [gSASRec](#gsasrec) | General self-attention model for diverse and evolving user behaviors. |
+| | [LightSANs](#lightsans) | Efficient self-attention with low-rank decomposition and decoupled positioning. |
+| | [LinRec](#linrec) | Linear attention mechanism (O(N)) for efficient long-term recommendation. |
+| | [SASRec](#sasrec) | Transformer-inspired model learning short- and long-term user preferences. |
+
 ## CNN-Based
 
 CNN-based sequential recommenders apply convolutional operations to user interaction histories, treating sequences as structured data. These models can capture both short-term dependencies and long-term patterns through different convolutional filters.
 
 ### Caser
-
-::: warprec.recommenders.sequential_recommender.caser.Caser
 
 Caser (Convolutional Sequence Embedding Recommendation): Treats a user's interaction history as a 2D "image" and applies horizontal and vertical convolutional filters. Caser models local patterns (short-term interests) as well as long-term user preferences, making it effective in session-based recommendation scenarios.
 
@@ -38,8 +55,6 @@ Some sequential recommenders combine Markovian assumptions with item similarity 
 
 ### FOSSIL
 
-::: warprec.recommenders.sequential_recommender.fossil.FOSSIL
-
 FOSSIL (FactOrized Sequential Prediction with Item SImilarity ModeLs): Integrates a first-order Markov Chain for short-term user behavior with a factored item similarity model (inspired by SLIM) to address data sparsity and capture long-term dependencies.
 
 For further details, please refer to the [paper](https://arxiv.org/abs/1609.09152).
@@ -66,8 +81,6 @@ Recurrent Neural Networks (RNNs) process sequences step by step, maintaining a h
 
 ### GRU4Rec
 
-::: warprec.recommenders.sequential_recommender.gru4rec.GRU4Rec
-
 GRU4Rec (Gated Recurrent Unit for Recommendation): One of the earliest deep learning approaches for session-based recommendation. It leverages GRUs to model user interaction sequences, focusing on short-term behavior and next-item prediction.
 
 For further details, please refer to the [paper](https://arxiv.org/abs/1606.08117).
@@ -89,8 +102,6 @@ models:
 ```
 
 ### NARM
-
-::: warprec.recommenders.sequential_recommender.narm.NARM
 
 NARM (Neural Attentive Session-based Recommendation): A hybrid encoder-decoder model that improves upon standard RNNs by incorporating an attention mechanism. It uses a Global Encoder (GRU) to model the user's sequential behavior and a Local Encoder (Attention) to capture the user's main purpose in the current session. These features are combined into a unified session representation for bi-linear matching with candidate items.
 
@@ -121,8 +132,6 @@ Transformer-inspired recommenders employ self-attention to capture dependencies 
 
 ### BERT4Rec
 
-::: warprec.recommenders.sequential_recommender.bert4rec.BERT4Rec
-
 BERT4Rec (Bidirectional Encoder Representations from Transformers for Recommendation): Applies a bidirectional Transformer architecture to sequential recommendation. Instead of predicting the next item, it is trained on a "cloze" task, where it predicts randomly masked items in a sequence, allowing it to learn context from both past and future interactions.
 
 For further details, please refer to the [paper](https://arxiv.org/abs/1904.06690).
@@ -147,8 +156,6 @@ models:
 ```
 
 ### CORE
-
-::: warprec.recommenders.sequential_recommender.core.CORE
 
 CORE (Consistent Representation Encoder): A session-based recommendation framework that unifies the representation space for both encoding and decoding. Unlike standard deep encoders that project session embeddings into a different space than item embeddings, CORE encodes sessions as a weighted sum of item embeddings (using a Transformer to learn the weights). It also employs Robust Distance Measuring (RDM) based on cosine similarity to prevent overfitting.
 
@@ -180,8 +187,6 @@ models:
 
 ### gSASRec
 
-::: warprec.recommenders.sequential_recommender.gsasrec.gSASRec
-
 gSASRec (General Self-Attentive Sequential Recommendation): Extends SASRec by introducing general self-attention. This enables better modeling of diverse or evolving user interests.
 
 For further details, please refer to the [paper](https://arxiv.org/abs/2308.07192).
@@ -208,8 +213,6 @@ models:
 
 ### LightSANs
 
-::: warprec.recommenders.sequential_recommender.lightsans.LightSANs
-
 LightSANs (Low-Rank Decomposed Self-Attention Networks): A sequential recommender that improves upon standard self-attention (like SASRec) by introducing low-rank decomposed self-attention to reduce complexity and decoupled position encoding to better model sequential relations.
 
 For further details, please refer to the [paper](https://dl.acm.org/doi/10.1145/3404835.3462978).
@@ -235,8 +238,6 @@ models:
 
 ### LinRec
 
-::: warprec.recommenders.sequential_recommender.linrec.LinRec
-
 LinRec (Linear Attention Mechanism for Long-term Sequential Recommender Systems): Proposed to address the quadratic complexity of standard Transformers. LinRec employs a linear attention mechanism (O(N)) using L2 normalization and ELU activation. This allows for efficient modeling of long-term user sequences while maintaining the ability to capture complex dependencies, making it significantly faster than standard SASRec on long sequences.
 
 For further details, please refer to the [paper](https://arxiv.org/abs/2411.01537).
@@ -260,8 +261,6 @@ models:
 
 ### SASRec
 
-::: warprec.recommenders.sequential_recommender.sasrec.SASRec
-
 SASRec (Self-Attentive Sequential Recommendation): A Transformer-based model that uses stacked self-attention blocks to capture item dependencies in user sequences. SASRec effectively models dynamic user preferences in sparse datasets, learning both short- and long-term interests.
 
 For further details, please refer to the [paper](https://arxiv.org/abs/1808.09781).
@@ -284,19 +283,3 @@ models:
     max_seq_len: 200
 ```
 
----
-
-## Summary of Available Sequential Models
-
-| Category | Model | Description |
-|---|---|---|
-| CNN-Based | Caser | Convolutional model capturing local and global sequential patterns. |
-| Markov-Chains | FOSSIL | Combines Markov Chains with factored item similarity for sequential prediction. |
-| RNN-Based | GRU4Rec | Session-based recommender using GRUs for short-term preference modeling. |
-| | NARM | Hybrid encoder (GRU + Attention) capturing sequential behavior and main purpose. |
-| Transformer-Based | BERT4Rec | Bidirectional Transformer model trained on a masked item prediction task. |
-| | CORE | Unifies encoding/decoding spaces using linear combination of embeddings and RDM. |
-| | gSASRec | General self-attention model for diverse and evolving user behaviors. |
-| | LightSANs | Efficient self-attention with low-rank decomposition and decoupled positioning. |
-| | LinRec | Linear attention mechanism (O(N)) for efficient long-term recommendation. |
-| | SASRec | Transformer-inspired model learning short- and long-term user preferences. |
