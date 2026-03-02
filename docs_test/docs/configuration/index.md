@@ -1,4 +1,4 @@
-# Configuration
+# Configuration Structure
 
 This section provides a comprehensive overview of WarpRec's configuration system.
 WarpRec configurations allow users to customize data loading, preprocessing, model training, evaluation, and general experiment settings.
@@ -41,9 +41,8 @@ reader:
     loading_strategy: dataset
     data_type: transaction
     reading_method: local
-    local_path: path/to/your/dataset.csv
+    local_path: path/to/your/dataset.tsv
     rating_type: implicit
-    sep: ','
 writer:
     dataset_name: MyDataset
     writing_method: local
@@ -88,9 +87,8 @@ reader:
     loading_strategy: dataset
     data_type: transaction
     reading_method: local
-    local_path: tests/test_dataset/movielens.csv
+    local_path: path/to/your/dataset.tsv
     rating_type: explicit
-    sep: ','
 splitter:
     test_splitting:
         strategy: temporal_holdout
@@ -139,9 +137,8 @@ reader:
     loading_strategy: dataset
     data_type: transaction
     reading_method: local
-    local_path: tests/test_dataset/movielens.csv
+    local_path: path/to/your/dataset.tsv
     rating_type: explicit
-    sep: ','
 splitter:
     test_splitting:
         strategy: temporal_holdout

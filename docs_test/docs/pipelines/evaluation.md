@@ -2,15 +2,13 @@
 
 The Evaluation Pipeline is dedicated to **post-hoc analysis and inference** using pre-trained models, without retraining. It supports two evaluation modes: loading model checkpoints or reading precomputed recommendation files.
 
-**Source:** `warprec/pipelines/eval.py` — `eval_pipeline(path)`
-
 ---
 
 ## When to Use
 
 - Evaluating a saved checkpoint on new metrics or cutoff values
 - Comparing models trained in different experiments
-- Evaluating recommendations produced by external frameworks (Elliot, RecBole, Cornac)
+- Evaluating recommendations produced by external frameworks (e.g. Elliot, RecBole, ...)
 - Computing statistical significance between pre-trained models
 
 ## Prerequisites
@@ -31,14 +29,12 @@ reader:
     loading_strategy: dataset
     data_type: transaction
     reading_method: local
-    local_path: data/movielens.tsv
+    local_path: path/to/my/dataset.tsv
     rating_type: implicit
-
 splitter:
     test_splitting:
         strategy: temporal_holdout
         ratio: 0.1
-
 models:
     LightGCN:
         meta:
@@ -49,7 +45,6 @@ models:
         batch_size: 4096
         epochs: 200
         learning_rate: 0.001
-
 evaluation:
     top_k: [10, 20, 50]
     metrics: [nDCG, Precision, Recall, HitRate, MAP, MRR]
@@ -68,20 +63,15 @@ reader:
     reading_method: local
     local_path: data/movielens.tsv
     rating_type: implicit
-
 splitter:
     test_splitting:
         strategy: temporal_holdout
         ratio: 0.1
-
 models:
-    ExternalModel:
-        meta:
-            model_name: ProxyRecommender
+    ProxyRecommender:
         recommendation_file: results/external_recs.tsv
         separator: "\t"
-        header: true
-
+        header: True
 evaluation:
     top_k: [10, 20, 50]
     metrics: [nDCG, Precision, Recall, HitRate]
@@ -92,22 +82,6 @@ evaluation:
 ```bash
 python -m warprec.run -c config/eval.yml -p eval
 ```
-
-## Execution Flow
-
-1. **Load configuration** — Parses the YAML file.
-2. **Initialize data** — Reads and splits the dataset (to obtain the test set ground truth).
-3. **Create Evaluator** — Instantiates with all configured metrics and cutoff values.
-4. **For each model:**
-
-    a. Instantiate the model from the registry.
-
-    b. Load the checkpoint from `meta.load_from` (or load recommendation file for ProxyRecommender).
-
-    c. Evaluate on the test set.
-
-5. **Statistical significance** — If multiple models are evaluated and `stat_significance` is configured, compute pairwise statistical tests.
-6. **Write results** — Persist results via the Writer module (if configured).
 
 ## Statistical Significance
 

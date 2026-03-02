@@ -37,9 +37,9 @@ Now everything is set up to start using WarpRec with cloud clustering.
 
 ## Creating a Cluster
 
-To create a cluster using WarpRec and Ray, you will need to define the cluster configuration in a YAML file. This configuration will specify the number of nodes, machine types, Docker images, and setup commands (including Micromamba environment creation).
+To create a cluster using WarpRec and Ray, you will need to define the cluster configuration in a YAML file. This configuration will specify the number of nodes, machine types, Docker images, and setup commands (including environment creation).
 
-You can find the example configuration file `ray_cluster.yml` in the `guides/gcp_clustering` directory of the WarpRec repository.
+You can find the example configuration file `guides/gcp_clustering/ray_cluster.yml` in the WarpRec repository.
 
 The available settings for Ray Clustering can be found in the [Ray Cluster Configuration Documentation](https://docs.ray.io/en/latest/cluster/getting-started.html).
 

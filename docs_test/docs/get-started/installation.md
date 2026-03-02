@@ -178,7 +178,7 @@ dashboard:
         output_dir: ./carbon_reports/
 ```
 
-For full details on dashboard configuration, see [Configuration > Dashboard](../core/configuration/dashboard.md).
+For full details on dashboard configuration, see [Configuration > Dashboard](../configuration/dashboard.md).
 
 ### Ray Cluster Setup (Distributed Training)
 

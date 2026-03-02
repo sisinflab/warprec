@@ -103,7 +103,7 @@ models:
         l2: [10, 20, 30, 40, 50, 100, 150, 200]
 ```
 
-A in depth configuration might include a model with more parameters and early stopping:
+An in depth configuration might include a model with more parameters and early stopping:
 
 ```yaml
 models:
@@ -112,7 +112,7 @@ models:
             patience: 20
             grace_period: 10
         embedding_size: [64, 128, 256]
-        weight_decay: [0., 0.001, 1e-6]
+        reg_weight: [0., 0.001, 1e-6]
         batch_size: [512, 1024, 2048, 4096]
         epochs: 300
         learning_rate: [0.001, 1e-4, 1e-5]
@@ -134,7 +134,7 @@ models:
     LightGCN:
         embedding_size: 64
         n_layers: 2
-        weight_decay: 0.0001
+        reg_weight: 0.0001
         batch_size: 512
         epochs: 50
         learning_rate: 0.001
@@ -150,31 +150,32 @@ models:
             grace_period: 10
         embedding_size: [64, 128, 256]
         n_layers: [1, 2, 3]
-        weight_decay: [0., 1e-6]
+        reg_weight: [0., 1e-6]
         batch_size: [512, 1024, 2048]
         epochs: 200
         learning_rate: [0.001, 1e-4, 1e-5]
 ```
 
-This configuration produces a total of 3 x 4 x 2 x 3 x 3 = 216 trials. Depending on the dataset size and available resources, the exploration may require some time. To optimize performance, you can leverage WarpRec's parallelization capabilities by adding the following to the configuration:
+This configuration produces a total of 3 x 3 x 2 x 3 x 3 = 162 trials. Depending on the dataset size and available resources, the exploration may require some time. To optimize performance, you can leverage WarpRec's parallelization capabilities by adding the following to the configuration:
 
 ```yaml
 models:
     LightGCN:
         optimization:
-            parallel_trials: 5
+            cpu_per_trial: 4
+            gpu_per_trial: 0.25
         early_stopping:
             patience: 20
             grace_period: 10
         embedding_size: [64, 128, 256]
         n_layers: [1, 2, 3]
-        weight_decay: [0., 1e-6]
+        reg_weight: [0., 1e-6]
         batch_size: [512, 1024, 2048]
         epochs: 200
         learning_rate: [0.001, 1e-4, 1e-5]
 ```
 
-With this setup, you can train up to 5 models at a time, though this change will require more computational resources.
+With this setup, you can train up to 4 models at a time (if only 1 GPU is available), though this change will require more computational resources.
 
 ### Search Space Configuration
 
@@ -212,7 +213,8 @@ Let's now use the sampling spaces to create a more complex HPO and have more con
 models:
     LightGCN:
         optimization:
-            parallel_trials: 5
+            cpu_per_trial: 4
+            gpu_per_trial: 0.25
             validation_metric: Recall@5
             strategy: hopt
             num_samples: 100
@@ -227,4 +229,4 @@ models:
         learning_rate: [uniform, 1e-6, 1e-3]
 ```
 
-This configuration performs hyperparameter optimization over 100 potential parameter combinations for the LightGCN model, executing up to 5 trials in parallel and applying early stopping.
+This configuration performs hyperparameter optimization over 100 potential parameter combinations for the LightGCN model, executing 4 trials in parallel and applying early stopping.

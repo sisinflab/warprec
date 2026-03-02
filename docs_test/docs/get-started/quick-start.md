@@ -1,7 +1,7 @@
 # Quick Start
 
 WarpRec provides a modular and extensible environment designed to support both advanced practitioners and newcomers.
-This guide demonstrates three distinct workflows: local rapid prototyping, distributed training with hyperparameter optimization, and agentic inference via the Model Context Protocol.
+This guide demonstrates two distinct workflows: local rapid prototyping and distributed training with hyperparameter optimization.
 
 ---
 
@@ -40,11 +40,11 @@ Optionally, the dataset may also include:
     WarpRec provides multiple I/O backends through its **Reader** and **Writer** modules (e.g., local filesystem, Azure Blob Storage).
     In this guide, we demonstrate the simplest **local I/O workflow**.
 
-    For a complete reference, see [Configuration](../core/configuration/index.md).
+    For a complete reference, see [Configuration](../configuration/index.md).
 
 ---
 
-## Example 1: The Academic — Local Rapid Prototyping
+## Local Rapid Prototyping
 
 This example uses the **Design Pipeline** for quick, local experimentation without hyperparameter optimization. It is ideal for testing model implementations, validating configurations, and debugging.
 
@@ -54,14 +54,14 @@ This example uses the **Design Pipeline** for quick, local experimentation witho
 
 **Step 1: Create the configuration file.**
 
-Save the following as `config/academic.yml`:
+Create a configuration file that fit your needs. An example could be something like this:
 
 ```yaml
 reader:
     loading_strategy: dataset
     data_type: transaction
     reading_method: local
-    local_path: data/movielens.tsv
+    local_path: path/to/my/dataset.tsv
     rating_type: implicit
 splitter:
     test_splitting:
@@ -85,7 +85,7 @@ evaluation:
 **Step 2: Run the experiment.**
 
 ```bash
-python -m warprec.run -c config/academic.yml -p design
+python -m warprec.run -c path/to/config.yml -p design
 ```
 
 WarpRec will:
@@ -95,11 +95,11 @@ WarpRec will:
 3. Train both EASE and ItemKNN with the specified hyperparameters.
 4. Evaluate both models and print the results.
 
-This workflow is the fastest way to prototype and compare models on small-to-medium datasets.
+This workflow is the fastest way to prototype and compare models.
 
 ---
 
-## Example 2: The Industrial — Distributed Training with HPO
+## Distributed Training
 
 This example uses the **Training Pipeline** with Ray-based distributed hyperparameter optimization. It demonstrates how WarpRec scales from a single machine to a multi-GPU cluster.
 
@@ -126,19 +126,19 @@ ray start --head --num-cpus=16 --num-gpus=2 \
 
 **Step 2: Create the configuration file.**
 
-Save the following as `config/industrial.yml`:
+When using a Ray cluster you can fully express WarpRec capabilities. In this case we propose a more configuration:
 
 ```yaml
 reader:
     loading_strategy: dataset
     data_type: transaction
     reading_method: local
-    local_path: data/movielens.tsv
+    local_path: path/to/my/dataset.tsv
     rating_type: implicit
 writer:
-    dataset_name: IndustrialBenchmark
+    dataset_name: Benchmark
     writing_method: local
-    local_experiment_path: experiments/industrial/
+    local_experiment_path: experiments/
 splitter:
     test_splitting:
         strategy: temporal_holdout
@@ -146,6 +146,14 @@ splitter:
     validation_splitting:
         strategy: temporal_holdout
         ratio: 0.1
+dashboard:
+    wandb:
+        enabled: true
+        project: WarpRec-Benchmark
+    codecarbon:
+        enabled: true
+        save_to_file: true
+        output_dir: ./carbon_reports/
 models:
     LightGCN:
         optimization:
@@ -193,14 +201,6 @@ evaluation:
             bonferroni: true
             fdr: true
             alpha: 0.05
-dashboard:
-    wandb:
-        enabled: true
-        project: WarpRec-Industrial
-    codecarbon:
-        enabled: true
-        save_to_file: true
-        output_dir: ./carbon_reports/
 ```
 
 **Key configuration highlights:**
@@ -213,7 +213,7 @@ dashboard:
 **Step 3: Run the experiment.**
 
 ```bash
-python -m warprec.run -c config/industrial.yml -p train
+python -m warprec.run -c path/to/config.yml -p train
 ```
 
 Ray will distribute the HPO trials across available GPUs, pruning unpromising configurations early via ASHA. Results, carbon reports, and trained checkpoints are saved to the `experiments/industrial/` directory.
@@ -225,100 +225,10 @@ Ray will distribute the HPO trials across available GPUs, pruning unpromising co
 
 ---
 
-## Example 3: The Agentic — MCP Server and LLM Interaction
-
-This example demonstrates how to serve a trained WarpRec model as a tool for LLMs and autonomous agents via the **Model Context Protocol (MCP)**.
-
-!!! note
-
-    This example requires a pre-trained model checkpoint. After running Example 2 (or any Training Pipeline), the trained model weights are saved as checkpoints in the experiment directory.
-
-**Step 1: Configure the inference server.**
-
-Copy the example environment file and adjust the paths:
-
-```bash
-cd infer-api
-cp .env.example .env
-```
-
-Edit `.env` to point to your checkpoints and datasets:
-
-```bash
-# Device for PyTorch inference
-DEVICE=cpu
-
-# Paths to model checkpoints and dataset files
-CHECKPOINTS_DIR=checkpoints
-DATASETS_DIR=datasets
-
-# Models and datasets to load
-MODELS=SASRec
-DATASETS=movielens
-
-# MCP Server
-MCP_HOST=0.0.0.0
-MCP_PORT=8082
-```
-
-**Step 2: Start the MCP server.**
-
-```bash
-python mcp_server.py
-```
-
-The server exposes the `recommend_movielens_sequential` tool via the Model Context Protocol. Any MCP-compatible client (Claude Desktop, custom agents, etc.) can discover and invoke this tool.
-
-**Step 3: Interact via an LLM agent.**
-
-The following illustrates how an AI agent uses the WarpRec MCP tool to generate recommendations. This example uses a SASRec model trained on MovieLens-32M:
-
-```text
-User:
-  "I've recently watched Pulp Fiction, Forrest Gump, and Full Metal Jacket.
-   Do you have any suggestions for what I should watch next?"
-
-Agent (Internal Thought):
-  User requests recommendations based on viewing history.
-  Calling WarpRec SASRec Tool...
-
-Tool Call:
-  recommend_movielens_sequential(
-      item_sequence=["Pulp Fiction", "Forrest Gump", "Full Metal Jacket"],
-      top_k=3,
-  )
-
-WarpRec Tool Output:
-  ["Star Wars: Episode IV - A New Hope", "The Godfather", "Schindler's List"]
-
-Agent Response:
-  "Here are some movies you could like: The Godfather would be an excellent
-   choice given your appreciation for character-driven storytelling and
-   grittier narratives. For something epic and immersive, the original
-   Star Wars IV captures the iconic '70s era you seem to enjoy.
-   Schindler's List shares the historical depth and emotional weight of
-   your recent watches. Do you prefer something more action-adventure
-   oriented, or another powerful drama?"
-```
-
-The agent combines the raw recommendation list from WarpRec with its own reasoning to provide a rich, conversational experience.
-
-**Alternative: REST API.**
-
-For standard microservices integration, WarpRec also provides a FastAPI-based REST server:
-
-```bash
-python server.py
-```
-
-This exposes versioned endpoints at `/api/warprec/v1/` for sequential, collaborative, and contextual inference. An interactive Swagger UI is available at `http://localhost:8081/docs`.
-
----
-
 ## Next Steps
 
-- **Pipelines:** For a detailed guide to each execution pipeline (Design, Training, Evaluation), see [Pipelines](pipelines/index.md).
-- **Configuration Reference:** For a complete guide to all configuration keys, see [Configuration](../core/configuration/index.md).
+- **Pipelines:** For a detailed guide to each execution pipeline (Design, Training, Evaluation), see [Pipelines](../pipelines/index.md).
+- **Configuration Reference:** For a complete guide to all configuration keys, see [Configuration](../configuration/index.md).
 - **Architecture:** For a deep dive into WarpRec's modular design, see [Architecture](architecture.md).
-- **Models:** For the full catalog of 55 algorithms with hyperparameters, see [Recommenders](../core/recommenders/index.md).
-- **Evaluation:** For the complete suite of 40 metrics, see [Evaluation](../core/evaluation/index.md).
+- **Models:** For the full catalog of 55 algorithms with hyperparameters, see [Recommenders](../recommenders/index.md).
+- **Evaluation:** For the complete suite of 40 metrics, see [Evaluation](../evaluation/index.md).

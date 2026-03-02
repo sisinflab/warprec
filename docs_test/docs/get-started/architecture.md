@@ -108,7 +108,7 @@ WarpRec provides a repository of **55 built-in algorithms** spanning 6 fundament
 | Sequential | 10 | SASRec, BERT4Rec, GRU4Rec, Caser, gSASRec, LinRec, and more |
 | Hybrid | 4 | AddEASE, CEASE, AttributeItemKNN, AttributeUserKNN |
 
-For a complete list with hyperparameters and configuration examples, see the [Recommenders](../core/recommenders/index.md) section.
+For a complete list with hyperparameters and configuration examples, see the [Recommenders](../recommenders/index.md) section.
 
 **Trainer.**
 The Trainer serves as the core execution engine, orchestrating model optimization and state persistence via automated checkpointing to enable seamless experiment resumption. Key capabilities:
@@ -178,7 +178,7 @@ The [FastMCP](https://github.com/jlowin/fastmcp)-powered MCP server (`infer-api/
 ### Pipelines
 
 WarpRec abstracts complex workflows into three standardized execution pipelines, all controlled via declarative YAML configuration files.
-For a detailed guide on each pipeline with complete configuration examples and step-by-step walkthroughs, see [Pipelines](pipelines/index.md).
+For a detailed guide on each pipeline with complete configuration examples and step-by-step walkthroughs, see [Pipelines](../pipelines/index.md).
 
 | Pipeline | Command | Description |
 |---|---|---|

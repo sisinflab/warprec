@@ -17,7 +17,7 @@
   }
 </style>
 
-# WarpRec: Unifying Academic Rigor and Industrial Scale
+# Unifying Academic Rigor and Industrial Scale
 
 **A high-performance, backend-agnostic framework for reproducible, scalable, and responsible Recommender Systems.**
 
@@ -25,7 +25,7 @@ Innovation in Recommender Systems is impeded by a fractured ecosystem. Researche
 
 <div class="feature-grid">
   <div class="feature-card">
-    <strong>55 Algorithms</strong>
+    <strong>50+ Algorithms</strong>
     From matrix factorization to graph-based and sequential architectures, spanning 6 model families.
   </div>
   <div class="feature-card">
@@ -58,42 +58,48 @@ Innovation in Recommender Systems is impeded by a fractured ecosystem. Researche
   </div>
 </div>
 
-## Get Started in Seconds
+## Quick Start
 
-Define your entire experiment in a single YAML file:
+Define the complete experimental pipeline through a single YAML configuration file. To explore the full capabilities of the framework, refer to the reference test configuration located at `config/quick_start.yml`, which provides a minimal yet comprehensive example of the supported settings and components.
 
 ```yaml
 reader:
-    loading_strategy: dataset
-    reading_method: local
-    local_path: data/movielens.tsv
-    rating_type: implicit
+  loading_strategy: dataset
+  data_type: transaction
+  reading_method: local
+  local_path: path/to/my/dataset.csv
+  rating_type: explicit
+  sep: ','
+  labels:
+    user_id_label: user_id
+    item_id_label: item_id
+    rating_label: rating
+    timestamp_label: timestamp
 writer:
-    dataset_name: QuickStart
-    writing_method: local
+  dataset_name: MyExperiment
+  writing_method: local
+  local_experiment_path: experiments/test/
 splitter:
-    test_splitting:
-        strategy: temporal_holdout
-        ratio: 0.1
+  test_splitting:
+    strategy: temporal_holdout
+    ratio: 0.1
 models:
-    LightGCN:
-        embedding_size: 64
-        n_layers: 3
-        reg_weight: 0.001
-        batch_size: 2048
-        epochs: 200
-        learning_rate: 0.001
+  ItemKNN:
+    k: 100
+    similarity: cosine
 evaluation:
-    top_k: [10, 20]
-    metrics: [nDCG, Precision, Recall, HitRate]
+  top_k: [10, 20, 50]
+  metrics: [nDCG, Precision, Recall, HitRate]
+  strategy: sampled
+  num_negatives: 99
 ```
 
-Then run:
+Then run the following command:
 
 ```bash
-python -m warprec.run -c config.yml -p train
+python -m warprec.run -c config/quick_start.yml -p design
 ```
 
 !!! note
 
-    WarpRec supports three execution pipelines: **Training** (full HPO), **Design** (rapid prototyping), and **Evaluation** (pre-trained checkpoints). See [Quick Start](getting-started/quick-start.md) for detailed examples covering local, distributed, and agentic workflows.
+    WarpRec supports three execution pipelines: **Training** (full HPO), **Design** (rapid prototyping), and **Evaluation** (pre-trained checkpoints). See [Quick Start](get-started/quick-start.md) for detailed examples covering local, distributed, and agentic workflows.

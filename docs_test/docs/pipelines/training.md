@@ -2,8 +2,6 @@
 
 The Training Pipeline is the main experimental pipeline for full-scale experiments. It leverages **Ray Tune** for distributed hyperparameter optimization, supports cross-validation, computes statistical significance tests between models, serializes trained model checkpoints, and produces comprehensive result reports.
 
-**Source:** `warprec/pipelines/train.py` — `train_pipeline(path)`
-
 ---
 
 ## When to Use
@@ -21,18 +19,20 @@ A **Ray cluster** must be running before invoking the Training Pipeline:
 ray start --head --num-cpus=16 --num-gpus=2
 ```
 
-For granular per-trial resource control (RAM/VRAM limits):
-
-```bash
-ray start --head --num-cpus=16 --num-gpus=2 \
-    --resources='{"ram_gb": 64, "vram_gb": 48}'
-```
-
 For multi-node clusters, connect worker nodes with:
 
 ```bash
 ray start --address=<HEAD_IP>:6379
 ```
+
+For shared machines, restrict GPU visibility:
+
+```bash
+CUDA_VISIBLE_DEVICES=0,1 ray start --head --num-cpus=16 --num-gpus=2
+```
+
+!!! note
+    These are some examples of Ray usage. For a more complex setup, refer to the Ray [documentation](https://docs.ray.io/en/latest/ray-core/starting-ray.html)
 
 ## Configuration
 
@@ -43,14 +43,12 @@ reader:
     loading_strategy: dataset
     data_type: transaction
     reading_method: local
-    local_path: data/movielens.tsv
+    local_path: path/to/my/dataset.tsv
     rating_type: implicit
-
 writer:
     dataset_name: MyBenchmark
     writing_method: local
-    local_experiment_path: experiments/benchmark/
-
+    local_experiment_path: experiments/
 splitter:
     test_splitting:
         strategy: temporal_holdout
@@ -58,7 +56,11 @@ splitter:
     validation_splitting:
         strategy: temporal_holdout
         ratio: 0.1
-
+dashboard:
+    codecarbon:
+        enabled: true
+        save_to_file: true
+        output_dir: ./carbon_reports/
 models:
     LightGCN:
         optimization:
@@ -78,7 +80,6 @@ models:
         batch_size: 4096
         epochs: 200
         learning_rate: [uniform, 0.0001, 0.01]
-
 evaluation:
     top_k: [10, 20, 50]
     metrics: [nDCG, Precision, Recall, HitRate]
@@ -90,18 +91,12 @@ evaluation:
             bonferroni: true
             fdr: true
             alpha: 0.05
-
-dashboard:
-    codecarbon:
-        enabled: true
-        save_to_file: true
-        output_dir: ./carbon_reports/
 ```
 
 ## Running
 
 ```bash
-python -m warprec.run -c config/benchmark.yml -p train
+python -m warprec.run -c path/to/config.yml -p train
 ```
 
 ## Execution Flows
@@ -143,11 +138,23 @@ Hyperparameter search spaces are defined inline in the YAML configuration:
 
 | Syntax | Meaning |
 |---|---|
-| `[64, 128, 256]` | Discrete choice among values. |
-| `[uniform, 0.001, 0.1]` | Continuous uniform sampling between min and max. |
-| `[loguniform, 0.0001, 0.1]` | Log-uniform sampling (for learning rates). |
-| `[randint, 1, 10]` | Random integer between min and max. |
-| `[choice, adam, sgd, rmsprop]` | Categorical choice. |
+| `[grid, 64, 128]` | Iterates over **all** values in the list (no random sampling). |
+| `[choice, 64, 128, 256]` | Samples a random element from the list. |
+| `[uniform, 0.0, 1.0]` | Samples a float uniformly between *min* and *max*. |
+| `[quniform, 0.0, 1.0, 0.1]` | Samples uniformly, but quantized (rounded) to the nearest *q*. |
+| `[loguniform, 1e-4, 1e-1]` | Samples a float from a log-uniform distribution. |
+| `[qloguniform, 1e-4, 1e-1, 5e-5]` | Log-uniform sampling, quantized to the nearest *q*. |
+| `[randn, 0.0, 1.0]` | Samples from a normal distribution with *mean* and *std*. |
+| `[qrandn, 0.0, 1.0, 0.1]` | Normal distribution, quantized to the nearest *q*. |
+| `[randint, 1, 10]` | Samples an integer uniformly between *min* and *max*. |
+| `[qrandint, 1, 10, 2]` | Integer uniform sampling, quantized to the nearest *q*. |
+| `[lograndint, 1, 100]` | Samples an integer from a log-uniform distribution. |
+| `[qlograndint, 1, 100, 2]` | Log-uniform integer sampling, quantized to the nearest *q*. |
+
+!!! note
+    The default value for each search space is always `grid` for grid search scenarios or `choice` for optimization strategies.
+
+
 
 ## Output Artifacts
 

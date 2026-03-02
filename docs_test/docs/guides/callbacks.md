@@ -1,24 +1,5 @@
 # Callbacks
 
-WarpRec offers a comprehensive set of tools to customize the model training process. This flexibility is essential, as recommendation models rely on diverse types of information, making it impractical to provide a one-size-fits-all solution.
-
-To address this need for customization, WarpRec introduces the **custom Callback system**.
-
-WarpRec provides customizable `Callback` functionality. When using the framework, you can either launch an experiment via a configuration file -- accessing the main training and inference pipelines -- or use a custom script to directly interact with WarpRec's internal components.
-
-In certain scenarios, you may want to modify the workflow slightly or perform additional computations during execution. This can be achieved seamlessly using WarpRec's `Callback` system.
-
-## Using a Custom Callback
-
-To integrate a custom callback into the main pipeline, follow these two steps:
-
-1. **Implement the Callback:** Create a script containing a class that extends the base `WarpRecCallback`.
-2. **Register the Callback:** Add the callback definition to your configuration file.
-
-That's it! In the [Implementation Guide](#implementation-guide) section below you can find an easy to follow tutorial on how to implement your first callback.
-
----
-
 ## Implementation Guide
 
 In this guide, we will go through two examples of using the `Callback system`. In the first example, we will explore the system's reporting capabilities, while in the second, we will append additional information to the dataset in order to run a custom model.
@@ -47,7 +28,7 @@ In this example, we track the `nDCG@5` metric across iterations during the train
 The callback must inherit from `WarpRecCallback`.
 
 ```python
-from warprec.callbacks import WarpRecCallback
+from warprec.utils.callbacks import WarpRecCallback
 
 class ComputeNDCGOverIterations(WarpRecCallback):
 
@@ -101,6 +82,8 @@ Finally, generate and save the plot in the `on_training_complete` hook, which is
 ```
 
 That's it! You've now integrated a custom callback into the main training pipeline. This is the result on the MovieLens1M dataset.
+
+![Callback example](../assets/images/callback-example.png)
 
 #### Registering the Callback
 
@@ -158,7 +141,7 @@ class CustomDataToStash(WarpRecCallback):
                 add_custom_information(fold)
 ```
 
-This ensures **all datasets** involved in the experiment are enriched with a `stash` entry containing custom data. See the [stash documentation](../core/data-management/stash.md) for further details.
+This ensures **all datasets** involved in the experiment are enriched with a `stash` entry containing custom data. See the [stash documentation](../data-management/stash.md) for further details.
 
 !!! important
 

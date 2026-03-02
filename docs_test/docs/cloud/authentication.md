@@ -4,14 +4,6 @@ In order to interact with the different remote storage services, **WarpRec** req
 
 Each remote storage service has its own authentication mechanisms and best practices.
 
-!!! note
-
-    All remote I/O modules in WarpRec are part of the extra *remote-io*. You can install them via pip:
-
-    ```bash
-    pip install warprec[remote-io]
-    ```
-
 ## Azure Blob Storage
 
 The Azure Blob Storage I/O modules in **WarpRec** support various authentication methods to securely connect to Azure services. WarpRec delegates Azure **authentication and credential management** entirely to the user. The I/O modules internally rely on the **Azure Identity** library, which provides secure and flexible authentication mechanisms.

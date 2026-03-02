@@ -2,53 +2,55 @@ site_name: WarpRec
 site_description: "Unifying Academic Rigor and Industrial Scale for Responsible, Reproducible, and Efficient Recommendation"
 
 nav:
-  - Home: index.md
-  - Getting Started:
-    - Why WarpRec?: getting-started/introduction.md
-    - Installation: getting-started/installation.md
-    - Quick Start: getting-started/quick-start.md
-    - Architecture: getting-started/architecture.md
-    - Pipelines:
-      - Overview: getting-started/pipelines/index.md
-      - Training: getting-started/pipelines/training.md
-      - Design: getting-started/pipelines/design.md
-      - Evaluation: getting-started/pipelines/evaluation.md
-      - Callbacks: getting-started/pipelines/callbacks.md
-  - Core:
-    - Configuration:
-      - Overview: core/configuration/index.md
-      - Reader: core/configuration/reader.md
-      - Writer: core/configuration/writer.md
-      - Filtering: core/configuration/filtering.md
-      - Splitting: core/configuration/splitting.md
-      - Dashboard: core/configuration/dashboard.md
-      - Models: core/configuration/models.md
-      - Evaluation: core/configuration/evaluation.md
-      - General: core/configuration/general.md
-    - Data Management:
-      - Reader: core/data-management/reader.md
-      - Writer: core/data-management/writer.md
-      - Stash: core/data-management/stash.md
-    - Recommenders:
-      - Overview: core/recommenders/index.md
-      - Collaborative Filtering: core/recommenders/collaborative.md
-      - Content-Based Filtering: core/recommenders/content.md
-      - Hybrid: core/recommenders/hybrid.md
-      - Context-Aware: core/recommenders/context.md
-      - Sequential: core/recommenders/sequential.md
-      - Unpersonalized: core/recommenders/unpersonalized.md
-    - Evaluation:
-      - Overview: core/evaluation/index.md
+  - Get Started:
+    - Welcome to WarpRec: index.md
+    - Why WarpRec?: get-started/introduction.md
+    - Installation: get-started/installation.md
+    - Quick Start: get-started/quick-start.md
+    - Architecture: get-started/architecture.md
+  - Pipelines:
+    - Standardized Workflows: pipelines/index.md
+    - Training: pipelines/training.md
+    - Design: pipelines/design.md
+    - Evaluation: pipelines/evaluation.md
+    - Callbacks: pipelines/callbacks.md
+  - Data Management:
+    - Reader: data-management/reader.md
+    - Writer: data-management/writer.md
+    - Stash: data-management/stash.md
+  - Configuration:
+      - Configuration Structure: configuration/index.md
+      - Reader: configuration/reader.md
+      - Writer: configuration/writer.md
+      - Filtering: configuration/filtering.md
+      - Splitting: configuration/splitting.md
+      - Dashboard: configuration/dashboard.md
+      - Models: configuration/models.md
+      - Evaluation: configuration/evaluation.md
+      - General: configuration/general.md
+  - Recommenders:
+      - Module Overview: recommenders/index.md
+      - Models Taxonomy: recommenders/taxonomy.md
+      - Collaborative Filtering: recommenders/collaborative.md
+      - Content-Based: recommenders/content.md
+      - Hybrid: recommenders/hybrid.md
+      - Context-Aware: recommenders/context.md
+      - Sequential: recommenders/sequential.md
+      - Unpersonalized: recommenders/unpersonalized.md
+  - Evaluation:
+      - Evaluation System: evaluation/index.md
+      - Sampled Evaluation: evaluation/sampled.md
+      - Statistical Significance: evaluation/statistical-significance.md
       - Metrics:
-        - Accuracy: core/evaluation/metrics/accuracy.md
-        - Bias: core/evaluation/metrics/bias.md
-        - Coverage: core/evaluation/metrics/coverage.md
-        - Diversity: core/evaluation/metrics/diversity.md
-        - Fairness: core/evaluation/metrics/fairness.md
-        - Multiobjective: core/evaluation/metrics/multiobjective.md
-        - Novelty: core/evaluation/metrics/novelty.md
-        - Rating: core/evaluation/metrics/rating.md
-      - Statistical Significance: core/evaluation/statistical-significance.md
+        - Metrics Taxonomy: evaluation/metrics/taxonomy.md
+        - Accuracy: evaluation/metrics/accuracy.md
+        - Bias: evaluation/metrics/bias.md
+        - Coverage: evaluation/metrics/coverage.md
+        - Diversity: evaluation/metrics/diversity.md
+        - Fairness: evaluation/metrics/fairness.md
+        - Multiobjective: evaluation/metrics/multiobjective.md
+        - Novelty: evaluation/metrics/novelty.md
+        - Rating: evaluation/metrics/rating.md
   - Cloud & Deployment:
     - Authentication: cloud/authentication.md
     - Cluster Management: cloud/cluster-management.md
@@ -60,16 +62,20 @@ nav:
 theme:
   name: material
   language: en
+  logo: assets/logo.png
+  favicon: assets/logo.ico
   palette:
-    - scheme: default
-      primary: purple
-      accent: cyan
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: blue
+      accent: deep orange
       toggle:
         icon: material/brightness-7
         name: Switch to dark mode
-    - scheme: slate
-      primary: purple
-      accent: cyan
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: blue
+      accent: deep orange
       toggle:
         icon: material/brightness-4
         name: Switch to light mode

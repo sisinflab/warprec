@@ -1,4 +1,4 @@
-# Pipelines
+# Standardized Workflows
 
 WarpRec abstracts complex workflows into three standardized execution pipelines, all controlled via declarative YAML configuration files. Each pipeline serves a distinct purpose in the experimentation lifecycle:
 
