@@ -289,7 +289,6 @@ def initialize_datasets(
         "timestamp_label": config.reader.labels.timestamp_label,
         "cluster_label": config.reader.labels.cluster_label,
         "context_labels": config.reader.labels.context_labels,
-        "precision": config.general.precision,
     }
 
     logger.msg("Creating main dataset")

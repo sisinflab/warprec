@@ -139,7 +139,6 @@ class GeneralConfig(BaseModel):
     This class reads all the side information about the experiment from the configuration file.
 
     Attributes:
-        precision (Optional[str]): The precision to use during computation.
         device (Optional[str]): The device that will be used for tensor operations.
         backend (Optional[str]): The backend to utilize for reading and writing data.
             Defaults to 'polars'.
@@ -152,7 +151,6 @@ class GeneralConfig(BaseModel):
         azure (Optional[AzureConfig]): The Azure configuration.
     """
 
-    precision: Optional[str] = "float32"
     device: Optional[str] = "cpu"
     backend: Optional[str] = "polars"
     ray_verbose: Optional[int] = 1
