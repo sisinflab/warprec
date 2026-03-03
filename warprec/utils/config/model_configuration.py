@@ -145,8 +145,8 @@ class Optimization(BaseModel):
             each trial. Defaults to 1.
         gpu_per_trial (Optional[float]): The number of GPU to assign to
             each trial. Defaults to 0.
-        ram_per_trial (Optional[int]): The amount of RAM in GB to assign to each trial. Defaults to 0.
-        vram_per_trial (Optional[int]): The amount of VRAM in GB to assign to each trial. Defaults to 0.
+        custom_resources_per_trial (Optional[Dict[str, float | int]]): Custom resources to assign to
+            each trial. Defaults to an empty dictionary.
         num_workers (Optional[int]): The number of workers to assign to the training dataloader.
             Defaults to None.
         block_size (Optional[int]): The number of items to process during prediction.
@@ -167,8 +167,9 @@ class Optimization(BaseModel):
     device: Optional[str] = None
     cpu_per_trial: Optional[int] = 1
     gpu_per_trial: Optional[float] = 0
-    ram_per_trial: Optional[int] = 0
-    vram_per_trial: Optional[int] = 0
+    custom_resources_per_trial: Optional[Dict[str, float | int]] = Field(
+        default_factory=Dict[str, float | int]
+    )
     num_workers: Optional[int] = None
     block_size: Optional[int] = 50
     chunk_size: Optional[int] = 4096
@@ -232,32 +233,6 @@ class Optimization(BaseModel):
                 "in the range (0, 1] or integer values > 1, like 2, 3, ..."
             )
 
-        return v
-
-    @field_validator("ram_per_trial")
-    @classmethod
-    def check_ram_per_trial(cls, v: int):
-        """Validate ram_per_trial."""
-        if v > 0:
-            logger.attention(
-                "Found a value of 'ram_per_trial' > 0. Make sure to initialize the Ray cluster with '--resources='{\"ram_gb\": <value>}' parameter set."
-            )
-        if v < 0:
-            logger.attention("Found a value of 'ram_per_trial' < 0. Defaulting to 0.")
-            v = 0
-        return v
-
-    @field_validator("vram_per_trial")
-    @classmethod
-    def check_vram_per_trial(cls, v: int):
-        """Validate vram_per_trial."""
-        if v > 0:
-            logger.attention(
-                "Found a value of 'vram_per_trial' > 0. Make sure to initialize the Ray cluster with '--resources='{\"vram_gb\": <value>}' parameter set."
-            )
-        if v < 0:
-            logger.attention("Found a value of 'vram_per_trial' < 0. Defaulting to 0.")
-            v = 0
         return v
 
     @field_validator("num_workers")

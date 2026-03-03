@@ -38,11 +38,31 @@ The **optimization** section defines how hyperparameter optimization is performe
 - **device**: Training device, e.g., `cpu` or `cuda`. Overrides global device.
 - **cpu_per_trial**: Number of CPU cores allocated per trial. Defaults to `1`.
 - **gpu_per_trial**: Number of GPUs allocated per trial. Defaults to `0`.
-- **ram_per_trial**: Amount of RAM allocated per trial in Gigabytes. Defaults to `0` (no limit).
-- **vram_per_trial**: Amount of VRAM allocated per trial in Gigabytes. Defaults to `0` (no limit).
+- **custom_resources_per_trial**: A dictionary containing custom resources to request per trial during optimization. Defaults to an empty dictionary.
 - **num_workers**: Number of worker processes for data loading. Defaults to `None` (main process).
 - **block_size**: Number of items to predict at once for efficiency. Defaults to `50`.
 - **checkpoint_to_keep**: Number of checkpoints to retain in Ray. Defaults to `5`.
+
+!!! Example
+    A more in-depth use-case scenario might involve the *custom_resources_per_trial* parameter. To correctly make use of this parameter you must start your nodes with the correct argument. As an example we might want to limit the trials also on the RAM usage. Let's say that your machine has 64 GB of RAM and you want to expose this information in your cluster. You can do so by running:
+
+    ```bash
+    ray start --head --resources='{"ram_gb": 64}'
+    ```
+
+    In your configuration you can then write the optimization parameters of you model like this:
+
+    ```yaml
+    models:
+        EASE:
+            optimization:
+                cpu_per_trial: 4
+                custom_resources_per_trial:
+                    ram_gb: 32
+            l2: [100, 200, 300, 400, 500, 1000, 2000, 5000]
+    ```
+
+    With this setup you ensure that at most 2 trials will be executed on the head node.
 
 ### LR Scheduler Section
 
