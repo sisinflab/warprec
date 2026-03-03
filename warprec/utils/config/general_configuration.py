@@ -4,7 +4,6 @@ import importlib
 from pathlib import Path
 from typing import Optional, Type, List, Dict, Any
 
-import torch
 from pydantic import BaseModel, field_validator, model_validator, Field
 
 from warprec.utils.helpers import is_python_module
@@ -163,18 +162,6 @@ class GeneralConfig(BaseModel):
         default_factory=WarpRecCallbackConfig
     )
     azure: Optional[AzureConfig] = None
-
-    @field_validator("device")
-    @classmethod
-    def check_device(cls, v: str):
-        """Validate device."""
-        if v in ("cuda", "cpu"):
-            if v == "cuda" and not torch.cuda.is_available():
-                raise ValueError(
-                    "Cuda device was selected but not available on current machine."
-                )
-            return v
-        raise ValueError(f'Device {v} is not supported. Use "cpu" or "cuda".')
 
     @field_validator("backend")
     @classmethod
