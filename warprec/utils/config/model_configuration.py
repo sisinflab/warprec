@@ -145,7 +145,7 @@ class Optimization(BaseModel):
             each trial. Defaults to 1.
         gpu_per_trial (Optional[float]): The number of GPU to assign to
             each trial. Defaults to 0.
-        custom_resources_per_trial (Optional[Dict[str, float]]): Custom resources to assign to
+        custom_resources_per_trial (Optional[Dict[str, float | int]]): Custom resources to assign to
             each trial. Defaults to an empty dictionary.
         num_workers (Optional[int]): The number of workers to assign to the training dataloader.
             Defaults to None.
@@ -167,8 +167,8 @@ class Optimization(BaseModel):
     device: Optional[str] = None
     cpu_per_trial: Optional[int] = 1
     gpu_per_trial: Optional[float] = 0
-    custom_resources_per_trial: Optional[Dict[str, float]] = Field(
-        default_factory=Dict[str, float]
+    custom_resources_per_trial: Optional[Dict[str, float | int]] = Field(
+        default_factory=Dict[str, float | int]
     )
     num_workers: Optional[int] = None
     block_size: Optional[int] = 50
