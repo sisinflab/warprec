@@ -24,8 +24,6 @@ class SGCL(IterativeRecommender, GraphRecommenderUtils):
     supervised contrastive loss function. It eliminates the need for data augmentation,
     negative sampling, and multi-task optimization.
 
-    For further details, please refer to the `paper <https://arxiv.org/abs/2507.13336>`_.
-
     Args:
         params (dict): Model parameters.
         info (dict): The dictionary containing dataset information.

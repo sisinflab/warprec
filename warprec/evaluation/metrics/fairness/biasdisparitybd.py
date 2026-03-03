@@ -16,21 +16,6 @@ class BiasDisparityBD(TopKMetric):
     It is computed as the relative difference between BiasDisparityBR (bias in recommendations)
     and BiasDisparityBS (bias in the training set):
 
-        BD(u, c) = (BR(u, c) - BS(u, c)) / BS(u, c)
-
-    where:
-        - u is a user cluster index,
-        - c is an item cluster index,
-        - BR(u, c) is the bias in recommendations for user cluster u and item cluster c,
-        - BS(u, c) is the bias in the training set for user cluster u and item cluster c.
-
-    A positive BD value indicates that the recommendation algorithm amplifies
-    the bias compared to the training data, while a negative value indicates a reduction of bias.
-
-    This metric internally uses the BiasDisparityBS and BiasDisparityBR metrics to compute its values.
-
-    For further details, please refer to this `link <https://arxiv.org/pdf/1811.01461>`_.
-
     Args:
         k (int): Cutoff for top-k recommendations (used by BiasDisparityBR).
         num_items (int): Number of items in the training set.

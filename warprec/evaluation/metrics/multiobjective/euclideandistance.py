@@ -9,8 +9,6 @@ from warprec.utils.registry import metric_registry
 class EucDistance(TopKMetric):
     """Computes the Euclidean Distance between the model's performance and an Utopia Point (Ideal Point).
 
-    Formula: sqrt(sum((score_i - utopia_i)^2))
-
     Usually, a lower Euclidean Distance indicates a better performance as it is closer
     to the ideal objectives.
 

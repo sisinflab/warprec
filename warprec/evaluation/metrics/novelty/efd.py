@@ -10,59 +10,10 @@ from warprec.utils.registry import metric_registry
 
 @metric_registry.register("EFD")
 class EFD(UserAverageTopKMetric):
-    """
-    Expected Free Discovery at K metric.
+    """Expected Free Discovery at K metric.
 
     This metric measures the recommender system's ability to suggest items
     that the user has not already seen (i.e., not present in the training set).
-
-    The metric formula is defines as:
-        EFD = sum(DCG(rel * novelty)) / (users * discounted_sum)
-
-    where:
-        - DCG is the discounted cumulative gain.
-        - rel is the relevance of the items.
-        - novelty is the novelty of the items.
-        - users is the number of users evaluated.
-        - discounted_sum is the sum of the discounted values for the top-k items.
-
-    Matrix computation of the metric:
-        PREDS                   TARGETS
-    +---+---+---+---+       +---+---+---+---+
-    | 8 | 2 | 7 | 2 |       | 1 | 0 | 1 | 0 |
-    | 5 | 4 | 3 | 9 |       | 0 | 0 | 1 | 1 |
-    +---+---+---+---+       +---+---+---+---+
-
-    We extract the top-k predictions and get their column index. Let's assume k=2:
-      TOP-K
-    +---+---+
-    | 0 | 2 |
-    | 3 | 0 |
-    +---+---+
-
-    then we extract the relevance (original score) for that user in that column:
-       REL
-    +---+---+
-    | 0 | 1 |
-    | 1 | 0 |
-    +---+---+
-
-    The discounted novelty score of an item is computed as:
-
-    DiscountedNovelty_i = -log_2(interactions_i / users)
-
-    where:
-        -interactions_i is the number of times the item i has been interacted with.
-        -users is the total number of users.
-
-    The novelty is expressed as a tensor of length equal to the number of items. This is repeated
-        for each user in the current batch.
-
-    The discounted sum is computed as (for k=2):
-
-    DiscountedSum@2 = 1/log_2(2) + 1/log_2(3) = 1.63
-
-    For further details, please refer to this `link <https://dl.acm.org/doi/abs/10.1145/2043932.2043955>`_.
 
     Attributes:
         novelty_profile (Tensor): The item novelty lookup tensor.

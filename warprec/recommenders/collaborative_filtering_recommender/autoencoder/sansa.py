@@ -27,8 +27,6 @@ class SANSA(ItemSimRecommender):
     It attempts to use `scikit-sparse` (CHOLMOD) for high-performance Cholesky
     factorization. If not available, it falls back to `scipy.sparse` inversion.
 
-    For further details, please refer to the `paper <https://dl.acm.org/doi/10.1145/3604915.3608827>`_.
-
     Args:
         params (dict): The dictionary with the model params.
         info (dict): The dictionary containing dataset information.

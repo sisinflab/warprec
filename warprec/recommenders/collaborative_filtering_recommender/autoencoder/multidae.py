@@ -77,8 +77,6 @@ class MultiDAE(IterativeRecommender):
     """Implementation of MultiDAE algorithm from
         Variational Autoencoders for Collaborative Filtering 2018.
 
-    For further details, please refer to the `paper <https://dl.acm.org/doi/10.1145/3178876.3186150>`_.
-
     Args:
         params (dict): Model parameters.
         info (dict): The dictionary containing dataset information.

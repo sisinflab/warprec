@@ -15,21 +15,6 @@ class BiasDisparityBS(BaseMetric):
     distribution within each user cluster. It helps to identify whether certain user groups are
     disproportionately exposed to specific item categories compared to the overall item popularity.
 
-    The metric is computed as:
-
-        BiasDisparityBS(u, c) = P_train(u, c) / P_global(c)
-
-    where:
-        - u is a user cluster index,
-        - c is an item cluster index,
-        - P_train(u, c) is the proportion of positive interactions from user cluster u with items in cluster c within the training set,
-        - P_global(c) is the global proportion of items in cluster c.
-
-    A value greater than 1 indicates over-recommendation of items from cluster c to user cluster u,
-    while a value less than 1 indicates under-recommendation.
-
-    For further details, please refer to this `link <https://arxiv.org/pdf/1811.01461>`_.
-
     Attributes:
         user_clusters (Tensor): Tensor mapping each user to a user cluster.
         item_clusters (Tensor): Tensor mapping each item to an item cluster.

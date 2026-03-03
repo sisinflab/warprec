@@ -16,8 +16,6 @@ class ELSA(IterativeRecommender):
     """Implementation of ELSA algorithm from
         "Scalable Linear Shallow Autoencoder for Collaborative Filtering" in RecSys 22.
 
-    For further details, please refer to the `paper <https://dl.acm.org/doi/10.1145/3523227.3551482>`_.
-
     Args:
         params (dict): The dictionary with the model params.
         info (dict): The dictionary containing dataset information.

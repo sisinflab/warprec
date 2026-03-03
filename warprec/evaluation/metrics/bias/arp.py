@@ -11,48 +11,6 @@ class ARP(UserAverageTopKMetric):
     """ARP (Average Recommendation Popularity) is a metric that evaluates
     the average popularity of the top-k recommendations.
 
-    The metric formula is defined as:
-        ARP = (1 / |U|) * sum( (1 / k) * sum_{i in L_u} pop(i) )
-
-    where:
-        - pop(i) is the popularity of item i (e.g., interaction count).
-        - L_u is the set of top-k recommended items for user u.
-        - k is the cutoff for recommendations.
-        - U is the set of users.
-
-    Matrix computation of the metric:
-        PREDS                   POPULARITY TENSOR
-    +---+---+---+---+       +---+---+---+---+
-    | 8 | 2 | 7 | 2 |       | 10| 5 | 15| 20|
-    | 5 | 4 | 3 | 9 |       +---+---+---+---+
-    +---+---+---+---+
-
-    1. Extract top-k predictions and get their item indices. Let's assume k=2:
-    TOP-K_INDICES
-    +---+---+
-    | 0 | 2 |
-    | 3 | 0 |
-    +---+---+
-
-    2. Use these indices to retrieve the popularity from the popularity tensor:
-    RECOMMENDED_ITEMS_POP
-    +---+---+
-    | 10| 15|
-    | 20| 10|
-    +---+---+
-
-    3. Sum the popularity for each user:
-    USER_POP_SUM
-    +---+
-    | 25|
-    | 30|
-    +---+
-
-    4. Average over all users and divide by k. For the global metric:
-        (25 + 30) / (2 * 2) = 13.75
-
-    For further details, please refer to this `paper <https://arxiv.org/abs/1901.07555>`_.
-
     Attributes:
         pop (Tensor): The lookup tensor of item popularity.
 

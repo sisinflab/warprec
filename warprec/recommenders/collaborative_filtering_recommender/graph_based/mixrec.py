@@ -21,8 +21,6 @@ class MixRec(IterativeRecommender, GraphRecommenderUtils):
     """Implementation of MixRec algorithm from
     "MixRec: Individual and Collective Mixing Empowers Data Augmentation for Recommender Systems" (WWW '25).
 
-    For further details, please refer to the `paper <https://doi.org/10.1145/3696410.3714565>`_.
-
     Args:
         params (dict): Model parameters.
         info (dict): The dictionary containing dataset information.

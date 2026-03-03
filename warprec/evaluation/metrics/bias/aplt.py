@@ -17,38 +17,6 @@ class APLT(UserAverageTopKMetric):
     This metric helps analyze how well a recommendation system balances diversity
     by incorporating less popular items into recommendations while maintaining relevance.
 
-    The metric formula is defined as:
-        APLT = sum(long_hits) / (users * k)
-
-    where:
-        -long_hits are the number of recommendation in the long tail.
-
-    Matrix computation of the metric:
-        PREDS                   TARGETS
-    +---+---+---+---+       +---+---+---+---+
-    | 8 | 2 | 7 | 2 |       | 1 | 0 | 1 | 0 |
-    | 5 | 4 | 3 | 9 |       | 0 | 0 | 1 | 1 |
-    +---+---+---+---+       +---+---+---+---+
-
-    We extract the top-k predictions and get their column index. Let's assume k=2:
-      TOP-K
-    +---+---+
-    | 0 | 2 |
-    | 3 | 0 |
-    +---+---+
-
-    then we extract the relevance (original score) for that user in that column but maintaining the original dimensions:
-           REL
-    +---+---+---+---+
-    | 0 | 0 | 1 | 0 |
-    | 0 | 0 | 0 | 1 |
-    +---+---+---+---+
-
-    Then we finally extract the long tail items from the relevance matrix.
-    Check BaseMetric for more details on the long tail definition.
-
-    For further details, please refer to this `paper <https://arxiv.org/abs/1901.07555>`_.
-
     Attributes:
         long_tail (Tensor): The lookup tensor of long tail items.
 
