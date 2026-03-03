@@ -20,7 +20,7 @@ pydantic = "^2.10.6"
 tabulate = "^0.9.0"
 scikit-learn = "^1.6.1"
 hyperopt = "^0.2.7"
-ray = {extras = ["data", "serve", "train", "tune"], version = "~2.45"}
+ray = {extras = ["data", "serve", "train", "tune"], version = "~2.50.1"}
 types-pyyaml = "^6.0.12.20241230"
 types-tabulate = "^0.9.0.20241207"
 loguru = "^0.7.3"
