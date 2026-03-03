@@ -152,8 +152,9 @@ models:
       device: [cpu, cuda]
       cpu_per_trial: 1
       gpu_per_trial: 0
-      ram_per_trial: 0
-      vram_per_trial: 0
+      custom_resources_per_trial:
+        resource_1: 10
+        resource_2: 0.5
       num_workers: 0
       block_size: 50
       num_samples: 10
@@ -193,7 +194,6 @@ evaluation:
   save_evaluation: [True, False]
   save_per_user: [True, False]
 general:
-  precision: [float32, float64]
   device: [cpu, cuda]
   backend: [polars, pandas]
   ray_verbose: [0, 1, 2, 3]
