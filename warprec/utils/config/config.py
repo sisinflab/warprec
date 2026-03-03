@@ -2,11 +2,9 @@ import os
 import sys
 import importlib
 from pathlib import Path
-from typing import ClassVar, Dict, Any, List
+from typing import Dict, Any, List
 
 import yaml
-import numpy as np
-import torch
 from pydantic import BaseModel, model_validator, Field
 from warprec.utils.helpers import load_custom_modules, validation_metric
 from warprec.data.filtering import Filter
@@ -36,28 +34,12 @@ class WarpRecConfiguration(BaseModel):
         models (Dict[str, dict]): The dictionary containing model information
             in the format {model_name: dict{param_1: value, param_2: value, ...}, ...}
         general (GeneralConfig): General configuration of the experiment.
-        sparse_np_dtype (ClassVar[dict]): The mapping between the string dtype
-            and their numpy sparse counterpart.
-        sparse_torch_dtype (ClassVar[dict]): The mapping between the string dtype
-            and their torch sparse counterpart.
     """
 
     reader: ReaderConfig
     filtering: Dict[str, dict] = None
     models: Dict[str, dict]
     general: GeneralConfig = Field(default_factory=GeneralConfig)
-
-    # Supported sparse precisions in numpy
-    sparse_np_dtype: ClassVar[dict] = {
-        "float32": np.float32,
-        "float64": np.float64,
-    }
-
-    # Supported sparse precision in torch
-    sparse_torch_dtype: ClassVar[dict] = {
-        "float32": torch.float32,
-        "float64": torch.float64,
-    }
 
     @model_validator(mode="after")
     def config_validation(self) -> "WarpRecConfiguration":
@@ -118,37 +100,7 @@ class WarpRecConfiguration(BaseModel):
                         f"Error initializing filter '{filter_name}' with these params {filter_params}: {e}"
                     ) from e
 
-        # Check if the precision is supported
-        self.check_precision()
-
         return self
-
-    def check_precision(self) -> None:
-        """This method checks the precision passed through configuration.
-
-        Raises:
-            ValueError: If the precision is not supported or incorrect.
-        """
-        if self.general.precision not in self.sparse_np_dtype:
-            raise ValueError(
-                f"Custom dtype {self.general.precision} not supported as sparse data type."
-            )
-
-    def precision_numpy(self) -> np.dtype:
-        """This method returns the precision that will be used for this experiment.
-
-        Returns:
-            np.dtype: The numpy precision requested.
-        """
-        return self.sparse_np_dtype[self.general.precision]
-
-    def precision_torch(self) -> torch.dtype:
-        """This method returns the precision that will be used for this experiment.
-
-        Returns:
-            torch.dtype: The torch precision requested.
-        """
-        return self.sparse_torch_dtype[self.general.precision]
 
     def get_filters(self) -> List[Filter]:
         """Returns the initialized filters based on the configuration.
@@ -235,7 +187,6 @@ class TrainConfiguration(WarpRecConfiguration):
             )
 
         # Parse and validate models
-        self.check_precision()
         self.models = self.parse_models()
 
         return self

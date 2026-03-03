@@ -41,7 +41,6 @@ class Interactions:
         rating_label (str): The label of the rating column.
         context_labels (Optional[List[str]]): The list of labels of the
             contextual data.
-        precision (Any): The precision of the internal representation of the data.
     """
 
     def __init__(
@@ -57,7 +56,6 @@ class Interactions:
         rating_type: RatingType = RatingType.IMPLICIT,
         rating_label: str = None,
         context_labels: Optional[List[str]] = None,
-        precision: Any = np.float32,
     ) -> None:
         # Setup the variables
         self._inter_df = data
@@ -66,7 +64,6 @@ class Interactions:
         self._inter_item_cluster = item_cluster if item_cluster is not None else None
         self.batch_size = batch_size
         self.rating_type = rating_type
-        self.precision = precision
 
         # Setup the training variables
         self._inter_dict: Optional[dict] = None
@@ -233,7 +230,7 @@ class Interactions:
 
         # Edge case: No interactions with the specified rating
         if rating_df.select(nw.len()).item() == 0:
-            return coo_matrix((self._og_nuid, self._og_niid), dtype=self.precision)
+            return coo_matrix((self._og_nuid, self._og_niid))
 
         umap_df = nw.from_dict(
             {
@@ -264,12 +261,10 @@ class Interactions:
         items = mapped_df.select("__iidx__").to_numpy().flatten()
 
         # Values are all ones for the presence of interaction
-        values = np.ones(len(users), dtype=self.precision)
+        values = np.ones(len(users))
 
         return coo_matrix(
-            (values, (users, items)),
-            shape=(self._og_nuid, self._og_niid),
-            dtype=self.precision,
+            (values, (users, items)), shape=(self._og_nuid, self._og_niid)
         )
 
     def get_side_sparse(self) -> csr_matrix:
@@ -291,7 +286,7 @@ class Interactions:
         # Convert to numpy first
         side_np = side_features.to_numpy()
 
-        self._inter_side_sparse = csr_matrix(side_np, dtype=self.precision)
+        self._inter_side_sparse = csr_matrix(side_np)
         return self._inter_side_sparse
 
     def get_side_tensor(self) -> Tensor:
@@ -533,9 +528,7 @@ class Interactions:
             ratings = np.ones(len(users))
 
         self._inter_sparse = coo_matrix(
-            (ratings, (users, items)),
-            shape=(self._og_nuid, self._og_niid),
-            dtype=self.precision,
+            (ratings, (users, items)), shape=(self._og_nuid, self._og_niid)
         ).tocsr()
 
         return self._inter_sparse

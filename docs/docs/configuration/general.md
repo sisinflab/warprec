@@ -5,7 +5,6 @@ It allows customization of numerical precision, device usage, logging verbosity,
 
 ## Available Keywords
 
-- **precision**: Numerical precision for computations during the experiment. Defaults to `float32`. Higher precision (e.g., `float64`) increases memory usage.
 - **device**: Device used for training and evaluation. Supports `cpu` or `cuda` devices. Defaults to `cpu`.
 - **backend**: Backend to use for data reading and writing. Supports `polars` or `pandas`. Defaults to `polars`.
 - **ray_verbose**: Verbosity level of Ray Tune. Acceptable values are integers from 0 (silent) to 3 (very verbose). Defaults to `1`.
