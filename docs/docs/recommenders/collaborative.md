@@ -163,6 +163,10 @@ SANSA (Scalable Approximate NonSymmetric Autoencoder): SANSA is a collaborative 
 
 For further details, please refer to the [paper](https://dl.acm.org/doi/10.1145/3604915.3608827).
 
+!!! warning
+
+    This model to correctly compile requires additional dependencies to run the scikit-sparse module. You can find more information and guides [here](https://github.com/scikit-sparse/scikit-sparse). In case these dependencies are not correctly installed, the model will compute the normal inverse of the target matrix, resulting in different results and slower training times.
+
 ```yaml
 models:
   SANSA:
