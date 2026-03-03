@@ -17,20 +17,6 @@ class UserMADRanking(UserAverageTopKMetric):
     of the average per-user nDCG scores per cluster. The MAD is computed as the mean
     of absolute differences between every pair of cluster-level averages.
 
-    Formally, the metric is defined as:
-
-        MAD = mean_c(|mean_gain(c) - mean_global|)
-
-    where:
-        - mean_gain(c) is the average discounted gain of user in cluster c,
-        - mean_global is the average of mean_gain(c) over all user clusters.
-
-    This metric is useful to detect disparities in ranking quality across clusters (e.g., genres, popularity buckets).
-
-    The metric uses a discounted relevance model (e.g., log-based) applied to the top-k predictions,
-
-    For further details, please refer to this `link <https://link.springer.com/article/10.1007/s11257-020-09285-1>`_.
-
     Attributes:
         user_clusters (Tensor): Tensor mapping each user to an user cluster.
 

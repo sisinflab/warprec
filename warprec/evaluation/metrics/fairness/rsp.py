@@ -19,50 +19,6 @@ class RSP(TopKMetric):
     of how equally the system recommends items across different groups, regardless
     of relevance in the test set.
 
-    The metric formula is defined as:
-        RSP = std(P(R@k | g=g_1), ..., P(R@k | g=g_A)) / mean(P(R@k | g=g_1), ..., P(R@k | g=g_A))
-
-    where:
-        - P(R@k | g=g_a) is the probability that an item from group g_a is ranked
-          in the top-k recommendations, relative to the pool of items from g_a
-          not seen during training.
-        - g_a represents an item cluster.
-        - A is the total number of item clusters.
-
-    The probability for a cluster g_a is calculated as:
-        P(R@k | g=g_a) = (Sum over users u of |{items in top-k for u} AND
-            {items in group g_a}|) / (Sum over users u of |{items not in training set for u} AND {items in group g_a}|)
-
-    This simplifies to:
-        P(R@k | g=g_a) = (Total count of group g_a items in top-k across all users) /
-            (Total count of group g_a items not in training set across all users)
-
-    Matrix computation of the numerator within a batch:
-    Given recommendations (preds) and ground truth relevance (target) for a batch of users:
-        PREDS (Scores)        TARGETS (Binary Relevance)
-    +---+---+---+---+       +---+---+---+---+
-    | . | . | . | . |       | 1 | 0 | 1 | 0 |
-    | . | . | . | . |       | 0 | 0 | 1 | 1 |
-    +---+---+---+---+       +---+---+---+---+
-    Item Clusters: [0, 1, 0, 1] (Example mapping item index to cluster ID)
-
-    1. Get top-k recommended item indices for each user.
-    2. Create a binary mask 'top_k_mask' where top_k_mask[u, i] = 1 if item i is in u's top-k recommendations, 0 otherwise.
-    3. For each item cluster 'c' (0 to n_item_clusters-1):
-        a. Sum top_k_mask[u, i] for all users u and items i where item_clusters[i] == c.
-            This is the total count of recommended items from cluster c in the batch.
-    4. Accumulate these counts across batches into 'cluster_recommendations'.
-
-    The denominator (Total count of group g_a items not in training set across all users)
-    is pre-calculated during initialization using the provided training set.
-
-    After processing all batches, compute the per-cluster probabilities:
-        pr_c = (total recommended items from cluster c) / (total items from cluster c not in training set)
-    Compute RSP = std(pr_0, pr_1, ..., pr_{A-1}) / mean(pr_0, pr_1, ..., pr_{A-1}).
-    Handle cases where the denominator is zero or no items exist in the eligible pool for a cluster.
-
-    For further details, please refer to this `paper <https://dl.acm.org/doi/abs/10.1145/3397271.3401177>`_.
-
     Attributes:
         item_clusters (Tensor): A tensor mapping item index to its cluster ID.
         cluster_recommendations (Tensor): Accumulator for the total count of recommended items per cluster in the top-k.

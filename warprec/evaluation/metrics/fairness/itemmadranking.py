@@ -17,23 +17,6 @@ class ItemMADRanking(TopKMetric):
     discounted relevance scores per cluster. The goal is to evaluate whether some item clusters
     receive consistently higher or lower exposure than others.
 
-    Formally, the metric is defined as:
-
-        MAD = mean_c(|mean_gain(c) - mean_global|)
-
-    where:
-        - mean_gain(c) is the average discounted gain of items in cluster c (only for recommended items),
-        - mean_global is the average of mean_gain(c) over all item clusters with at least one recommended item.
-
-    This metric is useful to detect disparities in ranking quality across clusters (e.g., genres, popularity buckets),
-    independent of the absolute relevance of items.
-
-    The metric uses a discounted relevance model (e.g., log-based) applied to the top-k predictions,
-    and tracks the average relevance score each item receives when recommended. These per-item scores
-    are then aggregated by cluster to compute the cluster-level mean gains and their deviation.
-
-    For further details, please refer to this `link <https://link.springer.com/article/10.1007/s11257-020-09285-1>`_.
-
     Attributes:
         num_items (int): Number of items in the training set.
         item_clusters (Tensor): Tensor mapping each item to an item cluster.

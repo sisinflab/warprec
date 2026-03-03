@@ -14,15 +14,6 @@ class UserCoverageAtN(TopKMetric):
     This metric measures the system's ability to provide a sufficiently long
     recommendation list for users.
 
-    The metric formula is defined as:
-        UserCoverageAtN = sum_{u=1}^{N_total} [|L_u| >= k]
-
-    where:
-        - N_total is the total number of users processed across all batches.
-        - k is the cutoff.
-        - |L_u| is the number of items available in the prediction list for user u.
-        - [|L_u| >= k] is either 1 or 0.
-
     Attributes:
         users (Tensor): Number of user with at least 1 relevant item.
 
