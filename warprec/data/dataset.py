@@ -2,7 +2,6 @@
 from typing import Tuple, Optional, List, Any, Dict
 
 import torch
-import numpy as np
 from torch import Tensor
 
 import narwhals as nw
@@ -38,7 +37,6 @@ class Dataset:
         cluster_label (str): The label of the cluster column.
         context_labels (Optional[List[str]]): The list of labels of the
             contextual data.
-        precision (Any): The precision of the internal representation of the data.
         evaluation_set (str): The type of evaluation set. Can either be 'Test'
             or 'Validation'.
 
@@ -74,7 +72,6 @@ class Dataset:
         timestamp_label: str = None,
         cluster_label: str = None,
         context_labels: Optional[List[str]] = None,
-        precision: Any = np.float32,
         evaluation_set: str = "Test",
     ):
         # Check evaluation set
@@ -227,7 +224,6 @@ class Dataset:
             rating_type=rating_type,
             rating_label=rating_label,
             context_labels=context_labels,
-            precision=precision,
         )
 
         if mat_eval_data is not None:
@@ -241,7 +237,6 @@ class Dataset:
                 rating_type=rating_type,
                 rating_label=rating_label,
                 context_labels=context_labels,
-                precision=precision,
             )
 
         # Save side information inside the dataset
@@ -364,7 +359,6 @@ class Dataset:
         rating_type: RatingType = RatingType.IMPLICIT,
         rating_label: str = None,
         context_labels: Optional[List[str]] = None,
-        precision: Any = np.float32,
     ) -> Interactions:
         """Functionality to create Interaction data from DataFrame.
 
@@ -379,7 +373,6 @@ class Dataset:
             rating_label (str): The label of the rating column.
             context_labels (Optional[List[str]]): The list of labels of the
                 contextual data.
-            precision (Any): The precision that will be used to store interactions.
 
         Returns:
             Interactions: The final interaction object.
@@ -396,7 +389,6 @@ class Dataset:
             rating_type=rating_type,
             rating_label=rating_label,
             context_labels=context_labels,
-            precision=precision,
         )
         nuid, niid = inter_set.get_dims()
         transactions = inter_set.get_transactions()
