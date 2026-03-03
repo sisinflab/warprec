@@ -20,8 +20,6 @@ class CDAE(IterativeRecommender):
     user-item interaction vectors, incorporating a user-specific embedding to guide the
     reconstruction.
 
-    For further details, please refer to the `paper <https://dl.acm.org/doi/10.1145/2835776.2835837>`_.
-
     Args:
         params (dict): Model parameters.
         info (dict): The dictionary containing dataset information.

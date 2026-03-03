@@ -169,8 +169,6 @@ class LightSANs(IterativeRecommender, SequentialRecommenderUtils):
     """Implementation of LightSANs algorithm from
     "Lighter and Better: Low-Rank Decomposed Self-Attention Networks for Next-Item Recommendation" (SIGIR 2021).
 
-    For further details, please refer to the `paper <https://dl.acm.org/doi/10.1145/3404835.3462978>`_.
-
     Args:
         params (dict): Model parameters.
         info (dict): The dictionary containing dataset information.

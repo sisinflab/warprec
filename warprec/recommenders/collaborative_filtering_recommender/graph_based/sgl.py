@@ -20,8 +20,6 @@ class SGL(IterativeRecommender, GraphRecommenderUtils):
     """Implementation of SGL algorithm from
         Self-supervised Graph Learning for Recommendation (SIGIR 2021)
 
-    For further details, please refer to the `paper <https://arxiv.org/abs/2010.10783>`_.
-
     Args:
         params (dict): Model parameters.
         info (dict): The dictionary containing dataset information.

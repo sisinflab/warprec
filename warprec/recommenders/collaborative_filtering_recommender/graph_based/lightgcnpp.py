@@ -27,8 +27,6 @@ class LightGCNpp(IterativeRecommender, GraphRecommenderUtils):
         LightGCN: Unexpected Inflexibility, Inconsistency, and
         A Remedy Towards Improved Recommendation (RecSys 2024).
 
-    For further details, please refer to the `paper <https://dl.acm.org/doi/10.1145/3640457.3688176>`_.
-
     Args:
         params (dict): Model parameters. Requires 'alpha', 'beta', 'gamma'.
         info (dict): The dictionary containing dataset information.
