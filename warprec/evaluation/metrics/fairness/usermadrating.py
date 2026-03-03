@@ -18,27 +18,6 @@ class UserMADRating(UserAverageTopKMetric):
     per-user average top-k rating scores per user cluster. The MAD is computed as the mean
     of absolute differences between every pair of cluster-level averages.
 
-    Formally, the metric is defined as:
-
-        MAD = mean_{c_1, c_2} (|mean_avg_topk_score(c_1) - mean_avg_topk_score(c_2)|)
-
-    where:
-        - mean_avg_topk_score(c) is the average of the per-user average top-k prediction
-          scores for all users in cluster c.
-        - The per-user average top-k prediction score is the mean of the predicted scores
-          of the top-k recommended items for that user.
-
-    This metric is useful to detect disparities in the perceived quality (in terms of
-    average predicted score) of recommendations across user clusters (e.g., based on
-    demographics, behavior, etc.).
-
-    The metric calculates the average predicted score of the top-k recommendations
-    for each user and tracks the sum of these averages and the count of users
-    per batch. These per-user statistics are then aggregated by cluster to compute
-    cluster-level means of these average top-k scores, and their deviation is computed.
-
-    For further details on the concept, please refer to this `link <https://dl.acm.org/doi/abs/10.1145/3269206.3271795>`_.
-
     Attributes:
         user_clusters (Tensor): Tensor mapping each user to an user cluster.
 

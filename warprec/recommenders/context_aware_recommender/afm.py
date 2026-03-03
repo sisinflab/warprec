@@ -53,8 +53,6 @@ class AFM(ContextRecommenderUtils, IterativeRecommender):
         Attentional Factorization Machines: Learning the Weight of Feature Interactions
         via Attention Networks, IJCAI 2017.
 
-    For further details, please refer to the `paper <https://arxiv.org/abs/1708.04617>`_.
-
     Args:
         params (dict): Model parameters.
         info (dict): The dictionary containing dataset information.

@@ -18,48 +18,6 @@ class REO(TopKMetric):
     deviation of these proportions divided by their mean, providing a measure
     of how equally the system recommends relevant items across different groups.
 
-    The metric formula is defined as:
-        REO = std(P(R@k | g=g_1, y=1), ..., P(R@k | g=g_A, y=1)) / mean(P(R@k | g=g_1, y=1), ..., P(R@k | g=g_A, y=1))
-
-    where:
-        - P(R@k | g=g_a, y=1) is the probability that a relevant item from group g_a
-          is ranked in the top-k recommendations.
-        - g_a represents an item cluster.
-        - A is the total number of item clusters.
-
-    The probability for a cluster g_a is calculated as:
-        P(R@k | g=g_a, y=1) = (Sum over users u of |{relevant items in top-k for u} AND
-            {items in group g_a}|) / (Sum over users u of |{relevant items for u} AND {items in group g_a}|)
-
-    This simplifies to:
-        P(R@k | g=g_a, y=1) = (Total count of relevant group g_a items in top-k across all users) /
-            (Total count of relevant group g_a items across all users)
-
-    Matrix computation of the metric within a batch:
-    Given recommendations (preds) and ground truth relevance (target) for a batch of users:
-        PREDS (Scores)        TARGETS (Binary Relevance)
-    +---+---+---+---+       +---+---+---+---+
-    | . | . | . | . |       | 1 | 0 | 1 | 0 |
-    | . | . | . | . |       | 0 | 0 | 1 | 1 |
-    +---+---+---+---+       +---+---+---+---+
-    Item Clusters: [0, 1, 0, 1] (Example mapping item index to cluster ID)
-
-    1. Get top-k recommended item indices for each user.
-    2. Create a binary matrix 'rel' where rel[u, i] = 1 if item i is relevant to user u AND i is in u's top-k recommendations, 0 otherwise.
-    3. For each item cluster 'c' (0 to n_item_clusters-1):
-        a. Sum rel[u, i] for all users u and items i where item_clusters[i] == c.
-            This is the total count of relevant recommended items from cluster c in the batch.
-        b. Sum target[u, i] for all users u and items i where item_clusters[i] == c.
-            This is the total count of relevant items from cluster c in the ground truth for the batch.
-    4. Accumulate these counts across batches.
-
-    After processing all batches, compute the per-cluster probabilities:
-        pr_c = (total relevant recommended items from cluster c) / (total relevant items from cluster c)
-    Compute REO = std(pr_0, pr_1, ..., pr_{A-1}) / mean(pr_0, pr_1, ..., pr_{A-1}).
-    Handle cases where the denominator is zero or no relevant items exist for a cluster.
-
-    For further details, please refer to this `paper <https://dl.acm.org/doi/abs/10.1145/3397271.3401177>`_.
-
     Attributes:
         item_clusters (Tensor): A tensor mapping item index to its cluster ID.
         cluster_recommendations (Tensor): Accumulator for the total count of relevant recommended items per cluster.

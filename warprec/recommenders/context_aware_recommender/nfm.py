@@ -20,8 +20,6 @@ class NFM(ContextRecommenderUtils, IterativeRecommender):
     """Implementation of NFM algorithm from
         Neural Factorization Machines for Sparse Predictive Analytics, SIGIR 2017.
 
-    For further details, please refer to the `paper <https://arxiv.org/abs/1708.05027>`_.
-
     Args:
         params (dict): Model parameters.
         info (dict): The dictionary containing dataset information.

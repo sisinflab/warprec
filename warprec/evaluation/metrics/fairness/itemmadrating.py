@@ -19,27 +19,6 @@ class ItemMADRating(TopKMetric):
     clusters receive consistently higher or lower average ratings when they are
     successfully recommended (i.e., recommended to a relevant user).
 
-    Formally, the metric is defined as:
-
-        MAD = mean_{c_1, c_2} (|mean_avg_rating(c_1) - mean_avg_rating(c_2)|)
-
-    where:
-        - mean_avg_rating(c) is the average of the per-item average ratings for all
-          items in cluster c that were recommended and relevant at least once.
-        - The per-item average rating is the sum of ratings an item received when
-          recommended to a relevant user, divided by the count of times it was
-          recommended to a relevant user.
-
-    This metric is useful to detect disparities in the quality (in terms of received
-    rating/relevance) of recommended items across clusters (e.g., genres, popularity buckets),
-    specifically focusing on items that were relevant and successfully recommended.
-
-    The metric tracks the sum of ratings and the count of recommendations for relevant items only
-    for each item. These per-item statistics are then aggregated by cluster to compute
-    cluster-level means of these average item ratings, and their deviation is computed.
-
-    For further details on the concept, please refer to this `link <https://dl.acm.org/doi/abs/10.1145/3269206.3271795>`_.
-
     Attributes:
         num_items (int): Number of items in the training set.
         item_clusters (Tensor): Tensor mapping each item to an item cluster.

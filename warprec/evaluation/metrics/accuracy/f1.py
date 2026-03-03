@@ -11,21 +11,6 @@ class F1(TopKMetric):
     """The F1@k metric combines precision and recall at k, providing a harmonic mean
     between the two to evaluate the relevance of the top-k recommended items.
 
-    This implementation follows the standard F1 formula:
-        F1@k = (1 + beta^2) * (Precision@k * Recall@k) / (beta^2 * Precision@k + Recall@k)
-
-    where:
-        Precision@k = sum_{u=1}^{n_users} sum_{i=1}^{k} rel_{u,i} / (k * n_users)
-        Recall@k = sum_{u=1}^{n_users} sum_{i=1}^{k} rel_{u,i} / (n_items * n_users)
-
-    For the matrix computation of the metric, please refer to the Precision@k and Recall@k classes.
-
-    This metric also supports the computation of F1-score using different metrics other than
-    Precision@k and Recall@k.
-
-    For further details, please refer to this `book <https://link.springer.com/chapter/10.1007/978-1-4899-7637-6_8>`_
-    and this `link <https://en.wikipedia.org/wiki/Precision_and_recall>`_.
-
     Attributes:
         metric_instance_1 (BaseMetric): First metric to use inside F1-score computation.
         metric_instance_2 (BaseMetric): Second metric to use inside F1-score computation.

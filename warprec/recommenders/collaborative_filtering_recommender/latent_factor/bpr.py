@@ -16,8 +16,6 @@ class BPR(IterativeRecommender):
     """Implementation of BPR algorithm from
         BPR: Bayesian Personalized Ranking from Implicit Feedback 2012
 
-    For further details, please refer to the `paper <https://arxiv.org/abs/1205.2618>`_.
-
     Args:
         params (dict): Model parameters.
         info (dict): The dictionary containing dataset information.

@@ -22,8 +22,6 @@ class gSASRec(IterativeRecommender, SequentialRecommenderUtils):
     This model adapts the SASRec architecture to predict the next item at every
     step of the sequence, using a Group-wise Binary Cross-Entropy (GBCE) loss function.
 
-    For further details, please refer to the `paper <https://arxiv.org/abs/2308.07192>`_.
-
     Args:
         params (dict): Model parameters.
         info (dict): The dictionary containing dataset information.

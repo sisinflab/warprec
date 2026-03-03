@@ -15,6 +15,7 @@ from .base_recommender import (
 )
 from .layers import MLP, CNN, FactorizationMachine
 from .losses import BPRLoss, EmbLoss, InfoNCELoss, MultiDAELoss, MultiVAELoss
+from .proxy import ProxyRecommender
 from .similarities import Similarity
 from .loops import train_loop
 
@@ -40,6 +41,7 @@ __all__ = [
     "InfoNCELoss",
     "MultiDAELoss",
     "MultiVAELoss",
+    "ProxyRecommender",
     "Similarity",
     "train_loop",
 ]

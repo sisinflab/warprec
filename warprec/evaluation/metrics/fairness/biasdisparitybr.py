@@ -15,22 +15,6 @@ class BiasDisparityBR(TopKMetric):
     This metric computes the disparity between the distribution of recommended items and the global
     item distribution per user cluster, averaged over users in the cluster.
 
-    The metric is computed as:
-
-        BiasDisparityBR(u, c) = (P_rec(u, c) / P_rec(u)) / P_global(c)
-
-    where:
-        - u is a user cluster index,
-        - c is an item cluster index,
-        - P_rec(u, c) is the proportion of recommended items from cluster c to users in cluster u,
-        - P_rec(u) is the total number of recommendations to users in cluster u,
-        - P_global(c) is the global proportion of items in cluster c.
-
-    A value > 1 indicates over-recommendation of items from cluster c to user cluster u,
-    while a value < 1 indicates under-recommendation.
-
-    For further details, please refer to this `link <https://arxiv.org/pdf/1811.01461>`_.
-
     Attributes:
         user_clusters (Tensor): Tensor mapping each user to a user cluster.
         item_clusters (Tensor): Tensor mapping each item to an item cluster.

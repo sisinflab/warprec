@@ -1,0 +1,152 @@
+site_name: WarpRec
+site_description: "Unifying Academic Rigor and Industrial Scale for Responsible, Reproducible, and Efficient Recommendation"
+
+nav:
+  - Get Started:
+    - Welcome to WarpRec: index.md
+    - Why WarpRec?: get-started/introduction.md
+    - Installation: get-started/installation.md
+    - Quick Start: get-started/quick-start.md
+    - Architecture: get-started/architecture.md
+  - Pipelines:
+    - Standardized Workflows: pipelines/index.md
+    - Training: pipelines/training.md
+    - Design: pipelines/design.md
+    - Evaluation: pipelines/evaluation.md
+    - Callbacks: pipelines/callbacks.md
+  - Data Management:
+    - Reader: data-management/reader.md
+    - Writer: data-management/writer.md
+    - Stash: data-management/stash.md
+  - Configuration:
+      - Configuration Structure: configuration/index.md
+      - Reader: configuration/reader.md
+      - Writer: configuration/writer.md
+      - Filtering: configuration/filtering.md
+      - Splitting: configuration/splitting.md
+      - Dashboard: configuration/dashboard.md
+      - Models: configuration/models.md
+      - Evaluation: configuration/evaluation.md
+      - General: configuration/general.md
+  - Recommenders:
+      - Module Overview: recommenders/index.md
+      - Models Taxonomy: recommenders/taxonomy.md
+      - Collaborative Filtering: recommenders/collaborative.md
+      - Content-Based: recommenders/content.md
+      - Hybrid: recommenders/hybrid.md
+      - Context-Aware: recommenders/context.md
+      - Sequential: recommenders/sequential.md
+      - Unpersonalized: recommenders/unpersonalized.md
+      - Cross-Framework Evaluation: recommenders/cross-framework-evaluation.md
+  - Evaluation:
+      - Evaluation System: evaluation/index.md
+      - Sampled Evaluation: evaluation/sampled.md
+      - Statistical Significance: evaluation/statistical-significance.md
+      - Metrics:
+        - Metrics Taxonomy: evaluation/metrics/taxonomy.md
+        - Accuracy: evaluation/metrics/accuracy.md
+        - Bias: evaluation/metrics/bias.md
+        - Coverage: evaluation/metrics/coverage.md
+        - Diversity: evaluation/metrics/diversity.md
+        - Fairness: evaluation/metrics/fairness.md
+        - Multiobjective: evaluation/metrics/multiobjective.md
+        - Novelty: evaluation/metrics/novelty.md
+        - Rating: evaluation/metrics/rating.md
+  - Cloud & Deployment:
+    - Authentication: cloud/authentication.md
+    - Cluster Management: cloud/cluster-management.md
+  - Guides:
+    - Callbacks: guides/callbacks.md
+    - Stash: guides/stash.md
+    - Models: guides/models.md
+    - Metrics: guides/metrics.md
+  - API Reference:
+    - Overview: api-reference/index.md
+    - Data:
+      - Reader: api-reference/data/reader.md
+      - Writer: api-reference/data/writer.md
+      - Dataset: api-reference/data/dataset.md
+      - Entities: api-reference/data/entities.md
+      - Filtering: api-reference/data/filtering.md
+      - Splitting: api-reference/data/splitting.md
+    - Recommenders:
+      - Model Interfaces: api-reference/recommenders/base.md
+      - Collaborative Filtering: api-reference/recommenders/collaborative.md
+      - Content-Based: api-reference/recommenders/content.md
+      - Hybrid: api-reference/recommenders/hybrid.md
+      - Context-Aware: api-reference/recommenders/context.md
+      - Sequential: api-reference/recommenders/sequential.md
+      - Unpersonalized: api-reference/recommenders/unpersonalized.md
+      - Proxy: api-reference/recommenders/proxy.md
+    - Metrics:
+      - Metric Interfaces: api-reference/metrics/base.md
+      - Accuracy: api-reference/metrics/accuracy.md
+      - Bias: api-reference/metrics/bias.md
+      - Coverage: api-reference/metrics/coverage.md
+      - Diversity: api-reference/metrics/diversity.md
+      - Fairness: api-reference/metrics/fairness.md
+      - Novelty: api-reference/metrics/novelty.md
+      - Rating: api-reference/metrics/rating.md
+      - Multiobjective: api-reference/metrics/multiobjective.md
+
+theme:
+  name: material
+  language: en
+  logo: assets//logo/logo.png
+  favicon: assets/logo/logo.ico
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: blue
+      accent: deep orange
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: blue
+      accent: deep orange
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+  features:
+    - navigation.tabs
+    - navigation.sections
+    - navigation.expand
+    - navigation.top
+    - search.suggest
+    - search.highlight
+    - content.code.copy
+
+markdown_extensions:
+  - admonition
+  - attr_list
+  - md_in_html
+  - tables
+  - toc:
+      permalink: true
+  - pymdownx.arithmatex:
+      generic: true
+  - pymdownx.details
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.superfences
+  - pymdownx.tabbed:
+      alternate_style: true
+
+extra_javascript:
+  - javascript/mathjax.js
+  - https://unpkg.com/mathjax@3/es5/tex-mml-chtml.js
+
+plugins:
+  - search
+  - mkdocstrings:
+      default_handler: python
+      handlers:
+        python:
+          paths: [..]
+          options:
+            docstring_style: google
+            show_source: true
+            show_root_heading: true
+            heading_level: 3
