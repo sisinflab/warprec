@@ -291,8 +291,7 @@ class Trainer:
         resources = self._get_resources(
             opt_config.cpu_per_trial,
             opt_config.gpu_per_trial,
-            opt_config.ram_per_trial,
-            opt_config.vram_per_trial,
+            opt_config.custom_resources_per_trial,
             device,
         )
         trainable = self._get_objective_function(
@@ -365,8 +364,7 @@ class Trainer:
         self,
         cpu_per_trial: int,
         gpu_per_trial: float,
-        ram_per_trial: int,
-        vram_per_trial: int,
+        custom_resources_per_trial: Dict[str, float | int],
         device: str,
     ) -> Dict[str, float]:
         """Calculates resource allocation per trial.
@@ -374,8 +372,7 @@ class Trainer:
         Args:
             cpu_per_trial (int): The number of cpu per trial.
             gpu_per_trial (float): The number of gpu per trial.
-            ram_per_trial (int): The amount of RAM in GB per trial.
-            vram_per_trial (int): The amount of VRAM in GB per trial.
+            custom_resources_per_trial (Dict[str, float | int]): Custom resources to assign to each trial.
             device (str): The device of the experiment.
 
         Returns:
@@ -389,21 +386,11 @@ class Trainer:
         resources = ray.available_resources()
         available_cpus = resources.get("CPU", 1)
         available_gpus = resources.get("GPU", 0)
-        available_ram = resources.get("ram_gb", 0)
-        available_vram = resources.get("vram_gb", 0)
 
         # Check resources are available
         if cpu_per_trial > available_cpus or gpu_per_trial > available_gpus:
             raise ValueError(
                 "Not enough resources in the cluster to allocate to the trial."
-            )
-        if ram_per_trial > 0 and ram_per_trial > available_ram:
-            raise ValueError(
-                f"Requested RAM per trial ({ram_per_trial} GB) exceeds available RAM ({available_ram} GB)."
-            )
-        if vram_per_trial > 0 and vram_per_trial > available_vram:
-            raise ValueError(
-                f"Requested VRAM per trial ({vram_per_trial} GB) exceeds available VRAM ({available_vram} GB)."
             )
 
         # Fallback to 1 gpu_per_trial in case of device set to CUDA
@@ -414,10 +401,15 @@ class Trainer:
             "cpu": cpu_per_trial,
             "gpu": gpu_per_trial,
         }
-        if ram_per_trial > 0:
-            resources_dict["ram_gb"] = ram_per_trial
-        if vram_per_trial > 0:
-            resources_dict["vram_gb"] = vram_per_trial
+
+        # Iterate over custom resources and check availability
+        for resource_name, amount in custom_resources_per_trial.items():
+            available_amount = resources.get(resource_name, 0)
+            if amount > available_amount:
+                raise ValueError(
+                    f"Not enough of resource '{resource_name}' in the cluster to allocate to the trial."
+                )
+            resources_dict[resource_name] = amount
 
         return resources_dict
 
