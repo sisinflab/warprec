@@ -1,0 +1,30 @@
+server:
+  host: "0.0.0.0"
+  rest_port: 8080
+  mcp_port: 8081
+  api_key: ""  # Overridable via SERVER_API_KEY env var
+
+checkpoints_dir: "checkpoints"
+datasets_dir: "datasets"
+
+# Dataset definitions. Each entry declares the file extension and column
+# separator so that endpoints can reference a dataset by name alone.
+datasets:
+  - name: "movielens"
+    item_mapping: "movies.dat"
+    separator: "::"
+
+# Model-dataset pairs to load at startup.
+# Each entry becomes a key: "{model}_{dataset}" (e.g., "SASRec_movielens").
+# Supported types: sequential, collaborative, contextual.
+# device: PyTorch device for this endpoint (e.g., "cpu", "cuda:0").
+endpoints:
+  - model: "SASRec"
+    dataset: "movielens"
+    type: "sequential"
+    device: "cpu"
+
+  # - model: "BPR"
+  #   dataset: "movielens"
+  #   type: "collaborative"
+  #   device: "cpu"
