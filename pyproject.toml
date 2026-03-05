@@ -51,6 +51,8 @@ pylint = "^3.3.3"
 bandit = "^1.8.2"
 nvitop = "^1.4.2"
 matplotlib = "^3.10.3"
+fastapi = "^0.135.1"
+fastmcp = "^3.1.0"
 
 
 [tool.poetry.requires-plugins]
