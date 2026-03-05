@@ -18,9 +18,9 @@ class ApiResponse(BaseModelCustom):
     """Standard API response wrapper.
 
     Attributes:
-        message: Human-readable status message.
-        timestamp: ISO 8601 timestamp of the response.
-        data: Optional payload dictionary.
+        message (str): Human-readable status message.
+        timestamp (datetime): ISO 8601 timestamp of the response.
+        data (Optional[Dict]): Optional payload dictionary.
     """
 
     message: str = Field(..., description="Message of response")

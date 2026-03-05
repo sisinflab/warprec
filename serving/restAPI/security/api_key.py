@@ -17,11 +17,11 @@ async def get_api_key(
     is effectively disabled.
 
     Args:
-        request: The incoming HTTP request (used to access app state).
-        api_key: Value of the ``X-API-Key`` header.
+        request (Request): The incoming HTTP request (used to access app state).
+        api_key (str): Value of the ``X-API-Key`` header.
 
     Returns:
-        The validated API key string.
+        str: The validated API key string.
 
     Raises:
         HTTPException: 401 if the header is missing, 403 if the key is invalid.

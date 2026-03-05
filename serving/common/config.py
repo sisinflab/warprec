@@ -7,7 +7,7 @@ the REST API and MCP server applications.
 
 import os
 from pathlib import Path
-from typing import Literal
+from typing import Literal, List, Optional
 
 import yaml
 from pydantic import BaseModel
@@ -17,10 +17,10 @@ class DatasetConfig(BaseModel):
     """Metadata for a dataset file used by one or more endpoints.
 
     Attributes:
-        name: Identifier for the dataset (e.g., "movielens").
-        item_mapping: Filename of the item mapping file inside the datasets directory
+        name (str): Identifier for the dataset (e.g., "movielens").
+        item_mapping (str): Filename of the item mapping file inside the datasets directory
             (e.g., "movies.dat").
-        separator: Column separator used in the file (e.g., "::", ",", "\\t").
+        separator (str): Column separator used in the file (e.g., "::", ",", "\\t").
     """
 
     name: str
@@ -28,19 +28,22 @@ class DatasetConfig(BaseModel):
     separator: str = "::"
 
 
+ModelType = Literal["sequential", "collaborative", "contextual"]
+
+
 class EndpointConfig(BaseModel):
     """A single model-dataset combination to load at startup.
 
     Attributes:
-        model: Name of the recommender model (e.g., "SASRec", "BPR").
-        dataset: Name of the dataset (must match a name in the datasets section).
-        type: Recommender category that determines the inference flow.
-        device: PyTorch device for this endpoint (e.g., "cpu", "cuda:0").
+        model (str): Name of the recommender model (e.g., "SASRec", "BPR").
+        dataset (str): Name of the dataset (must match a name in the datasets section).
+        type (ModelType): Recommender category that determines the inference flow.
+        device (str): PyTorch device for this endpoint (e.g., "cpu", "cuda:0").
     """
 
     model: str
     dataset: str
-    type: Literal["sequential", "collaborative", "contextual"]
+    type: ModelType
     device: str = "cpu"
 
     @property
@@ -53,13 +56,13 @@ class ServerConfig(BaseModel):
     """Network configuration for the serving applications.
 
     Attributes:
-        host: Bind address for the servers.
-        rest_port: Port for the FastAPI REST server.
-        mcp_port: Port for the MCP server.
-        api_key: API key for REST API authentication (empty string disables auth).
+        host (str): Bind address for the servers.
+        rest_port (int): Port for the FastAPI REST server.
+        mcp_port (int): Port for the MCP server.
+        api_key (str): API key for REST API authentication (empty string disables auth).
     """
 
-    host: str = "0.0.0.0"
+    host: str = "127.0.0.1"
     rest_port: int = 8080
     mcp_port: int = 8081
     api_key: str = ""
@@ -69,27 +72,27 @@ class ServingConfig(BaseModel):
     """Top-level configuration for the WarpRec serving module.
 
     Attributes:
-        server: Network settings for REST and MCP servers.
-        checkpoints_dir: Directory containing model checkpoint files (.pth).
-        datasets_dir: Directory containing dataset files.
-        datasets: List of dataset definitions with file metadata.
-        endpoints: List of model-dataset pairs to load at startup.
+        server (ServerConfig): Network settings for REST and MCP servers.
+        checkpoints_dir (str): Directory containing model checkpoint files (.pth).
+        datasets_dir (str): Directory containing dataset files.
+        datasets (List[DatasetConfig]): List of dataset definitions with file metadata.
+        endpoints (List[EndpointConfig]): List of model-dataset pairs to load at startup.
     """
 
     server: ServerConfig = ServerConfig()
     checkpoints_dir: str = "checkpoints"
     datasets_dir: str = "datasets"
-    datasets: list[DatasetConfig] = []
-    endpoints: list[EndpointConfig] = []
+    datasets: List[DatasetConfig] = []
+    endpoints: List[EndpointConfig] = []
 
     def get_dataset_config(self, name: str) -> DatasetConfig:
         """Look up a dataset configuration by name.
 
         Args:
-            name: The dataset identifier to search for.
+            name (str): The dataset identifier to search for.
 
         Returns:
-            The matching DatasetConfig instance.
+            DatasetConfig: The matching DatasetConfig instance.
 
         Raises:
             KeyError: If no dataset with the given name is defined.
@@ -104,7 +107,7 @@ class ServingConfig(BaseModel):
         )
 
     @classmethod
-    def from_yaml(cls, path: str | None = None) -> "ServingConfig":
+    def from_yaml(cls, path: Optional[str] = None) -> "ServingConfig":
         """Load configuration from a YAML file with environment variable overrides.
 
         The method looks for the config file in the following order:
@@ -117,10 +120,10 @@ class ServingConfig(BaseModel):
         - ``SERVER_API_KEY`` overrides ``server.api_key``
 
         Args:
-            path: Explicit path to the YAML configuration file.
+            path (Optional[str]): Explicit path to the YAML configuration file.
 
         Returns:
-            A fully resolved ServingConfig instance.
+            ServingConfig: A fully resolved ServingConfig instance.
         """
         if path is None:
             path = os.environ.get(
@@ -130,7 +133,7 @@ class ServingConfig(BaseModel):
 
         config_path = Path(path)
         if config_path.exists():
-            with open(config_path) as f:
+            with open(config_path, encoding="utf-8") as f:
                 raw = yaml.safe_load(f) or {}
         else:
             raw = {}

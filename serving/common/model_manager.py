@@ -7,6 +7,7 @@ the inference layer.
 
 import os
 import re
+from typing import Dict, List
 
 import pandas as pd
 import torch
@@ -26,7 +27,7 @@ class ModelManager:
     ``"{model}_{dataset}"`` key format.
 
     Args:
-        config: Parsed serving configuration.
+        config (ServingConfig): Parsed serving configuration.
     """
 
     def __init__(self, config: ServingConfig) -> None:
@@ -129,10 +130,10 @@ class ModelManager:
         """Retrieve a loaded model by its key.
 
         Args:
-            model_key: Identifier in ``"{model}_{dataset}"`` format.
+            model_key (str): Identifier in ``"{model}_{dataset}"`` format.
 
         Returns:
-            The loaded recommender model instance.
+            Recommender: The loaded recommender model instance.
 
         Raises:
             KeyError: If the model key is not available.
@@ -142,14 +143,14 @@ class ModelManager:
             raise KeyError(f"Model '{model_key}' is not loaded. Available: {available}")
         return self._models[model_key]
 
-    def get_dataset_mapping(self, dataset_name: str) -> dict[str, int]:
+    def get_dataset_mapping(self, dataset_name: str) -> Dict[str, int]:
         """Retrieve the item-name-to-internal-index mapping for a dataset.
 
         Args:
-            dataset_name: Name of the dataset (e.g., "movielens").
+            dataset_name (str): Name of the dataset (e.g., "movielens").
 
         Returns:
-            Dictionary mapping item names to internal model indices.
+            Dict[str, int]: Dictionary mapping item names to internal model indices.
 
         Raises:
             KeyError: If the dataset mapping is not available.
@@ -166,10 +167,10 @@ class ModelManager:
         """Return the recommender type for a given model key.
 
         Args:
-            model_key: Identifier in ``"{model}_{dataset}"`` format.
+            model_key (str): Identifier in ``"{model}_{dataset}"`` format.
 
         Returns:
-            One of ``"sequential"``, ``"collaborative"``, or ``"contextual"``.
+            str: One of ``"sequential"``, ``"collaborative"``, or ``"contextual"``.
 
         Raises:
             KeyError: If the model key is not available.
@@ -178,10 +179,10 @@ class ModelManager:
             raise KeyError(f"Model '{model_key}' is not loaded.")
         return self._endpoint_types[model_key]
 
-    def list_available_keys(self) -> list[str]:
+    def list_available_keys(self) -> List[str]:
         """Return all loaded model-dataset keys."""
         return list(self._models.keys())
 
-    def get_available_endpoints(self) -> dict[str, str]:
+    def get_available_endpoints(self) -> Dict[str, str]:
         """Return a mapping of model keys to their recommender types."""
         return dict(self._endpoint_types)

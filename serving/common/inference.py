@@ -5,11 +5,16 @@ recommender models so that both the REST API and MCP server share a single
 implementation.
 """
 
+from typing import List, Optional
+
 import torch
 import torch.nn.functional as F
 from torch import Tensor
 
-from warprec.recommenders.base_recommender import Recommender
+from warprec.recommenders.base_recommender import (
+    Recommender,
+    SequentialRecommenderUtils,
+)
 from warprec.utils.logger import logger
 
 from .model_manager import ModelManager
@@ -19,7 +24,7 @@ class InferenceService:
     """Dispatches recommendation requests to the appropriate model type.
 
     Args:
-        model_manager: A loaded ``ModelManager`` instance.
+        model_manager (ModelManager): A loaded ``ModelManager`` instance.
     """
 
     def __init__(self, model_manager: ModelManager) -> None:
@@ -31,21 +36,21 @@ class InferenceService:
         self,
         model_key: str,
         top_k: int = 10,
-        item_sequence: list[int] | None = None,
-        user_index: int | None = None,
-        context: list[int] | None = None,
-    ) -> list:
+        item_sequence: Optional[List[int]] = None,
+        user_index: Optional[int] = None,
+        context: Optional[List[int]] = None,
+    ) -> List[int]:
         """Unified entry point that dispatches to the correct recommendation method.
 
         Args:
-            model_key: Model-dataset identifier (e.g., ``"SASRec_movielens"``).
-            top_k: Number of recommendations to return.
-            item_sequence: External item IDs for sequential models.
-            user_index: User identifier for collaborative or contextual models.
-            context: Context feature values for contextual models.
+            model_key (str): Model-dataset identifier (e.g., ``"SASRec_movielens"``).
+            top_k (int): Number of recommendations to return.
+            item_sequence (Optional[List[int]]): External item IDs for sequential models.
+            user_index (Optional[int]): User identifier for collaborative or contextual models.
+            context (Optional[List[int]]): Context feature values for contextual models.
 
         Returns:
-            Ordered list of recommended external item identifiers.
+            List[int]: Ordered list of recommended external item identifiers.
 
         Raises:
             ValueError: If the model type is unknown or required parameters are missing.
@@ -80,9 +85,9 @@ class InferenceService:
     def recommend_sequential(
         self,
         model_key: str,
-        item_sequence: list[int],
+        item_sequence: List[int],
         top_k: int = 10,
-    ) -> list[int]:
+    ) -> List[int]:
         """Generate sequential recommendations from an item interaction history.
 
         Maps external item IDs to internal model indices, pads or truncates the
@@ -90,12 +95,12 @@ class InferenceService:
         the top-k internal indices back to external item IDs.
 
         Args:
-            model_key: Model-dataset identifier.
-            item_sequence: Ordered list of external item IDs.
-            top_k: Number of recommendations to return.
+            model_key (str): Model-dataset identifier.
+            item_sequence (List[int]): Ordered list of external item IDs.
+            top_k (int): Number of recommendations to return.
 
         Returns:
-            Ordered list of recommended external item IDs.
+            List[int]: Ordered list of recommended external item IDs.
         """
         model = self._manager.get_model(model_key)
         item_mapping = model.info.get("item_mapping", {})
@@ -131,16 +136,16 @@ class InferenceService:
         model_key: str,
         user_index: int,
         top_k: int = 10,
-    ) -> list[int]:
+    ) -> List[int]:
         """Generate collaborative filtering recommendations for a user.
 
         Args:
-            model_key: Model-dataset identifier.
-            user_index: External user identifier.
-            top_k: Number of recommendations to return.
+            model_key (str): Model-dataset identifier.
+            user_index (int): External user identifier.
+            top_k (int): Number of recommendations to return.
 
         Returns:
-            Ordered list of recommended external item identifiers.
+            List[int]: Ordered list of recommended external item identifiers.
         """
         model = self._manager.get_model(model_key)
 
@@ -159,9 +164,9 @@ class InferenceService:
         self,
         model_key: str,
         user_index: int,
-        context: list[int],
+        context: List[int],
         top_k: int = 10,
-    ) -> list[int]:
+    ) -> List[int]:
         """Generate context-aware recommendations for a user.
 
         This method provides the structural framework for contextual inference.
@@ -169,13 +174,13 @@ class InferenceService:
         checkpoint (e.g., FM trained on a dataset with context features).
 
         Args:
-            model_key: Model-dataset identifier.
-            user_index: External user identifier.
-            context: List of context feature values.
-            top_k: Number of recommendations to return.
+            model_key (str): Model-dataset identifier.
+            user_index (int): External user identifier.
+            context (List[int]): List of context feature values.
+            top_k (int): Number of recommendations to return.
 
         Returns:
-            Ordered list of recommended external item identifiers.
+            List[int]: Ordered list of recommended external item identifiers.
 
         Raises:
             NotImplementedError: If the contextual inference flow has not been
@@ -198,12 +203,18 @@ def _match_sequence_length(sequence: Tensor, model: Recommender) -> Tensor:
     most recent interactions.
 
     Args:
-        sequence: Input tensor of shape ``(1, seq_len)``.
-        model: Sequential recommender model instance.
+        sequence (Tensor): Input tensor of shape ``(1, seq_len)``.
+        model (Recommender): Sequential recommender model instance.
 
     Returns:
-        Adjusted tensor of shape ``(1, model.max_seq_len)``.
+        Tensor: Adjusted tensor of shape ``(1, model.max_seq_len)``.
+
+    Raises:
+        RuntimeError: If the model is not an instance of a sequential model.
     """
+    if not isinstance(model, SequentialRecommenderUtils):
+        raise RuntimeError("The model is not an instance of a Sequential model")
+
     pad_len = model.max_seq_len - sequence.size(1)
 
     if pad_len > 0:

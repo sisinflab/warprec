@@ -9,14 +9,15 @@ their types at runtime.
 
 import sys
 from pathlib import Path
+from typing import List, Dict, Optional
+from starlette.requests import Request
+from starlette.responses import PlainTextResponse
+
+from fastmcp import FastMCP
 
 # Ensure the repository root is on the Python path so that both
 # the ``warprec`` package and the ``serving`` package are importable.
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
-
-from fastmcp import FastMCP
-from starlette.requests import Request
-from starlette.responses import PlainTextResponse
 
 from serving.common import InferenceService, ModelManager, ServingConfig
 
@@ -43,21 +44,21 @@ mcp = FastMCP("WarpRec MCP Server")
 def recommend(
     model_key: str,
     top_k: int = 10,
-    item_sequence: list[int] | None = None,
-    user_index: int | None = None,
-    context: list[int] | None = None,
-) -> list:
+    item_sequence: Optional[List[int]] = None,
+    user_index: Optional[int] = None,
+    context: Optional[List[int]] = None,
+) -> List[int]:
     """Get recommendations from a specified model-dataset pair.
 
     Args:
-        model_key: Identifier selecting the model and dataset (e.g., "SASRec_movielens").
-        top_k: Number of recommendations to return.
-        item_sequence: External item IDs for sequential models.
-        user_index: User identifier for collaborative or contextual models.
-        context: Context feature values for contextual models.
+        model_key (str): Identifier selecting the model and dataset (e.g., "SASRec_movielens").
+        top_k (int): Number of recommendations to return.
+        item_sequence (Optional[List[int]]): External item IDs for sequential models.
+        user_index (Optional[int]): User identifier for collaborative or contextual models.
+        context (Optional[List[int]]): Context feature values for contextual models.
 
     Returns:
-        Ordered list of recommended items.
+        List[int]: Ordered list of recommended items.
     """
     return inference_service.recommend(
         model_key=model_key,
@@ -71,11 +72,11 @@ def recommend(
 @mcp.tool(
     description="List all available WarpRec model-dataset pairs and their recommendation types."
 )
-def list_models() -> dict[str, str]:
+def list_models() -> Dict[str, str]:
     """Return the available model keys and their recommender types.
 
     Returns:
-        Dictionary mapping model keys to their types
+        Dict[str, str]: Dictionary mapping model keys to their types
         (e.g., ``{"SASRec_movielens": "sequential", "BPR_movielens": "collaborative"}``).
     """
     return model_manager.get_available_endpoints()
