@@ -67,3 +67,4 @@ experiment/
 tests/
 experiments/
 data/
+.github/userid*

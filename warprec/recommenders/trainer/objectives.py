@@ -56,6 +56,19 @@ def _get_memory_report(
     return {"ram_peak_mb": ram_peak_mb, "vram_peak_mb": vram_peak_mb}
 
 
+def _move_batch_to_device(batch: Any, device: str | torch.device) -> Any:
+    """Recursively moves tensors contained in lists, tuples or dicts."""
+    if isinstance(batch, Tensor):
+        return batch.to(device)
+    if isinstance(batch, dict):
+        return {key: _move_batch_to_device(value, device) for key, value in batch.items()}
+    if isinstance(batch, tuple):
+        return tuple(_move_batch_to_device(value, device) for value in batch)
+    if isinstance(batch, list):
+        return [_move_batch_to_device(value, device) for value in batch]
+    return batch
+
+
 def objective_function(
     params: dict,
     model_name: str,
@@ -182,6 +195,9 @@ def objective_function(
         )
         model.to(device)
 
+        if hasattr(model, "set_validation_context"):
+            model.set_validation_context(dataset)
+
         # Retrieve appropriate evaluation dataloader
         dataloader = retrieve_evaluation_dataloader(
             dataset=dataset,
@@ -191,6 +207,42 @@ def objective_function(
         )
 
         if isinstance(model, IterativeRecommender):
+            if hasattr(model, "custom_train_loop"):
+                for metric_report in model.custom_train_loop(
+                    dataset=dataset,
+                    validation_top_k=validation_top_k,
+                    device=device,
+                ):
+                    score = metric_report[validation_score]
+                    current_validation_score = (
+                        score.nanmean().item()
+                        if isinstance(score, Tensor)
+                        else score
+                    )
+
+                    if (
+                        mode == "max"
+                        and current_validation_score > best_validation_score
+                    ):
+                        best_validation_score = current_validation_score
+
+                    if (
+                        mode == "min"
+                        and current_validation_score < best_validation_score
+                    ):
+                        best_validation_score = current_validation_score
+
+                    latest_metrics = metric_report.copy()
+                    latest_metrics[f"best_{validation_score}"] = best_validation_score
+                    memory_report = _get_memory_report(process, initial_ram_mb, device)
+                    validation_report(
+                        model=model,
+                        **latest_metrics,
+                        **memory_report,
+                    )
+
+                return
+
             # Compute optimization parameters
             match (num_workers is not None, device == "cuda"):
                 case (True, True):
@@ -238,7 +290,7 @@ def objective_function(
                 model.train()
                 epoch_loss = 0.0
                 for batch in train_dataloader:
-                    batch = [x.to(device) for x in batch]
+                    batch = _move_batch_to_device(batch, device)
                     optimizer.zero_grad()
 
                     loss = model.train_step(batch, epoch)
@@ -254,22 +306,30 @@ def objective_function(
                     # Set model to eval mode for the evaluation step
                     model.eval()
 
-                    # Evaluation at the end of each training epoch
-                    evaluator.evaluate(
-                        model=model,
-                        dataloader=dataloader,
-                        strategy=strategy,
-                        dataset=dataset,
-                        device=device,
-                    )
-                    results = evaluator.compute_results()
+                    if hasattr(model, "custom_validation"):
+                        current_metrics = model.custom_validation(
+                            dataset=dataset,
+                            validation_top_k=validation_top_k,
+                            validation_metric_name=validation_metric_name,
+                            device=device,
+                        )
+                    else:
+                        # Evaluation at the end of each training epoch
+                        evaluator.evaluate(
+                            model=model,
+                            dataloader=dataloader,
+                            strategy=strategy,
+                            dataset=dataset,
+                            device=device,
+                        )
+                        results = evaluator.compute_results()
 
-                    # Metrics to report
-                    current_metrics = {
-                        f"{metric_name}@{k}": value
-                        for k, metrics_results in results.items()
-                        for metric_name, value in metrics_results.items()
-                    }
+                        # Metrics to report
+                        current_metrics = {
+                            f"{metric_name}@{k}": value
+                            for k, metrics_results in results.items()
+                            for metric_name, value in metrics_results.items()
+                        }
 
                     # Check for best validation score
                     score = current_metrics[validation_score]
@@ -502,7 +562,7 @@ def objective_function_ddp(config: dict) -> None:
         train_dataloader.sampler.set_epoch(epoch)  # type:ignore [attr-defined]
 
         for batch in train_dataloader:
-            batch = [x.to(device) for x in batch]
+            batch = _move_batch_to_device(batch, device)
             optimizer.zero_grad()
 
             loss = unwrapped_model.train_step(batch, epoch)

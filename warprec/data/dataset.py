@@ -12,7 +12,9 @@ from narwhals.dataframe import DataFrame
 from warprec.data.entities import Interactions, Sessions
 from warprec.data.eval_loaders import (
     EvaluationDataLoader,
+    OnePositiveEvaluationDataLoader,
     SampledEvaluationDataLoader,
+    SampledOnePositiveEvaluationDataLoader,
     ContextualEvaluationDataLoader,
     SampledContextualEvaluationDataLoader,
 )
@@ -583,6 +585,22 @@ class Dataset:
 
         return self._precomputed_dataloader[key]
 
+    def get_one_positive_evaluation_dataloader(self) -> OnePositiveEvaluationDataLoader:
+        """Retrieve the full-eval loader using one target positive per user."""
+        key = "full_one_positive"
+        if key not in self._precomputed_dataloader:
+            self._precomputed_dataloader[key] = OnePositiveEvaluationDataLoader(
+                eval_data=self.eval_set.get_df(),
+                user_id_label=self.eval_set.user_label,
+                item_id_label=self.eval_set.item_label,
+                user_mapping=self._umap,
+                item_mapping=self._imap,
+                timestamp_label=self.train_session.timestamp_label,
+                batch_size=self.batch_size,
+            )
+
+        return self._precomputed_dataloader[key]
+
     def get_sampled_evaluation_dataloader(
         self,
         num_negatives: int = 99,
@@ -607,6 +625,38 @@ class Dataset:
             self._precomputed_dataloader[key] = SampledEvaluationDataLoader(
                 train_interactions=train_sparse,
                 eval_interactions=eval_sparse,
+                num_negatives=num_negatives,
+                batch_size=self.batch_size,
+                seed=seed,
+            )
+
+        return self._precomputed_dataloader[key]
+
+    def get_sampled_one_positive_evaluation_dataloader(
+        self,
+        num_negatives: int = 99,
+        seed: int = 42,
+    ) -> SampledOnePositiveEvaluationDataLoader:
+        """Retrieve the sampled loader using one target positive per user.
+
+        The selected target is the last positive item in the evaluation set for
+        each user, ordered by timestamp when available.
+        """
+        key = f"one_pos_neg_{num_negatives}_{seed}"
+
+        if key not in self._precomputed_dataloader:
+            train_sparse = self.train_set.get_sparse()
+            eval_sparse = self.eval_set.get_sparse()
+
+            self._precomputed_dataloader[key] = SampledOnePositiveEvaluationDataLoader(
+                train_interactions=train_sparse,
+                eval_interactions=eval_sparse,
+                eval_data=self.eval_set.get_df(),
+                user_id_label=self.eval_set.user_label,
+                item_id_label=self.eval_set.item_label,
+                user_mapping=self._umap,
+                item_mapping=self._imap,
+                timestamp_label=self.train_session.timestamp_label,
                 num_negatives=num_negatives,
                 batch_size=self.batch_size,
                 seed=seed,

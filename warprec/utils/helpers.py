@@ -120,8 +120,17 @@ def retrieve_evaluation_dataloader(
     match (strategy, use_context):
         case ("full", False):
             return dataset.get_evaluation_dataloader()
+        case ("full_repeat_aware", False):
+            return dataset.get_evaluation_dataloader()
+        case ("full_one_positive", False):
+            return dataset.get_one_positive_evaluation_dataloader()
         case ("sampled", False):
             return dataset.get_sampled_evaluation_dataloader(
+                num_negatives=num_negatives,
+                seed=seed,
+            )
+        case ("sampled_one_positive", False):
+            return dataset.get_sampled_one_positive_evaluation_dataloader(
                 num_negatives=num_negatives,
                 seed=seed,
             )

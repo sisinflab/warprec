@@ -2,6 +2,7 @@ import os
 from typing import Optional
 from tqdm.auto import tqdm
 
+import torch
 from torch.optim.lr_scheduler import ReduceLROnPlateau
 from torch.optim.lr_scheduler import LRScheduler as LRSchedulerBaseClass
 
@@ -11,6 +12,18 @@ from warprec.recommenders.base_recommender import IterativeRecommender
 from warprec.utils.config import LRScheduler
 from warprec.utils.registry import lr_scheduler_registry
 from warprec.utils.logger import logger
+
+
+def _move_batch_to_device(batch, device):
+    if isinstance(batch, torch.Tensor):
+        return batch.to(device)
+    if isinstance(batch, dict):
+        return {key: _move_batch_to_device(value, device) for key, value in batch.items()}
+    if isinstance(batch, tuple):
+        return tuple(_move_batch_to_device(value, device) for value in batch)
+    if isinstance(batch, list):
+        return [_move_batch_to_device(value, device) for value in batch]
+    return batch
 
 
 def train_loop(
@@ -80,7 +93,7 @@ def train_loop(
             leave=False,
             total=len(train_dataloader),
         ):
-            batch = [x.to(device) for x in batch]
+            batch = _move_batch_to_device(batch, device)
             optimizer.zero_grad()
 
             loss = model.train_step(batch, epoch)

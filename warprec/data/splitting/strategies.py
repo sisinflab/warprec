@@ -26,6 +26,8 @@ class SplittingStrategy(ABC):
             materialized_data = data
 
         index_col = "__original_row_index__"
+        if index_col in materialized_data.columns:
+            materialized_data = materialized_data.drop(index_col)
         return materialized_data.with_row_index(name=index_col), index_col
 
     def __call__(
@@ -237,6 +239,8 @@ class TimestampSlicingSplit(SplittingStrategy):
                 data_prep, best_timestamp, timestamp_label
             )
         else:
+            data_prep = data_prep.drop(idx_col)
+
             # Apply the split
             first_partition, second_partition = self._fixed_split(
                 data_prep, int(timestamp), timestamp_label

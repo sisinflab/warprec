@@ -169,9 +169,17 @@ class EvaluationConfig(BaseModel):
     @classmethod
     def strategy_validator(cls, v: str):
         """Validate strategy."""
-        if v not in ["full", "sampled"]:
+        if v not in [
+            "full",
+            "full_repeat_aware",
+            "full_one_positive",
+            "sampled",
+            "sampled_one_positive",
+        ]:
             raise ValueError(
-                f"The strategy value should be either 'full' or 'sampled'. Value provided: {v}"
+                "The strategy value should be either 'full', 'full_repeat_aware', "
+                "'full_one_positive', 'sampled' or "
+                f"'sampled_one_positive'. Value provided: {v}"
             )
         return v
 

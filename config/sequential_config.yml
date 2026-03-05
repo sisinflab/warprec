@@ -1,21 +1,25 @@
 reader:
-  loading_strategy: split
+  loading_strategy: dataset
+  local_path: data/lastfm1k_30000/lastfm_no_header.csv
   data_type: transaction
   reading_method: local
-  rating_type: implicit          
-  labels:
-    user_id_label: user_id
-    item_id_label: item_id
-    timestamp_label: timestamp
+  rating_type: implicit
+  header: False
+  sep: ","
+  
   dtypes:
-    user_id_type: int64          # Gli ID utente sono interi (es. 17454)
-    item_id_type:  str  #int64          # CAMBIATO: Gli item ora sono numerici (es. 29569939)
-    timestamp_type: str #int64        # CAMBIATO: Il timestamp ora è un intero (es. 1262377239)
-  split:
-    local_path: /home/chiara/projects/warprec/data/lastfm1k_30000
-    ext: .csv
-    sep: ','
-    header: True
+    user_id_type: int64
+    item_id_type: int64
+    timestamp_type: int64
+
+
+splitter:
+  test_splitting:
+    strategy: timestamp_slicing
+    timestamp: 1232987923   # Global 90% temporal cutoff on the full dataset
+  validation_splitting:
+    strategy: timestamp_slicing
+    timestamp: 1224107126   # Global 90% temporal cutoff on the pre-test train partition
 
 writer:
   dataset_name: lastfm1k_30000      # Aggiornato il nome del dataset
@@ -39,7 +43,7 @@ evaluation:
   batch_size: 512
 
 models:
-  BERT4Rec: # Assicurati che il nome coincida con @model_registry.register
+  BERT4Rec_gts: # Assicurati che il nome coincida con @model_registry.register
     embedding_size: 128
     n_layers: 3
     n_heads: 2
@@ -52,13 +56,13 @@ models:
     batch_size: 128
     epochs: 10000
     learning_rate: 0.001
-    neg_samples: 0       # Modificato: nella Full Evaluation (Cross-Entropy) non servono negativi campionati
     max_seq_len: 150
     early_stopping:
       monitor: "score"   
       patience: 500
       grace_period: 50
       min_delta: 0.0001
+
     optimization:
         strategy: grid
         properties:
@@ -68,9 +72,40 @@ models:
         gpu_per_trial: 1
           
 
+  # BERT4Rec: # Assicurati che il nome coincida con @model_registry.register
+  #     embedding_size: 128
+  #     n_layers: 3
+  #     n_heads: 2
+  #     inner_size: 512      # Modificato: nel primo framework era embedding_size * 4
+  #     dropout_prob: 0.2
+  #     attn_dropout_prob: 0.2
+  #     mask_prob: 0.2
+  #     reg_weight: 0.0      # Importante: 0.0 perché la Cross-Entropy non usa la reg_loss della BPR
+  #     weight_decay: 0
+  #     batch_size: 128
+  #     epochs: 10000
+  #     learning_rate: 0.001
+  #     max_seq_len: 150
+  #     neg_samples: 100  # Disabilitato il negative sampling per la Cross-Entropy
+  #     early_stopping:
+  #       monitor: "score"   
+  #       patience: 500
+  #       grace_period: 50
+  #       min_delta: 0.0001
 
-  # BERT4RecJPQ:                   # <-- Il nome deve coincidere ESATTAMENTE col @model_registry
-  #   embedding_size: 128          # IMPORTANTE: deve essere divisibile per pq_m (128 / 4 = 32. Ok!)
+  #     optimization:
+  #       strategy: grid
+  #       properties:
+  #           mode: max
+  #           seed: 42
+  #       cpu_per_trial: 12
+  #       gpu_per_trial: 1
+
+    
+
+
+  # BERT4RecJPQ:
+  #   embedding_size: 128          # Must be divisible by pq_m; here 128 / 64 = 2
   #   n_layers: 3
   #   n_heads: 2
   #   inner_size: 256              
@@ -83,8 +118,8 @@ models:
   #   max_seq_len: 150
     
   #   # --- PARAMETRI SPECIFICI PER JPQ ---
-  #   pq_m: 64                  # Numero di bytes/centroidi usati per comprimere ogni item
-  #   centroid_strategy: 'svd'     # Strategia di assegnazione per il "warm-start"
+  #   pq_m: 64
+  #   centroid_strategy: 'svd'
     
   #   # --- EARLY STOPPING ---
   #   early_stopping:

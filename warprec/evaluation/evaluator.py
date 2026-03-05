@@ -143,7 +143,13 @@ class Evaluator:
             ValueError: If the strategy isn't either "full" or "sampled".
         """
         # pylint: disable=too-many-statements
-        if strategy not in ["full", "sampled"]:
+        if strategy not in [
+            "full",
+            "full_repeat_aware",
+            "full_one_positive",
+            "sampled",
+            "sampled_one_positive",
+        ]:
             raise ValueError(f"Strategy '{strategy}' not supported.")
 
         if verbose:
@@ -156,6 +162,7 @@ class Evaluator:
 
         # Retrieve train interactions for masking (needed in full strategy)
         train_sparse = dataset.train_set.get_sparse()
+        eval_sparse = dataset.eval_set.get_sparse()
         padding_idx = train_sparse.shape[1]
 
         for batch in dataloader:
@@ -189,7 +196,7 @@ class Evaluator:
                 predict_kwargs["contexts"] = context
 
             # C. Item Indices (used in sampled evaluation)
-            if strategy == "sampled":
+            if strategy in ["sampled", "sampled_one_positive"]:
                 positives = batch_data["positives"]
                 negatives = batch_data["negatives"]
                 candidates = torch.cat([positives, negatives], dim=1)
@@ -228,7 +235,31 @@ class Evaluator:
                 # Mask seen items
                 predictions[train_batch.nonzero()] = -torch.inf
 
-            elif strategy == "sampled":
+            elif strategy == "full_repeat_aware":
+                if "target_item" in batch_data:
+                    target_item = batch_data["target_item"]
+                    eval_batch = torch.zeros(
+                        (len(user_indices), self.num_items), device=device
+                    )
+                    eval_batch.scatter_(1, target_item.unsqueeze(1), 1.0)
+                else:
+                    eval_batch = batch_data["ground_truth"]
+
+            elif strategy == "full_one_positive":
+                target_item = batch_data["target_item"]
+                eval_batch = torch.zeros(
+                    (len(user_indices), self.num_items), device=device
+                )
+                eval_batch.scatter_(1, target_item.unsqueeze(1), 1.0)
+
+                eval_batch_rows = eval_sparse[user_indices.tolist(), :]
+                exclusion_mask = torch.from_numpy(
+                    (train_batch + eval_batch_rows).toarray()
+                ).to(device=device, dtype=torch.bool)
+                exclusion_mask.scatter_(1, target_item.unsqueeze(1), False)
+                predictions[exclusion_mask] = -torch.inf
+
+            elif strategy in ["sampled", "sampled_one_positive"]:
                 # Mask seen items
                 predictions[candidates == padding_idx] = -torch.inf
 
@@ -237,7 +268,7 @@ class Evaluator:
                 predictions=predictions,
                 eval_batch=eval_batch,
                 user_indices=user_indices,
-                candidates=candidates if strategy == "sampled" else None,
+                candidates=candidates if strategy in ["sampled", "sampled_one_positive"] else None,
             )
 
         if verbose:
@@ -263,7 +294,7 @@ class Evaluator:
         # Index 0 is ALWAYS user_indices
         data["user_indices"] = batch[0]
 
-        if strategy == "full":
+        if strategy in ["full", "full_repeat_aware"]:
             if len(batch) == 2:
                 # Standard: (users, ground_truth)
                 data["ground_truth"] = batch[1]
@@ -276,7 +307,14 @@ class Evaluator:
                     f"Unexpected batch size {len(batch)} for Full strategy"
                 )
 
-        elif strategy == "sampled":
+        elif strategy == "full_one_positive":
+            if len(batch) != 2:
+                raise ValueError(
+                    f"Unexpected batch size {len(batch)} for Full One Positive strategy"
+                )
+            data["target_item"] = batch[1]
+
+        elif strategy in ["sampled", "sampled_one_positive"]:
             if len(batch) == 3:
                 # Standard Sampled: (users, positives, negatives)
                 data["positives"] = batch[1]

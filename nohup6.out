@@ -1,0 +1,102 @@
+/opt/miniconda3/envs/warprec/lib/python3.12/site-packages/torch/cuda/__init__.py:61: FutureWarning: The pynvml package is deprecated. Please install nvidia-ml-py instead. If you did not install pynvml directly, please report this to the maintainers of the package that installed pynvml for you.
+  import pynvml  # type: ignore[import]
+/opt/miniconda3/envs/warprec/lib/python3.12/site-packages/hyperopt/atpe.py:19: UserWarning: pkg_resources is deprecated as an API. See https://setuptools.pypa.io/en/latest/pkg_resources.html. The pkg_resources package is slated for removal as early as 2025-11-30. Refrain from using this package or pin to Setuptools<81.
+  import pkg_resources
+04-03-2026 14:26:31 - WarpRec - 📝 [37mStarting experiment.[0m
+04-03-2026 14:26:31 - WarpRec - 📝 [37mReading train configuration file in: config/personalized_mostpop_lastfm1k_legacy_split_raw.yml[0m
+04-03-2026 14:26:31 - WarpRec - 📝 [37mReading process completed correctly.[0m
+2026-03-04 14:26:31,964	WARNING services.py:397 -- Found multiple active Ray instances: {'10.74.0.61:6379', '10.74.1.7:6379'}. Connecting to latest cluster at 10.74.0.61:6379. You can override this by setting the `--address` flag or `RAY_ADDRESS` environment variable.
+2026-03-04 14:26:31,965	INFO worker.py:1833 -- Connecting to existing Ray cluster at address: 10.74.0.61:6379...
+2026-03-04 14:26:31,978	INFO worker.py:2004 -- Connected to Ray cluster. View the dashboard at [1m[32mhttp://127.0.0.1:8265 [39m[22m
+/opt/miniconda3/envs/warprec/lib/python3.12/site-packages/ray/_private/worker.py:2052: FutureWarning: Tip: In future versions of Ray, Ray will no longer override accelerator visible devices env var if num_gpus=0 or num_gpus=None (default). To enable this behavior and turn off this error message, set RAY_ACCEL_ENV_VAR_OVERRIDE_ON_ZERO=0
+  warnings.warn(
+04-03-2026 14:26:32 - WarpRec - ✅ [32mConnected to existing Ray cluster.[0m
+04-03-2026 14:26:32 - WarpRec - 📝 [37mSetting up experiment local folder.[0m
+04-03-2026 14:26:32 - WarpRec - 📝 [37mExperiment folder created successfully.[0m
+04-03-2026 14:26:32 - WarpRec - 📝 [37mStarting reading split process from: data/lastfm1k_30000/legacy_global_split_raw using polars[0m
+04-03-2026 14:26:32 - WarpRec - 📝 [37mCreating main dataset[0m
+04-03-2026 14:26:33 - WarpRec - 📝 [37m---------------------------------Train set---------------------------------[0m
+04-03-2026 14:26:33 - WarpRec - 📊 [36mNumber of users: 694      Number of items: 29110      Transactions: 4015823[0m
+04-03-2026 14:26:33 - WarpRec - 📝 [37m---------------------------------------------------------------------------[0m
+04-03-2026 14:26:33 - WarpRec - 📝 [37m---------------------------------Test set---------------------------------[0m
+04-03-2026 14:26:33 - WarpRec - 📊 [36mNumber of users: 694      Number of items: 22736      Transactions: 415405[0m
+04-03-2026 14:26:33 - WarpRec - 📝 [37m--------------------------------------------------------------------------[0m
+04-03-2026 14:26:34 - WarpRec - 📝 [37mCreating validation dataset[0m
+04-03-2026 14:26:34 - WarpRec - 📝 [37m---------------------------------Train set---------------------------------[0m
+04-03-2026 14:26:34 - WarpRec - 📊 [36mNumber of users: 694      Number of items: 29110      Transactions: 4015823[0m
+04-03-2026 14:26:34 - WarpRec - 📝 [37m---------------------------------------------------------------------------[0m
+04-03-2026 14:26:34 - WarpRec - 📝 [37m------------------------------Validation set-----------------------------[0m
+04-03-2026 14:26:34 - WarpRec - 📊 [36mNumber of users: 128      Number of items: 12626      Transactions: 65245[0m
+04-03-2026 14:26:34 - WarpRec - 📝 [37m-------------------------------------------------------------------------[0m
+04-03-2026 14:26:35 - WarpRec - 📝 [37mPreparing main dataset inner structures for evaluation.[0m
+04-03-2026 14:26:35 - WarpRec - ✅ [32mData preparation completed in 3.86 seconds.[0m
+04-03-2026 14:26:35 - WarpRec - 📢 [33mValidation metric for this experiment has been set to: nDCG@10[0m
+[36m(pid=3738697)[0m /opt/miniconda3/envs/warprec/lib/python3.12/site-packages/torch/cuda/__init__.py:61: FutureWarning: The pynvml package is deprecated. Please install nvidia-ml-py instead. If you did not install pynvml directly, please report this to the maintainers of the package that installed pynvml for you.
+[36m(pid=3738697)[0m   import pynvml  # type: ignore[import]
+[36m(pid=3738697)[0m /opt/miniconda3/envs/warprec/lib/python3.12/site-packages/hyperopt/atpe.py:19: UserWarning: pkg_resources is deprecated as an API. See https://setuptools.pypa.io/en/latest/pkg_resources.html. The pkg_resources package is slated for removal as early as 2025-11-30. Refrain from using this package or pin to Setuptools<81.
+[36m(pid=3738697)[0m   import pkg_resources
+[36m(objective_function pid=3738697)[0m Checkpoint successfully created at: Checkpoint(filesystem=local, path=/home/chiara/projects/warprec/experiments/lastfm1k/personalized_mostpop_legacy_split_raw/lastfm1k_30000_personalized_mostpop_legacy_split_raw/ray_results/objective_function_2026-03-04_14-26-37/Pop_a10e07e0_0_2026-03-04_14-26-37/checkpoint_000000)
+2026-03-04 14:26:49,333	INFO tune.py:1009 -- Wrote the latest version of all result files and experiment state to '/home/chiara/projects/warprec/experiments/lastfm1k/personalized_mostpop_legacy_split_raw/lastfm1k_30000_personalized_mostpop_legacy_split_raw/ray_results/objective_function_2026-03-04_14-26-37' in 0.0073s.
+╭───────────────────────────────────────────────────────────────────────────╮
+│ Configuration for experiment     objective_function_2026-03-04_14-26-37   │
+├───────────────────────────────────────────────────────────────────────────┤
+│ Search algorithm                 BasicVariantGenerator                    │
+│ Scheduler                        FIFOSchedulerWrapper                     │
+│ Number of trials                 1                                        │
+╰───────────────────────────────────────────────────────────────────────────╯
+
+View detailed results here: /home/chiara/projects/warprec/experiments/lastfm1k/personalized_mostpop_legacy_split_raw/lastfm1k_30000_personalized_mostpop_legacy_split_raw/ray_results/objective_function_2026-03-04_14-26-37
+To visualize your results with TensorBoard, run: `tensorboard --logdir /tmp/ray/session_2026-02-26_08-49-46_656476_3292889/artifacts/2026-03-04_14-26-37/objective_function_2026-03-04_14-26-37/driver_artifacts`
+
+Trial status: 1 PENDING
+Current time: 2026-03-04 14:26:37. Total running time: 0s
+Logical resource usage: 0/12 CPUs, 0/2 GPUs (0.0/1.0 accelerator_type:G)
+╭─────────────────────────╮
+│ Trial name     status   │
+├─────────────────────────┤
+│ Pop_a10e07e0   PENDING  │
+╰─────────────────────────╯
+
+Trial Pop_a10e07e0 started without custom configuration.
+
+Trial Pop_a10e07e0 completed after 1 iterations at 2026-03-04 14:26:49. Total running time: 12s
+╭─────────────────────────────────────────────────╮
+│ Trial Pop_a10e07e0 result                       │
+├─────────────────────────────────────────────────┤
+│ checkpoint_dir_name           checkpoint_000000 │
+│ time_this_iter_s                        1.69204 │
+│ time_total_s                            1.69204 │
+│ training_iteration                            1 │
+│ nDCG@10                                 0.00052 │
+│ ram_peak_mb                          2320.08984 │
+│ vram_peak_mb                                 0. │
+╰─────────────────────────────────────────────────╯
+
+Trial status: 1 TERMINATED
+Current time: 2026-03-04 14:26:49. Total running time: 12s
+Logical resource usage: 1.0/12 CPUs, 0/2 GPUs (0.0/1.0 accelerator_type:G)
+Current best trial: 271ab_00000 with nDCG@10=0.0005219492013566196 and params={}
+╭──────────────────────────────────────────────────────────────────────────────────────────────────────╮
+│ Trial name     status         iter     total time (s)       nDCG@10     ram_peak_mb     vram_peak_mb │
+├──────────────────────────────────────────────────────────────────────────────────────────────────────┤
+│ Pop_a10e07e0   TERMINATED        1            1.69204   0.000521949         2320.09                0 │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────────╯
+
+04-03-2026 14:26:49 - WarpRec - 📝 [37mBest params: {} | Score (nDCG@10): 0.0005219492013566196 | Iteration: 1[0m
+04-03-2026 14:26:49 - WarpRec - ✅ [32mHPO for Pop ended successfully.[0m
+04-03-2026 14:26:49 - WarpRec - 📝 [37mStarting evaluation process for model Pop.[0m
+04-03-2026 14:26:50 - WarpRec - ✅ [32mEvaluation completed for model Pop. Time: 00:00:00[0m
+04-03-2026 14:26:50 - WarpRec - 📝 [37m------------------------------Test------------------------------[0m
+04-03-2026 14:26:50 - WarpRec - 📝 [37m+----------+------------+-------------+------------+-----------+[0m
+04-03-2026 14:26:50 - WarpRec - 📝 [37m| Cutoff   |       nDCG |   Precision |     Recall |   HitRate |[0m
+04-03-2026 14:26:50 - WarpRec - 📝 [37m+==========+============+=============+============+===========+[0m
+04-03-2026 14:26:50 - WarpRec - 📝 [37m| Top@10   | 0.00237162 |   0.0263689 | 0.00112151 |  0.17147  |[0m
+04-03-2026 14:26:50 - WarpRec - 📝 [37m+----------+------------+-------------+------------+-----------+[0m
+04-03-2026 14:26:50 - WarpRec - 📝 [37m| Top@20   | 0.0024883  |   0.0251441 | 0.00188507 |  0.242075 |[0m
+04-03-2026 14:26:50 - WarpRec - 📝 [37m+----------+------------+-------------+------------+-----------+[0m
+04-03-2026 14:26:50 - WarpRec - 📝 [37m| Top@50   | 0.00474132 |   0.0248703 | 0.00721597 |  0.396254 |[0m
+04-03-2026 14:26:50 - WarpRec - 📝 [37m+----------+------------+-------------+------------+-----------+[0m
+04-03-2026 14:26:50 - WarpRec - 📝 [37mResults successfully written to experiments/lastfm1k/personalized_mostpop_legacy_split_raw/lastfm1k_30000_personalized_mostpop_legacy_split_raw/evaluation/Overall_Results_04.03.2026_14-26-32.csv[0m
+04-03-2026 14:26:50 - WarpRec - 📝 [37mParameters successfully written to experiments/lastfm1k/personalized_mostpop_legacy_split_raw/lastfm1k_30000_personalized_mostpop_legacy_split_raw/params/Overall_Params_04.03.2026_14-26-32.json[0m
+04-03-2026 14:26:50 - WarpRec - 📝 [37mTime report written to experiments/lastfm1k/personalized_mostpop_legacy_split_raw/lastfm1k_30000_personalized_mostpop_legacy_split_raw/evaluation/Time_Report_04.03.2026_14-26-32.tsv[0m
+04-03-2026 14:26:50 - WarpRec - ✅ [32mAll experiments concluded. WarpRec is shutting down.[0m

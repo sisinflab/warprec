@@ -102,7 +102,10 @@ class Recommender(nn.Module, ABC):
         """
         params = {}
         for ann, _ in self.__class__.__annotations__.items():
-            params[ann] = getattr(self, ann)
+            value = getattr(self, ann)
+            if isinstance(value, Tensor):
+                continue
+            params[ann] = value
         return params
 
     def set_seed(self, seed: int):

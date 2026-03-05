@@ -191,14 +191,6 @@ def train_pipeline(path: str):
         # Callback on training complete
         callback.on_training_complete(model=best_model)
 
-        # Retrieve appropriate evaluation dataloader
-        dataloader = retrieve_evaluation_dataloader(
-            dataset=main_dataset,
-            model=best_model,
-            strategy=config.evaluation.strategy,
-            num_negatives=config.evaluation.num_negatives,
-        )
-
         # Move model to device
         general_device = config.general.device
         model_device = params.optimization.device
@@ -207,15 +199,34 @@ def train_pipeline(path: str):
 
         # Evaluation testing
         model_evaluation_start_time = time.time()
-        evaluator.evaluate(
-            model=best_model,
-            dataloader=dataloader,
-            strategy=config.evaluation.strategy,
-            dataset=main_dataset,
-            device=device,
-            verbose=True,
-        )
-        results = evaluator.compute_results()
+        if hasattr(best_model, "custom_test_evaluation"):
+            logger.msg(f"Starting evaluation process for model {best_model.name}.")
+            results = best_model.custom_test_evaluation(
+                dataset=main_dataset,
+                top_k=list(config.evaluation.top_k),
+                device=device,
+            )
+            logger.positive(
+                f"Evaluation completed for model {best_model.name}. "
+                f"Time: {time.strftime('%H:%M:%S', time.gmtime(time.time() - model_evaluation_start_time))}"
+            )
+        else:
+            # Retrieve appropriate evaluation dataloader
+            dataloader = retrieve_evaluation_dataloader(
+                dataset=main_dataset,
+                model=best_model,
+                strategy=config.evaluation.strategy,
+                num_negatives=config.evaluation.num_negatives,
+            )
+            evaluator.evaluate(
+                model=best_model,
+                dataloader=dataloader,
+                strategy=config.evaluation.strategy,
+                dataset=main_dataset,
+                device=device,
+                verbose=True,
+            )
+            results = evaluator.compute_results()
         model_evaluation_total_time = time.time() - model_evaluation_start_time
         evaluator.print_console(results, "Test", config.evaluation.max_metric_per_row)
 

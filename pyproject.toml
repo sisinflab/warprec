@@ -31,6 +31,7 @@ torchmetrics = "^1.8.2"
 optuna = "^4.5.0"
 polars = "^1.36"
 narwhals = "^2.15.0"
+mmh3 = "^5.2.0"
 wandb = {version = "^0.19.10", optional = true}
 codecarbon = {version = "^3.0.0", optional = true}
 mlflow = {version = "^2.22.0", optional = true}
