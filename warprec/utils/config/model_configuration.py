@@ -167,9 +167,7 @@ class Optimization(BaseModel):
     device: Optional[str] = None
     cpu_per_trial: Optional[int] = 1
     gpu_per_trial: Optional[float] = 0
-    custom_resources_per_trial: Optional[Dict[str, float | int]] = Field(
-        default_factory=Dict[str, float | int]
-    )
+    custom_resources_per_trial: Optional[Dict[str, float | int]] = {}
     num_workers: Optional[int] = None
     block_size: Optional[int] = 50
     chunk_size: Optional[int] = 4096
