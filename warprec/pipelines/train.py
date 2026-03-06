@@ -156,7 +156,7 @@ def train_pipeline(path: str):
         trainer = Trainer(
             custom_callback=callback,
             custom_modules=config.general.custom_modules,
-            config=config,
+            dashboard_config=config.dashboard,
         )
 
         if val_dataset is not None:
