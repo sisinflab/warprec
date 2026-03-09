@@ -69,7 +69,7 @@ An **Application Layer** exposes trained models through a REST API (FastAPI) and
 
 ## ⚙️ Installation
 
-WarpRec is designed to be easily installed and reproducible using **Conda**. This ensures that all dependencies and the Python environment are managed consistently.
+WarpRec is designed to be easily installed and reproducible using **Conda**. This ensures that all dependencies and the Python environment are managed consistently. Environment is available both for CPU e GPU.
 
 ### 📋 Prerequisites
 
@@ -88,9 +88,9 @@ Follow these steps to clone the project and set up the environment:
    ```
 
 2. **Create the Conda environment**
-    Use the provided environment.yml file to create the virtual environment. This will install Python 3.12 and the necessary core dependencies.
+    Use the provided environment.gpu.yml (or environment.cpu.yml) file to create the virtual environment. This will install Python 3.12 and the necessary core dependencies.
     ```bash
-    conda env create --file environment.yml
+    conda env create --file environment.gpu.yml
     ```
 
 3.  **Activate the environment:**
