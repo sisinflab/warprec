@@ -1,13 +1,11 @@
-name: warprec
+name: warprec-cpu
 channels:
   - conda-forge
-  - nvidia
 dependencies:
   - python=3.12.11
   - pip=25.3
   - setuptools=80.9.0
   - wheel=0.45.1
-  - cuda-toolkit=12.6
   - azure-identity>=1.25.1,<2.0.0
   - azure-storage-blob>=12.26.0,<13.0.0
   - hyperopt>=0.2.7,<1.0.0
@@ -37,20 +35,18 @@ dependencies:
     - bandit>=1.8.2,<2.0.0
     - codecarbon>=3.0.0,<4.0.0
     - furo>=2025.7.19,<2026.0.0
-    - nvitop>=1.4.2,<2.0.0
     - pydata-sphinx-theme>=0.16.1,<1.0.0
     - pydoclint>=0.6.0,<1.0.0
     - ray[data,serve,train,tune]==2.50.1
     - ruff>=0.9.3,<1.0.0
-    - --extra-index-url https://download.pytorch.org/whl/cu126
-    - torch==2.7.0+cu126
-    - --find-links https://data.pyg.org/whl/torch-2.7.0+cu126.html
-    - torch-scatter==2.1.2+pt27cu126
-    - torch-sparse==0.6.18+pt27cu126
-    - torch-cluster==1.6.3+pt27cu126
-    - torch-spline-conv==1.2.2+pt27cu126
+    - --extra-index-url https://download.pytorch.org/whl/cpu
+    - torch==2.7.0
+    - --find-links https://data.pyg.org/whl/torch-2.7.0+cpu.html
+    - torch-scatter==2.1.2+pt27cpu
+    - torch-sparse==0.6.18+pt27cpu
+    - torch-cluster==1.6.3+pt27cpu
+    - torch-spline-conv==1.2.2+pt27cpu
     - torch-geometric==2.7.0
     - torchmetrics==1.8.2
-    - torchdiffeq==0.2.5
     - numba==0.62.1
     - grpcio==1.76.0

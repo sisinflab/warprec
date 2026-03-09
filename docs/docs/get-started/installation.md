@@ -1,6 +1,6 @@
 # Install WarpRec
 
-The procedure to install WarpRec is streamlined using Conda or Mamba.
+The procedure to install WarpRec is streamlined using Conda or Mamba. Environment is available both for CPU e GPU.
 
 > **Stay tuned!** WarpRec will be available on **PyPI** in a future release.
 
@@ -21,9 +21,9 @@ Follow these steps to clone the project and set up the environment:
    ```
 
 2. **Create the Conda environment**
-    Use the provided environment.yml file to create the virtual environment. This will install Python 3.12 and the necessary core dependencies.
+    Use the provided environment.gpu.yml (or environment.cpu.yml) file to create the virtual environment. This will install Python 3.12 and the necessary core dependencies.
     ```bash
-    conda env create --file environment.yml
+    conda env create --file environment.gpu.yml
     ```
 
 3.  **Activate the environment:**
