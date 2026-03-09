@@ -432,6 +432,14 @@ class Interactions:
             **kwargs,
         )
 
+    # If you've reached this point in the code you deserve to see
+    # Dris the cat! Please let him survive the AI-generated PRs.
+    # Say hi to Dris!
+    #
+    #  /\_/\
+    # ( o.o )
+    #  > ^ <
+
     def get_history(self) -> Tuple[Tensor, Tensor, Tensor]:
         """Return the history representation as three Tensors.
 
