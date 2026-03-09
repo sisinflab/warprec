@@ -19,6 +19,18 @@ reader:
     sep: ","
     header: false
 
+dashboard:
+  wandb:
+    enabled: True
+    team: "chiaramallamaci043-politecnico-di-bari"
+    project: "RecJPQ"
+    group: "lastfm1k_30000"
+    api_key: "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"
+    
+
+
+
+
 writer:
   dataset_name: lastfm1k_30000_legacy_split_raw_jpq
   writing_method: local
@@ -37,8 +49,12 @@ writer:
 evaluation:
   top_k: [10, 20, 40]
   metrics: [nDCG, Precision, Recall, HitRate]
-  validation_metric: nDCG@10
+  validation_metric: nDCG@40
   batch_size: 512
+  full_evaluation_on_report: True
+  save_per_user: True
+  save_evaluation: True
+  
 
 models:
   # BERT4RecJPQ:
@@ -54,7 +70,7 @@ models:
   #   epochs: 10000
   #   learning_rate: 0.001
   #   max_seq_len: 150
-  #   pq_m: 64
+  #   pq_m: [2, 4, 8, 16, 32, 64]
   #   centroid_strategy: svd
   #   early_stopping:
   #     monitor: "score"
@@ -70,27 +86,55 @@ models:
   #     gpu_per_trial: 1
 
 
-  BERT4Rec_gts:
+
+  # BERT4Rec_gts:
+  #   embedding_size: 128
+  #   n_layers: 3
+  #   n_heads: 2
+  #   inner_size: 512
+  #   dropout_prob: 0.2
+  #   attn_dropout_prob: 0.2
+  #   mask_prob: 0.2
+  #   reg_weight: 0.0
+  #   weight_decay: [0, 0.5]
+  #   batch_size: 128
+  #   epochs: 10000
+  #   learning_rate: [0.1, 0.001, 0.0001] 
+  #   max_seq_len: 150  
+    
+  #   early_stopping:
+  #     monitor: "score"
+  #     patience: 500
+  #     grace_period: 50
+  #     min_delta: 0.0001
+
+  #   optimization:
+  #     strategy: grid
+  #     properties:
+  #       mode: max
+  #       seed: 42
+  #     cpu_per_trial: 12
+  #     gpu_per_trial: 1
+
+  
+  SASRecJPQ:
     embedding_size: 128
     n_layers: 3
     n_heads: 2
-    inner_size: 512
+    inner_size: 128
     dropout_prob: 0.2
-    attn_dropout_prob: 0.2
-    mask_prob: 0.2
-    reg_weight: 0.0
-    weight_decay: 0
+    weight_decay: 0.0
     batch_size: 128
     epochs: 10000
-    learning_rate: [0.1, 0.001, 0.0001] 
-    max_seq_len: 150  
-    
+    learning_rate: 0.01
+    max_seq_len: 150
+    pq_m: [32,64]
+    centroid_strategy: svd
     early_stopping:
       monitor: "score"
       patience: 500
       grace_period: 50
       min_delta: 0.0001
-
     optimization:
       strategy: grid
       properties:
@@ -98,6 +142,92 @@ models:
         seed: 42
       cpu_per_trial: 12
       gpu_per_trial: 1
+
+
+
+  # SASRec_gts:
+  #   embedding_size: 128
+  #   n_layers: 3
+  #   n_heads: 2
+  #   dropout_prob: 0.2
+  #   weight_decay: [0, 0.5]
+  #   batch_size: 128
+  #   epochs: 10000
+  #   learning_rate: [0.1, 0.01, 0.001, 0.0001] 
+  #   max_seq_len: 150  
+    
+  #   early_stopping:
+  #     monitor: "score"
+  #     patience: 500
+  #     grace_period: 50
+  #     min_delta: 0.0001
+
+  #   optimization:
+  #     strategy: grid
+  #     properties:
+  #       mode: max
+  #       seed: 42
+  #     cpu_per_trial: 12
+  #     gpu_per_trial: 1
+
+
+  gSASRec_gts:
+    embedding_size: 128
+    n_layers: 2
+    n_heads: 2
+    inner_size: 512
+    dropout_prob: 0.2
+    attn_dropout_prob: 0.2
+    weight_decay: 0.0
+    batch_size: 128
+    epochs: 10000
+    learning_rate: [0.1, 0.01, 0.001, 0.0001]
+    max_seq_len: 150
+    gbce_t: 0.75
+    negs_per_pos: 256
+    early_stopping:
+      monitor: "score"
+      patience: 500
+      grace_period: 50
+      min_delta: 0.0001
+    optimization:
+      strategy: grid
+      properties:
+        mode: max
+        seed: 42
+      cpu_per_trial: 12
+      gpu_per_trial: 1
+
+  gSASRecJPQ:
+    embedding_size: 128
+    n_layers: 2
+    n_heads: 2
+    inner_size: 128
+    dropout_prob: 0.2
+    attn_dropout_prob: 0.2
+    weight_decay: 0.0
+    batch_size: 64
+    epochs: 10000
+    learning_rate: 0.01
+    max_seq_len: 150
+    pq_m: [2, 4, 8, 16, 32, 64]
+    centroid_strategy: svd
+    gbce_t: 0.75
+    negs_per_pos: 256
+    early_stopping:
+      monitor: "score"
+      patience: 500
+      grace_period: 50
+      min_delta: 0.0001
+    optimization:
+      strategy: grid
+      properties:
+        mode: max
+        seed: 42
+      cpu_per_trial: 12
+      gpu_per_trial: 1
+
+
 
 
 general:

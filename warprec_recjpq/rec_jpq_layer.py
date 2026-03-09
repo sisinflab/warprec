@@ -131,6 +131,76 @@ class ItemCodeLayer(nn.Module):
 
         sub_scores = scores.gather(-1, target_codes.unsqueeze(-1))
         return torch.sum(sub_scores.squeeze(-1), dim=-1).squeeze(1)
+    
+    def score_sequence_items(self, seq_emb: torch.Tensor, target_ids: torch.Tensor, batch_size: int):
+        """
+        Score items for sequence positions (from legacy TF code).
+        
+        Args:
+            seq_emb: (batch_size, seq_len, embedding_size)
+            target_ids: (batch_size, seq_len, num_targets) - e.g. [positive, neg1, neg2, ...]
+            batch_size: batch size
+            
+        Returns:
+            logits: (batch_size, seq_len, num_targets)
+        """
+        seq_len = seq_emb.shape[1]
+        num_targets = target_ids.shape[2]
+        
+        # Process each position in the sequence
+        # seq_emb shape: (batch, seq_len, embedding_size)
+        # We need to score each position against its targets
+        
+        # Reshape: (batch, seq_len, item_code_bytes, sub_embedding_size)
+        sub_emb = seq_emb.view(batch_size, seq_len, self.item_code_bytes, self.sub_embedding_size)
+        
+        # Compute scores for all byte positions and all centroid values
+        # sub_emb: (batch, seq_len, item_code_bytes, sub_embedding_size)
+        # centroids: (item_code_bytes, vals_per_dim, sub_embedding_size)
+        # Result: (batch, seq_len, item_code_bytes, vals_per_dim)
+        scores = torch.einsum("bsie,ine->bsin", sub_emb, self.centroids)
+        
+        if self.log_softmax:
+            scores = F.log_softmax(scores, dim=-1)
+        elif self.exp:
+            scores = torch.exp(scores)
+        
+        # Get codes for target items
+        # target_ids: (batch, seq_len, num_targets)
+        target_codes = self.item_codes[F.relu(target_ids).long()].long()
+        # target_codes: (batch, seq_len, num_targets, item_code_bytes)
+        
+        # Gather scores for each byte of each target item
+        # We need to gather from scores: (batch, seq_len, item_code_bytes, vals_per_dim)
+        # using target_codes: (batch, seq_len, num_targets, item_code_bytes)
+        
+        # Reshape for gathering
+        # scores: (batch, seq_len, item_code_bytes, vals_per_dim)
+        # target_codes: (batch, seq_len, num_targets, item_code_bytes)
+        
+        # Gather scores for each byte position
+        # For each (batch, seq, target, byte), get score at scores[batch, seq, byte, code_value]
+        # scores: (batch, seq_len, item_code_bytes, vals_per_dim)
+        # target_codes: (batch, seq_len, num_targets, item_code_bytes)
+        
+        # Permute target_codes to (batch, seq_len, item_code_bytes, num_targets) for easier gathering
+        target_codes_perm = target_codes.permute(0, 1, 3, 2)  # (batch, seq_len, item_code_bytes, num_targets)
+        
+        # Gather for all byte positions at once
+        # Expand scores to match gathering dimension
+        # scores: (batch, seq_len, item_code_bytes, vals_per_dim)
+        # We need to gather along last dim using target_codes_perm
+        
+        sub_scores = torch.gather(
+            scores.unsqueeze(3).expand(-1, -1, -1, num_targets, -1),  # (batch, seq, bytes, num_targets, vals_per_dim)
+            4,  # gather along vals_per_dim dimension
+            target_codes_perm.unsqueeze(-1)  # (batch, seq, bytes, num_targets, 1)
+        ).squeeze(-1)  # (batch, seq, bytes, num_targets)
+        
+        # Sum over bytes: (batch, seq_len, item_code_bytes, num_targets) -> (batch, seq_len, num_targets)
+        logits = torch.sum(sub_scores, dim=2)
+        
+        return logits
 
     def score_all_items(self, seq_emb: torch.Tensor):
         batch_size = seq_emb.shape[0]
@@ -171,3 +241,69 @@ class ItemCodeLayer(nn.Module):
             item_indices = target_codes[:, dim_idx]
             final_scores.add_(byte_scores.index_select(-1, item_indices))
         return final_scores
+    def score_sequence_all_items(self, seq_emb: torch.Tensor, batch_size: int):
+        """
+        Score all items for each position in sequence.
+        
+        Args:
+            seq_emb: (batch_size, seq_len, embedding_size)
+            batch_size: batch size
+            
+        Returns:
+            logits: (batch_size, seq_len, num_items)
+        """
+        seq_len = seq_emb.shape[1]
+        
+        # Reshape: (batch, seq_len, item_code_bytes, sub_embedding_size)
+        sub_emb = seq_emb.view(batch_size, seq_len, self.item_code_bytes, self.sub_embedding_size)
+        
+        # Compute scores for all byte positions and all centroid values
+        # sub_emb: (batch, seq_len, item_code_bytes, sub_embedding_size)
+        # centroids: (item_code_bytes, vals_per_dim, sub_embedding_size)
+        # Result: (batch, seq_len, item_code_bytes, vals_per_dim)
+        scores = torch.einsum("bsie,ine->bsin", sub_emb, self.centroids)
+        
+        if self.log_softmax:
+            scores = F.log_softmax(scores, dim=-1)
+        elif self.exp:
+            scores = torch.exp(scores)
+        
+        # Get codes for all items
+        target_codes = self.item_codes[:self.num_items].long()  # (num_items, item_code_bytes)
+        
+        # Score all items for each position
+        final_scores = torch.zeros(
+            (batch_size, seq_len, self.num_items), device=seq_emb.device
+        )
+        
+        for dim_idx in range(self.item_code_bytes):
+            byte_scores = scores[:, :, dim_idx, :]  # (batch, seq_len, vals_per_dim)
+            item_indices = target_codes[:, dim_idx]  # (num_items,)
+            # Gather scores for all items at this byte position
+            gathered = byte_scores.index_select(-1, item_indices)  # (batch, seq_len, num_items)
+            final_scores += gathered
+        
+        return final_scores
+
+    def score_all_items_with_bonus_user(self, seq_emb: torch.Tensor, user_sequence_ids: torch.Tensor):
+        """
+        Score all items with personalized bonus based on user history (PPS).
+        
+        Args:
+            seq_emb: (batch_size, embedding_size)
+            user_sequence_ids: (batch_size, history_len) - user's historical item IDs
+            
+        Returns:
+            logits: (batch_size, num_items)
+        """
+        # First get base scores for all items
+        base_scores = self.score_all_items(seq_emb)
+        
+        # Compute personalized bonus based on user history
+        # This is a simplified PPS implementation
+        # In the full version, this would use user-specific embeddings
+        batch_size = seq_emb.shape[0]
+        
+        # For now, return base scores
+        # TODO: Implement full PPS logic with user history bonus
+        return base_scores

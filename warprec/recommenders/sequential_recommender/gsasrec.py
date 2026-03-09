@@ -12,7 +12,9 @@ from warprec.recommenders.losses import EmbLoss
 from warprec.data.entities import Interactions, Sessions
 from warprec.utils.enums import DataLoaderType
 from warprec.utils.registry import model_registry
+import os
 
+os.environ['CUDA_VISIBLE_DEVICES'] = '1'
 
 @model_registry.register(name="gSASRec")
 class gSASRec(IterativeRecommender, SequentialRecommenderUtils):

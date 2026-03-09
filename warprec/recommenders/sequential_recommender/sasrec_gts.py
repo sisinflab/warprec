@@ -1,5 +1,6 @@
 # pylint: disable=R0801,E1102,W0221,C0103,W0613,W0235,R0902
 from collections import defaultdict
+import os
 from typing import Any, Optional
 import random
 
@@ -15,6 +16,7 @@ from warprec.recommenders.base_recommender import (
 from warprec.data.entities import Interactions, Sessions
 from warprec.utils.registry import model_registry
 import mmh3
+import os
 
 
 class MaskingCollator:
@@ -186,7 +188,6 @@ class SASRec_gts(IterativeRecommender, SequentialRecommenderUtils):
     n_layers: int
     n_heads: int
     dropout_prob: float
-    reg_weight: float
     weight_decay: float
     batch_size: int
     epochs: int

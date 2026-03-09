@@ -9,6 +9,8 @@ from .linrec import LinRec
 from .narm import NARM
 from .sasrec import SASRec
 from .bert4rec_gts import BERT4Rec_gts
+from .sasrec_gts import SASRec_gts
+from .gsasrec_gts import gSASRec_gts
 
 __all__ = [
     "BERT4Rec",
@@ -20,5 +22,5 @@ __all__ = [
     "LightSANs",
     "LinRec",
     "NARM",
-    "SASRec","BERT4Rec_gts"
+    "SASRec","BERT4Rec_gts", "SASRec_gts", "gSASRec_gts"
 ]

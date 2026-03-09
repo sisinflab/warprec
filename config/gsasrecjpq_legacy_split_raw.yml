@@ -1,0 +1,86 @@
+reader:
+  loading_strategy: split
+  data_type: transaction
+  reading_method: local
+  rating_type: implicit
+  labels:
+    user_id_label: user_id
+    item_id_label: item_id
+    rating_label: rating
+    timestamp_label: timestamp
+  dtypes:
+    user_id_type: int64
+    item_id_type: str
+    timestamp_type: str
+  split:
+    local_path: data/lastfm1k_30000/legacy_global_split_raw
+    ext: .csv
+    sep: ","
+    header: false
+
+dashboard:
+  wandb:
+    enabled: True
+    team: "chiaramallamaci043-politecnico-di-bari"
+    project: "RecJPQ"
+    group: "lastfm1k_30000"
+    api_key: "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"
+
+writer:
+  dataset_name: lastfm1k_30000_legacy_split_raw_gsasrecjpq
+  writing_method: local
+  local_experiment_path: experiments/lastfm1k/legacy_split_raw_gsasrecjpq/
+  results:
+    sep: ","
+    ext: .csv
+  recommendation:
+    sep: ","
+    ext: .csv
+    header: true
+    k: 50
+    user_label: user_id
+    item_label: item_id
+
+evaluation:
+  top_k: [10, 20, 40]
+  metrics: [nDCG, Precision, Recall, HitRate]
+  validation_metric: nDCG@40
+  batch_size: 512
+  full_evaluation_on_report: True
+  save_per_user: True
+  save_evaluation: True
+
+models:
+  gSASRecJPQ:
+    embedding_size: 128
+    n_layers: 2
+    n_heads: 2
+    inner_size: 128
+    dropout_prob: 0.2
+    attn_dropout_prob: 0.2
+    weight_decay: 0.0
+    batch_size: 64
+    epochs: 10000
+    learning_rate: 0.001
+    max_seq_len: 150
+    pq_m: [2, 4, 8, 16, 32, 64]
+    centroid_strategy: svd
+    gbce_t: 0.75
+    negs_per_pos: 256
+    early_stopping:
+      monitor: "score"
+      patience: 500
+      grace_period: 50
+      min_delta: 0.0001
+    optimization:
+      strategy: grid
+      properties:
+        mode: max
+        seed: 42
+      cpu_per_trial: 12
+      gpu_per_trial: 1
+
+
+general:
+  device: cuda
+  custom_models: ["warprec_recjpq"]
