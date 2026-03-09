@@ -1,7 +1,6 @@
 from typing import List, Optional, Union, ClassVar, Any, Dict
 from abc import ABC
 
-import torch
 from pydantic import BaseModel, ConfigDict, Field, model_validator, field_validator
 from warprec.utils.enums import (
     SearchAlgorithms,
@@ -193,21 +192,6 @@ class Optimization(BaseModel):
             logger.attention("The 'eval_every_n' value must be >= 1. Defaulting to 1.")
             v = 1
         return v
-
-    @field_validator("device")
-    @classmethod
-    def check_device(cls, v: str):
-        """Validate device."""
-        if v is None:
-            return v
-
-        if v in ("cuda", "cpu"):
-            if v == "cuda" and not torch.cuda.is_available():
-                raise ValueError(
-                    "Cuda device was selected but not available on current machine."
-                )
-            return v
-        raise ValueError(f'Device {v} is not supported. Use "cpu" or "cuda".')
 
     @field_validator("cpu_per_trial")
     @classmethod
