@@ -20,13 +20,13 @@ class Splitter:
         item_id_label: str = "item_id",
         rating_label: str = "rating",
         timestamp_label: str = "timestamp",
-        test_strategy: Optional[SplittingStrategies] = None,
+        test_strategy: Optional[SplittingStrategies | str] = None,
         test_ratio: Optional[float] = None,
         test_k: Optional[int] = None,
         test_folds: Optional[int] = None,
         test_timestamp: Optional[Union[int, str]] = None,
         test_seed: int = 42,
-        val_strategy: Optional[SplittingStrategies] = None,
+        val_strategy: Optional[SplittingStrategies | str] = None,
         val_ratio: Optional[float] = None,
         val_k: Optional[int] = None,
         val_folds: Optional[int] = None,
@@ -52,14 +52,14 @@ class Splitter:
             item_id_label (str): The item_id label.
             rating_label (str): The rating label.
             timestamp_label (str): The timestamp label.
-            test_strategy (Optional[SplittingStrategies]): The splitting strategy to use for test set.
+            test_strategy (Optional[SplittingStrategies | str]): The splitting strategy to use for test set.
             test_ratio (Optional[float]): The ratio value for test set.
             test_k (Optional[int]): The k value for test set.
             test_folds (Optional[int]): The folds value for test set.
             test_timestamp (Optional[Union[int, str]]): The timestamp to be used for the test set.
                 Either an integer or 'best'.
             test_seed (int): The seed value for test set. Defaults to 42.
-            val_strategy (Optional[SplittingStrategies]): The splitting strategy to use for validation set.
+            val_strategy (Optional[SplittingStrategies | str]): The splitting strategy to use for validation set.
             val_ratio (Optional[float]): The ratio value for validation set.
             val_k (Optional[int]): The k value for validation set.
             val_folds (Optional[int]): The folds value for validation set.
@@ -80,6 +80,13 @@ class Splitter:
                     the experiment to evaluate the model.
         """
         data = nw.from_native(data, pass_through=True)
+
+        # Parse strings
+        if isinstance(test_strategy, str):
+            test_strategy = SplittingStrategies(test_strategy)
+
+        if isinstance(val_strategy, str):
+            val_strategy = SplittingStrategies(val_strategy)
 
         # Test set
         split_process_start_time = time.time()

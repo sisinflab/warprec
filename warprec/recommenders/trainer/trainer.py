@@ -19,7 +19,6 @@ from warprec.recommenders.trainer.objectives import (
     driver_function_ddp,
 )
 from warprec.utils.config import (
-    TrainConfiguration,
     RecomModel,
     DashboardConfig,
     ComplexMetricConfig,
@@ -50,20 +49,20 @@ class Trainer:
     Delegates configuration details to TrainConfiguration object.
 
     Args:
-        config (TrainConfiguration): The complete configuration object.
         custom_callback (WarpRecCallback): Custom callback for training/eval.
         custom_modules (Optional[Union[str, List[str]]]): List of custom models to load.
+        dashboard_config (Optional[DashboardConfig]): Configuration for logging dashboards
+            (WandB, MLFlow, CodeCarbon). Defaults to None.
     """
 
     def __init__(
         self,
-        config: TrainConfiguration,
         custom_callback: WarpRecCallback = WarpRecCallback(),
         custom_modules: Optional[Union[str, List[str]]] = None,
+        dashboard_config: Optional[DashboardConfig] = None,
     ):
-        self.config = config
         self._custom_modules = custom_modules or []
-        self._callbacks = self._setup_callbacks(config.dashboard, custom_callback)
+        self._callbacks = self._setup_callbacks(custom_callback, dashboard_config)
 
     def train_single_fold(
         self,
@@ -563,9 +562,16 @@ class Trainer:
         return _creator
 
     def _setup_callbacks(
-        self, dashboard: DashboardConfig, custom_callback: WarpRecCallback
+        self,
+        custom_callback: WarpRecCallback,
+        dashboard: Optional[DashboardConfig] = None,
     ) -> List[tune.Callback | WarpRecCallback]:
         callbacks: List[tune.Callback | WarpRecCallback] = [custom_callback]
+
+        # If dashboard config is not provided, return only the custom callback
+        if dashboard is None:
+            return callbacks
+
         if not DASHBOARD_AVAILABLE:
             if any(
                 [
