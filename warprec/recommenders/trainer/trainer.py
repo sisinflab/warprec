@@ -157,7 +157,6 @@ class Trainer:
             dataset,
             params.optimization.properties.seed,
         )
-        best_model.to(device)
 
         report = self._create_report(results, best_model)
         return best_model, report, best_iter
