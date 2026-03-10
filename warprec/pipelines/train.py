@@ -203,6 +203,10 @@ def train_pipeline(path: str):
         general_device = config.general.device
         model_device = params.optimization.device
         device = general_device if model_device is None else model_device
+
+        # Fallback if HEAD node does not have CUDA
+        if not torch.cuda.is_available():
+            device = "cpu"
         best_model.to(device)
 
         # Evaluation testing
