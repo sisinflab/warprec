@@ -7,9 +7,9 @@ FastAPI-based REST server for WarpRec model inference.
 1. Ensure model checkpoints and dataset files are in the directories specified
    in `serving/serving_config.yml`.
 
-2. Install dependencies (from the repository root):
+2. Install dependencies (using specialized environment.yml):
    ```bash
-   poetry install
+   conda install --file serving/restAPI/environment.yml
    ```
 
 3. Start the server:
@@ -59,7 +59,7 @@ POST /api/warprec/v1/recommend/{model_key}
 | Field            | Type         | Required for        | Description                        |
 |------------------|------------- |---------------------|------------------------------------|
 | `top_k`          | `int`        | All (default: 10)   | Number of recommendations.         |
-| `item_sequence`  | `list[str]`  | Sequential          | Ordered item names.                |
+| `item_sequence`  | `list[int]`  | Sequential          | Ordered item names.                |
 | `user_index`     | `int`        | Collaborative       | External user identifier.          |
 | `context`        | `list[int]`  | Contextual          | Context feature values.            |
 
@@ -81,7 +81,7 @@ POST /api/warprec/v1/recommend/{model_key}
 curl -X POST http://localhost:8080/api/warprec/v1/recommend/SASRec_movielens \
   -H "Content-Type: application/json" \
   -d '{
-    "item_sequence": ["Toy Story", "Jurassic Park"],
+    "item_sequence": [5 28],
     "top_k": 5
   }'
 ```

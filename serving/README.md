@@ -22,13 +22,13 @@ All settings are defined in `serving_config.yml`. The main sections are:
 |-------------|-------------------------------------------------------------|
 | `server`    | Host, ports, and API key for the REST and MCP servers.      |
 | `paths`     | Directories for model checkpoints and dataset files.        |
-| `device`    | PyTorch device for inference (`cpu`, `cuda:0`, etc.).       |
+| `datasets`  | List of dataset and their configurations.                   |
 | `endpoints` | List of model-dataset pairs to load at startup.             |
 
-### Adding a new model-dataset pair
+### Adding a new endpoint
 
 1. Place the checkpoint file at `{checkpoints_dir}/{model}_{dataset}.pth`.
-2. Place the dataset file at `{datasets_dir}/{dataset}.dat`.
+2. Place the dataset file at `{datasets_dir}/{item_mapping}`.
 3. Add an entry to the `endpoints` list in `serving_config.yml`:
 
 ```yaml
@@ -51,15 +51,7 @@ endpoints:
 
 ## Dependencies
 
-- Python 3.12+
-- PyTorch
-- FastAPI + Uvicorn (REST API)
-- FastMCP (MCP server)
-- Pydantic
-- PyYAML
-- pandas
-
-All dependencies are declared in the root `pyproject.toml`.
+All dependencies are declared in the respective directories as separate `environment.yml`.
 
 ## Quick Start
 

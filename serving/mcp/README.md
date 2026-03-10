@@ -8,9 +8,9 @@ for integration with LLM agents that can discover and invoke MCP tools.
 1. Ensure model checkpoints and dataset files are in the directories specified
    in `serving/serving_config.yml`.
 
-2. Install dependencies (from the repository root):
+2. Install dependencies (using specialized environment.yml):
    ```bash
-   poetry install
+   conda install --file serving/mcp/environment.yml
    ```
 
 3. Start the server:
@@ -47,7 +47,7 @@ Get recommendations from any loaded model-dataset pair.
 |------------------|------------- |----------|-----------------------------------------------|
 | `model_key`      | `str`        | Yes      | Model-dataset identifier (e.g., `SASRec_movielens`). |
 | `top_k`          | `int`        | No       | Number of recommendations (default: 10).      |
-| `item_sequence`  | `list[str]`  | Sequential models | Ordered item names.                  |
+| `item_sequence`  | `list[int]`  | Sequential models | Ordered item names.                  |
 | `user_index`     | `int`        | Collaborative models | External user identifier.          |
 | `context`        | `list[int]`  | Contextual models | Context feature values.              |
 
@@ -65,7 +65,7 @@ For a sequential model like `SASRec_movielens`, the agent provides:
 ```json
 {
   "model_key": "SASRec_movielens",
-  "item_sequence": ["Toy Story", "Jurassic Park"],
+  "item_sequence": [5 28],
   "top_k": 5
 }
 ```
