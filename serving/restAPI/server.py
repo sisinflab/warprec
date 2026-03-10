@@ -1,3 +1,4 @@
+# pylint: disable = C0413
 """FastAPI entry point for the WarpRec REST inference server.
 
 Loads the serving configuration, initializes the model manager and inference
@@ -7,12 +8,12 @@ service, and starts the FastAPI application with Uvicorn.
 import sys
 from pathlib import Path
 
+import uvicorn
+from fastapi import FastAPI
+
 # Ensure the repository root is on the Python path so that both
 # the ``warprec`` package and the ``serving`` package are importable.
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
-
-import uvicorn
-from fastapi import FastAPI
 
 from serving.common import InferenceService, ModelManager, ServingConfig
 from serving.restAPI.routes import router
