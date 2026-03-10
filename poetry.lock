@@ -4185,7 +4185,6 @@ files = [
     {file = "psutil-7.0.0-cp37-abi3-win_amd64.whl", hash = "sha256:4cf3d4eb1aa9b348dec30105c55cd9b7d4629285735a102beb4441e38db90553"},
     {file = "psutil-7.0.0.tar.gz", hash = "sha256:7be9c3eba38beccb6495ea33afd982a44074b78f28c434a1f51cc07fd315c456"},
 ]
-markers = {main = "extra == \"dashboard\" or extra == \"graph\""}
 
 [package.extras]
 dev = ["abi3audit", "black (==24.10.0)", "check-manifest", "coverage", "packaging", "pylint", "pyperf", "pypinfo", "pytest", "pytest-cov", "pytest-xdist", "requests", "rstcheck", "ruff", "setuptools", "sphinx", "sphinx_rtd_theme", "toml-sort", "twine", "virtualenv", "vulture", "wheel"]
@@ -6102,7 +6101,6 @@ description = "Graph Neural Network Library for PyTorch"
 optional = true
 python-versions = ">=3.10"
 groups = ["main"]
-markers = "extra == \"graph\""
 files = [
     {file = "torch_geometric-2.7.0-py3-none-any.whl", hash = "sha256:6e0cd3ad824d484651ef5d308fc66c687bfcf5ba040d56d1e0fe0f81f365e292"},
     {file = "torch_geometric-2.7.0.tar.gz", hash = "sha256:f9099e4aece1a9f618c84dbaac33a77f43139736698c7e8bddf3301ef1f2e8d4"},
@@ -6135,7 +6133,6 @@ description = "PyTorch Extension Library of Optimized Scatter Operations"
 optional = true
 python-versions = ">=3.8"
 groups = ["main"]
-markers = "extra == \"graph\""
 files = [
     {file = "torch_scatter-2.1.2.tar.gz", hash = "sha256:69b3aa435f2424ac6a1bfb6ff702da6eb73b33ca0db38fb26989c74159258e47"},
 ]
@@ -6150,7 +6147,6 @@ description = "PyTorch Extension Library of Optimized Autograd Sparse Matrix Ope
 optional = true
 python-versions = ">=3.8"
 groups = ["main"]
-markers = "extra == \"graph\""
 files = [
     {file = "torch_sparse-0.6.18.tar.gz", hash = "sha256:2f14c510a6e93f404c6ea357210615b3c15a71731f9dbd86f25434e34fb5a741"},
 ]
@@ -6865,7 +6861,6 @@ description = "Python binding for xxHash"
 optional = true
 python-versions = ">=3.7"
 groups = ["main"]
-markers = "extra == \"graph\""
 files = [
     {file = "xxhash-3.6.0-cp310-cp310-macosx_10_9_x86_64.whl", hash = "sha256:87ff03d7e35c61435976554477a7f4cd1704c3596a89a8300d5ce7fc83874a71"},
     {file = "xxhash-3.6.0-cp310-cp310-macosx_11_0_arm64.whl", hash = "sha256:f572dfd3d0e2eb1a57511831cf6341242f5a9f8298a45862d085f5b93394a27d"},
@@ -7151,11 +7146,10 @@ type = ["pytest-mypy"]
 
 [extras]
 dashboard = ["codecarbon", "mlflow", "wandb"]
-graph = ["torch-geometric", "torch-scatter", "torch-sparse"]
 remote-io = ["azure-identity", "azure-storage-blob"]
 serving = ["fastapi", "fastmcp"]
 
 [metadata]
 lock-version = "2.1"
 python-versions = "~3.12"
-content-hash = "b9ed707b65e8452117e125a67a8433afbe62362d57c0aaa9acf923e0088187a3"
+content-hash = "8441f39fb9c3935f6f0b8f7d9b0f1a41c4398e5bc9967c992fb35c1bb00c91b7"
