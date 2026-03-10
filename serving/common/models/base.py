@@ -1,7 +1,7 @@
 """Base Pydantic models shared across all serving endpoints."""
 
 from datetime import datetime, timezone
-from typing import Dict, Optional
+from typing import Dict, Optional, Any
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -20,7 +20,7 @@ class ApiResponse(BaseModelCustom):
     Attributes:
         message (str): Human-readable status message.
         timestamp (datetime): ISO 8601 timestamp of the response.
-        data (Optional[Dict]): Optional payload dictionary.
+        data (Optional[Dict[str, Any]]): Optional payload dictionary.
     """
 
     message: str = Field(..., description="Message of response")
@@ -28,4 +28,6 @@ class ApiResponse(BaseModelCustom):
         default_factory=lambda: datetime.now(timezone.utc),
         description="Timestamp of response generation",
     )
-    data: Optional[Dict] = Field(None, description="Additional data if any")
+    data: Optional[Dict[str, Any]] = Field(
+        default=None, description="Additional data if any"
+    )
