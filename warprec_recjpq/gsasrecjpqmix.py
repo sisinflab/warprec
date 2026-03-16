@@ -17,13 +17,11 @@ from warprec.data.entities import Interactions, Sessions
 from warprec.utils.registry import model_registry
 import mmh3
 import os
-from .rec_jpq_layer import ItemCodeLayer
-import os  
+from .rec_jpq_combination import ItemCodeLayer
 
-os.environ['CUDA_VISIBLE_DEVICES'] = '1'
 
 class MaskingCollator:
-    """Collator per SASRecJPQ train/val/test."""
+    """Collator per gSASRecJPQMix train/val/test con supporto user_ids."""
 
     def __init__(
         self,
@@ -54,12 +52,14 @@ class MaskingCollator:
     def __call__(self, batch):
         seqs = []
         labels_all = []
+        user_ids_all = []
 
         val_ratings_all = []
         val_not_null_seqs_after_ts_idxs = []
 
         for batch_idx, user_id in enumerate(batch):
             user_hist = self.user_actions[user_id]
+            user_ids_all.append(user_id)
 
             if self.is_train:
                 if user_id not in self.val_users or self.border_timestamp is None:
@@ -85,7 +85,7 @@ class MaskingCollator:
                     )
                     labels = torch.cat([pad, labels], dim=0)
 
-                labels_all.append(labels[1:])  # Labels are shifted
+                labels_all.append(labels[1:])
 
             elif self.is_validation:
                 seq = [
@@ -135,7 +135,7 @@ class MaskingCollator:
                 labels_all.append(label)
                 val_ratings_all.append(ratings)
 
-            elif self.is_test:
+            else:  # test
                 seq = [x[1] for x in user_hist if x[2] > 0]
 
                 if len(seq) > self.sequence_length:
@@ -152,39 +152,42 @@ class MaskingCollator:
 
             seqs.append(seq)
 
+        result = {
+            "seq": torch.stack(seqs),
+            "user_ids": torch.tensor(user_ids_all, dtype=torch.long),
+        }
+
         if self.is_test:
-            return {"seq": torch.stack(seqs)}
+            return result
+            
         if self.is_train:
             negatives = torch.randint(
                 low=0,
-                high=self.pad_id,
+                high=self.n_items,
                 size=(len(batch), self.sequence_length - 1, self.n_negatives),
                 requires_grad=False,
             )
-            return {
-                "seq": torch.stack(seqs),
-                "labels": torch.stack(labels_all),
-                "negatives": negatives,
-            }
+            result["labels"] = torch.stack(labels_all)
+            result["negatives"] = negatives
+            return result
+            
         # Validation
         negatives = torch.randint(
-            low=0, high=self.pad_id, size=(len(batch), self.n_negatives), requires_grad=False
+            low=0, high=self.n_items, size=(len(batch), self.n_negatives), requires_grad=False
         )
-        return {
-            "seq": torch.stack(seqs),
-            "labels": torch.stack(labels_all),
-            "negatives": negatives,
-            "ratings": torch.stack(val_ratings_all),
-            "not_null_seqs_after_ts_idxs": torch.tensor(
-                val_not_null_seqs_after_ts_idxs,
-                dtype=torch.long,
-                requires_grad=False,
-            ),
-        }
+        result["labels"] = torch.stack(labels_all)
+        result["negatives"] = negatives
+        result["ratings"] = torch.stack(val_ratings_all)
+        result["not_null_seqs_after_ts_idxs"] = torch.tensor(
+            val_not_null_seqs_after_ts_idxs,
+            dtype=torch.long,
+            requires_grad=False,
+        )
+        return result
 
 
 class TransformerBlock(torch.nn.Module):
-    """Transformer block for gSASRecJPQ."""
+    """Transformer block for gSASRecJPQMix (POST-normalization)."""
 
     def __init__(self, embedding_dim: int, num_heads: int, ff_dim: int, dropout: float):
         super().__init__()
@@ -224,9 +227,9 @@ class TransformerBlock(torch.nn.Module):
         return x, attn_weights
 
 
-@model_registry.register(name="gSASRecJPQ")
-class gSASRecJPQ(IterativeRecommender, SequentialRecommenderUtils):
-    """Port di gSASRecJPQ con Product Quantization e GBCE loss."""
+@model_registry.register(name="gSASRecJPQMix")
+class gSASRecJPQMix(IterativeRecommender, SequentialRecommenderUtils):
+    """gSASRecJPQ with Product Quantization, GBCE loss, and PPS/SubID bonus support."""
 
     DATALOADER_TYPE = None
 
@@ -248,46 +251,56 @@ class gSASRecJPQ(IterativeRecommender, SequentialRecommenderUtils):
     gbce_t: float
     negs_per_pos: int
 
-    def __init__(
-        self,
-        params: dict,
-        info: dict,
-        *args: Any,
-        seed: int = 42,
-        **kwargs: Any,
-    ):
+    def __init__(self, params: dict, info: dict, *args: Any, seed: int = 42, **kwargs: Any):
         super().__init__(params, info, *args, seed=seed, **kwargs)
+
         self.seed = seed
-
         torch.manual_seed(seed)
-        random.seed(seed)
+        torch.cuda.manual_seed_all(seed)
         np.random.seed(seed)
-        torch.backends.cudnn.deterministic = True
-        torch.backends.cudnn.benchmark = False
+        random.seed(seed)
 
+        self.beta = self.gbce_t
         self.padding_token_id = self.n_items
         self.train_device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.eval_device = torch.device("cpu")
-        self.max_steps_per_epoch = params.get("max_steps_per_epoch", 128)
-        self.val_batch_size = params.get("val_batch_size", self.batch_size)
-        self.val_ndcg_at = params.get("val_ndcg_at", 10)
-        self.early_stop_epochs = params.get("early_stop_epochs", 500)
-        self.gbce_t = params.get("gbce_t", 0.75)
-        self.negs_per_pos = params.get("negs_per_pos", 1)
+        self.user_actions = None
+        self.val_users_internal = set()
+        self.val_border_timestamp = None
         
-        self.positions = torch.arange(1, self.val_ndcg_at + 1, dtype=torch.float)
-        self.ndcg_discounts = torch.unsqueeze(
-            1 / torch.log2(self.positions + 1), 0
+        # Initialize nDCG discounts
+        positions = torch.arange(1, self.val_ndcg_at + 1, dtype=torch.float)
+        self.ndcg_discounts = torch.unsqueeze(1 / torch.log2(positions + 1), 0)
+
+        # Item code layer with bonus support
+        self.item_codes_layer = ItemCodeLayer(
+            embedding_size=self.embedding_size,
+            pq_m=self.pq_m,
+            num_items=self.n_items,
+            sequence_length=self.max_seq_len,
+            codes_strategy=self.centroid_strategy,
         )
 
-        # GBCE parameters
-        alpha = self.negs_per_pos / (self.n_items - 1)
-        self.beta = alpha * ((1 - 1 / alpha) * self.gbce_t + 1 / alpha)
+        # Set bonus parameters if provided
+        if "alpha" in params:
+            self.item_codes_layer.alpha.copy_(torch.tensor(params["alpha"], dtype=torch.float32))
+        if "beta_bonus" in params:  # Use beta_bonus to avoid conflict with gbce_t
+            self.item_codes_layer.beta.copy_(torch.tensor(params["beta_bonus"], dtype=torch.float32))
 
-        # Initialize SASRec model with JPQ
-        self.position_embedding = torch.nn.Embedding(self.max_seq_len, self.embedding_size)
-        self.embeddings_dropout = torch.nn.Dropout(self.dropout_prob)
+        self._centroids_assigned = False
 
+        # Positional encoding
+        pos_encoding = torch.zeros(self.max_seq_len, self.embedding_size)
+        position = torch.arange(0, self.max_seq_len, dtype=torch.float).unsqueeze(1)
+        div_term = torch.exp(
+            torch.arange(0, self.embedding_size, 2).float()
+            * (-math.log(10000.0) / self.embedding_size)
+        )
+        pos_encoding[:, 0::2] = torch.sin(position * div_term)
+        pos_encoding[:, 1::2] = torch.cos(position * div_term)
+        self.register_buffer("pos_encoding", pos_encoding.unsqueeze(0))
+
+        # Transformer blocks
         self.transformer_blocks = torch.nn.ModuleList(
             [
                 TransformerBlock(
@@ -299,21 +312,6 @@ class gSASRecJPQ(IterativeRecommender, SequentialRecommenderUtils):
                 for _ in range(self.n_layers)
             ]
         )
-        self.seq_norm = torch.nn.LayerNorm(self.embedding_size)
-
-        # JPQ Item Codes Layer
-        self.item_codes_layer = ItemCodeLayer(
-            embedding_size=self.embedding_size,
-            pq_m=self.pq_m,
-            num_items=self.n_items,
-            sequence_length=self.max_seq_len,
-            codes_strategy=self.centroid_strategy,
-        )
-
-        self.user_actions: dict[int, list[tuple[Any, int, float]]] = defaultdict(list)
-        self.val_users_internal: set[int] = set()
-        self.val_border_timestamp: Optional[Any] = None
-        self._centroids_assigned = False
 
     def _append_actions_from_sessions(self, sessions: Sessions) -> None:
         processed_df = sessions._get_processed_data()
@@ -340,7 +338,7 @@ class gSASRecJPQ(IterativeRecommender, SequentialRecommenderUtils):
         inter_df = interactions.get_df()
         cols = [interactions.user_label, interactions.item_label]
         has_rating = rating_label is not None and rating_label in inter_df.columns
-        has_timestamp = timestamp_label in inter_df.columns
+        has_timestamp = timestamp_label is not None and timestamp_label in inter_df.columns
 
         if has_rating:
             cols.append(rating_label)
@@ -393,11 +391,13 @@ class gSASRecJPQ(IterativeRecommender, SequentialRecommenderUtils):
         if not train_users:
             raise ValueError("Unable to extract user histories for JPQ centroid assignment.")
 
+        print(f"\n[gSASRecJPQMix] Assigning codes for {len(train_users)} users...")
         self.item_codes_layer.assign_codes(train_users)
+        print(f"[gSASRecJPQMix] Codes assigned successfully!")
         self._centroids_assigned = True
 
     def set_validation_context(self, dataset) -> None:
-        """Prepara user_actions, val_users e border timestamp come nel codice originale."""
+        """Prepara user_actions, val_users e border timestamp."""
         self.user_actions = defaultdict(list)
         self.val_users_internal = set()
         self.val_border_timestamp = None
@@ -449,14 +449,22 @@ class gSASRecJPQ(IterativeRecommender, SequentialRecommenderUtils):
         interactions: Interactions,
         sessions: Sessions,
     ) -> None:
-        if self.user_actions:
-            self._assign_centroids(sessions)
+        if self.user_actions is not None:
             return
 
         self.user_actions = defaultdict(list)
         self._append_actions_from_sessions(sessions)
+
+        if hasattr(sessions, "validation_set") and sessions.validation_set is not None:
+            self._append_actions_from_interactions(
+                interactions=sessions.validation_set,
+                user_mapping=sessions._umap,
+                item_mapping=sessions._imap,
+                timestamp_label=sessions.timestamp_label,
+                rating_label=getattr(sessions.validation_set, "rating_label", None),
+            )
+
         self._sort_actions()
-        self._assign_centroids(sessions)
 
     def get_dataloader(
         self,
@@ -465,10 +473,12 @@ class gSASRecJPQ(IterativeRecommender, SequentialRecommenderUtils):
         **kwargs: Any,
     ) -> DataLoader:
         self._ensure_train_context(interactions, sessions)
+        if not self._centroids_assigned:
+            self._assign_centroids(sessions)
 
         mode = kwargs.pop("mode", "train")
         shuffle = kwargs.pop("shuffle", mode == "train")
-        kwargs.pop("generator", None)
+        batch_size = self.batch_size if mode == "train" else self.val_batch_size
 
         collator = MaskingCollator(
             user_actions=self.user_actions,
@@ -481,44 +491,32 @@ class gSASRecJPQ(IterativeRecommender, SequentialRecommenderUtils):
             n_negatives=self.negs_per_pos,
         )
 
-        all_users = list(self.user_actions.keys())
         return DataLoader(
-            all_users,
-            batch_size=self.batch_size,
+            list(self.user_actions.keys()),
+            batch_size=batch_size,
             collate_fn=collator,
             shuffle=shuffle,
-            **kwargs,
+            num_workers=0,
         )
 
-    def sasrec_forward(self, input_seq: Tensor) -> tuple[Tensor, list]:
-        """Forward pass del modello SASRecJPQ con JPQ item embeddings."""
-        # Get item embeddings from JPQ layer
-        seq = self.item_codes_layer(input_seq)
-        mask = (input_seq != self.padding_token_id).float().unsqueeze(-1)
+    def sasrec_forward(self, item_seq: Tensor) -> tuple[Tensor, list[Tensor]]:
+        """Forward pass through SASRec architecture."""
+        batch_size = item_seq.size(0)
+        seq_length = item_seq.size(1)
 
-        bs = seq.size(0)
-        positions = (
-            torch.arange(seq.shape[1])
-            .unsqueeze(0)
-            .repeat(bs, 1)
-            .to(input_seq.device)
-        )
-        pos_embeddings = self.position_embedding(positions)[: input_seq.size(0)]
-        seq = seq + pos_embeddings
-        seq = self.embeddings_dropout(seq)
-        seq *= mask
+        # Get item embeddings via JPQ
+        seq_emb = self.item_codes_layer(item_seq, batch_size)
+        seq_emb = seq_emb + self.pos_encoding[:, :seq_length, :]
 
-        attentions = []
+        mask = (item_seq != self.padding_token_id).float().unsqueeze(-1)
+        seq_emb = seq_emb * mask
+
+        attention_weights = []
         for block in self.transformer_blocks:
-            seq, attention = block(seq, mask)
-            attentions.append(attention)
+            seq_emb, attn = block(seq_emb, mask)
+            attention_weights.append(attn)
 
-        seq_emb = self.seq_norm(seq)
-        return seq_emb, attentions
-
-    def get_logits(self, model_out: Tensor) -> Tensor:
-        """Calcola i logits usando JPQ scoring."""
-        return self.item_codes_layer.score_all_items(model_out)
+        return seq_emb, attention_weights
 
     def apply_gbce_transform(self, positive_logits: Tensor) -> Tensor:
         """Apply GBCE transformation to positive logits."""
@@ -540,13 +538,25 @@ class gSASRecJPQ(IterativeRecommender, SequentialRecommenderUtils):
         validation_top_k: int,
         device: str | torch.device,
     ):
-        """Replica del loop custom originale con validazione interna ed early stopping."""
+        """Custom training loop with GBCE loss and bonus support."""
         self.set_validation_context(dataset)
 
-        train_loader = self.get_dataloader(
-            interactions=dataset.train_set,
-            sessions=dataset.train_session,
-            mode="train",
+        if not self._centroids_assigned:
+            self._assign_centroids(dataset.train_session)
+
+        train_loader = DataLoader(
+            list(self.user_actions.keys()),
+            batch_size=self.batch_size,
+            collate_fn=MaskingCollator(
+                user_actions=self.user_actions,
+                sequence_length=self.max_seq_len,
+                val_users=self.val_users_internal,
+                pad_id=self.padding_token_id,
+                mode="train",
+                border_timestamp=self.val_border_timestamp,
+                n_items=self.n_items,
+                n_negatives=self.negs_per_pos,
+            ),
             shuffle=True,
             num_workers=0,
         )
@@ -580,18 +590,26 @@ class gSASRecJPQ(IterativeRecommender, SequentialRecommenderUtils):
                 seq = batch["seq"]
                 labels = batch["labels"]
                 negatives = batch["negatives"]
+                user_ids = batch["user_ids"]
 
                 last_hidden_state, _ = self.sasrec_forward(seq)
 
-                # Score only positives and negatives (not all items!)
+                # Score only positives and negatives
                 pos_neg_concat = torch.cat([labels.unsqueeze(-1), negatives], dim=-1)
                 pos_neg_concat[pos_neg_concat < 0] = self.padding_token_id + 1
                 
-                # Use score_sequence_items which is faster than score_all_items
+                # Use bonus-aware scoring
                 batch_size = seq.size(0)
-                logits = self.item_codes_layer.score_sequence_items(
+                # Expand user_ids to match sequence positions
+                user_ids_expanded = user_ids.unsqueeze(1).expand(-1, self.max_seq_len - 1)
+                
+                # Get user sequence for bonus calculation (exclude last position)
+                user_seq_for_bonus = seq[:, :-1]
+                
+                logits = self.item_codes_layer.score_sequence_items_with_bonus_user(
                     last_hidden_state[:, :-1, :], 
                     pos_neg_concat,
+                    user_seq_for_bonus,
                     batch_size
                 )
 
@@ -649,88 +667,49 @@ class gSASRecJPQ(IterativeRecommender, SequentialRecommenderUtils):
         hidden, _ = self.sasrec_forward(item_seq)
         return self.get_logits(hidden)
 
-    def train_step(self, batch: Any, *args: Any, **kwargs: Any) -> Tensor:
-        """Training step with JPQ and GBCE."""
-        seq = batch["seq"]
-        labels = batch["labels"]
-        negatives = batch["negatives"]
-
-        last_hidden_state, _ = self.sasrec_forward(seq)
-
-        # Score only positives and negatives (not all items!)
-        pos_neg_concat = torch.cat([labels.unsqueeze(-1), negatives], dim=-1)
-        pos_neg_concat[pos_neg_concat < 0] = self.padding_token_id + 1
-        
-        # Use score_sequence_items which is faster than score_all_items
-        batch_size = seq.size(0)
-        logits = self.item_codes_layer.score_sequence_items(
-            last_hidden_state[:, :-1, :], 
-            pos_neg_concat,
-            batch_size
-        )
-
-        gt = torch.zeros_like(logits)
-        gt[:, :, 0] = 1
-
-        # Apply GBCE transformation
-        positive_logits = logits[:, :, 0:1].to(torch.float64)
-        negative_logits = logits[:, :, 1:].to(torch.float64)
-        positive_logits_transformed = self.apply_gbce_transform(positive_logits)
-        logits = torch.cat([positive_logits_transformed, negative_logits], -1)
-
-        mask = (labels != -100).float()
-        loss_per_element = (
-            torch.nn.functional.binary_cross_entropy_with_logits(
-                logits, gt, reduction="none"
-            ).mean(-1)
-            * mask
-        )
-        return loss_per_element.sum() / mask.sum()
+    def get_logits(self, hidden_states: Tensor) -> Tensor:
+        """Get logits for all items."""
+        batch_size = hidden_states.size(0)
+        return self.item_codes_layer.score_all_items(hidden_states, batch_size)
 
     @torch.no_grad()
     def predict(
         self,
-        user_indices: Tensor,
+        user_indices: torch.Tensor,
         *args: Any,
-        item_indices: Optional[Tensor] = None,
-        user_seq: Optional[Tensor] = None,
-        seq_len: Optional[Tensor] = None,
+        item_indices: Optional[torch.Tensor] = None,
+        user_seq: Optional[torch.Tensor] = None,
+        seq_len: Optional[torch.Tensor] = None,
         **kwargs: Any,
-    ) -> Tensor:
-        """Predict scores."""
-        seqs = []
-        for seq_row, length in zip(user_seq, seq_len):
-            row_len = int(length.item())
-            seq = seq_row[:row_len].tolist()
+    ):
+        """Predict with bonus support."""
+        self.eval()
+        device = next(self.parameters()).device
+        user_seq = user_seq.to(device)
+        batch_size = user_seq.shape[0]
 
-            if len(seq) > self.max_seq_len:
-                seq = seq[-self.max_seq_len :]
+        hidden, _ = self.sasrec_forward(user_seq)
+        sequence_embeddings = hidden[:, -1, :]
 
-            if len(seq) < self.max_seq_len:
-                pad_len = self.max_seq_len - len(seq)
-                seq = [self.padding_token_id] * pad_len + seq
-
-            seqs.append(seq)
-
-        pred_seq = torch.tensor(seqs, dtype=torch.long, device=user_seq.device)
-        hidden, _ = self.sasrec_forward(pred_seq)
-        last_logits = self.item_codes_layer.score_all_items(hidden[:, -1, :])
+        # Score with bonuses
+        scores = self.item_codes_layer.score_all_items_with_bonus_user(
+            sequence_embeddings,
+            user_sequence_ids=user_seq,
+        )
 
         if item_indices is None:
-            return last_logits
+            return scores
 
-        batch_indices = torch.arange(
-            last_logits.size(0), device=last_logits.device
-        ).unsqueeze(1)
+        batch_indices = torch.arange(scores.size(0), device=scores.device).unsqueeze(1)
         return (
-            last_logits[batch_indices, item_indices].squeeze(-1)
+            scores[batch_indices, item_indices].squeeze(-1)
             if item_indices.dim() == 1
-            else last_logits[batch_indices, item_indices]
+            else scores[batch_indices, item_indices]
         )
 
     @torch.no_grad()
     def recommend_impl(self, batch: dict[str, Tensor], limit: int, mode: str):
-        """Recommend implementation with JPQ."""
+        """Recommend with bonus and GBCE."""
         if mode == "val":
             seq = batch["seq"]
             labels = batch["labels"]
@@ -748,17 +727,19 @@ class gSASRecJPQ(IterativeRecommender, SequentialRecommenderUtils):
             ratings = ratings[retain_idxs]
             last_hidden_state, _ = self.sasrec_forward(seq)
 
-            # Loss computation with GBCE - score all items then gather
-            logits_for_loss_all = self.item_codes_layer.score_all_items(
-                last_hidden_state[:, -2, :]
+            # Loss computation with GBCE
+            pos_neg_concat = torch.cat(
+                [labels.unsqueeze(-1), negatives], dim=-1
             )
+            # Clip indices to valid range
+            pos_neg_concat = torch.clamp(pos_neg_concat, 0, self.n_items - 1)
             
-            # Gather positives and negatives separately
-            pos_logits = logits_for_loss_all.gather(1, labels.unsqueeze(-1))
-            neg_logits = logits_for_loss_all.gather(1, negatives)
-            
-            # Concatenate
-            logits_for_loss = torch.cat([pos_logits, neg_logits], dim=-1)
+            # Score all items with bonus for loss calculation
+            logits_for_loss_all = self.item_codes_layer.score_all_items_with_bonus_user(
+                last_hidden_state[:, -2, :],
+                user_sequence_ids=seq[:, :-1]
+            )
+            logits_for_loss = logits_for_loss_all.gather(1, pos_neg_concat)
 
             gt = torch.zeros_like(logits_for_loss)
             gt[:, 0] = 1
@@ -773,9 +754,10 @@ class gSASRecJPQ(IterativeRecommender, SequentialRecommenderUtils):
                 logits_for_loss, gt, reduction="none"
             ).mean(-1)
 
-            # NDCG recommendations using JPQ
-            logits_for_ndcg = self.item_codes_layer.score_all_items(
-                last_hidden_state[retain_idxs, -1, :]
+            # NDCG recommendations with bonus (only for users with validation data)
+            logits_for_ndcg = self.item_codes_layer.score_all_items_with_bonus_user(
+                last_hidden_state[retain_idxs, -1, :],
+                user_sequence_ids=seq[retain_idxs]
             )
             top_k = torch.topk(logits_for_ndcg, limit, dim=1)
 
@@ -788,7 +770,10 @@ class gSASRecJPQ(IterativeRecommender, SequentialRecommenderUtils):
         if mode == "test":
             seq = batch["seq"].to(self.device)
             last_hidden_state, _ = self.sasrec_forward(seq)
-            logits = self.item_codes_layer.score_all_items(last_hidden_state[:, -1, :])
+            logits = self.item_codes_layer.score_all_items_with_bonus_user(
+                last_hidden_state[:, -1, :],
+                seq
+            )
             top_k = torch.topk(logits, limit, dim=1)
 
             return {
@@ -805,7 +790,7 @@ class gSASRecJPQ(IterativeRecommender, SequentialRecommenderUtils):
         validation_top_k: int,
         **kwargs: Any,
     ) -> dict[str, float]:
-        """Validazione custom per riprodurre loss/NDCG del codice originale."""
+        """Validation with bonus and GBCE."""
         if not self.val_users_internal or self.val_border_timestamp is None:
             return {f"nDCG@{validation_top_k}": float("-inf"), "val_loss": float("inf")}
 
@@ -820,8 +805,8 @@ class gSASRecJPQ(IterativeRecommender, SequentialRecommenderUtils):
             pad_id=self.padding_token_id,
             mode="val",
             border_timestamp=self.val_border_timestamp,
-            val_ndcg_at=validation_top_k,
             n_items=self.n_items,
+            n_negatives=self.negs_per_pos,
         )
 
         val_loader = DataLoader(
@@ -873,110 +858,58 @@ class gSASRecJPQ(IterativeRecommender, SequentialRecommenderUtils):
             "val_loss": loss_value,
         }
 
-    @torch.no_grad()
-    def custom_test_evaluation(
-        self,
-        dataset,
-        top_k: list[int],
-        **kwargs: Any,
-    ) -> dict[int, dict[str, float]]:
-        """Test evaluation aligned with the original validation logic."""
-        self.set_validation_context(dataset)
+    def train_step(self, batch: Any, *args: Any, **kwargs: Any):
+        """Training step with GBCE and bonus."""
+        seq = batch["seq"]
+        labels = batch["labels"]
+        negatives = batch["negatives"]
+        user_ids = batch["user_ids"]
 
-        if not self.val_users_internal or self.val_border_timestamp is None:
-            return {
-                k: {"nDCG": 0.0, "Precision": 0.0, "Recall": 0.0, "HitRate": 0.0}
-                for k in top_k
-            }
+        last_hidden_state, _ = self.sasrec_forward(seq)
 
-        current_device = self.device
-        self.eval()
-        self.to(self.eval_device)
-
-        top_k = sorted(top_k)
-        max_top_k = max(top_k)
-        val_collator = MaskingCollator(
-            user_actions=self.user_actions,
-            sequence_length=self.max_seq_len,
-            val_users=self.val_users_internal,
-            pad_id=self.padding_token_id,
-            mode="val",
-            border_timestamp=self.val_border_timestamp,
-            val_ndcg_at=max_top_k,
-            n_items=self.n_items,
+        # Concatenate labels and negatives: (batch, seq-1, 1+n_negatives)
+        pos_neg_concat = torch.cat(
+            [labels.unsqueeze(-1), negatives], dim=-1
         )
-
-        val_loader = DataLoader(
-            list(self.val_users_internal),
-            batch_size=self.val_batch_size,
-            collate_fn=val_collator,
-            shuffle=False,
+        # Clamp to valid range
+        pos_neg_concat = torch.clamp(pos_neg_concat, 0, self.n_items - 1)
+        
+        # Score the specific items (pos + negs) with bonus at each position
+        batch_size = seq.size(0)
+        seq_len = seq.size(1)
+        
+        logits_list = []
+        for i in range(seq_len - 1):
+            pos_emb = last_hidden_state[:, i, :]  # (batch, emb)
+            user_seq_for_bonus = seq[:, :i+1]  # (batch, i+1)
+            target_items = pos_neg_concat[:, i, :]  # (batch, 1+n_negatives)
+            
+            # Score these specific items with bonus
+            logits_i = self.item_codes_layer.score_sequence_items_with_bonus_user(
+                pos_emb,
+                target_items,
+                user_sequence_ids=user_seq_for_bonus
+            )  # (batch, 1+n_negatives)
+            logits_list.append(logits_i.unsqueeze(1))
+        
+        logits = torch.cat(logits_list, dim=1)  # (batch, seq-1, 1+n_negatives)
+        
+        # Ground truth
+        gt = torch.zeros_like(logits)
+        gt[:, :, 0] = 1
+        
+        # Apply GBCE to positive logits
+        positive_logits = logits[:, :, 0:1].to(torch.float64)
+        negative_logits = logits[:, :, 1:].to(torch.float64)
+        positive_logits_transformed = self.apply_gbce_transform(positive_logits)
+        logits = torch.cat([positive_logits_transformed, negative_logits], -1)
+        
+        # Mask out padding positions
+        mask = (labels != -100).float()
+        loss_per_element = (
+            torch.nn.functional.binary_cross_entropy_with_logits(
+                logits, gt, reduction="none"
+            ).mean(-1)
+            * mask
         )
-
-        ndcgs = {k: [] for k in top_k}
-        precisions = {k: [] for k in top_k}
-        recalls = {k: [] for k in top_k}
-        hitrates = {k: [] for k in top_k}
-
-        discounts = {
-            k: torch.unsqueeze(
-                1 / torch.log2(torch.arange(1, k + 1, dtype=torch.float) + 1), 0
-            )
-            for k in top_k
-        }
-
-        for batch in val_loader:
-            batch = {
-                key: value.to(self.eval_device)
-                for key, value in batch.items()
-                if isinstance(value, torch.Tensor)
-            }
-            recommendations = self.recommend_impl(batch, max_top_k, "val")
-            items_for_ndcg = recommendations["items_for_ndcg"]
-            ratings = recommendations["ratings"]
-
-            if items_for_ndcg.numel() == 0:
-                continue
-
-            positive_ratings = ratings.clone().float()
-            positive_ratings[positive_ratings < 0] = 0
-            relevant_count = (positive_ratings > 0).sum(dim=1).float()
-            valid_mask = relevant_count > 0
-
-            if not valid_mask.any():
-                continue
-
-            for k in top_k:
-                rec_items = items_for_ndcg[:, :k]
-                gathered_scores = torch.gather(positive_ratings, 1, rec_items)
-                hits = (gathered_scores > 0).sum(dim=1).float()
-
-                dcg = torch.sum(gathered_scores * discounts[k], dim=1)
-                ideal_scores = torch.topk(positive_ratings, k, dim=1).values
-                idcg = torch.sum(ideal_scores * discounts[k], dim=1).clamp(min=1e-10)
-                ndcg = torch.nan_to_num(dcg / idcg)[valid_mask]
-
-                precision = (hits / k)[valid_mask]
-                recall = hits[valid_mask] / relevant_count[valid_mask]
-                hitrate = (hits[valid_mask] > 0).float()
-
-                ndcgs[k].append(ndcg.cpu())
-                precisions[k].append(precision.cpu())
-                recalls[k].append(recall.cpu())
-                hitrates[k].append(hitrate.cpu())
-
-        self.to(current_device)
-
-        results = {}
-        for k in top_k:
-            results[k] = {
-                "nDCG": torch.cat(ndcgs[k]).mean().item() if ndcgs[k] else 0.0,
-                "Precision": (
-                    torch.cat(precisions[k]).mean().item() if precisions[k] else 0.0
-                ),
-                "Recall": torch.cat(recalls[k]).mean().item() if recalls[k] else 0.0,
-                "HitRate": (
-                    torch.cat(hitrates[k]).mean().item() if hitrates[k] else 0.0
-                ),
-            }
-        return results
+        return loss_per_element.sum() / mask.sum()

@@ -68,3 +68,5 @@ tests/
 experiments/
 data/
 .github/userid*
+*.out
+inference_output/

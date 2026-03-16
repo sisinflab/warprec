@@ -36,24 +36,109 @@ writer:
 evaluation:
   top_k: [10, 20, 50]
   metrics: [nDCG, Precision, Recall, HitRate]
-  validation_metric: nDCG@10
+  validation_metric: nDCG@40
+
   batch_size: 512
 
 models:
-  # BERT4RecJPQ:
+  BERT4RecJPQ:
+    embedding_size: 128
+    n_layers: 3
+    n_heads: 2
+    inner_size: 128
+    dropout_prob: 0.2
+    attn_dropout_prob: 0.2
+    mask_prob: 0.2
+    weight_decay: 0.0
+    batch_size: 256
+    epochs: 10000
+    learning_rate: 0.001
+    max_seq_len: 150
+    pq_m: [8, 16, 32, 64]
+    centroid_strategy: svd
+    early_stopping:
+      monitor: "score"
+      patience: 500
+      grace_period: 50
+      min_delta: 0.0001
+    optimization:
+      strategy: grid
+      properties:
+        mode: max
+        seed: 42
+      cpu_per_trial: 12
+      gpu_per_trial: 1
+
+
+
+  BERT4Rec_gts:
+    embedding_size: 128
+    n_layers: 3
+    n_heads: 2
+    inner_size: 512
+    dropout_prob: 0.2
+    attn_dropout_prob: 0.2
+    mask_prob: 0.2
+    reg_weight: 0.0
+    weight_decay: 0
+    batch_size: 128
+    epochs: 10000
+    learning_rate: [0.1,0.01, 0.001, 0.0001] 
+    max_seq_len: 150  
+    
+    early_stopping:
+      monitor: "score"
+      patience: 500
+      grace_period: 50
+      min_delta: 0.0001
+
+    optimization:
+      strategy: grid
+      properties:
+        mode: max
+        seed: 42
+      cpu_per_trial: 12
+      gpu_per_trial: 1
+
+  
+  SASRecJPQ:
+    embedding_size: 128
+    n_layers: 3
+    n_heads: 2
+    inner_size: 128
+    dropout_prob: 0.2
+    weight_decay: 0.0
+    batch_size: 256
+    epochs: 10000
+    learning_rate: 0.01
+    max_seq_len: 150
+    pq_m: [16, 32, 64]
+    centroid_strategy: svd
+    early_stopping:
+      monitor: "score"
+      patience: 500
+      grace_period: 50
+      min_delta: 0.0001
+    optimization:
+      strategy: grid
+      properties:
+        mode: max
+        seed: 42
+      cpu_per_trial: 12
+      gpu_per_trial: 1
+
+  # SASRecJPQMix:
   #   embedding_size: 128
   #   n_layers: 3
   #   n_heads: 2
   #   inner_size: 128
   #   dropout_prob: 0.2
-  #   attn_dropout_prob: 0.2
-  #   mask_prob: 0.2
   #   weight_decay: 0.0
   #   batch_size: 128
   #   epochs: 10000
-  #   learning_rate: 0.001
+  #   learning_rate: 0.01
   #   max_seq_len: 150
-  #   pq_m: 64
+  #   pq_m: [2,4,8,16,32,64]
   #   centroid_strategy: svd
   #   early_stopping:
   #     monitor: "score"
@@ -68,20 +153,48 @@ models:
   #     cpu_per_trial: 12
   #     gpu_per_trial: 1
 
-  BERT4Rec_gts:
+
+
+  SASRec_gts:
     embedding_size: 128
     n_layers: 3
+    n_heads: 2
+    dropout_prob: 0.2
+    weight_decay: 0
+    batch_size: 256
+    epochs: 10000
+    learning_rate: [0.1, 0.01, 0.001, 0.0001] 
+    max_seq_len: 150  
+    
+    early_stopping:
+      monitor: "score"
+      patience: 500
+      grace_period: 50
+      min_delta: 0.0001
+
+    optimization:
+      strategy: grid
+      properties:
+        mode: max
+        seed: 42
+      cpu_per_trial: 12
+      gpu_per_trial: 1
+
+
+  gSASRec_gts:
+    embedding_size: 128
+    n_layers: 2
     n_heads: 2
     inner_size: 512
     dropout_prob: 0.2
     attn_dropout_prob: 0.2
-    mask_prob: 0.2
-    reg_weight: 0.0
-    weight_decay: 0
+    weight_decay: 0.0
     batch_size: 128
     epochs: 10000
-    learning_rate: 0.001
+    learning_rate: [0.1, 0.01, 0.001, 0.0001]
     max_seq_len: 150
+    gbce_t: 0.75
+    negs_per_pos: 256
     early_stopping:
       monitor: "score"
       patience: 500
@@ -95,6 +208,98 @@ models:
       cpu_per_trial: 12
       gpu_per_trial: 1
 
+  gSASRecJPQ:
+    embedding_size: 128
+    n_layers: 2
+    n_heads: 2
+    inner_size: 128
+    dropout_prob: 0.2
+    attn_dropout_prob: 0.2
+    weight_decay: 0.0
+    batch_size: 64
+    epochs: 10000
+    learning_rate: 0.01
+    max_seq_len: 150
+    pq_m: [16,32,64]
+    centroid_strategy: svd
+    gbce_t: 0.75
+    negs_per_pos: 256
+    early_stopping:
+      monitor: "score"
+      patience: 500
+      grace_period: 50
+      min_delta: 0.0001
+    optimization:
+      strategy: grid
+      properties:
+        mode: max
+        seed: 42
+      cpu_per_trial: 12
+      gpu_per_trial: 1
+
+  # BertJPQMix:
+  #   embedding_size: 128
+  #   n_layers: 3
+  #   n_heads: 2
+  #   inner_size: 128
+  #   dropout_prob: 0.2
+  #   weight_decay: 0.0
+  #   batch_size: 128
+  #   epochs: 10000
+  #   learning_rate: 0.001
+  #   max_seq_len: 150
+  #   pq_m: [4,8,16,32,64]
+  #   centroid_strategy: svd
+  #   mask_prob: 0.2
+  #   early_stopping:
+  #     monitor: "score"
+  #     patience: 500
+  #     grace_period: 50
+  #     min_delta: 0.0001
+  #   optimization:
+  #     strategy: grid
+  #     properties:
+  #       mode: max
+  #       seed: 42
+  #     cpu_per_trial: 12
+  #     gpu_per_trial: 1
+
+  # gSASRecJPQMix:
+  #   embedding_size: 128
+  #   n_layers: 2
+  #   n_heads: 2
+  #   dropout_prob: 0.2
+  #   weight_decay: 0.0
+  #   batch_size: 128
+  #   epochs: 10000
+  #   learning_rate: 0.01
+  #   max_seq_len: 150
+  #   max_steps_per_epoch: 200
+  #   val_batch_size: 128
+  
+  #   early_stop_epochs: 50
+  #   pq_m: [2,4,8,16,32,64]
+  #   centroid_strategy: svd
+  #   gbce_t: 0.75
+  #   negs_per_pos: 256
+  #   early_stopping:
+  #     monitor: "score"
+  #     patience: 500
+  #     grace_period: 50
+  #     min_delta: 0.0001
+  #   optimization:
+  #     strategy: grid
+  #     properties:
+  #       mode: max
+  #       seed: 42
+  #     cpu_per_trial: 12
+  #     gpu_per_trial: 1
+
+
+
+
 general:
   device: cuda
   custom_models: ["warprec_recjpq"]
+
+

@@ -72,21 +72,16 @@ class MaskingCollator:
                     seq = seq[borderline - self.sequence_length : borderline]
 
                 seq = torch.tensor(seq, dtype=torch.long, requires_grad=False)
-                
-                # Pad seq first
+                labels = seq.clone()
+
                 if len(seq) < self.sequence_length:
-                    pad_seq = torch.tensor(
-                        [self.pad_id] * (self.sequence_length - len(seq)),
+                    pad = torch.tensor(
+                        [self.ignore_val] * (self.sequence_length - len(seq)),
                         requires_grad=False,
                     )
-                    seq = torch.cat([pad_seq, seq], dim=0)
+                    labels = torch.cat([pad, labels], dim=0)
 
-                # Create shifted labels: labels[i] should be seq[i+1]
-                # For last position, use ignore_val
-                labels = torch.cat([seq[1:], torch.tensor([self.ignore_val])], dim=0)
-                
-                # Remove last position to match seq_len-1 after forward pass
-                labels_all.append(labels[:-1])  # Labels are shifted
+                labels_all.append(labels[1:])  # Labels are shifted
 
             elif self.is_validation:
                 seq = [
@@ -144,8 +139,7 @@ class MaskingCollator:
 
                 seq = torch.tensor(seq, dtype=torch.long, requires_grad=False)
 
-            # Pad seq for validation and test (training pads earlier)
-            if not self.is_train and len(seq) < self.sequence_length:
+            if len(seq) < self.sequence_length:
                 pad = torch.tensor(
                     [self.pad_id] * (self.sequence_length - len(seq)),
                     requires_grad=False,
@@ -186,7 +180,7 @@ class MaskingCollator:
 
 
 class TransformerBlock(torch.nn.Module):
-    """Transformer block for SASRecJPQ."""
+    """Transformer block for SASRecJPQ - PRE-normalization architecture."""
 
     def __init__(self, embedding_dim: int, num_heads: int, ff_dim: int, dropout: float):
         super().__init__()
@@ -194,35 +188,69 @@ class TransformerBlock(torch.nn.Module):
         self.num_heads = num_heads
         self.dropout = dropout
         
-        self.attention = torch.nn.MultiheadAttention(
-            embedding_dim, num_heads, dropout=dropout, batch_first=True
-        )
-        self.norm1 = torch.nn.LayerNorm(embedding_dim)
-        self.norm2 = torch.nn.LayerNorm(embedding_dim)
-        self.ff = torch.nn.Sequential(
-            torch.nn.Linear(embedding_dim, ff_dim),
-            torch.nn.ReLU(),
-            torch.nn.Dropout(dropout),
-            torch.nn.Linear(ff_dim, embedding_dim),
-            torch.nn.Dropout(dropout),
-        )
-        self.dropout_layer = torch.nn.Dropout(dropout)
+        self.first_norm = torch.nn.LayerNorm(embedding_dim)
+        self.query_proj = torch.nn.Linear(embedding_dim, embedding_dim)
+        self.key_proj = torch.nn.Linear(embedding_dim, embedding_dim)
+        self.val_proj = torch.nn.Linear(embedding_dim, embedding_dim)
+        self.attn_dropout = torch.nn.Dropout(dropout)
+        
+        self.second_norm = torch.nn.LayerNorm(embedding_dim)
+        self.dense1 = torch.nn.Linear(embedding_dim, ff_dim)
+        self.dense2 = torch.nn.Linear(ff_dim, embedding_dim)
+        self.ff_dropout1 = torch.nn.Dropout(dropout)
+        self.ff_dropout2 = torch.nn.Dropout(dropout)
 
-    def forward(self, x: Tensor, mask: Tensor) -> tuple[Tensor, Tensor]:
-        # Self-attention with causal mask
-        seq_len = x.size(1)
-        causal_mask = torch.triu(
-            torch.ones(seq_len, seq_len, device=x.device) * float("-inf"), diagonal=1
-        )
+    def forward(self, seq: Tensor, mask: Tensor) -> tuple[Tensor, Tensor]:
+        device = seq.device
+        mask = mask.to(device)
+        
+        # PRE-normalization for attention
+        x = self.first_norm(seq)
+        queries = self.query_proj(x)
+        keys = self.key_proj(x)
+        values = self.val_proj(x)
 
-        attn_output, attn_weights = self.attention(
-            x, x, x, attn_mask=causal_mask, need_weights=True
-        )
-        x = self.norm1(x + self.dropout_layer(attn_output))
-        ff_output = self.ff(x)
-        x = self.norm2(x + ff_output)
+        # Dimensions
+        B, S, _ = queries.shape
+        H = self.num_heads
+        D = self.embedding_dim // H
+        
+        # Reshape: (B, S, H, D) -> (B, H, S, D)
+        Q = queries.view(B, S, H, D).transpose(1, 2)
+        K = keys.view(B, S, H, D).transpose(1, 2)
+        V = values.view(B, S, H, D).transpose(1, 2)
+
+        # Manual Scaled Dot Product Attention
+        scores = torch.matmul(Q, K.transpose(-2, -1)) / math.sqrt(D)
+        
+        # Causal masking
+        causal_mask = torch.triu(torch.ones((S, S), device=device), diagonal=1).bool()
+        scores.masked_fill_(causal_mask, float('-inf'))
+        
+        # Softmax and dropout
+        attn_weights = torch.nn.functional.softmax(scores, dim=-1)
+        attn_weights = torch.nn.functional.dropout(attn_weights, p=self.dropout, training=self.training)
+        
+        # Value aggregation
+        attn_output = torch.matmul(attn_weights, V)
+        
+        # Reshape back: (B, H, S, D) -> (B, S, Emb_Size)
+        attn_output = attn_output.transpose(1, 2).contiguous().view(B, S, self.embedding_dim)
+        
+        # Residual connection
+        x = seq + attn_output
+        
+        # PRE-normalization for feed-forward
+        residual = x
+        x = self.second_norm(x)
+        x = self.dense1(x)
+        x = torch.nn.functional.relu(x)
+        x = self.ff_dropout1(x)
+        x = self.dense2(x)
+        x = self.ff_dropout2(x)
+        x += residual
+        
         x = x * mask
-
         return x, attn_weights
 
 
@@ -568,30 +596,21 @@ class SASRecJPQ(IterativeRecommender, SequentialRecommenderUtils):
 
                 last_hidden_state, _ = self.sasrec_forward(seq)
 
-                # Loss computation with JPQ - use score_all_items like BERT4RecJPQ
+                # Loss computation with JPQ - use score_sequence_items for efficiency
                 batch_size = seq.size(0)
-                seq_len_minus_one = last_hidden_state[:, :-1, :].size(1)
                 
-                # Score each position separately using score_all_items (proven to work in BERT4RecJPQ)
-                all_logits_list = []
-                for t in range(seq_len_minus_one):
-                    pos_hidden = last_hidden_state[:, t, :]
-                    pos_logits = self.item_codes_layer.score_all_items(pos_hidden)
-                    all_logits_list.append(pos_logits)
-                
-                # Stack: (seq_len-1, batch, n_items) -> (batch, seq_len-1, n_items)
-                all_logits = torch.stack(all_logits_list, dim=1)
-                
-                # Prepare pos/neg indices and gather
+                # Prepare pos/neg indices
                 pos_neg_concat = torch.cat(
                     [labels.unsqueeze(-1), negatives.unsqueeze(-1)], dim=-1
                 )
-                pos_neg_concat = torch.clamp(pos_neg_concat, min=0, max=self.n_items - 1)
+                pos_neg_concat[pos_neg_concat < 0] = self.padding_token_id + 1
                 
-                # Gather logits: (batch, seq_len-1, n_items) + indices (batch, seq_len-1, 2) -> (batch, seq_len-1, 2)
-                batch_indices = torch.arange(batch_size, device=all_logits.device).view(-1, 1, 1).expand(-1, seq_len_minus_one, 2)
-                seq_indices = torch.arange(seq_len_minus_one, device=all_logits.device).view(1, -1, 1).expand(batch_size, -1, 2)
-                logits = all_logits[batch_indices, seq_indices, pos_neg_concat]
+                # Score only the target items (much faster than score_all_items)
+                logits = self.item_codes_layer.score_sequence_items(
+                    last_hidden_state[:, :-1, :], 
+                    pos_neg_concat,
+                    batch_size
+                )
 
                 # Loss computation using softplus like legacy TF code
                 positive_logits = logits[:, :, 0]

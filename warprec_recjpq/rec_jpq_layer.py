@@ -183,22 +183,24 @@ class ItemCodeLayer(nn.Module):
         # scores: (batch, seq_len, item_code_bytes, vals_per_dim)
         # target_codes: (batch, seq_len, num_targets, item_code_bytes)
         
-        # Permute target_codes to (batch, seq_len, item_code_bytes, num_targets) for easier gathering
-        target_codes_perm = target_codes.permute(0, 1, 3, 2)  # (batch, seq_len, item_code_bytes, num_targets)
+        # Use advanced indexing instead of expand to avoid OOM
+        # Create indices for batch and seq dimensions
+        batch_idx = torch.arange(batch_size, device=scores.device).view(batch_size, 1, 1, 1)
+        seq_idx = torch.arange(seq_len, device=scores.device).view(1, seq_len, 1, 1)
+        byte_idx = torch.arange(self.item_code_bytes, device=scores.device).view(1, 1, 1, self.item_code_bytes)
         
-        # Gather for all byte positions at once
-        # Expand scores to match gathering dimension
-        # scores: (batch, seq_len, item_code_bytes, vals_per_dim)
-        # We need to gather along last dim using target_codes_perm
+        # Expand to match target_codes shape
+        batch_idx = batch_idx.expand(batch_size, seq_len, num_targets, self.item_code_bytes)
+        seq_idx = seq_idx.expand(batch_size, seq_len, num_targets, self.item_code_bytes)
+        byte_idx = byte_idx.expand(batch_size, seq_len, num_targets, self.item_code_bytes)
         
-        sub_scores = torch.gather(
-            scores.unsqueeze(3).expand(-1, -1, -1, num_targets, -1),  # (batch, seq, bytes, num_targets, vals_per_dim)
-            4,  # gather along vals_per_dim dimension
-            target_codes_perm.unsqueeze(-1)  # (batch, seq, bytes, num_targets, 1)
-        ).squeeze(-1)  # (batch, seq, bytes, num_targets)
+        # Gather using advanced indexing: scores[batch, seq, byte, code]
+        # target_codes: (batch, seq_len, num_targets, item_code_bytes)
+        sub_scores = scores[batch_idx, seq_idx, byte_idx, target_codes]
+        # sub_scores: (batch, seq_len, num_targets, item_code_bytes)
         
-        # Sum over bytes: (batch, seq_len, item_code_bytes, num_targets) -> (batch, seq_len, num_targets)
-        logits = torch.sum(sub_scores, dim=2)
+        # Sum over bytes: (batch, seq_len, num_targets, item_code_bytes) -> (batch, seq_len, num_targets)
+        logits = torch.sum(sub_scores, dim=3)
         
         return logits
 
