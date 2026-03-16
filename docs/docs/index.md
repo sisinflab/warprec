@@ -94,10 +94,16 @@ evaluation:
   num_negatives: 99
 ```
 
+Start your local instance of Ray:
+
+```bash
+ray start --head
+```
+
 Then run the following command:
 
 ```bash
-python -m warprec.run -c config/quick_start.yml -p design
+python -m warprec.run -c config/quick_start.yml -p train
 ```
 
 !!! note
