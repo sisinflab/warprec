@@ -346,6 +346,7 @@ class Trainer:
             scheduler=scheduler,  # type: ignore[arg-type]
             num_samples=opt_config.num_samples,
             trial_name_creator=self._trial_name_creator(model_name),
+            trial_dirname_creator=self._trial_dirname_creator(model_name),
         )
 
         num_folds = len(dataset) if isinstance(dataset, list) else 0
@@ -558,6 +559,12 @@ class Trainer:
         def _creator(trial: Trial):
             return f"{model_name}_{str(uuid.uuid4())[:8]}"
 
+        return _creator
+
+    def _trial_dirname_creator(self, model_name: str):
+        def _creator(trial: Trial):
+            return f"{model_name}_trial_{trial.trial_id}"
+        
         return _creator
 
     def _setup_callbacks(
