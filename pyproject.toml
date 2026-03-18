@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "warprec"
-version = "0.1.0"
+version = "1.0.0"
 description = "Unifying Academic Rigor and Industrial Scale for Responsible, Reproducible, and Efficient Recommendation"
 authors = [
     "MarcoWV <marco.avolio@wideverse.com>",
@@ -20,13 +20,13 @@ pydantic = "^2.10.6"
 tabulate = "^0.9.0"
 scikit-learn = "^1.6.1"
 hyperopt = "^0.2.7"
-ray = {extras = ["data", "serve", "train", "tune"], version = "~2.45"}
+ray = {extras = ["data", "serve", "train", "tune"], version = "^2.45.0"}
 types-pyyaml = "^6.0.12.20241230"
 types-tabulate = "^0.9.0.20241207"
 loguru = "^0.7.3"
 tensorboard = "^2.19.0"
 tensorboardx = "^2.6.2.2"
-torch = "~2.7"
+torch = "^2.7.0"
 torchmetrics = "^1.8.2"
 optuna = "^4.5.0"
 polars = "^1.36"
@@ -36,9 +36,6 @@ codecarbon = {version = "^3.0.0", optional = true}
 mlflow = {version = "^2.22.0", optional = true}
 azure-storage-blob = {version = "^12.26.0", optional = true}
 azure-identity = {version = "^1.25.1", optional = true}
-torch-scatter = {version = "*", optional = true}
-torch-sparse = {version = "*", optional = true}
-torch-geometric = {version = "*", optional = true}
 fastapi = {version = "^0.135.1", optional = true}
 fastmcp = {version = "^3.1.0", optional = true}
 
@@ -73,6 +70,19 @@ serving = [
     "fastapi",
     "fastmcp",
 ]
+
+
+[tool.semantic_release]
+version_toml = [
+    "pyproject.toml:tool.poetry.version",
+]
+branch = "main"
+changelog_file = "CHANGELOG.md"
+build_command = "poetry build"
+upload_to_repository = false
+upload_to_release = true
+commit_message = "chore(release): {version} [skip ci]"
+commit_author = "github-actions [bot] <github-actions[bot]@users.noreply.github.com>"
 
 
 [build-system]
