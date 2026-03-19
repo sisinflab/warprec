@@ -564,7 +564,7 @@ class Trainer:
     def _trial_dirname_creator(self, model_name: str):
         def _creator(trial: Trial):
             return f"{model_name}_trial_{trial.trial_id}"
-        
+
         return _creator
 
     def _setup_callbacks(
