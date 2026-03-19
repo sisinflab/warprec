@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "warprec"
-version = "1.0.0"
+version = "0.0.0"
 description = "Unifying Academic Rigor and Industrial Scale for Responsible, Reproducible, and Efficient Recommendation"
 authors = [
     "MarcoWV <marco.avolio@wideverse.com>",
