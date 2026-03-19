@@ -17,6 +17,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          token: ${{ secrets.RELEASE_TOKEN_WARPREC }}
 
       - name: Set up Python
         uses: actions/setup-python@v5
