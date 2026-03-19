@@ -19,25 +19,45 @@ jobs:
         with:
           fetch-depth: 0
           token: ${{ secrets.RELEASE_TOKEN_WARPREC }}
-
-      - name: Install Poetry
-        uses: snok/install-poetry@v1
-        with:
-          version: 2.1.2
-          virtualenvs-create: true
-          virtualenvs-in-project: true
-
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-
-      - name: Python Semantic Release
-        id: release
-        uses: python-semantic-release/python-semantic-release@v9.18.0
+      - name: Install Poetry
+        uses: snok/install-poetry@v1
         with:
-          github_token: ${{ secrets.RELEASE_TOKEN_WARPREC }}
-
-      - name: Publish to PyPI
-        if: steps.release.outputs.released == 'true'
-        uses: pypa/gh-action-pypi-publish@release/v1
+          virtualenvs-create: true
+          virtualenvs-in-project: true
+          version: 2.1.2
+      - name: Install dependencies
+        run: poetry install --no-interaction --all-extras
+      - name: Install Python Semantic Release
+        run: |
+          pip install python-semantic-release
+      - name: Git Configuration
+        run: |
+          git config user.name "github-actions [bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+      - name: Python Semantic Release (Version & Push)
+        id: psr
+        env:
+          GH_TOKEN: ${{ secrets.RELEASE_TOKEN_WARPREC }}
+        run: |
+          semantic-release version
+          if [ -f ".release_version" ] || git describe --tags --exact-match HEAD >/dev/null 2>&1; then
+            echo "released=true" >> $GITHUB_OUTPUT
+          else
+            echo "released=false" >> $GITHUB_OUTPUT
+          fi
+      - name: Build Package
+        if: steps.psr.outputs.released == 'true'
+        run: poetry build
+      - name: Publish to GitHub Release
+        if: steps.psr.outputs.released == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.RELEASE_TOKEN_WARPREC }}
+        run: |
+          semantic-release publish
+      # - name: Publish to PyPI
+      #   if: steps.psr.outputs.released == 'true'
+      #   uses: pypa/gh-action-pypi-publish@release/v1

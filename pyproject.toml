@@ -78,7 +78,6 @@ version_toml = [
 ]
 branch = "main"
 changelog_file = "CHANGELOG.md"
-build_command = "poetry build"
 upload_to_repository = false
 upload_to_release = true
 commit_message = "chore(release): {version} [skip ci]"
