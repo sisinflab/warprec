@@ -14,10 +14,18 @@ jobs:
       contents: write
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0
           token: ${{ secrets.RELEASE_TOKEN_WARPREC }}
+
+      - name: Install Poetry
+        uses: snok/install-poetry@v1
+        with:
+          version: 2.1.2
+          virtualenvs-create: true
+          virtualenvs-in-project: true
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -26,7 +34,7 @@ jobs:
 
       - name: Python Semantic Release
         id: release
-        uses: python-semantic-release/python-semantic-release@v9
+        uses: python-semantic-release/python-semantic-release@v9.18.0
         with:
           github_token: ${{ secrets.RELEASE_TOKEN_WARPREC }}
 
