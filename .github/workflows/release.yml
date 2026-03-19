@@ -26,10 +26,9 @@ jobs:
 
       - name: Python Semantic Release
         id: release
-        uses: python-semantic-release/python-semantic-release@v9.8.1
+        uses: python-semantic-release/python-semantic-release@v10
         with:
           github_token: ${{ secrets.RELEASE_TOKEN_WARPREC }}
-          root_options: "-v"
 
       - name: Publish to PyPI
         if: steps.release.outputs.released == 'true'
