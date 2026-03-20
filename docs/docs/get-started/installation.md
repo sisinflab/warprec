@@ -1,17 +1,30 @@
 # Install WarpRec
 
-The procedure to install WarpRec is streamlined using Conda or Mamba. Environment is available both for CPU e GPU.
+WarpRec is designed to be easily installed via **pip** or via **Conda**. This ensures that all dependencies and the Python environment are managed consistently. Conda environment is available both for CPU and GPU.
 
-> **Stay tuned!** WarpRec will be available on **PyPI** in a future release.
+### Quick Install (PyPI)
+The easiest way to get started is using pip:
+```bash
+pip install warprec
+```
 
-## Prerequisites
+WarpRec provides extra dependencies for specific use cases:
 
-- **Git**: To clone the repository.
-- **Conda**: You need either [Anaconda](https://www.anaconda.com/) or [Miniconda](https://docs.conda.io/en/latest/miniconda.html) installed on your system.
+| extra | usage |
+|---|---|
+| dashboard | Dashboard functionalities like MLflow and Weights & Biases. |
+| remote-io | Remote communication with cloud services like Azure. |
+| serving | Optional dependencies to serve your recommendation models. |
+| all | All of the above. |
 
-## Installation guide
+You can install them at any moment using the following command:
+```bash
+pip install "warprec[dashboard, remote-io]"
+```
 
-Follow these steps to clone the project and set up the environment:
+### Development Setup (Conda)
+
+If you want to contribute or need a specific environment (CPU/GPU), we recommend using Conda. The conda environment already contains all the extra dependencies:
 
 1. **Clone the repository**
    Open your terminal and clone the WarpRec repository:
@@ -23,7 +36,10 @@ Follow these steps to clone the project and set up the environment:
 2. **Create the Conda environment**
     Use the provided environment.gpu.yml (or environment.cpu.yml) file to create the virtual environment. This will install Python 3.12 and the necessary core dependencies.
     ```bash
+    # For GPU support
     conda env create --file environment.gpu.yml
+    # Or for CPU only
+    conda env create --file environment.cpu.yml
     ```
 
 3.  **Activate the environment:**
