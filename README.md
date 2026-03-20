@@ -1,6 +1,7 @@
 # 🚀 WarpRec
 
 [![GitHub release (latest by date)](https://img.shields.io/github/v/release/sisinflab/warprec)](https://github.com/sisinflab/warprec/releases)
+[![PyPI version](https://badge.fury.io/py/warprec.svg)](https://pypi.org/project/warprec/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Python 3.12](https://img.shields.io/badge/python-3.12-blue.svg)](https://www.python.org/downloads/release/python-3120/)
 [![Documentation Status](https://readthedocs.org/projects/warprec/badge/?version=latest)](https://warprec.readthedocs.io/en/latest/)
@@ -42,8 +43,8 @@ An **Application Layer** exposes trained models through a REST API (FastAPI) and
 
 - [✨ Key Features](#-key-features)
 - [⚙️ Installation](#️-installation)
-  - [📋 Prerequisites](#-prerequisites)
-  - [🛠️ Setup Guide](#️-setup-guide)
+  - [🚀 Quick Install (PyPI)](#-quick-install-pypi)
+  - [🛠️ Development Setup (Conda)](#️-development-setup-conda)
 - [🚂 Usage](#-usage)
   - [🏋️ Training a model](#️-training-a-model)
   - [✏️ Design a model](#️-design-a-model)
@@ -70,16 +71,17 @@ An **Application Layer** exposes trained models through a REST API (FastAPI) and
 
 ## ⚙️ Installation
 
-WarpRec is designed to be easily installed and reproducible using **Conda**. This ensures that all dependencies and the Python environment are managed consistently. Environment is available both for CPU e GPU.
+WarpRec is designed to be easily installed via **pip** or via **Conda**. This ensures that all dependencies and the Python environment are managed consistently. Conda environment is available both for CPU e GPU.
 
-### 📋 Prerequisites
+### 🚀 Quick Install (PyPI)
+The easiest way to get started is using pip:
+```bash
+pip install warprec
+```
 
-- **Git**: To clone the repository.
-- **Conda**: You need either [Anaconda](https://www.anaconda.com/) or [Miniconda](https://docs.conda.io/en/latest/miniconda.html) installed on your system.
+### 🛠️ Development Setup (Conda)
 
-### 🛠️ Setup Guide
-
-Follow these steps to clone the project and set up the environment:
+If you want to contribute or need a specific environment (CPU/GPU), we recommend using Conda:
 
 1. **Clone the repository**
    Open your terminal and clone the WarpRec repository:
@@ -91,7 +93,10 @@ Follow these steps to clone the project and set up the environment:
 2. **Create the Conda environment**
     Use the provided environment.gpu.yml (or environment.cpu.yml) file to create the virtual environment. This will install Python 3.12 and the necessary core dependencies.
     ```bash
+    # For GPU support
     conda env create --file environment.gpu.yml
+    # Or for CPU only
+    conda env create --file environment.cpu.yml
     ```
 
 3.  **Activate the environment:**
@@ -113,6 +118,9 @@ To train a model, use the `train` pipeline. Here's an example:
     ray start --head
 3. Run the following command:
     ```bash
+    # Running with pip
+    warprec -c config/train_config.yml -p train
+    # Or with cloned repo
     python -m warprec.run -c config/train_config.yml -p train
 
 This command starts the training process using the specified configuration file.
@@ -125,6 +133,9 @@ To implement a custom model, WarpRec provides a dedicated design interface via t
     about the custom models, dataset and training parameters.
 2. Run the following command:
     ```bash
+    # Running with pip
+    warprec -c config/design_config.yml -p design
+    # Or with cloned repo
     python -m warprec.run -c config/design_config.yml -p design
 
 This command initializes a lightweight training pipeline, specifically intended for rapid prototyping and debugging of custom architectures within the framework.
@@ -137,6 +148,9 @@ To run only evaluation on a model, use the `eval` pipeline. Here's an example:
     about the model, dataset and training parameters.
 2. Run the following command:
     ```bash
+    # Running with pip
+    warprec -c config/eval_config.yml -p eval
+    # Or with cloned repo
     python -m warprec.run -c config/eval_config.yml -p eval
 
 This command starts the evaluation process using the specified configuration file.
