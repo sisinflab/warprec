@@ -36,7 +36,7 @@ mcp = FastMCP("WarpRec MCP Server")
         "Provide the 'model_key' to select which model-dataset pair to use "
         "(e.g., 'SASRec_movielens' for sequential, 'BPR_movielens' for collaborative). "
         "Use the 'list_models' tool first to discover available model keys and their types. "
-        "For sequential models, provide 'item_sequence' as a list of integer item IDs. "
+        "For sequential models, provide 'item_names' as a list of string item names. "
         "For collaborative models, provide 'user_index' as an integer. "
         "For contextual models, provide both 'user_index' and 'context'."
     )
@@ -44,26 +44,26 @@ mcp = FastMCP("WarpRec MCP Server")
 def recommend(
     model_key: str,
     top_k: int = 10,
-    item_sequence: Optional[List[int]] = None,
+    item_names: Optional[List[str]] = None,
     user_index: Optional[int] = None,
     context: Optional[List[int]] = None,
-) -> List[int]:
+) -> List[str]:
     """Get recommendations from a specified model-dataset pair.
 
     Args:
         model_key (str): Identifier selecting the model and dataset (e.g., "SASRec_movielens").
         top_k (int): Number of recommendations to return.
-        item_sequence (Optional[List[int]]): External item IDs for sequential models.
+        item_names (Optional[List[str]]): Item names for sequential models.
         user_index (Optional[int]): User identifier for collaborative or contextual models.
         context (Optional[List[int]]): Context feature values for contextual models.
 
     Returns:
-        List[int]: Ordered list of recommended items.
+        List[str]: Ordered list of recommended items.
     """
-    return inference_service.recommend(
+    return inference_service.recommend_with_names(
         model_key=model_key,
         top_k=top_k,
-        item_sequence=item_sequence,
+        item_names=item_names,
         user_index=user_index,
         context=context,
     )
