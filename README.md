@@ -71,7 +71,7 @@ An **Application Layer** exposes trained models through a REST API (FastAPI) and
 
 ## ⚙️ Installation
 
-WarpRec is designed to be easily installed via **pip** or via **Conda**. This ensures that all dependencies and the Python environment are managed consistently. Conda environment is available both for CPU e GPU.
+WarpRec is designed to be easily installed via **pip** or via **Conda**. This ensures that all dependencies and the Python environment are managed consistently. Conda environment is available both for CPU and GPU.
 
 ### 🚀 Quick Install (PyPI)
 The easiest way to get started is using pip:
