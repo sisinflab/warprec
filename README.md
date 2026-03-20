@@ -79,9 +79,23 @@ The easiest way to get started is using pip:
 pip install warprec
 ```
 
+WarpRec provides extra dependencies for specific use cases:
+
+| extra | usage |
+|---|---|
+| dashboard | Dashboard functionalities like MLflow and Weights & Biases. |
+| remote-io | Remote communication with cloud services like Azure. |
+| serving | Optional dependencies to serve your recommendation models. |
+| all | All of the above. |
+
+You can install them at any moment using the following command:
+```bash
+pip install "warprec[dashboard, remote-io]"
+```
+
 ### 🛠️ Development Setup (Conda)
 
-If you want to contribute or need a specific environment (CPU/GPU), we recommend using Conda:
+If you want to contribute or need a specific environment (CPU/GPU), we recommend using Conda. The conda environment already contains all the extra dependencies:
 
 1. **Clone the repository**
    Open your terminal and clone the WarpRec repository:
