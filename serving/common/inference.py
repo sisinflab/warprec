@@ -82,6 +82,64 @@ class InferenceService:
             f"Unknown endpoint type '{endpoint_type}' for key '{model_key}'."
         )
 
+    def recommend_with_names(
+        self,
+        model_key: str,
+        top_k: int = 10,
+        item_names: Optional[List[str]] = None,
+        user_index: Optional[int] = None,
+        context: Optional[List[int]] = None,
+    ) -> List[str]:
+        """Wrapper that handles string-to-ID conversion for input and output.
+
+        This allows the MCP tool to work with movie titles while keeping the
+        core recommendation logic (used by REST API) based on integer IDs.
+
+        Args:
+            model_key (str): Model-dataset identifier (e.g., ``"SASRec_movielens"``).
+            top_k (int): Number of recommendations to return.
+            item_names (Optional[List[str]]): Item names for sequential models.
+            user_index (Optional[int]): User identifier for collaborative or contextual models.
+            context (Optional[List[int]]): Context feature values for contextual models.
+
+        Returns:
+            List[str]: Ordered list of recommended item names.
+
+        Raises:
+            ValueError: If the dataset is not found for the model key.
+        """
+        dataset_name = self._manager.get_dataset_for_model(model_key)
+        if not dataset_name:
+            raise ValueError(f"No dataset found for model key '{model_key}'")
+
+        # Map input names to external IDs
+        external_ids = None
+        if item_names:
+            external_ids = []
+            for name in item_names:
+                ext_id = self._manager.name_to_external_id(dataset_name, name)
+                if ext_id is not None:
+                    external_ids.append(ext_id)
+                else:
+                    logger.attention(
+                        f"Item '{name}' not found in dataset '{dataset_name}'."
+                    )
+
+        # Call the existing recommend method (returns List[int] of external IDs)
+        recommended_ids = self.recommend(
+            model_key=model_key,
+            top_k=top_k,
+            item_sequence=external_ids,
+            user_index=user_index,
+            context=context,
+        )
+
+        # Map result external IDs back to names
+        return [
+            self._manager.external_id_to_name(dataset_name, ext_id)
+            for ext_id in recommended_ids
+        ]
+
     def recommend_sequential(
         self,
         model_key: str,
