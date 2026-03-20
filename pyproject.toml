@@ -11,6 +11,9 @@ authors = [
 ]
 readme = "README.md"
 
+[tool.poetry.scripts]
+warprec = "warprec.run:main"
+
 [tool.poetry.dependencies]
 python = "~3.12"
 pandas = "^2.2.3"
