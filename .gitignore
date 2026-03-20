@@ -70,3 +70,4 @@ data/
 .github/userid*
 *.out
 inference_output/
+inference_output_validation/

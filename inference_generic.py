@@ -26,18 +26,18 @@ except ImportError:
 # ============================================================================
 
 MODELS_CONFIG = {
-    'SASRecJPQMix': {
-        'checkpoint': '/home/chiara/projects/warprec/experiments/lastfm1k/legacy_split_raw_jpq/lastfm1k_30000_legacy_split_raw_jpq/ray_results/objective_function_2026-03-11_16-24-25/SASRecJPQMix_95101655_0_batch_size=128,centroid_strategy=svd,dropout_prob=0.2000,embedding_size=128,epochs=10000,inner_size=128,le_2026-03-11_16-24-25/checkpoint_002196/checkpoint.pt',
-        'enabled': True,
-    },
+    # 'SASRecJPQMix': {
+    #     'checkpoint': '/home/chiara/projects/warprec/experiments/lastfm1k/legacy_split_raw_jpq/lastfm1k_30000_legacy_split_raw_jpq/ray_results/objective_function_2026-03-11_16-24-25/SASRecJPQMix_95101655_0_batch_size=128,centroid_strategy=svd,dropout_prob=0.2000,embedding_size=128,epochs=10000,inner_size=128,le_2026-03-11_16-24-25/checkpoint_002196/checkpoint.pt',
+    #     'enabled': True,
+    # },
 #     'BERT4RecJPQ': {
 #         'checkpoint': 'experiments/lastfm1k/legacy_split_raw_jpq/.../checkpoint_xxx',
 #         'enabled': False,  # Cambia a True quando hai il checkpoint
 #     },
-#     'SASRecJPQMix': {
-#         'checkpoint': 'experiments/lastfm1k/legacy_split_raw_jpq/.../checkpoint_xxx',
-#         'enabled': False,
-#     },
+    'SASRecBase': {
+        'checkpoint': '/home/chiara/projects/warprec/experiments/lastfm1k/legacy_split_raw_jpq/lastfm1k_30000_legacy_split_raw_jpq/ray_results/objective_function_2026-03-07_06-06-08/SASRec_gts_3465f893_1_batch_size=128,dropout_prob=0.2000,embedding_size=128,epochs=10000,learning_rate=0.0100,max_seq_len=150,n_he_2026-03-07_06-06-08/checkpoint_004884/checkpoint.pt',
+        'enabled': True,
+    },
 #     'gSASRecJPQ': {
 #         'checkpoint': 'experiments/lastfm1k/legacy_split_raw_jpq/.../checkpoint_xxx',
 #         'enabled': False,
@@ -51,6 +51,44 @@ PATH_TO_ORIGINAL_TSV = "/home/chiara/projects/warprec/data/lastfm1k_30000/userid
 LIMIT_REC = 100
 
 # ============================================================================
+
+
+MODEL_NAME_ALIASES = {
+    "SASRecBase": "SASREC_GTS",
+    "SASRec": "SASREC",
+    "gSASRec": "GSASREC",
+    "BertJPQMix": "BERTJPQMIX",
+    "SASRecJPQMix": "SASRECJPQMIX",
+    "gSASRecJPQMix": "GSASRECJPQMIX",
+}
+
+
+def resolve_model_registry_name(requested_name: str) -> str:
+    """Resolve user-friendly model names to registry names."""
+    available = list(model_registry._registry.keys()) if hasattr(model_registry, '_registry') else []
+
+    # 1) Alias esplicito
+    aliased = MODEL_NAME_ALIASES.get(requested_name, requested_name)
+    if aliased in available:
+        return aliased
+
+    # 2) Match case-insensitive
+    upper_map = {name.upper(): name for name in available}
+    if aliased.upper() in upper_map:
+        return upper_map[aliased.upper()]
+
+    # 3) Match ignorando underscore/hyphen
+    def norm(s: str) -> str:
+        return s.replace("_", "").replace("-", "").upper()
+
+    target = norm(aliased)
+    for name in available:
+        if norm(name) == target:
+            return name
+
+    raise ValueError(
+        f"Modello '{requested_name}' non trovato nel registry. Disponibili: {available}"
+    )
 
 
 def load_lastfm_metadata(tsv_path: str):
@@ -149,12 +187,17 @@ def load_model_from_checkpoint(checkpoint_path: str, model_name: str):
     if not params and 'hyperparameters' in checkpoint:
         params = checkpoint['hyperparameters']
     
-    print(f"Info modello: {info}")
-    print(f"Parametri: {params}")
+    info_keys = list(info.keys()) if isinstance(info, dict) else []
+    param_keys = list(params.keys()) if isinstance(params, dict) else []
+    print(f"Info keys: {info_keys}")
+    print(f"Parametri keys: {param_keys}")
     
     # Ottieni classe modello dal registry
     try:
-        model_class = model_registry.get_class(model_name)
+        resolved_model_name = resolve_model_registry_name(model_name)
+        if resolved_model_name != model_name:
+            print(f"Alias modello: '{model_name}' -> '{resolved_model_name}'")
+        model_class = model_registry.get_class(resolved_model_name)
     except (KeyError, ValueError) as e:
         available = list(model_registry._registry.keys()) if hasattr(model_registry, '_registry') else []
         raise ValueError(f"Modello '{model_name}' non trovato nel registry. Disponibili: {available}") from e
@@ -502,67 +545,92 @@ def main():
             # Carica modello (una sola volta)
             model, device, info, params = load_model_from_checkpoint(checkpoint_path, model_name)
             
-            # Verifica che il modello abbia item_codes_layer con alpha/beta
-            if not hasattr(model, 'item_codes_layer'):
-                print(f"⚠️  {model_name} non ha 'item_codes_layer', salto grid search")
-                continue
-            
-            if not hasattr(model.item_codes_layer, 'alpha') or not hasattr(model.item_codes_layer, 'beta'):
-                print(f"⚠️  {model_name}.item_codes_layer non ha parametri alpha/beta, salto grid search")
-                continue
-            
-            print(f"\n🔍 Grid Search su alpha/beta per {model_name}...")
-            print(f"   Alpha values: {alpha_values}")
-            print(f"   Beta values: {beta_values}")
-            
-            # Grid search su alpha/beta
-            for alpha in alpha_values:
-                for beta in beta_values:
-                    # Salta combinazioni invalide
-                    if alpha + beta > 1.0:
-                        continue
-                    
-                    gamma = 1.0 - alpha - beta
-                    if gamma < 0.0:
-                        continue
-                    
-                    run_name = f"{model_name}_alpha{alpha:.2f}_beta{beta:.2f}_gamma{gamma:.2f}"
-                    print(f"\n{'='*60}")
-                    print(f"🔧 {run_name}")
-                    print(f"{'='*60}")
-                    
-                    # Setta alpha/beta nel modello
-                    model.item_codes_layer.alpha.data.fill_(alpha)
-                    model.item_codes_layer.beta.data.fill_(beta)
-                    
-                    # Genera raccomandazioni
-                    recommendations = generate_recommendations_generic(
-                        model, sessions, test_users, device, limit=LIMIT_REC, info=info
-                    )
-                    
-                    # Salva CSV dettagliato per ogni combinazione alpha/beta/gamma
-                    recs_dir = os.path.join(output_dir, "detailed_recommendations")
-                    os.makedirs(recs_dir, exist_ok=True)
-                    out_csv = os.path.join(recs_dir, f"recs_a{alpha:.1f}_b{beta:.1f}_g{gamma:.1f}.csv")
-                    save_recommendations_csv(recommendations, item_metadata, out_csv)
-                    
-                    # Calcola metriche
-                    metrics = compute_metrics(recommendations, test_df, k_values=[10, 40, 100])
-                    
-                    # Store risultati
-                    result_row = {
-                        'model': model_name,
-                        'run_name': run_name,
-                        'alpha': alpha,
-                        'beta': beta,
-                        'gamma': gamma,
-                    }
-                    result_row.update(metrics)
-                    all_results.append(result_row)
-                    
-                    print(f"✅ Metriche:")
-                    for metric, value in metrics.items():
-                        print(f"   {metric:20s}: {value:.4f}")
+            supports_alpha_beta = (
+                hasattr(model, 'item_codes_layer')
+                and hasattr(model.item_codes_layer, 'alpha')
+                and hasattr(model.item_codes_layer, 'beta')
+            )
+
+            recs_dir = os.path.join(output_dir, "detailed_recommendations")
+            os.makedirs(recs_dir, exist_ok=True)
+
+            if supports_alpha_beta:
+                print(f"\n🔍 Grid Search su alpha/beta per {model_name}...")
+                print(f"   Alpha values: {alpha_values}")
+                print(f"   Beta values: {beta_values}")
+
+                # Grid search su alpha/beta
+                for alpha in alpha_values:
+                    for beta in beta_values:
+                        # Salta combinazioni invalide
+                        if alpha + beta > 1.0:
+                            continue
+
+                        gamma = 1.0 - alpha - beta
+                        if gamma < 0.0:
+                            continue
+
+                        run_name = f"{model_name}_alpha{alpha:.2f}_beta{beta:.2f}_gamma{gamma:.2f}"
+                        print(f"\n{'='*60}")
+                        print(f"🔧 {run_name}")
+                        print(f"{'='*60}")
+
+                        # Setta alpha/beta nel modello
+                        model.item_codes_layer.alpha.data.fill_(alpha)
+                        model.item_codes_layer.beta.data.fill_(beta)
+
+                        # Genera raccomandazioni
+                        recommendations = generate_recommendations_generic(
+                            model, sessions, test_users, device, limit=LIMIT_REC, info=info
+                        )
+
+                        # Salva CSV dettagliato per ogni combinazione alpha/beta/gamma
+                        out_csv = os.path.join(recs_dir, f"recs_a{alpha:.1f}_b{beta:.1f}_g{gamma:.1f}.csv")
+                        save_recommendations_csv(recommendations, item_metadata, out_csv)
+
+                        # Calcola metriche
+                        metrics = compute_metrics(recommendations, test_df, k_values=[10, 40, 100])
+
+                        # Store risultati
+                        result_row = {
+                            'model': model_name,
+                            'run_name': run_name,
+                            'alpha': alpha,
+                            'beta': beta,
+                            'gamma': gamma,
+                        }
+                        result_row.update(metrics)
+                        all_results.append(result_row)
+
+                        print(f"✅ Metriche:")
+                        for metric, value in metrics.items():
+                            print(f"   {metric:20s}: {value:.4f}")
+            else:
+                print(f"\nℹ️  {model_name} non usa alpha/beta: eseguo una singola valutazione metriche.")
+
+                run_name = f"{model_name}_default"
+                recommendations = generate_recommendations_generic(
+                    model, sessions, test_users, device, limit=LIMIT_REC, info=info
+                )
+
+                out_csv = os.path.join(recs_dir, f"recs_{model_name}.csv")
+                save_recommendations_csv(recommendations, item_metadata, out_csv)
+
+                metrics = compute_metrics(recommendations, test_df, k_values=[10, 40, 100])
+
+                result_row = {
+                    'model': model_name,
+                    'run_name': run_name,
+                    'alpha': None,
+                    'beta': None,
+                    'gamma': None,
+                }
+                result_row.update(metrics)
+                all_results.append(result_row)
+
+                print(f"✅ Metriche:")
+                for metric, value in metrics.items():
+                    print(f"   {metric:20s}: {value:.4f}")
             
             print(f"\n{'='*80}")
             print(f"✅ COMPLETATO: {model_name} - {len([r for r in all_results if r['model'] == model_name])} configurazioni testate")
@@ -590,7 +658,7 @@ def main():
         
         # Mostra top 10 configurazioni per nDCG@10
         print("\n🏆 Top 10 configurazioni per nDCG@10:")
-        top10 = df_results.nlargest(10, 'nDCG@10')[['run_name', 'alpha', 'beta', 'gamma', 'nDCG@10', 'nDCG@40', 'nDCG@100', 'Precision@40']]
+        top10 = df_results.nlargest(10, 'nDCG@10')[['run_name', 'alpha', 'beta', 'gamma', 'nDCG@10', 'nDCG@40', 'nDCG@100', 'Precision@10', 'Precision@40', 'Recall@10', 'Recall@40', 'Precision@100', 'Recall@100']]
         print(top10.to_string(index=False))
         
         print("\n" + "=" * 80)

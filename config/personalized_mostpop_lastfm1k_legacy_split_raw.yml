@@ -13,11 +13,11 @@ reader:
     item_id_type: str
     timestamp_type: str
   split:
+    # This directory already contains the exact legacy GlobalTemporalSplit output.
     local_path: data/lastfm1k_30000/legacy_global_split_raw
     ext: .csv
     sep: ","
     header: false
-
 writer:
   dataset_name: lastfm1k_30000_personalized_mostpop_legacy_split_raw
   writing_method: local
@@ -36,11 +36,19 @@ writer:
 evaluation:
   top_k: [10, 20, 50]
   metrics: [nDCG, Precision, Recall, HitRate]
-  validation_metric: nDCG@10
+  validation_metric: nDCG@40
   batch_size: 512
 
 models:
-  Pop: {}
+  Pop: 
+    optimization:
+      strategy: grid
+      properties:
+        mode: max
+        seed: 42
+      cpu_per_trial: 12
+     
+
 
 general:
   device: cpu
