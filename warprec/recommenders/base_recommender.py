@@ -4,6 +4,7 @@ from typing import Any, Optional, List, Dict, no_type_check
 from abc import ABC, abstractmethod
 
 import torch
+import lightning as L
 import numpy as np
 from torch import nn, Tensor
 from torch.nn.init import xavier_normal_, xavier_uniform_, constant_
@@ -226,9 +227,16 @@ class Recommender(nn.Module, ABC):
         return torch.device("cpu")
 
 
-class IterativeRecommender(Recommender):
+class IterativeRecommender(Recommender, L.LightningModule):
     """Interface for recommendation model that use
     an iterative approach to be trained.
+
+    Args:
+        params (dict): The dictionary with the model params.
+        info (dict): The dictionary containing dataset information.
+        *args (Any): Argument for PyTorch LightningModule.
+        seed (int): The seed to use for reproducibility.
+        **kwargs (Any): Keyword argument for PyTorch LightningModule.
 
     Attributes:
         epochs (int): The number of epochs used to
@@ -239,6 +247,17 @@ class IterativeRecommender(Recommender):
 
     epochs: int
     learning_rate: float
+
+    def __init__(
+        self, params: dict, info: dict, *args: Any, seed: int = 42, **kwargs: Any
+    ):
+        super().__init__(params, info, *args, seed=seed, **kwargs)
+        self.save_hyperparameters(params)
+
+    def configure_optimizers(self):
+        """Standard Lightning method to define optimizers."""
+        optimizer = torch.optim.Adam(self.parameters(), lr=self.learning_rate)
+        return optimizer
 
     def _init_weights(self, module: nn.Module):
         """A comprehensive default weight initialization method.
@@ -309,19 +328,14 @@ class IterativeRecommender(Recommender):
         """
 
     @abstractmethod
-    def train_step(self, batch: Any, epoch: int, *args: Any, **kwargs: Any) -> Tensor:
+    def training_step(self, batch: Any, batch_idx: int) -> Tensor:
         """Performs a single training step for a given batch.
 
-        This method should compute the forward pass, calculate the loss,
-        and return the loss value.
-        It should NOT perform zero_grad, backward, or step on the optimizer,
-        as these will be handled by the generic training loop.
+        This is a standard method defined by PyTorch Lightning.
 
         Args:
             batch (Any): A single batch of data from the DataLoader.
-            epoch (int): The current epoch iteration.
-            *args (Any): The argument list.
-            **kwargs (Any): The keyword arguments.
+            batch_idx (int): The current current batch index.
 
         Returns:
             Tensor: The computed loss for the batch.
