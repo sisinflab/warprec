@@ -65,6 +65,10 @@ class Evaluator:
         # Set the seed for random permutation in sampled evaluation
         self.g = torch.Generator().manual_seed(seed)
 
+        # Safety check if additional_data is not provided
+        if additional_data is None:
+            additional_data = {}
+
         # Common parameters shared across metrics
         self.common_params: Dict[str, Any] = {
             "num_users": train_set.shape[0],
