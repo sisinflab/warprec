@@ -165,7 +165,7 @@ class EGCF(IterativeRecommender, GraphRecommenderUtils):
             **kwargs,
         )
 
-    def train_step(self, batch: Any, epoch: int, *args, **kwargs) -> Tensor:
+    def training_step(self, batch: Any, batch_idx: int) -> Tensor:
         user, pos_item, neg_item = batch
 
         # Get propagated embeddings
@@ -199,7 +199,10 @@ class EGCF(IterativeRecommender, GraphRecommenderUtils):
         )  # User-Item Alignment (L_inter)
         ssl_loss = self.ssl_lambda * (ssl_user_loss + ssl_pos_loss + ssl_inter_loss)
 
-        return bpr_loss + reg_loss + ssl_loss
+        # Loss logging
+        loss = bpr_loss + reg_loss + ssl_loss
+        self.log("training_loss", loss, prog_bar=True, on_step=False, on_epoch=True)
+        return loss
 
     def forward(self) -> Tuple[Tensor, Tensor]:
         """Forward pass of EGCF.

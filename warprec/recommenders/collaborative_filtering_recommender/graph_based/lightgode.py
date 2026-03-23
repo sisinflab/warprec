@@ -171,7 +171,7 @@ class LightGODE(IterativeRecommender, GraphRecommenderUtils):
         user_final, item_final = torch.split(h_t, [self.n_users, self.n_items + 1])
         return user_final, item_final
 
-    def train_step(self, batch: Any, *args, **kwargs) -> Tensor:
+    def training_step(self, batch: Any, batch_idx: int) -> Tensor:
         user, pos_item, _ = batch  # Ignore rating values
 
         # Get Embeddings (No GCN)
@@ -197,7 +197,10 @@ class LightGODE(IterativeRecommender, GraphRecommenderUtils):
             self.user_embedding(user), self.item_embedding(pos_item)
         )
 
-        return align_loss + unif_loss + reg_loss
+        # Loss logging
+        loss = align_loss + unif_loss + reg_loss
+        self.log("training_loss", loss, prog_bar=True, on_step=False, on_epoch=True)
+        return loss
 
     def forward(self) -> Tuple[Tensor, Tensor]:
         """Standard forward pass.

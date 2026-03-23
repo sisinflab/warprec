@@ -116,7 +116,7 @@ class SGCL(IterativeRecommender, GraphRecommenderUtils):
 
         return user_final, item_final
 
-    def train_step(self, batch: Any, *args, **kwargs) -> Tensor:
+    def training_step(self, batch: Any, batch_idx: int) -> Tensor:
         user, pos_item, _ = batch  # Ignore rating for SGCL
 
         # Get embeddings from propagation network
@@ -155,7 +155,10 @@ class SGCL(IterativeRecommender, GraphRecommenderUtils):
             self.user_embedding(user), self.item_embedding(pos_item)
         )
 
-        return sgcl_loss + reg_loss
+        # Loss logging
+        loss = sgcl_loss + reg_loss
+        self.log("training_loss", loss, prog_bar=True, on_step=False, on_epoch=True)
+        return loss
 
     def predict(
         self,

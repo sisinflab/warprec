@@ -91,7 +91,7 @@ class NFM(ContextRecommenderUtils, IterativeRecommender):
         # Initialize weights
         self.apply(self._init_weights)
 
-    def train_step(self, batch: Any, epoch: int, *args, **kwargs) -> Tensor:
+    def training_step(self, batch: Any, batch_idx: int) -> Tensor:
         user, item, rating = batch[0], batch[1], batch[2]
 
         contexts: Optional[Tensor] = None
@@ -111,13 +111,16 @@ class NFM(ContextRecommenderUtils, IterativeRecommender):
         prediction = self.forward(user, item, features, contexts)
 
         # Compute BCE loss
-        loss = self.bce_loss(prediction, rating)
+        bce_loss = self.bce_loss(prediction, rating)
 
         # Compute L2 regularization on embeddings and biases
         reg_params = self.get_reg_params(user, item, features, contexts)
         reg_loss = self.reg_weight * self.reg_loss(*reg_params)
 
-        return loss + reg_loss
+        # Loss logging
+        loss = bce_loss + reg_loss
+        self.log("training_loss", loss, prog_bar=True, on_step=False, on_epoch=True)
+        return loss
 
     def forward(
         self,

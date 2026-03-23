@@ -177,14 +177,18 @@ class MacridVAE(IterativeRecommender):
             **kwargs,
         )
 
-    def train_step(self, batch: Any, epoch: int, *args: Any, **kwargs: Any) -> Tensor:
-        rating_matrix = batch[0]
-
-        beta_anneal = (
-            min(self.anneal_cap * epoch / self.total_anneal_steps, self.anneal_cap)
+    def on_train_epoch_start(self):
+        self.beta_anneal = (
+            min(
+                self.anneal_cap * self.current_epoch / self.total_anneal_steps,
+                self.anneal_cap,
+            )
             if self.total_anneal_steps > 0
             else self.anneal_cap
         )
+
+    def training_step(self, batch: Any, batch_idx: int) -> Tensor:
+        rating_matrix = batch[0]
 
         logits, z_mean, z_log_var = self.forward(rating_matrix)
 
@@ -201,7 +205,9 @@ class MacridVAE(IterativeRecommender):
         term2 = (z_log_var.exp() + z_mean.pow(2)) / var_prior
 
         # KL = 0.5 * sum( term1 + term2 - 1 )
-        kl_loss = beta_anneal * (0.5 * torch.sum(term1 + term2 - 1, dim=[1, 2]).mean())
+        kl_loss = self.beta_anneal * (
+            0.5 * torch.sum(term1 + term2 - 1, dim=[1, 2]).mean()
+        )
 
         # Calculate L2 loss
         reg_tensors = []
@@ -213,7 +219,10 @@ class MacridVAE(IterativeRecommender):
             self.item_embedding.weight, self.k_embedding.weight * reg_tensors
         )
 
-        return recon_loss + kl_loss + reg_loss
+        # Loss logging
+        loss = recon_loss + kl_loss + reg_loss
+        self.log("training_loss", loss, prog_bar=True, on_step=False, on_epoch=True)
+        return loss
 
     def forward(self, rating_matrix: Tensor) -> Tuple[Tensor, Tensor, Tensor]:
         """Forward pass handling Macro-Disentanglement logic.

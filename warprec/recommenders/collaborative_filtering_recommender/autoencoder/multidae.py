@@ -151,12 +151,14 @@ class MultiDAE(IterativeRecommender):
             **kwargs,
         )
 
-    def train_step(self, batch: Any, *args: Any, **kwargs: Any):
+    def training_step(self, batch: Any, batch_idx: int):
         rating_matrix = batch[0]
 
         reconstructed = self(rating_matrix)
-        loss: Tensor = self.loss(rating_matrix, reconstructed)
+        loss = self.loss(rating_matrix, reconstructed)
 
+        # Loss logging
+        self.log("training_loss", loss, prog_bar=True, on_step=False, on_epoch=True)
         return loss
 
     def forward(self, rating_matrix: Tensor) -> Tensor:

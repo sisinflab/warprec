@@ -184,17 +184,23 @@ class MultiVAE(IterativeRecommender):
             **kwargs,
         )
 
-    def train_step(self, batch: Any, epoch: int, *args: Any, **kwargs: Any):
-        rating_matrix = batch[0]
-
-        anneal = (
-            min(self.anneal_cap * epoch / self.anneal_step, self.anneal_cap)
+    def on_train_epoch_start(self):
+        self.current_anneal = (
+            min(
+                self.anneal_cap * self.current_epoch / self.anneal_step, self.anneal_cap
+            )
             if self.anneal_step > 0
             else self.anneal_cap
         )
-        reconstructed, kl_loss = self.forward(rating_matrix)
-        loss: Tensor = self.loss(rating_matrix, reconstructed, kl_loss, anneal)
 
+    def training_step(self, batch: Any, batch_idx: int):
+        rating_matrix = batch[0]
+
+        reconstructed, kl_loss = self.forward(rating_matrix)
+        loss = self.loss(rating_matrix, reconstructed, kl_loss, self.current_anneal)
+
+        # Loss logging
+        self.log("training_loss", loss, prog_bar=True, on_step=False, on_epoch=True)
         return loss
 
     def forward(self, rating_matrix: Tensor) -> Tuple[Tensor, Tensor]:

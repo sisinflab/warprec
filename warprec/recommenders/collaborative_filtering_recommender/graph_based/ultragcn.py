@@ -181,7 +181,7 @@ class UltraGCN(IterativeRecommender, GraphRecommenderUtils):
         """Forward pass just returns the embeddings."""
         return self.user_embedding.weight, self.item_embedding.weight
 
-    def train_step(self, batch: Any, epoch: int, *args, **kwargs) -> Tensor:
+    def training_step(self, batch: Any, batch_idx: int) -> Tensor:
         user, pos_item, neg_item = batch
 
         user_emb = self.user_embedding(user)
@@ -222,7 +222,10 @@ class UltraGCN(IterativeRecommender, GraphRecommenderUtils):
         # Calculate L2 loss
         reg_loss = self.reg_weight * self.reg_loss(user_emb, pos_item_emb, neg_item_emb)
 
-        return loss_O + (self.w_lambda * loss_C) + (self.w_gamma * loss_I) + reg_loss
+        # Loss logging
+        loss = loss_O + (self.w_lambda * loss_C) + (self.w_gamma * loss_I) + reg_loss
+        self.log("training_loss", loss, prog_bar=True, on_step=False, on_epoch=True)
+        return loss
 
     def predict(
         self,

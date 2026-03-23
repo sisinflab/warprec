@@ -97,7 +97,7 @@ class LightGCN(GraphRecommenderUtils, IterativeRecommender):
             **kwargs,
         )
 
-    def train_step(self, batch: Any, *args, **kwargs):
+    def training_step(self, batch: Any, batch_idx: int):
         user, pos_item, neg_item = batch
 
         # Get propagated embeddings
@@ -120,7 +120,10 @@ class LightGCN(GraphRecommenderUtils, IterativeRecommender):
             self.item_embedding(neg_item),
         )
 
-        return bpr_loss + reg_loss
+        # Loss logging
+        loss = bpr_loss + reg_loss
+        self.log("training_loss", loss, prog_bar=True, on_step=False, on_epoch=True)
+        return loss
 
     def forward(self) -> Tuple[Tensor, Tensor]:
         """Forward pass of the LightGCN model for embedding propagation.

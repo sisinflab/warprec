@@ -166,7 +166,7 @@ class LightGCNpp(IterativeRecommender, GraphRecommenderUtils):
             **kwargs,
         )
 
-    def train_step(self, batch: Any, *args, **kwargs):
+    def training_step(self, batch: Any, batch_idx: int):
         user, pos_item, neg_item = batch
 
         # Get propagated embeddings
@@ -180,7 +180,7 @@ class LightGCNpp(IterativeRecommender, GraphRecommenderUtils):
         # Calculate BPR Loss
         pos_scores = torch.mul(u_embeddings, pos_embeddings).sum(dim=1)
         neg_scores = torch.mul(u_embeddings, neg_embeddings).sum(dim=1)
-        brp_loss = self.bpr_loss(pos_scores, neg_scores)
+        bpr_loss = self.bpr_loss(pos_scores, neg_scores)
 
         # Calculate L2 loss
         reg_loss = self.reg_weight * self.reg_loss(
@@ -189,7 +189,10 @@ class LightGCNpp(IterativeRecommender, GraphRecommenderUtils):
             self.item_embedding(neg_item),
         )
 
-        return brp_loss + reg_loss
+        # Loss logging
+        loss = bpr_loss + reg_loss
+        self.log("training_loss", loss, prog_bar=True, on_step=False, on_epoch=True)
+        return loss
 
     def forward(self) -> Tuple[Tensor, Tensor]:
         """Forward pass of LightGCN++ with custom pooling logic"""

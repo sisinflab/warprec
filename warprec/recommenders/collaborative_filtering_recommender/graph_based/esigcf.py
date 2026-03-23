@@ -168,7 +168,7 @@ class ESIGCF(IterativeRecommender, GraphRecommenderUtils):
             **kwargs,
         )
 
-    def train_step(self, batch: Any, epoch: int, *args, **kwargs) -> Tensor:
+    def training_step(self, batch: Any, batch_idx: int) -> Tensor:
         user, pos_item, neg_item = batch
 
         # Get propagated embeddings
@@ -205,7 +205,10 @@ class ESIGCF(IterativeRecommender, GraphRecommenderUtils):
         can_item_loss = self.nce_loss(pos_emb, can_neg_emb)
         can_loss = self.can_lambda * can_item_loss
 
-        return bpr_loss + reg_loss + ssl_loss + can_loss
+        # Loss logging
+        loss = bpr_loss + reg_loss + ssl_loss + can_loss
+        self.log("training_loss", loss, prog_bar=True, on_step=False, on_epoch=True)
+        return loss
 
     def forward(self) -> Tuple[Tensor, Tensor]:
         """Forward pass of ESIGCF.

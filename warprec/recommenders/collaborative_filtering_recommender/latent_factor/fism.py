@@ -98,7 +98,7 @@ class FISM(IterativeRecommender):
             **kwargs,
         )
 
-    def train_step(self, batch: Any, *args, **kwargs):
+    def training_step(self, batch: Any, batch_idx: int):
         user, item, rating = batch
 
         # Calculate BCE loss
@@ -111,7 +111,10 @@ class FISM(IterativeRecommender):
             self.item_dst_embedding(item),
         )
 
-        return bce_loss + reg_loss
+        # Loss logging
+        loss = bce_loss + reg_loss
+        self.log("training_loss", loss, prog_bar=True, on_step=False, on_epoch=True)
+        return loss
 
     def forward(self, user: Tensor, item: Tensor) -> Tensor:
         """Forward pass for calculating scores for specific user-item pairs.

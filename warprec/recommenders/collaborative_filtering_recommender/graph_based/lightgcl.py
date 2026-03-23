@@ -222,7 +222,7 @@ class LightGCL(IterativeRecommender, GraphRecommenderUtils):
 
         return user_gcn, item_gcn, gcn_embeddings, svd_embeddings
 
-    def train_step(self, batch: Any, *args, **kwargs) -> Tensor:
+    def training_step(self, batch: Any, batch_idx: int) -> Tensor:
         user, pos_item, neg_item = batch
 
         # Forward Pass
@@ -263,7 +263,10 @@ class LightGCL(IterativeRecommender, GraphRecommenderUtils):
             self.item_embedding(neg_item),
         )
 
-        return bpr_loss + cl_loss + reg_loss
+        # Loss logging
+        loss = bpr_loss + reg_loss + cl_loss
+        self.log("training_loss", loss, prog_bar=True, on_step=False, on_epoch=True)
+        return loss
 
     def predict(
         self,

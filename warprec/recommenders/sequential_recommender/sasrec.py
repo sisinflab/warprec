@@ -123,7 +123,7 @@ class SASRec(IterativeRecommender, SequentialRecommenderUtils):
             **kwargs,
         )
 
-    def train_step(self, batch: Any, *args, **kwargs):
+    def training_step(self, batch: Any, batch_idx: int):
         if self.neg_samples > 0:
             item_seq, item_seq_len, pos_item, neg_item = batch
         else:
@@ -166,7 +166,10 @@ class SASRec(IterativeRecommender, SequentialRecommenderUtils):
                 self.item_embedding(pos_item),
             )
 
-        return main_loss + reg_loss
+        # Loss logging
+        loss = main_loss + reg_loss
+        self.log("training_loss", loss, prog_bar=True, on_step=False, on_epoch=True)
+        return loss
 
     def forward(self, item_seq: Tensor, item_seq_len: Tensor) -> Tensor:
         """Forward pass of the SASRec model.
