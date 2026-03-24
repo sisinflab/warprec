@@ -341,6 +341,19 @@ class IterativeRecommender(Recommender, L.LightningModule):
             Tensor: The computed loss for the batch.
         """
 
+    def validation_step(self, batch: Any, batch_idx: int) -> Any:
+        """PyTorch Lightning needs this method to be implemented
+        to correctly perform the on_validation_epoch_end callback.
+
+        Args:
+            batch (Any): A single batch of data from the DataLoader.
+            batch_idx (int): The current current batch index.
+
+        Returns:
+            Any: The batch of data from the DataLoader.
+        """
+        return batch
+
 
 class ContextRecommenderUtils(nn.Module, ABC):
     """Common definition for context-aware recommenders.
