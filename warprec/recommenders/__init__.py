@@ -13,6 +13,7 @@ from .base_recommender import (
     SequentialRecommenderUtils,
     ItemSimRecommender,
 )
+from .callbacks import EvaluationCallback
 from .layers import MLP, CNN, FactorizationMachine
 from .losses import BPRLoss, EmbLoss, InfoNCELoss, MultiDAELoss, MultiVAELoss
 from .proxy import ProxyRecommender
@@ -33,6 +34,7 @@ __all__ = [
     "ContextRecommenderUtils",
     "SequentialRecommenderUtils",
     "ItemSimRecommender",
+    "EvaluationCallback",
     "MLP",
     "CNN",
     "FactorizationMachine",
