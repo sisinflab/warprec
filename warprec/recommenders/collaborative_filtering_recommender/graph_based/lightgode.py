@@ -199,7 +199,7 @@ class LightGODE(IterativeRecommender, GraphRecommenderUtils):
 
         # Loss logging
         loss = align_loss + unif_loss + reg_loss
-        self.log("training_loss", loss, prog_bar=True, on_step=False, on_epoch=True)
+        self.log("loss", loss, prog_bar=True, on_step=False, on_epoch=True)
         return loss
 
     def forward(self) -> Tuple[Tensor, Tensor]:

@@ -207,7 +207,7 @@ class ESIGCF(IterativeRecommender, GraphRecommenderUtils):
 
         # Loss logging
         loss = bpr_loss + reg_loss + ssl_loss + can_loss
-        self.log("training_loss", loss, prog_bar=True, on_step=False, on_epoch=True)
+        self.log("loss", loss, prog_bar=True, on_step=False, on_epoch=True)
         return loss
 
     def forward(self) -> Tuple[Tensor, Tensor]:

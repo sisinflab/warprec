@@ -224,7 +224,7 @@ class UltraGCN(IterativeRecommender, GraphRecommenderUtils):
 
         # Loss logging
         loss = loss_O + (self.w_lambda * loss_C) + (self.w_gamma * loss_I) + reg_loss
-        self.log("training_loss", loss, prog_bar=True, on_step=False, on_epoch=True)
+        self.log("loss", loss, prog_bar=True, on_step=False, on_epoch=True)
         return loss
 
     def predict(

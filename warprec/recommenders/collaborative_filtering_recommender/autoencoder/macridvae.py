@@ -221,7 +221,7 @@ class MacridVAE(IterativeRecommender):
 
         # Loss logging
         loss = recon_loss + kl_loss + reg_loss
-        self.log("training_loss", loss, prog_bar=True, on_step=False, on_epoch=True)
+        self.log("loss", loss, prog_bar=True, on_step=False, on_epoch=True)
         return loss
 
     def forward(self, rating_matrix: Tensor) -> Tuple[Tensor, Tensor, Tensor]:
