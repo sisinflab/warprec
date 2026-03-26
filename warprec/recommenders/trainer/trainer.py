@@ -1,23 +1,27 @@
+# pylint: disable = wrong-import-position
 import os
+
+# Set Ray environment variable to enable new features
+os.environ["RAY_TRAIN_V2_ENABLED"] = "1"
 import uuid
 import math
-from typing import List, Tuple, Optional, Dict, Callable, Union, Any
+from typing import List, Tuple, Optional, Dict, Union, Any
 from pathlib import Path
 
 import torch
 import numpy as np
 import ray
 from ray import tune
-from ray.tune import Tuner, TuneConfig, CheckpointConfig, RunConfig
+from ray.tune import Tuner, TuneConfig, CheckpointConfig
 from ray.tune.stopper import Stopper
 from ray.tune.experiment import Trial
+from ray.tune.integration.ray_train import TuneReportCallback
+from ray.train.torch import TorchTrainer
+from ray.train import ScalingConfig
 
 from warprec.recommenders.base_recommender import Recommender, IterativeRecommender
 from warprec.data import Dataset
-from warprec.recommenders.trainer.objectives import (
-    objective_function,
-    driver_function_ddp,
-)
+from warprec.recommenders.trainer.objectives import objective_function
 from warprec.utils.config import (
     RecomModel,
     DashboardConfig,
@@ -285,27 +289,62 @@ class Trainer:
         opt_config = params.optimization
         mode = opt_config.properties.mode
 
-        # Determine resources and objective function
-        resources = self._get_resources(
+        # Determine resources
+        scaling_config_dict = self._get_scaling_config(
             opt_config.cpu_per_trial,
             opt_config.gpu_per_trial,
             opt_config.custom_resources_per_trial,
             device,
         )
-        trainable = self._get_objective_function(
-            model_name=model_name,
-            params=params,
-            dataset=dataset,
-            metrics=metrics,
-            topk=topk,
-            validation_score=validation_score,
-            storage_path=storage_path,
-            device=device,
-            evaluation_strategy=evaluation_strategy,
-            num_negatives=num_negatives,
-            complex_metrics=complex_metrics,
-            resources=resources,
-        )
+
+        # Prepare data bundle
+        validation_metric_name, validation_top_k = validation_metric(validation_score)
+        data_bundle = {
+            "model_name": model_name,
+            "dataset_folds": ray.put(dataset),
+            "metrics": metrics,
+            "topk": topk,
+            "validation_top_k": validation_top_k,
+            "validation_metric_name": validation_metric_name,
+            "mode": opt_config.properties.mode,
+            "device": device,
+            "eval_every_n": opt_config.eval_every_n,
+            "strategy": evaluation_strategy,
+            "num_negatives": num_negatives,
+            "complex_metrics": complex_metrics,
+            "lr_scheduler": opt_config.lr_scheduler,
+            "seed": opt_config.properties.seed,
+            "block_size": opt_config.block_size,
+            "chunk_size": opt_config.chunk_size,
+            "custom_modules": self._custom_modules,
+        }
+
+        num_folds = len(dataset) if isinstance(dataset, list) else 0
+        param_space = self._parse_params(params, num_folds)
+
+        # Driver function that will be launched by Ray Tune and will
+        # initialize Ray Train
+        def train_driver_fn(config: dict, data_bundle: dict, scaling_config_dict: dict):
+            scaling_config = ScalingConfig(**scaling_config_dict)
+
+            train_loop_config = {**data_bundle, "params": config}
+
+            trainer = TorchTrainer(
+                train_loop_per_worker=objective_function,
+                train_loop_config=train_loop_config,
+                scaling_config=scaling_config,
+                run_config=ray.train.RunConfig(
+                    callbacks=[TuneReportCallback()],  # type: ignore[list-item]
+                    storage_path=storage_path,
+                    checkpoint_config=CheckpointConfig(
+                        num_to_keep=opt_config.checkpoint_to_keep,
+                        checkpoint_score_attribute=validation_score,
+                        checkpoint_score_order=mode,
+                    ),
+                ),
+            )
+
+            trainer.fit()
 
         # Search Algorithm & Scheduler
         search_alg = search_algorithm_registry.get(
@@ -327,7 +366,7 @@ class Trainer:
             )
 
         # Configs
-        run_config = RunConfig(
+        run_config = ray.tune.RunConfig(
             stop=stopper,
             callbacks=self._callbacks,
             verbose=ray_verbose,
@@ -339,6 +378,17 @@ class Trainer:
             ),
         )
 
+        # Deadlock fix
+        resources = ray.available_resources()
+        available_cpus = resources.get("CPU", 1)
+        available_gpus = resources.get("GPU", 0)
+
+        if scaling_config_dict["use_gpu"] and opt_config.gpu_per_trial > 0:
+            max_concurrent = max(1, int(available_gpus // opt_config.gpu_per_trial))
+        else:
+            max_concurrent = max(1, int(available_cpus // opt_config.cpu_per_trial))
+
+        # Tuner will execute the driver function
         tune_config = TuneConfig(
             metric=validation_score,
             mode=mode,
@@ -347,10 +397,16 @@ class Trainer:
             num_samples=opt_config.num_samples,
             trial_name_creator=self._trial_name_creator(model_name),
             trial_dirname_creator=self._trial_dirname_creator(model_name),
+            max_concurrent_trials=max_concurrent,
         )
-
-        num_folds = len(dataset) if isinstance(dataset, list) else 0
-        param_space = self._parse_params(params, num_folds)
+        trainable = tune.with_resources(
+            tune.with_parameters(
+                train_driver_fn,
+                data_bundle=data_bundle,
+                scaling_config_dict=scaling_config_dict,
+            ),
+            resources={"CPU": 1},
+        )
 
         return Tuner(
             trainable,
@@ -359,13 +415,13 @@ class Trainer:
             run_config=run_config,
         )
 
-    def _get_resources(
+    def _get_scaling_config(
         self,
         cpu_per_trial: int,
         gpu_per_trial: float,
         custom_resources_per_trial: Dict[str, float | int],
         device: str,
-    ) -> Dict[str, float]:
+    ) -> Dict[str, Any]:
         """Calculates resource allocation per trial.
 
         Args:
@@ -375,96 +431,34 @@ class Trainer:
             device (str): The device of the experiment.
 
         Returns:
-            Dict[str, float]: Resources dictionary for Ray Tune.
-
-        Raises:
-            ValueError: If the number of resources requested is higher
-                than the one available in the Ray Cluster.
+            Dict[str, Any]: Resources dictionary for Ray Tune.
         """
-        # Get available resources
-        resources = ray.available_resources()
-        available_cpus = resources.get("CPU", 1)
-        available_gpus = resources.get("GPU", 0)
+        # Determine if we are using GPUs
+        use_gpu = device == "cuda" or gpu_per_trial > 0
 
-        # Check resources are available
-        if cpu_per_trial > available_cpus or gpu_per_trial > available_gpus:
-            raise ValueError(
-                "Not enough resources in the cluster to allocate to the trial."
-            )
-
-        # Fallback to 1 gpu_per_trial in case of device set to CUDA
-        if device == "cuda" and gpu_per_trial == 0:
-            gpu_per_trial = 1
-
-        resources_dict: Dict[str, float] = {
-            "cpu": cpu_per_trial,
-            "gpu": gpu_per_trial,
-        }
-
-        # Iterate over custom resources and check availability
-        for resource_name, amount in custom_resources_per_trial.items():
-            available_amount = resources.get(resource_name, 0)
-            if amount > available_amount:
-                raise ValueError(
-                    f"Not enough of resource '{resource_name}' in the cluster to allocate to the trial."
-                )
-            resources_dict[resource_name] = amount
-
-        return resources_dict
-
-    def _get_objective_function(self, **kwargs: Any) -> Callable:
-        """Selects and wraps the appropriate objective function (Standard or DDP).
-
-        Args:
-            **kwargs (Any): Keyword arguments for the objective functions.
-
-        Returns:
-            Callable: The wrapped objective function.
-        """
-        params = kwargs.get("params")
-        gpu_per_trial = kwargs.get("resources", {}).get("gpu", 0)
-        opt_config = params.optimization
-        validation_metric_name, validation_top_k = validation_metric(
-            kwargs["validation_score"]
-        )
-
-        common_args = {
-            "model_name": kwargs["model_name"],
-            "dataset_folds": ray.put(kwargs["dataset"]),
-            "metrics": kwargs["metrics"],
-            "topk": kwargs["topk"],
-            "validation_top_k": validation_top_k,
-            "validation_metric_name": validation_metric_name,
-            "mode": opt_config.properties.mode,
-            "eval_every_n": opt_config.eval_every_n,
-            "strategy": kwargs["evaluation_strategy"],
-            "num_negatives": kwargs["num_negatives"],
-            "complex_metrics": kwargs["complex_metrics"],
-            "lr_scheduler": opt_config.lr_scheduler,
-            "seed": opt_config.properties.seed,
-            "block_size": opt_config.block_size,
-            "chunk_size": opt_config.chunk_size,
-            "custom_modules": self._custom_modules,
-        }
-
-        if gpu_per_trial > 1:
-            logger.msg(f"Using Distributed Data Parallel with {gpu_per_trial} GPUs.")
-            obj_func = tune.with_parameters(
-                driver_function_ddp,
-                num_gpus=gpu_per_trial,
-                storage_path=kwargs["storage_path"],
-                num_to_keep=opt_config.checkpoint_to_keep,
-                **common_args,
-            )
+        # In Ray Train, `num_workers` represents the number of distributed processes.
+        # For GPU training, we typically spawn 1 worker per GPU to enable DDP.
+        if use_gpu:
+            num_workers = max(1, int(gpu_per_trial))
         else:
-            obj_func = tune.with_parameters(
-                objective_function,
-                device=kwargs["device"],
-                num_workers=opt_config.num_workers,
-                **common_args,
-            )
+            # For CPU training, we default to 1 worker per trial
+            num_workers = 1
 
-        return tune.with_resources(obj_func, resources=kwargs["resources"])
+        # Calculate resources per individual worker
+        resources_per_worker = {
+            "CPU": cpu_per_trial / num_workers,
+        }
+        if use_gpu:
+            resources_per_worker["GPU"] = gpu_per_trial / num_workers
+
+        for res, amount in custom_resources_per_trial.items():
+            resources_per_worker[res] = amount / num_workers
+
+        return {
+            "num_workers": num_workers,
+            "use_gpu": use_gpu,
+            "resources_per_worker": resources_per_worker,
+        }
 
     def _load_best_model(self, model_name, best_result, best_params, dataset, seed):
         """Loads the model state from the best checkpoint."""
@@ -480,7 +474,7 @@ class Trainer:
         # Load the model checkpoint
         if isinstance(model, IterativeRecommender):
             checkpoint_path = (
-                Path(best_result.checkpoint.to_directory()) / "checkpoint.pt"
+                Path(best_result.metrics.get("checkpoint_path")) / "checkpoint.pt"
             )
             checkpoint = torch.load(
                 checkpoint_path, weights_only=False, map_location="cpu"
