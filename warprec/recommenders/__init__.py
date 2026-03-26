@@ -13,7 +13,7 @@ from .base_recommender import (
     SequentialRecommenderUtils,
     ItemSimRecommender,
 )
-from .callbacks import EvaluationCallback
+from .callbacks import _get_memory_usage, WarpRecLightningIntegrationCallback
 from .layers import MLP, CNN, FactorizationMachine
 from .losses import BPRLoss, EmbLoss, InfoNCELoss, MultiDAELoss, MultiVAELoss
 from .proxy import ProxyRecommender
@@ -34,7 +34,8 @@ __all__ = [
     "ContextRecommenderUtils",
     "SequentialRecommenderUtils",
     "ItemSimRecommender",
-    "EvaluationCallback",
+    "_get_memory_usage",
+    "WarpRecLightningIntegrationCallback",
     "MLP",
     "CNN",
     "FactorizationMachine",
