@@ -354,6 +354,17 @@ class IterativeRecommender(Recommender, L.LightningModule):
         """
         return batch
 
+    def on_save_checkpoint(self, checkpoint: Dict[str, Any]):
+        """PyTorch Lightning hook used during checkpoint saving.
+
+        Args:
+            checkpoint (Dict[str, Any]): The dictionary containing the
+                checkpoint information.
+        """
+        checkpoint["name"] = self.name
+        checkpoint["params"] = self.get_params()
+        checkpoint["info"] = self.info
+
 
 class ContextRecommenderUtils(nn.Module, ABC):
     """Common definition for context-aware recommenders.
