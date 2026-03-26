@@ -1,5 +1,4 @@
 # pylint: disable=too-many-branches, too-many-statements
-import os
 import time
 from typing import List, Tuple, Dict, Any
 
@@ -56,9 +55,6 @@ def train_pipeline(path: str):
 
     # Config parser testing
     config = load_train_configuration(path)
-
-    # Set Ray environment variable to enable new features
-    os.environ["RAY_TRAIN_V2_ENABLED"] = "1"
 
     # Before starting training process, initialize Ray
     py_modules = (
