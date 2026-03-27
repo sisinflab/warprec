@@ -142,10 +142,13 @@ class Trainer:
             return None, {}, 0
 
         best_params = best_result.config
-        # Remove internal ray config keys if present
         best_params = {k: v for k, v in best_params.items() if not k.startswith("_")}
-        best_score = best_result.metrics.get(validation_score)
-        best_iter = best_result.metrics.get("training_iteration")
+        best_row = self._get_best_result_row(
+            best_result.metrics_dataframe, validation_score, mode
+        )
+        best_score = best_row.get(validation_score).item()
+        best_iter = best_row.get("training_iteration").item()
+        best_checkpoint_path = best_row.get("checkpoint_path")
 
         logger.msg(
             f"Best params: {best_params} | Score ({validation_score}): {best_score} "
@@ -156,10 +159,9 @@ class Trainer:
         # Load Best Model
         best_model = self._load_best_model(
             model_name,
-            best_result,
+            best_checkpoint_path,
             best_params,
             dataset,
-            params.optimization.properties.seed,
         )
 
         report = self._create_report(results, best_model)
@@ -460,27 +462,35 @@ class Trainer:
             "resources_per_worker": resources_per_worker,
         }
 
-    def _load_best_model(self, model_name, best_result, best_params, dataset, seed):
+    def _load_best_model(self, model_name, checkpoint_path, best_params, dataset):
         """Loads the model state from the best checkpoint."""
-        model = model_registry.get(
-            name=model_name,
-            params=best_params,
-            interactions=dataset.train_set,
-            seed=seed,
-            info=dataset.info(),
-            **dataset.get_stash(),
-        )
+        model_class = model_registry.get_class(model_name)
 
-        # Load the model checkpoint
-        if isinstance(model, IterativeRecommender):
-            checkpoint_path = (
-                Path(best_result.metrics.get("checkpoint_path")) / "checkpoint.pt"
+        if issubclass(model_class, IterativeRecommender):
+            model = model_class.from_checkpoint(
+                torch.load(
+                    Path(checkpoint_path) / "checkpoint.pt",
+                    weights_only=False,
+                    map_location="cpu",
+                )
             )
-            checkpoint = torch.load(
-                checkpoint_path, weights_only=False, map_location="cpu"
+        else:
+            model = model_class(
+                params=best_params,
+                interactions=dataset.train_set,
+                info=dataset.info(),
+                **dataset.get_stash(),
             )
-            model.load_state_dict(checkpoint["state_dict"])
+
         return model
+
+    def _get_best_result_row(self, df, metric, mode):
+        """Extract the best iteration row from the result DataFrame."""
+        if mode == "max":
+            best_idx = df[metric].idxmax()
+        else:
+            best_idx = df[metric].idxmin()
+        return df.loc[best_idx]
 
     def _aggregate_cv_results(self, df, metric, mode, desired_it_stat):
         """Aggregates Cross-Validation results to find best hyperparameters."""
