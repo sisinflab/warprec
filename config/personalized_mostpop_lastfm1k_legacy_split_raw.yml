@@ -46,9 +46,11 @@ models:
       properties:
         mode: max
         seed: 42
-      cpu_per_trial: 12
+      
+      gpu_per_trial: 1
+     
      
 
 
 general:
-  device: cpu
+  device: cuda

@@ -8,7 +8,9 @@ from torch import Tensor
 from warprec.recommenders.base_recommender import Recommender
 from warprec.data.entities import Interactions
 from warprec.utils.registry import model_registry
-
+import os
+os.environ['CUDA_VISIBLE_DEVICES'] = '1'
+NUM_SPECIAL_ITEMS = 3
 
 @model_registry.register(name="Pop")
 class Pop(Recommender):

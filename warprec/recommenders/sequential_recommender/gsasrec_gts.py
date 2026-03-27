@@ -16,9 +16,7 @@ from warprec.data.entities import Interactions, Sessions
 from warprec.utils.registry import model_registry
 import mmh3
 
-import os
 
-os.environ['CUDA_VISIBLE_DEVICES'] = '1'
 class MaskingCollator:
     """Collator per gSASRec train/val/test with GBCE."""
 
