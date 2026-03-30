@@ -53,6 +53,9 @@ pylint = "^3.3.3"
 bandit = "^1.8.2"
 nvitop = "^1.4.2"
 matplotlib = "^3.10.3"
+mkdocs = "^1.6.1"
+mkdocs-material = "^9.7.6"
+mkdocstrings = {extras = ["python"], version = "^1.0.3"}
 
 
 [tool.poetry.requires-plugins]

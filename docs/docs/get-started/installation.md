@@ -31,12 +31,14 @@ If you use [Poetry](https://python-poetry.org/) for dependency management, you c
    ```bash
    git clone <repository_url>
    cd warprec
+   ```
 
 2. **Install the project**
     ```
     poetry install
     # Or you can install all extra dependencies
     poetry install --extras all
+    ```
 
 ### Development Setup (Conda)
 
