@@ -105,7 +105,7 @@ If you use [Poetry](https://python-poetry.org/) for dependency management, you c
    cd warprec
 
 2. **Install the project**
-    ```
+    ```bash
     poetry install
     # Or you can install all extra dependencies
     poetry install --extras all
