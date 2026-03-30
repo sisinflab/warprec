@@ -1,9 +1,11 @@
 # pylint: disable=too-many-branches, too-many-statements
 import time
+import os
 from typing import List, Tuple, Dict, Any
 
 import ray
 import torch
+import lightning as L
 
 from warprec.common import (
     initialize_datasets,
@@ -26,7 +28,6 @@ from warprec.utils.helpers import (
 )
 from warprec.utils.logger import logger
 from warprec.recommenders.trainer import Trainer
-from warprec.recommenders.loops import train_loop
 from warprec.recommenders.base_recommender import (
     Recommender,
     IterativeRecommender,
@@ -536,13 +537,40 @@ def multiple_fold_validation_flow(
         block_size=block_size,
         chunk_size=chunk_size,
     )
-    best_model.to(device)
 
     # Train the model using backpropagation if the model
     # is iterative
     if isinstance(best_model, IterativeRecommender):
-        # Training loop decorated with tqdm for a better visualization
-        train_loop(best_model, main_dataset, iterations, num_workers, device=device)
+        # Dataloader settings
+        if num_workers is None:
+            available_cpus = os.cpu_count()
+            num_workers = max(available_cpus - 1, 1)
+
+        persistent_workers = num_workers > 0
+        pin_memory = device == "cuda"
+
+        # Train dataloader
+        train_dataloader = best_model.get_dataloader(
+            interactions=main_dataset.train_set,
+            sessions=main_dataset.train_session,
+            num_workers=num_workers,
+            pin_memory=pin_memory,
+            persistent_workers=persistent_workers,
+        )
+
+        # Standard training loop
+        l_trainer = L.Trainer(
+            max_epochs=best_model.epochs,
+            devices="auto",
+            accelerator=device,
+            num_sanity_val_steps=0,
+            logger=False,
+            enable_checkpointing=False,
+        )
+        l_trainer.fit(
+            best_model,
+            train_dataloaders=train_dataloader,
+        )
 
     # Final reporting
     report["Total Params (Best Model)"] = sum(
