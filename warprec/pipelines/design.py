@@ -108,7 +108,7 @@ def design_pipeline(path: str):
             persistent_workers = num_workers > 0
             pin_memory = device == "cuda"
 
-            # Train and evaluation dataloaders
+            # Train dataloader
             train_dataloader = model.get_dataloader(
                 interactions=main_dataset.train_set,
                 sessions=main_dataset.train_session,
