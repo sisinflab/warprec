@@ -67,6 +67,7 @@ def objective_function(config: dict) -> None:
     block_size = config.get("block_size", 50)
     chunk_size = config.get("chunk_size", 4096)
     custom_modules = config.get("custom_modules", [])
+    early_stopping_config = config.get("early_stopping_config", None)
 
     # Validation metric in the correct format
     validation_score = f"{validation_metric_name}@{validation_top_k}"
@@ -99,6 +100,9 @@ def objective_function(config: dict) -> None:
         evaluator=evaluator,
         dataset=dataset,
         strategy=strategy,
+        early_stopping_config=early_stopping_config,
+        validation_score=validation_score,
+        mode=mode,
     )
 
     # Trial parameter configuration check for consistency

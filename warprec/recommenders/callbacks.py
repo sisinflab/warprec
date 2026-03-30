@@ -1,6 +1,6 @@
 import os
 import tempfile
-from typing import Dict
+from typing import Dict, Optional
 
 import psutil
 import torch
@@ -9,6 +9,8 @@ from ray import train
 
 from warprec.data.dataset import Dataset
 from warprec.evaluation.evaluator import Evaluator
+from warprec.utils.config.model_configuration import EarlyStopping
+from warprec.utils.logger import logger
 
 
 def _get_memory_usage() -> Dict[str, float]:
@@ -34,13 +36,36 @@ class WarpRecLightningIntegrationCallback(L.Callback):
         evaluator (Evaluator): WarpRec Evaluator instance.
         dataset (Dataset): The dataset used in the training process.
         strategy (str): The evaluation strategy to use.
+        early_stopping_config (Optional[EarlyStopping]): The configuration of the early stopping.
+        validation_score (str): The score used to validate the model.
+        mode (str): The mode of optimization.
     """
 
-    def __init__(self, evaluator: Evaluator, dataset: Dataset, strategy: str = "full"):
+    def __init__(
+        self,
+        evaluator: Evaluator,
+        dataset: Dataset,
+        strategy: str = "full",
+        early_stopping_config: Optional[EarlyStopping] = None,
+        validation_score: str = "nDCG@10",
+        mode: str = "max",
+    ):
         super().__init__()
         self.evaluator = evaluator
         self.dataset = dataset
         self.strategy = strategy
+
+        # Early Stopping configuration
+        self.early_stopping_config = early_stopping_config
+        self.validation_score = validation_score
+        self.mode = mode
+
+        if self.early_stopping_config:
+            self.patience = self.early_stopping_config.patience
+            self.min_delta = self.early_stopping_config.min_delta
+            self.grace_period = self.early_stopping_config.grace_period
+            self.best_score = None
+            self.wait = 0
 
     def on_train_epoch_end(self, trainer, pl_module):
         # Capture memory stats
@@ -86,6 +111,35 @@ class WarpRecLightningIntegrationCallback(L.Callback):
 
                 # Store metric for Ray reporting
                 metric_report[metric_key] = val_scalar
+
+        if self.early_stopping_config and self.validation_score in metric_report:
+            current_score = metric_report[self.validation_score]
+            epoch = trainer.current_epoch
+
+            if epoch >= self.grace_period:
+                if self.best_score is None:
+                    self.best_score = current_score
+                else:
+                    improved = (
+                        (current_score < self.best_score - self.min_delta)
+                        if self.mode == "min"
+                        else (current_score > self.best_score + self.min_delta)
+                    )
+
+                    if improved:
+                        self.best_score = current_score
+                        self.wait = 0
+                    else:
+                        self.wait += 1
+
+                    if self.wait >= self.patience:
+                        if trainer.is_global_zero:
+                            logger.attention(
+                                f"Early stopping triggered at epoch {epoch} "
+                                f"(Score: {current_score:.4f}, Best: {self.best_score:.4f})."
+                            )
+                        # This trigger will stop Lightning Trainer
+                        trainer.should_stop = True
 
         # Create the checkpoint and report to Ray the results
         if trainer.is_global_zero:  # Execute only on master node

@@ -13,7 +13,6 @@ import numpy as np
 import ray
 from ray import tune
 from ray.tune import Tuner, TuneConfig, CheckpointConfig
-from ray.tune.stopper import Stopper
 from ray.tune.experiment import Trial
 from ray.tune.integration.ray_train import TuneReportCallback
 from ray.train.torch import TorchTrainer
@@ -319,6 +318,7 @@ class Trainer:
             "block_size": opt_config.block_size,
             "chunk_size": opt_config.chunk_size,
             "custom_modules": self._custom_modules,
+            "early_stopping_config": params.early_stopping,
         }
 
         num_folds = len(dataset) if isinstance(dataset, list) else 0
@@ -356,20 +356,8 @@ class Trainer:
             opt_config.scheduler, **opt_config.properties.model_dump()
         )
 
-        # Early Stopping
-        stopper = None
-        if params.early_stopping:
-            stopper = EarlyStopping(
-                metric=validation_score,
-                mode=mode,
-                patience=params.early_stopping.patience,
-                grace_period=params.early_stopping.grace_period,
-                min_delta=params.early_stopping.min_delta,
-            )
-
         # Configs
         run_config = ray.tune.RunConfig(
-            stop=stopper,
             callbacks=self._callbacks,
             verbose=ray_verbose,
             storage_path=storage_path,
@@ -704,59 +692,3 @@ class CodeCarbonCallback(tune.Callback):
         tracker = self.trackers.pop(trial_id, None)
         if tracker:
             tracker.stop()
-
-
-class EarlyStopping(Stopper):
-    """Ray Tune Stopper for early stopping based on a validation metric."""
-
-    def __init__(
-        self,
-        metric: str,
-        mode: str,
-        patience: int,
-        grace_period: int = 0,
-        min_delta: float = 0.0,
-    ):
-        if mode not in ["min", "max"]:
-            raise ValueError("Mode must be 'min' or 'max'.")
-        self.metric = metric
-        self.mode = mode
-        self.patience = patience
-        self.grace_period = grace_period
-        self.min_delta = min_delta
-        self.trial_state: Dict[str, Dict] = {}  # Stores best_score and wait_count
-
-    def __call__(self, trial_id: str, result: Dict) -> bool:
-        score = result.get(self.metric)
-        iteration = result.get("training_iteration", 0)
-
-        if score is None:
-            return False
-
-        if trial_id not in self.trial_state:
-            self.trial_state[trial_id] = {"best": score, "wait": 0}
-            return False
-
-        if iteration <= self.grace_period:
-            return False
-
-        state = self.trial_state[trial_id]
-        improved = (
-            (score < state["best"] - self.min_delta)
-            if self.mode == "min"
-            else (score > state["best"] + self.min_delta)
-        )
-
-        if improved:
-            state["best"] = score
-            state["wait"] = 0
-        else:
-            state["wait"] += 1
-
-        if state["wait"] >= self.patience:
-            logger.attention(f"Early stopping trial {trial_id} at iter {iteration}.")
-            return True
-        return False
-
-    def stop_all(self):
-        return False
