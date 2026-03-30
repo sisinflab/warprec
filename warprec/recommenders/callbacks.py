@@ -60,11 +60,14 @@ class WarpRecLightningIntegrationCallback(L.Callback):
         self.validation_score = validation_score
         self.mode = mode
 
+        # Best score tracking
+        self.absolute_best_score = -float("inf") if self.mode == "max" else float("inf")
+
         if self.early_stopping_config:
             self.patience = self.early_stopping_config.patience
             self.min_delta = self.early_stopping_config.min_delta
             self.grace_period = self.early_stopping_config.grace_period
-            self.best_score = None
+            self.es_best_score = None
             self.wait = 0
 
     def on_train_epoch_end(self, trainer, pl_module):
@@ -112,22 +115,40 @@ class WarpRecLightningIntegrationCallback(L.Callback):
                 # Store metric for Ray reporting
                 metric_report[metric_key] = val_scalar
 
+        # Retrieve callback metrics from Lightning Trainer
+        for key, val in trainer.callback_metrics.items():
+            if isinstance(val, torch.Tensor):
+                metric_report[key] = val.item()
+            else:
+                metric_report[key] = val
+
+        # Keep track of the best validation score
+        current_score = metric_report.get(self.validation_score)
+        if current_score is not None:
+            if self.mode == "max":
+                self.absolute_best_score = max(self.absolute_best_score, current_score)
+            else:
+                self.absolute_best_score = min(self.absolute_best_score, current_score)
+
+            metric_report[f"best_{self.validation_score}"] = self.absolute_best_score
+
+        # Early stopping logic
         if self.early_stopping_config and self.validation_score in metric_report:
             current_score = metric_report[self.validation_score]
             epoch = trainer.current_epoch
 
             if epoch >= self.grace_period:
-                if self.best_score is None:
-                    self.best_score = current_score
+                if self.es_best_score is None:
+                    self.es_best_score = current_score
                 else:
                     improved = (
-                        (current_score < self.best_score - self.min_delta)
+                        (current_score < self.es_best_score - self.min_delta)
                         if self.mode == "min"
-                        else (current_score > self.best_score + self.min_delta)
+                        else (current_score > self.es_best_score + self.min_delta)
                     )
 
                     if improved:
-                        self.best_score = current_score
+                        self.es_best_score = current_score
                         self.wait = 0
                     else:
                         self.wait += 1
@@ -136,7 +157,7 @@ class WarpRecLightningIntegrationCallback(L.Callback):
                         if trainer.is_global_zero:
                             logger.attention(
                                 f"Early stopping triggered at epoch {epoch} "
-                                f"(Score: {current_score:.4f}, Best: {self.best_score:.4f})."
+                                f"(Score: {current_score:.4f}, Best: {self.es_best_score:.4f})."
                             )
                         # This trigger will stop Lightning Trainer
                         trainer.should_stop = True
