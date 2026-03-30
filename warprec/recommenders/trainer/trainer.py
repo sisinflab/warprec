@@ -12,7 +12,7 @@ import torch
 import numpy as np
 import ray
 from ray import tune
-from ray.tune import Tuner, TuneConfig, CheckpointConfig
+from ray.tune import Tuner, TuneConfig
 from ray.tune.experiment import Trial
 from ray.tune.integration.ray_train import TuneReportCallback
 from ray.train.torch import TorchTrainer
@@ -338,7 +338,7 @@ class Trainer:
                 run_config=ray.train.RunConfig(
                     callbacks=[TuneReportCallback()],  # type: ignore[list-item]
                     storage_path=storage_path,
-                    checkpoint_config=CheckpointConfig(
+                    checkpoint_config=ray.train.CheckpointConfig(
                         num_to_keep=opt_config.checkpoint_to_keep,
                         checkpoint_score_attribute=validation_score,
                         checkpoint_score_order=mode,
@@ -361,7 +361,7 @@ class Trainer:
             callbacks=self._callbacks,
             verbose=ray_verbose,
             storage_path=storage_path,
-            checkpoint_config=CheckpointConfig(
+            checkpoint_config=ray.tune.CheckpointConfig(
                 num_to_keep=opt_config.checkpoint_to_keep,
                 checkpoint_score_attribute=validation_score,
                 checkpoint_score_order=mode,
