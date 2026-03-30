@@ -44,6 +44,7 @@ An **Application Layer** exposes trained models through a REST API (FastAPI) and
 - [✨ Key Features](#-key-features)
 - [⚙️ Installation](#️-installation)
   - [🚀 Quick Install (PyPI)](#-quick-install-pypi)
+  - [📦 Install via Poetry](#-install-via-poetry)
   - [🛠️ Development Setup (Conda)](#️-development-setup-conda)
 - [🚂 Usage](#-usage)
   - [🏋️ Training a model](#️-training-a-model)
@@ -92,6 +93,22 @@ You can install them at any moment using the following command:
 ```bash
 pip install "warprec[dashboard, remote-io]"
 ```
+
+### 📦 Install via Poetry
+
+If you use [Poetry](https://python-poetry.org/) for dependency management, you can easily install WarpRec and its dependencies directly from the source:
+
+1. **Clone the repository**
+   Open your terminal and clone the WarpRec repository:
+   ```bash
+   git clone <repository_url>
+   cd warprec
+
+2. **Install the project**
+    ```
+    poetry install
+    # Or you can install all extra dependencies
+    poetry install --extras all
 
 ### 🛠️ Development Setup (Conda)
 
