@@ -1,11 +1,9 @@
 import os
-import tempfile
 from typing import Dict, Optional
 
 import psutil
 import torch
 import lightning as L
-from ray import train
 
 from warprec.data.dataset import Dataset
 from warprec.evaluation.evaluator import Evaluator
@@ -162,14 +160,7 @@ class WarpRecLightningIntegrationCallback(L.Callback):
                         # This trigger will stop Lightning Trainer
                         trainer.should_stop = True
 
-        # Create the checkpoint and report to Ray the results
-        if trainer.is_global_zero:  # Execute only on master node
-            with tempfile.TemporaryDirectory() as temp_dir:
-                checkpoint_path = os.path.join(temp_dir, "checkpoint.pt")
-
-                # Save the checkpoint using WarpRec custom information
-                trainer.save_checkpoint(checkpoint_path, weights_only=True)
-
-                # Ray reporting
-                ray_checkpoint = train.Checkpoint.from_directory(temp_dir)
-                train.report(metric_report, checkpoint=ray_checkpoint)
+        # Log all metrics to Lightning
+        # NOTE: We don't need synching here as we already did it before
+        for key, val in metric_report.items():
+            pl_module.log(key, val, prog_bar=True, on_epoch=True, sync_dist=False)

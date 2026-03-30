@@ -6,7 +6,11 @@ from typing import Union, Any, List
 import lightning as L
 import ray
 from ray import train
-from ray.train.lightning import RayDDPStrategy, RayLightningEnvironment
+from ray.train.lightning import (
+    RayDDPStrategy,
+    RayLightningEnvironment,
+    RayTrainReportCallback,
+)
 
 from warprec.evaluation.evaluator import Evaluator
 from warprec.recommenders.callbacks import (
@@ -193,7 +197,7 @@ def objective_function(config: dict) -> None:
                 enable_model_summary=False,
                 enable_progress_bar=False,
                 check_val_every_n_epoch=eval_every_n,
-                callbacks=[integration_callback],
+                callbacks=[integration_callback, RayTrainReportCallback()],
             )
             trainer.fit(
                 model,

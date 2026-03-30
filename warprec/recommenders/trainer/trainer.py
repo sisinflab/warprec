@@ -457,7 +457,7 @@ class Trainer:
         if issubclass(model_class, IterativeRecommender):
             model = model_class.from_checkpoint(
                 torch.load(
-                    Path(checkpoint_path) / "checkpoint.pt",
+                    Path(checkpoint_path) / "checkpoint.ckpt",
                     weights_only=False,
                     map_location="cpu",
                 )
