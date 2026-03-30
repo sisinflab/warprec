@@ -22,6 +22,22 @@ You can install them at any moment using the following command:
 pip install "warprec[dashboard, remote-io]"
 ```
 
+### Install via Poetry
+
+If you use [Poetry](https://python-poetry.org/) for dependency management, you can easily install WarpRec and its dependencies directly from the source:
+
+1. **Clone the repository**
+   Open your terminal and clone the WarpRec repository:
+   ```bash
+   git clone <repository_url>
+   cd warprec
+
+2. **Install the project**
+    ```
+    poetry install
+    # Or you can install all extra dependencies
+    poetry install --extras all
+
 ### Development Setup (Conda)
 
 If you want to contribute or need a specific environment (CPU/GPU), we recommend using Conda. The conda environment already contains all the extra dependencies:
