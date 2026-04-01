@@ -6,6 +6,7 @@ from . import sequential_recommender
 from . import unpersonalized_recommender
 from . import trainer
 from . import lr_scheduler_wrapper
+from . import optimizer_wrapper
 from .base_recommender import (
     Recommender,
     IterativeRecommender,
@@ -28,6 +29,7 @@ __all__ = [
     "unpersonalized_recommender",
     "trainer",
     "lr_scheduler_wrapper",
+    "optimizer_wrapper",
     "Recommender",
     "IterativeRecommender",
     "ContextRecommenderUtils",
