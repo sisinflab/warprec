@@ -3,7 +3,7 @@ from .common import Labels
 from .dashboard_configuration import DashboardConfig, Wandb, CodeCarbon, MLflow
 from .evaluation_configuration import EvaluationConfig, ComplexMetricConfig
 from .general_configuration import GeneralConfig, WarpRecCallbackConfig, AzureConfig
-from .model_configuration import RecomModel, LRScheduler
+from .model_configuration import RecomModel, LRSchedulerConfig, OptimizerConfig
 from .reader_configuration import (
     ReaderConfig,
     CustomDtype,
@@ -43,7 +43,8 @@ __all__ = [
     "WarpRecCallbackConfig",
     "AzureConfig",
     "RecomModel",
-    "LRScheduler",
+    "LRSchedulerConfig",
+    "OptimizerConfig",
     "ReaderConfig",
     "CustomDtype",
     "SplitReading",
