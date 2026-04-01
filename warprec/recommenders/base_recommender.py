@@ -12,6 +12,8 @@ from torch.utils.data import DataLoader
 
 from warprec.data.entities import Interactions, Sessions
 from warprec.utils.enums import DataLoaderType
+from warprec.utils.config.model_configuration import LRSchedulerConfig, OptimizerConfig
+from warprec.utils.registry import lr_scheduler_registry, optimizer_registry
 
 
 class Recommender(nn.Module, ABC):
@@ -254,6 +256,27 @@ class IterativeRecommender(Recommender, L.LightningModule):
         super().__init__(params, info, *args, seed=seed, **kwargs)
         self.save_hyperparameters(params)
 
+        # Optimization parameters
+        self._optimizer_name: str = "Adam"
+        self._optimizer_kwargs: Dict[str, Any] = {}
+        self._lr_scheduler_name: Optional[str] = None
+        self._lr_scheduler_kwargs: Dict[str, Any] = {}
+
+    def set_optimization_parameters(
+        self,
+        optimizer_config: Optional[OptimizerConfig] = None,
+        lr_scheduler_config: Optional[LRSchedulerConfig] = None,
+    ):
+        # Set the optimizer values
+        if optimizer_config:
+            self._optimizer_name = optimizer_config.name
+            self._optimizer_kwargs = optimizer_config.params
+
+        # Set the scheduler values
+        if lr_scheduler_config:
+            self._lr_scheduler_name = lr_scheduler_config.name
+            self._lr_scheduler_kwargs = lr_scheduler_config.params
+
     def configure_optimizers(self):
         """Standard Lightning method to define optimizers.
 
@@ -312,10 +335,30 @@ class IterativeRecommender(Recommender, L.LightningModule):
             },
         ]
 
-        optimizer = torch.optim.Adam(
-            optimizer_grouped_parameters, lr=self.learning_rate
+        # Create the optimizer instance
+        optimizer = optimizer_registry.get(
+            name=self._optimizer_name,
+            params=optimizer_grouped_parameters,
+            lr=self.learning_rate,
+            **self._optimizer_kwargs,
         )
-        return optimizer
+
+        # No learning rate scheduler provided -> Return only the optimizer
+        if self._lr_scheduler_name is None:
+            return optimizer
+
+        # Create the instance of the learning rate scheduler
+        scheduler = lr_scheduler_registry.get(
+            name=self._lr_scheduler_name,
+            optimizer=optimizer,
+            **self._lr_scheduler_kwargs,
+        )
+        lr_scheduler_config = {
+            "scheduler": scheduler,
+            "interval": "epoch",
+            "frequency": 1,
+        }
+        return {"optimizer": optimizer, "lr_scheduler": lr_scheduler_config}
 
     def _init_weights(self, module: nn.Module):
         """A comprehensive default weight initialization method.
