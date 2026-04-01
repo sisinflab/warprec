@@ -314,6 +314,7 @@ class Trainer:
             "num_negatives": num_negatives,
             "complex_metrics": complex_metrics,
             "lr_scheduler": opt_config.lr_scheduler,
+            "optimizer": opt_config.optimizer,
             "seed": opt_config.properties.seed,
             "block_size": opt_config.block_size,
             "chunk_size": opt_config.chunk_size,

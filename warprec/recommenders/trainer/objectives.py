@@ -67,6 +67,8 @@ def objective_function(config: dict) -> None:
     strategy = config.get("strategy", "full")
     num_negatives = config.get("num_negatives", 99)
     complex_metrics = config.get("complex_metrics", None)
+    lr_scheduler_config = config.get("lr_scheduler", None)
+    optimizer_config = config.get("optimizer", None)
     seed = config.get("seed", 42)
     block_size = config.get("block_size", 50)
     chunk_size = config.get("chunk_size", 4096)
@@ -149,6 +151,12 @@ def objective_function(config: dict) -> None:
         )
 
         if isinstance(model, IterativeRecommender):
+            # Set up the learning rate scheduler and the optimizer
+            model.set_optimization_parameters(
+                optimizer_config=optimizer_config,
+                lr_scheduler_config=lr_scheduler_config,
+            )
+
             # Dataloader workers logic
             if num_workers is None:
                 try:

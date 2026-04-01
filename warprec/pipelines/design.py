@@ -100,6 +100,12 @@ def design_pipeline(path: str):
         )
 
         if isinstance(model, IterativeRecommender):
+            # Set up the learning rate scheduler and the optimizer
+            model.set_optimization_parameters(
+                optimizer_config=params.optimization.optimizer,
+                lr_scheduler_config=params.optimization.lr_scheduler,
+            )
+
             # Dataloader settings
             if num_workers is None:
                 available_cpus = os.cpu_count()

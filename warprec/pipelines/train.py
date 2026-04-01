@@ -541,6 +541,12 @@ def multiple_fold_validation_flow(
     # Train the model using backpropagation if the model
     # is iterative
     if isinstance(best_model, IterativeRecommender):
+        # Set up the learning rate scheduler and the optimizer
+        best_model.set_optimization_parameters(
+            optimizer_config=params.optimization.optimizer,
+            lr_scheduler_config=params.optimization.lr_scheduler,
+        )
+
         # Dataloader settings
         if num_workers is None:
             available_cpus = os.cpu_count()
