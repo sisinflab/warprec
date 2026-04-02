@@ -40,19 +40,20 @@ The **optimization** section defines how hyperparameter optimization is performe
 - **cpu_per_trial**: Number of CPU cores allocated per trial. Defaults to `1`.
 - **gpu_per_trial**: Number of GPUs allocated per trial. Defaults to `0`.
 - **custom_resources_per_trial**: A dictionary containing custom resources to request per trial during optimization. Defaults to an empty dictionary.
+- **label_selector**: A dictionary containing a set of labels with respective rules.
 - **num_workers**: Number of worker processes for data loading. Defaults to `None` (main process).
 - **block_size**: Number of items to predict at once for efficiency. Defaults to `50`.
 - **checkpoint_to_keep**: Number of checkpoints to retain in Ray. Defaults to `5`.
 
-!!! Example
-    A more in-depth use-case scenario might involve the *custom_resources_per_trial* parameter. To correctly make use of this parameter you must start your nodes with the correct argument. As an example we might want to limit the trials also on the RAM usage. Let's say that your machine has 64 GB of RAM and you want to expose this information in your cluster. You can do so by running:
+!!! Example "Advanced Resource Management & Node Affinity"
+    WarpRec allows strict control over cluster scheduling through logical resources and label selectors.
 
+    **1. Logical Resource Constraints (`custom_resources_per_trial`)**
+    Use this to prevent Out-Of-Memory (OOM) errors by treating RAM as a consumable logical resource. First, provision the Ray node exposing its memory capacity:
     ```bash
     ray start --head --resources='{"ram_gb": 64}'
     ```
-
-    In your configuration you can then write the optimization parameters of you model like this:
-
+    Then, require a fraction of this resource in your configuration:
     ```yaml
     models:
         EASE:
@@ -60,10 +61,27 @@ The **optimization** section defines how hyperparameter optimization is performe
                 cpu_per_trial: 4
                 custom_resources_per_trial:
                     ram_gb: 32
-            l2: [100, 200, 300, 400, 500, 1000, 2000, 5000]
     ```
+    *Result:* The Ray scheduler will strictly limit concurrent trials on this node to a maximum of 2, ensuring memory limits are respected.
 
-    With this setup you ensure that at most 2 trials will be executed on the head node.
+    **2. Node Affinity via Label Selectors (`label_selector`)**
+    Use this to enforce execution on specific hardware or environments (e.g., isolating development from production, or targeting specific GPU architectures). Provision a node with custom labels:
+    ```bash
+    ray start --node-ip-address=<node-ip> --labels='env=dev,storage=fast_ssd'
+    ```
+    Then, bind the model training to these labels:
+    ```yaml
+    models:
+        EASE:
+            optimization:
+                cpu_per_trial: 4
+                label_selector:
+                    env: dev
+    ```
+    *Result:* The trial workers will only be scheduled on nodes explicitly labeled with `env=dev`.
+
+    *Tip:* Ray automatically injects hardware labels. You can use `label_selector: {"ray.io/accelerator-type": "A100"}` to target specific GPU architectures without manual node labeling. For more details, refer to the [Ray Scheduling Documentation](https://docs.ray.io/en/latest/ray-core/scheduling/labels.html).
+
 
 ### LR Scheduler Section
 
