@@ -2,10 +2,10 @@
 
 ::: warprec.data.dataset.Dataset
 
-::: warprec.data.eval_loaders.EvaluationDataLoader
+::: warprec.data.eval_loaders.EvaluationDataset
 
-::: warprec.data.eval_loaders.ContextualEvaluationDataLoader
+::: warprec.data.eval_loaders.ContextualEvaluationDataset
 
-::: warprec.data.eval_loaders.SampledEvaluationDataLoader
+::: warprec.data.eval_loaders.SampledEvaluationDataset
 
-::: warprec.data.eval_loaders.SampledContextualEvaluationDataLoader
+::: warprec.data.eval_loaders.SampledContextualEvaluationDataset
