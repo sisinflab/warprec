@@ -295,6 +295,7 @@ class Trainer:
             opt_config.cpu_per_trial,
             opt_config.gpu_per_trial,
             opt_config.custom_resources_per_trial,
+            opt_config.label_selector,
             device,
         )
 
@@ -410,15 +411,17 @@ class Trainer:
         self,
         cpu_per_trial: int,
         gpu_per_trial: float,
-        custom_resources_per_trial: Dict[str, float | int],
-        device: str,
+        custom_resources_per_trial: Optional[Dict[str, float | int]] = None,
+        label_selector: Optional[Dict[str, str]] = None,
+        device: str = "cpu",
     ) -> Dict[str, Any]:
         """Calculates resource allocation per trial.
 
         Args:
             cpu_per_trial (int): The number of cpu per trial.
             gpu_per_trial (float): The number of gpu per trial.
-            custom_resources_per_trial (Dict[str, float | int]): Custom resources to assign to each trial.
+            custom_resources_per_trial (Optional[Dict[str, float | int]]): Custom resources to assign to each trial.
+            label_selector (Optional[Dict[str, str]]): Custom labels used during trial assignment.
             device (str): The device of the experiment.
 
         Returns:
@@ -442,14 +445,22 @@ class Trainer:
         if use_gpu:
             resources_per_worker["GPU"] = gpu_per_trial / num_workers
 
-        for res, amount in custom_resources_per_trial.items():
-            resources_per_worker[res] = amount / num_workers
+        # Add custom resources if provided
+        if custom_resources_per_trial is not None:
+            for res, amount in custom_resources_per_trial.items():
+                resources_per_worker[res] = amount / num_workers
 
-        return {
+        scaling_dict = {
             "num_workers": num_workers,
             "use_gpu": use_gpu,
             "resources_per_worker": resources_per_worker,
         }
+
+        # Add label selector if provided
+        if label_selector is not None:
+            scaling_dict["label_selector"] = label_selector
+
+        return scaling_dict
 
     def _load_best_model(self, model_name, checkpoint_path, best_params, dataset):
         """Loads the model state from the best checkpoint."""

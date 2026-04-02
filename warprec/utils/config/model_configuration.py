@@ -171,6 +171,7 @@ class Optimization(BaseModel):
             each trial. Defaults to 0.
         custom_resources_per_trial (Optional[Dict[str, float | int]]): Custom resources to assign to
             each trial. Defaults to an empty dictionary.
+        label_selector (Optional[Dict[str, str]]): Custom labels to use during trial assignment.
         num_workers (Optional[int]): The number of workers to assign to the training dataloader.
             Defaults to None.
         block_size (Optional[int]): The number of items to process during prediction.
@@ -193,6 +194,7 @@ class Optimization(BaseModel):
     cpu_per_trial: Optional[int] = 1
     gpu_per_trial: Optional[float] = 0
     custom_resources_per_trial: Optional[Dict[str, float | int]] = {}
+    label_selector: Optional[Dict[str, str]] = None
     num_workers: Optional[int] = None
     block_size: Optional[int] = 50
     chunk_size: Optional[int] = 4096
