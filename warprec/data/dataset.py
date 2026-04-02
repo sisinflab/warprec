@@ -3,6 +3,7 @@ from typing import Tuple, Optional, List, Any, Dict
 
 import torch
 from torch import Tensor
+from torch.utils.data import DataLoader
 
 import narwhals as nw
 from narwhals.typing import FrameT
@@ -10,10 +11,10 @@ from narwhals.dataframe import DataFrame
 
 from warprec.data.entities import Interactions, Sessions
 from warprec.data.eval_loaders import (
-    EvaluationDataLoader,
-    SampledEvaluationDataLoader,
-    ContextualEvaluationDataLoader,
-    SampledContextualEvaluationDataLoader,
+    EvaluationDataset,
+    ContextualEvaluationDataset,
+    SampledEvaluationDataset,
+    SampledContextualEvaluationDataset,
 )
 from warprec.utils.enums import RatingType
 from warprec.utils.logger import logger
@@ -557,20 +558,26 @@ class Dataset:
 
         return df_processed
 
-    def get_evaluation_dataloader(self) -> EvaluationDataLoader:
-        """Retrieve the EvaluationDataLoader for the dataset.
+    def get_evaluation_dataloader(self, **kwargs: Any) -> DataLoader:
+        """Retrieve the full evaluation DataLoader for the dataset.
+
+        Args:
+            **kwargs (Any): The keyword arguments to pass to DataLoader initialization.
 
         Returns:
-            EvaluationDataLoader: DataLoader that yields batches of interactions
+            DataLoader: DataLoader that yields batches of interactions
                 (eval_batch, user_indices).
         """
         key = "full"
         if key not in self._precomputed_dataloader:
             eval_sparse = self.eval_set.get_sparse()
 
-            self._precomputed_dataloader[key] = EvaluationDataLoader(
-                eval_interactions=eval_sparse,
+            dataset = EvaluationDataset(eval_interactions=eval_sparse)
+            self._precomputed_dataloader[key] = DataLoader(
+                dataset,
                 batch_size=self.batch_size,
+                shuffle=False,
+                **kwargs,
             )
 
         return self._precomputed_dataloader[key]
@@ -579,15 +586,17 @@ class Dataset:
         self,
         num_negatives: int = 99,
         seed: int = 42,
-    ) -> SampledEvaluationDataLoader:
-        """Retrieve the SampledEvaluationDataLoader for the dataset.
+        **kwargs: Any,
+    ) -> DataLoader:
+        """Retrieve the sampled evaluation DataLoader for the dataset.
 
         Args:
             num_negatives (int): Number of negative samples per user.
             seed (int): Random seed for negative sampling.
+            **kwargs (Any): The keyword arguments to pass to DataLoader initialization.
 
         Returns:
-            SampledEvaluationDataLoader: DataLoader that yields batches
+            DataLoader: DataLoader that yields batches
                 of interactions (pos_items, neg_items, user_indices)
         """
         key = f"neg_{num_negatives}_{seed}"
@@ -596,24 +605,33 @@ class Dataset:
             train_sparse = self.train_set.get_sparse()
             eval_sparse = self.eval_set.get_sparse()
 
-            self._precomputed_dataloader[key] = SampledEvaluationDataLoader(
+            dataset = SampledEvaluationDataset(
                 train_interactions=train_sparse,
                 eval_interactions=eval_sparse,
                 num_negatives=num_negatives,
-                batch_size=self.batch_size,
                 seed=seed,
+            )
+            self._precomputed_dataloader[key] = DataLoader(
+                dataset,
+                batch_size=self.batch_size,
+                shuffle=False,
+                collate_fn=dataset.collate_fn,
+                **kwargs,
             )
 
         return self._precomputed_dataloader[key]
 
-    def get_contextual_evaluation_dataloader(self) -> ContextualEvaluationDataLoader:
-        """Retrieve the ContextualEvaluationDataLoader for the dataset.
+    def get_contextual_evaluation_dataloader(self, **kwargs: Any) -> DataLoader:
+        """Retrieve the full contextual evaluation DataLoader for the dataset.
 
         This loader is specific for Context-Aware Recommender Systems.
         It iterates over transactions (User, Item, Context) instead of Users.
 
+        Args:
+            **kwargs (Any): The keyword arguments to pass to DataLoader initialization.
+
         Returns:
-            ContextualEvaluationDataLoader: The contextual data loader.
+            DataLoader: The contextual data loader.
         """
         key = "full_contextual"
         if key not in self._precomputed_dataloader:
@@ -660,12 +678,14 @@ class Dataset:
             # but if we need to drop other nulls:
             # eval_data = eval_data.drop_nulls(subset=[user_label, item_label])
 
-            self._precomputed_dataloader[key] = ContextualEvaluationDataLoader(
+            dataset = ContextualEvaluationDataset(
                 eval_data=eval_data,
                 user_id_label=user_label,
                 item_id_label=item_label,
                 context_labels=context_labels,
-                batch_size=self.batch_size,
+            )
+            self._precomputed_dataloader[key] = DataLoader(
+                dataset, batch_size=self.batch_size, shuffle=False, **kwargs
             )
 
         return self._precomputed_dataloader[key]
@@ -674,15 +694,17 @@ class Dataset:
         self,
         num_negatives: int = 99,
         seed: int = 42,
-    ) -> SampledContextualEvaluationDataLoader:
-        """Retrieve the SampledContextualEvaluationDataLoader for the dataset.
+        **kwargs: Any,
+    ) -> DataLoader:
+        """Retrieve the sampled contextual evaluation DataLoader for the dataset.
 
         Args:
             num_negatives (int): Number of negative samples per transaction.
             seed (int): Random seed.
+            **kwargs (Any): The keyword arguments to pass to DataLoader initialization.
 
         Returns:
-            SampledContextualEvaluationDataLoader: The sampled contextual loader.
+            DataLoader: The sampled contextual loader.
         """
         key = f"sampled_contextual_{num_negatives}_{seed}"
 
@@ -724,7 +746,7 @@ class Dataset:
                 nw.col(f"{item_label}_idx").alias(item_label),
             ).drop(f"{user_label}_idx", f"{item_label}_idx")
 
-            self._precomputed_dataloader[key] = SampledContextualEvaluationDataLoader(
+            dataset = SampledContextualEvaluationDataset(
                 train_interactions=train_sparse,
                 eval_data=eval_data,
                 user_id_label=user_label,
@@ -733,7 +755,13 @@ class Dataset:
                 num_items=self._niid,
                 num_negatives=num_negatives,
                 seed=seed,
+            )
+            self._precomputed_dataloader[key] = DataLoader(
+                dataset,
                 batch_size=self.batch_size,
+                shuffle=False,
+                collate_fn=dataset.collate_fn,
+                **kwargs,
             )
 
         return self._precomputed_dataloader[key]
