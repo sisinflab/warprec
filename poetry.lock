@@ -7363,4 +7363,4 @@ serving = ["fastapi", "fastmcp"]
 [metadata]
 lock-version = "2.1"
 python-versions = "~3.12"
-content-hash = "6d03d5111074f216c3b838b7a7e22fa53dcbd65a1e4858b6624cb4f1e9fdd3c9"
+content-hash = "7c195f42efbda7ac28a5e9840dd09cf9a15803e01b2571ebd7a6e9e9ee55615d"
