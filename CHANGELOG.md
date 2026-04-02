@@ -2,6 +2,33 @@
 
 <!-- version list -->
 
+## v1.1.1 (2026-04-02)
+
+### Bug Fixes
+
+- Added label selector to optimization configuration
+  ([`93172af`](https://github.com/sisinflab/warprec/commit/93172af4a2c6b486d92fe7ca5f0a02019c6cf8ef))
+
+### Chores
+
+- Linting
+  ([`919f925`](https://github.com/sisinflab/warprec/commit/919f92503116a1c6d38eef6241ec2bfc5af12267))
+
+- Updated lock file
+  ([`ef7babb`](https://github.com/sisinflab/warprec/commit/ef7babb85e3d1b422fbc69178466ed57d6c844e4))
+
+- Updated Ray dependency minimum version
+  ([`e3a9e4d`](https://github.com/sisinflab/warprec/commit/e3a9e4d59286a6153a603df29d4db645a07c4ccf))
+
+### Documentation
+
+- Added label selector to documentation
+  ([`a41c69b`](https://github.com/sisinflab/warprec/commit/a41c69b06f69f84e915834a70d8ef355f55bffc1))
+
+- Fixed api reference
+  ([`d352aa0`](https://github.com/sisinflab/warprec/commit/d352aa0c448da5217a2f0d57e77a5bfdb19cda43))
+
+
 ## v1.1.0 (2026-04-02)
 
 ### Bug Fixes
