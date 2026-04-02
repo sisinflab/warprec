@@ -129,7 +129,7 @@ class BERT4Rec(IterativeRecommender, SequentialRecommenderUtils):
             **kwargs,
         )
 
-    def train_step(self, batch: Any, *args, **kwargs):
+    def training_step(self, batch: Any, batch_idx: int):
         masked_seq, pos_items, neg_items, masked_indices = batch
 
         # Get the output of the bidirectional transformer
@@ -161,7 +161,10 @@ class BERT4Rec(IterativeRecommender, SequentialRecommenderUtils):
             neg_items_emb,
         )
 
-        return bpr_loss + reg_loss
+        # Loss logging
+        loss = bpr_loss + reg_loss
+        self.log("loss", loss, prog_bar=True, on_step=False, on_epoch=True)
+        return loss
 
     def forward(self, item_seq: Tensor) -> Tensor:
         """

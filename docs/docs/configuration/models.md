@@ -34,6 +34,7 @@ The **optimization** section defines how hyperparameter optimization is performe
     - `asha`: ASHA scheduler for optimized early stopping and trial pruning.
 
 - **lr_scheduler**: Scheduling algorithm to adjust the learning rate at run time. Defaults to `None`.
+- **optimizer**: Optimizer to use during the training process. Defaults to `None`.
 - **properties**: Nested section for strategy and scheduler parameters.
 - **device**: Training device, e.g., `cpu` or `cuda`. Overrides global device.
 - **cpu_per_trial**: Number of CPU cores allocated per trial. Defaults to `1`.
@@ -85,6 +86,31 @@ models:
 ```
 
 For further details about the scheduling algorithms and their parameters, you can check the original [PyTorch Guide](https://docs.pytorch.org/docs/stable/optim.html#how-to-adjust-learning-rate).
+
+### Optimizer Section
+
+Within WarpRec standard pipelines, you customize the optimizer used during training to fit your need. To do so, you can pass the following parameters under the optimizer configuration block:
+
+- **name**: Name of the optimizer (e.g., Adam, AdamW).
+- **params**: A dictionary of parameters expected by the specific optimizer.
+
+An example of this configuration could be something like this:
+
+```yaml
+models:
+    MyModel:
+        optimization:
+            optimizer:
+                name: SGD
+                params:
+                    momentum: 0.001
+                    dampening: 0.0001
+```
+
+For further details about the optimizers and their parameters, you can check the original [PyTorch Guide](https://docs.pytorch.org/docs/stable/optim.html#algorithms).
+
+!!! Tip
+    You can combine the use of a learning rate scheduler and an optimizer to boost model performance. Choosing the right optimizer or scheduler is a critical factor in achieving optimal convergence, directly impacting the effectiveness and stability of the learning process.
 
 ### Properties Section
 

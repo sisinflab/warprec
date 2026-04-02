@@ -237,7 +237,7 @@ class MixRec(IterativeRecommender, GraphRecommenderUtils):
         loss = (beta * l_pos + (1 - beta) * l_neg).mean()
         return loss
 
-    def train_step(self, batch: Any, *args, **kwargs) -> Tensor:
+    def training_step(self, batch: Any, batch_idx: int) -> Tensor:
         user, pos_item, neg_item = batch
         batch_size = user.size(0)
 
@@ -300,7 +300,10 @@ class MixRec(IterativeRecommender, GraphRecommenderUtils):
 
         cl_loss = self.ssl_lambda * (cl_user + cl_item)
 
-        return main_loss + cl_loss + reg_loss
+        # Loss logging
+        loss = main_loss + cl_loss + reg_loss
+        self.log("loss", loss, prog_bar=True, on_step=False, on_epoch=True)
+        return loss
 
     def predict(
         self,

@@ -133,7 +133,7 @@ class Caser(IterativeRecommender, SequentialRecommenderUtils):
             **kwargs,
         )
 
-    def train_step(self, batch: Any, *args, **kwargs):
+    def training_step(self, batch: Any, batch_idx: int):
         if self.neg_samples > 0:
             user, item_seq, _, pos_item, neg_item = batch
         else:
@@ -174,7 +174,10 @@ class Caser(IterativeRecommender, SequentialRecommenderUtils):
                 pos_items_emb,
             )
 
-        return main_loss + reg_loss
+        # Loss logging
+        loss = main_loss + reg_loss
+        self.log("loss", loss, prog_bar=True, on_step=False, on_epoch=True)
+        return loss
 
     def forward(self, user: Tensor, item_seq: Tensor) -> Tensor:
         """Forward pass of the Caser model.

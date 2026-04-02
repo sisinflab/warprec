@@ -1,4 +1,4 @@
-from .objectives import objective_function, driver_function_ddp
+from .objectives import objective_function
 from .trainer import Trainer
 from .search_algorithm_wrapper import (
     GridSearchWrapper,
@@ -15,7 +15,6 @@ from .scheduler_wrapper import (
 
 __all__ = [
     "objective_function",
-    "driver_function_ddp",
     "Trainer",
     "GridSearchWrapper",
     "RandomSearchWrapper",

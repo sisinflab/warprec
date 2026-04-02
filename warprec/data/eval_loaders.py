@@ -6,7 +6,7 @@ import numpy as np
 from narwhals.dataframe import DataFrame
 
 from torch import Tensor
-from torch.utils.data import DataLoader, Dataset as TorchDataset
+from torch.utils.data import Dataset as TorchDataset
 from torch.nn.utils.rnn import pad_sequence
 from scipy.sparse import csr_matrix
 
@@ -159,6 +159,24 @@ class SampledEvaluationDataset(TorchDataset):
             self.negative_items_list[idx],
         )
 
+    def collate_fn(
+        self, batch: List[Tuple[int, Tensor, Tensor]]
+    ) -> Tuple[Tensor, Tensor, Tensor]:
+        user_indices, positive_tensors, negative_tensors = zip(*batch)
+        user_indices_tensor = torch.tensor(list(user_indices), dtype=torch.long)
+
+        positives_padded = pad_sequence(
+            positive_tensors,  # type: ignore[arg-type]
+            batch_first=True,
+            padding_value=self.num_items,
+        )
+        negatives_padded = pad_sequence(
+            negative_tensors,  # type: ignore[arg-type]
+            batch_first=True,
+            padding_value=self.num_items,
+        )
+        return user_indices_tensor, positives_padded, negatives_padded
+
 
 class SampledContextualEvaluationDataset(TorchDataset):
     """
@@ -249,141 +267,8 @@ class SampledContextualEvaluationDataset(TorchDataset):
             self.context_features[idx],
         )
 
-
-class EvaluationDataLoader(DataLoader):
-    """
-    Output Batch: (user_indices, ground_truths)
-    """
-
-    def __init__(
-        self,
-        eval_interactions: csr_matrix,
-        batch_size: int = 1024,
-        **kwargs,
-    ):
-        dataset = EvaluationDataset(
-            eval_interactions=eval_interactions,
-        )
-        super().__init__(dataset, batch_size=batch_size, shuffle=False, **kwargs)
-
-
-class ContextualEvaluationDataLoader(DataLoader):
-    """
-    Output Batch: (user_indices, target_items, contexts)
-    """
-
-    def __init__(
-        self,
-        eval_data: DataFrame[Any],
-        user_id_label: str,
-        item_id_label: str,
-        context_labels: List[str],
-        batch_size: int = 1024,
-        **kwargs,
-    ):
-        dataset = ContextualEvaluationDataset(
-            eval_data=eval_data,
-            user_id_label=user_id_label,
-            item_id_label=item_id_label,
-            context_labels=context_labels,
-        )
-        super().__init__(dataset, batch_size=batch_size, shuffle=False, **kwargs)
-
-
-class SampledEvaluationDataLoader(DataLoader):
-    """
-    Output Batch: (user_indices, pos_items, neg_items)
-    """
-
-    def __init__(
-        self,
-        train_interactions: csr_matrix,
-        eval_interactions: csr_matrix,
-        num_negatives: int = 99,
-        seed: int = 42,
-        batch_size: int = 1024,
-        **kwargs,
-    ):
-        self.num_items = train_interactions.shape[1]
-
-        dataset = SampledEvaluationDataset(
-            train_interactions=train_interactions,
-            eval_interactions=eval_interactions,
-            num_negatives=num_negatives,
-            seed=seed,
-        )
-
-        super().__init__(
-            dataset,
-            batch_size=batch_size,
-            shuffle=False,
-            collate_fn=self._collate_fn,
-            **kwargs,
-        )
-
-    def _collate_fn(
-        self,
-        batch: List[Tuple[int, Tensor, Tensor]],
-    ) -> Tuple[Tensor, Tensor, Tensor]:
-        user_indices, positive_tensors, negative_tensors = zip(*batch)
-
-        user_indices_tensor = torch.tensor(list(user_indices), dtype=torch.long)
-
-        # Stack sequences and pad them ensure same length
-        positives_padded = pad_sequence(
-            positive_tensors,  # type: ignore[arg-type]
-            batch_first=True,
-            padding_value=self.num_items,
-        )
-        negatives_padded = pad_sequence(
-            negative_tensors,  # type: ignore[arg-type]
-            batch_first=True,
-            padding_value=self.num_items,
-        )
-
-        return user_indices_tensor, positives_padded, negatives_padded
-
-
-class SampledContextualEvaluationDataLoader(DataLoader):
-    """
-    Output Batch: (user_indices, pos_items, neg_items, contexts)
-    """
-
-    def __init__(
-        self,
-        train_interactions: csr_matrix,
-        eval_data: DataFrame[Any],
-        user_id_label: str,
-        item_id_label: str,
-        context_labels: List[str],
-        num_items: int,
-        num_negatives: int = 99,
-        seed: int = 42,
-        batch_size: int = 1024,
-        **kwargs,
-    ):
-        dataset = SampledContextualEvaluationDataset(
-            train_interactions=train_interactions,
-            eval_data=eval_data,
-            user_id_label=user_id_label,
-            item_id_label=item_id_label,
-            context_labels=context_labels,
-            num_items=num_items,
-            num_negatives=num_negatives,
-            seed=seed,
-        )
-
-        super().__init__(
-            dataset,
-            batch_size=batch_size,
-            shuffle=False,
-            collate_fn=self._collate_fn,
-            **kwargs,
-        )
-
-    def _collate_fn(
-        self,
-        batch: List[Tuple[Tensor, Tensor, Tensor, Tensor]],
+    def collate_fn(
+        self, batch: List[Tuple[Tensor, Tensor, Tensor, Tensor]]
     ) -> Tuple[Tensor, Tensor, Tensor, Tensor]:
         user_indices, pos_items, neg_items, context_features = zip(*batch)
 

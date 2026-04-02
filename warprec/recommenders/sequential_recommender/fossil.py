@@ -230,7 +230,7 @@ class FOSSIL(IterativeRecommender, SequentialRecommenderUtils):
         )  # (batch_size, embedding_size)
         return similarity
 
-    def train_step(self, batch: Any, *args, **kwargs):
+    def training_step(self, batch: Any, batch_idx: int):
         if self.neg_samples > 0:
             user_id, item_seq, item_seq_len, pos_item, neg_item = batch
         else:
@@ -267,7 +267,10 @@ class FOSSIL(IterativeRecommender, SequentialRecommenderUtils):
                 pos_items_emb,
             )
 
-        return main_loss + reg_loss
+        # Loss logging
+        loss = main_loss + reg_loss
+        self.log("loss", loss, prog_bar=True, on_step=False, on_epoch=True)
+        return loss
 
     def forward(
         self,

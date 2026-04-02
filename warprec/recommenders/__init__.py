@@ -6,6 +6,7 @@ from . import sequential_recommender
 from . import unpersonalized_recommender
 from . import trainer
 from . import lr_scheduler_wrapper
+from . import optimizer_wrapper
 from .base_recommender import (
     Recommender,
     IterativeRecommender,
@@ -13,11 +14,11 @@ from .base_recommender import (
     SequentialRecommenderUtils,
     ItemSimRecommender,
 )
+from .callbacks import _get_memory_usage, WarpRecLightningIntegrationCallback
 from .layers import MLP, CNN, FactorizationMachine
 from .losses import BPRLoss, EmbLoss, InfoNCELoss, MultiDAELoss, MultiVAELoss
 from .proxy import ProxyRecommender
 from .similarities import Similarity
-from .loops import train_loop
 
 __all__ = [
     "collaborative_filtering_recommender",
@@ -28,11 +29,14 @@ __all__ = [
     "unpersonalized_recommender",
     "trainer",
     "lr_scheduler_wrapper",
+    "optimizer_wrapper",
     "Recommender",
     "IterativeRecommender",
     "ContextRecommenderUtils",
     "SequentialRecommenderUtils",
     "ItemSimRecommender",
+    "_get_memory_usage",
+    "WarpRecLightningIntegrationCallback",
     "MLP",
     "CNN",
     "FactorizationMachine",
@@ -43,5 +47,4 @@ __all__ = [
     "MultiVAELoss",
     "ProxyRecommender",
     "Similarity",
-    "train_loop",
 ]

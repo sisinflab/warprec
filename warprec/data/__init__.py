@@ -1,9 +1,9 @@
 from .dataset import Dataset
 from .eval_loaders import (
-    EvaluationDataLoader,
-    ContextualEvaluationDataLoader,
-    SampledEvaluationDataLoader,
-    SampledContextualEvaluationDataLoader,
+    EvaluationDataset,
+    ContextualEvaluationDataset,
+    SampledEvaluationDataset,
+    SampledContextualEvaluationDataset,
 )
 from . import entities
 from . import reader
@@ -13,10 +13,10 @@ from .filtering import Filter, apply_filtering
 
 __all__ = [
     "Dataset",
-    "EvaluationDataLoader",
-    "ContextualEvaluationDataLoader",
-    "SampledEvaluationDataLoader",
-    "SampledContextualEvaluationDataLoader",
+    "EvaluationDataset",
+    "ContextualEvaluationDataset",
+    "SampledEvaluationDataset",
+    "SampledContextualEvaluationDataset",
     "entities",
     "reader",
     "splitting",

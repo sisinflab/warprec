@@ -1530,6 +1530,9 @@ files = [
     {file = "fsspec-2025.3.2.tar.gz", hash = "sha256:e52c77ef398680bbd6a98c0e628fbc469491282981209907bbc8aea76a04fdc6"},
 ]
 
+[package.dependencies]
+aiohttp = {version = "<4.0.0a0 || >4.0.0a0,<4.0.0a1 || >4.0.0a1", optional = true, markers = "extra == \"http\""}
+
 [package.extras]
 abfs = ["adlfs"]
 adl = ["adlfs"]
@@ -2487,6 +2490,50 @@ files = [
     {file = "kiwisolver-1.4.8-pp310-pypy310_pp73-win_amd64.whl", hash = "sha256:65ea09a5a3faadd59c2ce96dc7bf0f364986a315949dc6374f04396b0d60e09b"},
     {file = "kiwisolver-1.4.8.tar.gz", hash = "sha256:23d5f023bdc8c7e54eb65f03ca5d5bb25b601eac4d7f1a042888a1f45237987e"},
 ]
+
+[[package]]
+name = "lightning"
+version = "2.6.1"
+description = "The Deep Learning framework to train, deploy, and ship AI products Lightning fast."
+optional = false
+python-versions = ">=3.10"
+groups = ["main"]
+files = [
+    {file = "lightning-2.6.1-py3-none-any.whl", hash = "sha256:30e1adac23004c713663928541bd72ecb1371b7abc9aff9f46b7fd2644988d30"},
+    {file = "lightning-2.6.1.tar.gz", hash = "sha256:859104b98c61add6fe60d0c623abf749baf25f2950a66ebdfb4bd18aa7decba9"},
+]
+
+[package.dependencies]
+fsspec = {version = ">=2022.5.0,<2028.0", extras = ["http"]}
+lightning-utilities = ">=0.10.0,<2.0"
+packaging = ">=23.0,<27.0"
+pytorch-lightning = "*"
+PyYAML = ">5.4,<8.0"
+torch = ">=2.1.0,<4.0"
+torchmetrics = ">0.7.0,<3.0"
+tqdm = ">=4.57.0,<6.0"
+typing-extensions = ">4.5.0,<6.0"
+
+[package.extras]
+all = ["bitsandbytes (>=0.45.2,<1.0) ; platform_system != \"Darwin\"", "deepspeed (>=0.15.0,<0.17.0) ; platform_system != \"Windows\" and platform_system != \"Darwin\"", "hydra-core (>=1.2.0,<2.0)", "ipython[all] (>=8.0.0,<11.0)", "jsonargparse[jsonnet,signatures] (>=4.39.0,<5.0)", "matplotlib (>3.1,<4.0)", "omegaconf (>=2.2.3,<3.0)", "requests (<3.0)", "rich (>=12.3.0,<15.0)", "tensorboardX (>=2.2,<3.0)", "torchmetrics (>=0.10.0,<2.0)", "torchvision (>=0.16.0,<1.0)"]
+data = ["litdata (>=0.2.0rc,<1.0)"]
+dev = ["bitsandbytes (>=0.45.2,<1.0) ; platform_system != \"Darwin\"", "click (==8.1.8) ; python_version < \"3.11\"", "click (==8.3.1) ; python_version > \"3.10\"", "cloudpickle (>=1.3,<4.0)", "coverage (==7.10.7) ; python_version < \"3.10\"", "coverage (==7.13.1) ; python_version >= \"3.10\"", "deepspeed (>=0.15.0,<0.17.0) ; platform_system != \"Windows\" and platform_system != \"Darwin\"", "fastapi", "huggingface-hub", "hydra-core (>=1.2.0,<2.0)", "ipython[all] (>=8.0.0,<11.0)", "jsonargparse[jsonnet,signatures] (>=4.39.0,<5.0)", "matplotlib (>3.1,<4.0)", "numpy (>1.21.0,<2.0) ; python_version < \"3.12\"", "numpy (>2.1.0,<3.0) ; python_version >= \"3.12\"", "omegaconf (>=2.2.3,<3.0)", "onnx (>1.12.0,<2.0)", "onnxruntime (>=1.12.0,<2.0)", "onnxscript (>=0.1.0,<1.0)", "pandas (>2.0,<3.0)", "psutil (<8.0)", "pytest (==9.0.2)", "pytest-cov (==7.0.0)", "pytest-random-order (==1.2.0)", "pytest-rerunfailures (==16.0.1) ; python_version < \"3.10\"", "pytest-rerunfailures (==16.1) ; python_version >= \"3.10\"", "pytest-timeout (==2.4.0)", "requests (<3.0)", "rich (>=12.3.0,<15.0)", "scikit-learn (>0.22.1,<2.0)", "tensorboard (>=2.11,<3.0)", "tensorboardX (>=2.2,<3.0)", "tensorboardX (>=2.6,<3.0)", "torch-tensorrt ; platform_system != \"Darwin\" and python_version >= \"3.12\"", "torchmetrics (>=0.10.0,<2.0)", "torchvision (>=0.16.0,<1.0)", "uvicorn"]
+examples = ["ipython[all] (>=8.0.0,<11.0)", "requests (<3.0)", "torchmetrics (>=0.10.0,<2.0)", "torchvision (>=0.16.0,<1.0)"]
+extra = ["bitsandbytes (>=0.45.2,<1.0) ; platform_system != \"Darwin\"", "hydra-core (>=1.2.0,<2.0)", "jsonargparse[jsonnet,signatures] (>=4.39.0,<5.0)", "matplotlib (>3.1,<4.0)", "omegaconf (>=2.2.3,<3.0)", "rich (>=12.3.0,<15.0)", "tensorboardX (>=2.2,<3.0)"]
+fabric-all = ["bitsandbytes (>=0.45.2,<1.0) ; platform_system != \"Darwin\"", "deepspeed (>=0.15.0,<0.17.0) ; platform_system != \"Windows\" and platform_system != \"Darwin\"", "hydra-core (>=1.2.0,<2.0)", "torchmetrics (>=0.10.0,<2.0)", "torchvision (>=0.16.0,<1.0)"]
+fabric-dev = ["bitsandbytes (>=0.45.2,<1.0) ; platform_system != \"Darwin\"", "click (==8.1.8) ; python_version < \"3.11\"", "click (==8.3.1) ; python_version > \"3.10\"", "coverage (==7.10.7) ; python_version < \"3.10\"", "coverage (==7.13.1) ; python_version >= \"3.10\"", "deepspeed (>=0.15.0,<0.17.0) ; platform_system != \"Windows\" and platform_system != \"Darwin\"", "huggingface-hub", "hydra-core (>=1.2.0,<2.0)", "numpy (>1.21.0,<2.0) ; python_version < \"3.12\"", "numpy (>2.1.0,<3.0) ; python_version >= \"3.12\"", "pytest (==9.0.2)", "pytest-cov (==7.0.0)", "pytest-random-order (==1.2.0)", "pytest-rerunfailures (==16.0.1) ; python_version < \"3.10\"", "pytest-rerunfailures (==16.1) ; python_version >= \"3.10\"", "pytest-timeout (==2.4.0)", "tensorboardX (>=2.6,<3.0)", "torchmetrics (>=0.10.0,<2.0)", "torchvision (>=0.16.0,<1.0)"]
+fabric-examples = ["torchmetrics (>=0.10.0,<2.0)", "torchvision (>=0.16.0,<1.0)"]
+fabric-extra = ["hydra-core (>=1.2.0,<2.0)"]
+fabric-strategies = ["bitsandbytes (>=0.45.2,<1.0) ; platform_system != \"Darwin\"", "deepspeed (>=0.15.0,<0.17.0) ; platform_system != \"Windows\" and platform_system != \"Darwin\""]
+fabric-test = ["click (==8.1.8) ; python_version < \"3.11\"", "click (==8.3.1) ; python_version > \"3.10\"", "coverage (==7.10.7) ; python_version < \"3.10\"", "coverage (==7.13.1) ; python_version >= \"3.10\"", "huggingface-hub", "numpy (>1.21.0,<2.0) ; python_version < \"3.12\"", "numpy (>2.1.0,<3.0) ; python_version >= \"3.12\"", "pytest (==9.0.2)", "pytest-cov (==7.0.0)", "pytest-random-order (==1.2.0)", "pytest-rerunfailures (==16.0.1) ; python_version < \"3.10\"", "pytest-rerunfailures (==16.1) ; python_version >= \"3.10\"", "pytest-timeout (==2.4.0)", "tensorboardX (>=2.6,<3.0)"]
+pytorch-all = ["bitsandbytes (>=0.45.2,<1.0) ; platform_system != \"Darwin\"", "deepspeed (>=0.15.0,<0.17.0) ; platform_system != \"Windows\" and platform_system != \"Darwin\"", "hydra-core (>=1.2.0,<2.0)", "ipython[all] (>=8.0.0,<11.0)", "jsonargparse[jsonnet,signatures] (>=4.39.0,<5.0)", "matplotlib (>3.1,<4.0)", "omegaconf (>=2.2.3,<3.0)", "requests (<3.0)", "rich (>=12.3.0,<15.0)", "tensorboardX (>=2.2,<3.0)", "torchmetrics (>=0.10.0,<2.0)", "torchvision (>=0.16.0,<1.0)"]
+pytorch-dev = ["bitsandbytes (>=0.45.2,<1.0) ; platform_system != \"Darwin\"", "cloudpickle (>=1.3,<4.0)", "coverage (==7.10.7) ; python_version < \"3.10\"", "coverage (==7.13.1) ; python_version >= \"3.10\"", "deepspeed (>=0.15.0,<0.17.0) ; platform_system != \"Windows\" and platform_system != \"Darwin\"", "fastapi", "huggingface-hub", "hydra-core (>=1.2.0,<2.0)", "ipython[all] (>=8.0.0,<11.0)", "jsonargparse[jsonnet,signatures] (>=4.39.0,<5.0)", "matplotlib (>3.1,<4.0)", "numpy (>1.21.0,<2.0) ; python_version < \"3.12\"", "numpy (>2.1.0,<3.0) ; python_version >= \"3.12\"", "omegaconf (>=2.2.3,<3.0)", "onnx (>1.12.0,<2.0)", "onnxruntime (>=1.12.0,<2.0)", "onnxscript (>=0.1.0,<1.0)", "pandas (>2.0,<3.0)", "psutil (<8.0)", "pytest (==9.0.2)", "pytest-cov (==7.0.0)", "pytest-random-order (==1.2.0)", "pytest-rerunfailures (==16.0.1) ; python_version < \"3.10\"", "pytest-rerunfailures (==16.1) ; python_version >= \"3.10\"", "pytest-timeout (==2.4.0)", "requests (<3.0)", "rich (>=12.3.0,<15.0)", "scikit-learn (>0.22.1,<2.0)", "tensorboard (>=2.11,<3.0)", "tensorboardX (>=2.2,<3.0)", "torch-tensorrt ; platform_system != \"Darwin\" and python_version >= \"3.12\"", "torchmetrics (>=0.10.0,<2.0)", "torchvision (>=0.16.0,<1.0)", "uvicorn"]
+pytorch-examples = ["ipython[all] (>=8.0.0,<11.0)", "requests (<3.0)", "torchmetrics (>=0.10.0,<2.0)", "torchvision (>=0.16.0,<1.0)"]
+pytorch-extra = ["bitsandbytes (>=0.45.2,<1.0) ; platform_system != \"Darwin\"", "hydra-core (>=1.2.0,<2.0)", "jsonargparse[jsonnet,signatures] (>=4.39.0,<5.0)", "matplotlib (>3.1,<4.0)", "omegaconf (>=2.2.3,<3.0)", "rich (>=12.3.0,<15.0)", "tensorboardX (>=2.2,<3.0)"]
+pytorch-strategies = ["deepspeed (>=0.15.0,<0.17.0) ; platform_system != \"Windows\" and platform_system != \"Darwin\""]
+pytorch-test = ["cloudpickle (>=1.3,<4.0)", "coverage (==7.10.7) ; python_version < \"3.10\"", "coverage (==7.13.1) ; python_version >= \"3.10\"", "fastapi", "huggingface-hub", "numpy (>1.21.0,<2.0) ; python_version < \"3.12\"", "numpy (>2.1.0,<3.0) ; python_version >= \"3.12\"", "onnx (>1.12.0,<2.0)", "onnxruntime (>=1.12.0,<2.0)", "onnxscript (>=0.1.0,<1.0)", "pandas (>2.0,<3.0)", "psutil (<8.0)", "pytest (==9.0.2)", "pytest-cov (==7.0.0)", "pytest-random-order (==1.2.0)", "pytest-rerunfailures (==16.0.1) ; python_version < \"3.10\"", "pytest-rerunfailures (==16.1) ; python_version >= \"3.10\"", "pytest-timeout (==2.4.0)", "scikit-learn (>0.22.1,<2.0)", "tensorboard (>=2.11,<3.0)", "torch-tensorrt ; platform_system != \"Darwin\" and python_version >= \"3.12\"", "uvicorn"]
+strategies = ["bitsandbytes (>=0.45.2,<1.0) ; platform_system != \"Darwin\"", "deepspeed (>=0.15.0,<0.17.0) ; platform_system != \"Windows\" and platform_system != \"Darwin\""]
+test = ["click (==8.1.8) ; python_version < \"3.11\"", "click (==8.3.1) ; python_version > \"3.10\"", "cloudpickle (>=1.3,<4.0)", "coverage (==7.10.7) ; python_version < \"3.10\"", "coverage (==7.13.1) ; python_version >= \"3.10\"", "fastapi", "huggingface-hub", "numpy (>1.21.0,<2.0) ; python_version < \"3.12\"", "numpy (>2.1.0,<3.0) ; python_version >= \"3.12\"", "onnx (>1.12.0,<2.0)", "onnxruntime (>=1.12.0,<2.0)", "onnxscript (>=0.1.0,<1.0)", "pandas (>2.0,<3.0)", "psutil (<8.0)", "pytest (==9.0.2)", "pytest-cov (==7.0.0)", "pytest-random-order (==1.2.0)", "pytest-rerunfailures (==16.0.1) ; python_version < \"3.10\"", "pytest-rerunfailures (==16.1) ; python_version >= \"3.10\"", "pytest-timeout (==2.4.0)", "scikit-learn (>0.22.1,<2.0)", "tensorboard (>=2.11,<3.0)", "tensorboardX (>=2.6,<3.0)", "torch-tensorrt ; platform_system != \"Darwin\" and python_version >= \"3.12\"", "uvicorn"]
 
 [[package]]
 name = "lightning-utilities"
@@ -5068,6 +5115,37 @@ files = [
 ]
 
 [[package]]
+name = "pytorch-lightning"
+version = "2.6.1"
+description = "PyTorch Lightning is the lightweight PyTorch wrapper for ML researchers. Scale your models. Write less boilerplate."
+optional = false
+python-versions = ">=3.10"
+groups = ["main"]
+files = [
+    {file = "pytorch_lightning-2.6.1-py3-none-any.whl", hash = "sha256:1f8118567ec829e3055f16cf1aa320883a86a47c836951bfd9dcfa34ec7ffd59"},
+    {file = "pytorch_lightning-2.6.1.tar.gz", hash = "sha256:ba08f8901cf226fcca473046ad9346f414e99117762dc869c76e650d5b3d7bdc"},
+]
+
+[package.dependencies]
+fsspec = {version = ">=2022.5.0", extras = ["http"]}
+lightning-utilities = ">=0.10.0"
+packaging = ">=23.0"
+PyYAML = ">5.4"
+torch = ">=2.1.0"
+torchmetrics = ">0.7.0"
+tqdm = ">=4.57.0"
+typing-extensions = ">4.5.0"
+
+[package.extras]
+all = ["bitsandbytes (>=0.45.2) ; platform_system != \"Darwin\"", "deepspeed (>=0.15.0,<0.17.0) ; platform_system != \"Windows\" and platform_system != \"Darwin\"", "hydra-core (>=1.2.0)", "ipython[all] (>=8.0.0)", "jsonargparse[jsonnet,signatures] (>=4.39.0)", "matplotlib (>3.1)", "omegaconf (>=2.2.3)", "requests (<2.33.0)", "rich (>=12.3.0)", "tensorboardX (>=2.2)", "torchmetrics (>=0.10.0)", "torchvision (>=0.16.0)"]
+deepspeed = ["deepspeed (>=0.15.0,<0.17.0) ; platform_system != \"Windows\" and platform_system != \"Darwin\""]
+dev = ["bitsandbytes (>=0.45.2) ; platform_system != \"Darwin\"", "cloudpickle (>=1.3)", "coverage (==7.10.7) ; python_version < \"3.10\"", "coverage (==7.13.1) ; python_version >= \"3.10\"", "deepspeed (>=0.15.0,<0.17.0) ; platform_system != \"Windows\" and platform_system != \"Darwin\"", "fastapi", "huggingface-hub", "hydra-core (>=1.2.0)", "ipython[all] (>=8.0.0)", "jsonargparse[jsonnet,signatures] (>=4.39.0)", "matplotlib (>3.1)", "numpy (>1.21.0) ; python_version < \"3.12\"", "numpy (>2.1.0) ; python_version >= \"3.12\"", "omegaconf (>=2.2.3)", "onnx (>1.12.0)", "onnxruntime (>=1.12.0)", "onnxscript (>=0.1.0)", "pandas (>2.0)", "psutil (<7.3.0)", "pytest (==9.0.2)", "pytest-cov (==7.0.0)", "pytest-random-order (==1.2.0)", "pytest-rerunfailures (==16.0.1) ; python_version < \"3.10\"", "pytest-rerunfailures (==16.1) ; python_version >= \"3.10\"", "pytest-timeout (==2.4.0)", "requests (<2.33.0)", "rich (>=12.3.0)", "scikit-learn (>0.22.1)", "tensorboard (>=2.11)", "tensorboardX (>=2.2)", "torch-tensorrt ; platform_system != \"Darwin\" and python_version >= \"3.12\"", "torchmetrics (>=0.10.0)", "torchvision (>=0.16.0)", "uvicorn"]
+examples = ["ipython[all] (>=8.0.0)", "requests (<2.33.0)", "torchmetrics (>=0.10.0)", "torchvision (>=0.16.0)"]
+extra = ["bitsandbytes (>=0.45.2) ; platform_system != \"Darwin\"", "hydra-core (>=1.2.0)", "jsonargparse[jsonnet,signatures] (>=4.39.0)", "matplotlib (>3.1)", "omegaconf (>=2.2.3)", "rich (>=12.3.0)", "tensorboardX (>=2.2)"]
+strategies = ["deepspeed (>=0.15.0,<0.17.0) ; platform_system != \"Windows\" and platform_system != \"Darwin\""]
+test = ["cloudpickle (>=1.3)", "coverage (==7.10.7) ; python_version < \"3.10\"", "coverage (==7.13.1) ; python_version >= \"3.10\"", "fastapi", "huggingface-hub", "numpy (>1.21.0) ; python_version < \"3.12\"", "numpy (>2.1.0) ; python_version >= \"3.12\"", "onnx (>1.12.0)", "onnxruntime (>=1.12.0)", "onnxscript (>=0.1.0)", "pandas (>2.0)", "psutil (<7.3.0)", "pytest (==9.0.2)", "pytest-cov (==7.0.0)", "pytest-random-order (==1.2.0)", "pytest-rerunfailures (==16.0.1) ; python_version < \"3.10\"", "pytest-rerunfailures (==16.1) ; python_version >= \"3.10\"", "pytest-timeout (==2.4.0)", "scikit-learn (>0.22.1)", "tensorboard (>=2.11)", "torch-tensorrt ; platform_system != \"Darwin\" and python_version >= \"3.12\"", "uvicorn"]
+
+[[package]]
 name = "pytz"
 version = "2025.2"
 description = "World timezone definitions, modern and historical"
@@ -7281,4 +7359,4 @@ serving = ["fastapi", "fastmcp"]
 [metadata]
 lock-version = "2.1"
 python-versions = "~3.12"
-content-hash = "dba95826939bac622cc6c3df3b04373804305f66154e8b10afc66a24b53c2a06"
+content-hash = "6d03d5111074f216c3b838b7a7e22fa53dcbd65a1e4858b6624cb4f1e9fdd3c9"

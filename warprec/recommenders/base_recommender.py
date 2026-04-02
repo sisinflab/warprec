@@ -4,6 +4,7 @@ from typing import Any, Optional, List, Dict, no_type_check
 from abc import ABC, abstractmethod
 
 import torch
+import lightning as L
 import numpy as np
 from torch import nn, Tensor
 from torch.nn.init import xavier_normal_, xavier_uniform_, constant_
@@ -11,6 +12,8 @@ from torch.utils.data import DataLoader
 
 from warprec.data.entities import Interactions, Sessions
 from warprec.utils.enums import DataLoaderType
+from warprec.utils.config.model_configuration import LRSchedulerConfig, OptimizerConfig
+from warprec.utils.registry import lr_scheduler_registry, optimizer_registry
 
 
 class Recommender(nn.Module, ABC):
@@ -226,9 +229,16 @@ class Recommender(nn.Module, ABC):
         return torch.device("cpu")
 
 
-class IterativeRecommender(Recommender):
+class IterativeRecommender(Recommender, L.LightningModule):
     """Interface for recommendation model that use
     an iterative approach to be trained.
+
+    Args:
+        params (dict): The dictionary with the model params.
+        info (dict): The dictionary containing dataset information.
+        *args (Any): Argument for PyTorch LightningModule.
+        seed (int): The seed to use for reproducibility.
+        **kwargs (Any): Keyword argument for PyTorch LightningModule.
 
     Attributes:
         epochs (int): The number of epochs used to
@@ -239,6 +249,116 @@ class IterativeRecommender(Recommender):
 
     epochs: int
     learning_rate: float
+
+    def __init__(
+        self, params: dict, info: dict, *args: Any, seed: int = 42, **kwargs: Any
+    ):
+        super().__init__(params, info, *args, seed=seed, **kwargs)
+        self.save_hyperparameters(params)
+
+        # Optimization parameters
+        self._optimizer_name: str = "Adam"
+        self._optimizer_kwargs: Dict[str, Any] = {}
+        self._lr_scheduler_name: Optional[str] = None
+        self._lr_scheduler_kwargs: Dict[str, Any] = {}
+
+    def set_optimization_parameters(
+        self,
+        optimizer_config: Optional[OptimizerConfig] = None,
+        lr_scheduler_config: Optional[LRSchedulerConfig] = None,
+    ):
+        # Set the optimizer values
+        if optimizer_config:
+            self._optimizer_name = optimizer_config.name
+            self._optimizer_kwargs = optimizer_config.params
+
+        # Set the scheduler values
+        if lr_scheduler_config:
+            self._lr_scheduler_name = lr_scheduler_config.name
+            self._lr_scheduler_kwargs = lr_scheduler_config.params
+
+    def configure_optimizers(self):
+        """Standard Lightning method to define optimizers.
+
+        This method separates parameters into two groups:
+        1. Decay Group:
+           - Dense layers weights (Linear, Conv).
+           - Structural embeddings (e.g., Positional Embeddings).
+        2. No-Decay Group:
+           - Sparse Entity Embeddings (User/Item) -> Handled manually by EmbLoss.
+           - Biases -> Standard DL practice (no decay).
+           - LayerNorm weights -> Standard Transformer practice (no decay).
+        """
+        # Identify parameters that belong to nn.Embedding modules
+        embedding_param_ids = set()
+        for module in self.modules():
+            if isinstance(module, nn.Embedding):
+                for param in module.parameters():
+                    embedding_param_ids.add(id(param))
+
+        # Separate parameters into groups
+        decay_params = []
+        no_decay_params = []
+
+        for name, param in self.named_parameters():
+            if not param.requires_grad:
+                continue
+
+            # We disable optimizer weight decay for:
+            # A. Biases (standard practice)
+            # B. LayerNorm parameters (standard Transformer practice)
+            # C. Sparse Embeddings (User/Item), because we use EmbLoss for them.
+            #    EXCEPTION: Positional Embeddings should have weight decay applied.
+
+            is_bias = "bias" in name
+            is_layernorm = "layernorm" in name or "norm" in name
+            is_embedding = id(param) in embedding_param_ids
+            is_positional = "position" in name  # Heuristic to catch position_embedding
+
+            if is_bias or is_layernorm or (is_embedding and not is_positional):
+                no_decay_params.append(param)
+            else:
+                # Linear weights, Conv weights, and Positional Embeddings go here
+                decay_params.append(param)
+
+        # Finalize the Optimizer with correct groups
+        decay = getattr(self, "weight_decay", 0.0)
+
+        optimizer_grouped_parameters = [
+            {
+                "params": decay_params,
+                "weight_decay": decay,
+            },
+            {
+                "params": no_decay_params,
+                "weight_decay": 0.0,
+            },
+        ]
+
+        # Create the optimizer instance
+        optimizer = optimizer_registry.get(
+            name=self._optimizer_name,
+            params=optimizer_grouped_parameters,
+            lr=self.learning_rate,
+            **self._optimizer_kwargs,
+        )
+
+        # No learning rate scheduler provided -> Return only the optimizer
+        if self._lr_scheduler_name is None:
+            return optimizer
+
+        # Create the instance of the learning rate scheduler
+        scheduler = lr_scheduler_registry.get(
+            name=self._lr_scheduler_name,
+            optimizer=optimizer,
+            **self._lr_scheduler_kwargs,
+        )
+        lr_scheduler_config = {
+            "scheduler": scheduler,
+            "interval": "epoch",
+            "frequency": 1,
+        }
+        return {"optimizer": optimizer, "lr_scheduler": lr_scheduler_config}
 
     def _init_weights(self, module: nn.Module):
         """A comprehensive default weight initialization method.
@@ -309,23 +429,42 @@ class IterativeRecommender(Recommender):
         """
 
     @abstractmethod
-    def train_step(self, batch: Any, epoch: int, *args: Any, **kwargs: Any) -> Tensor:
+    def training_step(self, batch: Any, batch_idx: int) -> Tensor:
         """Performs a single training step for a given batch.
 
-        This method should compute the forward pass, calculate the loss,
-        and return the loss value.
-        It should NOT perform zero_grad, backward, or step on the optimizer,
-        as these will be handled by the generic training loop.
+        This is a standard method defined by PyTorch Lightning.
 
         Args:
             batch (Any): A single batch of data from the DataLoader.
-            epoch (int): The current epoch iteration.
-            *args (Any): The argument list.
-            **kwargs (Any): The keyword arguments.
+            batch_idx (int): The current current batch index.
 
         Returns:
             Tensor: The computed loss for the batch.
         """
+
+    def validation_step(self, batch: Any, batch_idx: int) -> Any:
+        """PyTorch Lightning needs this method to be implemented
+        to correctly perform the on_validation_epoch_end callback.
+
+        Args:
+            batch (Any): A single batch of data from the DataLoader.
+            batch_idx (int): The current current batch index.
+
+        Returns:
+            Any: The batch of data from the DataLoader.
+        """
+        return batch
+
+    def on_save_checkpoint(self, checkpoint: Dict[str, Any]):
+        """PyTorch Lightning hook used during checkpoint saving.
+
+        Args:
+            checkpoint (Dict[str, Any]): The dictionary containing the
+                checkpoint information.
+        """
+        checkpoint["name"] = self.name
+        checkpoint["params"] = self.get_params()
+        checkpoint["info"] = self.info
 
 
 class ContextRecommenderUtils(nn.Module, ABC):

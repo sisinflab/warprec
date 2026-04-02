@@ -12,6 +12,7 @@ from warprec.utils.registry import (
     params_registry,
     search_algorithm_registry,
     lr_scheduler_registry,
+    optimizer_registry,
 )
 from warprec.utils.config.common import _scientific_notation_conversion
 from warprec.utils.logger import logger
@@ -95,7 +96,7 @@ class Properties(BaseModel):
         return v.lower()
 
 
-class LRScheduler(BaseModel):
+class LRSchedulerConfig(BaseModel):
     """Definition of the learning rate scheduling configuration.
 
     Attributes:
@@ -118,6 +119,29 @@ class LRScheduler(BaseModel):
         return v
 
 
+class OptimizerConfig(BaseModel):
+    """Definition of the optimizer configuration.
+
+    Attributes:
+        name (Optional[str]): The name of the optimizer.
+        params (Optional[Dict[str, Any]]): The parameters of the optimizer.
+    """
+
+    name: Optional[str]
+    params: Optional[Dict[str, Any]] = {}
+
+    @field_validator("name")
+    @classmethod
+    def check_name(cls, v: str):
+        """Validate name."""
+        if v.upper() not in optimizer_registry.list_registered():
+            raise ValueError(
+                "The optimizer name provided is not supported. These are the "
+                f"supported optimizers: {optimizer_registry.list_registered()}"
+            )
+        return v
+
+
 class Optimization(BaseModel):
     """Definition of the Optimization sub-configuration of a RecommenderModel.
 
@@ -136,7 +160,8 @@ class Optimization(BaseModel):
                 https://docs.ray.io/en/latest/tune/api/doc/ray.tune.schedulers.ASHAScheduler.html.
         eval_every_n (Optional[int]): The number of epochs to wait before evaluating the model.
             Defaults to 1.
-        lr_scheduler (Optional[LRScheduler]): The learning rate scheduling options.
+        lr_scheduler (Optional[LRSchedulerConfig]): The learning rate scheduling options.
+        optimizer (Optional[OptimizerConfig]): The optimizer options.
         properties (Optional[Properties]): The attributes required for Ray Tune to work.
         device (Optional[str]): The device that will be used for tensor operations.
             Overrides general device.
@@ -161,7 +186,8 @@ class Optimization(BaseModel):
     strategy: Optional[SearchAlgorithms] = SearchAlgorithms.GRID
     scheduler: Optional[Schedulers] = Schedulers.FIFO
     eval_every_n: Optional[int] = 1
-    lr_scheduler: Optional[LRScheduler] = None
+    lr_scheduler: Optional[LRSchedulerConfig] = None
+    optimizer: Optional[OptimizerConfig] = None
     properties: Optional[Properties] = Field(default_factory=Properties)
     device: Optional[str] = None
     cpu_per_trial: Optional[int] = 1

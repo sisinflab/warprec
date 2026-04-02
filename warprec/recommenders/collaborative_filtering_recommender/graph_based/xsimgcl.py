@@ -163,7 +163,7 @@ class XSimGCL(IterativeRecommender, GraphRecommenderUtils):
 
         return user_final, item_final, user_cl, item_cl
 
-    def train_step(self, batch: Any, *args: Any, **kwargs: Any) -> Tensor:
+    def training_step(self, batch: Any, batch_idx: int) -> Tensor:
         user, pos_item, neg_item = batch
 
         # Forward Pass with Perturbation
@@ -193,7 +193,10 @@ class XSimGCL(IterativeRecommender, GraphRecommenderUtils):
             self.item_embedding(neg_item),
         )
 
-        return bpr_loss + cl_loss + reg_loss
+        # Loss logging
+        loss = bpr_loss + cl_loss + reg_loss
+        self.log("loss", loss, prog_bar=True, on_step=False, on_epoch=True)
+        return loss
 
     def predict(
         self,

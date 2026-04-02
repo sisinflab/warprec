@@ -196,7 +196,7 @@ class GCMC(IterativeRecommender, GraphRecommenderUtils):
 
         return F.relu(user_embed), F.relu(item_embed)
 
-    def train_step(self, batch: Any, *args: Any, **kwargs: Any):
+    def training_step(self, batch: Any, batch_idx: int):
         user, item, rating = batch
 
         predictions = self.forward(user, item)
@@ -216,7 +216,10 @@ class GCMC(IterativeRecommender, GraphRecommenderUtils):
             self.item_embedding(item),
         )
 
-        return ce_loss + reg_loss
+        # Loss logging
+        loss = ce_loss + reg_loss
+        self.log("loss", loss, prog_bar=True, on_step=False, on_epoch=True)
+        return loss
 
     def forward(self, user: Tensor, item: Tensor) -> Tensor:
         """Forward pass for GCMC. Computes rating logits for given user-item pairs.

@@ -68,7 +68,7 @@ class ELSA(IterativeRecommender):
             **kwargs,
         )
 
-    def train_step(self, batch: Any, epoch: int, *args, **kwargs) -> Tensor:
+    def training_step(self, batch: Any, batch_idx: int) -> Tensor:
         rating_matrix = batch[0]
 
         # Prediction
@@ -81,6 +81,8 @@ class ELSA(IterativeRecommender):
             reduction="mean",
         )
 
+        # Loss logging
+        self.log("loss", loss, prog_bar=True, on_step=False, on_epoch=True)
         return loss
 
     def forward(self, x: Tensor) -> Tensor:

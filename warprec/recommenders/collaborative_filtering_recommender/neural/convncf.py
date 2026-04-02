@@ -105,7 +105,7 @@ class ConvNCF(IterativeRecommender):
             **kwargs,
         )
 
-    def train_step(self, batch: Any, *args, **kwargs):
+    def training_step(self, batch: Any, batch_idx: int):
         user, pos_item, neg_item = batch
 
         # Calculate BPR loss
@@ -120,7 +120,10 @@ class ConvNCF(IterativeRecommender):
             self.item_embedding(neg_item),
         )
 
-        return bpr_loss + reg_loss
+        # Loss logging
+        loss = bpr_loss + reg_loss
+        self.log("loss", loss, prog_bar=True, on_step=False, on_epoch=True)
+        return loss
 
     def forward(self, user: Tensor, item: Tensor) -> Tensor:
         """Forward pass of the ConvNCF model.

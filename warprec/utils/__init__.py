@@ -30,6 +30,7 @@ from .registry import (
     filter_registry,
     stat_significance_registry,
     lr_scheduler_registry,
+    optimizer_registry,
 )
 
 
@@ -61,4 +62,5 @@ __all__ = [
     "filter_registry",
     "stat_significance_registry",
     "lr_scheduler_registry",
+    "optimizer_registry",
 ]

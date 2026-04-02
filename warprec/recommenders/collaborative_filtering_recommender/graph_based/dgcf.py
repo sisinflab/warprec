@@ -123,7 +123,7 @@ class DGCF(IterativeRecommender, GraphRecommenderUtils):
             **kwargs,
         )
 
-    def train_step(self, batch: Any, *args: Any, **kwargs: Any) -> Tensor:
+    def training_step(self, batch: Any, batch_idx: int) -> Tensor:
         user, pos_item, neg_item = batch
 
         # Get propagated embeddings
@@ -150,7 +150,10 @@ class DGCF(IterativeRecommender, GraphRecommenderUtils):
         cor_loss = self._correlation_loss(u_embeddings, pos_embeddings)
         cor_loss = self.cor_weight * cor_loss
 
-        return bpr_loss + reg_loss + cor_loss
+        # Loss logging
+        loss = bpr_loss + reg_loss + cor_loss
+        self.log("loss", loss, prog_bar=True, on_step=False, on_epoch=True)
+        return loss
 
     def forward(self) -> Tuple[Tensor, Tensor]:
         """Performs DGCF propagation using vectorized operations."""

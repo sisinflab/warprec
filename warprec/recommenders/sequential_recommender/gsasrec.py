@@ -225,7 +225,7 @@ class gSASRec(IterativeRecommender, SequentialRecommenderUtils):
 
         return gbce_loss_fn
 
-    def train_step(self, batch: Any, *args, **kwargs):
+    def training_step(self, batch: Any, batch_idx: int):
         positives, negatives = batch
 
         if positives.shape[0] == 0 or positives.shape[1] < 2:
@@ -251,7 +251,10 @@ class gSASRec(IterativeRecommender, SequentialRecommenderUtils):
             self._get_output_embeddings()(negatives),
         )
 
-        return gbce_loss + reg_loss
+        # Loss logging
+        loss = gbce_loss + reg_loss
+        self.log("loss", loss, prog_bar=True, on_step=False, on_epoch=True)
+        return loss
 
     def predict(
         self,
