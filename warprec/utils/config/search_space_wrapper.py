@@ -1,5 +1,5 @@
 # pylint: disable=too-few-public-methods
-from typing import Callable, Any
+from typing import Callable, Any, Dict, Iterable
 
 from ray import tune
 from warprec.utils.enums import SearchSpace
@@ -17,7 +17,7 @@ class SearchSpaceWrapper:
 class GridSpaceWrapper(SearchSpaceWrapper):
     """The Grid Search Space Wrapper."""
 
-    def __call__(self, *args: Any) -> Callable:
+    def __call__(self, *args: Any) -> Dict[str, Iterable]:
         return tune.grid_search(args)
 
 
