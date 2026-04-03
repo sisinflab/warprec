@@ -414,14 +414,14 @@ class Evaluator:
 
     def print_console(
         self,
-        results: Dict[int, Dict[str, float | Tensor]],
+        results: Dict[int, Dict[str, Tensor]],
         header: str,
         max_metrics_per_row: int = 4,
     ):
         """Utility function to print results using tabulate.
 
         Args:
-            results (Dict[int, Dict[str, float | Tensor]]): The dictionary containing
+            results (Dict[int, Dict[str, Tensor]]): The dictionary containing
                 all the results.
             header (str): The header of the table to be printed.
             max_metrics_per_row (int): The number of metrics
@@ -447,7 +447,7 @@ class Evaluator:
                     metric = metrics.get(key, float("nan"))
                     if isinstance(
                         metric, Tensor
-                    ):  # In case of user_wise computation, we compute the mean
+                    ):  # In case of tensor we compute the mean
                         metric = metric.nanmean().item()
                     _metric_tab.append(str(metric))
                 _tab.append(_metric_tab)

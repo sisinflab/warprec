@@ -174,7 +174,7 @@ class Writer(ABC):
 
     def write_results(
         self,
-        result_data: Dict[int, Dict[str, float | Tensor]],
+        result_data: Dict[int, Dict[str, Tensor]],
         model_name: str,
         sep: str = "\t",
         ext: str = ".tsv",
@@ -182,7 +182,7 @@ class Writer(ABC):
         """Process and write results of the experiment.
 
         Args:
-            result_data (Dict[int, Dict[str, float | Tensor]]): The results
+            result_data (Dict[int, Dict[str, Tensor]]): The results
                 of the experiment.
             model_name (str): The model used to produce the results.
             sep (str): The separator of the file to produce.
@@ -206,11 +206,7 @@ class Writer(ABC):
         for k, metrics in result_data.items():
             row = {"Model": model_name, "Top@k": k}
             for metric_name, metric_result in metrics.items():
-                value = (
-                    metric_result.nanmean().item()
-                    if isinstance(metric_result, Tensor)
-                    else metric_result
-                )
+                value = metric_result.nanmean().item()
                 row[metric_name] = value
             new_result_list.append(row)
         new_df = pd.DataFrame(new_result_list)
@@ -233,7 +229,7 @@ class Writer(ABC):
 
     def write_results_per_user(
         self,
-        result_data: Dict[int, Dict[str, float | Tensor]],
+        result_data: Dict[int, Dict[str, Tensor]],
         model_name: str,
         user_mapping: Dict[int, Any],
         sep: str = "\t",
@@ -246,7 +242,7 @@ class Writer(ABC):
         I/O to the `_write_text` method, which must be implemented by a subclass.
 
         Args:
-            result_data (Dict[int, Dict[str, float | Tensor]]): Dictionary containing per-user
+            result_data (Dict[int, Dict[str, Tensor]]): Dictionary containing per-user
                 result data.
             model_name (str): The name of the model used.
             user_mapping (Dict[int, Any]): The dictionary that maps the idx -> ID.
