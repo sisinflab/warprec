@@ -472,7 +472,9 @@ class Trainer:
                     Path(checkpoint_path) / "checkpoint.ckpt",
                     weights_only=False,
                     map_location="cpu",
-                )
+                ),
+                interactions=dataset.train_set,
+                **dataset.get_stash(),
             )
         else:
             model = model_class(
