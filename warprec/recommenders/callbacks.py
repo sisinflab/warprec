@@ -4,6 +4,7 @@ from typing import Dict, Optional
 import psutil
 import torch
 import lightning as L
+from torch import Tensor
 
 from warprec.data.dataset import Dataset
 from warprec.evaluation.evaluator import Evaluator
@@ -98,7 +99,9 @@ class WarpRecLightningIntegrationCallback(L.Callback):
         metric_report = {}
         for k, metrics in results.items():
             for metric_name, value in metrics.items():
-                val_scalar = value.nanmean().item()
+                val_scalar = (
+                    value.nanmean().item() if isinstance(value, Tensor) else value
+                )
                 metric_key = f"{metric_name}@{k}"
 
                 # Lightning logging
