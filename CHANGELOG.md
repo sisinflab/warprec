@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v1.1.2 (2026-04-03)
+
+### Bug Fixes
+
+- Correctly create the instance of the best model after the training is complete
+  ([`79cc2b6`](https://github.com/sisinflab/warprec/commit/79cc2b6d0ac780d4d6be372f8f5dc9d1bad19a36))
+
+
 ## v1.1.1 (2026-04-02)
 
 ### Bug Fixes
