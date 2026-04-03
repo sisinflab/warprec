@@ -11,6 +11,7 @@ from ray.train.lightning import (
     RayLightningEnvironment,
     RayTrainReportCallback,
 )
+from torch import Tensor
 
 from warprec.evaluation.evaluator import Evaluator
 from warprec.recommenders.callbacks import (
@@ -227,7 +228,9 @@ def objective_function(config: dict) -> None:
             # Metrics to report
             if train.get_context().get_world_rank() == 0:
                 metric_report = {
-                    f"{metric_name}@{k}": value  # type: ignore[misc]
+                    f"{metric_name}@{k}": value.nanmean().item()
+                    if isinstance(value, Tensor)
+                    else value
                     for k, metrics_results in results.items()
                     for metric_name, value in metrics_results.items()
                 }
