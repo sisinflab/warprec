@@ -2,6 +2,17 @@
 
 <!-- version list -->
 
+## v1.1.3 (2026-04-03)
+
+### Bug Fixes
+
+- Correct metric reporting for non iterative recommenders
+  ([`e26c837`](https://github.com/sisinflab/warprec/commit/e26c8379f5298039660202871915e0f381aede01))
+
+- Metric report during training will accept non-tensors metrics
+  ([`83d8c98`](https://github.com/sisinflab/warprec/commit/83d8c98a7e7ed0da819c727aaae6673dd9c2ab6f))
+
+
 ## v1.1.2 (2026-04-03)
 
 ### Bug Fixes
