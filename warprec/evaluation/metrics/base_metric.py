@@ -15,7 +15,7 @@ class BaseMetric(Metric, ABC):
     )  # This defines the data that needs to be pre-computed
 
     @abstractmethod
-    def compute(self) -> dict[str, float]:
+    def compute(self) -> dict[str, Tensor]:
         pass
 
     @classmethod
