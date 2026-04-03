@@ -227,7 +227,7 @@ def objective_function(config: dict) -> None:
             # Metrics to report
             if train.get_context().get_world_rank() == 0:
                 metric_report = {
-                    f"{metric_name}@{k}": value  # type: ignore[misc]
+                    f"{metric_name}@{k}": value.nanmean().item()  # type: ignore[misc]
                     for k, metrics_results in results.items()
                     for metric_name, value in metrics_results.items()
                 }
