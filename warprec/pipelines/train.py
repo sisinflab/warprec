@@ -1,4 +1,3 @@
-# pylint: disable=too-many-branches, too-many-statements
 import time
 from typing import List, Tuple, Dict, Any
 
@@ -46,7 +45,7 @@ def train_pipeline(path: str):
     logger.msg("Starting experiment.")
     experiment_start_time = time.time()
 
-    # Config parser testing
+    # Parse configuration
     config = load_train_configuration(path)
 
     # Before starting training process, initialize Ray
@@ -115,18 +114,14 @@ def train_pipeline(path: str):
             case _:
                 raise ValueError(f"File format '{file_format}'not supported.")
 
-    # Trainer testing
+    # List of models to train
     models = list(config.models.keys())
 
-    # If statistical significance is required, metrics will
-    # be computed user-wise
+    # Check if statistical significance is requested
     requires_stat_significance = (
         config.evaluation.stat_significance.requires_stat_significance()
     )
     if requires_stat_significance:
-        logger.attention(
-            "Statistical significance is required, metrics will be computed user-wise."
-        )
         model_results: Dict[str, Any] = {}
 
     data_preparation_time = time.time() - experiment_start_time
@@ -241,7 +236,7 @@ def train_pipeline(path: str):
                 **config.writer.results.model_dump(),
             )
 
-        # Recommendation
+        # Recommendation writing
         if params.meta.save_recs:
             logger.msg(
                 f"Delegating recommendations generation for {model_name} to Ray cluster"
