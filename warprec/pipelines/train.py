@@ -1,19 +1,19 @@
 # pylint: disable=too-many-branches, too-many-statements
 import time
-import os
 from typing import List, Tuple, Dict, Any
 
 import ray
-import torch
-import lightning as L
 
-from warprec.common import (
-    initialize_datasets,
-    dataset_preparation,
-)
+from warprec.common import log_evaluation
 from warprec.data.reader import ReaderFactory
 from warprec.data.writer import WriterFactory
 from warprec.data import Dataset
+from warprec.pipelines.remotes import (
+    remote_data_preparation,
+    remote_model_retraining,
+    remote_evaluation_and_timing,
+    remote_generate_recs,
+)
 from warprec.utils.callback import WarpRecCallback
 from warprec.utils.config import (
     load_train_configuration,
@@ -24,19 +24,11 @@ from warprec.utils.config import (
 from warprec.utils.helpers import (
     model_param_from_dict,
     validation_metric,
-    retrieve_evaluation_dataloader,
 )
 from warprec.utils.logger import logger
 from warprec.recommenders.trainer import Trainer
-from warprec.recommenders.base_recommender import (
-    Recommender,
-    IterativeRecommender,
-    SequentialRecommenderUtils,
-    ContextRecommenderUtils,
-)
-from warprec.evaluation.evaluator import Evaluator
+from warprec.recommenders.base_recommender import Recommender
 from warprec.evaluation.statistical_significance import compute_paired_statistical_test
-from warprec.utils.registry import model_registry
 
 
 def train_pipeline(path: str):
@@ -83,10 +75,22 @@ def train_pipeline(path: str):
     writer = WriterFactory.get_writer(config=config)
 
     # Load datasets using common utility
-    main_dataset, val_dataset, fold_dataset = initialize_datasets(
-        reader=reader,
-        callback=callback,
-        config=config,
+    logger.msg("Delegating data preparation to Ray cluster")
+    cpu_data_prep = config.general.cpu_data_prep
+    custom_res_data_prep = config.general.custom_resources_data_prep
+    label_selector_data_prep = config.general.label_selector_data_prep
+    main_dataset, val_dataset, fold_dataset = ray.get(
+        remote_data_preparation.options(
+            num_cpus=cpu_data_prep,
+            resources=custom_res_data_prep if custom_res_data_prep else None,
+            label_selector=label_selector_data_prep
+            if label_selector_data_prep
+            else None,
+        ).remote(
+            reader=reader,
+            callback=callback,
+            config=config,
+        )  # type: ignore[call-arg]
     )
 
     # Write split information if required
@@ -124,21 +128,6 @@ def train_pipeline(path: str):
             "Statistical significance is required, metrics will be computed user-wise."
         )
         model_results: Dict[str, Any] = {}
-
-    # Create instance of main evaluator used to evaluate the main dataset
-    evaluator = Evaluator(
-        list(config.evaluation.metrics),
-        list(config.evaluation.top_k),
-        train_set=main_dataset.train_set.get_sparse(),
-        additional_data=main_dataset.get_stash(),
-        complex_metrics=config.evaluation.complex_metrics,
-        feature_lookup=main_dataset.get_features_lookup(),
-        user_cluster=main_dataset.get_user_cluster(),
-        item_cluster=main_dataset.get_item_cluster(),
-    )
-
-    # Prepare dataloaders for evaluation
-    dataset_preparation(main_dataset, fold_dataset, config)
 
     data_preparation_time = time.time() - experiment_start_time
     logger.positive(
@@ -188,37 +177,40 @@ def train_pipeline(path: str):
         # Callback on training complete
         callback.on_training_complete(model=best_model)
 
-        # Retrieve appropriate evaluation dataloader
-        dataloader = retrieve_evaluation_dataloader(
-            dataset=main_dataset,
-            model=best_model,
-            strategy=config.evaluation.strategy,
-            num_negatives=config.evaluation.num_negatives,
-        )
-
-        # Move model to device
+        # Prepare device for current model
         general_device = config.general.device
         model_device = params.optimization.device
         device = general_device if model_device is None else model_device
 
-        # Fallback if HEAD node does not have CUDA
-        if not torch.cuda.is_available():
-            device = "cpu"
-        best_model.to(device)
+        # Retrieve resources and labels to request correct node from cluster
+        num_cpus = params.optimization.cpu_per_trial
+        num_gpus = params.optimization.gpu_per_trial
+        custom_res = params.optimization.custom_resources_per_trial or {}
+        label_selector = params.optimization.label_selector or {}
 
-        # Evaluation testing
-        model_evaluation_start_time = time.time()
-        evaluator.evaluate(
-            model=best_model,
-            dataloader=dataloader,
-            strategy=config.evaluation.strategy,
-            dataset=main_dataset,
-            device=device,
-            verbose=True,
+        # Offload evaluation to worker node
+        logger.msg(f"Delegating evaluation of {model_name} model to Ray cluster")
+        results, model_evaluation_total_time, inference_time = ray.get(
+            remote_evaluation_and_timing.options(
+                num_cpus=num_cpus,
+                num_gpus=num_gpus,
+                resources=custom_res if custom_res else None,
+                label_selector=label_selector if label_selector else None,
+            ).remote(
+                model=best_model,
+                main_dataset=main_dataset,
+                metrics=config.evaluation.metrics,
+                top_k=config.evaluation.top_k,
+                complex_metrics=config.evaluation.complex_metrics,
+                strategy=config.evaluation.strategy,
+                num_negatives=config.evaluation.num_negatives,
+                device=device,
+                requires_timing=config.general.time_report,
+            )  # type: ignore[call-arg]
         )
-        results = evaluator.compute_results()
-        model_evaluation_total_time = time.time() - model_evaluation_start_time
-        evaluator.print_console(results, "Test", config.evaluation.max_metric_per_row)
+
+        # Log the results
+        log_evaluation(results, "Test", config.evaluation.max_metric_per_row)
 
         if requires_stat_significance:
             model_results[model_name] = (
@@ -251,10 +243,22 @@ def train_pipeline(path: str):
 
         # Recommendation
         if params.meta.save_recs:
-            writer.write_recs(
-                model=best_model,
-                dataset=main_dataset,
-                **config.writer.recommendation.model_dump(),
+            logger.msg(
+                f"Delegating recommendations generation for {model_name} to Ray cluster"
+            )
+            ray.get(
+                remote_generate_recs.options(
+                    num_cpus=num_cpus,
+                    num_gpus=num_gpus,
+                    resources=custom_res if custom_res else None,
+                    label_selector=label_selector if label_selector else None,
+                ).remote(
+                    writer=writer,
+                    model=best_model,
+                    dataset=main_dataset,
+                    config=config,
+                    device=device,
+                )  # type: ignore[call-arg]
             )
 
         # Save params
@@ -271,62 +275,6 @@ def train_pipeline(path: str):
             writer.write_model(best_model)
 
         if config.general.time_report:
-            # Retrieve dataset information
-            info = main_dataset.info()
-            n_users = info.get("n_users", None)
-            n_items = info.get("n_items", None)
-            context_dims = info.get("context_dims", {})
-
-            # Define simple sample to measure prediction time
-            n_users_to_predict = min(1000, n_users)
-            n_items_to_predict = min(1000, n_items)
-
-            # Create mock data to test model performance during inference
-            if isinstance(best_model, SequentialRecommenderUtils):
-                max_seq_len = best_model.max_seq_len
-            else:
-                max_seq_len = 10
-
-            # Create mock data for Context-Aware models
-            contexts = None
-            if isinstance(best_model, ContextRecommenderUtils):
-                model_labels = best_model.context_labels
-
-                if model_labels:
-                    ctx_list = []
-                    for label in model_labels:
-                        dim = context_dims.get(label, 10)
-                        c_data = torch.randint(1, dim, (n_users_to_predict,)).to(
-                            device=device
-                        )
-                        ctx_list.append(c_data)
-
-                    contexts = torch.stack(ctx_list, dim=1)
-
-            # Create mock data to test prediction time
-            user_indices = torch.arange(n_users_to_predict).to(device=device)
-            item_indices = torch.randint(
-                1, n_items, (n_users_to_predict, n_items_to_predict)
-            ).to(device=device)
-            user_seq = torch.randint(1, n_items, (n_users_to_predict, max_seq_len)).to(
-                device=device
-            )
-            seq_len = torch.randint(1, max_seq_len + 1, (n_users_to_predict,)).to(
-                device=device
-            )
-
-            # Test inference time
-            inference_time_start = time.time()
-            with torch.inference_mode():
-                best_model.predict(
-                    user_indices=user_indices,
-                    item_indices=item_indices,
-                    user_seq=user_seq,
-                    seq_len=seq_len,
-                    contexts=contexts,
-                )
-            inference_time = time.time() - inference_time_start
-
             # Timing report for the current model
             model_timing_report.append(
                 {
@@ -475,9 +423,6 @@ def multiple_fold_validation_flow(
     device = general_device if model_device is None else model_device
 
     # Retrieve common params
-    block_size = params.optimization.block_size
-    chunk_size = params.optimization.chunk_size
-    num_workers = params.optimization.num_workers
     validation_score = config.evaluation.validation_metric
     desired_training_it = params.optimization.properties.desired_training_it
     seed = params.optimization.properties.seed
@@ -522,68 +467,32 @@ def multiple_fold_validation_flow(
     if best_params is None:
         return None, report, 0
 
-    logger.msg(f"Initializing {model_name} model for test set evaluation")
+    logger.msg(f"Delegating {model_name} model retraining to Ray cluster")
 
-    # Retrieve the model from the registry
-    # using the best parameters
-    iterations = best_params["iterations"]
-    best_model = model_registry.get(
-        name=model_name,
-        params=best_params,
-        interactions=main_dataset.train_set,
-        seed=seed,
-        info=main_dataset.info(),
-        **main_dataset.get_stash(),
-        block_size=block_size,
-        chunk_size=chunk_size,
+    # Retrieve resources to request correct node from cluster
+    num_cpus = params.optimization.cpu_per_trial
+    num_gpus = params.optimization.gpu_per_trial
+    custom_res = params.optimization.custom_resources_per_trial or {}
+    label_selector = params.optimization.label_selector or {}
+
+    # Offload the retraining to a worker node
+    best_model, retrain_report, iterations = ray.get(
+        remote_model_retraining.options(
+            num_cpus=num_cpus,
+            num_gpus=num_gpus,
+            resources=custom_res if custom_res else None,
+            label_selector=label_selector if label_selector else None,
+        ).remote(
+            model_name=model_name,
+            best_params=best_params,
+            main_dataset=main_dataset,
+            params=params,
+            device=device,
+            seed=seed,
+        )  # type: ignore[call-arg]
     )
 
-    # Train the model using backpropagation if the model
-    # is iterative
-    if isinstance(best_model, IterativeRecommender):
-        # Set up the learning rate scheduler and the optimizer
-        best_model.set_optimization_parameters(
-            optimizer_config=params.optimization.optimizer,
-            lr_scheduler_config=params.optimization.lr_scheduler,
-        )
-
-        # Dataloader settings
-        if num_workers is None:
-            available_cpus = os.cpu_count()
-            num_workers = max(available_cpus - 1, 1)
-
-        persistent_workers = num_workers > 0
-        pin_memory = device == "cuda"
-
-        # Train dataloader
-        train_dataloader = best_model.get_dataloader(
-            interactions=main_dataset.train_set,
-            sessions=main_dataset.train_session,
-            num_workers=num_workers,
-            pin_memory=pin_memory,
-            persistent_workers=persistent_workers,
-        )
-
-        # Standard training loop
-        l_trainer = L.Trainer(
-            max_epochs=best_model.epochs,
-            devices="auto",
-            accelerator=device,
-            num_sanity_val_steps=0,
-            logger=False,
-            enable_checkpointing=False,
-        )
-        l_trainer.fit(
-            best_model,
-            train_dataloaders=train_dataloader,
-        )
-
-    # Final reporting
-    report["Total Params (Best Model)"] = sum(
-        p.numel() for p in best_model.parameters()
-    )
-    report["Trainable Params (Best Model)"] = sum(
-        p.numel() for p in best_model.parameters() if p.requires_grad
-    )
+    # Merge the parameter counts into the main report
+    report.update(retrain_report)
 
     return best_model, report, iterations
