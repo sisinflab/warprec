@@ -8,6 +8,9 @@ It allows customization of numerical precision, device usage, logging verbosity,
 - **device**: Device used for training and evaluation. Supports `cpu` or `cuda` devices. Defaults to `cpu`.
 - **backend**: Backend to use for data reading and writing. Supports `polars` or `pandas`. Defaults to `polars`.
 - **ray_verbose**: Verbosity level of Ray Tune. Acceptable values are integers from 0 (silent) to 3 (very verbose). Defaults to `1`.
+- **cpu_data_prep**: The cpu resource to request for data preparation phase. Defaults to `1`.
+- **custom_resources_data_prep**: The custom resources to request for data preparation phase.
+- **label_selector_data_prep**: The label selector used for data preparation phase.
 - **time_report**: Whether to report the time taken by each step. Defaults to `True`.
 - **custom_modules**: Python modules to import custom implementations into WarpRec. Can be a string or a list of strings.
 - **callback**: Nested section to configure a custom callback.
