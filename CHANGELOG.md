@@ -2,6 +2,30 @@
 
 <!-- version list -->
 
+## v1.2.0 (2026-04-09)
+
+### Bug Fixes
+
+- Reduces resources requested by the driver function
+  ([`f863b48`](https://github.com/sisinflab/warprec/commit/f863b48c0bfbf69847305a7c75d27a223321f6e8))
+
+### Documentation
+
+- Added data preparation resources configuration
+  ([`8b2215f`](https://github.com/sisinflab/warprec/commit/8b2215fb766c433af8cf9ce1c194ef41c9e23b1c))
+
+- Added documentation of swarm pipeline
+  ([`e0bf466`](https://github.com/sisinflab/warprec/commit/e0bf4660a18970fe96c37356df8de67ba43f3f97))
+
+### Features
+
+- Added new pipeline "swarm"
+  ([`c9abea6`](https://github.com/sisinflab/warprec/commit/c9abea6e04d7f34774285d984fae897d9be413e5))
+
+- Added remote functions to offload execution to Ray cluster
+  ([`c379638`](https://github.com/sisinflab/warprec/commit/c379638db859a0826acb9af839592b35a6f4a6a0))
+
+
 ## v1.1.3 (2026-04-03)
 
 ### Bug Fixes
