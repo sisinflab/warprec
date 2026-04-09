@@ -10,8 +10,9 @@ WarpRec's configuration is divided into several main sections, each one has its 
 WarpRec supports multiple pipelines that leverage the configuration system differently depending on the purpose of the experiment:
 
 1. **Training Pipeline**: Executes full workflow including hyperparameter optimization (HPO), model training, evaluation, and result saving.
-2. **Design Pipeline**: Focuses on testing and evaluating models without HPO. This pipeline is ideal for rapid prototyping and design experiments.
-3. **Evaluation Pipeline**: Evaluates pre-trained models without training, using provided checkpoints.
+2. **Swarm Pipeline**: Executes the same workflow as the training pipeline *every trial* will be processed in parallel saturating every resource possible in the Ray cluster.
+3. **Design Pipeline**: Focuses on testing and evaluating models without HPO. This pipeline is ideal for rapid prototyping and design experiments.
+4. **Evaluation Pipeline**: Evaluates pre-trained models without training, using provided checkpoints.
 
 A single configuration file can be used across multiple pipelines; WarpRec ensures that workflows remain interchangeable, with some sections being ignored or interpreted differently depending on the pipeline.
 
@@ -62,6 +63,13 @@ Run the training pipeline with:
 ```bash
 python -m warprec.run --config path/to/the/config.yml --pipeline train
 ```
+
+!!! info
+    The swarm pipeline expects the same configuration file as the **training pipeline**. You can start the swarm pipeline with:
+
+    ```bash
+    python -m warprec.run --config path/to/the/config.yml --pipeline swarm
+    ```
 
 ### Design Pipeline
 
