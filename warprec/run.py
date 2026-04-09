@@ -1,7 +1,12 @@
 import argparse
 from pathlib import Path
 
-from warprec.pipelines import design_pipeline, train_pipeline, eval_pipeline
+from warprec.pipelines import (
+    design_pipeline,
+    train_pipeline,
+    eval_pipeline,
+    swarm_pipeline,
+)
 
 
 def main():
@@ -30,9 +35,9 @@ def main():
     if not Path(path).is_file():
         raise FileNotFoundError(f"Configuration file not found at: {path}")
 
-    if pipeline not in ["train", "design", "eval"]:
+    if pipeline not in ["train", "design", "eval", "swarm"]:
         raise ValueError(
-            f"Invalid pipeline specified: {pipeline}. Choose 'train', 'design' or 'eval'."
+            f"Invalid pipeline specified: {pipeline}. Choose 'train', 'design', 'eval' or 'swarm'."
         )
 
     match pipeline:
@@ -42,6 +47,8 @@ def main():
             design_pipeline(path)
         case "eval":
             eval_pipeline(path)
+        case "swarm":
+            swarm_pipeline(path)
 
 
 if __name__ == "__main__":

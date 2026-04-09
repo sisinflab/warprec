@@ -1,10 +1,9 @@
-# pylint: disable=too-many-branches, too-many-statements
 import time
 from typing import Dict, Any
 
 import torch
 
-from warprec.common import initialize_datasets
+from warprec.common import initialize_datasets, log_evaluation
 from warprec.data.reader import ReaderFactory
 from warprec.data.writer import WriterFactory
 from warprec.utils.callback import WarpRecCallback
@@ -140,7 +139,7 @@ def eval_pipeline(path: str):
             verbose=True,
         )
         results = evaluator.compute_results()
-        evaluator.print_console(results, "Test", config.evaluation.max_metric_per_row)
+        log_evaluation(results, "Test", config.evaluation.max_metric_per_row)
 
         if requires_stat_significance:
             model_results[model_name] = (

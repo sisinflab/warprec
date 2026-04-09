@@ -143,6 +143,11 @@ class GeneralConfig(BaseModel):
         backend (Optional[str]): The backend to utilize for reading and writing data.
             Defaults to 'polars'.
         ray_verbose (Optional[int]): The Ray level of verbosity.
+        cpu_data_prep (Optional[int]): The cpu resource to request for data preparation phase.
+        custom_resources_data_prep (Optional[Dict[str, float | int]]): The custom resources
+            to request for data preparation phase.
+        label_selector_data_prep (Optional[Dict[str, str]]): The label selector used
+            for data preparation phase.
         time_report (Optional[bool]): Whether to report the time taken by each step.
         custom_modules (Optional[str | List[str]]): List of custom module paths to load.
             This is useful for loading custom modules that are not part of the
@@ -154,6 +159,9 @@ class GeneralConfig(BaseModel):
     device: Optional[str] = "cpu"
     backend: Optional[str] = "polars"
     ray_verbose: Optional[int] = 1
+    cpu_data_prep: Optional[int] = 1
+    custom_resources_data_prep: Optional[Dict[str, float | int]] = {}
+    label_selector_data_prep: Optional[Dict[str, str]] = None
     time_report: Optional[bool] = True
     custom_modules: Optional[str | List[str]] = None
     callback: Optional[WarpRecCallbackConfig] = Field(

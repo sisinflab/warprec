@@ -397,7 +397,7 @@ class Trainer:
                 data_bundle=data_bundle,
                 scaling_config_dict=scaling_config_dict,
             ),
-            resources={"CPU": 1},
+            resources={"CPU": 0.05},
         )
 
         return Tuner(

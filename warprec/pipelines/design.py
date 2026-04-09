@@ -3,7 +3,7 @@ import os
 
 import lightning as L
 
-from warprec.common import initialize_datasets
+from warprec.common import initialize_datasets, log_evaluation
 from warprec.data.reader import ReaderFactory
 from warprec.recommenders.base_recommender import IterativeRecommender
 from warprec.recommenders.callbacks import WarpRecLightningIntegrationCallback
@@ -161,7 +161,7 @@ def design_pipeline(path: str):
             verbose=True,
         )
         results = evaluator.compute_results()
-        evaluator.print_console(results, "Test", config.evaluation.max_metric_per_row)
+        log_evaluation(results, "Test", config.evaluation.max_metric_per_row)
 
         # Callback after complete evaluation
         callback.on_evaluation_complete(
