@@ -1,9 +1,13 @@
 import os
+import tempfile
+from pathlib import Path
 from typing import Dict, Optional
 
 import psutil
 import torch
 import lightning as L
+from ray import train as ray_train
+from ray.train import Checkpoint
 from torch import Tensor
 
 from warprec.data.dataset import Dataset
@@ -167,3 +171,15 @@ class WarpRecLightningIntegrationCallback(L.Callback):
         # NOTE: We don't need synching here as we already did it before
         for key, val in metric_report.items():
             pl_module.log(key, val, prog_bar=True, on_epoch=True, sync_dist=False)
+
+        # Report fresh validation metrics to Ray Train with a checkpoint.
+        # This replaces the stale report from RayTrainReportCallback which
+        # fires at on_train_epoch_end (before validation has run).
+        if ray_train.get_context().get_world_rank() == 0:
+            with tempfile.TemporaryDirectory() as tmpdir:
+                ckpt_path = Path(tmpdir) / "checkpoint.pt"
+                torch.save(pl_module.get_state(), ckpt_path)
+                ray_train.report(
+                    metric_report,
+                    checkpoint=Checkpoint.from_directory(tmpdir),
+                )

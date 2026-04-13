@@ -206,7 +206,7 @@ def objective_function(config: dict) -> None:
                 enable_model_summary=False,
                 enable_progress_bar=False,
                 check_val_every_n_epoch=eval_every_n,
-                callbacks=[integration_callback, RayTrainReportCallback()],
+                callbacks=[integration_callback],
             )
             trainer.fit(
                 model,
