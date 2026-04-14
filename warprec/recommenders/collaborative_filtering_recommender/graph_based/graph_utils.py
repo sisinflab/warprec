@@ -14,8 +14,15 @@ class GraphRecommenderUtils(nn.Module):
     """
 
     # Cache storage
-    _cached_user_emb: Optional[Tensor] = None
-    _cached_item_emb: Optional[Tensor] = None
+    _cached_user_emb: Optional[Tensor]
+    _cached_item_emb: Optional[Tensor]
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        # Initialize local cache
+        self._cached_user_emb = None
+        self._cached_item_emb = None
 
     def train(self, mode=True):
         """Override train mode to empty the cache when switching to training."""
@@ -25,6 +32,14 @@ class GraphRecommenderUtils(nn.Module):
             # We are in training mode, embeddings will change. Empty the cache
             self._cached_user_emb = None
             self._cached_item_emb = None
+
+    def eval(self):
+        """Override eval mode to empty the cache when switching to evaluation."""
+        super().eval()
+
+        # We are in evaluation mode, embeddings will be cached. Empty the cache
+        self._cached_user_emb = None
+        self._cached_item_emb = None
 
     def propagate_embeddings(self) -> Tuple[Tensor, Tensor]:
         """Retrieve the propagate user and item embeddings.
