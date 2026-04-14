@@ -2,6 +2,19 @@
 
 <!-- version list -->
 
+## v1.2.1 (2026-04-14)
+
+### Bug Fixes
+
+- Correct invalidation of graph recommenders local cache
+  ([`c940e33`](https://github.com/sisinflab/warprec/commit/c940e33e0eecd9706fba409494b2ec01f243fd67))
+
+### Documentation
+
+- Added llms-txt plugin
+  ([`dda4a22`](https://github.com/sisinflab/warprec/commit/dda4a22f6f1fa6c02455e13a326a8f8ff6dc6f08))
+
+
 ## v1.2.0 (2026-04-09)
 
 ### Bug Fixes
