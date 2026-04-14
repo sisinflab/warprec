@@ -1,5 +1,6 @@
 site_name: WarpRec
 site_description: "Unifying Academic Rigor and Industrial Scale for Responsible, Reproducible, and Efficient Recommendation"
+site_url: https://warprec.readthedocs.io/en/latest/
 
 nav:
   - Get Started:
@@ -151,3 +152,31 @@ plugins:
             show_source: true
             show_root_heading: true
             heading_level: 3
+  - llmstxt:
+      base_url: https://warprec.readthedocs.io/en/latest/
+      full_output: llms-full.txt
+      markdown_description: WarpRec is a flexible and efficient framework designed for building, training, and evaluating recommendation models. It supports a wide range of configurations, customizable pipelines, and powerful optimization tools to enhance model performance and usability. WarpRec is designed for both beginners and experienced practitioners. For newcomers, it offers a simple and intuitive interface to explore and experiment with state-of-the-art recommendation models. For advanced users, WarpRec provides a modular and extensible architecture that allows rapid prototyping, complex experiment design, and fine-grained control over every step of the recommendation pipeline. Whether you're learning how recommender systems work or conducting high-performance research and development, WarpRec offers the right tools to match your workflow.
+      sections:
+        Get Started:
+          - index.md
+          - get-started/*.md
+        Available Pipelines:
+          - pipelines/*.md
+        Data Management:
+          - data-management/*.md
+        Configuration:
+          - configuration/*.md
+        Recommendation Models:
+          - recommenders/*.md
+        Evaluation:
+          - evaluation/*.md
+        Evaluation Metrics:
+          - evaluation/metrics/*.md
+        Cloud & Deployment:
+          - cloud/*.md
+        Implementation Guides:
+          - guides/*.md
+        API Reference:
+          - api-reference/data/*.md
+          - api-reference/recommenders/*.md
+          - api-reference/metrics/*.md
