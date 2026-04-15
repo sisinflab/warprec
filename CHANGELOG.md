@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v1.2.2 (2026-04-15)
+
+### Bug Fixes
+
+- Move remote evaluated metrics to cpu to avoid CUDA errors on driver node
+  ([`5361e3a`](https://github.com/sisinflab/warprec/commit/5361e3a2a00462de702182478735706106523d24))
+
+
 ## v1.2.1 (2026-04-14)
 
 ### Bug Fixes
