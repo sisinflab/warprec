@@ -18,6 +18,7 @@ try:
     from .ngcf import NGCF  # noqa: F401
     from .sgcl import SGCL  # noqa: F401
     from .sgl import SGL  # noqa: F401
+    from .simrec import SimRec  # noqa: F401
     from .ultragcn import UltraGCN  # noqa: F401
     from .xsimgcl import XSimGCL
 
@@ -39,6 +40,7 @@ try:
             "NGCF",
             "SGCL",
             "SGL",
+            "SimRec",
             "UltraGCN",
             "XSimGCL",
         ]
@@ -186,6 +188,17 @@ except ImportError:
         def __init__(self, *args, **kwargs):
             raise ImportError(
                 "SGL model requires PyG dependencies. "
+                "Please install following the documentation you can find here: "
+                "https://pytorch-geometric.readthedocs.io/en/latest/install/installation.html"
+            )
+
+    @model_registry.register("SimRec")
+    class SimRec:  # type: ignore[no-redef]
+        """Placeholder for SimRec model when PyG dependencies are not installed."""
+
+        def __init__(self, *args, **kwargs):
+            raise ImportError(
+                "SimRec model requires PyG dependencies. "
                 "Please install following the documentation you can find here: "
                 "https://pytorch-geometric.readthedocs.io/en/latest/install/installation.html"
             )
