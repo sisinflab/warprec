@@ -72,12 +72,13 @@ class HyperOptWrapper(HyperOptSearch, BaseSearchWrapper):
     Args:
         mode (str): The mode to run the optimization. Must be
             either 'min' or 'max'.
+        metric (str): The metric to optimize.
         seed (int): The seed to make the experiment reproducible.
         **kwargs (Any): Keyword arguments.
     """
 
-    def __init__(self, mode: str, seed: int, **kwargs: Any):
-        super().__init__(mode=mode, random_state_seed=seed, metric="score")
+    def __init__(self, mode: str, metric: str, seed: int, **kwargs: Any):
+        super().__init__(mode=mode, metric=metric, random_state_seed=seed)
 
 
 @search_algorithm_registry.register(SearchAlgorithms.OPTUNA)
@@ -87,12 +88,13 @@ class OptunaWrapper(OptunaSearch, BaseSearchWrapper):
     Args:
         mode (str): The mode to run the optimization. Must be
             either 'min' or 'max'.
+        metric (str): The metric to optimize.
         seed (int): The seed to make the experiment reproducible.
         **kwargs (Any): Keyword arguments.
     """
 
-    def __init__(self, mode: str, seed: int, **kwargs: Any):
-        super().__init__(mode=mode, seed=seed, metric="score")
+    def __init__(self, mode: str, metric: str, seed: int, **kwargs: Any):
+        super().__init__(mode=mode, metric=metric, seed=seed)
 
 
 @search_algorithm_registry.register(SearchAlgorithms.BOHB)
@@ -102,9 +104,10 @@ class BOHBWrapper(TuneBOHB, BaseSearchWrapper):
     Args:
         mode (str): The mode to run the optimization. Must be
             either 'min' or 'max'.
+        metric (str): The metric to optimize.
         seed (int): The seed to make the experiment reproducible.
         **kwargs (Any): Keyword arguments.
     """
 
-    def __init__(self, mode: str, seed: int, **kwargs: Any):
-        super().__init__(mode=mode, seed=seed, metric="score")
+    def __init__(self, mode: str, metric: str, seed: int, **kwargs: Any):
+        super().__init__(mode=mode, metric=metric, seed=seed)

@@ -1,4 +1,4 @@
-# pylint: disable = wrong-import-position
+# pylint: disable = wrong-import-position, ungrouped-imports
 import os
 
 # Set Ray environment variable to enable new features
@@ -352,7 +352,9 @@ class Trainer:
 
         # Search Algorithm & Scheduler
         search_alg = search_algorithm_registry.get(
-            opt_config.strategy, **opt_config.properties.model_dump()
+            opt_config.strategy,
+            metric=validation_score,
+            **opt_config.properties.model_dump(),
         )
         scheduler = scheduler_registry.get(
             opt_config.scheduler, **opt_config.properties.model_dump()
@@ -517,9 +519,7 @@ class Trainer:
             .reset_index()
         )
 
-        best_row = agg_df.sort_values(by="mean_score", ascending=(mode == "min")).iloc[
-            0
-        ]
+        best_row = agg_df.sort_values(by="mean_score", ascending=mode == "min").iloc[0]
 
         # Reconstruct clean params dict
         best_params = {"iterations": math.ceil(best_row["desired_training_iterations"])}
@@ -562,7 +562,7 @@ class Trainer:
         return tune_params
 
     def _trial_name_creator(self, model_name: str):
-        def _creator(trial: Trial):
+        def _creator(trial: Trial):  # type: ignore[unused-argument]
             return f"{model_name}_{str(uuid.uuid4())[:8]}"
 
         return _creator
@@ -668,6 +668,7 @@ class Trainer:
         return report
 
 
+# type: ignore[unused-argument]
 class CodeCarbonCallback(tune.Callback):
     """Custom CodeCarbon callback for Ray Tune."""
 
