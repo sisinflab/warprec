@@ -8,6 +8,7 @@ from .lightsans import LightSANs
 from .linrec import LinRec
 from .narm import NARM
 from .sasrec import SASRec
+from .stan import STAN
 
 __all__ = [
     "BERT4Rec",
@@ -20,4 +21,5 @@ __all__ = [
     "LinRec",
     "NARM",
     "SASRec",
+    "STAN",
 ]

@@ -1463,3 +1463,52 @@ class SASRec(RecomModel):
                 f"embedding_size ({embedding_size_clean}) must be divisible "
                 f"by n_heads ({n_heads_clean})."
             )
+
+
+@params_registry.register("STAN")
+class STAN(RecomModel):
+    """Definition of the model STAN.
+
+    Attributes:
+        k (INT_FIELD): List of values for k (neighborhood size).
+        lambda_1 (FLOAT_FIELD): List of values for lambda_1.
+        lambda_2 (FLOAT_FIELD): List of values for lambda_2.
+        lambda_3 (FLOAT_FIELD): List of values for lambda_3.
+        max_seq_len (INT_FIELD): List of values for max_seq_len.
+    """
+
+    k: INT_FIELD
+    lambda_1: FLOAT_FIELD
+    lambda_2: FLOAT_FIELD
+    lambda_3: FLOAT_FIELD
+    max_seq_len: INT_FIELD
+
+    @field_validator("k")
+    @classmethod
+    def check_k(cls, v: list):
+        """Validate k."""
+        return validate_greater_than_zero(cls, v, "k")
+
+    @field_validator("lambda_1")
+    @classmethod
+    def check_lambda_1(cls, v: list):
+        """Validate lambda_1."""
+        return validate_greater_than_zero(cls, v, "lambda_1")
+
+    @field_validator("lambda_2")
+    @classmethod
+    def check_lambda_2(cls, v: list):
+        """Validate lambda_2."""
+        return validate_greater_than_zero(cls, v, "lambda_2")
+
+    @field_validator("lambda_3")
+    @classmethod
+    def check_lambda_3(cls, v: list):
+        """Validate lambda_3."""
+        return validate_greater_than_zero(cls, v, "lambda_3")
+
+    @field_validator("max_seq_len")
+    @classmethod
+    def check_max_seq_len(cls, v: list):
+        """Validate max_seq_len."""
+        return validate_greater_than_zero(cls, v, "max_seq_len")
