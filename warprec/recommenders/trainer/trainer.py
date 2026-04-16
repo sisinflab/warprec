@@ -380,7 +380,9 @@ class Trainer:
         if scaling_config_dict["use_gpu"] and opt_config.gpu_per_trial > 0:
             max_concurrent = max(1, int(available_gpus // opt_config.gpu_per_trial))
         else:
-            max_concurrent = max(1, int(available_cpus // opt_config.cpu_per_trial))
+            max_concurrent = max(
+                1, int(available_cpus // (opt_config.cpu_per_trial + 0.05))
+            )
 
         # Tuner will execute the driver function
         tune_config = TuneConfig(
