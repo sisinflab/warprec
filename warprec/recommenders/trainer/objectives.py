@@ -136,6 +136,7 @@ def objective_function(config: dict) -> None:
             name=model_name,
             params=params,
             interactions=dataset.train_set,
+            sessions=dataset.train_session,
             seed=seed,
             info=dataset.info(),
             **dataset.get_stash(),

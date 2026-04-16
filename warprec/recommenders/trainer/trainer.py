@@ -478,12 +478,14 @@ class Trainer:
                     map_location="cpu",
                 ),
                 interactions=dataset.train_set,
+                sessions=dataset.train_session,
                 **dataset.get_stash(),
             )
         else:
             model = model_class(
                 params=best_params,
                 interactions=dataset.train_set,
+                sessions=dataset.train_session,
                 info=dataset.info(),
                 **dataset.get_stash(),
             )

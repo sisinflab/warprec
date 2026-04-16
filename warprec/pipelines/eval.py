@@ -93,6 +93,7 @@ def eval_pipeline(path: str):
             name=model_name,
             params=model_params,
             interactions=main_dataset.train_set,
+            sessions=main_dataset.train_session,
             seed=42,
             info=main_dataset.info(),
             **main_dataset.get_stash(),
