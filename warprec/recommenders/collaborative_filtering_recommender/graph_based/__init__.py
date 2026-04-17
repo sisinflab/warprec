@@ -18,6 +18,7 @@ try:
     from .mixrec import MixRec
     from .ngcf import NGCF  # noqa: F401
     from .popdcl import PopDCL  # noqa: F401
+    from .recdcl import RecDCL  # noqa: F401
     from .sgcl import SGCL  # noqa: F401
     from .sgl import SGL  # noqa: F401
     from .simrec import SimRec  # noqa: F401
@@ -42,6 +43,7 @@ try:
             "MixRec",
             "NGCF",
             "PopDCL",
+            "RecDCL",
             "SGCL",
             "SGL",
             "SimRec",
@@ -192,6 +194,17 @@ except ImportError:
         def __init__(self, *args, **kwargs):
             raise ImportError(
                 "PopDCL model requires PyG dependencies. "
+                "Please install following the documentation you can find here: "
+                "https://pytorch-geometric.readthedocs.io/en/latest/install/installation.html"
+            )
+
+    @model_registry.register("RecDCL")
+    class RecDCL:  # type: ignore[no-redef]
+        """Placeholder for RecDCL model when PyG dependencies are not installed."""
+
+        def __init__(self, *args, **kwargs):
+            raise ImportError(
+                "RecDCL model requires PyG dependencies. "
                 "Please install following the documentation you can find here: "
                 "https://pytorch-geometric.readthedocs.io/en/latest/install/installation.html"
             )

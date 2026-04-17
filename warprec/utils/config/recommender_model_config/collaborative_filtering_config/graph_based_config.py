@@ -1063,6 +1063,111 @@ class PopDCL(RecomModel):
         return validate_greater_than_zero(cls, v, "learning_rate")
 
 
+@params_registry.register("RecDCL")
+class RecDCL(RecomModel):
+    """Definition of the model RecDCL.
+
+    Attributes:
+        embedding_size (INT_FIELD): List of values for embedding_size.
+        n_layers (INT_FIELD): List of values for n_layers.
+        gamma (FLOAT_FIELD): List of values for gamma.
+        alpha (FLOAT_FIELD): List of values for alpha.
+        poly_a (FLOAT_FIELD): List of values for poly_a.
+        poly_c (FLOAT_FIELD): List of values for poly_c.
+        poly_e (INT_FIELD): List of values for poly_e.
+        beta (FLOAT_FIELD): List of values for beta.
+        tau_momentum (FLOAT_FIELD): List of values for tau_momentum.
+        batch_size (INT_FIELD): List of values for batch_size.
+        epochs (INT_FIELD): List of values for epochs.
+        learning_rate (FLOAT_FIELD): List of values for learning rate.
+    """
+
+    embedding_size: INT_FIELD
+    n_layers: INT_FIELD
+    gamma: FLOAT_FIELD
+    alpha: FLOAT_FIELD
+    poly_a: FLOAT_FIELD
+    poly_c: FLOAT_FIELD
+    poly_e: INT_FIELD
+    beta: FLOAT_FIELD
+    tau_momentum: FLOAT_FIELD
+    batch_size: INT_FIELD
+    epochs: INT_FIELD
+    learning_rate: FLOAT_FIELD
+
+    @field_validator("embedding_size")
+    @classmethod
+    def check_embedding_size(cls, v: list):
+        """Validate embedding_size."""
+        return validate_greater_than_zero(cls, v, "embedding_size")
+
+    @field_validator("n_layers")
+    @classmethod
+    def check_n_layers(cls, v: list):
+        """Validate n_layers."""
+        return validate_greater_than_zero(cls, v, "n_layers")
+
+    @field_validator("gamma")
+    @classmethod
+    def check_gamma(cls, v: list):
+        """Validate gamma."""
+        return validate_greater_equal_than_zero(cls, v, "gamma")
+
+    @field_validator("alpha")
+    @classmethod
+    def check_alpha(cls, v: list):
+        """Validate alpha."""
+        return validate_greater_equal_than_zero(cls, v, "alpha")
+
+    @field_validator("poly_a")
+    @classmethod
+    def check_poly_a(cls, v: list):
+        """Validate poly_a."""
+        return validate_greater_equal_than_zero(cls, v, "poly_a")
+
+    @field_validator("poly_c")
+    @classmethod
+    def check_poly_c(cls, v: list):
+        """Validate poly_c."""
+        return validate_greater_equal_than_zero(cls, v, "poly_c")
+
+    @field_validator("poly_e")
+    @classmethod
+    def check_poly_e(cls, v: list):
+        """Validate poly_e."""
+        return validate_greater_than_zero(cls, v, "poly_e")
+
+    @field_validator("beta")
+    @classmethod
+    def check_beta(cls, v: list):
+        """Validate beta."""
+        return validate_greater_equal_than_zero(cls, v, "beta")
+
+    @field_validator("tau_momentum")
+    @classmethod
+    def check_tau_momentum(cls, v: list):
+        """Validate tau_momentum."""
+        return validate_between_zero_and_one(cls, v, "tau_momentum")
+
+    @field_validator("batch_size")
+    @classmethod
+    def check_batch_size(cls, v: list):
+        """Validate batch_size."""
+        return validate_greater_than_zero(cls, v, "batch_size")
+
+    @field_validator("epochs")
+    @classmethod
+    def check_epochs(cls, v: list):
+        """Validate epochs."""
+        return validate_greater_than_zero(cls, v, "epochs")
+
+    @field_validator("learning_rate")
+    @classmethod
+    def check_learning_rate(cls, v: list):
+        """Validate learning_rate."""
+        return validate_greater_than_zero(cls, v, "learning_rate")
+
+
 @params_registry.register("RP3Beta")
 class RP3Beta(RecomModel):
     """Definition of the model RP3Beta.
