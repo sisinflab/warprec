@@ -12,6 +12,7 @@ from warprec.data.entities.train_structures import (
     InteractionDataset,
     PointWiseDataset,
     ContrastiveDataset,
+    PositiveDataset,
 )
 from warprec.utils.enums import RatingType
 
@@ -497,6 +498,46 @@ class Interactions:
             item_ids=pos_items,
             sparse_matrix=self.get_sparse(),
             niid=self._niid,
+        )
+
+        # Set the generator for the Dataloader for reproducibility
+        g = torch.Generator()
+        g.manual_seed(seed)
+
+        return DataLoader(
+            dataset,
+            batch_size=batch_size,
+            shuffle=shuffle,
+            worker_init_fn=seed_worker,
+            generator=g,
+            **kwargs,
+        )
+
+    def get_positive_dataloader(
+        self,
+        batch_size: int = 1024,
+        shuffle: bool = True,
+        seed: int = 42,
+        **kwargs: Any,
+    ) -> DataLoader:
+        """Create a PyTorch DataLoader with only positive (user, item) pairs.
+
+        Args:
+            batch_size (int): The batch size.
+            shuffle (bool): Whether to shuffle the data.
+            seed (int): Seed for reproducibility.
+            **kwargs (Any): The additional keyword arguments to pass the Dataloader.
+
+        Returns:
+            DataLoader: Yields pairs of (user, positive_item).
+        """
+        # Extract directly the positive interactions
+        pos_users, pos_items = self._get_mapped_indices()
+
+        # Create the Dataset
+        dataset = PositiveDataset(
+            user_ids=pos_users,
+            item_ids=pos_items,
         )
 
         # Set the generator for the Dataloader for reproducibility
