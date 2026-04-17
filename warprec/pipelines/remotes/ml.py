@@ -59,6 +59,9 @@ def remote_evaluation_and_timing(
     # Move to worker node device
     model.to(device)
 
+    # Force model to use the same seed after de-serialization on the worker node
+    model.set_seed(model.seed)
+
     # Instantiate the Evaluator locally on the worker node
     evaluator = Evaluator(
         metric_list=metrics,
