@@ -224,6 +224,7 @@ class Dataset:
             batch_size=batch_size,
             rating_type=rating_type,
             rating_label=rating_label,
+            timestamp_label=timestamp_label,
             context_labels=context_labels,
         )
 
@@ -359,6 +360,7 @@ class Dataset:
         batch_size: int = 1024,
         rating_type: RatingType = RatingType.IMPLICIT,
         rating_label: str = None,
+        timestamp_label: str = None,
         context_labels: Optional[List[str]] = None,
     ) -> Interactions:
         """Functionality to create Interaction data from DataFrame.
@@ -372,6 +374,7 @@ class Dataset:
             batch_size (int): The batch size of the interaction.
             rating_type (RatingType): The type of rating used.
             rating_label (str): The label of the rating column.
+            timestamp_label (str): The label of the timestamp column.
             context_labels (Optional[List[str]]): The list of labels of the
                 contextual data.
 
@@ -389,6 +392,7 @@ class Dataset:
             batch_size=batch_size,
             rating_type=rating_type,
             rating_label=rating_label,
+            timestamp_label=timestamp_label,
             context_labels=context_labels,
         )
         nuid, niid = inter_set.get_dims()

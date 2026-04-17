@@ -39,6 +39,7 @@ class Interactions:
             iterate over the interactions.
         rating_type (RatingType): The type of rating to be used.
         rating_label (str): The label of the rating column.
+        timestamp_label (str): The label of the timestamp column.
         context_labels (Optional[List[str]]): The list of labels of the
             contextual data.
     """
@@ -55,6 +56,7 @@ class Interactions:
         batch_size: int = 1024,
         rating_type: RatingType = RatingType.IMPLICIT,
         rating_label: str = None,
+        timestamp_label: str = None,
         context_labels: Optional[List[str]] = None,
     ) -> None:
         # Setup the variables
@@ -79,7 +81,14 @@ class Interactions:
         self.user_label = data.columns[0]
         self.item_label = data.columns[1]
         self.rating_label = rating_label if rating_type == RatingType.EXPLICIT else None
+        self.timestamp_label = timestamp_label
         self.context_labels = context_labels if context_labels else []
+
+        # Setup flat views cache
+        self._flat_users: Optional[np.ndarray] = None
+        self._flat_items: Optional[np.ndarray] = None
+        self._flat_ratings: Optional[np.ndarray] = None
+        self._flat_timestamps: Optional[np.ndarray] = None
 
         # Set mappings
         self._umap = user_mapping
@@ -205,6 +214,77 @@ class Interactions:
         if isinstance(self._inter_sparse, csr_matrix):
             return self._inter_sparse
         return self._to_sparse()
+
+    def get_flat(
+        self,
+    ) -> Tuple[np.ndarray, np.ndarray, np.ndarray, Optional[np.ndarray]]:
+        """Returns the flattened, aligned arrays of users, items, ratings, and timestamps.
+
+        This method caches the arrays after the first computation to ensure fast
+        subsequent retrievals. The arrays are sorted by user and item indices.
+
+        Returns:
+            Tuple[np.ndarray, np.ndarray, np.ndarray, Optional[np.ndarray]]:
+                - users array
+                - items array
+                - ratings array (or ones for implicit)
+                - timestamps array (if timestamp_label is provided, else None)
+        """
+        # Return cached views if already computed
+        if self._flat_users is not None:
+            return (
+                self._flat_users,
+                self._flat_items,
+                self._flat_ratings,
+                self._flat_timestamps,
+            )
+
+        umap_df = nw.from_dict(
+            {
+                self.user_label: list(self._umap.keys()),
+                "__uidx__": list(self._umap.values()),
+            },
+            native_namespace=nw.get_native_namespace(self._inter_df),
+        )
+
+        imap_df = nw.from_dict(
+            {
+                self.item_label: list(self._imap.keys()),
+                "__iidx__": list(self._imap.values()),
+            },
+            native_namespace=nw.get_native_namespace(self._inter_df),
+        )
+
+        # Join and sort to ensure reproducibility and alignment
+        mapped_df = self._inter_df.join(umap_df, on=self.user_label, how="inner").join(
+            imap_df, on=self.item_label, how="inner"
+        )
+        mapped_df = mapped_df.sort(["__uidx__", "__iidx__"])
+
+        # Extract arrays
+        self._flat_users = mapped_df.select("__uidx__").to_numpy().flatten()
+        self._flat_items = mapped_df.select("__iidx__").to_numpy().flatten()
+
+        if self.rating_type == RatingType.EXPLICIT:
+            self._flat_ratings = (
+                mapped_df.select(self.rating_label).to_numpy().flatten()
+            )
+        else:
+            self._flat_ratings = np.ones(len(self._flat_users), dtype=np.float32)
+
+        if self.timestamp_label and self.timestamp_label in mapped_df.columns:
+            self._flat_timestamps = (
+                mapped_df.select(self.timestamp_label).to_numpy().flatten()
+            )
+        else:
+            self._flat_timestamps = None
+
+        return (
+            self._flat_users,
+            self._flat_items,
+            self._flat_ratings,
+            self._flat_timestamps,
+        )
 
     def get_sparse_by_rating(self, rating_value: float) -> coo_matrix:
         """Returns a sparse matrix (COO format) containing only the interactions
@@ -503,37 +583,7 @@ class Interactions:
         Returns:
             csr_matrix: Sparse representation of the transactions (CSR Format).
         """
-        umap_df = nw.from_dict(
-            {
-                self.user_label: list(self._umap.keys()),
-                "__uidx__": list(self._umap.values()),
-            },
-            native_namespace=nw.get_native_namespace(self._inter_df),
-        )
-
-        imap_df = nw.from_dict(
-            {
-                self.item_label: list(self._imap.keys()),
-                "__iidx__": list(self._imap.values()),
-            },
-            native_namespace=nw.get_native_namespace(self._inter_df),
-        )
-
-        # Join
-        mapped_df = self._inter_df.join(umap_df, on=self.user_label, how="inner").join(
-            imap_df, on=self.item_label, how="inner"
-        )
-
-        # Sort to ensure reproducibility
-        mapped_df = mapped_df.sort(["__uidx__", "__iidx__"])
-
-        users = mapped_df.select("__uidx__").to_numpy().flatten()
-        items = mapped_df.select("__iidx__").to_numpy().flatten()
-
-        if self.rating_type == RatingType.EXPLICIT:
-            ratings = mapped_df.select(self.rating_label).to_numpy().flatten()
-        else:
-            ratings = np.ones(len(users))
+        users, items, ratings, _ = self.get_flat()
 
         self._inter_sparse = coo_matrix(
             (ratings, (users, items)), shape=(self._og_nuid, self._og_niid)
