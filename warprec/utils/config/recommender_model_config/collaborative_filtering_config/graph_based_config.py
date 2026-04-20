@@ -1477,6 +1477,87 @@ class SGL(RecomModel):
         return validate_greater_than_zero(cls, v, "learning_rate")
 
 
+@params_registry.register("SimGCL")
+class SimGCL(RecomModel):
+    """Definition of the model SimGCL.
+
+    Attributes:
+        embedding_size (INT_FIELD): List of values for embedding_size.
+        n_layers (INT_FIELD): List of values for n_layers.
+        lambda_ (FLOAT_FIELD): List of values for lambda_.
+        eps (FLOAT_FIELD): List of values for eps.
+        temperature (FLOAT_FIELD): List of values for temperature.
+        reg_weight (FLOAT_FIELD): List of values for reg_weight.
+        batch_size (INT_FIELD): List of values for batch_size.
+        epochs (INT_FIELD): List of values for epochs.
+        learning_rate (FLOAT_FIELD): List of values for learning rate.
+    """
+
+    embedding_size: INT_FIELD
+    n_layers: INT_FIELD
+    lambda_: FLOAT_FIELD
+    eps: FLOAT_FIELD
+    temperature: FLOAT_FIELD
+    reg_weight: FLOAT_FIELD
+    batch_size: INT_FIELD
+    epochs: INT_FIELD
+    learning_rate: FLOAT_FIELD
+
+    @field_validator("embedding_size")
+    @classmethod
+    def check_embedding_size(cls, v: list):
+        """Validate embedding_size."""
+        return validate_greater_than_zero(cls, v, "embedding_size")
+
+    @field_validator("n_layers")
+    @classmethod
+    def check_n_layers(cls, v: list):
+        """Validate n_layers."""
+        return validate_greater_than_zero(cls, v, "n_layers")
+
+    @field_validator("lambda_")
+    @classmethod
+    def check_lambda_(cls, v: list):
+        """Validate lambda_."""
+        return validate_greater_equal_than_zero(cls, v, "lambda_")
+
+    @field_validator("eps")
+    @classmethod
+    def check_eps(cls, v: list):
+        """Validate eps."""
+        return validate_greater_equal_than_zero(cls, v, "eps")
+
+    @field_validator("temperature")
+    @classmethod
+    def check_temperature(cls, v: list):
+        """Validate temperature."""
+        return validate_greater_than_zero(cls, v, "temperature")
+
+    @field_validator("reg_weight")
+    @classmethod
+    def check_reg_weight(cls, v: list):
+        """Validate reg_weight."""
+        return validate_greater_equal_than_zero(cls, v, "reg_weight")
+
+    @field_validator("batch_size")
+    @classmethod
+    def check_batch_size(cls, v: list):
+        """Validate batch_size."""
+        return validate_greater_than_zero(cls, v, "batch_size")
+
+    @field_validator("epochs")
+    @classmethod
+    def check_epochs(cls, v: list):
+        """Validate epochs."""
+        return validate_greater_than_zero(cls, v, "epochs")
+
+    @field_validator("learning_rate")
+    @classmethod
+    def check_learning_rate(cls, v: list):
+        """Validate learning_rate."""
+        return validate_greater_than_zero(cls, v, "learning_rate")
+
+
 @params_registry.register("SimRec")
 class SimRec(RecomModel):
     """Definition of the model SimRec.
