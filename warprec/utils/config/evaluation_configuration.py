@@ -118,15 +118,6 @@ class EvaluationConfig(BaseModel):
     @classmethod
     def metrics_validator(cls, v: List[str]):
         """Validate metrics."""
-        for metric in v:
-            # Check for normal metrics
-            if metric.upper() not in metric_registry.list_registered():
-                raise ValueError(
-                    f"Metric {metric} not in metric registry. This is the list"
-                    f"of supported metrics: {metric_registry.list_registered()}"
-                )
-
-        # Check for duplicates
         len_before = len(v)
         v = cls.check_duplicates_in_list(v)
         len_after = len(v)
@@ -153,12 +144,8 @@ class EvaluationConfig(BaseModel):
             raise ValueError(
                 "Validation metric contains more than one @, check your configuration file."
             )
-        metric, top_k = v.split("@")
-        if metric.upper() not in metric_registry.list_registered():
-            raise ValueError(
-                f"Metric {metric} not in metric registry. This is the list"
-                f"of supported metrics: {metric_registry.list_registered()}"
-            )
+
+        _, top_k = v.split("@")
         if not top_k.isnumeric():
             raise ValueError(
                 "Validation metric should be provided with a top_k number."
