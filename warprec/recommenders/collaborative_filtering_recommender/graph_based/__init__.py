@@ -17,6 +17,7 @@ try:
     from .macrgcn import MACRGCN  # noqa: F401
     from .mixrec import MixRec
     from .ngcf import NGCF  # noqa: F401
+    from .paac import PAAC  # noqa: F401
     from .popdcl import PopDCL  # noqa: F401
     from .recdcl import RecDCL  # noqa: F401
     from .sgcl import SGCL  # noqa: F401
@@ -42,6 +43,7 @@ try:
             "MACRGCN",
             "MixRec",
             "NGCF",
+            "PAAC",
             "PopDCL",
             "RecDCL",
             "SGCL",
@@ -183,6 +185,17 @@ except ImportError:
         def __init__(self, *args, **kwargs):
             raise ImportError(
                 "NGCF model requires PyG dependencies. "
+                "Please install following the documentation you can find here: "
+                "https://pytorch-geometric.readthedocs.io/en/latest/install/installation.html"
+            )
+
+    @model_registry.register("PAAC")
+    class PAAC:  # type: ignore[no-redef]
+        """Placeholder for PAAC model when PyG dependencies are not installed."""
+
+        def __init__(self, *args, **kwargs):
+            raise ImportError(
+                "PAAC model requires PyG dependencies. "
                 "Please install following the documentation you can find here: "
                 "https://pytorch-geometric.readthedocs.io/en/latest/install/installation.html"
             )

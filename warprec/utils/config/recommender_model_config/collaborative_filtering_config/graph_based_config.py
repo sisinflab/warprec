@@ -998,6 +998,119 @@ class NGCF(RecomModel):
         return validate_greater_than_zero(cls, v, "learning_rate")
 
 
+@params_registry.register("PAAC")
+class PAAC(RecomModel):
+    """Definition of the model PAAC.
+
+    Attributes:
+        embedding_size (INT_FIELD): List of values for embedding_size.
+        n_layers (INT_FIELD): List of values for n_layers.
+        lambda1 (FLOAT_FIELD): List of values for lambda1.
+        lambda2 (FLOAT_FIELD): List of values for lambda2.
+        temperature (FLOAT_FIELD): List of values for temperature.
+        gamma (FLOAT_FIELD): List of values for gamma.
+        beta (FLOAT_FIELD): List of values for beta.
+        pop_ratio (FLOAT_FIELD): List of values for pop_ratio.
+        eps (FLOAT_FIELD): List of values for eps.
+        reg_weight (FLOAT_FIELD): List of values for reg_weight.
+        batch_size (INT_FIELD): List of values for batch_size.
+        epochs (INT_FIELD): List of values for epochs.
+        learning_rate (FLOAT_FIELD): List of values for learning rate.
+    """
+
+    embedding_size: INT_FIELD
+    n_layers: INT_FIELD
+    lambda1: FLOAT_FIELD
+    lambda2: FLOAT_FIELD
+    temperature: FLOAT_FIELD
+    gamma: FLOAT_FIELD
+    beta: FLOAT_FIELD
+    pop_ratio: FLOAT_FIELD
+    eps: FLOAT_FIELD
+    reg_weight: FLOAT_FIELD
+    batch_size: INT_FIELD
+    epochs: INT_FIELD
+    learning_rate: FLOAT_FIELD
+
+    @field_validator("embedding_size")
+    @classmethod
+    def check_embedding_size(cls, v: list):
+        """Validate embedding_size."""
+        return validate_greater_than_zero(cls, v, "embedding_size")
+
+    @field_validator("n_layers")
+    @classmethod
+    def check_n_layers(cls, v: list):
+        """Validate n_layers."""
+        return validate_greater_than_zero(cls, v, "n_layers")
+
+    @field_validator("lambda1")
+    @classmethod
+    def check_lambda1(cls, v: list):
+        """Validate lambda1."""
+        return validate_greater_equal_than_zero(cls, v, "lambda1")
+
+    @field_validator("lambda2")
+    @classmethod
+    def check_lambda2(cls, v: list):
+        """Validate lambda2."""
+        return validate_greater_equal_than_zero(cls, v, "lambda2")
+
+    @field_validator("temperature")
+    @classmethod
+    def check_temperature(cls, v: list):
+        """Validate temperature."""
+        return validate_greater_than_zero(cls, v, "temperature")
+
+    @field_validator("gamma")
+    @classmethod
+    def check_gamma(cls, v: list):
+        """Validate gamma."""
+        return validate_between_zero_and_one(cls, v, "gamma")
+
+    @field_validator("beta")
+    @classmethod
+    def check_beta(cls, v: list):
+        """Validate beta."""
+        return validate_greater_equal_than_zero(cls, v, "beta")
+
+    @field_validator("pop_ratio")
+    @classmethod
+    def check_pop_ratio(cls, v: list):
+        """Validate pop_ratio."""
+        return validate_between_zero_and_one(cls, v, "pop_ratio")
+
+    @field_validator("eps")
+    @classmethod
+    def check_eps(cls, v: list):
+        """Validate eps."""
+        return validate_greater_equal_than_zero(cls, v, "eps")
+
+    @field_validator("reg_weight")
+    @classmethod
+    def check_reg_weight(cls, v: list):
+        """Validate reg_weight."""
+        return validate_greater_equal_than_zero(cls, v, "reg_weight")
+
+    @field_validator("batch_size")
+    @classmethod
+    def check_batch_size(cls, v: list):
+        """Validate batch_size."""
+        return validate_greater_than_zero(cls, v, "batch_size")
+
+    @field_validator("epochs")
+    @classmethod
+    def check_epochs(cls, v: list):
+        """Validate epochs."""
+        return validate_greater_than_zero(cls, v, "epochs")
+
+    @field_validator("learning_rate")
+    @classmethod
+    def check_learning_rate(cls, v: list):
+        """Validate learning_rate."""
+        return validate_greater_than_zero(cls, v, "learning_rate")
+
+
 @params_registry.register("PopDCL")
 class PopDCL(RecomModel):
     """Definition of the model PopDCL.
