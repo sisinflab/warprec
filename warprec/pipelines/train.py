@@ -201,6 +201,7 @@ def train_pipeline(path: str):
                 num_negatives=config.evaluation.num_negatives,
                 device=device,
                 requires_timing=config.general.time_report,
+                custom_modules=config.general.custom_modules,
             )  # type: ignore[call-arg]
         )
 
@@ -482,6 +483,7 @@ def multiple_fold_validation_flow(
             best_params=best_params,
             main_dataset=main_dataset,
             params=params,
+            custom_modules=config.general.custom_modules,
             device=device,
             seed=seed,
         )  # type: ignore[call-arg]

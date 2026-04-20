@@ -333,6 +333,7 @@ def remote_model_pipeline(
             num_negatives=config.evaluation.num_negatives,
             device=device,
             requires_timing=config.general.time_report,
+            custom_modules=config.general.custom_modules,
         )  # type: ignore[call-arg]
     )
 
