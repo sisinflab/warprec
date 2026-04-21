@@ -22,13 +22,7 @@ class Pop(Recommender):
         *args (Any): Argument for PyTorch nn.Module.
         seed (int): The seed to use for reproducibility.
         **kwargs (Any): Keyword argument for PyTorch nn.Module.
-
-    Attributes:
-        normalized_popularity (Tensor): The lookup tensor for normalized
-            popularity.
     """
-
-    normalized_popularity: Tensor
 
     def __init__(
         self,
@@ -77,11 +71,7 @@ class Pop(Recommender):
             batch_size = user_indices.size(0)
 
             # Expand the popularity scores for each user in the batch
-            return self.normalized_popularity.expand(
-                batch_size, -1
-            ).clone()  # [batch_size, n_items]
+            return self.normalized_popularity.expand(batch_size, -1).clone()  # type: ignore[operator]
 
         # Case 'sampled': prediction on a sampled set of items
-        return self.normalized_popularity[
-            item_indices.clamp(max=self.n_items - 1)
-        ]  # [batch_size, pad_seq]
+        return self.normalized_popularity[item_indices.clamp(max=self.n_items - 1)]  # type: ignore[index, operator]
