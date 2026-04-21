@@ -58,7 +58,6 @@ class CodeCarbon(BaseModel):
         enabled (bool): Whether to enable CodeCarbon tracking.
         save_to_api (bool): Whether to save the results to CodeCarbon API.
         save_to_file (bool): Whether to save the results to a file.
-        output_dir (str): Directory to save the results.
         tracking_mode (str): Tracking mode for CodeCarbon.
             Options are "machine" or "process".
     """
@@ -66,7 +65,6 @@ class CodeCarbon(BaseModel):
     enabled: bool = False
     save_to_api: bool = False
     save_to_file: bool = False
-    output_dir: str = "./"
     tracking_mode: str = "machine"
 
 
