@@ -21,3 +21,5 @@ Auto-generated documentation for sequential recommender model classes.
 ::: warprec.recommenders.sequential_recommender.linrec.LinRec
 
 ::: warprec.recommenders.sequential_recommender.sasrec.SASRec
+
+::: warprec.recommenders.sequential_recommender.stan.STAN

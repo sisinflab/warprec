@@ -38,13 +38,25 @@ Auto-generated documentation for all collaborative filtering model classes.
 
 ::: warprec.recommenders.collaborative_filtering_recommender.graph_based.lightgode.LightGODE
 
+::: warprec.recommenders.collaborative_filtering_recommender.graph_based.macrgcn.MACRGCN
+
 ::: warprec.recommenders.collaborative_filtering_recommender.graph_based.mixrec.MixRec
 
 ::: warprec.recommenders.collaborative_filtering_recommender.graph_based.ngcf.NGCF
 
+::: warprec.recommenders.collaborative_filtering_recommender.graph_based.paac.PAAC
+
+::: warprec.recommenders.collaborative_filtering_recommender.graph_based.popdcl.PopDCL
+
+::: warprec.recommenders.collaborative_filtering_recommender.graph_based.recdcl.RecDCL
+
 ::: warprec.recommenders.collaborative_filtering_recommender.graph_based.rp3beta.RP3Beta
 
 ::: warprec.recommenders.collaborative_filtering_recommender.graph_based.sgcl.SGCL
+
+::: warprec.recommenders.collaborative_filtering_recommender.graph_based.simgcl.SimGCL
+
+::: warprec.recommenders.collaborative_filtering_recommender.graph_based.simrec.SimRec
 
 ::: warprec.recommenders.collaborative_filtering_recommender.graph_based.sgl.SGL
 
@@ -56,7 +68,11 @@ Auto-generated documentation for all collaborative filtering model classes.
 
 ::: warprec.recommenders.collaborative_filtering_recommender.knn.itemknn.ItemKNN
 
+::: warprec.recommenders.collaborative_filtering_recommender.knn.itemknntd.ItemKNNTD
+
 ::: warprec.recommenders.collaborative_filtering_recommender.knn.userknn.UserKNN
+
+::: warprec.recommenders.collaborative_filtering_recommender.knn.userknntd.UserKNNTD
 
 ## Latent Factor
 
@@ -65,6 +81,8 @@ Auto-generated documentation for all collaborative filtering model classes.
 ::: warprec.recommenders.collaborative_filtering_recommender.latent_factor.bpr.BPR
 
 ::: warprec.recommenders.collaborative_filtering_recommender.latent_factor.fism.FISM
+
+::: warprec.recommenders.collaborative_filtering_recommender.latent_factor.macrmf.MACRMF
 
 ::: warprec.recommenders.collaborative_filtering_recommender.latent_factor.slim.Slim
 
