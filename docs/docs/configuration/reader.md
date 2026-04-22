@@ -120,6 +120,7 @@ If your dataset uses different column names, you can override them using the `la
 - **item_id_label**: Custom label for item ID.
 - **rating_label**: Custom label for rating column.
 - **timestamp_label**: Custom label for timestamp column.
+- **context_labels**: Custom labels for contextual information.
 
 !!! important
     - `user_id` and `item_id` are **mandatory**.
@@ -141,6 +142,7 @@ To override these defaults, use the `dtypes` section:
 - **item_id_type**: Datatype for item IDs.
 - **rating_type**: Datatype for ratings.
 - **timestamp_type**: Datatype for timestamps.
+- **context_types**: Datatype for context information.
 
 !!! note
     When `header=False`, dtype specifications will be **ignored**. Supported datatypes include:

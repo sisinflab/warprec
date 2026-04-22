@@ -1,4 +1,4 @@
-# pylint: disable = wrong-import-position
+# pylint: disable = wrong-import-position, ungrouped-imports
 import os
 
 # Set Ray environment variable to enable new features
@@ -52,6 +52,7 @@ class Trainer:
     Delegates configuration details to TrainConfiguration object.
 
     Args:
+        storage_path (str): Path to store Ray Tune results and checkpoints.
         custom_callback (WarpRecCallback): Custom callback for training/eval.
         custom_modules (Optional[Union[str, List[str]]]): List of custom models to load.
         dashboard_config (Optional[DashboardConfig]): Configuration for logging dashboards
@@ -60,10 +61,12 @@ class Trainer:
 
     def __init__(
         self,
+        storage_path: str,
         custom_callback: WarpRecCallback = WarpRecCallback(),
         custom_modules: Optional[Union[str, List[str]]] = None,
         dashboard_config: Optional[DashboardConfig] = None,
     ):
+        self._stg_path = storage_path
         self._custom_modules = custom_modules or []
         self._callbacks = self._setup_callbacks(custom_callback, dashboard_config)
 
@@ -75,7 +78,6 @@ class Trainer:
         metrics: List[str],
         topk: List[int],
         validation_score: str,
-        storage_path: str,
         device: str = "cpu",
         evaluation_strategy: str = "full",
         num_negatives: int = 99,
@@ -94,7 +96,6 @@ class Trainer:
             metrics (List[str]): List of metrics to compute on each report.
             topk (List[int]): List of cutoffs for metrics.
             validation_score (str): The metric to monitor during training.
-            storage_path (str): Path to store Ray results.
             device (str): The device that will be used for tensor operations.
             evaluation_strategy (str): Evaluation strategy, either "full" or "sampled".
             num_negatives (int): Number of negative samples to use in "sampled" strategy.
@@ -118,7 +119,6 @@ class Trainer:
             metrics=metrics,
             topk=topk,
             validation_score=validation_score,
-            storage_path=storage_path,
             device=device,
             evaluation_strategy=evaluation_strategy,
             num_negatives=num_negatives,
@@ -174,7 +174,6 @@ class Trainer:
         metrics: List[str],
         topk: List[int],
         validation_score: str,
-        storage_path: str,
         device: str = "cpu",
         evaluation_strategy: str = "full",
         num_negatives: int = 99,
@@ -191,7 +190,6 @@ class Trainer:
             metrics (List[str]): List of metrics to compute on each report.
             topk (List[int]): List of cutoffs for metrics.
             validation_score (str): The metric to monitor during training.
-            storage_path (str): Path to store Ray results.
             device (str): The device that will be used for tensor operations.
             evaluation_strategy (str): Evaluation strategy, either "full" or "sampled".
             num_negatives (int): Number of negative samples to use in "sampled" strategy.
@@ -218,7 +216,6 @@ class Trainer:
             metrics=metrics,
             topk=topk,
             validation_score=validation_score,
-            storage_path=storage_path,
             device=device,
             evaluation_strategy=evaluation_strategy,
             num_negatives=num_negatives,
@@ -259,7 +256,6 @@ class Trainer:
         metrics: List[str],
         topk: List[int],
         validation_score: str,
-        storage_path: str,
         device: str,
         evaluation_strategy: str,
         num_negatives: int,
@@ -276,7 +272,6 @@ class Trainer:
             metrics (List[str]): List of metrics to compute on each report.
             topk (List[int]): List of cutoffs for metrics.
             validation_score (str): The metric to monitor during training.
-            storage_path (str): Path to store Ray results.
             device (str): The device that will be used for tensor operations.
             evaluation_strategy (str): Evaluation strategy, either "full" or "sampled".
             num_negatives (int): Number of negative samples to use in "sampled" strategy.
@@ -339,7 +334,7 @@ class Trainer:
                 scaling_config=scaling_config,
                 run_config=ray.train.RunConfig(
                     callbacks=[TuneReportCallback()],  # type: ignore[list-item]
-                    storage_path=storage_path,
+                    storage_path=self._stg_path,
                     checkpoint_config=ray.train.CheckpointConfig(
                         num_to_keep=opt_config.checkpoint_to_keep,
                         checkpoint_score_attribute=validation_score,
@@ -352,7 +347,9 @@ class Trainer:
 
         # Search Algorithm & Scheduler
         search_alg = search_algorithm_registry.get(
-            opt_config.strategy, **opt_config.properties.model_dump()
+            opt_config.strategy,
+            metric=validation_score,
+            **opt_config.properties.model_dump(),
         )
         scheduler = scheduler_registry.get(
             opt_config.scheduler, **opt_config.properties.model_dump()
@@ -362,7 +359,7 @@ class Trainer:
         run_config = ray.tune.RunConfig(
             callbacks=self._callbacks,
             verbose=ray_verbose,
-            storage_path=storage_path,
+            storage_path=self._stg_path,
             checkpoint_config=ray.tune.CheckpointConfig(
                 num_to_keep=opt_config.checkpoint_to_keep,
                 checkpoint_score_attribute=validation_score,
@@ -378,7 +375,9 @@ class Trainer:
         if scaling_config_dict["use_gpu"] and opt_config.gpu_per_trial > 0:
             max_concurrent = max(1, int(available_gpus // opt_config.gpu_per_trial))
         else:
-            max_concurrent = max(1, int(available_cpus // opt_config.cpu_per_trial))
+            max_concurrent = max(
+                1, int(available_cpus // (opt_config.cpu_per_trial + 0.05))
+            )
 
         # Tuner will execute the driver function
         tune_config = TuneConfig(
@@ -474,12 +473,14 @@ class Trainer:
                     map_location="cpu",
                 ),
                 interactions=dataset.train_set,
+                sessions=dataset.train_session,
                 **dataset.get_stash(),
             )
         else:
             model = model_class(
                 params=best_params,
                 interactions=dataset.train_set,
+                sessions=dataset.train_session,
                 info=dataset.info(),
                 **dataset.get_stash(),
             )
@@ -517,9 +518,7 @@ class Trainer:
             .reset_index()
         )
 
-        best_row = agg_df.sort_values(by="mean_score", ascending=(mode == "min")).iloc[
-            0
-        ]
+        best_row = agg_df.sort_values(by="mean_score", ascending=mode == "min").iloc[0]
 
         # Reconstruct clean params dict
         best_params = {"iterations": math.ceil(best_row["desired_training_iterations"])}
@@ -562,7 +561,7 @@ class Trainer:
         return tune_params
 
     def _trial_name_creator(self, model_name: str):
-        def _creator(trial: Trial):
+        def _creator(trial: Trial):  # type: ignore[unused-argument]
             return f"{model_name}_{str(uuid.uuid4())[:8]}"
 
         return _creator
@@ -616,7 +615,7 @@ class Trainer:
                 CodeCarbonCallback(
                     save_to_api=dashboard.codecarbon.save_to_api,
                     save_to_file=dashboard.codecarbon.save_to_file,
-                    output_dir=dashboard.codecarbon.output_dir,
+                    output_dir=self._stg_path,
                     tracking_mode=dashboard.codecarbon.tracking_mode,
                 )
             )
@@ -668,6 +667,7 @@ class Trainer:
         return report
 
 
+# type: ignore[unused-argument]
 class CodeCarbonCallback(tune.Callback):
     """Custom CodeCarbon callback for Ray Tune."""
 

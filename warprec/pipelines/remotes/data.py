@@ -10,6 +10,7 @@ from warprec.data.reader import Reader
 from warprec.data.writer import Writer
 from warprec.recommenders.base_recommender import Recommender
 from warprec.data import Dataset
+from warprec.utils.helpers import load_custom_modules
 from warprec.utils.callback import WarpRecCallback
 from warprec.utils.config import TrainConfiguration
 
@@ -37,6 +38,9 @@ def remote_data_preparation(
             - Optional[Dataset]: The validation dataset (if any).
             - List[Dataset]: The list of fold datasets for cross-validation.
     """
+    # Load custom modules if provided
+    load_custom_modules(config.general.custom_modules)
+
     # Load datasets using common utility
     main_dataset, val_dataset, fold_dataset = initialize_datasets(
         reader=reader,
@@ -70,6 +74,9 @@ def remote_generate_recs(
     Returns:
         bool: True if successful.
     """
+    # Load custom modules if provided
+    load_custom_modules(config.general.custom_modules)
+
     # Move model to the correct device on the worker
     model.to(device)
 

@@ -47,8 +47,6 @@ class ASHASchedulerWrapper(ASHAScheduler, BaseSchedulerWrapper):
     """Wrapper for the ASHA scheduler.
 
     Args:
-        mode (str): The mode to run the optimization. Must be
-            either 'min' or 'max'.
         time_attr (str): The measure of time that will be used
             by the scheduler.
         max_t (int): Maximum number of iterations.
@@ -59,7 +57,6 @@ class ASHASchedulerWrapper(ASHAScheduler, BaseSchedulerWrapper):
 
     def __init__(
         self,
-        mode: str,
         time_attr: str,
         max_t: int,
         grace_period: int,
@@ -67,10 +64,8 @@ class ASHASchedulerWrapper(ASHAScheduler, BaseSchedulerWrapper):
         **kwargs: Any,
     ):
         super().__init__(
-            mode=mode,
             time_attr=time_attr,
             max_t=max_t,
             grace_period=grace_period,
             reduction_factor=reduction_factor,
-            metric="score",
         )

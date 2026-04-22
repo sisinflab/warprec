@@ -26,18 +26,27 @@ The **Collaborative-Filtering Recommenders** module of WarpRec is a collection o
 | | [LightGCN](#lightgcn) | Simplified Graph convolutional neural network. |
 | | [LightGCN++](#lightgcnpp) | Improved LightGCN with asymmetric normalization and residual connections. |
 | | [LightGODE](#lightgode) | Training-free graph convolution using post-training ODE solver. |
+| | [MACRGCN](#macrgcn) | LightGCN backbone with counterfactual reasoning for popularity debiasing. |
 | | [MixRec](#mixrec) | Dual mixing data augmentation with contrastive learning. |
 | | [NGCF](#ngcf) | Complex Graph convolutional neural network. |
+| | [PAAC](#paac) | Popularity-aware alignment and contrast for debiasing with LightGCN. |
+| | [PopDCL](#popdcl) | Popularity-aware debiased contrastive loss with LightGCN encoder. |
+| | [RecDCL](#recdcl) | Dual contrastive learning combining feature-wise and batch-wise objectives. |
 | | [RP3Beta](#rp3beta) | Random walk model with popularity penalization. |
 | | [SGCL](#sgcl) | Unified supervised contrastive learning without negative sampling. |
+| | [SimGCL](#simgcl) | Graph contrastive learning via noise perturbation without graph augmentation. |
+| | [SimRec](#simrec) | Graph-less collaborative filtering via contrastive knowledge distillation. |
 | | [SGL](#sgl) | Self-supervised learning with graph structure augmentation (ED, ND, RW). |
 | | [UltraGCN](#ultragcn) | Efficient GCN approximation using constraint losses without message passing. |
 | | [XSimGCL](#xsimgcl) | Graph contrastive learning with noise perturbation. |
 | KNN | [ItemKNN](#itemknn) | Item-based collaborative KNN using similarity metrics. |
+| | [ItemKNN-TD](#itemknn-td) | Item-based KNN with exponential temporal decay on interactions. |
 | | [UserKNN](#userknn) | User-based collaborative KNN using historical interactions. |
+| | [UserKNN-TD](#userknn-td) | User-based KNN with exponential temporal decay on interactions. |
 | Latent Factor | [ADMMSlim](#admmslim) | Sparse item similarity model optimized via ADMM. |
 | | [BPR](#bpr) | Pairwise ranking model for implicit feedback. |
 | | [FISM](#fism) | Efficient item similarity model using weighted average as user embeddings. |
+| | [MACRMF](#macrmf) | Matrix factorization with counterfactual reasoning for popularity debiasing. |
 | | [SLIM](#slim) | Interpretable item similarity model with L1/L2 regularization. |
 | Neural | [ConvNCF](#convncf) | Applies CNNs to user-item embeddings outer product to capture structured interaction patterns. |
 | | [NeuMF](#neumf) | Hybrid neural model combining GMF and MLP layers. |
@@ -357,6 +366,29 @@ models:
     learning_rate: 0.001
 ```
 
+### MACRGCN
+
+MACRGCN (Model-Agnostic Counterfactual Reasoning with GCN): Extends the MACR framework by replacing the Matrix Factorization backbone with LightGCN. It maintains a three-branch architecture with a main matching branch, an item module (capturing popularity bias), and a user module (capturing user conformity). During training the branches are fused with a multi-task BCE loss; during inference, counterfactual reasoning removes the direct effect of item popularity on ranking scores (TIE = TE - NDE).
+
+For further details, please refer to the [paper](https://arxiv.org/abs/2010.15363).
+
+```yaml
+models:
+  MACRGCN:
+    embedding_size: 64
+    n_layers: 3
+    reg_weight: 0.001
+    alpha: 0.1
+    beta: 0.1
+    c: 0.1
+    user_mlp_hidden: 64
+    item_mlp_hidden: 64
+    neg_samples: 1
+    batch_size: 2048
+    epochs: 200
+    learning_rate: 0.001
+```
+
 ### MixRec
 
 MixRec (Individual and Collective Mixing): A graph-based model that employs dual mixing strategies (Individual and Collective) to augment embeddings. It uses a dual-mixing contrastive learning objective to enhance consistency between positive pairs while leveraging mixed negatives.
@@ -396,6 +428,71 @@ models:
     learning_rate: 0.001
 ```
 
+### PAAC
+
+PAAC (Popularity-Aware Alignment and Contrast): A debiasing model built on a LightGCN backbone with two complementary modules. The Supervised Alignment Module pulls together representations of popular and unpopular co-interacted items, injecting supervision into sparse unpopular embeddings. The Re-weighting Contrast Module splits items into popular and unpopular groups and applies asymmetric negative weighting in InfoNCE losses to prevent excessive separation between groups.
+
+For further details, please refer to the [paper](https://arxiv.org/abs/2405.20718).
+
+```yaml
+models:
+  PAAC:
+    embedding_size: 64
+    n_layers: 3
+    lambda1: 0.1
+    lambda2: 0.1
+    temperature: 0.1
+    gamma: 0.1
+    beta: 0.1
+    pop_ratio: 0.1
+    eps: 0.001
+    reg_weight: 0.001
+    batch_size: 2048
+    epochs: 200
+    learning_rate: 0.001
+```
+
+### PopDCL
+
+PopDCL (Popularity-aware Debiased Contrastive Loss): A contrastive learning model using a LightGCN encoder that simultaneously corrects positive and negative scores based on popularity. The M+ correction reduces scores of positive pairs likely to be false-positives due to popularity bias, while the M- correction personalizes the debiased contrastive loss using per-user false-negative probabilities. Both corrections rely solely on pre-computed item/user popularity from the training set.
+
+For further details, please refer to the [paper](https://dl.acm.org/doi/10.1145/3583780.3615009).
+
+```yaml
+models:
+  PopDCL:
+    embedding_size: 64
+    n_layers: 3
+    temperature: 0.2
+    reg_weight: 0.001
+    batch_size: 2048
+    epochs: 200
+    learning_rate: 0.001
+```
+
+### RecDCL
+
+RecDCL (Dual Contrastive Learning for Recommendation): Combines Feature-wise Contrastive Learning (FCL) and Batch-wise Contrastive Learning (BCL) on a LightGCN encoder. FCL includes a Barlow-Twins-style cross-correlation loss (UIBT) to reduce inter-user/item redundancy and a polynomial-kernel uniformity loss (UUII) within user/item embeddings. BCL uses historical-embedding augmentation inspired by SimSiam for robust output representations.
+
+For further details, please refer to the [paper](https://arxiv.org/abs/2401.15635).
+
+```yaml
+models:
+  RecDCL:
+    embedding_size: 64
+    n_layers: 2
+    gamma: 0.01
+    alpha: 0.2
+    poly_a: 1.0
+    poly_c: 0.0000001
+    poly_e: 4
+    beta: 5.0
+    tau_momentum: 0.1
+    batch_size: 2048
+    epochs: 200
+    learning_rate: 0.001
+```
+
 ### RP3Beta
 
 RP3Beta: A graph-based collaborative filtering model that performs a biased random walk of length 3 on the user-item bipartite graph.
@@ -427,6 +524,55 @@ models:
     batch_size: 2048
     epochs: 200
     learning_rate: 0.001
+```
+
+### SimGCL
+
+SimGCL (Simple Graph Contrastive Learning): A graph contrastive learning model that completely discards graph augmentations (such as edge/node dropout). Instead, it creates contrastive views by adding uniform random noise to node embeddings at each GCN layer. Two independently perturbed views are generated per forward pass; an InfoNCE loss maximizes agreement between same-node representations across views, while a BPR loss drives the recommendation task.
+
+For further details, please refer to the [paper](https://arxiv.org/abs/2112.08679).
+
+```yaml
+models:
+  SimGCL:
+    embedding_size: 64
+    n_layers: 3
+    lambda_: 0.2
+    eps: 0.1
+    temperature: 0.2
+    reg_weight: 0.001
+    batch_size: 2048
+    epochs: 200
+    learning_rate: 0.001
+```
+
+### SimRec
+
+SimRec (Graph-less Collaborative Filtering): A knowledge distillation framework that trains a lightweight MLP student to match a GCN teacher, eliminating the need for graph convolution at inference time. It employs prediction-level KD, embedding-level contrastive KD, and adaptive contrastive regularization to distill high-order collaborative semantics while mitigating over-smoothing effects from the GNN teacher.
+
+For further details, please refer to the [paper](https://arxiv.org/abs/2303.08537).
+
+```yaml
+models:
+  SimRec:
+    embedding_size: 64
+    n_teacher_layers: 3
+    n_student_layers: 2
+    teacher_reg_weight: 0.001
+    lambda1: 0.1
+    lambda2: 0.1
+    lambda3: 0.1
+    lambda4: 0.1
+    tau1: 0.1
+    tau2: 0.1
+    tau3: 0.1
+    eps: 0.1
+    batch_size_kd: 2048
+    teacher_epochs: 200
+    batch_size: 2048
+    epochs: 200
+    learning_rate: 0.001
+    teacher_learning_rate: 0.001
 ```
 
 ### SGL
@@ -510,6 +656,20 @@ models:
     similarity: cosine
 ```
 
+### ItemKNN-TD { #itemknn-td }
+
+ItemKNN-TD (Item KNN with Temporal Decay): Extends the standard ItemKNN by applying exponential temporal decay to interaction weights, so that older interactions contribute less to the item-item similarity computation. A higher beta means older interactions decay faster.
+
+For further details, please refer to the [paper](https://dl.acm.org/doi/10.1145/1099554.1099689).
+
+```yaml
+models:
+  ItemKNN-TD:
+    k: 10
+    similarity: cosine
+    beta: 0.5
+```
+
 ### UserKNN
 
 UserKNN: A collaborative user-based KNN model that recommends items liked by similar users.
@@ -521,6 +681,20 @@ models:
   UserKNN:
     k: 10
     similarity: cosine
+```
+
+### UserKNN-TD { #userknn-td }
+
+UserKNN-TD (User KNN with Temporal Decay): User-side variant of ItemKNN-TD that applies exponential temporal decay to user-user similarity computations, giving less weight to older interactions. A higher beta means older interactions decay faster.
+
+For further details, please refer to the [paper](https://dl.acm.org/doi/10.1145/1099554.1099689).
+
+```yaml
+models:
+  UserKNN-TD:
+    k: 10
+    similarity: cosine
+    beta: 0.5
 ```
 
 ---
@@ -577,6 +751,26 @@ models:
     split_to: 5
     reg_weight: 0.001
     batch_size: 2048
+    epochs: 200
+    learning_rate: 0.001
+```
+
+### MACRMF
+
+MACRMF (Model-Agnostic Counterfactual Reasoning with MF): Implements the MACR framework with a Matrix Factorization backbone. It uses a three-branch architecture: a main MF matching branch, an item module that captures the direct effect of item popularity, and a user module that captures user conformity. During training the branches are jointly optimized with a multi-task BCE loss; during inference, counterfactual reasoning subtracts the natural direct effect (NDE) of popularity, leaving only the true user-item matching signal.
+
+For further details, please refer to the [paper](https://arxiv.org/abs/2010.15363).
+
+```yaml
+models:
+  MACRMF:
+    embedding_size: 64
+    alpha: 0.1
+    beta: 0.1
+    c: 0.1
+    reg_weight: 0.001
+    batch_size: 2048
+    neg_samples: 1
     epochs: 200
     learning_rate: 0.001
 ```

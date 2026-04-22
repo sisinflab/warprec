@@ -133,8 +133,13 @@ def train_pipeline(path: str):
     for model_name in models:
         model_exploration_start_time = time.time()
 
+        # Retrieve storage path for Ray results
+        # based on the writer configuration
+        storage_path = config.get_storage_path()
+
         params = model_param_from_dict(model_name, config.models[model_name])
         trainer = Trainer(
+            storage_path=storage_path,
             custom_callback=callback,
             custom_modules=config.general.custom_modules,
             dashboard_config=config.dashboard,
@@ -201,6 +206,7 @@ def train_pipeline(path: str):
                 num_negatives=config.evaluation.num_negatives,
                 device=device,
                 requires_timing=config.general.time_report,
+                custom_modules=config.general.custom_modules,
             )  # type: ignore[call-arg]
         )
 
@@ -362,10 +368,6 @@ def single_split_flow(
         topk = [val_k]
         complex_metrics = []
 
-    # Retrieve storage path for Ray results
-    # based on the writer configuration
-    storage_path = config.get_storage_path()
-
     # Start HPO phase on test set,
     # no need of further training
     best_model, ray_report, best_iter = trainer.train_single_fold(
@@ -375,7 +377,6 @@ def single_split_flow(
         metrics=metrics,
         topk=topk,
         validation_score=validation_score,
-        storage_path=storage_path,
         device=device,
         evaluation_strategy=config.evaluation.strategy,
         num_negatives=config.evaluation.num_negatives,
@@ -437,10 +438,6 @@ def multiple_fold_validation_flow(
         topk = [val_k]
         complex_metrics = []
 
-    # Retrieve storage path for Ray results
-    # based on the writer configuration
-    storage_path = config.get_storage_path()
-
     # Start HPO phase on validation folds
     best_params, report = trainer.train_multiple_fold(
         model_name,
@@ -449,7 +446,6 @@ def multiple_fold_validation_flow(
         metrics=metrics,
         topk=topk,
         validation_score=validation_score,
-        storage_path=storage_path,
         device=device,
         evaluation_strategy=config.evaluation.strategy,
         num_negatives=config.evaluation.num_negatives,
@@ -482,6 +478,7 @@ def multiple_fold_validation_flow(
             best_params=best_params,
             main_dataset=main_dataset,
             params=params,
+            custom_modules=config.general.custom_modules,
             device=device,
             seed=seed,
         )  # type: ignore[call-arg]

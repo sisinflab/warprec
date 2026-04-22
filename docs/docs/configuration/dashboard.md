@@ -51,7 +51,6 @@ WarpRec supports **CodeCarbon** via Ray to monitor energy consumption and carbon
 - **enabled**: Boolean flag to activate the dashboard. Defaults to `False`.
 - **save_to_api**: Whether to send results to the CodeCarbon API. Defaults to `False`.
 - **save_to_file**: Whether to save results locally to a file. Defaults to `False`.
-- **output_dir**: Directory where results are stored.
 - **tracking_mode**: Tracking mode for CodeCarbon. Options are `machine` or `process`.
 
 When using the **save_to_api** feature, the main to correctly track the experiment is to create a `.codecarbon.config` file which contains the following information:

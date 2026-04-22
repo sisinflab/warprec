@@ -276,9 +276,15 @@ def remote_model_pipeline(
     """
 
     model_exploration_start_time = time.time()
+
+    # Retrieve storage path for Ray results
+    # based on the writer configuration
+    storage_path = config.get_storage_path()
+
     params = model_param_from_dict(model_name, config.models[model_name])
 
     trainer = Trainer(
+        storage_path=storage_path,
         custom_callback=callback,
         custom_modules=config.general.custom_modules,
         dashboard_config=config.dashboard,
@@ -333,6 +339,7 @@ def remote_model_pipeline(
             num_negatives=config.evaluation.num_negatives,
             device=device,
             requires_timing=config.general.time_report,
+            custom_modules=config.general.custom_modules,
         )  # type: ignore[call-arg]
     )
 

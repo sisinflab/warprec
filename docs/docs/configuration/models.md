@@ -151,6 +151,41 @@ The **early_stopping** section optionally adds stopping criteria for each trial:
 - **grace_period**: Minimum number of evaluations before early stopping can trigger.
 - **min_delta**: Minimum change to consider as an improvement.
 
+!!! Example "ASHA Scheduler for Efficient Trial Pruning"
+    When running a large hyperparameter search (e.g., with `random`, `optuna`, or `hopt`), many trials will perform poorly from the start. Instead of waiting for all trials to finish, you can use the **ASHA (Asynchronous Successive Halving Algorithm)** scheduler to aggressively terminate bad trials early and allocate resources only to the most promising ones.
+
+    To use ASHA, you must define the `scheduler` as `asha` and provide the required parameters inside the `properties` block: `max_t`, `grace_period`, and `reduction_factor`.
+
+    **Configuration Example:**
+    ```yaml
+    models:
+        LightGCN:
+            optimization:
+                strategy: optuna
+                num_samples: 100
+                scheduler: asha
+                properties:
+                    time_attr: training_iteration  # The metric used to track time/progress
+                    max_t: 200                     # Maximum iterations a trial can run
+                    grace_period: 20               # Minimum iterations before pruning begins
+                    reduction_factor: 3.0          # Halving rate (keeps top 1/3 of trials)
+
+            # Model parameters
+            embedding_size: [choice, 64, 128, 256]
+            n_layers: [choice, 1, 2, 3]
+            learning_rate: [loguniform, 1e-5, 1e-2]
+            epochs: 200
+    ```
+
+    **How this works in practice:**
+
+    1. **`time_attr: training_iteration`**: Tells the scheduler to evaluate the progress of the trials based on the number of training epochs/iterations completed.
+    2. **`grace_period: 20`**: Every single trial is guaranteed to run for at least 20 iterations. This prevents the scheduler from killing a model that just has a slow start.
+    3. **`reduction_factor: 3.0`**: At iteration 20, the scheduler compares all running trials. Only the top 33% (1/3) of the trials are allowed to continue. The bottom 66% are permanently stopped. This process repeats at iterations 60 (20 * 3) and 180 (60 * 3).
+    4. **`max_t: 200`**: The absolute maximum number of iterations any trial is allowed to reach. This should generally match your model's `epochs` parameter.
+
+    *Result:* By pruning unpromising trials early, ASHA allows you to test 100 configurations in a fraction of the time and compute cost it would take using the standard `fifo` scheduler.
+
 ## Example Model Configuration
 
 In this section, we provide examples illustrating how to define the appropriate configuration for your experiment.

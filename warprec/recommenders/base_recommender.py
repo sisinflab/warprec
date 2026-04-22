@@ -108,6 +108,7 @@ class Recommender(nn.Module, ABC):
         Args:
             seed (int): The seed value to be used.
         """
+        self.seed = seed
         random.seed(seed)
         np.random.seed(seed)
         torch.manual_seed(seed)

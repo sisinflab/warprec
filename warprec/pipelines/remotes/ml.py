@@ -18,6 +18,7 @@ from warprec.recommenders.base_recommender import (
     ContextRecommenderUtils,
 )
 from warprec.evaluation import Evaluator
+from warprec.utils.helpers import load_custom_modules
 from warprec.utils.config import RecomModel
 from warprec.utils.config.evaluation_configuration import ComplexMetricConfig
 from warprec.utils.registry import model_registry
@@ -34,6 +35,7 @@ def remote_evaluation_and_timing(
     num_negatives: int,
     device: str,
     requires_timing: bool,
+    custom_modules: List[str],
 ) -> Tuple[Dict[int, Dict[str, float | Tensor]], float, float]:
     """This remote function will be executed on the Ray Cluster using requested resources.
 
@@ -49,6 +51,7 @@ def remote_evaluation_and_timing(
         num_negatives (int): The number of negative samples to use with 'sampled' strategy.
         device (str): The device to use for evaluation.
         requires_timing (bool): Wether or not to calculate timings.
+        custom_modules (List[str]): The list of custom modules to load on the worker node.
 
     Returns:
         Tuple[Dict[int, Dict[str, float | Tensor]], float, float]: A tuple containing:
@@ -56,8 +59,14 @@ def remote_evaluation_and_timing(
             - float: The evaluation timing.
             - float: The inference timing.
     """
+    # Load custom modules if provided
+    load_custom_modules(custom_modules)
+
     # Move to worker node device
     model.to(device)
+
+    # Force model to use the same seed after de-serialization on the worker node
+    model.set_seed(model.seed)
 
     # Instantiate the Evaluator locally on the worker node
     evaluator = Evaluator(
@@ -157,6 +166,7 @@ def remote_model_retraining(
     best_params: dict,
     main_dataset: Dataset,
     params: RecomModel,
+    custom_modules: List[str],
     device: str,
     seed: int,
 ) -> Tuple[Recommender, dict, int]:
@@ -170,6 +180,7 @@ def remote_model_retraining(
         best_params (dict): The best hyperparameters found during HPO.
         main_dataset (Dataset): The dataset to train on.
         params (RecomModel): The model configuration parameters.
+        custom_modules (List[str]): The list of custom modules to load on the worker node.
         device (str): The device to use for training.
         seed (int): The random seed.
 
@@ -179,6 +190,9 @@ def remote_model_retraining(
             - A report dictionary with parameter counts.
             - The number of iterations.
     """
+    # Load custom modules if provided
+    load_custom_modules(custom_modules)
+
     block_size = params.optimization.block_size
     chunk_size = params.optimization.chunk_size
     num_workers = params.optimization.num_workers
@@ -189,6 +203,7 @@ def remote_model_retraining(
         name=model_name,
         params=best_params,
         interactions=main_dataset.train_set,
+        sessions=main_dataset.train_session,
         seed=seed,
         info=main_dataset.info(),
         **main_dataset.get_stash(),

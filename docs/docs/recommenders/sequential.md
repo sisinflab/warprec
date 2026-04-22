@@ -12,6 +12,7 @@ The **Sequential Recommenders** module of WarpRec focuses on models that leverag
 |---|---|---|
 | CNN-Based | [Caser](#caser) | Convolutional model capturing local and global sequential patterns. |
 | Markov-Chains | [FOSSIL](#fossil) | Combines Markov Chains with factored item similarity for sequential prediction. |
+| Neighborhood-Based | [STAN](#stan) | Session-based model using time- and position-weighted neighborhood matching. |
 | RNN-Based | [GRU4Rec](#gru4rec) | Session-based recommender using GRUs for short-term preference modeling. |
 | | [NARM](#narm) | Hybrid encoder (GRU + Attention) capturing sequential behavior and main purpose. |
 | Transformer-Based | [BERT4Rec](#bert4rec) | Bidirectional Transformer model trained on a masked item prediction task. |
@@ -71,6 +72,28 @@ models:
     learning_rate: 0.001
     neg_samples: 1
     max_seq_len: 200
+```
+
+---
+
+## Neighborhood-Based
+
+Neighborhood-based sequential recommenders identify similar historical sessions and use them to predict the next item. These models are non-neural and rely on weighted similarity between the current session and past sessions.
+
+### STAN
+
+STAN (Sequence and Time Aware Neighborhood): A session-based recommendation model that scores candidate items by matching the current session against historical neighbor sessions. It incorporates three weighting factors: position decay (lambda_1) gives more importance to recently viewed items within a session, temporal decay (lambda_2) favors sessions that occurred closer in time, and co-occurrence temporal proximity (lambda_3) weights the relevance of shared items based on their temporal distance within sessions.
+
+For further details, please refer to the [paper](https://dl.acm.org/doi/10.1145/3331184.3331322).
+
+```yaml
+models:
+  STAN:
+    k: 500
+    lambda_1: 10
+    lambda_2: 10
+    lambda_3: 10
+    max_seq_len: 20
 ```
 
 ---

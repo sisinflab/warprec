@@ -37,11 +37,15 @@ reader:
     item_id_label: my_item_id_label
     rating_label: my_rating_label
     timestamp_label: my_timestamp_label
+    context_labels: [context_label_1, context_label_2, ...]
   dtypes:
     user_id_type: [int8, int16, int32, int64, float32, float64, str]
     item_id_type: [int8, int16, int32, int64, float32, float64, str]
     rating_type: [int8, int16, int32, int64, float32, float64, str]
     timestamp_type: [int8, int16, int32, int64, float32, float64, str]
+    context_types:
+      context_label_1: [int8, int16, int32, int64, float32, float64, str]
+      context_label_2: [int8, int16, int32, int64, float32, float64, str]
 writer:
   dataset_name: MyDataset
   writing_method: local
@@ -127,7 +131,6 @@ dashboard:
     enabled: [True, False]
     save_to_api: [True, False]
     save_to_file: [True, False]
-    output_dir: path/to/output/dir/
     tracking_mode: [machine, process]
 models:
   MyModel:
@@ -140,6 +143,9 @@ models:
       scheduler: [fifo, asha]
       lr_scheduler:
         name: [StepLR, MultiStepLR, LinearLR, ExponentialLR, PolynomialLR, CosineAnnealingLR, ReduceLROnPlateau, CosineAnnealingWarmRestarts]
+        params: {...}
+      optimizer:
+        name: [Adam, SGD, RMSprop, ...]
         params: {...}
       properties:
         mode: [max, min]

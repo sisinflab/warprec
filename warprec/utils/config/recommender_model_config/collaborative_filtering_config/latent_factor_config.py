@@ -194,6 +194,81 @@ class FISM(RecomModel):
         return validate_greater_than_zero(cls, v, "learning_rate")
 
 
+@params_registry.register("MACRMF")
+class MACRMF(RecomModel):
+    """Definition of the model MACRMF.
+
+    Attributes:
+        embedding_size (INT_FIELD): List of values for embedding_size.
+        alpha (FLOAT_FIELD): List of values for alpha.
+        beta (FLOAT_FIELD): List of values for beta.
+        c (FLOAT_FIELD): List of values for c.
+        reg_weight (FLOAT_FIELD): List of values for reg_weight.
+        batch_size (INT_FIELD): List of values for batch_size.
+        neg_samples (INT_FIELD): List of values for neg_samples.
+        epochs (INT_FIELD): List of values for epochs.
+        learning_rate (FLOAT_FIELD): List of values for learning rate.
+    """
+
+    embedding_size: INT_FIELD
+    alpha: FLOAT_FIELD
+    beta: FLOAT_FIELD
+    c: FLOAT_FIELD
+    reg_weight: FLOAT_FIELD
+    batch_size: INT_FIELD
+    neg_samples: INT_FIELD
+    epochs: INT_FIELD
+    learning_rate: FLOAT_FIELD
+
+    @field_validator("embedding_size")
+    @classmethod
+    def check_embedding_size(cls, v: list):
+        """Validate embedding_size."""
+        return validate_greater_than_zero(cls, v, "embedding_size")
+
+    @field_validator("alpha")
+    @classmethod
+    def check_alpha(cls, v: list):
+        """Validate alpha."""
+        return validate_greater_equal_than_zero(cls, v, "alpha")
+
+    @field_validator("beta")
+    @classmethod
+    def check_beta(cls, v: list):
+        """Validate beta."""
+        return validate_greater_equal_than_zero(cls, v, "beta")
+
+    @field_validator("reg_weight")
+    @classmethod
+    def check_reg_weight(cls, v: list):
+        """Validate reg_weight."""
+        return validate_greater_equal_than_zero(cls, v, "reg_weight")
+
+    @field_validator("batch_size")
+    @classmethod
+    def check_batch_size(cls, v: list):
+        """Validate batch_size."""
+        return validate_greater_than_zero(cls, v, "batch_size")
+
+    @field_validator("neg_samples")
+    @classmethod
+    def check_neg_samples(cls, v: list):
+        """Validate neg_samples."""
+        return validate_greater_than_zero(cls, v, "neg_samples")
+
+    @field_validator("epochs")
+    @classmethod
+    def check_epochs(cls, v: list):
+        """Validate epochs."""
+        return validate_greater_than_zero(cls, v, "epochs")
+
+    @field_validator("learning_rate")
+    @classmethod
+    def check_learning_rate(cls, v: list):
+        """Validate learning_rate."""
+        return validate_greater_than_zero(cls, v, "learning_rate")
+
+
 @params_registry.register("Slim")
 class Slim(RecomModel):
     """Definition of the model Slim.

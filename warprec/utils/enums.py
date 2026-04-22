@@ -223,6 +223,12 @@ class DataLoaderType(Enum):
         construction_params=["neg_samples"],
         fixed_params={"include_context": True},
     )
+    POS_DATALOADER = DataLoaderRequirements(
+        dataloader_source="train_set",
+        method_name="get_positive_dataloader",
+        construction_params=[],
+        fixed_params={},
+    )
     POS_NEG_LOADER = DataLoaderRequirements(
         dataloader_source="train_set",
         method_name="get_contrastive_dataloader",

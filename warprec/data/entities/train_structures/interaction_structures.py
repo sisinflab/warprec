@@ -197,3 +197,29 @@ class ContrastiveDataset(Dataset):
 
         # Return triplet (user, pos, neg)
         return user_tensor, pos_item_tensor, neg_item_tensor
+
+
+class PositiveDataset(Dataset):
+    """A PyTorch Dataset for (user, positive_item) pairs.
+
+    Yields only positive interactions without any negative sampling.
+
+    Args:
+        user_ids (Tensor): Tensor of user indices for positive interactions.
+        item_ids (Tensor): Tensor of item indices for positive interactions.
+    """
+
+    def __init__(
+        self,
+        user_ids: Tensor,
+        item_ids: Tensor,
+    ):
+        self.user_ids = user_ids
+        self.item_ids = item_ids
+
+    def __len__(self) -> int:
+        return len(self.user_ids)
+
+    def __getitem__(self, idx: int) -> Tuple[Tensor, Tensor]:
+        # Return only the positive pair (user, pos_item)
+        return self.user_ids[idx], self.item_ids[idx]
