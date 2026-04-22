@@ -2,6 +2,78 @@
 
 <!-- version list -->
 
+## v1.3.0 (2026-04-22)
+
+### Bug Fixes
+
+- Correct ASHA initialization
+  ([`a9669ed`](https://github.com/sisinflab/warprec/commit/a9669ed9067989e8a56edb1a189b997ad727a3c5))
+
+- Correctly initialize optimization metric for bayesian strategies
+  ([`4b9299e`](https://github.com/sisinflab/warprec/commit/4b9299eb2119dc7955577851ec95ee10861b5617))
+
+- Correctly loading custom modules on remote worker nodes
+  ([`7e0b168`](https://github.com/sisinflab/warprec/commit/7e0b1687e119dcfd1042eb4367e742c74ccf0e2d))
+
+- Correctly set reproducibility after final evaluation model de-serialization
+  ([`f855350`](https://github.com/sisinflab/warprec/commit/f8553505c7f5ed899fba26f3a6da6dd9f2847598))
+
+- Metrics will not be validated with config, allowing custom metrics to be correctly imported
+  ([`d2867a0`](https://github.com/sisinflab/warprec/commit/d2867a07e511ac5e597de1194a29d5782d584a51))
+
+- Serialization error of Pop model
+  ([`64fb583`](https://github.com/sisinflab/warprec/commit/64fb583bb49697630ce319ebdd1d2c2f3a494658))
+
+- Tuning process will now account for driver function resources during CPU-bound optimizations
+  ([`f2c6938`](https://github.com/sisinflab/warprec/commit/f2c693873caa3a20434ec391051c6d5521f26f8d))
+
+### Documentation
+
+- Added ASHA scheduler example usage
+  ([`b514b11`](https://github.com/sisinflab/warprec/commit/b514b11c31b3bff9d919ad3b0cf5fe75cc5d349b))
+
+- Added context label in the configuration setting
+  ([`134ef19`](https://github.com/sisinflab/warprec/commit/134ef197110a3093f8c0f905124349946b51bc49))
+
+- Updated documentation with new models
+  ([`290127e`](https://github.com/sisinflab/warprec/commit/290127e137ef12226e26cc53b2b90a6a62858428))
+
+### Features
+
+- Added ItemKNN-TD model implementation
+  ([`6c01021`](https://github.com/sisinflab/warprec/commit/6c01021b91e9e66654aa5fc5a4a0edb2557bbe60))
+
+- Added MACRGCN model implementation
+  ([`98bf4e8`](https://github.com/sisinflab/warprec/commit/98bf4e84643f3e65b1524f0ac645fee4713d3d7e))
+
+- Added MACRMF model implementation
+  ([`91d162a`](https://github.com/sisinflab/warprec/commit/91d162a3bc92647a493168170c48e3ce3b9681f6))
+
+- Added PAAC model implementation
+  ([`c2f5c15`](https://github.com/sisinflab/warprec/commit/c2f5c159e3f36e1574f80032ecade643491f02a9))
+
+- Added PopDCL model implementation
+  ([`0a182a0`](https://github.com/sisinflab/warprec/commit/0a182a07c043988c44e72125ecb1f611a2bcd882))
+
+- Added RecDCL model implementation
+  ([`738404a`](https://github.com/sisinflab/warprec/commit/738404ac0e4cecd4881d0643bb406c82bb06f6b0))
+
+- Added SimGCL model implementation
+  ([`abba348`](https://github.com/sisinflab/warprec/commit/abba34881ec2a129fc16f14456775430ec3bb97d))
+
+- Added SimRec model implementation
+  ([`37a7257`](https://github.com/sisinflab/warprec/commit/37a72579868a2541d68cd9bde713509254c45645))
+
+- Added STAN model implementation
+  ([`79cc29a`](https://github.com/sisinflab/warprec/commit/79cc29a54c8bbe048490a44e9f01bf9c58b9b774))
+
+- Added UserKNN-TD model implementation
+  ([`3034ad5`](https://github.com/sisinflab/warprec/commit/3034ad5b6c749a0a7c98c254eba79d50c31090c8))
+
+- Codecarbon local logging will be saved in WarpRec experiment directory
+  ([`6d8ffff`](https://github.com/sisinflab/warprec/commit/6d8ffff610e9af8f305a7af7281abc552507d038))
+
+
 ## v1.2.2 (2026-04-15)
 
 ### Bug Fixes
