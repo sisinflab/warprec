@@ -20,17 +20,22 @@ class EvaluationDataset(TorchDataset):
         self,
         eval_interactions: csr_matrix,
     ):
-        self.num_users = eval_interactions.shape[0]
         self.eval_interactions = eval_interactions
+        self.users_with_eval = [
+            u
+            for u in range(eval_interactions.shape[0])
+            if eval_interactions.indptr[u + 1] - eval_interactions.indptr[u] > 0
+        ]
 
     def __len__(self) -> int:
-        return self.num_users
+        return len(self.users_with_eval)
 
     def __getitem__(self, idx: int) -> Tuple[int, Tensor]:
-        eval_row = self.eval_interactions.getrow(idx)
+        user_idx = self.users_with_eval[idx]
+        eval_row = self.eval_interactions.getrow(user_idx)
         ground_truth = torch.from_numpy(eval_row.toarray()).to(torch.float32).squeeze(0)
 
-        return idx, ground_truth
+        return user_idx, ground_truth
 
 
 class ContextualEvaluationDataset(TorchDataset):
