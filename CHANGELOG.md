@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v1.3.1 (2026-04-23)
+
+### Bug Fixes
+
+- Full evaluation will now iterate over only the test set, not the full set of users and items
+  ([`505853a`](https://github.com/sisinflab/warprec/commit/505853ae6610a7f33721197bb4e37000ff9b3dc7))
+
+
 ## v1.3.0 (2026-04-22)
 
 ### Bug Fixes
