@@ -25,7 +25,7 @@ Innovation in Recommender Systems is impeded by a fractured ecosystem. Researche
 
 <div class="feature-grid">
   <div class="feature-card">
-    <strong>50+ Algorithms</strong>
+    <strong>65+ Algorithms</strong>
     From matrix factorization to graph-based and sequential architectures, spanning 6 model families.
   </div>
   <div class="feature-card">
