@@ -1,6 +1,6 @@
 # Models Taxonomy
 
-WarpRec ships with **50+ built-in algorithms** spanning 6 model families. All models can run locally or at cluster scale via Ray.
+WarpRec ships with **65+ built-in algorithms** spanning 6 model families. All models can run locally or at cluster scale via Ray.
 
 | Family | Model | Description |
 |---|---|---|
@@ -24,18 +24,27 @@ WarpRec ships with **50+ built-in algorithms** spanning 6 model families. All mo
 | | [LightGCN](collaborative.md#lightgcn) | Simplified GCN with linear propagation (no feature transforms). |
 | | [LightGCN++](collaborative.md#lightgcnpp) | LightGCN with asymmetric normalization and residual connections. |
 | | [LightGODE](collaborative.md#lightgode) | Training-free graph convolution; applies ODE solver at inference. |
+| | [MACRGCN](collaborative.md#macrgcn) | Counterfactual reasoning on LightGCN backbone to eliminate popularity bias. |
 | | [MixRec](collaborative.md#mixrec) | Dual individual/collective mixing with contrastive learning. |
 | | [NGCF](collaborative.md#ngcf) | Neural graph CF with higher-order connectivity propagation. |
+| | [PAAC](collaborative.md#paac) | Popularity-aware alignment and contrast for mitigating popularity bias. |
+| | [PopDCL](collaborative.md#popdcl) | Popularity-aware debiased contrastive loss on LightGCN backbone. |
+| | [RecDCL](collaborative.md#recdcl) | Dual contrastive learning combining feature-wise and topology-wise CL. |
 | | [RP3Beta](collaborative.md#rp3beta) | Biased random walk of length 3 on the user-item bipartite graph. |
 | | [SGCL](collaborative.md#sgcl) | Supervised graph contrastive learning without negative sampling. |
 | | [SGL](collaborative.md#sgl) | Self-supervised graph learning with structure augmentation (ED/ND/RW). |
+| | [SimGCL](collaborative.md#simgcl) | Contrastive learning via uniform noise perturbation without graph augmentation. |
+| | [SimRec](collaborative.md#simrec) | Graph-less CF distilling GCN teacher into MLP student via contrastive KD. |
 | | [UltraGCN](collaborative.md#ultragcn) | Infinite-layer GCN approximation via constraint losses (no message passing). |
 | | [XSimGCL](collaborative.md#xsimgcl) | Graph contrastive learning with uniform noise perturbation. |
 | **CF / KNN** | [ItemKNN](collaborative.md#itemknn) | Item-based collaborative KNN using configurable similarity metrics. |
+| | [ItemKNN-TD](collaborative.md#itemknn-td) | Item-based KNN with temporal decay weighting on interactions. |
 | | [UserKNN](collaborative.md#userknn) | User-based collaborative KNN from historical interactions. |
+| | [UserKNN-TD](collaborative.md#userknn-td) | User-based KNN with temporal decay weighting on interactions. |
 | **CF / Latent Factor** | [ADMMSlim](collaborative.md#admmslim) | Sparse item similarity matrix optimized via ADMM. |
 | | [BPR](collaborative.md#bpr) | Bayesian Personalized Ranking for pairwise implicit feedback. |
 | | [FISM](collaborative.md#fism) | Factored item similarity with weighted-average user representations. |
+| | [MACRMF](collaborative.md#macrmf) | Counterfactual MF eliminating popularity bias via causal inference. |
 | | [Slim](collaborative.md#slim) | Sparse linear method with L1/L2 (ElasticNet) regularization. |
 | **CF / Neural** | [ConvNCF](collaborative.md#convncf) | CNN on user-item embedding outer product for structured interaction patterns. |
 | | [NeuMF](collaborative.md#neumf) | Hybrid neural CF combining GMF and MLP branches. |
@@ -47,6 +56,7 @@ WarpRec ships with **50+ built-in algorithms** spanning 6 model families. All mo
 | | [NFM](context.md#nfm) | Neural FM with Bi-Interaction pooling layer followed by MLP. |
 | | [WideAndDeep](context.md#wideanddeep) | Joint wide (linear) + deep (DNN) model for memorization and generalization. |
 | | [xDeepFM](context.md#xdeepfm) | Compressed Interaction Network (CIN) for vector-wise explicit interactions. |
+| **Sequential / KNN** | [STAN](sequential.md#stan) | Sequence- and time-aware neighborhood model for session-based recommendation. |
 | **Sequential / CNN** | [Caser](sequential.md#caser) | Convolutional sequence embedding with horizontal and vertical filters. |
 | **Sequential / Markov** | [FOSSIL](sequential.md#fossil) | First-order Markov chain fused with factored item similarity. |
 | **Sequential / RNN** | [GRU4Rec](sequential.md#gru4rec) | Session-based GRU for short-term preference modeling. |
