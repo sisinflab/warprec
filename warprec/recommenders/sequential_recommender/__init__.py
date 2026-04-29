@@ -1,4 +1,5 @@
 from .bert4rec import BERT4Rec
+from .bsarec import BSAREC
 from .caser import Caser
 from .core import CORE
 from .fossil import FOSSIL
@@ -10,8 +11,10 @@ from .narm import NARM
 from .sasrec import SASRec
 from .stan import STAN
 
+
 __all__ = [
     "BERT4Rec",
+    "BSAREC",
     "Caser",
     "CORE",
     "FOSSIL",
