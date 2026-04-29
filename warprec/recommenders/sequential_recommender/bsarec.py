@@ -1,44 +1,193 @@
 # pylint: disable = R0801, E1102, W0221, C0103, W0613, W0235
-# -*- coding: utf-8 -*-
-"""
-BSARec - Bandlimited Self-Attention for Sequential Recommendation
-##################################################################
-
-Reference:
-    "BSARec: Beyond Self-Attention with Frequency Filtering" 
-    
-    Combines two complementary patterns:
-    1. Domain-Specific Patterns (DSP): Frequency-based filtering using FFT
-    2. Graph-Space Patterns (GSP): Multi-head self-attention
-    
-    The model learns an optimal combination via learnable parameter alpha.
-
-Key Features:
-    - Frequency filtering to capture periodic/cyclical patterns
-    - Low-pass + high-pass decomposition with learnable scaling
-    - Multi-head attention for capturing dependencies
-    - Efficient adaptive combination via weighted sum
-"""
-
 from typing import Any, Optional
 
 import torch
-import torch.nn.functional as F
 from torch import nn, Tensor
 
 from warprec.recommenders.base_recommender import (
     IterativeRecommender,
     SequentialRecommenderUtils,
 )
-from warprec.recommenders.losses import BPRLoss, EmbLoss
+from warprec.recommenders.losses import EmbLoss
 from warprec.data.entities import Interactions, Sessions
 from warprec.utils.enums import DataLoaderType
 from warprec.utils.registry import model_registry
 
 
+class BSARecEncoder(nn.Module):
+    """BSARec Encoder: Stacked layers combining frequency filtering and attention."""
+
+    def __init__(
+        self,
+        embedding_size: int,
+        n_layers: int,
+        n_heads: int,
+        inner_size: int,
+        attn_dropout_prob: float,
+        dropout_prob: float,
+        max_seq_len: int,
+        alpha: float = 0.5,
+        c: int = 10,
+    ):
+        super().__init__()
+        self.n_layers = n_layers
+        self.layers = nn.ModuleList(
+            [
+                BSARecBlock(
+                    embedding_size=embedding_size,
+                    n_heads=n_heads,
+                    inner_size=inner_size,
+                    attn_dropout_prob=attn_dropout_prob,
+                    dropout_prob=dropout_prob,
+                    max_seq_len=max_seq_len,
+                    alpha=alpha,
+                    c=c,
+                )
+                for _ in range(n_layers)
+            ]
+        )
+
+    def forward(
+        self, hidden_states: Tensor, padding_mask: Tensor, attn_mask: Tensor
+    ) -> Tensor:
+        """Pass through stacked BSARec blocks."""
+        for layer_module in self.layers:
+            hidden_states = layer_module(hidden_states, padding_mask, attn_mask)
+        return hidden_states
+
+
+class BSARecBlock(nn.Module):
+    """Single BSARec Block: Frequency Layer + Attention Layer + FeedForward."""
+
+    def __init__(
+        self,
+        embedding_size: int,
+        n_heads: int,
+        inner_size: int,
+        attn_dropout_prob: float,
+        dropout_prob: float,
+        max_seq_len: int,
+        alpha: float = 0.5,
+        c: int = 10,
+    ):
+        super().__init__()
+        self.frequency_layer = FrequencyLayer(embedding_size, dropout_prob, c)
+        self.attention_layer = nn.MultiheadAttention(
+            embed_dim=embedding_size,
+            num_heads=n_heads,
+            dropout=attn_dropout_prob,
+            batch_first=True,
+        )
+        self.feed_forward = FeedForwardLayer(embedding_size, inner_size, dropout_prob)
+        self.layernorm1 = nn.LayerNorm(embedding_size, eps=1e-8)
+        self.layernorm2 = nn.LayerNorm(embedding_size, eps=1e-8)
+        self.dropout = nn.Dropout(dropout_prob)
+        self.alpha = alpha  # Balance parameter: alpha * AIB + (1-alpha) * attention
+
+    def forward(
+        self, hidden_states: Tensor, padding_mask: Tensor, attn_mask: Tensor
+    ) -> Tensor:
+        """
+        Forward pass of a BSA block.
+
+        Args:
+            hidden_states (Tensor): [batch_size, seq_len, embedding_size]
+            padding_mask (Tensor): [batch_size, seq_len] - True for padding tokens
+            attn_mask (Tensor): [seq_len, seq_len] - True where future positions are masked
+
+        Returns:
+            Tensor: [batch_size, seq_len, embedding_size]
+        """
+        # The paper defines the attentive inductive bias and self-attention
+        # as parallel branches applied to the same layer input X^l.
+        aib_output = self.frequency_layer(hidden_states)
+        attn_output, _ = self.attention_layer(
+            hidden_states,
+            hidden_states,
+            hidden_states,
+            attn_mask=attn_mask,
+            key_padding_mask=padding_mask,
+            need_weights=False,
+        )
+
+        # Eq. (5): alpha * A_IB X^l + (1 - alpha) * A X^l
+        combined = self.alpha * aib_output + (1 - self.alpha) * attn_output
+        combined = self.layernorm1(hidden_states + self.dropout(combined))
+
+        ff_output = self.feed_forward(combined)
+        output = self.layernorm2(combined + self.dropout(ff_output))
+        return output
+
+
+class FrequencyLayer(nn.Module):
+    """Frequency Layer: FFT-based low-pass + high-pass decomposition.
+
+    Captures periodic and cyclical patterns in sequences using spectral analysis.
+    The learnable sqrt_beta parameter allows the model to adjust the contribution
+    of high-frequency components.
+    """
+
+    def __init__(self, embedding_size: int, dropout_prob: float, c: int = 10):
+        super().__init__()
+        self.c = c  # Cutoff frequency for low-pass filter
+        self.dropout = nn.Dropout(dropout_prob)
+        self.sqrt_beta = nn.Parameter(torch.randn(1, 1, embedding_size))
+
+    def forward(self, hidden_states: Tensor) -> Tensor:
+        """
+        Apply FFT-based frequency filtering.
+
+        Args:
+            hidden_states (Tensor): [batch_size, seq_len, embedding_size]
+
+        Returns:
+            Tensor: Frequency-filtered output [batch_size, seq_len, embedding_size]
+        """
+        _, seq_len, _ = hidden_states.shape
+
+        # Compute FFT along sequence dimension
+        # rfft: real FFT, returns complex values
+        x_fft = torch.fft.rfft(hidden_states, dim=1, norm="ortho")
+
+        # Low-pass filter: keep only low frequencies
+        low_pass = x_fft.clone()
+        low_pass[:, self.c :, :] = 0  # Zero out frequencies > c
+        low_pass = torch.fft.irfft(low_pass, n=seq_len, dim=1, norm="ortho")
+
+        # High-pass: residual from low-pass
+        high_pass = hidden_states - low_pass
+
+        # Combine with learnable scaling
+        # sqrt_beta^2 controls contribution of high-frequency components
+        sequence_emb_fft = low_pass + (self.sqrt_beta**2) * high_pass
+
+        output = self.dropout(sequence_emb_fft)
+        return output
+
+
+class FeedForwardLayer(nn.Module):
+    """Feed-Forward Network with two linear layers and GELU activation."""
+
+    def __init__(self, embedding_size: int, inner_size: int, dropout_prob: float):
+        super().__init__()
+        self.linear1 = nn.Linear(embedding_size, inner_size)
+        self.linear2 = nn.Linear(inner_size, embedding_size)
+        self.dropout = nn.Dropout(dropout_prob)
+        self.activation = nn.GELU()
+
+    def forward(self, hidden_states: Tensor) -> Tensor:
+        """Apply feed-forward transformation."""
+        hidden_states = self.linear1(hidden_states)
+        hidden_states = self.activation(hidden_states)
+        hidden_states = self.dropout(hidden_states)
+        hidden_states = self.linear2(hidden_states)
+        return hidden_states
+
+
 @model_registry.register(name="BSARec")
 class BSARec(IterativeRecommender, SequentialRecommenderUtils):
-    """BSARec: Bandlimited Self-Attention for Sequential Recommendation.
+    """Implementation of BASRec model from
+    "BSARec: Bandlimited Self-Attention for Sequential Recommendation." in AAAi 2024.
 
     This model combines frequency-based filtering with self-attention to capture
     both periodic patterns and sequential dependencies in user behavior.
@@ -53,7 +202,6 @@ class BSARec(IterativeRecommender, SequentialRecommenderUtils):
 
     Args:
         params (dict): Model parameters.
-        interactions (Interactions): The training interactions.
         info (dict): The dictionary containing dataset information.
         *args (Any): Variable length argument list.
         seed (int): The seed to use for reproducibility.
@@ -101,13 +249,12 @@ class BSARec(IterativeRecommender, SequentialRecommenderUtils):
     def __init__(
         self,
         params: dict,
-        interactions: Interactions,
         info: dict,
         *args: Any,
         seed: int = 42,
         **kwargs: Any,
     ):
-        super().__init__(params, interactions, info, *args, seed=seed, **kwargs)
+        super().__init__(params, info, *args, seed=seed, **kwargs)
 
         # Item and position embeddings
         self.item_embedding = nn.Embedding(
@@ -135,12 +282,8 @@ class BSARec(IterativeRecommender, SequentialRecommenderUtils):
         causal_mask = self._generate_square_subsequent_mask(self.max_seq_len)
         self.register_buffer("causal_mask", causal_mask)
 
-        # Loss functions
-        self.main_loss: nn.Module
-        if self.neg_samples > 0:
-            self.main_loss = BPRLoss()
-        else:
-            self.main_loss = nn.CrossEntropyLoss()
+        # The paper optimizes next-item prediction with full softmax CE loss.
+        self.main_loss = nn.CrossEntropyLoss()
         self.reg_loss = EmbLoss()
 
     def get_dataloader(
@@ -152,13 +295,13 @@ class BSARec(IterativeRecommender, SequentialRecommenderUtils):
     ):
         return sessions.get_sequential_dataloader(
             max_seq_len=self.max_seq_len,
-            neg_samples=self.neg_samples,
+            neg_samples=0,
             batch_size=self.batch_size,
             low_memory=low_memory,
         )
 
-    def train_step(self, batch: Any, *args, **kwargs):
-        if self.neg_samples > 0:
+    def training_step(self, batch: Any, batch_idx: int):
+        if len(batch) == 4:
             item_seq, item_seq_len, pos_item, neg_item = batch
         else:
             item_seq, item_seq_len, pos_item = batch
@@ -166,31 +309,18 @@ class BSARec(IterativeRecommender, SequentialRecommenderUtils):
 
         seq_output = self.forward(item_seq, item_seq_len)
 
-        # Calculate main loss
-        if self.neg_samples > 0:
-            pos_items_emb = self.item_embedding(pos_item)
-            neg_items_emb = self.item_embedding(neg_item)
+        logits = torch.matmul(
+            seq_output, self.item_embedding.weight[:-1].transpose(0, 1)
+        )
+        main_loss = self.main_loss(logits, pos_item)
 
-            pos_score = torch.sum(seq_output * pos_items_emb, dim=-1)
-            neg_score = torch.sum(seq_output.unsqueeze(1) * neg_items_emb, dim=-1)
-            main_loss = self.main_loss(pos_score, neg_score)
-
-            # L2 regularization
-            reg_loss = self.reg_weight * self.reg_loss(
-                self.item_embedding(item_seq),
-                self.item_embedding(pos_item),
-                self.item_embedding(neg_item),
-            )
-        else:
-            test_item_emb = self.item_embedding.weight
-            logits = torch.matmul(seq_output, test_item_emb.transpose(0, 1))
-            main_loss = self.main_loss(logits, pos_item)
-
-            # L2 regularization
-            reg_loss = self.reg_weight * self.reg_loss(
-                self.item_embedding(item_seq),
-                self.item_embedding(pos_item),
-            )
+        reg_terms = [
+            self.item_embedding(item_seq),
+            self.item_embedding(pos_item),
+        ]
+        if neg_item is not None:
+            reg_terms.append(self.item_embedding(neg_item))
+        reg_loss = self.reg_weight * self.reg_loss(*reg_terms)
 
         return main_loss + reg_loss
 
@@ -229,6 +359,7 @@ class BSARec(IterativeRecommender, SequentialRecommenderUtils):
         transformer_output = self.bsarec_encoder(
             seq_emb,
             padding_mask,
+            self.causal_mask[:seq_len, :seq_len],  # type: ignore[index]
         )  # [batch_size, max_seq_len, embedding_size]
 
         # Gather the output of the last relevant item in each sequence
@@ -277,185 +408,3 @@ class BSARec(IterativeRecommender, SequentialRecommenderUtils):
 
         predictions = torch.einsum(einsum_string, seq_output, item_embeddings)
         return predictions
-
-
-class BSARecEncoder(nn.Module):
-    """BSARec Encoder: Stacked layers combining frequency filtering and attention."""
-
-    def __init__(
-        self,
-        embedding_size: int,
-        n_layers: int,
-        n_heads: int,
-        inner_size: int,
-        attn_dropout_prob: float,
-        dropout_prob: float,
-        max_seq_len: int,
-        alpha: float = 0.5,
-        c: int = 10,
-    ):
-        super().__init__()
-        self.n_layers = n_layers
-        self.layers = nn.ModuleList(
-            [
-                BSARecBlock(
-                    embedding_size=embedding_size,
-                    n_heads=n_heads,
-                    inner_size=inner_size,
-                    attn_dropout_prob=attn_dropout_prob,
-                    dropout_prob=dropout_prob,
-                    max_seq_len=max_seq_len,
-                    alpha=alpha,
-                    c=c,
-                )
-                for _ in range(n_layers)
-            ]
-        )
-
-    def forward(self, hidden_states: Tensor, padding_mask: Tensor) -> Tensor:
-        """Pass through stacked BSARec blocks."""
-        for layer_module in self.layers:
-            hidden_states = layer_module(hidden_states, padding_mask)
-        return hidden_states
-
-
-class BSARecBlock(nn.Module):
-    """Single BSARec Block: Frequency Layer + Attention Layer + FeedForward."""
-
-    def __init__(
-        self,
-        embedding_size: int,
-        n_heads: int,
-        inner_size: int,
-        attn_dropout_prob: float,
-        dropout_prob: float,
-        max_seq_len: int,
-        alpha: float = 0.5,
-        c: int = 10,
-    ):
-        super().__init__()
-        self.frequency_layer = FrequencyLayer(embedding_size, dropout_prob, c)
-        self.attention_layer = nn.MultiheadAttention(
-            embed_dim=embedding_size,
-            num_heads=n_heads,
-            dropout=attn_dropout_prob,
-            batch_first=True,
-        )
-        self.feed_forward = FeedForwardLayer(embedding_size, inner_size, dropout_prob)
-        self.layernorm1 = nn.LayerNorm(embedding_size, eps=1e-8)
-        self.layernorm2 = nn.LayerNorm(embedding_size, eps=1e-8)
-        self.layernorm3 = nn.LayerNorm(embedding_size, eps=1e-8)
-        self.dropout = nn.Dropout(dropout_prob)
-        self.alpha = alpha  # Balance parameter: alpha * DSP + (1-alpha) * GSP
-
-    def forward(self, hidden_states: Tensor, padding_mask: Tensor) -> Tensor:
-        """
-        Forward pass combining frequency patterns and attention patterns.
-
-        Args:
-            hidden_states (Tensor): [batch_size, seq_len, embedding_size]
-            padding_mask (Tensor): [batch_size, seq_len] - True for padding tokens
-
-        Returns:
-            Tensor: [batch_size, seq_len, embedding_size]
-        """
-        # Domain-Specific Patterns (DSP): Frequency filtering
-        dsp_output = self.frequency_layer(hidden_states)
-        dsp_output = self.dropout(dsp_output)
-        dsp_output = self.layernorm1(dsp_output + hidden_states)
-
-        # Graph-Space Patterns (GSP): Multi-head attention
-        # Create attention mask: padding positions should be masked
-        attn_mask = None
-        if padding_mask is not None:
-            # Convert boolean mask to attention mask
-            # True means mask (ignore), so we invert it
-            attn_output, _ = self.attention_layer(
-                dsp_output,
-                dsp_output,
-                dsp_output,
-                key_padding_mask=padding_mask,
-            )
-        else:
-            attn_output, _ = self.attention_layer(
-                dsp_output,
-                dsp_output,
-                dsp_output,
-            )
-        attn_output = self.dropout(attn_output)
-        attn_output = self.layernorm2(attn_output + dsp_output)
-
-        # Adaptive combination: alpha * DSP + (1-alpha) * GSP
-        combined = self.alpha * dsp_output + (1 - self.alpha) * attn_output
-
-        # Feed-forward network
-        ff_output = self.feed_forward(combined)
-        ff_output = self.dropout(ff_output)
-        output = self.layernorm3(ff_output + combined)
-
-        return output
-
-
-class FrequencyLayer(nn.Module):
-    """Frequency Layer: FFT-based low-pass + high-pass decomposition.
-
-    Captures periodic and cyclical patterns in sequences using spectral analysis.
-    The learnable sqrt_beta parameter allows the model to adjust the contribution
-    of high-frequency components.
-    """
-
-    def __init__(self, embedding_size: int, dropout_prob: float, c: int = 10):
-        super().__init__()
-        self.c = c  # Cutoff frequency for low-pass filter
-        self.dropout = nn.Dropout(dropout_prob)
-        self.sqrt_beta = nn.Parameter(torch.randn(1, 1, embedding_size))
-
-    def forward(self, hidden_states: Tensor) -> Tensor:
-        """
-        Apply FFT-based frequency filtering.
-
-        Args:
-            hidden_states (Tensor): [batch_size, seq_len, embedding_size]
-
-        Returns:
-            Tensor: Frequency-filtered output [batch_size, seq_len, embedding_size]
-        """
-        batch, seq_len, hidden = hidden_states.shape
-
-        # Compute FFT along sequence dimension
-        # rfft: real FFT, returns complex values
-        x_fft = torch.fft.rfft(hidden_states, dim=1, norm="ortho")
-
-        # Low-pass filter: keep only low frequencies
-        low_pass = x_fft.clone()
-        low_pass[:, self.c :, :] = 0  # Zero out frequencies > c
-        low_pass = torch.fft.irfft(low_pass, n=seq_len, dim=1, norm="ortho")
-
-        # High-pass: residual from low-pass
-        high_pass = hidden_states - low_pass
-
-        # Combine with learnable scaling
-        # sqrt_beta^2 controls contribution of high-frequency components
-        sequence_emb_fft = low_pass + (self.sqrt_beta ** 2) * high_pass
-
-        output = self.dropout(sequence_emb_fft)
-        return output
-
-
-class FeedForwardLayer(nn.Module):
-    """Feed-Forward Network with two linear layers and GELU activation."""
-
-    def __init__(self, embedding_size: int, inner_size: int, dropout_prob: float):
-        super().__init__()
-        self.linear1 = nn.Linear(embedding_size, inner_size)
-        self.linear2 = nn.Linear(inner_size, embedding_size)
-        self.dropout = nn.Dropout(dropout_prob)
-        self.activation = nn.GELU()
-
-    def forward(self, hidden_states: Tensor) -> Tensor:
-        """Apply feed-forward transformation."""
-        hidden_states = self.linear1(hidden_states)
-        hidden_states = self.activation(hidden_states)
-        hidden_states = self.dropout(hidden_states)
-        hidden_states = self.linear2(hidden_states)
-        return hidden_states
