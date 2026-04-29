@@ -1,7 +1,10 @@
 from .bert4rec import BERT4Rec
 from .bsarec import BSAREC
 from .caser import Caser
+from .cl4srec import CL4SRec
 from .core import CORE
+from .duorec import DuoRec
+from .esasrec import ESASRec
 from .fossil import FOSSIL
 from .gru4rec import GRU4Rec
 from .gsasrec import gSASRec
@@ -16,7 +19,10 @@ __all__ = [
     "BERT4Rec",
     "BSAREC",
     "Caser",
+    "CL4SRec",
     "CORE",
+    "DuoRec",
+    "ESASRec",
     "FOSSIL",
     "GRU4Rec",
     "gSASRec",
