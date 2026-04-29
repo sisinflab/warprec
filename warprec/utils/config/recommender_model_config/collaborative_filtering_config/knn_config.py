@@ -38,7 +38,7 @@ class ItemKNN(RecomModel):
         return validate_similarity(cls, v, "similarity")
 
 
-@params_registry.register("ItemKNN-TD")
+@params_registry.register("ItemKNNTD")
 class ItemKNNTD(RecomModel):
     """Definition of the model ItemKNN-TD.
 
@@ -96,7 +96,7 @@ class UserKNN(RecomModel):
         return validate_similarity(cls, v, "similarity")
 
 
-@params_registry.register("UserKNN-TD")
+@params_registry.register("UserKNNTD")
 class UserKNNTD(RecomModel):
     """Definition of the model UserKNN-TD.
 

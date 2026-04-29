@@ -238,6 +238,12 @@ class MACRMF(RecomModel):
         """Validate beta."""
         return validate_greater_equal_than_zero(cls, v, "beta")
 
+    @field_validator("c")
+    @classmethod
+    def check_c(cls, v: list):
+        """Validate c."""
+        return validate_greater_equal_than_zero(cls, v, "c")
+
     @field_validator("reg_weight")
     @classmethod
     def check_reg_weight(cls, v: list):

@@ -9,7 +9,7 @@ from warprec.recommenders.collaborative_filtering_recommender.knn import ItemKNN
 from warprec.utils.registry import model_registry
 
 
-@model_registry.register(name="ItemKNN-TD")
+@model_registry.register(name="ItemKNNTD")
 class ItemKNNTD(ItemKNN):
     """Implementation of ItemKNN with Temporal Decay (ItemKNN-TD).
     from Time Weight Collaborative Filtering (CIKM 2005).

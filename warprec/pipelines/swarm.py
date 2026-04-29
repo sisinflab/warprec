@@ -322,6 +322,11 @@ def remote_model_pipeline(
     custom_res = params.optimization.custom_resources_per_trial or {}
     label_selector = params.optimization.label_selector or {}
 
+    # Fallback: in case the device is set to cuda but no GPUs are requested,
+    # we set num_gpus to 1 to ensure the correct node is selected
+    if device == "cuda" and num_gpus == 0:
+        num_gpus = 1
+
     # Execute evaluation on a proper device
     results, model_evaluation_total_time, inference_time = ray.get(
         remote_evaluation_and_timing.options(

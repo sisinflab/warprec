@@ -9,7 +9,7 @@ from warprec.recommenders.collaborative_filtering_recommender.knn import UserKNN
 from warprec.utils.registry import model_registry
 
 
-@model_registry.register(name="UserKNN-TD")
+@model_registry.register(name="UserKNNTD")
 class UserKNNTD(UserKNN):
     """Implementation of UserKNN with Temporal Decay (UserKNN-TD).
     Adapted from Time Weight Collaborative Filtering (CIKM 2005).
