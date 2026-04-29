@@ -2,6 +2,26 @@
 
 <!-- version list -->
 
+## v1.3.2 (2026-04-29)
+
+### Bug Fixes
+
+- MACRMF parameter validation fixed
+  ([`0f98503`](https://github.com/sisinflab/warprec/commit/0f98503b402a2fd6c04d595c251041be1cb6d14f))
+
+- Temporal Decay KNN models parameter validation fixed
+  ([`cbea62b`](https://github.com/sisinflab/warprec/commit/cbea62bcc9f43d8e3507ef37e62c894c59c2fc8a))
+
+- Train and Swarm pipeline will assign a fallback value to number of GPUs for cuda models with no
+  specified number of cuda devices per trial
+  ([`5d2b4d7`](https://github.com/sisinflab/warprec/commit/5d2b4d7f4cf50bf489621504e136abb6894c96ba))
+
+### Documentation
+
+- Updated model taxonomy and counting
+  ([`94a2c0f`](https://github.com/sisinflab/warprec/commit/94a2c0fa9f30bff433f549281c62e67ef54363cf))
+
+
 ## v1.3.1 (2026-04-23)
 
 ### Bug Fixes
