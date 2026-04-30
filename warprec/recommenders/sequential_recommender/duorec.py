@@ -69,11 +69,11 @@ class DuoRec(IterativeRecommender, SequentialRecommenderUtils):
     learning_rate: float
     neg_samples: int
     max_seq_len: int
-    ssl_type: str = "us_x"
-    ssl_lambda: float = 0.5
-    ssl_lambda_sem: float = 0.5
-    tau: float = 0.1
-    sim_type: str = "dot"
+    ssl_type: str
+    ssl_lambda: float
+    ssl_lambda_sem: float
+    tau: float
+    sim_type: str
 
     def __init__(
         self,

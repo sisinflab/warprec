@@ -41,12 +41,12 @@ class CL4SRec(IterativeRecommender, SequentialRecommenderUtils):
     learning_rate: float
     neg_samples: int
     max_seq_len: int
-    ssl_lambda: float = 0.5
-    tau: float = 0.1
-    sim_type: str = "dot"
-    crop_eta: float = 0.6
-    mask_gamma: float = 0.3
-    reorder_beta: float = 0.6
+    ssl_lambda: float
+    tau: float
+    sim_type: str
+    crop_eta: float
+    mask_gamma: float
+    reorder_beta: float
 
     def __init__(
         self,
