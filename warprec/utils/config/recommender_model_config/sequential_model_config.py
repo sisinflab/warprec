@@ -1,4 +1,4 @@
-# pylint: disable=duplicate-code, too-many-lines
+# pylint: disable=duplicate-code, too-many-lines, too-many-public-methods
 from itertools import product
 from typing import ClassVar
 
@@ -179,6 +179,191 @@ class BERT4Rec(RecomModel):
             )
 
 
+@params_registry.register("BSARec")
+class BSARec(RecomModel):
+    """Definition of the model BSARec.
+
+    Attributes:
+        embedding_size (INT_FIELD): List of values for embedding_size.
+        n_layers (INT_FIELD):  List of values for n_layers.
+        n_heads (INT_FIELD): List of values for n_heads.
+        inner_size (INT_FIELD): List of values for inner_size.
+        dropout_prob (FLOAT_FIELD): List of values for dropout_prob.
+        attn_dropout_prob (FLOAT_FIELD): List of values for attn_dropout_prob.
+        alpha (FLOAT_FIELD): List of values for alpha.
+        c (INT_FIELD): List of values for c.
+        reg_weight (FLOAT_FIELD): List of values for reg_weight.
+        weight_decay (FLOAT_FIELD): List of values for weight_decay.
+        batch_size (INT_FIELD): List of values for batch_size.
+        epochs (INT_FIELD): List of values for epochs.
+        learning_rate (FLOAT_FIELD): List of values for learning rate.
+        neg_samples (INT_FIELD): List of values for neg_samples.
+        max_seq_len (INT_FIELD): List of values for max_seq_len.
+        need_single_trial_validation (ClassVar[bool]): Flag to enable single trial validation.
+    """
+
+    embedding_size: INT_FIELD
+    n_layers: INT_FIELD
+    n_heads: INT_FIELD
+    inner_size: INT_FIELD
+    dropout_prob: FLOAT_FIELD
+    attn_dropout_prob: FLOAT_FIELD
+    alpha: FLOAT_FIELD
+    c: INT_FIELD
+    reg_weight: FLOAT_FIELD
+    weight_decay: FLOAT_FIELD
+    batch_size: INT_FIELD
+    epochs: INT_FIELD
+    learning_rate: FLOAT_FIELD
+    neg_samples: INT_FIELD
+    max_seq_len: INT_FIELD
+    need_single_trial_validation: ClassVar[bool] = True
+
+    @field_validator("embedding_size")
+    @classmethod
+    def check_embedding_size(cls, v: list):
+        """Validate embedding_size."""
+        return validate_greater_than_zero(cls, v, "embedding_size")
+
+    @field_validator("n_layers")
+    @classmethod
+    def check_n_layers(cls, v: list):
+        """Validate n_layers."""
+        return validate_greater_than_zero(cls, v, "n_layers")
+
+    @field_validator("n_heads")
+    @classmethod
+    def check_n_heads(cls, v: list):
+        """Validate n_heads."""
+        return validate_greater_than_zero(cls, v, "n_heads")
+
+    @field_validator("inner_size")
+    @classmethod
+    def check_inner_size(cls, v: list):
+        """Validate inner_size."""
+        return validate_greater_than_zero(cls, v, "inner_size")
+
+    @field_validator("dropout_prob")
+    @classmethod
+    def check_dropout_prob(cls, v: list):
+        """Validate dropout_prob."""
+        return validate_between_zero_and_one(cls, v, "dropout_prob")
+
+    @field_validator("attn_dropout_prob")
+    @classmethod
+    def check_attn_dropout_prob(cls, v: list):
+        """Validate attn_dropout_prob."""
+        return validate_between_zero_and_one(cls, v, "attn_dropout_prob")
+
+    @field_validator("alpha")
+    @classmethod
+    def check_alpha(cls, v: list):
+        """Validate alpha."""
+        return validate_between_zero_and_one(cls, v, "alpha")
+
+    @field_validator("c")
+    @classmethod
+    def check_c(cls, v: list):
+        """Validate c."""
+        return validate_greater_than_zero(cls, v, "c")
+
+    @field_validator("reg_weight")
+    @classmethod
+    def check_reg_weight(cls, v: list):
+        """Validate reg_weight"""
+        return validate_greater_equal_than_zero(cls, v, "reg_weight")
+
+    @field_validator("weight_decay")
+    @classmethod
+    def check_weight_decay(cls, v: list):
+        """Validate weight_decay."""
+        return validate_greater_equal_than_zero(cls, v, "weight_decay")
+
+    @field_validator("batch_size")
+    @classmethod
+    def check_batch_size(cls, v: list):
+        """Validate batch_size."""
+        return validate_greater_than_zero(cls, v, "batch_size")
+
+    @field_validator("epochs")
+    @classmethod
+    def check_epochs(cls, v: list):
+        """Validate epochs."""
+        return validate_greater_than_zero(cls, v, "epochs")
+
+    @field_validator("learning_rate")
+    @classmethod
+    def check_learning_rate(cls, v: list):
+        """Validate learning_rate."""
+        return validate_greater_than_zero(cls, v, "learning_rate")
+
+    @field_validator("neg_samples")
+    @classmethod
+    def check_neg_samples(cls, v: list):
+        """Validate neg_samples."""
+        return validate_greater_equal_than_zero(cls, v, "neg_samples")
+
+    @field_validator("max_seq_len")
+    @classmethod
+    def check_max_seq_len(cls, v: list):
+        """Validate max_seq_len."""
+        return validate_greater_than_zero(cls, v, "max_seq_len")
+
+    def validate_all_combinations(self):
+        """Validates if at least one valid combination of hyperparameters exists.
+        This method should be called after all individual fields have been validated.
+
+        Raises:
+            ValueError: If no valid combination of hyperparameters can be formed.
+        """
+        # Extract parameters to check, removing searching strategy
+        embedding_sizes = self._clean_param_list(self.embedding_size)
+        num_heads = self._clean_param_list(self.n_heads)
+
+        # Check if any combination of parameters is a valid combination
+        has_valid_combination = False
+        for emb_size, n_head in product(embedding_sizes, num_heads):
+            if emb_size % n_head == 0:
+                has_valid_combination = True
+                break
+
+        if not has_valid_combination:
+            raise ValueError(
+                "No valid hyperparameter combination found for BSARec. "
+                "Ensure there's at least one combination of 'embedding_size' and "
+                "'n_heads' that meets the criteria: "
+                "1. Embedding size must be divisible by n_heads. "
+            )
+
+    def validate_single_trial_params(self):
+        """Validates the coherence of embedding_size and n_heads
+        for a single trial's parameter set.
+
+        Raises:
+            ValueError: If the parameter values are not consistent for the model.
+        """
+        # Clean parameters from search space information
+        embedding_size_clean = (
+            self.embedding_size[1]
+            if self.embedding_size and isinstance(self.embedding_size[0], str)
+            else self.embedding_size[0]
+        )
+        n_heads_clean = (
+            self.n_heads[1]
+            if self.n_heads and isinstance(self.n_heads[0], str)
+            else self.n_heads[0]
+        )
+
+        # Check if embedding size is divisible by n_heads, otherwise transformer
+        # will raise an exception
+        if embedding_size_clean % n_heads_clean != 0:
+            raise ValueError(
+                f"Inconsistent embedding and heads number configuration: "
+                f"embedding_size ({embedding_size_clean}) must be divisible "
+                f"by n_heads ({n_heads_clean})."
+            )
+
+
 @params_registry.register("Caser")
 class Caser(RecomModel):
     """Definition of the model Caser.
@@ -274,6 +459,227 @@ class Caser(RecomModel):
     def check_max_seq_len(cls, v: list):
         """Validate max_seq_len."""
         return validate_greater_than_zero(cls, v, "max_seq_len")
+
+
+@params_registry.register("CL4SRec")
+class CL4SRec(RecomModel):
+    """Definition of the model CL4SRec.
+
+    Attributes:
+        embedding_size (INT_FIELD): List of values for embedding_size.
+        n_layers (INT_FIELD):  List of values for n_layers.
+        n_heads (INT_FIELD): List of values for n_heads.
+        inner_size (INT_FIELD): List of values for inner_size.
+        dropout_prob (FLOAT_FIELD): List of values for dropout_prob.
+        attn_dropout_prob (FLOAT_FIELD): List of values for attn_dropout_prob.
+        ssl_lambda (FLOAT_FIELD): List of values for ssl_lambda.
+        tau (FLOAT_FIELD): List of values for tau.
+        sim_type (STR_FIELD): List of values for sim_type.
+        crop_eta (FLOAT_FIELD): List of values for crop_eta.
+        mask_gamma (FLOAT_FIELD): List of values for mask_gamma.
+        reorder_beta (FLOAT_FIELD): List of values for reorder_beta.
+        reg_weight (FLOAT_FIELD): List of values for reg_weight.
+        weight_decay (FLOAT_FIELD): List of values for weight_decay.
+        batch_size (INT_FIELD): List of values for batch_size.
+        epochs (INT_FIELD): List of values for epochs.
+        learning_rate (FLOAT_FIELD): List of values for learning rate.
+        neg_samples (INT_FIELD): List of values for neg_samples.
+        max_seq_len (INT_FIELD): List of values for max_seq_len.
+        need_single_trial_validation (ClassVar[bool]): Flag to enable single trial validation.
+    """
+
+    embedding_size: INT_FIELD
+    n_layers: INT_FIELD
+    n_heads: INT_FIELD
+    inner_size: INT_FIELD
+    dropout_prob: FLOAT_FIELD
+    attn_dropout_prob: FLOAT_FIELD
+    ssl_lambda: FLOAT_FIELD
+    tau: FLOAT_FIELD
+    sim_type: STR_FIELD
+    crop_eta: FLOAT_FIELD
+    mask_gamma: FLOAT_FIELD
+    reorder_beta: FLOAT_FIELD
+    reg_weight: FLOAT_FIELD
+    weight_decay: FLOAT_FIELD
+    batch_size: INT_FIELD
+    epochs: INT_FIELD
+    learning_rate: FLOAT_FIELD
+    neg_samples: INT_FIELD
+    max_seq_len: INT_FIELD
+    need_single_trial_validation: ClassVar[bool] = True
+
+    @field_validator("embedding_size")
+    @classmethod
+    def check_embedding_size(cls, v: list):
+        """Validate embedding_size."""
+        return validate_greater_than_zero(cls, v, "embedding_size")
+
+    @field_validator("n_layers")
+    @classmethod
+    def check_n_layers(cls, v: list):
+        """Validate n_layers."""
+        return validate_greater_than_zero(cls, v, "n_layers")
+
+    @field_validator("n_heads")
+    @classmethod
+    def check_n_heads(cls, v: list):
+        """Validate n_heads."""
+        return validate_greater_than_zero(cls, v, "n_heads")
+
+    @field_validator("inner_size")
+    @classmethod
+    def check_inner_size(cls, v: list):
+        """Validate inner_size."""
+        return validate_greater_than_zero(cls, v, "inner_size")
+
+    @field_validator("dropout_prob")
+    @classmethod
+    def check_dropout_prob(cls, v: list):
+        """Validate dropout_prob."""
+        return validate_between_zero_and_one(cls, v, "dropout_prob")
+
+    @field_validator("attn_dropout_prob")
+    @classmethod
+    def check_attn_dropout_prob(cls, v: list):
+        """Validate attn_dropout_prob."""
+        return validate_between_zero_and_one(cls, v, "attn_dropout_prob")
+
+    @field_validator("ssl_lambda")
+    @classmethod
+    def check_ssl_lambda(cls, v: list):
+        """Validate ssl_lambda."""
+        return validate_greater_equal_than_zero(cls, v, "ssl_lambda")
+
+    @field_validator("tau")
+    @classmethod
+    def check_tau(cls, v: list):
+        """Validate tau."""
+        return validate_greater_than_zero(cls, v, "tau")
+
+    @field_validator("sim_type")
+    @classmethod
+    def check_sim_type(cls, v: list):
+        """Validate sim_type."""
+        valid_types = {"cos", "dot"}
+        for val in v:
+            if val not in valid_types:
+                raise ValueError(f"sim_type must be one of {valid_types}, got {val}")
+        return v
+
+    @field_validator("crop_eta")
+    @classmethod
+    def check_crop_eta(cls, v: list):
+        """Validate crop_eta."""
+        return validate_between_zero_and_one(cls, v, "crop_eta")
+
+    @field_validator("mask_gamma")
+    @classmethod
+    def check_mask_gamma(cls, v: list):
+        """Validate mask_gamma."""
+        return validate_between_zero_and_one(cls, v, "mask_gamma")
+
+    @field_validator("reorder_beta")
+    @classmethod
+    def check_reorder_beta(cls, v: list):
+        """Validate reorder_beta."""
+        return validate_between_zero_and_one(cls, v, "reorder_beta")
+
+    @field_validator("reg_weight")
+    @classmethod
+    def check_reg_weight(cls, v: list):
+        """Validate reg_weight"""
+        return validate_greater_equal_than_zero(cls, v, "reg_weight")
+
+    @field_validator("weight_decay")
+    @classmethod
+    def check_weight_decay(cls, v: list):
+        """Validate weight_decay."""
+        return validate_greater_equal_than_zero(cls, v, "weight_decay")
+
+    @field_validator("batch_size")
+    @classmethod
+    def check_batch_size(cls, v: list):
+        """Validate batch_size."""
+        return validate_greater_than_zero(cls, v, "batch_size")
+
+    @field_validator("epochs")
+    @classmethod
+    def check_epochs(cls, v: list):
+        """Validate epochs."""
+        return validate_greater_than_zero(cls, v, "epochs")
+
+    @field_validator("learning_rate")
+    @classmethod
+    def check_learning_rate(cls, v: list):
+        """Validate learning_rate."""
+        return validate_greater_than_zero(cls, v, "learning_rate")
+
+    @field_validator("neg_samples")
+    @classmethod
+    def check_neg_samples(cls, v: list):
+        """Validate neg_samples."""
+        return validate_greater_equal_than_zero(cls, v, "neg_samples")
+
+    @field_validator("max_seq_len")
+    @classmethod
+    def check_max_seq_len(cls, v: list):
+        """Validate max_seq_len."""
+        return validate_greater_than_zero(cls, v, "max_seq_len")
+
+    def validate_all_combinations(self):
+        """Validates if at least one valid combination of hyperparameters exists.
+        This method should be called after all individual fields have been validated.
+
+        Raises:
+            ValueError: If no valid combination of hyperparameters can be formed.
+        """
+        # Extract parameters to check, removing searching strategy
+        embedding_sizes = self._clean_param_list(self.embedding_size)
+        num_heads = self._clean_param_list(self.n_heads)
+
+        # Check if any combination of parameters is a valid combination
+        has_valid_combination = False
+        for emb_size, n_head in product(embedding_sizes, num_heads):
+            if emb_size % n_head == 0:
+                has_valid_combination = True
+                break
+
+        if not has_valid_combination:
+            raise ValueError(
+                "No valid hyperparameter combination found for CL4SRec. "
+                "Ensure there's at least one combination of 'embedding_size' and "
+                "'n_heads' that meets the criteria: "
+                "1. Embedding size must be divisible by n_heads. "
+            )
+
+    def validate_single_trial_params(self):
+        """Validates the coherence of embedding_size and n_heads
+        for a single trial's parameter set.
+
+        Raises:
+            ValueError: If the parameter values are not consistent for the model.
+        """
+        # Clean parameters from search space information
+        embedding_size_clean = (
+            self.embedding_size[1]
+            if self.embedding_size and isinstance(self.embedding_size[0], str)
+            else self.embedding_size[0]
+        )
+        n_heads_clean = (
+            self.n_heads[1]
+            if self.n_heads and isinstance(self.n_heads[0], str)
+            else self.n_heads[0]
+        )
+
+        # Check if embedding size is divisible by n_heads, otherwise transformer
+        # will raise an exception
+        if embedding_size_clean % n_heads_clean != 0:
+            raise ValueError(
+                f"Inconsistent embedding and heads number configuration: "
+                f"embedding_size ({embedding_size_clean}) must be divisible "
+                f"by n_heads ({n_heads_clean})."
+            )
 
 
 @params_registry.register("CORE")
@@ -485,6 +891,414 @@ class CORE(RecomModel):
         if dnn_type_clean == "trm" and embedding_size_clean % n_heads_clean != 0:
             raise ValueError(
                 f"Inconsistent configuration for CORE (trm): "
+                f"embedding_size ({embedding_size_clean}) must be divisible "
+                f"by n_heads ({n_heads_clean})."
+            )
+
+
+@params_registry.register("DuoRec")
+class DuoRec(RecomModel):
+    """Definition of the model DuoRec.
+
+    Attributes:
+        embedding_size (INT_FIELD): List of values for embedding_size.
+        n_layers (INT_FIELD):  List of values for n_layers.
+        n_heads (INT_FIELD): List of values for n_heads.
+        inner_size (INT_FIELD): List of values for inner_size.
+        dropout_prob (FLOAT_FIELD): List of values for dropout_prob.
+        attn_dropout_prob (FLOAT_FIELD): List of values for attn_dropout_prob.
+        ssl_type (STR_FIELD): List of values for ssl_type.
+        ssl_lambda (FLOAT_FIELD): List of values for ssl_lambda.
+        ssl_lambda_sem (FLOAT_FIELD): List of values for ssl_lambda_sem.
+        tau (FLOAT_FIELD): List of values for tau.
+        sim_type (STR_FIELD): List of values for sim_type.
+        reg_weight (FLOAT_FIELD): List of values for reg_weight.
+        weight_decay (FLOAT_FIELD): List of values for weight_decay.
+        batch_size (INT_FIELD): List of values for batch_size.
+        epochs (INT_FIELD): List of values for epochs.
+        learning_rate (FLOAT_FIELD): List of values for learning rate.
+        neg_samples (INT_FIELD): List of values for neg_samples.
+        max_seq_len (INT_FIELD): List of values for max_seq_len.
+    """
+
+    embedding_size: INT_FIELD
+    n_layers: INT_FIELD
+    n_heads: INT_FIELD
+    inner_size: INT_FIELD
+    dropout_prob: FLOAT_FIELD
+    attn_dropout_prob: FLOAT_FIELD
+    ssl_type: STR_FIELD
+    ssl_lambda: FLOAT_FIELD
+    ssl_lambda_sem: FLOAT_FIELD
+    tau: FLOAT_FIELD
+    sim_type: STR_FIELD
+    reg_weight: FLOAT_FIELD
+    weight_decay: FLOAT_FIELD
+    batch_size: INT_FIELD
+    epochs: INT_FIELD
+    learning_rate: FLOAT_FIELD
+    neg_samples: INT_FIELD
+    max_seq_len: INT_FIELD
+
+    @field_validator("embedding_size")
+    @classmethod
+    def check_embedding_size(cls, v: list):
+        """Validate embedding_size."""
+        return validate_greater_than_zero(cls, v, "embedding_size")
+
+    @field_validator("n_layers")
+    @classmethod
+    def check_n_layers(cls, v: list):
+        """Validate n_layers."""
+        return validate_greater_than_zero(cls, v, "n_layers")
+
+    @field_validator("n_heads")
+    @classmethod
+    def check_n_heads(cls, v: list):
+        """Validate n_heads."""
+        return validate_greater_than_zero(cls, v, "n_heads")
+
+    @field_validator("inner_size")
+    @classmethod
+    def check_inner_size(cls, v: list):
+        """Validate inner_size."""
+        return validate_greater_than_zero(cls, v, "inner_size")
+
+    @field_validator("dropout_prob")
+    @classmethod
+    def check_dropout_prob(cls, v: list):
+        """Validate dropout_prob."""
+        return validate_between_zero_and_one(cls, v, "dropout_prob")
+
+    @field_validator("attn_dropout_prob")
+    @classmethod
+    def check_attn_dropout_prob(cls, v: list):
+        """Validate attn_dropout_prob."""
+        return validate_between_zero_and_one(cls, v, "attn_dropout_prob")
+
+    @field_validator("ssl_type")
+    @classmethod
+    def check_ssl_type(cls, v: list):
+        """Validate ssl_type."""
+        valid_types = {"us", "su", "un", "us_x"}
+        for val in v:
+            if val not in valid_types:
+                raise ValueError(f"ssl_type must be one of {valid_types}, got {val}")
+        return v
+
+    @field_validator("ssl_lambda")
+    @classmethod
+    def check_ssl_lambda(cls, v: list):
+        """Validate ssl_lambda."""
+        return validate_greater_equal_than_zero(cls, v, "ssl_lambda")
+
+    @field_validator("ssl_lambda_sem")
+    @classmethod
+    def check_ssl_lambda_sem(cls, v: list):
+        """Validate ssl_lambda_sem."""
+        return validate_greater_equal_than_zero(cls, v, "ssl_lambda_sem")
+
+    @field_validator("tau")
+    @classmethod
+    def check_tau(cls, v: list):
+        """Validate tau."""
+        return validate_greater_equal_than_zero(cls, v, "tau")
+
+    @field_validator("sim_type")
+    @classmethod
+    def check_sim_type(cls, v: list):
+        """Validate sim_type."""
+        valid_types = {"cos", "dot"}
+        for val in v:
+            if val not in valid_types:
+                raise ValueError(f"sim_type must be one of {valid_types}, got {val}")
+        return v
+
+    @field_validator("reg_weight")
+    @classmethod
+    def check_reg_weight(cls, v: list):
+        """Validate reg_weight"""
+        return validate_greater_equal_than_zero(cls, v, "reg_weight")
+
+    @field_validator("weight_decay")
+    @classmethod
+    def check_weight_decay(cls, v: list):
+        """Validate weight_decay."""
+        return validate_greater_equal_than_zero(cls, v, "weight_decay")
+
+    @field_validator("batch_size")
+    @classmethod
+    def check_batch_size(cls, v: list):
+        """Validate batch_size."""
+        return validate_greater_than_zero(cls, v, "batch_size")
+
+    @field_validator("epochs")
+    @classmethod
+    def check_epochs(cls, v: list):
+        """Validate epochs."""
+        return validate_greater_than_zero(cls, v, "epochs")
+
+    @field_validator("learning_rate")
+    @classmethod
+    def check_learning_rate(cls, v: list):
+        """Validate learning_rate."""
+        return validate_greater_than_zero(cls, v, "learning_rate")
+
+    @field_validator("neg_samples")
+    @classmethod
+    def check_neg_samples(cls, v: list):
+        """Validate neg_samples."""
+        return validate_greater_equal_than_zero(cls, v, "neg_samples")
+
+    @field_validator("max_seq_len")
+    @classmethod
+    def check_max_seq_len(cls, v: list):
+        """Validate max_seq_len."""
+        return validate_greater_than_zero(cls, v, "max_seq_len")
+
+    def validate_all_combinations(self):
+        """Validates if at least one valid combination of hyperparameters exists.
+        This method should be called after all individual fields have been validated.
+
+        Raises:
+            ValueError: If no valid combination of hyperparameters can be formed.
+        """
+        # Extract parameters to check, removing searching strategy
+        embedding_sizes = self._clean_param_list(self.embedding_size)
+        num_heads = self._clean_param_list(self.n_heads)
+
+        # Check if any combination of parameters is a valid combination
+        has_valid_combination = False
+        for emb_size, n_head in product(embedding_sizes, num_heads):
+            if emb_size % n_head == 0:
+                has_valid_combination = True
+                break
+
+        if not has_valid_combination:
+            raise ValueError(
+                "No valid hyperparameter combination found for DuoRec. "
+                "Ensure there's at least one combination of 'embedding_size' and "
+                "'n_heads' that meets the criteria: "
+                "1. Embedding size must be divisible by n_heads. "
+            )
+
+    def validate_single_trial_params(self):
+        """Validates the coherence of embedding_size and n_heads
+        for a single trial's parameter set.
+
+        Raises:
+            ValueError: If the parameter values are not consistent for the model.
+        """
+        # Clean parameters from search space information
+        embedding_size_clean = (
+            self.embedding_size[1]
+            if self.embedding_size and isinstance(self.embedding_size[0], str)
+            else self.embedding_size[0]
+        )
+        n_heads_clean = (
+            self.n_heads[1]
+            if self.n_heads and isinstance(self.n_heads[0], str)
+            else self.n_heads[0]
+        )
+
+        # Check if embedding size is divisible by n_heads, otherwise transformer
+        # will raise an exception
+        if embedding_size_clean % n_heads_clean != 0:
+            raise ValueError(
+                f"Inconsistent embedding and heads number configuration: "
+                f"embedding_size ({embedding_size_clean}) must be divisible "
+                f"by n_heads ({n_heads_clean})."
+            )
+
+
+@params_registry.register("eSASRec")
+class eSASRec(RecomModel):
+    """Definition of the model eSASRec.
+
+    Attributes:
+        embedding_size (INT_FIELD): List of values for embedding_size.
+        n_layers (INT_FIELD):  List of values for n_layers.
+        n_heads (INT_FIELD): List of values for n_heads.
+        inner_size (INT_FIELD): List of values for inner_size.
+        dropout_prob (FLOAT_FIELD): List of values for dropout_prob.
+        attn_dropout_prob (FLOAT_FIELD): List of values for attn_dropout_prob.
+        use_relative_pos (BOOL_FIELD): List of values for use_relative_pos.
+        use_sampled_softmax (BOOL_FIELD): List of values for use_sampled_softmax.
+        use_ligr (BOOL_FIELD): List of values for use_ligr.
+        mn_ratio (FLOAT_FIELD): List of values for mn_ratio.
+        reg_weight (FLOAT_FIELD): List of values for reg_weight.
+        weight_decay (FLOAT_FIELD): List of values for weight_decay.
+        batch_size (INT_FIELD): List of values for batch_size.
+        epochs (INT_FIELD): List of values for epochs.
+        learning_rate (FLOAT_FIELD): List of values for learning rate.
+        neg_samples (INT_FIELD): List of values for neg_samples.
+        max_seq_len (INT_FIELD): List of values for max_seq_len.
+    """
+
+    embedding_size: INT_FIELD
+    n_layers: INT_FIELD
+    n_heads: INT_FIELD
+    inner_size: INT_FIELD
+    dropout_prob: FLOAT_FIELD
+    attn_dropout_prob: FLOAT_FIELD
+    use_relative_pos: BOOL_FIELD
+    use_sampled_softmax: BOOL_FIELD
+    use_ligr: BOOL_FIELD
+    mn_ratio: FLOAT_FIELD
+    reg_weight: FLOAT_FIELD
+    weight_decay: FLOAT_FIELD
+    batch_size: INT_FIELD
+    epochs: INT_FIELD
+    learning_rate: FLOAT_FIELD
+    neg_samples: INT_FIELD
+    max_seq_len: INT_FIELD
+
+    @field_validator("embedding_size")
+    @classmethod
+    def check_embedding_size(cls, v: list):
+        """Validate embedding_size."""
+        return validate_greater_than_zero(cls, v, "embedding_size")
+
+    @field_validator("n_layers")
+    @classmethod
+    def check_n_layers(cls, v: list):
+        """Validate n_layers."""
+        return validate_greater_than_zero(cls, v, "n_layers")
+
+    @field_validator("n_heads")
+    @classmethod
+    def check_n_heads(cls, v: list):
+        """Validate n_heads."""
+        return validate_greater_than_zero(cls, v, "n_heads")
+
+    @field_validator("inner_size")
+    @classmethod
+    def check_inner_size(cls, v: list):
+        """Validate inner_size."""
+        return validate_greater_than_zero(cls, v, "inner_size")
+
+    @field_validator("dropout_prob")
+    @classmethod
+    def check_dropout_prob(cls, v: list):
+        """Validate dropout_prob."""
+        return validate_between_zero_and_one(cls, v, "dropout_prob")
+
+    @field_validator("attn_dropout_prob")
+    @classmethod
+    def check_attn_dropout_prob(cls, v: list):
+        """Validate attn_dropout_prob."""
+        return validate_between_zero_and_one(cls, v, "attn_dropout_prob")
+
+    @field_validator("use_relative_pos")
+    @classmethod
+    def check_use_relative_pos(cls, v: list):
+        """Validate use_relative_pos."""
+        return validate_bool_values(v)
+
+    @field_validator("use_sampled_softmax")
+    @classmethod
+    def check_use_sampled_softmax(cls, v: list):
+        """Validate use_sampled_softmax."""
+        return validate_bool_values(v)
+
+    @field_validator("mn_ratio")
+    @classmethod
+    def check_mn_ratio(cls, v: list):
+        """Validate mn_ratio."""
+        return validate_between_zero_and_one(cls, v, "mn_ratio")
+
+    @field_validator("reg_weight")
+    @classmethod
+    def check_reg_weight(cls, v: list):
+        """Validate reg_weight"""
+        return validate_greater_equal_than_zero(cls, v, "reg_weight")
+
+    @field_validator("weight_decay")
+    @classmethod
+    def check_weight_decay(cls, v: list):
+        """Validate weight_decay."""
+        return validate_greater_equal_than_zero(cls, v, "weight_decay")
+
+    @field_validator("batch_size")
+    @classmethod
+    def check_batch_size(cls, v: list):
+        """Validate batch_size."""
+        return validate_greater_than_zero(cls, v, "batch_size")
+
+    @field_validator("epochs")
+    @classmethod
+    def check_epochs(cls, v: list):
+        """Validate epochs."""
+        return validate_greater_than_zero(cls, v, "epochs")
+
+    @field_validator("learning_rate")
+    @classmethod
+    def check_learning_rate(cls, v: list):
+        """Validate learning_rate."""
+        return validate_greater_than_zero(cls, v, "learning_rate")
+
+    @field_validator("neg_samples")
+    @classmethod
+    def check_neg_samples(cls, v: list):
+        """Validate neg_samples."""
+        return validate_greater_equal_than_zero(cls, v, "neg_samples")
+
+    @field_validator("max_seq_len")
+    @classmethod
+    def check_max_seq_len(cls, v: list):
+        """Validate max_seq_len."""
+        return validate_greater_than_zero(cls, v, "max_seq_len")
+
+    def validate_all_combinations(self):
+        """Validates if at least one valid combination of hyperparameters exists.
+        This method should be called after all individual fields have been validated.
+
+        Raises:
+            ValueError: If no valid combination of hyperparameters can be formed.
+        """
+        # Extract parameters to check, removing searching strategy
+        embedding_sizes = self._clean_param_list(self.embedding_size)
+        num_heads = self._clean_param_list(self.n_heads)
+
+        # Check if any combination of parameters is a valid combination
+        has_valid_combination = False
+        for emb_size, n_head in product(embedding_sizes, num_heads):
+            if emb_size % n_head == 0:
+                has_valid_combination = True
+                break
+
+        if not has_valid_combination:
+            raise ValueError(
+                "No valid hyperparameter combination found for eSASRec. "
+                "Ensure there's at least one combination of 'embedding_size' and "
+                "'n_heads' that meets the criteria: "
+                "1. Embedding size must be divisible by n_heads. "
+            )
+
+    def validate_single_trial_params(self):
+        """Validates the coherence of embedding_size and n_heads
+        for a single trial's parameter set.
+
+        Raises:
+            ValueError: If the parameter values are not consistent for the model.
+        """
+        # Clean parameters from search space information
+        embedding_size_clean = (
+            self.embedding_size[1]
+            if self.embedding_size and isinstance(self.embedding_size[0], str)
+            else self.embedding_size[0]
+        )
+        n_heads_clean = (
+            self.n_heads[1]
+            if self.n_heads and isinstance(self.n_heads[0], str)
+            else self.n_heads[0]
+        )
+
+        # Check if embedding size is divisible by n_heads, otherwise transformer
+        # will raise an exception
+        if embedding_size_clean % n_heads_clean != 0:
+            raise ValueError(
+                f"Inconsistent embedding and heads number configuration: "
                 f"embedding_size ({embedding_size_clean}) must be divisible "
                 f"by n_heads ({n_heads_clean})."
             )
