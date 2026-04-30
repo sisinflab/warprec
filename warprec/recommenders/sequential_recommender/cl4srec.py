@@ -24,6 +24,35 @@ class CL4SRec(IterativeRecommender, SequentialRecommenderUtils):
     2. Two random augmentations sampled from crop/mask/reorder.
     3. A multi-task objective with sampled-softmax next-item prediction
        and InfoNCE contrastive learning.
+
+    Args:
+        params (dict): Model parameters.
+        info (dict): The dictionary containing dataset information.
+        *args (Any): Variable length argument list.
+        seed (int): The seed to use for reproducibility.
+        **kwargs (Any): Arbitrary keyword arguments.
+
+    Attributes:
+        DATALOADER_TYPE: The type of dataloader used.
+        embedding_size (int): The dimension of the item embeddings (hidden_size).
+        n_layers (int): The number of transformer encoder layers.
+        n_heads (int): The number of attention heads in the transformer.
+        inner_size (int): The dimensionality of the feed-forward layer.
+        dropout_prob (float): The probability of dropout for embeddings.
+        attn_dropout_prob (float): The probability of dropout for attention weights.
+        reg_weight (float): The L2 regularization weight.
+        weight_decay (float): The value of weight decay used in optimizer.
+        batch_size (int): The batch size used during training.
+        epochs (int): The number of training epochs.
+        learning_rate (float): The learning rate value.
+        neg_samples (int): The number of negative samples.
+        max_seq_len (int): The maximum length of sequences.
+        ssl_lambda (float): The weight for the unsupervised CL loss.
+        tau (float): The temperature parameter for contrastive loss.
+        sim_type (str): The similarity metric for contrastive loss ("dot" or "cos").
+        crop_eta (float): The probability of cropping items in the augmentation.
+        mask_gamma (float): The probability of masking items in the augmentation.
+        reorder_beta (float): The probability of reordering items in the augmentation.
     """
 
     DATALOADER_TYPE = DataLoaderType.SEQUENTIAL_LOADER

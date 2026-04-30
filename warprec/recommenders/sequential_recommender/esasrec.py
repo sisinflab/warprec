@@ -103,6 +103,33 @@ class eSASRec(IterativeRecommender, SequentialRecommenderUtils):
     The model is built around the winning combination described in the paper:
     shifted-sequence objective, LiGR Transformer blocks, and sampled softmax,
     with optional mixed negative sampling.
+
+    Args:
+        params (dict): Model parameters.
+        info (dict): The dictionary containing dataset information.
+        *args (Any): Variable length argument list.
+        seed (int): The seed to use for reproducibility.
+        **kwargs (Any): Arbitrary keyword arguments.
+
+    Attributes:
+        DATALOADER_TYPE: The type of dataloader used.
+        embedding_size (int): Dimension of item and position embeddings.
+        n_layers (int): Number of transformer encoder layers.
+        n_heads (int): Number of attention heads in the transformer.
+        inner_size (int): Dimension of the feedforward network in the transformer.
+        dropout_prob (float): Dropout probability for embeddings.
+        attn_dropout_prob (float): Dropout probability for attention weights.
+        reg_weight (float): Weight for the embedding regularization loss.
+        weight_decay (float): L2 regularization weight for optimizer.
+        batch_size (int): Training batch size.
+        epochs (int): Number of training epochs.
+        learning_rate (float): Learning rate for optimizer.
+        neg_samples (int): Number of negative samples for training.
+        max_seq_len (int): Maximum length of input sequences.
+        use_relative_pos (bool): Whether to use relative positional embeddings.
+        use_sampled_softmax (bool): Whether to use sampled softmax loss.
+        use_ligr (bool): Whether to use LiGR blocks instead of standard transformer layers.
+        mn_ratio (float): Ratio of in-batch negatives to uniform negatives when using mixed negative sampling.
     """
 
     DATALOADER_TYPE = DataLoaderType.SEQUENTIAL_LOADER
