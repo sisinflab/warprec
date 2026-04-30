@@ -12,6 +12,7 @@ from warprec.utils.config.common import (
     validate_greater_equal_than_zero,
     validate_bool_values,
     validate_between_zero_and_one,
+    validate_str_list,
 )
 from warprec.utils.registry import params_registry
 
@@ -292,13 +293,8 @@ class iALS2008(RecomModel):
     @classmethod
     def check_confidence_type(cls, v: list):
         """Validate confidence_type."""
-        valid_values = {"linear", "log"}
-        for val in v:
-            if val not in valid_values:
-                raise ValueError(
-                    f"Invalid confidence_type: {val}. Must be one of {valid_values}."
-                )
-        return v
+        allowed = ["linear", "log"]
+        return validate_str_list(cls, v, allowed, "confidence_type")
 
     @field_validator("epsilon")
     @classmethod

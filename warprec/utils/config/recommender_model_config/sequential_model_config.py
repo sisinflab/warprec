@@ -15,6 +15,7 @@ from warprec.utils.config.common import (
     validate_greater_equal_than_zero,
     validate_bool_values,
     validate_between_zero_and_one,
+    validate_str_list,
 )
 from warprec.utils.registry import params_registry
 
@@ -561,11 +562,8 @@ class CL4SRec(RecomModel):
     @classmethod
     def check_sim_type(cls, v: list):
         """Validate sim_type."""
-        valid_types = {"cos", "dot"}
-        for val in v:
-            if val not in valid_types:
-                raise ValueError(f"sim_type must be one of {valid_types}, got {val}")
-        return v
+        allowed = ["cos", "dot"]
+        return validate_str_list(cls, v, allowed, "sim_type")
 
     @field_validator("crop_eta")
     @classmethod
@@ -738,12 +736,8 @@ class CORE(RecomModel):
     @classmethod
     def check_dnn_type(cls, v: list):
         """Validate dnn_type."""
-        valid_types = {"trm", "ave"}
-        # Clean params handles the list structure, we check values
-        for val in v:
-            if val not in valid_types:
-                raise ValueError(f"dnn_type must be one of {valid_types}, got {val}")
-        return v
+        allowed = ["trm", "ave"]
+        return validate_str_list(cls, v, allowed, "dnn_type")
 
     @field_validator("n_layers")
     @classmethod
@@ -980,11 +974,8 @@ class DuoRec(RecomModel):
     @classmethod
     def check_ssl_type(cls, v: list):
         """Validate ssl_type."""
-        valid_types = {"us", "su", "un", "us_x"}
-        for val in v:
-            if val not in valid_types:
-                raise ValueError(f"ssl_type must be one of {valid_types}, got {val}")
-        return v
+        allowed = ["us", "su", "un", "us_x"]
+        return validate_str_list(cls, v, allowed, "ssl_type")
 
     @field_validator("ssl_lambda")
     @classmethod
@@ -1008,11 +999,8 @@ class DuoRec(RecomModel):
     @classmethod
     def check_sim_type(cls, v: list):
         """Validate sim_type."""
-        valid_types = {"cos", "dot"}
-        for val in v:
-            if val not in valid_types:
-                raise ValueError(f"sim_type must be one of {valid_types}, got {val}")
-        return v
+        allowed = ["cos", "dot"]
+        return validate_str_list(cls, v, allowed, "sim_type")
 
     @field_validator("reg_weight")
     @classmethod
@@ -1199,6 +1187,12 @@ class eSASRec(RecomModel):
     @classmethod
     def check_use_sampled_softmax(cls, v: list):
         """Validate use_sampled_softmax."""
+        return validate_bool_values(v)
+
+    @field_validator("use_ligr")
+    @classmethod
+    def check_use_ligr(cls, v: list):
+        """Validate use_ligr."""
         return validate_bool_values(v)
 
     @field_validator("mn_ratio")
