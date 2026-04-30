@@ -243,8 +243,8 @@ class BSARec(IterativeRecommender, SequentialRecommenderUtils):
     learning_rate: float
     neg_samples: int
     max_seq_len: int
-    alpha: float = 0.5  # Balance between DSP (frequency) and GSP (attention)
-    c: int = 10  # Cutoff frequency for FFT filtering
+    alpha: float
+    c: int
 
     def __init__(
         self,
