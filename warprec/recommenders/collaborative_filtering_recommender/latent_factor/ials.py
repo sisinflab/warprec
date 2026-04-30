@@ -1,5 +1,5 @@
 # pylint: disable = R0801, E1102
-from typing import Any, Optional, cast
+from typing import Any, Optional, no_type_check
 
 import numpy as np
 import torch
@@ -161,6 +161,7 @@ class iALS(Recommender):
 
         return updated
 
+    @no_type_check
     def predict(
         self,
         user_indices: Tensor,
@@ -183,13 +184,16 @@ class iALS(Recommender):
         Returns:
             Tensor: Score tensor [batch_size, n_items] or [batch_size, k].
         """
-        user_factors = cast(Tensor, self.user_factors)
-        item_factors = cast(Tensor, self.item_factors)
-        X_u = user_factors[user_indices]  # [batch_size, factors]
+        user_indices = user_indices.to(self.user_factors.device)
+        X_u = self.user_factors[user_indices]  # [batch_size, factors]
 
         if item_indices is None:
-            return X_u @ item_factors.T  # [batch_size, n_items]
+            return X_u @ self.item_factors.T  # [batch_size, n_items]
 
-        item_indices = item_indices.to(item_factors.device).clamp(max=self.n_items - 1)
-        selected_item_factors = item_factors[item_indices]  # [batch_size, k, factors]
+        item_indices = item_indices.to(self.item_factors.device).clamp(
+            max=self.n_items - 1
+        )
+        selected_item_factors = self.item_factors[
+            item_indices
+        ]  # [batch_size, k, factors]
         return (X_u.unsqueeze(1) * selected_item_factors).sum(dim=-1)  # [batch_size, k]
