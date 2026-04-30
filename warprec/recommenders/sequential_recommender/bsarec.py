@@ -290,14 +290,13 @@ class BSARec(IterativeRecommender, SequentialRecommenderUtils):
         self,
         interactions: Interactions,
         sessions: Sessions,
-        low_memory: bool = False,
         **kwargs,
     ):
         return sessions.get_sequential_dataloader(
             max_seq_len=self.max_seq_len,
             neg_samples=0,
             batch_size=self.batch_size,
-            low_memory=low_memory,
+            **kwargs,
         )
 
     def training_step(self, batch: Any, batch_idx: int):

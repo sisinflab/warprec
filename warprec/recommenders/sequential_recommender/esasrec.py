@@ -4,7 +4,6 @@ from typing import Any, Optional
 import torch
 import torch.nn.functional as F
 from torch import nn, Tensor
-from torch.nn.init import constant_, xavier_uniform_
 
 from warprec.recommenders.base_recommender import (
     IterativeRecommender,
@@ -202,40 +201,22 @@ class eSASRec(IterativeRecommender, SequentialRecommenderUtils):
         causal_mask = self._generate_square_subsequent_mask(self.max_seq_len)
         self.register_buffer("causal_mask", causal_mask)
 
-        self.apply(self._init_weights_xavier)
+        self.apply(self._init_weights)
 
         self.full_softmax_loss = nn.CrossEntropyLoss()
         self.sampled_softmax_loss = SampledSoftmaxLoss(temperature=1.0)
         self.reg_loss = EmbLoss()
 
-    def _init_weights_xavier(self, module: nn.Module):
-        """Xavier initialization for linear, embedding, and attention layers."""
-        if isinstance(module, nn.Linear):
-            xavier_uniform_(module.weight.data)
-            if module.bias is not None:
-                constant_(module.bias.data, 0)
-        elif isinstance(module, nn.Embedding):
-            xavier_uniform_(module.weight.data)
-        elif isinstance(module, nn.MultiheadAttention):
-            xavier_uniform_(module.in_proj_weight.data)
-            if module.in_proj_bias is not None:
-                constant_(module.in_proj_bias.data, 0)
-            xavier_uniform_(module.out_proj.weight.data)
-            if module.out_proj.bias is not None:
-                constant_(module.out_proj.bias.data, 0)
-
     def get_dataloader(
         self,
         interactions: Interactions,
         sessions: Sessions,
-        low_memory: bool = False,
         **kwargs,
     ):
         return sessions.get_sequential_dataloader(
             max_seq_len=self.max_seq_len,
             neg_samples=self.neg_samples,
             batch_size=self.batch_size,
-            low_memory=low_memory,
             **kwargs,
         )
 
