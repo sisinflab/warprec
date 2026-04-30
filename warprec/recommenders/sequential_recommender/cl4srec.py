@@ -40,6 +40,12 @@ class CL4SRec(IterativeRecommender, SequentialRecommenderUtils):
         inner_size (int): The dimensionality of the feed-forward layer.
         dropout_prob (float): The probability of dropout for embeddings.
         attn_dropout_prob (float): The probability of dropout for attention weights.
+        ssl_lambda (float): The weight for the unsupervised CL loss.
+        tau (float): The temperature parameter for contrastive loss.
+        sim_type (str): The similarity metric for contrastive loss ("dot" or "cos").
+        crop_eta (float): The probability of cropping items in the augmentation.
+        mask_gamma (float): The probability of masking items in the augmentation.
+        reorder_beta (float): The probability of reordering items in the augmentation.
         reg_weight (float): The L2 regularization weight.
         weight_decay (float): The value of weight decay used in optimizer.
         batch_size (int): The batch size used during training.
@@ -47,12 +53,6 @@ class CL4SRec(IterativeRecommender, SequentialRecommenderUtils):
         learning_rate (float): The learning rate value.
         neg_samples (int): The number of negative samples.
         max_seq_len (int): The maximum length of sequences.
-        ssl_lambda (float): The weight for the unsupervised CL loss.
-        tau (float): The temperature parameter for contrastive loss.
-        sim_type (str): The similarity metric for contrastive loss ("dot" or "cos").
-        crop_eta (float): The probability of cropping items in the augmentation.
-        mask_gamma (float): The probability of masking items in the augmentation.
-        reorder_beta (float): The probability of reordering items in the augmentation.
     """
 
     DATALOADER_TYPE = DataLoaderType.SEQUENTIAL_LOADER
@@ -63,6 +63,12 @@ class CL4SRec(IterativeRecommender, SequentialRecommenderUtils):
     inner_size: int
     dropout_prob: float
     attn_dropout_prob: float
+    ssl_lambda: float
+    tau: float
+    sim_type: str
+    crop_eta: float
+    mask_gamma: float
+    reorder_beta: float
     reg_weight: float
     weight_decay: float
     batch_size: int
@@ -70,12 +76,6 @@ class CL4SRec(IterativeRecommender, SequentialRecommenderUtils):
     learning_rate: float
     neg_samples: int
     max_seq_len: int
-    ssl_lambda: float
-    tau: float
-    sim_type: str
-    crop_eta: float
-    mask_gamma: float
-    reorder_beta: float
 
     def __init__(
         self,

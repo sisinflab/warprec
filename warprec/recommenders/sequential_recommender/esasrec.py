@@ -119,6 +119,10 @@ class eSASRec(IterativeRecommender, SequentialRecommenderUtils):
         inner_size (int): Dimension of the feedforward network in the transformer.
         dropout_prob (float): Dropout probability for embeddings.
         attn_dropout_prob (float): Dropout probability for attention weights.
+        use_relative_pos (bool): Whether to use relative positional embeddings.
+        use_sampled_softmax (bool): Whether to use sampled softmax loss.
+        use_ligr (bool): Whether to use LiGR blocks instead of standard transformer layers.
+        mn_ratio (float): Ratio of in-batch negatives to uniform negatives when using mixed negative sampling.
         reg_weight (float): Weight for the embedding regularization loss.
         weight_decay (float): L2 regularization weight for optimizer.
         batch_size (int): Training batch size.
@@ -126,10 +130,6 @@ class eSASRec(IterativeRecommender, SequentialRecommenderUtils):
         learning_rate (float): Learning rate for optimizer.
         neg_samples (int): Number of negative samples for training.
         max_seq_len (int): Maximum length of input sequences.
-        use_relative_pos (bool): Whether to use relative positional embeddings.
-        use_sampled_softmax (bool): Whether to use sampled softmax loss.
-        use_ligr (bool): Whether to use LiGR blocks instead of standard transformer layers.
-        mn_ratio (float): Ratio of in-batch negatives to uniform negatives when using mixed negative sampling.
     """
 
     DATALOADER_TYPE = DataLoaderType.SEQUENTIAL_LOADER
@@ -140,6 +140,10 @@ class eSASRec(IterativeRecommender, SequentialRecommenderUtils):
     inner_size: int
     dropout_prob: float
     attn_dropout_prob: float
+    use_relative_pos: bool
+    use_sampled_softmax: bool
+    use_ligr: bool
+    mn_ratio: float
     reg_weight: float
     weight_decay: float
     batch_size: int
@@ -147,10 +151,6 @@ class eSASRec(IterativeRecommender, SequentialRecommenderUtils):
     learning_rate: float
     neg_samples: int
     max_seq_len: int
-    use_relative_pos: bool
-    use_sampled_softmax: bool
-    use_ligr: bool
-    mn_ratio: float
 
     def __init__(
         self,

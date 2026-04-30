@@ -215,6 +215,8 @@ class BSARec(IterativeRecommender, SequentialRecommenderUtils):
         inner_size (int): The dimensionality of the feed-forward layer.
         dropout_prob (float): The probability of dropout for embeddings.
         attn_dropout_prob (float): The probability of dropout for attention weights.
+        alpha (float): Balance parameter between DSP and GSP (0.0-1.0).
+        c (int): Cutoff frequency for low-pass filtering.
         reg_weight (float): The L2 regularization weight.
         weight_decay (float): The value of weight decay used in optimizer.
         batch_size (int): The batch size used during training.
@@ -222,8 +224,6 @@ class BSARec(IterativeRecommender, SequentialRecommenderUtils):
         learning_rate (float): The learning rate value.
         neg_samples (int): The number of negative samples.
         max_seq_len (int): The maximum length of sequences.
-        alpha (float): Balance parameter between DSP and GSP (0.0-1.0).
-        c (int): Cutoff frequency for low-pass filtering.
     """
 
     # Dataloader definition
@@ -236,6 +236,8 @@ class BSARec(IterativeRecommender, SequentialRecommenderUtils):
     inner_size: int
     dropout_prob: float
     attn_dropout_prob: float
+    alpha: float
+    c: int
     reg_weight: float
     weight_decay: float
     batch_size: int
@@ -243,8 +245,6 @@ class BSARec(IterativeRecommender, SequentialRecommenderUtils):
     learning_rate: float
     neg_samples: int
     max_seq_len: int
-    alpha: float
-    c: int
 
     def __init__(
         self,

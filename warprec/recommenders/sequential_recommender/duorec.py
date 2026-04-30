@@ -39,6 +39,11 @@ class DuoRec(IterativeRecommender, SequentialRecommenderUtils):
         inner_size (int): Dimension of the feedforward network in the transformer.
         dropout_prob (float): Dropout probability for embeddings.
         attn_dropout_prob (float): Dropout probability for attention weights.
+        ssl_type (str): Type of self-supervised learning ("us", "su", "un", "us_x").
+        ssl_lambda (float): Weight for the unsupervised CL loss.
+        ssl_lambda_sem (float): Weight for the supervised CL loss.
+        tau (float): Temperature parameter for contrastive loss.
+        sim_type (str): Similarity metric for contrastive loss ("dot" or "cos").
         reg_weight (float): Weight for the embedding regularization loss.
         weight_decay (float): L2 regularization weight for optimizer.
         batch_size (int): Training batch size.
@@ -46,11 +51,6 @@ class DuoRec(IterativeRecommender, SequentialRecommenderUtils):
         learning_rate (float): Learning rate for optimizer.
         neg_samples (int): Number of negative samples for training.
         max_seq_len (int): Maximum length of input sequences.
-        ssl_type (str): Type of self-supervised learning ("us", "su", "un", "us_x").
-        ssl_lambda (float): Weight for the unsupervised CL loss.
-        ssl_lambda_sem (float): Weight for the supervised CL loss.
-        tau (float): Temperature parameter for contrastive loss.
-        sim_type (str): Similarity metric for contrastive loss ("dot" or "cos").
     """
 
     DATALOADER_TYPE = DataLoaderType.SEQUENTIAL_LOADER
@@ -62,6 +62,11 @@ class DuoRec(IterativeRecommender, SequentialRecommenderUtils):
     inner_size: int
     dropout_prob: float
     attn_dropout_prob: float
+    ssl_type: str
+    ssl_lambda: float
+    ssl_lambda_sem: float
+    tau: float
+    sim_type: str
     reg_weight: float
     weight_decay: float
     batch_size: int
@@ -69,11 +74,6 @@ class DuoRec(IterativeRecommender, SequentialRecommenderUtils):
     learning_rate: float
     neg_samples: int
     max_seq_len: int
-    ssl_type: str
-    ssl_lambda: float
-    ssl_lambda_sem: float
-    tau: float
-    sim_type: str
 
     def __init__(
         self,
