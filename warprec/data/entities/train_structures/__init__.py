@@ -7,6 +7,7 @@ from .interaction_structures import (
 )
 from .session_structures import (
     SequentialDataset,
+    SameTargetSequentialDataset,
     SlidingWindowDataset,
     ClozeDataset,
 )
@@ -18,6 +19,7 @@ __all__ = [
     "ContrastiveDataset",
     "PositiveDataset",
     "SequentialDataset",
+    "SameTargetSequentialDataset",
     "SlidingWindowDataset",
     "ClozeDataset",
 ]

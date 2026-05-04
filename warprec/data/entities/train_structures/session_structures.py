@@ -10,7 +10,8 @@ from scipy.sparse import csr_matrix
 class SequentialDataset(Dataset):
     """
     Standard Sequential dataset.
-    Returns: (Sequence, Length, PosTarget, [NegTarget])
+
+    Sampled Output: (Sequence, Length, PosTarget, [NegTarget])
     """
 
     def __init__(
@@ -90,10 +91,106 @@ class SequentialDataset(Dataset):
         return tuple(ret)
 
 
+class SameTargetSequentialDataset(Dataset):
+    """
+    Sequential dataset that also provides a semantic positive sequence
+    sampled from another sequence sharing the same target item.
+
+    Args:
+        flat_items (np.ndarray): 1D array of all items in the dataset, ordered by user and time.
+        flat_users (np.ndarray): 1D array of user IDs corresponding to each item in
+            flat_items.
+        user_offsets (np.ndarray): 1D array where the value at index i indicates the
+            starting index in flat_items for user i.
+        valid_target_indices (np.ndarray): 1D array of indices in flat_items that are
+            valid targets for training (e.g., not the first interaction of a user).
+        max_seq_len (int): Maximum length of the input sequence.
+        niid (int): Number of items (used for padding and negative sampling).
+
+    Sampled Output:
+        (Sequence, Length, PosTarget, SemanticSequence, SemanticLength, HasSemanticPositive)
+    """
+
+    def __init__(
+        self,
+        flat_items: np.ndarray,
+        flat_users: np.ndarray,
+        user_offsets: np.ndarray,
+        valid_target_indices: np.ndarray,
+        max_seq_len: int,
+        niid: int,
+    ):
+        self.flat_items = flat_items
+        self.flat_users = flat_users
+        self.user_offsets = user_offsets
+        self.sample_indices = valid_target_indices
+        self.max_seq_len = max_seq_len
+        self.niid = niid
+        self.padding_token = niid
+
+        target_items = self.flat_items[self.sample_indices]
+        self.target_to_indices: dict[int, np.ndarray] = {}
+        unique_targets = np.unique(target_items)
+        for target in unique_targets:
+            self.target_to_indices[int(target)] = self.sample_indices[
+                target_items == target
+            ]
+
+    def __len__(self) -> int:
+        return len(self.sample_indices)
+
+    def _build_sequence(self, target_flat_idx: int) -> Tuple[Tensor, Tensor]:
+        user_idx = self.flat_users[target_flat_idx]
+        user_start_idx = self.user_offsets[user_idx]
+        seq_end_idx = target_flat_idx
+        seq_start_idx = max(user_start_idx, seq_end_idx - self.max_seq_len)
+
+        seq_array = self.flat_items[seq_start_idx:seq_end_idx].copy()
+        seq_len = len(seq_array)
+
+        seq_tensor = torch.full(
+            (self.max_seq_len,), self.padding_token, dtype=torch.long
+        )
+        seq_tensor[:seq_len] = torch.from_numpy(seq_array)
+        return seq_tensor, torch.tensor(seq_len, dtype=torch.long)
+
+    def __getitem__(self, idx: int) -> Tuple[Tensor, ...]:
+        target_flat_idx = int(self.sample_indices[idx])
+        pos_item = int(self.flat_items[target_flat_idx])
+
+        seq_tensor, seq_len = self._build_sequence(target_flat_idx)
+
+        same_target_candidates = self.target_to_indices[pos_item]
+        other_candidates = same_target_candidates[
+            same_target_candidates != target_flat_idx
+        ]
+
+        if len(other_candidates) > 0:
+            sampled_idx = int(
+                other_candidates[np.random.randint(0, len(other_candidates))]
+            )
+            sem_seq_tensor, sem_seq_len = self._build_sequence(sampled_idx)
+            has_semantic_positive = torch.tensor(True, dtype=torch.bool)
+        else:
+            sem_seq_tensor = seq_tensor.clone()
+            sem_seq_len = seq_len.clone()
+            has_semantic_positive = torch.tensor(False, dtype=torch.bool)
+
+        return (
+            seq_tensor,
+            seq_len,
+            torch.tensor(pos_item, dtype=torch.long),
+            sem_seq_tensor,
+            sem_seq_len,
+            has_semantic_positive,
+        )
+
+
 class SlidingWindowDataset(Dataset):
     """
     Dataset for Sequence-to-Sequence training.
-    Returns: (InputSequence, NegativeSamplesMatrix)
+
+    Sampled Output: (InputSequence, NegativeSamplesMatrix)
     """
 
     def __init__(
@@ -173,7 +270,8 @@ class SlidingWindowDataset(Dataset):
 class ClozeDataset(Dataset):
     """
     Dataset for Cloze Mask training.
-    Returns 4 tensors: (MaskedSeq, PosItems, NegItems, MaskedIndices)
+
+    Sampled Output: (MaskedSeq, PosItems, NegItems, MaskedIndices)
     """
 
     def __init__(

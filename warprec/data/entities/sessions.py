@@ -11,6 +11,7 @@ from scipy.sparse import csr_matrix
 
 from warprec.data.entities.train_structures import (
     SequentialDataset,
+    SameTargetSequentialDataset,
     SlidingWindowDataset,
     ClozeDataset,
 )
@@ -226,6 +227,53 @@ class Sessions:
             neg_samples=neg_samples,
             niid=self._niid,
             include_user_id=include_user_id,
+        )
+
+        g = torch.Generator()
+        g.manual_seed(seed)
+
+        return DataLoader(
+            dataset,
+            batch_size=batch_size,
+            shuffle=shuffle,
+            worker_init_fn=seed_worker,
+            generator=g,
+            **kwargs,
+        )
+
+    def get_same_target_sequential_dataloader(
+        self,
+        max_seq_len: int,
+        batch_size: int = 1024,
+        shuffle: bool = True,
+        seed: int = 42,
+        low_memory: bool = False,
+        **kwargs: Any,
+    ) -> DataLoader:
+        """Sequential dataloader that also samples a same-target positive sequence."""
+
+        if self._valid_sample_indices is None:
+            all_indices = np.arange(len(self._flat_items))
+            valid_mask = np.ones(len(self._flat_items), dtype=bool)
+
+            user_starts = self._user_offsets[:-1]
+            active_starts = user_starts[user_starts < len(self._flat_items)]
+
+            valid_mask[active_starts] = False
+            self._valid_sample_indices = all_indices[valid_mask]
+
+        if len(self._valid_sample_indices) == 0:
+            raise ValueError(
+                "No valid sequences found (min 2 interactions per user needed)."
+            )
+
+        dataset = SameTargetSequentialDataset(
+            flat_items=self._flat_items,
+            flat_users=self._flat_users,
+            user_offsets=self._user_offsets,
+            valid_target_indices=self._valid_sample_indices,
+            max_seq_len=max_seq_len,
+            niid=self._niid,
         )
 
         g = torch.Generator()

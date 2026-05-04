@@ -46,6 +46,8 @@ The **Collaborative-Filtering Recommenders** module of WarpRec is a collection o
 | Latent Factor | [ADMMSlim](#admmslim) | Sparse item similarity model optimized via ADMM. |
 | | [BPR](#bpr) | Pairwise ranking model for implicit feedback. |
 | | [FISM](#fism) | Efficient item similarity model using weighted average as user embeddings. |
+| | [iALS](#ials) | Implicit ALS optimized for top-N recommendation with all-pairs weighting. |
+| | [iALS2008](#ials2008) | Confidence-weighted implicit ALS from the original ICDM 2008 formulation. |
 | | [MACRMF](#macrmf) | Matrix factorization with counterfactual reasoning for popularity debiasing. |
 | | [SLIM](#slim) | Interpretable item similarity model with L1/L2 regularization. |
 | Neural | [ConvNCF](#convncf) | Applies CNNs to user-item embeddings outer product to capture structured interaction patterns. |
@@ -753,6 +755,39 @@ models:
     batch_size: 2048
     epochs: 200
     learning_rate: 0.001
+```
+
+### iALS
+
+iALS (Improved Implicit ALS): An ALS-based matrix factorization model for implicit feedback that revisits the iALS objective for top-N recommendation. It uses binary positives, all-pairs weighting through `alpha0`, and frequency-scaled regularization through `nu`.
+
+For further details, please refer to the [paper](https://dl.acm.org/doi/10.1145/3523227.3548486).
+
+```yaml
+models:
+  iALS:
+    factors: 64
+    alpha0: 1.0
+    reg: 0.01
+    n_iterations: 10
+    nu: 0.5
+```
+
+### iALS2008
+
+iALS2008 (Implicit ALS 2008): Original confidence-weighted ALS for implicit feedback where confidence is modeled from interaction strength (linear or logarithmic). It optimizes a weighted squared loss alternating between user and item factor updates.
+
+For further details, please refer to the [paper](https://ieeexplore.ieee.org/document/4781121).
+
+```yaml
+models:
+  iALS2008:
+    factors: 64
+    alpha: 40.0
+    reg: 0.01
+    n_iterations: 10
+    confidence_type: "linear"
+    epsilon: 1.0
 ```
 
 ### MACRMF

@@ -5,12 +5,14 @@ from warprec.utils.config.model_configuration import (
     INT_FIELD,
     FLOAT_FIELD,
     BOOL_FIELD,
+    STR_FIELD,
 )
 from warprec.utils.config.common import (
     validate_greater_than_zero,
     validate_greater_equal_than_zero,
     validate_bool_values,
     validate_between_zero_and_one,
+    validate_str_list,
 )
 from warprec.utils.registry import params_registry
 
@@ -192,6 +194,113 @@ class FISM(RecomModel):
     def check_learning_rate(cls, v: list):
         """Validate learning_rate."""
         return validate_greater_than_zero(cls, v, "learning_rate")
+
+
+@params_registry.register("iALS")
+class iALS(RecomModel):
+    """Definition of the model iALS.
+
+    Attributes:
+         factors (INT_FIELD): List of values for factors.
+         alpha0 (FLOAT_FIELD): List of values for alpha0.
+         reg (FLOAT_FIELD): List of values for reg.
+         n_iterations (INT_FIELD): List of values for n_iterations.
+         nu (FLOAT_FIELD): List of values for nu.
+    """
+
+    factors: INT_FIELD
+    alpha0: FLOAT_FIELD
+    reg: FLOAT_FIELD
+    n_iterations: INT_FIELD
+    nu: FLOAT_FIELD
+
+    @field_validator("factors")
+    @classmethod
+    def check_factors(cls, v: list):
+        """Validate factors."""
+        return validate_greater_than_zero(cls, v, "factors")
+
+    @field_validator("alpha0")
+    @classmethod
+    def check_alpha0(cls, v: list):
+        """Validate alpha0."""
+        return validate_greater_equal_than_zero(cls, v, "alpha0")
+
+    @field_validator("reg")
+    @classmethod
+    def check_reg(cls, v: list):
+        """Validate reg."""
+        return validate_greater_equal_than_zero(cls, v, "reg")
+
+    @field_validator("n_iterations")
+    @classmethod
+    def check_n_iterations(cls, v: list):
+        """Validate n_iterations."""
+        return validate_greater_than_zero(cls, v, "n_iterations")
+
+    @field_validator("nu")
+    @classmethod
+    def check_nu(cls, v: list):
+        """Validate nu."""
+        return validate_greater_equal_than_zero(cls, v, "nu")
+
+
+@params_registry.register("iALS2008")
+class iALS2008(RecomModel):
+    """Definition of the model iALS2008.
+
+    Attributes:
+        factors (INT_FIELD): List of values for factors.
+        alpha (FLOAT_FIELD): List of values for alpha.
+        reg (FLOAT_FIELD): List of values for reg.
+        n_iterations (INT_FIELD): List of values for n_iterations.
+        confidence_type (STR_FIELD): List of values for confidence_type.
+        epsilon (FLOAT_FIELD): List of values for epsilon.
+    """
+
+    factors: INT_FIELD
+    alpha: FLOAT_FIELD
+    reg: FLOAT_FIELD
+    n_iterations: INT_FIELD
+    confidence_type: STR_FIELD
+    epsilon: FLOAT_FIELD
+
+    @field_validator("factors")
+    @classmethod
+    def check_factors(cls, v: list):
+        """Validate factors."""
+        return validate_greater_than_zero(cls, v, "factors")
+
+    @field_validator("alpha")
+    @classmethod
+    def check_alpha(cls, v: list):
+        """Validate alpha."""
+        return validate_greater_equal_than_zero(cls, v, "alpha")
+
+    @field_validator("reg")
+    @classmethod
+    def check_reg(cls, v: list):
+        """Validate reg."""
+        return validate_greater_equal_than_zero(cls, v, "reg")
+
+    @field_validator("n_iterations")
+    @classmethod
+    def check_n_iterations(cls, v: list):
+        """Validate n_iterations."""
+        return validate_greater_than_zero(cls, v, "n_iterations")
+
+    @field_validator("confidence_type")
+    @classmethod
+    def check_confidence_type(cls, v: list):
+        """Validate confidence_type."""
+        allowed = ["linear", "log"]
+        return validate_str_list(cls, v, allowed, "confidence_type")
+
+    @field_validator("epsilon")
+    @classmethod
+    def check_epsilon(cls, v: list):
+        """Validate epsilon."""
+        return validate_greater_than_zero(cls, v, "epsilon")
 
 
 @params_registry.register("MACRMF")

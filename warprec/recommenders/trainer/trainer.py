@@ -367,18 +367,6 @@ class Trainer:
             ),
         )
 
-        # Deadlock fix
-        resources = ray.available_resources()
-        available_cpus = resources.get("CPU", 1)
-        available_gpus = resources.get("GPU", 0)
-
-        if scaling_config_dict["use_gpu"] and opt_config.gpu_per_trial > 0:
-            max_concurrent = max(1, int(available_gpus // opt_config.gpu_per_trial))
-        else:
-            max_concurrent = max(
-                1, int(available_cpus // (opt_config.cpu_per_trial + 0.05))
-            )
-
         # Tuner will execute the driver function
         tune_config = TuneConfig(
             metric=validation_score,
@@ -388,7 +376,6 @@ class Trainer:
             num_samples=opt_config.num_samples,
             trial_name_creator=self._trial_name_creator(model_name),
             trial_dirname_creator=self._trial_dirname_creator(model_name),
-            max_concurrent_trials=max_concurrent,
         )
         trainable = tune.with_resources(
             tune.with_parameters(

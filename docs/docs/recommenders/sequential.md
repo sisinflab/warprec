@@ -16,7 +16,11 @@ The **Sequential Recommenders** module of WarpRec focuses on models that leverag
 | RNN-Based | [GRU4Rec](#gru4rec) | Session-based recommender using GRUs for short-term preference modeling. |
 | | [NARM](#narm) | Hybrid encoder (GRU + Attention) capturing sequential behavior and main purpose. |
 | Transformer-Based | [BERT4Rec](#bert4rec) | Bidirectional Transformer model trained on a masked item prediction task. |
+| | [BSARec](#bsarec) | Bandlimited self-attention combining frequency filtering and Transformer attention. |
+| | [CL4SRec](#cl4srec) | SASRec backbone with sequence augmentations and contrastive learning. |
 | | [CORE](#core) | Unifies encoding/decoding spaces using linear combination of embeddings and RDM. |
+| | [DuoRec](#duorec) | Contrastive sequential model with unsupervised and supervised sequence-level CL. |
+| | [eSASRec](#esasrec) | Enhanced SASRec with LiGR blocks and optional sampled-softmax training. |
 | | [gSASRec](#gsasrec) | General self-attention model for diverse and evolving user behaviors. |
 | | [LightSANs](#lightsans) | Efficient self-attention with low-rank decomposition and decoupled positioning. |
 | | [LinRec](#linrec) | Linear attention mechanism (O(N)) for efficient long-term recommendation. |
@@ -178,6 +182,62 @@ models:
     max_seq_len: 200
 ```
 
+### BSARec
+
+BSARec (Bandlimited Self-Attention for Sequential Recommendation): Combines frequency-domain filtering with self-attention in each block. The model captures periodic behavior through FFT-based low/high-pass decomposition while preserving Transformer-based sequential dependency modeling.
+
+For further details, please refer to the [paper](https://arxiv.org/abs/2312.10325).
+
+```yaml
+models:
+  BSARec:
+    embedding_size: 128
+    n_layers: 2
+    n_heads: 8
+    inner_size: 512
+    dropout_prob: 0.1
+    attn_dropout_prob: 0.1
+    alpha: 0.5
+    c: 10
+    reg_weight: 0.001
+    weight_decay: 0.0001
+    batch_size: 2048
+    epochs: 200
+    learning_rate: 0.001
+    neg_samples: 1
+    max_seq_len: 200
+```
+
+### CL4SRec
+
+CL4SRec (Contrastive Learning for Sequential Recommendation): Extends a SASRec-style encoder with stochastic sequence augmentations (crop/mask/reorder) and an InfoNCE objective, jointly optimized with next-item prediction.
+
+For further details, please refer to the [paper](https://arxiv.org/abs/2010.14395).
+
+```yaml
+models:
+  CL4SRec:
+    embedding_size: 128
+    n_layers: 2
+    n_heads: 8
+    inner_size: 512
+    dropout_prob: 0.1
+    attn_dropout_prob: 0.1
+    ssl_lambda: 0.1
+    tau: 1.0
+    sim_type: "dot"
+    crop_eta: 0.6
+    mask_gamma: 0.3
+    reorder_beta: 0.6
+    reg_weight: 0.001
+    weight_decay: 0.0001
+    batch_size: 2048
+    epochs: 200
+    learning_rate: 0.001
+    neg_samples: 1
+    max_seq_len: 200
+```
+
 ### CORE
 
 CORE (Consistent Representation Encoder): A session-based recommendation framework that unifies the representation space for both encoding and decoding. Unlike standard deep encoders that project session embeddings into a different space than item embeddings, CORE encodes sessions as a weighted sum of item embeddings (using a Transformer to learn the weights). It also employs Robust Distance Measuring (RDM) based on cosine similarity to prevent overfitting.
@@ -206,6 +266,63 @@ models:
     learning_rate: 0.001
     neg_samples: 1
     max_seq_len: 50
+```
+
+### DuoRec
+
+DuoRec (Dual Contrastive Sequential Recommendation): Uses a SASRec-like backbone and introduces two contrastive signals: unsupervised consistency across stochastic views of the same sequence, and supervised consistency across sequences sharing the same target item.
+
+For further details, please refer to the [paper](https://dl.acm.org/doi/10.1145/3477495.3531918).
+
+```yaml
+models:
+  DuoRec:
+    embedding_size: 128
+    n_layers: 2
+    n_heads: 8
+    inner_size: 512
+    dropout_prob: 0.1
+    attn_dropout_prob: 0.1
+    ssl_type: "us_x"
+    ssl_lambda: 0.1
+    ssl_lambda_sem: 0.1
+    tau: 1.0
+    sim_type: "dot"
+    reg_weight: 0.001
+    weight_decay: 0.0001
+    batch_size: 2048
+    epochs: 200
+    learning_rate: 0.001
+    neg_samples: 1
+    max_seq_len: 200
+```
+
+### eSASRec { #esasrec }
+
+eSASRec (Enhanced SASRec): A modular enhancement of SASRec that supports LiGR blocks, sampled-softmax training, and optional mixed-negative sampling. It improves training efficiency while preserving strong sequential modeling performance.
+
+For further details, please refer to the [paper](https://arxiv.org/abs/2508.06450).
+
+```yaml
+models:
+  eSASRec:
+    embedding_size: 128
+    n_layers: 2
+    n_heads: 8
+    inner_size: 512
+    dropout_prob: 0.1
+    attn_dropout_prob: 0.1
+    use_relative_pos: False
+    use_sampled_softmax: True
+    use_ligr: True
+    mn_ratio: 0.0
+    reg_weight: 0.001
+    weight_decay: 0.0001
+    batch_size: 2048
+    epochs: 200
+    learning_rate: 0.001
+    neg_samples: 1
+    max_seq_len: 200
 ```
 
 ### gSASRec

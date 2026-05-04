@@ -1,6 +1,6 @@
 # Models Taxonomy
 
-WarpRec ships with **65+ built-in algorithms** spanning 6 model families. All models can run locally or at cluster scale via Ray.
+WarpRec ships with **70+ built-in algorithms** spanning 6 model families. All models can run locally or at cluster scale via Ray.
 
 | Family | Model | Description |
 |---|---|---|
@@ -44,6 +44,8 @@ WarpRec ships with **65+ built-in algorithms** spanning 6 model families. All mo
 | **CF / Latent Factor** | [ADMMSlim](collaborative.md#admmslim) | Sparse item similarity matrix optimized via ADMM. |
 | | [BPR](collaborative.md#bpr) | Bayesian Personalized Ranking for pairwise implicit feedback. |
 | | [FISM](collaborative.md#fism) | Factored item similarity with weighted-average user representations. |
+| | [iALS](collaborative.md#ials) | Implicit ALS revisited for top-N recommendation with all-pairs weighting. |
+| | [iALS2008](collaborative.md#ials2008) | Original confidence-weighted implicit ALS for implicit-feedback matrix factorization. |
 | | [MACRMF](collaborative.md#macrmf) | Counterfactual MF eliminating popularity bias via causal inference. |
 | | [Slim](collaborative.md#slim) | Sparse linear method with L1/L2 (ElasticNet) regularization. |
 | **CF / Neural** | [ConvNCF](collaborative.md#convncf) | CNN on user-item embedding outer product for structured interaction patterns. |
@@ -62,7 +64,11 @@ WarpRec ships with **65+ built-in algorithms** spanning 6 model families. All mo
 | **Sequential / RNN** | [GRU4Rec](sequential.md#gru4rec) | Session-based GRU for short-term preference modeling. |
 | | [NARM](sequential.md#narm) | Hybrid GRU encoder with global + local attention mechanisms. |
 | **Sequential / Transformer** | [BERT4Rec](sequential.md#bert4rec) | Bidirectional Transformer with masked item prediction (cloze task). |
+| | [BSARec](sequential.md#bsarec) | Bandlimited self-attention combining frequency filtering with Transformer attention. |
+| | [CL4SRec](sequential.md#cl4srec) | SASRec-style encoder with sequence augmentations and contrastive learning. |
 | | [CORE](sequential.md#core) | Consistent Representation Encoder unifying encoding/decoding spaces. |
+| | [DuoRec](sequential.md#duorec) | Dual contrastive sequential recommendation with unsupervised and supervised CL. |
+| | [eSASRec](sequential.md#esasrec) | Enhanced SASRec variant with LiGR blocks and sampled-softmax support. |
 | | [gSASRec](sequential.md#gsasrec) | General self-attention with group-wise binary cross-entropy loss. |
 | | [LightSANs](sequential.md#lightsans) | Low-rank decomposed self-attention with decoupled position encoding. |
 | | [LinRec](sequential.md#linrec) | Linear attention mechanism (O(N)) for efficient long-sequence modeling. |
