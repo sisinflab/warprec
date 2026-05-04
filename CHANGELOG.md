@@ -2,6 +2,48 @@
 
 <!-- version list -->
 
+## v1.4.0 (2026-05-04)
+
+### Bug Fixes
+
+- Fixed PAAC model implementation to correctly reflect original paper formulation
+  ([`057b727`](https://github.com/sisinflab/warprec/commit/057b727d37cdc621562e4cc094233ddb91c15f21))
+
+- Removed max trial constraint
+  ([`d0be3be`](https://github.com/sisinflab/warprec/commit/d0be3beb719fbb5cc6f4071ea599a467fcf4f97b))
+
+- RP3Beta model initialization
+  ([`b1e002e`](https://github.com/sisinflab/warprec/commit/b1e002e8d3510cb9f1c723618e21ed84c7cbe16e))
+
+### Documentation
+
+- Added new models to the documentation
+  ([`bbead3c`](https://github.com/sisinflab/warprec/commit/bbead3cf89d9a2424979fa1c922d81d4ed10649f))
+
+### Features
+
+- Added bsarec model implementation
+  ([`af91531`](https://github.com/sisinflab/warprec/commit/af915318eaf9b4fb73ded1d0b71d22471b2fcdf3))
+
+- Added cl4srec model implementation
+  ([`1e26bee`](https://github.com/sisinflab/warprec/commit/1e26bee42c01d02ccd0d5d703dccbdd3a8c90293))
+
+- Added duorec model implementation
+  ([`21a7345`](https://github.com/sisinflab/warprec/commit/21a7345bfed7744eeff54ebb609d95ce61dd4e55))
+
+- Added esasrec model implementation
+  ([`2390ce9`](https://github.com/sisinflab/warprec/commit/2390ce97f21dd7ff519d1e11d9a275a020609adc))
+
+- Added iALS model implementation
+  ([`29b583d`](https://github.com/sisinflab/warprec/commit/29b583d3916a9e890321bf2a31204a84009b74ec))
+
+- Added iALS2008 model implementation
+  ([`11b5eed`](https://github.com/sisinflab/warprec/commit/11b5eed8eda9888df2e05be5b443a01f2d86fa53))
+
+- New dataloader for same target sequential data
+  ([`2da35bf`](https://github.com/sisinflab/warprec/commit/2da35bf1e640830a705bc6e5aeec10a4f251cd42))
+
+
 ## v1.3.2 (2026-04-29)
 
 ### Bug Fixes
