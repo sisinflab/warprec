@@ -12,7 +12,15 @@ Auto-generated documentation for sequential recommender model classes.
 
 ::: warprec.recommenders.sequential_recommender.bert4rec.BERT4Rec
 
+::: warprec.recommenders.sequential_recommender.bsarec.BSARec
+
+::: warprec.recommenders.sequential_recommender.cl4srec.CL4SRec
+
 ::: warprec.recommenders.sequential_recommender.core.CORE
+
+::: warprec.recommenders.sequential_recommender.duorec.DuoRec
+
+::: warprec.recommenders.sequential_recommender.esasrec.eSASRec
 
 ::: warprec.recommenders.sequential_recommender.gsasrec.gSASRec
 

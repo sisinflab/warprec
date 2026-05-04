@@ -82,6 +82,10 @@ Auto-generated documentation for all collaborative filtering model classes.
 
 ::: warprec.recommenders.collaborative_filtering_recommender.latent_factor.fism.FISM
 
+::: warprec.recommenders.collaborative_filtering_recommender.latent_factor.ials.iALS
+
+::: warprec.recommenders.collaborative_filtering_recommender.latent_factor.ials2008.iALS2008
+
 ::: warprec.recommenders.collaborative_filtering_recommender.latent_factor.macrmf.MACRMF
 
 ::: warprec.recommenders.collaborative_filtering_recommender.latent_factor.slim.Slim
