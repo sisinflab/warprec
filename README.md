@@ -17,7 +17,7 @@
   </a>
 </p>
 
-WarpRec is a flexible and efficient framework designed for building, training, and evaluating recommendation models. It supports a wide range of configurations, customizable pipelines, and powerful optimization tools to enhance model performance and usability.
+WarpRec is a flexible and efficient framework designed for building, training, evaluating, and estimating recommendation workloads. It supports a wide range of configurations, customizable pipelines, and powerful optimization tools to enhance model performance and usability.
 
 WarpRec is designed for both beginners and experienced practitioners. For newcomers, it offers a simple and intuitive interface to explore and experiment with state-of-the-art recommendation models. For advanced users, WarpRec provides a modular and extensible architecture that allows rapid prototyping, complex experiment design, and fine-grained control over every step of the recommendation pipeline.
 
@@ -68,7 +68,7 @@ An **Application Layer** exposes trained models through a REST API (FastAPI) and
 - **Agentic AI via MCP**: WarpRec natively implements a [Model Context Protocol](https://modelcontextprotocol.io/) server (`infer-api/mcp_server.py`), exposing trained recommenders as callable tools within LLM and autonomous agent workflows — transforming the framework from a static predictor into an interactive, agent-ready component.
 - **REST API & Model Serving**: Trained models are instantly deployable as RESTful microservices via the built-in FastAPI server (`infer-api/server.py`), decoupling the modeling core from serving infrastructure with zero additional engineering effort.
 - **Experiment Tracking**: Native integrations with `TensorBoard`, `Weights & Biases`, and `MLflow` for real-time monitoring of metrics, training dynamics, and multi-run management.
-- **Custom Pipelines & Callbacks**: Beyond the three standard pipelines (Training, Design, Evaluation), WarpRec exposes an event-driven Callback system for injecting custom logic at any stage — enabling complex experiments without modifying framework internals.
+- **Custom Pipelines & Callbacks**: Alongside the standard Training, Design, Evaluation, Swarm, and Estimate workflows, WarpRec exposes an event-driven Callback system for injecting custom logic at any stage — enabling complex experiments without modifying framework internals.
 
 ## ⚙️ Installation
 
@@ -103,12 +103,14 @@ If you use [Poetry](https://python-poetry.org/) for dependency management, you c
    ```bash
    git clone <repository_url>
    cd warprec
+   ```
 
 2. **Install the project**
     ```bash
     poetry install
     # Or you can install all extra dependencies
     poetry install --extras all
+    ```
 
 ### 🛠️ Development Setup (Conda)
 
@@ -147,12 +149,14 @@ To train a model, use the `train` pipeline. Here's an example:
 2. Start a Ray HEAD node:
     ```bash
     ray start --head
+    ```
 3. Run the following command:
     ```bash
     # Running with pip
     warprec -c config/train_config.yml -p train
     # Or with cloned repo
     python -m warprec.run -c config/train_config.yml -p train
+    ```
 
 This command starts the training process using the specified configuration file.
 
@@ -168,6 +172,7 @@ To implement a custom model, WarpRec provides a dedicated design interface via t
     warprec -c config/design_config.yml -p design
     # Or with cloned repo
     python -m warprec.run -c config/design_config.yml -p design
+    ```
 
 This command initializes a lightweight training pipeline, specifically intended for rapid prototyping and debugging of custom architectures within the framework.
 
@@ -183,6 +188,7 @@ To run only evaluation on a model, use the `eval` pipeline. Here's an example:
     warprec -c config/eval_config.yml -p eval
     # Or with cloned repo
     python -m warprec.run -c config/eval_config.yml -p eval
+    ```
 
 This command starts the evaluation process using the specified configuration file.
 
@@ -193,9 +199,11 @@ The project includes a Makefile to simplify common operations:
 - 🧹 Run linting:
     ```bash
     make lint
+    ```
 - 🧑‍🔬 Run tests:
     ```bash
     make test
+    ```
 
 ## 🤝 Contributing
 We welcome contributions from the community! Whether you're fixing bugs, improving documentation, or proposing new features, your input is highly valued.

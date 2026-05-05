@@ -1,6 +1,6 @@
 # Standardized Workflows
 
-WarpRec abstracts complex workflows into three standardized execution pipelines, all controlled via declarative YAML configuration files. Each pipeline serves a distinct purpose in the experimentation lifecycle:
+WarpRec abstracts complex workflows into five standardized execution pipelines, all controlled via declarative YAML configuration files. Each pipeline serves a distinct purpose in the experimentation lifecycle:
 
 | Pipeline | Command | Purpose |
 |---|---|---|
@@ -8,6 +8,7 @@ WarpRec abstracts complex workflows into three standardized execution pipelines,
 | **Training** | `-p train` | Full-scale experiments with distributed HPO, cross-validation, and statistical testing via Ray. |
 | **Swarm** | `-p swarm` | Aggressive full-scale experiment consuming all available resources in the cluster. |
 | **Evaluation** | `-p eval` | Evaluate pre-trained checkpoints or external recommendation files without retraining. |
+| **Estimate** | `-p estimate` | Estimate time and memory costs before full execution using lightweight profiling and analytical space estimates. |
 
 All pipelines are invoked with the same command structure:
 
@@ -28,3 +29,4 @@ python -m warprec.run -c <config_file>.yml -p <pipeline>
 | Complete the training as fast as possible | Swarm | Yes | Yes |
 | Evaluate a saved checkpoint on new metrics | Evaluation | No | Optional |
 | Evaluate recommendations from another framework | Evaluation | No | Optional |
+| Estimate RAM, VRAM, and runtime before a full run | Estimate | No | Yes |

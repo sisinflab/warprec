@@ -15,6 +15,7 @@ nav:
     - Swarm: pipelines/swarm.md
     - Design: pipelines/design.md
     - Evaluation: pipelines/evaluation.md
+    - Estimate: pipelines/estimate.md
     - Callbacks: pipelines/callbacks.md
   - Data Management:
     - Reader: data-management/reader.md
@@ -29,6 +30,7 @@ nav:
       - Dashboard: configuration/dashboard.md
       - Models: configuration/models.md
       - Evaluation: configuration/evaluation.md
+      - Estimate: configuration/estimate.md
       - General: configuration/general.md
   - Recommenders:
       - Module Overview: recommenders/index.md

@@ -108,4 +108,4 @@ python -m warprec.run -c config/quick_start.yml -p train
 
 !!! note
 
-    WarpRec supports three execution pipelines: **Training** (full HPO), **Design** (rapid prototyping), and **Evaluation** (pre-trained checkpoints). See [Quick Start](get-started/quick-start.md) for detailed examples covering local, distributed, and agentic workflows.
+    WarpRec supports five execution pipelines: **Training** (full HPO), **Swarm** (fully parallel training), **Design** (rapid prototyping), **Evaluation** (pre-trained checkpoints), and **Estimate** (resource and runtime profiling). See [Quick Start](get-started/quick-start.md) for detailed examples covering local, distributed, and agentic workflows.
