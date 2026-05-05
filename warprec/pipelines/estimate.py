@@ -280,11 +280,13 @@ def _expand_model_setups(model_name: str, model_params: dict) -> List[dict]:
 
     setups = []
     for values in product(*field_values):
-        setup = {
-            "meta": model_params.get("meta"),
-            "optimization": model_params.get("optimization"),
-            "early_stopping": model_params.get("early_stopping"),
-        }
+        setup = {}
+        for optional_field in ("meta", "optimization", "early_stopping"):
+            if (
+                optional_field in model_params
+                and model_params[optional_field] is not None
+            ):
+                setup[optional_field] = model_params[optional_field]
         setup.update(dict(zip(param_fields, values)))
         setups.append(setup)
     return setups
