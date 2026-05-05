@@ -2,6 +2,22 @@
 
 <!-- version list -->
 
+## v1.4.1 (2026-05-05)
+
+### Bug Fixes
+
+- Added warning message in the swarm pipeline
+  ([`750e321`](https://github.com/sisinflab/warprec/commit/750e321bdc349a27cee0f7cca3774f8cbb207a75))
+
+- Corrected PAAC model loss computation
+  ([`074d11a`](https://github.com/sisinflab/warprec/commit/074d11aacc4c909400ccb5ce7ce52533df4b7792))
+
+### Documentation
+
+- Added references to the new estimate pipeline
+  ([`fcad7b1`](https://github.com/sisinflab/warprec/commit/fcad7b104a66ab9b5d7e03be09976855ee1edac7))
+
+
 ## v1.4.0 (2026-05-04)
 
 ### Bug Fixes
