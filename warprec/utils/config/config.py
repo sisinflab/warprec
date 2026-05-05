@@ -17,6 +17,7 @@ from warprec.utils.config import (
     DashboardConfig,
     RecomModel,
     EvaluationConfig,
+    EstimateConfig,
 )
 from warprec.utils.callback import WarpRecCallback
 from warprec.utils.enums import ReadingMethods, WritingMethods
@@ -314,6 +315,16 @@ class EvalConfiguration(WarpRecConfiguration):
     evaluation: EvaluationConfig
 
 
+class EstimateConfiguration(EvalConfiguration):
+    """Definition of estimate pipeline configuration.
+
+    Attributes:
+        estimate (EstimateConfig): Estimate-specific execution settings.
+    """
+
+    estimate: EstimateConfig = Field(default_factory=EstimateConfig)
+
+
 def load_train_configuration(path: str) -> TrainConfiguration:
     """This method reads the train configuration file and returns
         a TrainConfiguration object.
@@ -363,6 +374,23 @@ def load_eval_configuration(path: str) -> EvalConfiguration:
         data = yaml.safe_load(file)
     logger.msg("Reading process completed correctly.")
     return EvalConfiguration(**data)
+
+
+def load_estimate_configuration(path: str) -> EstimateConfiguration:
+    """This method reads the estimate configuration file and returns
+        a EstimateConfiguration object.
+
+    Args:
+        path (str): The path to the configuration file.
+
+    Returns:
+        EstimateConfiguration: The configuration object created from the configuration file.
+    """
+    logger.msg(f"Reading estimate configuration file in: {path}")
+    with open(path, "r", encoding="utf-8") as file:
+        data = yaml.safe_load(file)
+    logger.msg("Reading process completed correctly.")
+    return EstimateConfiguration(**data)
 
 
 def load_callback(
