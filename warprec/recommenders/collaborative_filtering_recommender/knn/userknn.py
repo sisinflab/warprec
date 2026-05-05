@@ -30,6 +30,28 @@ class UserKNN(Recommender):
     k: int
     similarity: str
 
+    @classmethod
+    def estimate_space(
+        cls,
+        params: dict,
+        info: dict,
+        interactions: Optional[Interactions] = None,
+        **kwargs: Any,
+    ) -> dict:
+        interactions = cls._require_interactions_for_estimate(
+            interactions, cls.__name__
+        )
+        X = interactions.get_sparse()
+        n_users = info["n_users"]
+
+        train_matrix_mb = cls._sparse_size_mb(X)
+        similarity_matrix_mb = cls._dense_size_mb((n_users, n_users), X.dtype)
+
+        return {
+            "train_ram_mb": train_matrix_mb + similarity_matrix_mb,
+            "notes": "UserKNN analytical train-space estimate",
+        }
+
     def __init__(
         self,
         params: dict,

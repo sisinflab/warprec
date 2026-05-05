@@ -34,6 +34,60 @@ class AttributeUserKNN(Recommender):
     similarity: str
     user_profile: str
 
+    @classmethod
+    def estimate_space(
+        cls,
+        params: dict,
+        info: dict,
+        interactions: Optional[Interactions] = None,
+        **kwargs: Any,
+    ) -> dict:
+        interactions = cls._require_interactions_for_estimate(
+            interactions, cls.__name__
+        )
+        X_inter = interactions.get_sparse()
+        X_feat = interactions.get_side_sparse()
+        if X_feat is None:
+            raise ValueError(
+                "AttributeUserKNN requires side information to estimate space."
+            )
+
+        n_users = info["n_users"]
+        n_items = info["n_items"]
+        n_features = X_feat.shape[1]
+
+        avg_features_per_item = X_feat.nnz / max(n_items, 1)
+        profile_nnz = int(
+            min(n_users * n_features, np.ceil(X_inter.nnz * avg_features_per_item))
+        )
+
+        train_matrix_mb = cls._sparse_size_mb(X_inter)
+        feature_matrix_mb = cls._sparse_size_mb(X_feat)
+        profile_matrix_mb = cls._compressed_sparse_size_mb(
+            nnz=profile_nnz,
+            ptr_len=n_users + 1,
+            data_dtype=X_inter.dtype,
+        )
+        similarity_matrix_mb = cls._dense_size_mb((n_users, n_users), X_inter.dtype)
+
+        train_ram_mb = cls._peak_size_mb(
+            train_matrix_mb + feature_matrix_mb + profile_matrix_mb,
+            train_matrix_mb + profile_matrix_mb + similarity_matrix_mb,
+        )
+        if params.get("user_profile") == "tfidf":
+            train_ram_mb = cls._peak_size_mb(
+                train_ram_mb,
+                train_matrix_mb
+                + feature_matrix_mb
+                + 2 * profile_matrix_mb
+                + cls._dense_size_mb((n_users,), np.float64),
+            )
+
+        return {
+            "train_ram_mb": train_ram_mb,
+            "notes": "AttributeUserKNN analytical train-space estimate",
+        }
+
     def __init__(
         self,
         params: dict,

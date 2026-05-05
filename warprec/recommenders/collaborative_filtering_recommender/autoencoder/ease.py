@@ -1,5 +1,5 @@
 # pylint: disable = R0801, E1102
-from typing import Any
+from typing import Any, Optional
 
 import numpy as np
 
@@ -26,6 +26,41 @@ class EASE(ItemSimRecommender):
     """
 
     l2: float
+
+    @classmethod
+    def estimate_space(
+        cls,
+        params: dict,
+        info: dict,
+        interactions: Optional[Interactions] = None,
+        **kwargs: Any,
+    ) -> dict:
+        interactions = cls._require_interactions_for_estimate(
+            interactions, cls.__name__
+        )
+        X = interactions.get_sparse()
+        n_items = info["n_items"]
+
+        gram_matrix_mb = cls._estimated_sparse_square_size_mb(
+            source_nnz=X.nnz,
+            side_len=n_items,
+            data_dtype=X.dtype,
+        )
+        dense_conversion_mb = cls._dense_size_mb((n_items, n_items), X.dtype)
+        dense_inverse_mb = cls._dense_size_mb((n_items, n_items), np.float64)
+
+        regularization_peak_mb = (
+            gram_matrix_mb + dense_conversion_mb + 2 * dense_inverse_mb
+        )
+        inverse_peak_mb = dense_conversion_mb + 4 * dense_inverse_mb
+
+        return {
+            "train_ram_mb": cls._peak_size_mb(
+                regularization_peak_mb,
+                inverse_peak_mb,
+            ),
+            "notes": "EASE analytical train-space estimate",
+        }
 
     def __init__(
         self,

@@ -1,5 +1,5 @@
 # pylint: disable = R0801, E1102
-from typing import Any
+from typing import Any, Optional
 
 import torch
 from warprec.data.entities import Interactions
@@ -27,6 +27,35 @@ class AttributeItemKNN(ItemSimRecommender):
 
     k: int
     similarity: str
+
+    @classmethod
+    def estimate_space(
+        cls,
+        params: dict,
+        info: dict,
+        interactions: Optional[Interactions] = None,
+        **kwargs: Any,
+    ) -> dict:
+        interactions = cls._require_interactions_for_estimate(
+            interactions, cls.__name__
+        )
+        X = interactions.get_sparse()
+        X_feat = interactions.get_side_sparse()
+        if X_feat is None:
+            raise ValueError(
+                "AttributeItemKNN requires side information to estimate space."
+            )
+
+        n_items = info["n_items"]
+
+        train_matrix_mb = cls._sparse_size_mb(X)
+        feature_matrix_mb = cls._sparse_size_mb(X_feat)
+        similarity_matrix_mb = cls._dense_size_mb((n_items, n_items), X_feat.dtype)
+
+        return {
+            "train_ram_mb": train_matrix_mb + feature_matrix_mb + similarity_matrix_mb,
+            "notes": "AttributeItemKNN analytical train-space estimate",
+        }
 
     def __init__(
         self,

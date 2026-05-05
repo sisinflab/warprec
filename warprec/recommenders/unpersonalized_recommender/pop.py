@@ -1,6 +1,7 @@
 # pylint: disable = R0801, E1102
 from typing import Any, Optional
 
+import numpy as np
 import torch
 from torch import Tensor
 from warprec.recommenders.base_recommender import Recommender
@@ -46,6 +47,26 @@ class Pop(Recommender):
         # Add epsilon to avoid division by zero if there are no interactions
         norm_pop = popularity / (item_count + 1e-6)
         self.register_buffer("normalized_popularity", norm_pop)
+
+    @classmethod
+    def estimate_space(
+        cls,
+        params: dict,
+        info: dict,
+        interactions: Optional[Interactions] = None,
+        **kwargs: Any,
+    ) -> dict:
+        interactions = cls._require_interactions_for_estimate(
+            interactions, cls.__name__
+        )
+        X = interactions.get_sparse()
+        train_ram_mb = cls._sparse_size_mb(X)
+        train_ram_mb += cls._dense_size_mb((info["n_items"],), np.float32)
+        train_ram_mb += cls._dense_size_mb((1,), np.float32)
+        return {
+            "train_ram_mb": train_ram_mb,
+            "notes": "Pop analytical train-space estimate",
+        }
 
     def predict(
         self,

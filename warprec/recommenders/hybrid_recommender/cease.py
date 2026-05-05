@@ -1,5 +1,5 @@
 # pylint: disable = R0801, E1102
-from typing import Any
+from typing import Any, Optional
 
 import numpy as np
 from scipy.sparse import vstack
@@ -28,6 +28,54 @@ class CEASE(ItemSimRecommender):
 
     l2: float
     alpha: float
+
+    @classmethod
+    def estimate_space(
+        cls,
+        params: dict,
+        info: dict,
+        interactions: Optional[Interactions] = None,
+        **kwargs: Any,
+    ) -> dict:
+        interactions = cls._require_interactions_for_estimate(
+            interactions, cls.__name__
+        )
+        X = interactions.get_sparse()
+        item_profile = interactions.get_side_sparse()
+        if item_profile is None:
+            raise ValueError("CEASE requires side information to estimate space.")
+
+        n_items = info["n_items"]
+        extended_nnz = X.nnz + item_profile.nnz
+        extended_matrix_mb = cls._compressed_sparse_size_mb(
+            nnz=extended_nnz,
+            ptr_len=X.shape[0] + item_profile.shape[1] + 1,
+            data_dtype=X.dtype,
+        )
+        gram_matrix_mb = cls._estimated_sparse_square_size_mb(
+            source_nnz=extended_nnz,
+            side_len=n_items,
+            data_dtype=X.dtype,
+        )
+        dense_conversion_mb = cls._dense_size_mb((n_items, n_items), X.dtype)
+        dense_inverse_mb = cls._dense_size_mb((n_items, n_items), np.float64)
+
+        regularization_peak_mb = (
+            extended_matrix_mb
+            + gram_matrix_mb
+            + dense_conversion_mb
+            + 2 * dense_inverse_mb
+        )
+        inverse_peak_mb = dense_conversion_mb + 4 * dense_inverse_mb
+
+        train_ram_mb = cls._peak_size_mb(
+            regularization_peak_mb,
+            inverse_peak_mb,
+        )
+        return {
+            "train_ram_mb": train_ram_mb,
+            "notes": "CEASE analytical train-space estimate",
+        }
 
     def __init__(
         self,
