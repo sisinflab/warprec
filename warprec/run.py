@@ -1,12 +1,17 @@
 import argparse
+import warnings
 from pathlib import Path
 
 from warprec.pipelines import (
     design_pipeline,
+    estimate_pipeline,
     train_pipeline,
     eval_pipeline,
     swarm_pipeline,
 )
+
+# Disable warnings during pipelines execution
+warnings.filterwarnings("ignore", category=UserWarning)
 
 
 def main():
@@ -35,9 +40,16 @@ def main():
     if not Path(path).is_file():
         raise FileNotFoundError(f"Configuration file not found at: {path}")
 
-    if pipeline not in ["train", "design", "eval", "swarm"]:
+    if pipeline not in [
+        "train",
+        "design",
+        "eval",
+        "swarm",
+        "estimate",
+    ]:
         raise ValueError(
-            f"Invalid pipeline specified: {pipeline}. Choose 'train', 'design', 'eval' or 'swarm'."
+            "Invalid pipeline specified: "
+            f"{pipeline}. Choose 'train', 'design', 'eval', 'swarm' or 'estimate'."
         )
 
     match pipeline:
@@ -49,6 +61,8 @@ def main():
             eval_pipeline(path)
         case "swarm":
             swarm_pipeline(path)
+        case "estimate":
+            estimate_pipeline(path)
 
 
 if __name__ == "__main__":
