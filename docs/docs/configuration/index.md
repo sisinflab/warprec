@@ -13,6 +13,7 @@ WarpRec supports multiple pipelines that leverage the configuration system diffe
 2. **Swarm Pipeline**: Executes the same workflow as the training pipeline *every trial* will be processed in parallel saturating every resource possible in the Ray cluster.
 3. **Design Pipeline**: Focuses on testing and evaluating models without HPO. This pipeline is ideal for rapid prototyping and design experiments.
 4. **Evaluation Pipeline**: Evaluates pre-trained models without training, using provided checkpoints.
+5. **Estimate Pipeline**: Estimates runtime and memory requirements with lightweight profiling before executing a full experiment.
 
 A single configuration file can be used across multiple pipelines; WarpRec ensures that workflows remain interchangeable, with some sections being ignored or interpreted differently depending on the pipeline.
 
@@ -167,4 +168,62 @@ Run the evaluation pipeline with:
 
 ```bash
 python -m warprec.run --config path/to/the/config.yml --pipeline eval
+```
+
+### Estimate Pipeline
+
+The **estimate pipeline** is used to approximate execution cost before running a full experiment. It supports the same dataset loading and evaluation setup as the evaluation pipeline, but adds an `estimate` section to control how many batches are sampled for timing. The workflow requires the following sections:
+
+- reader
+- writer
+- splitter
+- models
+- evaluation
+- estimate
+
+Optionally, you can also provide:
+
+- filtering
+- general
+
+An example use of the estimate pipeline is to compare expected cost across multiple candidate models. Here is a configuration example:
+
+```yaml
+reader:
+    loading_strategy: dataset
+    data_type: transaction
+    reading_method: local
+    local_path: path/to/your/dataset.tsv
+    rating_type: implicit
+writer:
+    dataset_name: MyEstimateRun
+    writing_method: local
+    local_experiment_path: experiment/test/
+splitter:
+    test_splitting:
+        strategy: temporal_holdout
+        ratio: 0.1
+models:
+    ItemKNN:
+        k: [50, 100, 200]
+        similarity: cosine
+    BPR:
+        embedding_size: [64, 128]
+        reg_weight: [0.0001, 0.001]
+        batch_size: 4096
+        epochs: 100
+        learning_rate: [grid, 0.0005, 0.001]
+evaluation:
+    top_k: [10, 20]
+    metrics: [nDCG, Precision, Recall]
+estimate:
+    warmup_batches: 10
+    train_batches: 100
+    eval_batches: 100
+```
+
+Run the estimate pipeline with:
+
+```bash
+python -m warprec.run --config path/to/the/config.yml --pipeline estimate
 ```

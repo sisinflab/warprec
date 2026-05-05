@@ -39,6 +39,9 @@ def swarm_pipeline(path: str):
         ConnectionError: If unable to connect to Ray cluster.
         ValueError: If the file format is not supported.
     """
+    logger.attention(
+        "WARNING: Swarm pipeline is experimental. Please submit bug reports via GitHub Issues."
+    )
     logger.msg("Start experiment swarming.")
     experiment_start_time = time.time()
 

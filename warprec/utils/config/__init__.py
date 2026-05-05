@@ -19,14 +19,17 @@ from .writer_configuration import (
     SplitWriting,
     RecommendationWriting,
 )
+from .estimate_configuration import EstimateConfig
 from .config import (
     WarpRecConfiguration,
     TrainConfiguration,
     DesignConfiguration,
     EvalConfiguration,
+    EstimateConfiguration,
     load_train_configuration,
     load_design_configuration,
     load_eval_configuration,
+    load_estimate_configuration,
     load_callback,
 )
 
@@ -57,12 +60,15 @@ __all__ = [
     "ResultsWriting",
     "SplitWriting",
     "RecommendationWriting",
+    "EstimateConfig",
     "WarpRecConfiguration",
     "TrainConfiguration",
     "DesignConfiguration",
     "EvalConfiguration",
+    "EstimateConfiguration",
     "load_train_configuration",
     "load_design_configuration",
     "load_eval_configuration",
+    "load_estimate_configuration",
     "load_callback",
 ]

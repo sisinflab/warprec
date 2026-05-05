@@ -7,7 +7,7 @@ import narwhals as nw
 from scipy.sparse import coo_matrix
 from torch import Tensor
 
-from warprec.data.entities import Sessions
+from warprec.data.entities import Interactions, Sessions
 from warprec.recommenders.base_recommender import (
     Recommender,
     SequentialRecommenderUtils,
@@ -44,6 +44,59 @@ class STAN(Recommender, SequentialRecommenderUtils):
     lambda_2: float
     lambda_3: float
     max_seq_len: int
+
+    @classmethod
+    def estimate_space(
+        cls,
+        params: dict,
+        info: dict,
+        interactions: Optional[Interactions] = None,
+        **kwargs: Any,
+    ) -> dict:
+        sessions = kwargs.get("sessions")
+        if sessions is None:
+            raise ValueError("STAN requires sessions to estimate space.")
+
+        n_users = info["n_users"]
+        n_items = info["n_items"]
+        n_events = len(sessions._flat_items)
+        nnz = interactions.get_sparse().nnz if interactions is not None else n_events
+
+        flat_items_mb = cls._bytes_to_mb(sessions._flat_items.nbytes)
+        flat_users_mb = cls._bytes_to_mb(sessions._flat_users.nbytes)
+        user_offsets_mb = cls._bytes_to_mb(sessions._user_offsets.nbytes)
+        session_timestamps_mb = (
+            cls._dense_size_mb((n_users,), np.float64)
+            if sessions.timestamp_label in sessions._inter_df.columns
+            else 0.0
+        )
+        session_item_coo_mb = cls._bytes_to_mb(nnz * (8 + 4 + 4))
+        session_item_csr_mb = cls._compressed_sparse_size_mb(
+            nnz=nnz,
+            ptr_len=n_users + 1,
+            data_dtype=np.float64,
+        )
+        session_item_csc_mb = cls._compressed_sparse_size_mb(
+            nnz=nnz,
+            ptr_len=n_items + 1,
+            data_dtype=np.float64,
+        )
+        unique_counts_mb = cls._dense_size_mb((n_users,), np.float64)
+
+        resident_mb = (
+            flat_items_mb
+            + flat_users_mb
+            + user_offsets_mb
+            + session_timestamps_mb
+            + session_item_csc_mb
+            + session_item_csr_mb
+            + unique_counts_mb
+        )
+        train_ram_mb = cls._peak_size_mb(resident_mb, resident_mb + session_item_coo_mb)
+        return {
+            "train_ram_mb": train_ram_mb,
+            "notes": "STAN analytical train-space estimate",
+        }
 
     def __init__(
         self,

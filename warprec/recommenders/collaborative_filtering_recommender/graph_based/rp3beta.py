@@ -1,5 +1,5 @@
 # pylint: disable = R0801, E1102
-from typing import Union, Any
+from typing import Union, Any, Optional
 
 import numpy as np
 from scipy.sparse import csr_matrix, coo_matrix, lil_matrix
@@ -33,6 +33,60 @@ class RP3Beta(ItemSimRecommender):
     alpha: float
     beta: float
     normalize: bool
+
+    @classmethod
+    def estimate_space(
+        cls,
+        params: dict,
+        info: dict,
+        interactions: Optional[Interactions] = None,
+        **kwargs: Any,
+    ) -> dict:
+        interactions = cls._require_interactions_for_estimate(
+            interactions, cls.__name__
+        )
+        X = interactions.get_sparse()
+        n_users = info["n_users"]
+        n_items = info["n_items"]
+        filtered_nnz = min(n_items * n_items, n_items * params["k"])
+
+        train_matrix_mb = cls._sparse_size_mb(X)
+        pui_mb = cls._compressed_sparse_size_mb(
+            nnz=X.nnz, ptr_len=n_users + 1, data_dtype=X.dtype
+        )
+        x_bool_mb = cls._compressed_sparse_size_mb(
+            nnz=X.nnz, ptr_len=n_items + 1, data_dtype=np.float32
+        )
+        piu_mb = cls._compressed_sparse_size_mb(
+            nnz=X.nnz, ptr_len=n_items + 1, data_dtype=X.dtype
+        )
+        degree_mb = cls._dense_size_mb((n_items,), np.float64)
+        work_arrays_mb = cls._bytes_to_mb(10000000 * (4 + 4 + 4))
+        filtered_sparse_mb = cls._compressed_sparse_size_mb(
+            nnz=filtered_nnz,
+            ptr_len=n_items + 1,
+            data_dtype=np.float32,
+        )
+        final_similarity_mb = cls._dense_size_mb((n_items, n_items), np.float32)
+
+        resident_mb = train_matrix_mb + pui_mb + x_bool_mb + degree_mb + piu_mb
+        block_peak_mb = resident_mb + work_arrays_mb
+        final_peak_mb = resident_mb + filtered_sparse_mb + final_similarity_mb
+        alpha_peak_mb = (
+            resident_mb + pui_mb + piu_mb if params.get("alpha", 1.0) != 1.0 else 0.0
+        )
+
+        train_ram_mb = cls._peak_size_mb(
+            resident_mb,
+            block_peak_mb,
+            final_peak_mb,
+            alpha_peak_mb,
+        )
+
+        return {
+            "train_ram_mb": train_ram_mb,
+            "notes": "RP3Beta analytical train-space estimate",
+        }
 
     def __init__(
         self,

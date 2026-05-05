@@ -137,6 +137,99 @@ class Recommender(nn.Module, ABC):
         return state
 
     @classmethod
+    def estimate_space(
+        cls,
+        params: dict,
+        info: dict,
+        interactions: Optional[Interactions] = None,
+        **kwargs: Any,
+    ) -> Dict[str, Any]:
+        """Estimate the train memory footprint of the model in MB."""
+        raise NotImplementedError(
+            f"Model '{cls.__name__}' does not implement estimate_space()."
+        )
+
+    @staticmethod
+    def _require_interactions_for_estimate(
+        interactions: Optional[Interactions], model_name: str
+    ) -> Interactions:
+        if interactions is None:
+            raise ValueError(f"{model_name} requires interactions to estimate space.")
+        return interactions
+
+    @staticmethod
+    def _bytes_to_mb(value: float) -> float:
+        return float(value) / 1024**2
+
+    @staticmethod
+    def _dense_size_mb(shape: tuple, dtype: Any) -> float:
+        return Recommender._bytes_to_mb(np.prod(shape) * np.dtype(dtype).itemsize)
+
+    @staticmethod
+    def _csr_size_mb(matrix: Any) -> float:
+        return Recommender._bytes_to_mb(
+            matrix.data.nbytes + matrix.indices.nbytes + matrix.indptr.nbytes
+        )
+
+    @staticmethod
+    def _sparse_size_mb(matrix: Any) -> float:
+        if matrix is None:
+            return 0.0
+
+        total_bytes = matrix.data.nbytes if hasattr(matrix, "data") else 0
+        total_bytes += matrix.indices.nbytes if hasattr(matrix, "indices") else 0
+        total_bytes += matrix.indptr.nbytes if hasattr(matrix, "indptr") else 0
+        total_bytes += matrix.row.nbytes if hasattr(matrix, "row") else 0
+        total_bytes += matrix.col.nbytes if hasattr(matrix, "col") else 0
+        return Recommender._bytes_to_mb(total_bytes)
+
+    @staticmethod
+    def _compressed_sparse_size_mb(
+        nnz: int,
+        ptr_len: int,
+        data_dtype: Any,
+        index_dtype: Any = np.int32,
+    ) -> float:
+        total_bytes = (
+            nnz * np.dtype(data_dtype).itemsize
+            + nnz * np.dtype(index_dtype).itemsize
+            + ptr_len * np.dtype(index_dtype).itemsize
+        )
+        return Recommender._bytes_to_mb(total_bytes)
+
+    @staticmethod
+    def _estimated_sparse_square_size_mb(
+        source_nnz: int,
+        side_len: int,
+        data_dtype: Any,
+        overlap: float = 0.9,
+        index_dtype: Any = np.int32,
+    ) -> float:
+        estimated_nnz = max(
+            side_len,
+            int(np.ceil(source_nnz * overlap)),
+        )
+        estimated_nnz = min(side_len * side_len, estimated_nnz)
+        return Recommender._compressed_sparse_size_mb(
+            nnz=estimated_nnz,
+            ptr_len=side_len + 1,
+            data_dtype=data_dtype,
+            index_dtype=index_dtype,
+        )
+
+    @staticmethod
+    def _coo_size_mb(nnz: int, data_dtype: Any, index_dtype: Any = np.int32) -> float:
+        total_bytes = (
+            nnz * np.dtype(data_dtype).itemsize
+            + 2 * nnz * np.dtype(index_dtype).itemsize
+        )
+        return Recommender._bytes_to_mb(total_bytes)
+
+    @staticmethod
+    def _peak_size_mb(*values: float) -> float:
+        return float(max(values, default=0.0))
+
+    @classmethod
     def from_checkpoint(
         cls, checkpoint: Any, strict: bool = True, **kwargs: Any
     ) -> "Recommender":

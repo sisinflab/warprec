@@ -18,7 +18,11 @@ from warprec.recommenders.base_recommender import (
     Recommender,
     SequentialRecommenderUtils,
 )
-from warprec.utils.config import TrainConfiguration, EvalConfiguration
+from warprec.utils.config import (
+    TrainConfiguration,
+    EvalConfiguration,
+    EstimateConfiguration,
+)
 from warprec.utils.enums import WritingMethods
 from warprec.utils.logger import logger
 
@@ -489,6 +493,88 @@ class Writer(ABC):
         except (pd.errors.ParserError, ValueError, pd.errors.EmptyDataError) as e:
             logger.negative(f"Error writing time report to {path}: {e}")
 
+    def _format_duration(self, seconds: float) -> str | float:
+        """Formats durations using a unit that matches the magnitude."""
+        if pd.isna(seconds):
+            return np.nan
+
+        seconds = float(seconds)
+        if seconds < 60:
+            return f"{seconds:.6f} s"
+        if seconds < 3600:
+            return f"{seconds / 60:.6f} min"
+        if seconds < 86400:
+            return f"{seconds / 3600:.6f} h"
+        return f"{seconds / 86400:.6f} d"
+
+    def _format_memory(self, value_mb: float) -> str | float:
+        """Formats memory using a unit that matches the magnitude."""
+        if pd.isna(value_mb):
+            return np.nan
+
+        value_bytes = float(value_mb) * 1024**2
+        units = ["B", "KB", "MB", "GB", "TB"]
+        idx = 0
+        while value_bytes >= 1024 and idx < len(units) - 1:
+            value_bytes /= 1024
+            idx += 1
+        return f"{value_bytes:.6f} {units[idx]}"
+
+    def write_estimate_report(
+        self, estimate_report: List[Dict[str, Any]], sep: str = "\t", ext: str = ".tsv"
+    ) -> None:
+        """Writes the estimate report, handling merging with existing data."""
+        path = self._path_join(
+            self.experiment_evaluation_path,
+            f"Estimate_Report_{self._timestamp}{ext}",
+        )
+
+        existing_content = self._read_text(path)
+        existing_df = pd.DataFrame()
+        if existing_content:
+            try:
+                existing_df = pd.read_csv(StringIO(existing_content), sep=sep)
+            except (pd.errors.ParserError, ValueError, pd.errors.EmptyDataError) as e:
+                logger.attention(
+                    f"Could not parse existing estimate report from {path}: {e}. Overwriting."
+                )
+
+        report_df = pd.DataFrame(estimate_report)
+
+        for col in report_df.columns:
+            if "Time" in col:
+                report_df[col] = report_df[col].apply(
+                    lambda value: self._format_duration(value)
+                )
+            elif "RAM" in col or "VRAM" in col:
+                report_df[col] = report_df[col].apply(
+                    lambda value: self._format_memory(value)
+                )
+
+        merge_keys = ["Model Name"]
+        combined_df = pd.concat([existing_df, report_df], ignore_index=True)
+        report = combined_df.drop_duplicates(subset=merge_keys, keep="last")
+
+        first_columns = [
+            "Model Name",
+            "Setup Count",
+            "Measured Train Batches",
+            "Measured Eval Batches",
+        ]
+        ordered_columns = first_columns + [
+            col for col in report.columns if col not in first_columns
+        ]
+        report = (
+            report[ordered_columns].sort_values(by=merge_keys).reset_index(drop=True)
+        )
+
+        try:
+            output_csv = report.to_csv(sep=sep, index=False)
+            self._write_text(path, output_csv)
+            logger.msg(f"Estimate report written to {path}")
+        except (pd.errors.ParserError, ValueError, pd.errors.EmptyDataError) as e:
+            logger.negative(f"Error writing estimate report to {path}: {e}")
+
     def write_statistical_significance_test(
         self,
         test_results: DataFrame,
@@ -513,17 +599,20 @@ class WriterFactory:  # pylint: disable=C0415, R0903
     """Factory class for creating Writer instances based on configuration.
 
     Attributes:
-        config (TrainConfiguration | EvalConfiguration): The configuration of the experiment.
+        config (TrainConfiguration | EvalConfiguration | EstimateConfiguration): The configuration of the experiment.
     """
 
-    config: TrainConfiguration | EvalConfiguration = None
+    config: TrainConfiguration | EvalConfiguration | EstimateConfiguration = None
 
     @classmethod
-    def get_writer(cls, config: TrainConfiguration | EvalConfiguration) -> Writer:
+    def get_writer(
+        cls, config: TrainConfiguration | EvalConfiguration | EstimateConfiguration
+    ) -> Writer:
         """Factory method to get the appropriate Writer instance based on the configuration.
 
         Args:
-            config (TrainConfiguration | EvalConfiguration): The configuration of the experiment.
+            config (TrainConfiguration | EvalConfiguration | EstimateConfiguration): The configuration
+                of the experiment.
 
         Returns:
             Writer: An instance of a class that extends the Writer abstract class.

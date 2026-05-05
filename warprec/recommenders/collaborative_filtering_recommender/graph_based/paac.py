@@ -171,43 +171,80 @@ class PAAC(GraphRecommenderUtils, IterativeRecommender):
         item_embeddings: Tensor,
     ) -> Tensor:
         """Compute the batch-local supervised alignment loss from Eq. 5."""
-        device = item_embeddings.device
-        total_loss = torch.tensor(0.0, device=device)
-        unique_users, inverse_users = users.unique(return_inverse=True)
+        # Find unique users and items in the current batch
+        unique_users, user_inverse = torch.unique(users, return_inverse=True)
+        unique_items, item_inverse = torch.unique(pos_items, return_inverse=True)
 
-        for user_idx in range(unique_users.numel()):
-            user_items = pos_items[inverse_users == user_idx].unique()
-            if user_items.numel() < 2:
-                continue
+        num_u = unique_users.size(0)
+        num_i = unique_items.size(0)
 
-            item_pops = self.item_popularity[user_items]  # type: ignore[index]
-            sorted_items = user_items[torch.argsort(item_pops, descending=True)]
-            n_items = sorted_items.numel()
-            n_pop = n_items // 2
-            n_unpop = n_items - n_pop
+        # Create a boolean mask of interactions in the batch (Users x Items)
+        mask = torch.zeros((num_u, num_i), dtype=torch.bool, device=users.device)
+        mask[user_inverse, item_inverse] = True
 
-            if n_pop == 0 or n_unpop == 0:
-                continue
+        # Count items per user and filter out users with fewer than 2 items
+        n_items = mask.sum(dim=1)
+        valid_users = n_items >= 2
 
-            pop_items = sorted_items[:n_pop]
-            unpop_items = sorted_items[n_pop:]
+        if not valid_users.any():
+            return torch.tensor(0.0, device=users.device)
 
-            h_pop = item_embeddings[pop_items]
-            h_unpop = item_embeddings[unpop_items]
+        # Reduce matrices to valid users only to save computation memory and time
+        mask = mask[valid_users]
+        n_items = n_items[valid_users]
+        num_u = mask.size(0)
 
-            sum_sq_pop = h_pop.pow(2).sum()
-            sum_sq_unpop = h_unpop.pow(2).sum()
-            sum_pop = h_pop.sum(dim=0)
-            sum_unpop = h_unpop.sum(dim=0)
+        # Get item popularity and calculate per-user ranks
+        pops = self.item_popularity[unique_items]  # type: ignore[index]
 
-            pair_loss_sum = (
-                n_unpop * sum_sq_pop
-                + n_pop * sum_sq_unpop
-                - 2.0 * torch.dot(sum_pop, sum_unpop)
-            )
-            total_loss = total_loss + torch.clamp(pair_loss_sum, min=0.0) / n_items
+        # Assign -inf to items the user hasn't interacted with
+        # to push them to the bottom during the sorting phase
+        user_item_pops = torch.where(
+            mask, pops.unsqueeze(0), torch.tensor(-float("inf"), device=users.device)
+        )
 
-        return total_loss
+        # Calculate the popularity rank (0 = most popular)
+        sort_idx = torch.argsort(user_item_pops, dim=1, descending=True)
+        ranks = torch.empty_like(sort_idx)
+        ranks.scatter_(
+            1,
+            sort_idx,
+            torch.arange(num_i, device=users.device).unsqueeze(0).expand(num_u, num_i),
+        )
+
+        # Determine the split points (n_pop and n_unpop)
+        n_pop = n_items // 2
+        n_unpop = n_items - n_pop
+
+        # Create masks for popular and unpopular items
+        # An item is "pop" if the user interacted with it (mask) AND its rank is < n_pop
+        pop_mask = mask & (ranks < n_pop.unsqueeze(1))
+        unpop_mask = mask & (ranks >= n_pop.unsqueeze(1))
+
+        # Extract embeddings and compute sums
+        H = item_embeddings[unique_items]  # [num_i, D]
+        H_sq = H.pow(2).sum(dim=1)  # [num_i]
+
+        # Sum of squares (equivalent to sum_sq_pop / sum_sq_unpop)
+        sum_sq_pop = (pop_mask.float() * H_sq.unsqueeze(0)).sum(dim=1)  # [num_u]
+        sum_sq_unpop = (unpop_mask.float() * H_sq.unsqueeze(0)).sum(dim=1)  # [num_u]
+
+        # Sum of embeddings (equivalent to sum_pop / sum_unpop)
+        # We use matrix multiplication: [num_u, num_i] @ [num_i, D] -> [num_u, D]
+        sum_pop = pop_mask.float() @ H  # [num_u, D]
+        sum_unpop = unpop_mask.float() @ H  # [num_u, D]
+
+        # Dot product between the sums
+        dot_sums = (sum_pop * sum_unpop).sum(dim=1)  # [num_u]
+
+        # Final loss calculation
+        pair_loss = (
+            n_unpop.float() * sum_sq_pop + n_pop.float() * sum_sq_unpop - 2.0 * dot_sums
+        )
+
+        loss_per_user = torch.clamp(pair_loss, min=0.0) / n_items.float()
+
+        return loss_per_user.sum()
 
     def _reweighting_contrast_loss(
         self,

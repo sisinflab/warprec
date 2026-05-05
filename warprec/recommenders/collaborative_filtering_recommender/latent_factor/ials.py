@@ -48,6 +48,61 @@ class iALS(Recommender):
     n_iterations: int
     nu: float
 
+    @classmethod
+    def estimate_space(
+        cls,
+        params: dict,
+        info: dict,
+        interactions: Optional[Interactions] = None,
+        **kwargs: Any,
+    ) -> dict:
+        interactions = cls._require_interactions_for_estimate(
+            interactions, cls.__name__
+        )
+        X = interactions.get_sparse()
+        factors = params["factors"]
+
+        n_users = info["n_users"]
+        n_items = info["n_items"]
+
+        train_matrix_mb = cls._csr_size_mb(X)
+        observed_matrix_mb = cls._bytes_to_mb(
+            X.data.size * np.dtype(np.float64).itemsize
+            + X.indices.nbytes
+            + X.indptr.nbytes
+        )
+        observed_transpose_mb = observed_matrix_mb
+
+        user_factors_mb = cls._dense_size_mb((n_users, factors), np.float64)
+        item_factors_mb = cls._dense_size_mb((n_items, factors), np.float64)
+        updated_factors_mb = max(user_factors_mb, item_factors_mb)
+        final_user_factors_mb = cls._dense_size_mb((n_users, factors), np.float32)
+        final_item_factors_mb = cls._dense_size_mb((n_items, factors), np.float32)
+        solve_workspace_mb = cls._dense_size_mb((4, factors, factors), np.float64)
+
+        iteration_peak_mb = (
+            train_matrix_mb
+            + observed_matrix_mb
+            + observed_transpose_mb
+            + user_factors_mb
+            + item_factors_mb
+            + updated_factors_mb
+            + solve_workspace_mb
+        )
+        final_buffers_peak_mb = (
+            train_matrix_mb
+            + observed_matrix_mb
+            + user_factors_mb
+            + item_factors_mb
+            + final_user_factors_mb
+            + final_item_factors_mb
+        )
+        train_ram_mb = cls._peak_size_mb(iteration_peak_mb, final_buffers_peak_mb)
+        return {
+            "train_ram_mb": train_ram_mb,
+            "notes": "iALS analytical train-space estimate",
+        }
+
     def __init__(
         self,
         params: dict,

@@ -1,5 +1,5 @@
 # pylint: disable = R0801, E1102
-from typing import Any
+from typing import Any, Optional
 
 import numpy as np
 from warprec.data.entities import Interactions
@@ -37,6 +37,51 @@ class ADMMSlim(ItemSimRecommender):
     it: int
     positive_only: bool
     center_columns: bool
+
+    @classmethod
+    def estimate_space(
+        cls,
+        params: dict,
+        info: dict,
+        interactions: Optional[Interactions] = None,
+        **kwargs: Any,
+    ) -> dict:
+        interactions = cls._require_interactions_for_estimate(
+            interactions, cls.__name__
+        )
+        X = interactions.get_sparse()
+        n_users = info["n_users"]
+        n_items = info["n_items"]
+
+        train_matrix_mb = cls._sparse_size_mb(X)
+        item_means_mb = cls._dense_size_mb((n_items,), np.float64)
+        zero_mean_mb = (
+            cls._dense_size_mb((n_users, n_items), np.float64)
+            if params.get("center_columns")
+            else 0.0
+        )
+        dense_item_float64_mb = cls._dense_size_mb((n_items, n_items), np.float64)
+        dense_item_float32_mb = cls._dense_size_mb((n_items, n_items), np.float32)
+        gamma_mb = cls._dense_size_mb((n_items,), np.float32)
+        resident_mb = train_matrix_mb + item_means_mb
+
+        build_gram_peak_mb = resident_mb + zero_mean_mb + dense_item_float64_mb
+        diag_peak_mb = resident_mb + dense_item_float64_mb + 3 * dense_item_float64_mb
+        inverse_peak_mb = (
+            resident_mb + 3 * dense_item_float64_mb + dense_item_float32_mb
+        )
+        loop_peak_mb = resident_mb + 7 * dense_item_float32_mb + gamma_mb
+
+        train_ram_mb = cls._peak_size_mb(
+            build_gram_peak_mb,
+            diag_peak_mb,
+            inverse_peak_mb,
+            loop_peak_mb,
+        )
+        return {
+            "train_ram_mb": train_ram_mb,
+            "notes": "ADMMSlim analytical train-space estimate",
+        }
 
     def __init__(
         self,

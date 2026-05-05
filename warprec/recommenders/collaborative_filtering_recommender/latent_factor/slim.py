@@ -1,6 +1,7 @@
 # pylint: disable = R0801, E1102
-from typing import Any
+from typing import Any, Optional
 
+import numpy as np
 import scipy.sparse as sp
 from sklearn.linear_model import ElasticNet
 from warprec.recommenders.base_recommender import ItemSimRecommender
@@ -28,6 +29,41 @@ class Slim(ItemSimRecommender):
 
     l1: float
     alpha: float
+
+    @classmethod
+    def estimate_space(
+        cls,
+        params: dict,
+        info: dict,
+        interactions: Optional[Interactions] = None,
+        **kwargs: Any,
+    ) -> dict:
+        interactions = cls._require_interactions_for_estimate(
+            interactions, cls.__name__
+        )
+        X = interactions.get_sparse()
+        n_users = info["n_users"]
+        n_items = info["n_items"]
+
+        train_matrix_mb = cls._sparse_size_mb(X)
+        train_matrix_lil_mb = cls._compressed_sparse_size_mb(
+            nnz=X.nnz,
+            ptr_len=n_users + 1,
+            data_dtype=X.dtype,
+            index_dtype=np.int64,
+        )
+        response_vector_mb = cls._dense_size_mb((n_users,), np.float64)
+        gram_matrix_mb = cls._dense_size_mb((n_items, n_items), np.float64)
+        final_similarity_mb = cls._dense_size_mb((n_items, n_items), np.float64)
+
+        train_ram_mb = cls._peak_size_mb(
+            train_matrix_mb + train_matrix_lil_mb + gram_matrix_mb + response_vector_mb,
+            train_matrix_mb + train_matrix_lil_mb + final_similarity_mb,
+        )
+        return {
+            "train_ram_mb": train_ram_mb,
+            "notes": "Slim analytical train-space estimate",
+        }
 
     def __init__(
         self,

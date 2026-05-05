@@ -1,5 +1,5 @@
 # pylint: disable = R0801, E1102
-from typing import Any
+from typing import Any, Optional
 
 import numpy as np
 
@@ -28,6 +28,59 @@ class AddEASE(ItemSimRecommender):
 
     l2: float
     alpha: float
+
+    @classmethod
+    def estimate_space(
+        cls,
+        params: dict,
+        info: dict,
+        interactions: Optional[Interactions] = None,
+        **kwargs: Any,
+    ) -> dict:
+        interactions = cls._require_interactions_for_estimate(
+            interactions, cls.__name__
+        )
+        X = interactions.get_sparse()
+        item_profile = interactions.get_side_sparse()
+        if item_profile is None:
+            raise ValueError("AddEASE requires side information to estimate space.")
+
+        n_items = info["n_items"]
+        collab_sparse_gram_mb = cls._estimated_sparse_square_size_mb(
+            source_nnz=X.nnz,
+            side_len=n_items,
+            data_dtype=X.dtype,
+        )
+        side_sparse_gram_mb = cls._estimated_sparse_square_size_mb(
+            source_nnz=item_profile.nnz,
+            side_len=n_items,
+            data_dtype=item_profile.dtype,
+        )
+        collab_dense_conversion_mb = cls._dense_size_mb((n_items, n_items), X.dtype)
+        side_dense_conversion_mb = cls._dense_size_mb(
+            (n_items, n_items), item_profile.dtype
+        )
+        dense_inverse_mb = cls._dense_size_mb((n_items, n_items), np.float64)
+
+        collab_peak_mb = cls._peak_size_mb(
+            collab_sparse_gram_mb + collab_dense_conversion_mb + 2 * dense_inverse_mb,
+            collab_dense_conversion_mb + 4 * dense_inverse_mb,
+        )
+        side_peak_mb = cls._peak_size_mb(
+            side_sparse_gram_mb + side_dense_conversion_mb + 2 * dense_inverse_mb,
+            side_dense_conversion_mb + 4 * dense_inverse_mb,
+        )
+        merge_peak_mb = 3 * dense_inverse_mb
+
+        train_ram_mb = cls._peak_size_mb(
+            collab_peak_mb,
+            side_peak_mb,
+            merge_peak_mb,
+        )
+        return {
+            "train_ram_mb": train_ram_mb,
+            "notes": "AddEASE analytical train-space estimate",
+        }
 
     def __init__(
         self,

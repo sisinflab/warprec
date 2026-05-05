@@ -4,6 +4,7 @@ from typing import Any, Optional
 import torch
 from torch import Tensor
 
+from warprec.data.entities import Interactions
 from warprec.recommenders.base_recommender import Recommender
 from warprec.utils.registry import model_registry
 
@@ -13,6 +14,19 @@ class Random(Recommender):
     """Definition of Random unpersonalized model.
     This model will recommend items based on a random number generator.
     """
+
+    @classmethod
+    def estimate_space(
+        cls,
+        params: dict,
+        info: dict,
+        interactions: Optional[Interactions] = None,
+        **kwargs: Any,
+    ) -> dict:
+        return {
+            "train_ram_mb": 0.0,
+            "notes": "Random analytical train-space estimate",
+        }
 
     def predict(
         self,

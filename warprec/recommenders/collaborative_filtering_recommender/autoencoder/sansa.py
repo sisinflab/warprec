@@ -43,6 +43,60 @@ class SANSA(ItemSimRecommender):
     l2: float
     target_density: float
 
+    @classmethod
+    def estimate_space(
+        cls,
+        params: dict,
+        info: dict,
+        interactions: Optional[Interactions] = None,
+        **kwargs: Any,
+    ) -> dict:
+        interactions = cls._require_interactions_for_estimate(
+            interactions, cls.__name__
+        )
+        X = interactions.get_sparse()
+        n_items = info["n_items"]
+        target_density = min(max(params.get("target_density", 1.0), 0.0), 1.0)
+        final_nnz = int(np.ceil(n_items * n_items * target_density))
+        gram_nnz = max(n_items, int(np.ceil(X.nnz * 0.9)))
+
+        diagonal_mb = cls._dense_size_mb((n_items,), X.dtype)
+        gram_matrix_mb = cls._estimated_sparse_square_size_mb(
+            source_nnz=X.nnz,
+            side_len=n_items,
+            data_dtype=X.dtype,
+        )
+        inverse_matrix_mb = cls._compressed_sparse_size_mb(
+            nnz=max(gram_nnz, final_nnz),
+            ptr_len=n_items + 1,
+            data_dtype=X.dtype,
+        )
+        similarity_sparse_mb = cls._compressed_sparse_size_mb(
+            nnz=final_nnz,
+            ptr_len=n_items + 1,
+            data_dtype=X.dtype,
+        )
+        sparsify_coo_mb = cls._coo_size_mb(final_nnz, X.dtype)
+
+        train_ram_mb = cls._peak_size_mb(
+            gram_matrix_mb,
+            gram_matrix_mb + inverse_matrix_mb + diagonal_mb,
+            inverse_matrix_mb + similarity_sparse_mb + diagonal_mb,
+        )
+        if target_density < 1.0:
+            train_ram_mb = cls._peak_size_mb(
+                train_ram_mb,
+                inverse_matrix_mb
+                + similarity_sparse_mb
+                + sparsify_coo_mb
+                + diagonal_mb,
+            )
+
+        return {
+            "train_ram_mb": train_ram_mb,
+            "notes": "SANSA analytical train-space estimate",
+        }
+
     def __init__(
         self,
         params: dict,

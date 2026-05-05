@@ -1,5 +1,5 @@
 # pylint: disable = R0801, E1102
-from typing import Any
+from typing import Any, Optional
 
 import numpy as np
 import scipy.sparse as sp
@@ -36,6 +36,29 @@ class UserKNNTD(UserKNN):
     k: int
     similarity: str
     beta: float
+
+    @classmethod
+    def estimate_space(
+        cls,
+        params: dict,
+        info: dict,
+        interactions: Optional[Interactions] = None,
+        **kwargs: Any,
+    ) -> dict:
+        interactions = cls._require_interactions_for_estimate(
+            interactions, cls.__name__
+        )
+        timestamps = interactions.get_flat()[3]
+        if timestamps is None:
+            raise ValueError("UserKNNTD requires timestamps to estimate space.")
+
+        base_estimate = UserKNN.estimate_space(
+            params=params, info=info, interactions=interactions, **kwargs
+        )
+        return {
+            "train_ram_mb": base_estimate["train_ram_mb"],
+            "notes": "UserKNNTD analytical train-space estimate",
+        }
 
     def __init__(
         self,

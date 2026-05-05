@@ -35,6 +35,72 @@ class VSM(Recommender):
     user_profile: str
     item_profile: str
 
+    @classmethod
+    def estimate_space(
+        cls,
+        params: dict,
+        info: dict,
+        interactions: Optional[Interactions] = None,
+        **kwargs: Any,
+    ) -> dict:
+        interactions = cls._require_interactions_for_estimate(
+            interactions, cls.__name__
+        )
+        X = interactions.get_sparse()
+        item_profile = interactions.get_side_sparse()
+        if item_profile is None:
+            raise ValueError("VSM requires side information to estimate space.")
+
+        n_users = info["n_users"]
+        n_items = info["n_items"]
+        n_features = item_profile.shape[1]
+
+        avg_features_per_item = item_profile.nnz / max(n_items, 1)
+        user_profile_nnz = int(
+            min(n_users * n_features, np.ceil(X.nnz * avg_features_per_item))
+        )
+
+        train_matrix_mb = cls._sparse_size_mb(X)
+        item_profile_mb = cls._sparse_size_mb(item_profile)
+        user_profile_mb = cls._compressed_sparse_size_mb(
+            nnz=user_profile_nnz,
+            ptr_len=n_users + 1,
+            data_dtype=X.dtype,
+        )
+        resident_item_profile_mb = item_profile_mb
+        train_ram_mb = cls._peak_size_mb(
+            train_matrix_mb + resident_item_profile_mb,
+            train_matrix_mb + resident_item_profile_mb + user_profile_mb,
+        )
+
+        if params.get("item_profile") == "tfidf":
+            item_idf_mb = cls._dense_size_mb((n_features,), np.float64)
+            idf_diag_mb = cls._compressed_sparse_size_mb(
+                nnz=n_features,
+                ptr_len=n_features + 1,
+                data_dtype=np.float64,
+            )
+            train_ram_mb = cls._peak_size_mb(
+                train_ram_mb,
+                train_matrix_mb + 2 * item_profile_mb + item_idf_mb + idf_diag_mb,
+                train_matrix_mb + item_profile_mb + user_profile_mb,
+            )
+            resident_item_profile_mb = item_profile_mb
+
+        if params.get("user_profile") == "tfidf":
+            train_ram_mb = cls._peak_size_mb(
+                train_ram_mb,
+                train_matrix_mb
+                + resident_item_profile_mb
+                + 2 * user_profile_mb
+                + cls._dense_size_mb((n_users,), np.float64),
+            )
+
+        return {
+            "train_ram_mb": train_ram_mb,
+            "notes": "VSM analytical train-space estimate",
+        }
+
     def __init__(
         self,
         params: dict,

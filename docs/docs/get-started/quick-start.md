@@ -220,7 +220,7 @@ Ray will distribute the HPO trials across available GPUs, pruning unpromising co
 
 ## Next Steps
 
-- **Pipelines:** For a detailed guide to each execution pipeline (Design, Training, Evaluation), see [Pipelines](../pipelines/index.md).
+- **Pipelines:** For a detailed guide to each execution pipeline (Design, Training, Swarm, Evaluation, Estimate), see [Pipelines](../pipelines/index.md).
 - **Configuration Reference:** For a complete guide to all configuration keys, see [Configuration](../configuration/index.md).
 - **Architecture:** For a deep dive into WarpRec's modular design, see [Architecture](architecture.md).
 - **Models:** For the full catalog of 67 algorithms with hyperparameters, see [Recommenders](../recommenders/index.md).
