@@ -2,6 +2,25 @@
 
 <!-- version list -->
 
+## v1.4.2 (2026-05-06)
+
+### Bug Fixes
+
+- Added concurrent trial estimation and placement group compute during trial allocation
+  ([`3dabb4b`](https://github.com/sisinflab/warprec/commit/3dabb4ba737c36bdfe0231a8f40873f463c588e8))
+
+- Custom Ray Train trial ID to prevent race condition during trial allocation
+  ([`8627f52`](https://github.com/sisinflab/warprec/commit/8627f5267f82541599704cf3920a833bf873baf7))
+
+- Removed placement group strategy and delegating resource management to Ray Train
+  ([`66c3520`](https://github.com/sisinflab/warprec/commit/66c35201bc73d72949228ac58915dabdb1a5dbde))
+
+### Chores
+
+- Added max_concurrent_trial configuration
+  ([`7d1e548`](https://github.com/sisinflab/warprec/commit/7d1e548d58494eadae6d106aae19554c434cffa5))
+
+
 ## v1.4.1 (2026-05-05)
 
 ### Bug Fixes
