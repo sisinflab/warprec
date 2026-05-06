@@ -325,6 +325,7 @@ class Trainer:
         # initialize Ray Train
         def train_driver_fn(config: dict, data_bundle: dict, scaling_config_dict: dict):
             scaling_config = ScalingConfig(**scaling_config_dict)
+            trial_id = tune.get_context().get_trial_id()
 
             train_loop_config = {**data_bundle, "params": config}
 
@@ -333,6 +334,7 @@ class Trainer:
                 train_loop_config=train_loop_config,
                 scaling_config=scaling_config,
                 run_config=ray.train.RunConfig(
+                    name=f"ray_train_trial_id={trial_id}",
                     callbacks=[TuneReportCallback()],  # type: ignore[list-item]
                     storage_path=self._stg_path,
                     checkpoint_config=ray.train.CheckpointConfig(
@@ -374,6 +376,11 @@ class Trainer:
             search_alg=search_alg,  # type: ignore[arg-type]
             scheduler=scheduler,  # type: ignore[arg-type]
             num_samples=opt_config.num_samples,
+            max_concurrent_trials=(
+                opt_config.max_concurrent_trials
+                if opt_config.max_concurrent_trials is not None
+                else self._estimate_max_concurrent_trials(scaling_config_dict)
+            ),
             trial_name_creator=self._trial_name_creator(model_name),
             trial_dirname_creator=self._trial_dirname_creator(model_name),
         )
@@ -383,6 +390,8 @@ class Trainer:
                 data_bundle=data_bundle,
                 scaling_config_dict=scaling_config_dict,
             ),
+            # Reserve only the lightweight Tune driver resources here.
+            # The inner TorchTrainer will request the actual worker bundles.
             resources={"CPU": 0.05},
         )
 
@@ -447,6 +456,48 @@ class Trainer:
             scaling_dict["label_selector"] = label_selector
 
         return scaling_dict
+
+    def _estimate_max_concurrent_trials(
+        self,
+        scaling_config_dict: Dict[str, Any],
+        trainer_driver_cpu: float = 0.05,
+    ) -> Optional[int]:
+        """Estimate a safe Tune concurrency limit from Ray Train trial resources.
+
+        The Tune trial itself only reserves a tiny driver CPU. The real cluster
+        footprint comes from the inner TorchTrainer worker group, so concurrency
+        must be capped explicitly to avoid launching more Train runs than the
+        cluster can actually execute in parallel.
+        """
+
+        cluster_resources = ray.cluster_resources()
+        total_trial_resources: Dict[str, float] = {"CPU": trainer_driver_cpu}
+
+        for resource, amount in scaling_config_dict["resources_per_worker"].items():
+            total_trial_resources[resource] = total_trial_resources.get(
+                resource, 0.0
+            ) + (amount * scaling_config_dict["num_workers"])
+
+        concurrency_limits = []
+        for resource, required in total_trial_resources.items():
+            if required <= 0:
+                continue
+
+            available = float(cluster_resources.get(resource, 0.0))
+            if available <= 0:
+                logger.attention(
+                    "Could not estimate max concurrent trials because Ray reports "
+                    f"no available '{resource}' resource."
+                )
+                return None
+
+            concurrency_limits.append(int(available // required))
+
+        if not concurrency_limits:
+            return None
+
+        max_concurrent_trials = min(concurrency_limits)
+        return max_concurrent_trials if max_concurrent_trials > 0 else None
 
     def _load_best_model(self, model_name, checkpoint_path, best_params, dataset):
         """Loads the model state from the best checkpoint."""

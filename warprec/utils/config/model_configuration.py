@@ -171,6 +171,9 @@ class Optimization(BaseModel):
             each trial. Defaults to 0.
         custom_resources_per_trial (Optional[Dict[str, float | int]]): Custom resources to assign to
             each trial. Defaults to an empty dictionary.
+        max_concurrent_trials (Optional[int]): The maximum number of trials to run
+            concurrently. Defaults to None, which means WarpRec will estimate a safe
+            value from the Ray cluster resources.
         label_selector (Optional[Dict[str, str]]): Custom labels to use during trial assignment.
         num_workers (Optional[int]): The number of workers to assign to the training dataloader.
             Defaults to None.
@@ -194,6 +197,7 @@ class Optimization(BaseModel):
     cpu_per_trial: Optional[int] = 1
     gpu_per_trial: Optional[float] = 0
     custom_resources_per_trial: Optional[Dict[str, float | int]] = {}
+    max_concurrent_trials: Optional[int] = None
     label_selector: Optional[Dict[str, str]] = None
     num_workers: Optional[int] = None
     block_size: Optional[int] = 50
@@ -242,6 +246,15 @@ class Optimization(BaseModel):
                 "Number of 'gpu_per_trial' not supported. Supported values must be "
                 "in the range (0, 1] or integer values > 1, like 2, 3, ..."
             )
+
+        return v
+
+    @field_validator("max_concurrent_trials")
+    @classmethod
+    def check_max_concurrent_trials(cls, v: Optional[int]):
+        """Validate max_concurrent_trials."""
+        if v is not None and v < 0:
+            raise ValueError("Requested a negative value for 'max_concurrent_trials'.")
 
         return v
 
