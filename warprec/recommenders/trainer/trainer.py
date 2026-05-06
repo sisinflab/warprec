@@ -374,6 +374,11 @@ class Trainer:
             search_alg=search_alg,  # type: ignore[arg-type]
             scheduler=scheduler,  # type: ignore[arg-type]
             num_samples=opt_config.num_samples,
+            max_concurrent_trials=(
+                opt_config.max_concurrent_trials
+                if opt_config.max_concurrent_trials is not None
+                else self._estimate_max_concurrent_trials(scaling_config_dict)
+            ),
             trial_name_creator=self._trial_name_creator(model_name),
             trial_dirname_creator=self._trial_dirname_creator(model_name),
         )
@@ -383,7 +388,7 @@ class Trainer:
                 data_bundle=data_bundle,
                 scaling_config_dict=scaling_config_dict,
             ),
-            resources={"CPU": 0.05},
+            resources=self._get_trial_placement_group(scaling_config_dict),
         )
 
         return Tuner(
@@ -447,6 +452,64 @@ class Trainer:
             scaling_dict["label_selector"] = label_selector
 
         return scaling_dict
+
+    def _get_trial_placement_group(
+        self,
+        scaling_config_dict: Dict[str, Any],
+        trainer_driver_cpu: float = 0.05,
+    ) -> tune.PlacementGroupFactory:
+        """Build the Tune placement group for a full trial.
+
+        The first bundle reserves the lightweight Tune driver task. The remaining
+        bundles reserve the Ray Train workers that will be started by the trial.
+        This keeps unschedulable trials in PENDING instead of letting them start
+        and repeatedly fail worker placement.
+        """
+
+        bundles = [{"CPU": trainer_driver_cpu}]
+        worker_bundle = dict(scaling_config_dict["resources_per_worker"])
+
+        bundles.extend(
+            dict(worker_bundle) for _ in range(scaling_config_dict["num_workers"])
+        )
+
+        return tune.PlacementGroupFactory(bundles, strategy="PACK")
+
+    def _estimate_max_concurrent_trials(
+        self,
+        scaling_config_dict: Dict[str, Any],
+        trainer_driver_cpu: float = 0.05,
+    ) -> Optional[int]:
+        """Estimate a safe trial concurrency limit from current cluster resources."""
+
+        cluster_resources = ray.cluster_resources()
+        total_trial_resources: Dict[str, float] = {"CPU": trainer_driver_cpu}
+
+        for resource, amount in scaling_config_dict["resources_per_worker"].items():
+            total_trial_resources[resource] = total_trial_resources.get(
+                resource, 0.0
+            ) + (amount * scaling_config_dict["num_workers"])
+
+        concurrency_limits = []
+        for resource, required in total_trial_resources.items():
+            if required <= 0:
+                continue
+
+            available = float(cluster_resources.get(resource, 0.0))
+            if available <= 0:
+                logger.attention(
+                    "Could not estimate max concurrent trials because Ray reports "
+                    f"no available '{resource}' resource."
+                )
+                return None
+
+            concurrency_limits.append(int(available // required))
+
+        if not concurrency_limits:
+            return None
+
+        max_concurrent_trials = min(concurrency_limits)
+        return max_concurrent_trials if max_concurrent_trials > 0 else None
 
     def _load_best_model(self, model_name, checkpoint_path, best_params, dataset):
         """Loads the model state from the best checkpoint."""
