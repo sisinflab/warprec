@@ -388,7 +388,9 @@ class Trainer:
                 data_bundle=data_bundle,
                 scaling_config_dict=scaling_config_dict,
             ),
-            resources=self._get_trial_placement_group(scaling_config_dict),
+            # Reserve only the lightweight Tune driver resources here.
+            # The inner TorchTrainer will request the actual worker bundles.
+            resources={"CPU": 0.05},
         )
 
         return Tuner(
@@ -453,34 +455,18 @@ class Trainer:
 
         return scaling_dict
 
-    def _get_trial_placement_group(
-        self,
-        scaling_config_dict: Dict[str, Any],
-        trainer_driver_cpu: float = 0.05,
-    ) -> tune.PlacementGroupFactory:
-        """Build the Tune placement group for a full trial.
-
-        The first bundle reserves the lightweight Tune driver task. The remaining
-        bundles reserve the Ray Train workers that will be started by the trial.
-        This keeps unschedulable trials in PENDING instead of letting them start
-        and repeatedly fail worker placement.
-        """
-
-        bundles = [{"CPU": trainer_driver_cpu}]
-        worker_bundle = dict(scaling_config_dict["resources_per_worker"])
-
-        bundles.extend(
-            dict(worker_bundle) for _ in range(scaling_config_dict["num_workers"])
-        )
-
-        return tune.PlacementGroupFactory(bundles, strategy="PACK")
-
     def _estimate_max_concurrent_trials(
         self,
         scaling_config_dict: Dict[str, Any],
         trainer_driver_cpu: float = 0.05,
     ) -> Optional[int]:
-        """Estimate a safe trial concurrency limit from current cluster resources."""
+        """Estimate a safe Tune concurrency limit from Ray Train trial resources.
+
+        The Tune trial itself only reserves a tiny driver CPU. The real cluster
+        footprint comes from the inner TorchTrainer worker group, so concurrency
+        must be capped explicitly to avoid launching more Train runs than the
+        cluster can actually execute in parallel.
+        """
 
         cluster_resources = ray.cluster_resources()
         total_trial_resources: Dict[str, float] = {"CPU": trainer_driver_cpu}
