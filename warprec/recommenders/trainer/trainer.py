@@ -325,6 +325,7 @@ class Trainer:
         # initialize Ray Train
         def train_driver_fn(config: dict, data_bundle: dict, scaling_config_dict: dict):
             scaling_config = ScalingConfig(**scaling_config_dict)
+            trial_id = tune.get_context().get_trial_id()
 
             train_loop_config = {**data_bundle, "params": config}
 
@@ -333,6 +334,7 @@ class Trainer:
                 train_loop_config=train_loop_config,
                 scaling_config=scaling_config,
                 run_config=ray.train.RunConfig(
+                    name=f"ray_train_trial_id={trial_id}",
                     callbacks=[TuneReportCallback()],  # type: ignore[list-item]
                     storage_path=self._stg_path,
                     checkpoint_config=ray.train.CheckpointConfig(
