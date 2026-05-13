@@ -286,6 +286,34 @@ class Recommender(nn.Module, ABC):
         # Create sparse similarity matrix with top-k values
         return torch.zeros_like(sim_matrix).scatter_(1, indices, values)
 
+    @classmethod
+    def get_name_from_params(cls, params: dict) -> str:
+        """Generates a deterministic coolname based on a dictionary of parameters."""
+        # Create a reproducible json dump of model parameters
+        param_str = json.dumps(params, sort_keys=True, default=str)
+
+        # Use the hash of the model hyperparameter as seed for the name generation
+        hash_hex = hashlib.md5(
+            param_str.encode("utf-8"),
+            usedforsecurity=False,
+        ).hexdigest()
+        seed_int = int(hash_hex, 16)
+
+        # Coolname uses the random seed
+        current_state = random.getstate()
+        fun_extension = "DefaultCoolName"  # Default name in case of failure
+
+        # After the name generation the random seed
+        # will be reverted to the experiment seed
+        try:
+            random.seed(seed_int)
+            words = coolname.generate(3)
+            fun_extension = "".join(word.capitalize() for word in words)
+        finally:
+            random.setstate(current_state)
+
+        return f"{cls.__name__}_{fun_extension}"
+
     @property
     def name(self):
         """The name of the model."""
@@ -298,32 +326,7 @@ class Recommender(nn.Module, ABC):
         The name is generated based on the hash of the model's parameters,
         ensuring that the same parameters always yield the same name.
         """
-        # Create a reproducible json dump of model parameters
-        params = self.get_params()
-        param_str = json.dumps(params, sort_keys=True, default=str)
-
-        # Use the hash of the model hyperparameter as seed for the name generation
-        hash_hex = hashlib.md5(
-            param_str.encode("utf-8"),
-            usedforsecurity=False,
-        ).hexdigest()
-        seed_int = int(hash_hex, 16)
-
-        # Coolname uses the random seed
-        current_state = random.getstate()
-        fun_extension = "default_cool_name"  # Default name in case of failure
-
-        # After the name generation the random seed
-        # will be reverted to the experiment seed
-        try:
-            random.seed(seed_int)
-
-            fun_extension = coolname.generate_slug(3)
-            fun_extension = fun_extension.replace("-", "_")
-        finally:
-            random.setstate(current_state)
-
-        return f"{self.name}_{fun_extension}"
+        return self.get_name_from_params(self.get_params())
 
     @property
     def device(self) -> torch.device:
