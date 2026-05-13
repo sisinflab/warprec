@@ -969,6 +969,18 @@ test = ["Pillow", "contourpy[test-no-images]", "matplotlib"]
 test-no-images = ["pytest", "pytest-cov", "pytest-rerunfailures", "pytest-xdist", "wurlitzer"]
 
 [[package]]
+name = "coolname"
+version = "5.0.0"
+description = "Random name and slug generator"
+optional = false
+python-versions = ">=3.10"
+groups = ["main"]
+files = [
+    {file = "coolname-5.0.0-py3-none-any.whl", hash = "sha256:b86eea9670aa0620965167d1bfadfe654fabec839a5b51e8da611c4a64f86192"},
+    {file = "coolname-5.0.0.tar.gz", hash = "sha256:594bc6c98ebc75ddd51c0ce10efbb5d2556c14eac60b5b36900dfdd5db20eecf"},
+]
+
+[[package]]
 name = "cryptography"
 version = "44.0.3"
 description = "cryptography is a package which provides cryptographic recipes and primitives to Python developers."
@@ -7466,4 +7478,4 @@ serving = ["fastapi", "fastmcp"]
 [metadata]
 lock-version = "2.1"
 python-versions = "~3.12"
-content-hash = "f478b160edd5190464b11101fed6ab6ab25873f554fe70e511911cba3d0b6aad"
+content-hash = "d28307dcd2abae3f89f91f66ec3925bbddbeb3b912945f8b7f9bf82d3405392d"
