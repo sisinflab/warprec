@@ -1,11 +1,14 @@
 # pylint: disable = unused-argument
 import random
+import json
 from typing import Any, Optional, List, Dict, no_type_check
 from abc import ABC, abstractmethod
 
 import torch
 import lightning as L
 import numpy as np
+import coolname
+import hashlib
 from torch import nn, Tensor
 from torch.nn.init import xavier_normal_, xavier_uniform_, constant_
 from torch.utils.data import DataLoader
@@ -283,6 +286,34 @@ class Recommender(nn.Module, ABC):
         # Create sparse similarity matrix with top-k values
         return torch.zeros_like(sim_matrix).scatter_(1, indices, values)
 
+    @classmethod
+    def get_name_from_params(cls, params: dict) -> str:
+        """Generates a deterministic coolname based on a dictionary of parameters."""
+        # Create a reproducible json dump of model parameters
+        param_str = json.dumps(params, sort_keys=True, default=str)
+
+        # Use the hash of the model hyperparameter as seed for the name generation
+        hash_hex = hashlib.md5(
+            param_str.encode("utf-8"),
+            usedforsecurity=False,
+        ).hexdigest()
+        seed_int = int(hash_hex, 16)
+
+        # Coolname uses the random seed
+        current_state = random.getstate()
+        fun_extension = "DefaultCoolName"  # Default name in case of failure
+
+        # After the name generation the random seed
+        # will be reverted to the experiment seed
+        try:
+            random.seed(seed_int)
+            words = coolname.generate(3)
+            fun_extension = "".join(word.capitalize() for word in words)
+        finally:
+            random.setstate(current_state)
+
+        return f"{cls.__name__}_{fun_extension}"
+
     @property
     def name(self):
         """The name of the model."""
@@ -290,15 +321,12 @@ class Recommender(nn.Module, ABC):
 
     @property
     def name_param(self):
-        """The name of the model with all it's parameters."""
-        name = self.name
-        for ann, _ in self.__class__.__annotations__.items():
-            value = getattr(self, ann, None)
-            if isinstance(value, float):
-                name += f"_{ann}={value:.4f}"
-            else:
-                name += f"_{ann}={value}"
-        return name
+        """The name of the model with a deterministic coolname extension.
+
+        The name is generated based on the hash of the model's parameters,
+        ensuring that the same parameters always yield the same name.
+        """
+        return self.get_name_from_params(self.get_params())
 
     @property
     def device(self) -> torch.device:
