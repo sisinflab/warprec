@@ -2,6 +2,22 @@
 
 <!-- version list -->
 
+## v1.4.3 (2026-05-13)
+
+### Bug Fixes
+
+- Model names will be created using coolname based on their parameter hash
+  ([`b424f7a`](https://github.com/sisinflab/warprec/commit/b424f7a33deb41472adaeca07a3cb02fff6edbad))
+
+- Trial name during training will be derived from the new naming convention
+  ([`86f14da`](https://github.com/sisinflab/warprec/commit/86f14da7c4312fc564fe0198b9ba949d7ade0575))
+
+### Chores
+
+- Added coolname dependency
+  ([`d606015`](https://github.com/sisinflab/warprec/commit/d606015f4a057a713cf3b9a3e36d4d013fd4914d))
+
+
 ## v1.4.2 (2026-05-06)
 
 ### Bug Fixes
