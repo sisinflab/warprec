@@ -3,7 +3,6 @@ import os
 
 # Set Ray environment variable to enable new features
 os.environ["RAY_TRAIN_V2_ENABLED"] = "1"
-import uuid
 import math
 from typing import List, Tuple, Optional, Dict, Union, Any
 from pathlib import Path
@@ -599,14 +598,17 @@ class Trainer:
         return tune_params
 
     def _trial_name_creator(self, model_name: str):
-        def _creator(trial: Trial):  # type: ignore[unused-argument]
-            return f"{model_name}_{str(uuid.uuid4())[:8]}"
+        def _creator(trial: Trial):
+            model_class = model_registry.get_class(model_name)
+            return model_class.get_name_from_params(trial.config)
 
         return _creator
 
     def _trial_dirname_creator(self, model_name: str):
         def _creator(trial: Trial):
-            return f"{model_name}_trial_{trial.trial_id}"
+            model_class = model_registry.get_class(model_name)
+            name_ext = model_class.get_name_from_params(trial.config)
+            return f"{name_ext}_{trial.trial_id}"
 
         return _creator
 
