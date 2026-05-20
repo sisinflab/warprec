@@ -143,7 +143,7 @@ class Splitter:
 
         # Filter out the test set
         test_set = self.filter_sets(
-            original_train_set, test_set, user_id_label, item_id_label
+            original_train_set, test_set, user_id_label, item_id_label, "Test"
         )
 
         if len(validation_folds) == 0:
@@ -154,7 +154,7 @@ class Splitter:
             # CASE 2: Train/Validation/Test
             train_set, validation_set = validation_folds[0]
             test_set = self.filter_sets(
-                train_set, test_set, user_id_label, item_id_label
+                train_set, test_set, user_id_label, item_id_label, "Validation"
             )
             return (train_set, validation_set, test_set)
 
@@ -162,7 +162,7 @@ class Splitter:
         # corresponding train set
         for train, validation in validation_folds:
             validation = self.filter_sets(
-                train, validation, user_id_label, item_id_label
+                train, validation, user_id_label, item_id_label, "Validation"
             )
 
         # CASE 3: N folds of train and validation + the test set
@@ -222,6 +222,7 @@ class Splitter:
         evaluation_set: DataFrame[Any],
         user_id_label: str = "user_id",
         item_id_label: str = "item_id",
+        eval_set_name: Optional[str] = None,
     ) -> DataFrame[Any]:
         """Filter the evaluation set based on the train set.
 
@@ -230,12 +231,17 @@ class Splitter:
             evaluation_set (DataFrame[Any]): The evaluation set to be filtered.
             user_id_label (str): The user ID label.
             item_id_label (str): The item ID label.
+            eval_set_name (Optional[str]): The name of the evaluation set.
+                Used for logging purposes.
 
         Returns:
             DataFrame[Any]: The filtered evaluation set.
         """
         train_users = train_set.select(user_id_label).unique()
         train_items = train_set.select(item_id_label).unique()
+
+        # Save the evaluation transaction before filtering
+        eval_transaction_count = len(evaluation_set)
 
         filtered_by_users = evaluation_set.join(
             train_users, on=user_id_label, how="inner"
@@ -244,5 +250,15 @@ class Splitter:
         filtered_final = filtered_by_users.join(
             train_items, on=item_id_label, how="inner"
         )
+
+        # Log any filtering that happened
+        if len(filtered_final) < eval_transaction_count:
+            eval_set_name = (
+                eval_set_name.capitalize() if eval_set_name is not None else "Eval"
+            )
+            logger.attention(
+                f"{eval_set_name} set was not aligned with the training set. "
+                f"Filtered out {eval_transaction_count - len(filtered_final)} transactions."
+            )
 
         return filtered_final

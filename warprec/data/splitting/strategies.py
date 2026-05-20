@@ -237,6 +237,9 @@ class TimestampSlicingSplit(SplittingStrategy):
                 data_prep, best_timestamp, timestamp_label
             )
         else:
+            # Clean the output
+            data_prep = data_prep.drop(idx_col)
+
             # Apply the split
             first_partition, second_partition = self._fixed_split(
                 data_prep, int(timestamp), timestamp_label
