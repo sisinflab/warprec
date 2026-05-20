@@ -120,12 +120,14 @@ def initialize_datasets(
 
             # Filter out train and validation data if not aligned with the training set
             def _align_set_on_train(
-                train_set: DataFrame[Any], eval_set: DataFrame[Any]
+                train_set: DataFrame[Any],
+                eval_set: DataFrame[Any],
+                eval_set_name: str,
             ):
-                eval_transactions = len(eval_set)
                 eval_set = splitter.filter_sets(
                     train_set,
                     eval_set,
+                    eval_set_name=eval_set_name,
                     **config.reader.labels.model_dump(
                         exclude=[
                             "rating_label",
@@ -139,19 +141,17 @@ def initialize_datasets(
                     raise ValueError(
                         "After aligning the split with the training set, it resulted in an empty set. Please check the consistency of your splits and the filtering process."
                     )
-                if len(eval_set) < eval_transactions:
-                    logger.attention(
-                        f"Eval set was not aligned with the training set. Filtered out {eval_transactions - len(eval_set)} transactions."
-                    )
                 return eval_set
 
-            test_data = _align_set_on_train(train_data, test_data)
+            test_data = _align_set_on_train(train_data, test_data, "Test")
             if val_data is not None:
                 if isinstance(val_data, list):
                     for idx, (val_train, val_set) in enumerate(val_data):
-                        val_data[idx] = _align_set_on_train(train_data, val_set)
+                        val_data[idx] = _align_set_on_train(
+                            train_data, val_set, "Validation"
+                        )
                 else:
-                    val_data = _align_set_on_train(train_data, val_data)
+                    val_data = _align_set_on_train(train_data, val_data, "Validation")
         else:
             raise ValueError("Data type not yet supported.")
 
