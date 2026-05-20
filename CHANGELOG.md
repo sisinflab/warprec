@@ -2,6 +2,17 @@
 
 <!-- version list -->
 
+## v1.4.4 (2026-05-20)
+
+### Bug Fixes
+
+- Fixed bug with Timestamp Slicing splitting strategy which corrupted dataset dimensions
+  ([`81aa8b6`](https://github.com/sisinflab/warprec/commit/81aa8b683b4f95fa3d2511ef1727a91a937a824c))
+
+- WarpRec will now log internal alignment filtering on evaluation sets
+  ([`f1e85ca`](https://github.com/sisinflab/warprec/commit/f1e85ca426204c4fd67f844c48aa12f6260d9a36))
+
+
 ## v1.4.3 (2026-05-13)
 
 ### Bug Fixes
