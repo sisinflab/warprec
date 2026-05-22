@@ -2,6 +2,26 @@
 
 <!-- version list -->
 
+## v1.4.5 (2026-05-22)
+
+### Bug Fixes
+
+- Added address as general configuration parameter
+  ([`bac5b93`](https://github.com/sisinflab/warprec/commit/bac5b93aa66d50161aba3ba5a62fd8aa54cbac15))
+
+- Evaluation dataloaders will accept and correctly cache kwargs
+  ([`1fa6e13`](https://github.com/sisinflab/warprec/commit/1fa6e132ecdb5913e0a1f189d719b127c569f234))
+
+- Model extended name depends also on original model name to ensure that models with same parameters
+  generate the same name extension
+  ([`c364ddb`](https://github.com/sisinflab/warprec/commit/c364ddb810e8e3ae91da2725414941c8b152dd74))
+
+### Documentation
+
+- Added ray address to documentation
+  ([`b4494a2`](https://github.com/sisinflab/warprec/commit/b4494a2b242543407f1666110b67d3e96d38e7bb))
+
+
 ## v1.4.4 (2026-05-20)
 
 ### Bug Fixes
