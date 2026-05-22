@@ -1,6 +1,6 @@
 import os
 import time
-from typing import Tuple, Dict, List
+from typing import Optional, Tuple, Dict, List
 
 import ray
 import lightning as L
@@ -9,6 +9,8 @@ from torch import Tensor
 
 from warprec.data import Dataset
 from warprec.utils.helpers import (
+    build_evaluation_dataloader_kwargs,
+    resolve_num_workers,
     retrieve_evaluation_dataloader,
 )
 from warprec.recommenders.base_recommender import (
@@ -24,7 +26,7 @@ from warprec.utils.config.evaluation_configuration import ComplexMetricConfig
 from warprec.utils.registry import model_registry
 
 
-@ray.remote
+@ray.remote  # type: ignore[arg-type]
 def remote_evaluation_and_timing(
     model: Recommender,
     main_dataset: Dataset,
@@ -33,6 +35,7 @@ def remote_evaluation_and_timing(
     complex_metrics: List[ComplexMetricConfig],
     strategy: str,
     num_negatives: int,
+    num_workers: Optional[int],
     device: str,
     requires_timing: bool,
     custom_modules: List[str],
@@ -49,6 +52,7 @@ def remote_evaluation_and_timing(
         complex_metrics (List[ComplexMetricConfig]): The configuration of the complex metrics.
         strategy (str): The evaluation strategy.
         num_negatives (int): The number of negative samples to use with 'sampled' strategy.
+        num_workers (Optional[int]): The number of dataloader workers to use for evaluation.
         device (str): The device to use for evaluation.
         requires_timing (bool): Wether or not to calculate timings.
         custom_modules (List[str]): The list of custom modules to load on the worker node.
@@ -81,11 +85,17 @@ def remote_evaluation_and_timing(
     )
 
     # Retrieve dataloader
+    evaluation_dataloader_kwargs = build_evaluation_dataloader_kwargs(
+        num_workers=resolve_num_workers(num_workers, os.cpu_count()),
+        device=device,
+        reuse_loader=False,
+    )
     dataloader = retrieve_evaluation_dataloader(
         dataset=main_dataset,
         model=model,
         strategy=strategy,
         num_negatives=num_negatives,
+        **evaluation_dataloader_kwargs,
     )
 
     # Evaluation
@@ -160,7 +170,7 @@ def remote_evaluation_and_timing(
     return results, eval_time, inference_time
 
 
-@ray.remote
+@ray.remote  # type: ignore[arg-type]
 def remote_model_retraining(
     model_name: str,
     best_params: dict,

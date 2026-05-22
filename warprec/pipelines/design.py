@@ -10,7 +10,12 @@ from warprec.recommenders.callbacks import WarpRecLightningIntegrationCallback
 from warprec.evaluation.evaluator import Evaluator
 from warprec.utils.callback import WarpRecCallback
 from warprec.utils.config import load_design_configuration, load_callback
-from warprec.utils.helpers import retrieve_evaluation_dataloader, model_param_from_dict
+from warprec.utils.helpers import (
+    build_evaluation_dataloader_kwargs,
+    resolve_num_workers,
+    retrieve_evaluation_dataloader,
+    model_param_from_dict,
+)
 from warprec.utils.logger import logger
 from warprec.utils.registry import model_registry
 
@@ -92,14 +97,6 @@ def design_pipeline(path: str):
             chunk_size=chunk_size,
         )
 
-        # Evaluation dataloader
-        eval_dataloader = retrieve_evaluation_dataloader(
-            dataset=main_dataset,
-            model=model,
-            strategy=config.evaluation.strategy,
-            num_negatives=config.evaluation.num_negatives,
-        )
-
         if isinstance(model, IterativeRecommender):
             # Set up the learning rate scheduler and the optimizer
             model.set_optimization_parameters(
@@ -108,13 +105,27 @@ def design_pipeline(path: str):
             )
 
             # Dataloader settings
-            if num_workers is None:
-                available_cpus = os.cpu_count()
-                num_workers = max(available_cpus - 1, 1)
+            num_workers = resolve_num_workers(num_workers, os.cpu_count())
 
             persistent_workers = num_workers > 0
             pin_memory = device == "cuda"
+        else:
+            num_workers = resolve_num_workers(num_workers, os.cpu_count())
 
+        evaluation_dataloader_kwargs = build_evaluation_dataloader_kwargs(
+            num_workers=num_workers,
+            device=device,
+            reuse_loader=isinstance(model, IterativeRecommender),
+        )
+        eval_dataloader = retrieve_evaluation_dataloader(
+            dataset=main_dataset,
+            model=model,
+            strategy=config.evaluation.strategy,
+            num_negatives=config.evaluation.num_negatives,
+            **evaluation_dataloader_kwargs,
+        )
+
+        if isinstance(model, IterativeRecommender):
             # Train dataloader
             train_dataloader = model.get_dataloader(
                 interactions=main_dataset.train_set,

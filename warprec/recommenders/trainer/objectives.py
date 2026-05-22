@@ -20,7 +20,12 @@ from warprec.recommenders.callbacks import (
 )
 from warprec.recommenders.base_recommender import IterativeRecommender
 from warprec.utils.config import RecomModel
-from warprec.utils.helpers import load_custom_modules, retrieve_evaluation_dataloader
+from warprec.utils.helpers import (
+    build_evaluation_dataloader_kwargs,
+    load_custom_modules,
+    resolve_num_workers,
+    retrieve_evaluation_dataloader,
+)
 from warprec.utils.registry import (
     model_registry,
     params_registry,
@@ -144,14 +149,6 @@ def objective_function(config: dict) -> None:
             chunk_size=chunk_size,
         )
 
-        # Retrieve appropriate evaluation dataloader
-        eval_dataloader = retrieve_evaluation_dataloader(
-            dataset=dataset,
-            model=model,
-            strategy=strategy,
-            num_negatives=num_negatives,
-        )
-
         if isinstance(model, IterativeRecommender):
             # Set up the learning rate scheduler and the optimizer
             model.set_optimization_parameters(
@@ -166,10 +163,15 @@ def objective_function(config: dict) -> None:
                     allocated_cpus = int(resources.get("CPU", 1))
                 except Exception:
                     allocated_cpus = os.cpu_count() or 1
-                num_workers = max(allocated_cpus - 1, 1)
+                num_workers = resolve_num_workers(num_workers, allocated_cpus)
 
             persistent_workers = num_workers > 0
             pin_memory = device == "cuda"
+            evaluation_dataloader_kwargs = build_evaluation_dataloader_kwargs(
+                num_workers=num_workers,
+                device=device,
+                reuse_loader=True,
+            )
 
             # Proceed with standard training loop
             train_dataloader = model.get_dataloader(
@@ -178,6 +180,13 @@ def objective_function(config: dict) -> None:
                 num_workers=num_workers,
                 pin_memory=pin_memory,
                 persistent_workers=persistent_workers,
+            )
+            eval_dataloader = retrieve_evaluation_dataloader(
+                dataset=dataset,
+                model=model,
+                strategy=strategy,
+                num_negatives=num_negatives,
+                **evaluation_dataloader_kwargs,
             )
             epochs = model.epochs
 
@@ -216,6 +225,18 @@ def objective_function(config: dict) -> None:
             )
 
         else:
+            evaluation_dataloader_kwargs = build_evaluation_dataloader_kwargs(
+                num_workers=resolve_num_workers(num_workers, os.cpu_count()),
+                device=device,
+                reuse_loader=False,
+            )
+            eval_dataloader = retrieve_evaluation_dataloader(
+                dataset=dataset,
+                model=model,
+                strategy=strategy,
+                num_negatives=num_negatives,
+                **evaluation_dataloader_kwargs,
+            )
             # Model is trained in the __init__ we can directly evaluate it
             evaluator.evaluate(
                 model=model,
