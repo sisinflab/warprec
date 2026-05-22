@@ -572,7 +572,7 @@ class Dataset:
             DataLoader: DataLoader that yields batches of interactions
                 (eval_batch, user_indices).
         """
-        key = "full"
+        key = f"full_{self._serialize_dataloader_kwargs(kwargs)}"
         if key not in self._precomputed_dataloader:
             eval_sparse = self.eval_set.get_sparse()
 
@@ -603,7 +603,10 @@ class Dataset:
             DataLoader: DataLoader that yields batches
                 of interactions (pos_items, neg_items, user_indices)
         """
-        key = f"neg_{num_negatives}_{seed}"
+        key = (
+            f"sampled_{num_negatives}_{seed}_"
+            f"{self._serialize_dataloader_kwargs(kwargs)}"
+        )
 
         if key not in self._precomputed_dataloader:
             train_sparse = self.train_set.get_sparse()
@@ -637,7 +640,7 @@ class Dataset:
         Returns:
             DataLoader: The contextual data loader.
         """
-        key = "full_contextual"
+        key = f"full_contextual_{self._serialize_dataloader_kwargs(kwargs)}"
         if key not in self._precomputed_dataloader:
             eval_data = self.eval_set.get_df()
 
@@ -710,7 +713,10 @@ class Dataset:
         Returns:
             DataLoader: The sampled contextual loader.
         """
-        key = f"sampled_contextual_{num_negatives}_{seed}"
+        key = (
+            f"sampled_contextual_{num_negatives}_{seed}_"
+            f"{self._serialize_dataloader_kwargs(kwargs)}"
+        )
 
         if key not in self._precomputed_dataloader:
             train_sparse = self.train_set.get_sparse()
@@ -769,6 +775,14 @@ class Dataset:
             )
 
         return self._precomputed_dataloader[key]
+
+    @staticmethod
+    def _serialize_dataloader_kwargs(kwargs: dict[str, Any]) -> str:
+        """Serialize DataLoader kwargs into a deterministic cache-key suffix."""
+        if not kwargs:
+            return "default"
+
+        return "_".join(f"{name}={value}" for name, value in sorted(kwargs.items()))
 
     def get_dims(self) -> Tuple[int, int]:
         """Returns the dimensions of the data.
