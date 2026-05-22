@@ -164,6 +164,7 @@ models:
       num_workers: 0
       block_size: 50
       num_samples: 10
+      max_concurrent_trials: 4
       checkpoint_to_keep: 5
     early_stopping:
       monitor: [score, loss]
@@ -203,6 +204,7 @@ general:
   device: [cpu, cuda]
   backend: [polars, pandas]
   ray_verbose: [0, 1, 2, 3]
+  ray_address: auto
   time_report: [True, False]
   custom_models: [path/to/python/module, path/to/python/script.py]
   callback:
