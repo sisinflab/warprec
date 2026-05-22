@@ -143,6 +143,8 @@ class GeneralConfig(BaseModel):
         backend (Optional[str]): The backend to utilize for reading and writing data.
             Defaults to 'polars'.
         ray_verbose (Optional[int]): The Ray level of verbosity.
+        ray_address (Optional[str]): The address of the Ray cluster to connect to.
+            Defaults to 'auto', which means that Warprec will automatically detect the Ray cluster.
         cpu_data_prep (Optional[int]): The cpu resource to request for data preparation phase.
         custom_resources_data_prep (Optional[Dict[str, float | int]]): The custom resources
             to request for data preparation phase.
@@ -159,6 +161,7 @@ class GeneralConfig(BaseModel):
     device: Optional[str] = "cpu"
     backend: Optional[str] = "polars"
     ray_verbose: Optional[int] = 1
+    ray_address: Optional[str] = "auto"
     cpu_data_prep: Optional[int] = 1
     custom_resources_data_prep: Optional[Dict[str, float | int]] = {}
     label_selector_data_prep: Optional[Dict[str, str]] = None
