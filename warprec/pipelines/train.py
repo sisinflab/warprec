@@ -55,7 +55,8 @@ def train_pipeline(path: str):
     py_modules.extend(["warprec"])  # type: ignore[union-attr]
 
     try:
-        ray.init(address="auto", runtime_env={"py_modules": py_modules})
+        address = config.general.ray_address
+        ray.init(address=address, runtime_env={"py_modules": py_modules})
         logger.positive("Connected to existing Ray cluster.")
     except ConnectionError as e:
         raise ConnectionError(
@@ -209,6 +210,7 @@ def train_pipeline(path: str):
                 complex_metrics=config.evaluation.complex_metrics,
                 strategy=config.evaluation.strategy,
                 num_negatives=config.evaluation.num_negatives,
+                num_workers=params.optimization.num_workers,
                 device=device,
                 requires_timing=config.general.time_report,
                 custom_modules=config.general.custom_modules,

@@ -289,8 +289,11 @@ class Recommender(nn.Module, ABC):
     @classmethod
     def get_name_from_params(cls, params: dict) -> str:
         """Generates a deterministic coolname based on a dictionary of parameters."""
+        # Add model name to params to ensure different models with same params get different names
+        params_with_model = {"model": cls.__name__, **params}
+
         # Create a reproducible json dump of model parameters
-        param_str = json.dumps(params, sort_keys=True, default=str)
+        param_str = json.dumps(params_with_model, sort_keys=True, default=str)
 
         # Use the hash of the model hyperparameter as seed for the name generation
         hash_hex = hashlib.md5(

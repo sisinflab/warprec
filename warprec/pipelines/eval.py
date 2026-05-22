@@ -1,3 +1,4 @@
+import os
 import time
 from typing import Dict, Any
 
@@ -8,7 +9,12 @@ from warprec.data.reader import ReaderFactory
 from warprec.data.writer import WriterFactory
 from warprec.utils.callback import WarpRecCallback
 from warprec.utils.config import load_eval_configuration, load_callback
-from warprec.utils.helpers import retrieve_evaluation_dataloader, model_param_from_dict
+from warprec.utils.helpers import (
+    build_evaluation_dataloader_kwargs,
+    resolve_num_workers,
+    retrieve_evaluation_dataloader,
+    model_param_from_dict,
+)
 from warprec.utils.logger import logger
 from warprec.utils.registry import model_registry
 from warprec.recommenders.base_recommender import IterativeRecommender
@@ -88,6 +94,19 @@ def eval_pipeline(path: str):
         # Evaluation params
         block_size = params.optimization.block_size
         chunk_size = params.optimization.chunk_size
+        num_workers = resolve_num_workers(
+            params.optimization.num_workers,
+            os.cpu_count(),
+        )
+
+        # Model device
+        model_device = params.optimization.device
+        device = general_device if model_device is None else model_device
+        evaluation_dataloader_kwargs = build_evaluation_dataloader_kwargs(
+            num_workers=num_workers,
+            device=device,
+            reuse_loader=False,
+        )
 
         model = model_registry.get(
             name=model_name,
@@ -123,11 +142,8 @@ def eval_pipeline(path: str):
             model=model,
             strategy=config.evaluation.strategy,
             num_negatives=config.evaluation.num_negatives,
+            **evaluation_dataloader_kwargs,
         )
-
-        # Move model to device
-        model_device = params.optimization.device
-        device = general_device if model_device is None else model_device
         model.to(device)
 
         # Evaluation on main dataset

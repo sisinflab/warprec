@@ -1,5 +1,5 @@
 import importlib
-from typing import List, Tuple, TYPE_CHECKING
+from typing import Any, Optional, Dict, List, Tuple, TYPE_CHECKING
 from pathlib import Path
 
 from torch.utils.data import DataLoader
@@ -93,6 +93,7 @@ def retrieve_evaluation_dataloader(
     strategy: str,
     num_negatives: int = 99,
     seed: int = 42,
+    **kwargs: Any,
 ) -> DataLoader:
     """Retrieve the appropriate evaluation dataloader based on the strategy and model type.
 
@@ -102,6 +103,8 @@ def retrieve_evaluation_dataloader(
         strategy (str): The evaluation strategy ('full' or 'sampled').
         num_negatives (int): The number of negative samples per positive instance.
         seed (int): Random seed for negative sampling.
+        **kwargs (Any): Keyword arguments forwarded to the evaluation
+            DataLoader constructor.
 
     Returns:
         DataLoader: The appropriate evaluation dataloader.
@@ -119,18 +122,45 @@ def retrieve_evaluation_dataloader(
 
     match (strategy, use_context):
         case ("full", False):
-            return dataset.get_evaluation_dataloader()
+            return dataset.get_evaluation_dataloader(**kwargs)
         case ("sampled", False):
             return dataset.get_sampled_evaluation_dataloader(
                 num_negatives=num_negatives,
                 seed=seed,
+                **kwargs,
             )
         case ("full", True):
-            return dataset.get_contextual_evaluation_dataloader()
+            return dataset.get_contextual_evaluation_dataloader(**kwargs)
         case ("sampled", True):
             return dataset.get_sampled_contextual_evaluation_dataloader(
                 num_negatives=num_negatives,
                 seed=seed,
+                **kwargs,
             )
         case _:
             raise ValueError(f"Unknown evaluation strategy: {strategy}")
+
+
+def build_evaluation_dataloader_kwargs(
+    num_workers: Optional[int], device: str, reuse_loader: bool = False
+) -> Dict[str, Any]:
+    """Build DataLoader kwargs used by evaluation loops."""
+    if num_workers is None:
+        return {}
+
+    return {
+        "num_workers": num_workers,
+        "pin_memory": device == "cuda",
+        "persistent_workers": reuse_loader and num_workers > 0,
+    }
+
+
+def resolve_num_workers(
+    num_workers: Optional[int], available_cpus: Optional[int]
+) -> int:
+    """Resolve DataLoader workers using the training fallback policy."""
+    if num_workers is not None:
+        return num_workers
+
+    resolved_cpus = available_cpus or 1
+    return max(resolved_cpus - 1, 1)

@@ -27,8 +27,10 @@ from warprec.utils.config import (
 )
 from warprec.utils.enums import SearchAlgorithms, SearchSpace
 from warprec.utils.helpers import (
+    build_evaluation_dataloader_kwargs,
     load_custom_modules,
     model_param_from_dict,
+    resolve_num_workers,
     retrieve_evaluation_dataloader,
 )
 from warprec.utils.logger import logger
@@ -598,11 +600,21 @@ def _run_estimate_setup(
 
     callback.on_training_complete(model=model)
 
+    eval_num_workers = resolve_num_workers(
+        params.optimization.num_workers,
+        os.cpu_count(),
+    )
+    evaluation_dataloader_kwargs = build_evaluation_dataloader_kwargs(
+        num_workers=eval_num_workers,
+        device=device,
+        reuse_loader=False,
+    )
     eval_dataloader = retrieve_evaluation_dataloader(
         dataset=eval_dataset,
         model=model,
         strategy=config.evaluation.strategy,
         num_negatives=config.evaluation.num_negatives,
+        **evaluation_dataloader_kwargs,
     )
     model.to(device)
 
