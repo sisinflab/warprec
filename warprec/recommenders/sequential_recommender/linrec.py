@@ -56,8 +56,9 @@ class LinRecAttention(nn.Module):
         k = F.elu(k)
 
         # Normalizing along sequence (dim=-2) would cause future data leakage.
-        q = F.normalize(q, p=2, dim=-1)
-        k = F.normalize(k, p=2, dim=-1)
+        scaling = 1.0 / (self.head_dim**0.5)
+        q = F.normalize(q, p=2, dim=-1) * scaling
+        k = F.normalize(k, p=2, dim=-1) * scaling
 
         # Causal Linear Attention (The "Recurrent" trick via CumSum)
         # We compute the context matrix for each step 'i' as sum(K_j^T * V_j) for j <= i

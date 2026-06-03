@@ -388,13 +388,20 @@ class PopDCL(GraphRecommenderUtils, IterativeRecommender):
         """
         user_all_embeddings, item_all_embeddings = self.propagate_embeddings()
 
-        user_embeddings = user_all_embeddings[user_indices]  # [B, d]
+        # L2-normalize embeddings for cosine similarity (consistent with training)
+        user_embeddings = F.normalize(
+            user_all_embeddings[user_indices], p=2, dim=-1
+        )  # [B, d]
 
         if item_indices is None:
             # Full ranking – score against all n_items (drop padding slot)
-            item_embeddings = item_all_embeddings[:-1, :]  # [n_items, d]
+            item_embeddings = F.normalize(
+                item_all_embeddings[:-1, :], p=2, dim=-1
+            )  # [n_items, d]
             return torch.einsum("be,ie->bi", user_embeddings, item_embeddings)
 
         # Sampled ranking
-        item_embeddings = item_all_embeddings[item_indices]  # [B, S, d]
+        item_embeddings = F.normalize(
+            item_all_embeddings[item_indices], p=2, dim=-1
+        )  # [B, S, d]
         return torch.einsum("be,bse->bs", user_embeddings, item_embeddings)

@@ -165,18 +165,24 @@ class CL4SRec(IterativeRecommender, SequentialRecommenderUtils):
         batch_size, max_seq = item_seq.shape
         num_mask = torch.floor(item_seq_len * self.mask_gamma).long().clamp(min=1)
 
+        # Assign random float values to all items and assign 1.0 to padding items so they are sorted last
         rand_vals = torch.rand(batch_size, max_seq, device=item_seq.device)
         pos_indices = torch.arange(max_seq, device=item_seq.device).unsqueeze(0)
         valid_mask = pos_indices < item_seq_len.unsqueeze(1)
         rand_vals = torch.where(valid_mask, rand_vals, torch.ones_like(rand_vals))
+
+        # Sort the random values to get candidate positions for masking
         _, sorted_indices = torch.sort(rand_vals, dim=1, descending=False)
 
-        mask_positions = torch.zeros(
-            (batch_size, max_seq), dtype=torch.bool, device=item_seq.device
-        )
-        for i in range(batch_size):
-            mask_positions[i, sorted_indices[i, : num_mask[i].item()]] = True  # type: ignore[misc]
+        # Determine the rank of each position in the original sequence (vectorized double argsort)
+        ranks = torch.argsort(sorted_indices, dim=1)
 
+        # Identify mask positions where rank is less than the calculated masking budget
+        mask_positions = ranks < num_mask.unsqueeze(1)
+        # Prevent masking of padding elements
+        mask_positions = mask_positions & valid_mask
+
+        # Replace selected elements with the mask token
         masked = torch.where(
             mask_positions,
             torch.full_like(item_seq, self.mask_token_id),
@@ -188,27 +194,42 @@ class CL4SRec(IterativeRecommender, SequentialRecommenderUtils):
         self, item_seq: Tensor, item_seq_len: Tensor
     ) -> Tuple[Tensor, Tensor]:
         """Shuffle a valid continuous subsequence of length floor(beta * |s|)."""
-        reordered = item_seq.clone()
+        batch_size, max_seq = item_seq.shape
         num_reorder = torch.floor(item_seq_len * self.reorder_beta).long().clamp(min=1)
 
-        for i in range(item_seq.shape[0]):
-            seq_len_i = int(item_seq_len[i].item())
-            reorder_count = min(int(num_reorder[i].item()), max(1, seq_len_i - 1))
-            if reorder_count <= 1:
-                continue
+        # Constrain the reorder length to avoid shuffling beyond sequence boundaries
+        max_reorder = (item_seq_len - 1).clamp(min=1)
+        num_reorder = torch.minimum(num_reorder, max_reorder)
 
-            max_start = seq_len_i - reorder_count
-            reorder_start = torch.randint(
-                0,
-                max_start + 1,
-                (1,),
-                device=item_seq.device,
-            ).item()
-            shuffle_perm = torch.randperm(reorder_count, device=item_seq.device)
-            original_window = item_seq[i, reorder_start : reorder_start + reorder_count]  # type: ignore[misc]
-            reordered[i, reorder_start : reorder_start + reorder_count] = (  # type: ignore[misc]
-                original_window[shuffle_perm]
-            )
+        # Calculate randomized start indices for the reorder window in a vectorized manner
+        max_start = (item_seq_len - num_reorder).clamp(min=0)
+        random_offsets = torch.rand(batch_size, device=item_seq.device)
+        reorder_start = torch.floor(random_offsets * (max_start + 1).float()).long()
+
+        # Create a boolean mask indicating the active reorder window for each sequence
+        seq_indices = torch.arange(max_seq, device=item_seq.device).unsqueeze(0)
+        reorder_mask = (seq_indices >= reorder_start.unsqueeze(1)) & (
+            seq_indices < (reorder_start + num_reorder).unsqueeze(1)
+        )
+        # Ensure we do not shuffle padding elements by restricting to actual sequence lengths
+        reorder_mask = reorder_mask & (seq_indices < item_seq_len.unsqueeze(1))
+
+        # Initialize sorting keys with original indices to keep unselected items in place
+        seq_indices_float = seq_indices.float()
+
+        # Generate random sorting keys bounded strictly within the active reorder window
+        rand_vals = torch.rand(batch_size, max_seq, device=item_seq.device)
+        shuffled_keys = (
+            reorder_start.unsqueeze(1).float()
+            + rand_vals * num_reorder.unsqueeze(1).float()
+        )
+
+        # Merge the keys: random values for the shuffle window, original indices for the rest
+        sort_keys = torch.where(reorder_mask, shuffled_keys, seq_indices_float)
+
+        # Perform a single batched sort to find the new shuffled index mapping
+        _, shuffle_idx = torch.sort(sort_keys, dim=1)
+        reordered = torch.gather(item_seq, 1, shuffle_idx)
 
         return reordered, item_seq_len
 

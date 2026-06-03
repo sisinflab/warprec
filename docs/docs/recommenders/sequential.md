@@ -255,7 +255,6 @@ models:
     hidden_dropout_prob: 0.1
     attn_dropout_prob: 0.1
     layer_norm_eps: 1e-12
-    initializer_range: 0.02
     session_dropout: 0.1
     item_dropout: 0.1
     temperature: 0.07
