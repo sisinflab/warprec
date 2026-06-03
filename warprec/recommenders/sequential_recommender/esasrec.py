@@ -250,30 +250,41 @@ class eSASRec(IterativeRecommender, SequentialRecommenderUtils):
         )
 
         batch_size = pos_item.size(0)
-        in_batch_part = torch.empty(
-            batch_size, num_in_batch, dtype=pos_item.dtype, device=pos_item.device
+
+        # Create a boolean candidate mask of shape [B, B]
+        # candidate_mask[i, j] is True if pos_item[j] != pos_item[i]
+        # This naturally avoids self-negation (j == i) and duplicate items in the batch
+        candidate_mask = pos_item.unsqueeze(1) != pos_item.unsqueeze(0)
+
+        # Assign random weights to all batch elements to perform uniform sampling
+        rand_weights = torch.rand(batch_size, batch_size, device=pos_item.device)
+
+        # Zero out weights for invalid candidates
+        rand_weights = torch.where(
+            candidate_mask, rand_weights, torch.zeros_like(rand_weights)
         )
-        batch_indices = torch.arange(batch_size, device=pos_item.device)
 
-        for i in range(batch_size):
-            candidates = pos_item[batch_indices != i]
-            candidates = candidates[candidates != pos_item[i]]
-            if candidates.numel() == 0:
-                if num_uniform > 0:
-                    in_batch_part[i] = uniform_part[i, :1].expand(num_in_batch)
-                else:
-                    in_batch_part[i] = pos_item[(i + 1) % batch_size].expand(
-                        num_in_batch
-                    )
-                continue
+        # Retrieve the top-k indices with the largest weights
+        sampled_vals, sampled_idx = torch.topk(rand_weights, num_in_batch, dim=1)
 
-            sampled_idx = torch.randint(
-                0,
-                candidates.numel(),
-                (num_in_batch,),
-                device=pos_item.device,
-            )
-            in_batch_part[i] = candidates[sampled_idx]
+        # Handle potential edge cases where a row has fewer valid candidates than num_in_batch
+        # Create a deterministic fallback index matrix (e.g., shifting indices safely)
+        row_indices = (
+            torch.arange(batch_size, device=pos_item.device)
+            .unsqueeze(1)
+            .expand(-1, num_in_batch)
+        )
+        shift_offsets = torch.arange(
+            1, num_in_batch + 1, device=pos_item.device
+        ).unsqueeze(0)
+        fallback_idx = (row_indices + shift_offsets) % batch_size
+
+        # Check if the sampled top-k items are actually valid (weight > 0)
+        is_valid = sampled_vals > 0.0
+        final_idx = torch.where(is_valid, sampled_idx, fallback_idx)
+
+        # Gather the final mixed in-batch negatives
+        in_batch_part = pos_item[final_idx]
 
         return torch.cat([uniform_part, in_batch_part], dim=1)
 
