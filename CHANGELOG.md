@@ -2,6 +2,31 @@
 
 <!-- version list -->
 
+## v1.4.6 (2026-06-03)
+
+### Bug Fixes
+
+- Changed python version dependency to be >= 3.12 version
+  ([`8a96a03`](https://github.com/sisinflab/warprec/commit/8a96a0324475cd46f6760663b287cdb0660d83d9))
+
+- CL4SRec model operation vectorization
+  ([`9af00e8`](https://github.com/sisinflab/warprec/commit/9af00e88bb493697c1ff78c62d9a61ce07404bd8))
+
+- ESASRec model operation vectorization
+  ([`65961b3`](https://github.com/sisinflab/warprec/commit/65961b3887ea78da86172dad069e97db00bb3232))
+
+- LinRec model Q and K scaling factor during normalization
+  ([`d79c7ec`](https://github.com/sisinflab/warprec/commit/d79c7ecf5166721c9ce57e35defe6695b1f9b442))
+
+- PopDCL model now applies normalization correctly during predict
+  ([`8e98cc3`](https://github.com/sisinflab/warprec/commit/8e98cc3ae81e54d50e576f0341cb3a52db33c814))
+
+### Documentation
+
+- Removed unused hyperparameter from CORE configuration example
+  ([`c4888be`](https://github.com/sisinflab/warprec/commit/c4888bec613cda55840da3bf475a2e849501ecc9))
+
+
 ## v1.4.5 (2026-05-22)
 
 ### Bug Fixes
