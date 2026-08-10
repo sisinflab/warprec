@@ -63,6 +63,10 @@ class Properties(BaseModel):
         max_t (Optional[int]): Max time unit given to each trial.
         grace_period (Optional[int]): Min time unit given to each trial.
         reduction_factor (Optional[float]): Halving rate of trials.
+        n_startup_trials (Optional[int]): Number of random trials the Bayesian
+            search algorithms ('hopt', 'optuna') run before their surrogate
+            model starts guiding the search. When None, the default of the
+            underlying library is kept. Ignored by the other strategies.
     """
 
     mode: Optional[str] = "max"
@@ -72,6 +76,7 @@ class Properties(BaseModel):
     max_t: Optional[int] = None
     grace_period: Optional[int] = None
     reduction_factor: Optional[float] = None
+    n_startup_trials: Optional[int] = None
 
     @field_validator("mode")
     @classmethod
@@ -94,6 +99,14 @@ class Properties(BaseModel):
                 "Desired_training_it should be either: median, mean, min or max."
             )
         return v.lower()
+
+    @field_validator("n_startup_trials")
+    @classmethod
+    def check_n_startup_trials(cls, v: Optional[int]):
+        """Validate n_startup_trials."""
+        if v is not None and v <= 0:
+            raise ValueError("Value for n_startup_trials must be >0.")
+        return v
 
 
 class LRSchedulerConfig(BaseModel):
@@ -314,6 +327,14 @@ class Optimization(BaseModel):
                     "Reduction_factor property is required for ASHA scheduling. "
                     "Change type of scheduling or provide the reduction_factor attribute."
                 )
+        if self.properties.n_startup_trials is not None and self.strategy not in (
+            SearchAlgorithms.HYPEROPT,
+            SearchAlgorithms.OPTUNA,
+        ):
+            logger.attention(
+                "You have passed the field n_startup_trials but only the "
+                "'hopt' and 'optuna' strategies make use of it."
+            )
 
         return self
 
