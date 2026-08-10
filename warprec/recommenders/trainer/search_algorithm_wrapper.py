@@ -11,9 +11,10 @@ Author: Avolio Marco
 Date: 03/03/2025
 """
 
-from typing import Any
+from typing import Any, Optional
 from abc import ABC, abstractmethod
 
+from optuna.samplers import TPESampler
 from ray.tune.search.hyperopt import HyperOptSearch
 from ray.tune.search.optuna import OptunaSearch
 from ray.tune.search.bohb import TuneBOHB
@@ -74,27 +75,61 @@ class HyperOptWrapper(HyperOptSearch, BaseSearchWrapper):
             either 'min' or 'max'.
         metric (str): The metric to optimize.
         seed (int): The seed to make the experiment reproducible.
+        n_startup_trials (Optional[int]): The number of random trials to run
+            before the Parzen estimators start guiding the search. When None,
+            the HyperOpt default is kept.
         **kwargs (Any): Keyword arguments.
     """
 
-    def __init__(self, mode: str, metric: str, seed: int, **kwargs: Any):
-        super().__init__(mode=mode, metric=metric, random_state_seed=seed)
+    def __init__(
+        self,
+        mode: str,
+        metric: str,
+        seed: int,
+        n_startup_trials: Optional[int] = None,
+        **kwargs: Any,
+    ):
+        warm_up = (
+            {} if n_startup_trials is None else {"n_initial_points": n_startup_trials}
+        )
+        super().__init__(mode=mode, metric=metric, random_state_seed=seed, **warm_up)
 
 
 @search_algorithm_registry.register(SearchAlgorithms.OPTUNA)
 class OptunaWrapper(OptunaSearch, BaseSearchWrapper):
-    """Wrapper for the HyperOpt algorithm in Ray Tune.
+    """Wrapper for the Optuna algorithm in Ray Tune.
 
     Args:
         mode (str): The mode to run the optimization. Must be
             either 'min' or 'max'.
         metric (str): The metric to optimize.
         seed (int): The seed to make the experiment reproducible.
+        n_startup_trials (Optional[int]): The number of random trials to run
+            before the Parzen estimators start guiding the search. When None,
+            the Optuna default is kept.
         **kwargs (Any): Keyword arguments.
     """
 
-    def __init__(self, mode: str, metric: str, seed: int, **kwargs: Any):
-        super().__init__(mode=mode, metric=metric, seed=seed)
+    def __init__(
+        self,
+        mode: str,
+        metric: str,
+        seed: int,
+        n_startup_trials: Optional[int] = None,
+        **kwargs: Any,
+    ):
+        if n_startup_trials is None:
+            super().__init__(mode=mode, metric=metric, seed=seed)
+            return
+
+        # OptunaSearch does not expose `n_startup_trials`: it has to be set on
+        # the sampler. The seed is passed to the sampler as well, because Optuna
+        # ignores `seed` whenever a custom sampler is provided.
+        super().__init__(
+            mode=mode,
+            metric=metric,
+            sampler=TPESampler(seed=seed, n_startup_trials=n_startup_trials),
+        )
 
 
 @search_algorithm_registry.register(SearchAlgorithms.BOHB)
