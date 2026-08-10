@@ -727,6 +727,7 @@ class CodeCarbonCallback(tune.Callback):
 
     def on_trial_start(self, iteration, trials, trial, **info):
         tracker = EmissionsTracker(
+            project_name=trial.trial_id,  # Tag each row with its trial
             save_to_api=self.save_to_api,
             save_to_file=self.save_to_file,
             output_dir=self.output_dir,
