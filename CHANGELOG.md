@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v1.4.7 (2026-08-10)
+
+### Bug Fixes
+
+- Tag each row with its trial in CodeCarbonCallback
+  ([`6f2a3f0`](https://github.com/sisinflab/warprec/commit/6f2a3f04bbb232d1df7684414e8b31af45391426))
+
+
 ## v1.4.6 (2026-06-03)
 
 ### Bug Fixes
