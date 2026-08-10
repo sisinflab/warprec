@@ -89,10 +89,16 @@ class HyperOptWrapper(HyperOptSearch, BaseSearchWrapper):
         n_startup_trials: Optional[int] = None,
         **kwargs: Any,
     ):
-        warm_up = (
-            {} if n_startup_trials is None else {"n_initial_points": n_startup_trials}
+        if n_startup_trials is None:
+            super().__init__(mode=mode, metric=metric, random_state_seed=seed)
+            return
+
+        super().__init__(
+            mode=mode,
+            metric=metric,
+            random_state_seed=seed,
+            n_initial_points=n_startup_trials,
         )
-        super().__init__(mode=mode, metric=metric, random_state_seed=seed, **warm_up)
 
 
 @search_algorithm_registry.register(SearchAlgorithms.OPTUNA)
