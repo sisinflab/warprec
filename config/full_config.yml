@@ -155,6 +155,7 @@ models:
         max_t: 100
         grace_period: 50
         reduction_factor: 2.0
+        n_startup_trials: 10
       device: [cpu, cuda]
       cpu_per_trial: 1
       gpu_per_trial: 0
