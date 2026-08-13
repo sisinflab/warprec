@@ -128,9 +128,6 @@ class OptunaWrapper(OptunaSearch, BaseSearchWrapper):
             super().__init__(mode=mode, metric=metric, seed=seed)
             return
 
-        # OptunaSearch does not expose `n_startup_trials`: it has to be set on
-        # the sampler. The seed is passed to the sampler as well, because Optuna
-        # ignores `seed` whenever a custom sampler is provided.
         super().__init__(
             mode=mode,
             metric=metric,

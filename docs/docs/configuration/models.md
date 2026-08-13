@@ -142,6 +142,39 @@ The **properties** subsection provides additional parameters to the optimization
 - **max_t**: Maximum time units per trial.
 - **grace_period**: Minimum time units per trial.
 - **reduction_factor**: ASHA scheduler reduction rate.
+- **n_startup_trials**: Number of random trials the Bayesian strategies (`hopt`, `optuna`) run before their surrogate model starts guiding the search. Must be greater than `0`. Defaults to `None`, in which case the default of the underlying library is kept. Ignored by the other strategies.
+
+!!! Example "Warm-up for Bayesian Search Strategies"
+    Bayesian strategies such as `hopt` and `optuna` build a surrogate model of the search space from the trials observed so far. Until that model has enough evidence to be reliable, they sample configurations at random: this initial phase is the **warm-up**. The `n_startup_trials` property defines how many trials belong to it.
+
+    **Configuration Example:**
+    ```yaml
+    models:
+        LightGCN:
+            optimization:
+                strategy: optuna
+                num_samples: 50
+                properties:
+                    seed: 42
+                    n_startup_trials: 15   # 15 random trials, then the sampler takes over
+
+            # Model parameters
+            embedding_size: [choice, 64, 128, 256]
+            n_layers: [choice, 1, 2, 3]
+            learning_rate: [loguniform, 1e-5, 1e-2]
+    ```
+
+    **How to choose the value:**
+
+    1. A **short** warm-up lets the sampler start exploiting earlier, which helps when the budget defined by `num_samples` is small, but it risks locking the search around the first promising region.
+    2. A **long** warm-up covers more of the space before committing, which pays off on wide or highly non-convex search spaces, at the cost of spending a larger share of the budget on random configurations.
+
+    As a rule of thumb, keeping the warm-up between 10% and 30% of `num_samples` is a reasonable starting point.
+
+    *Result:* You gain explicit control over the exploration/exploitation trade-off of the search, instead of relying on the default of the underlying library. Reproducibility is preserved in both cases, since `seed` is always propagated to the sampler.
+
+!!! Warning
+    `n_startup_trials` is only used by the `hopt` and `optuna` strategies. If you set it while using `grid`, `random` or `bohb`, WarpRec logs an attention message and ignores the value.
 
 ## Early Stopping
 
