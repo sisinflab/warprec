@@ -2,6 +2,24 @@
 
 <!-- version list -->
 
+## v1.4.8 (2026-08-13)
+
+### Bug Fixes
+
+- Removed an unnecessary comment regarding 'n_startup_trials' in the OptunaWrapper class
+  ([`3ff68fb`](https://github.com/sisinflab/warprec/commit/3ff68fbec4f1c5e055241fe3a7b0f1bf0faed22c))
+
+### Chores
+
+- Added n_startup_trials configuration for Bayesian search algorithms
+  ([`29442d6`](https://github.com/sisinflab/warprec/commit/29442d68e949242dfc1981a17a6c1f37416c0b30))
+
+### Documentation
+
+- Added n_startup_trials to optimization properties
+  ([`bc34823`](https://github.com/sisinflab/warprec/commit/bc3482385624dfc0c6b2083f4775c5df0c7cd50c))
+
+
 ## v1.4.7 (2026-08-10)
 
 ### Bug Fixes
