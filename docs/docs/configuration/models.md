@@ -139,7 +139,7 @@ The **properties** subsection provides additional parameters to the optimization
 - **mode**: Whether to maximize or minimize the validation metric. Accepted values: `min` / `max`. Defaults to `max`.
 - **desired_training_it**: Defines the number of iterations for final training after cross-validation. Strategies: `median`, `mean`, `min`, `max`. Defaults to `median`.
 - **seed**: Random seed for reproducibility. Defaults to `42`.
-- **time_attr**: Attribute used to measure time in the scheduler. Used by the `asha` and `bohb` schedulers.
+- **time_attr**: Attribute used to measure time in the scheduler. Used by the `asha` and `bohb` schedulers, both of which fall back to `training_iteration` when it is not provided.
 - **max_t**: Maximum time units per trial. Required by the `asha` and `bohb` schedulers.
 - **grace_period**: Minimum time units per trial. Required by the `asha` scheduler and ignored by `bohb`, which has no grace period.
 - **reduction_factor**: Reduction rate of the `asha` and `bohb` schedulers. Required by both.

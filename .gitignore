@@ -65,3 +65,6 @@ junit_result.xml
 .coverage
 experiment/
 tests/
+
+# MkDocs build output
+docs/site/
