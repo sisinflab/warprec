@@ -12,6 +12,7 @@ from .scheduler_wrapper import (
     FIFOSchedulerWrapper,
     ASHASchedulerWrapper,
     BOHBSchedulerWrapper,
+    MedianStoppingRuleWrapper,
 )
 
 __all__ = [
@@ -26,4 +27,5 @@ __all__ = [
     "FIFOSchedulerWrapper",
     "ASHASchedulerWrapper",
     "BOHBSchedulerWrapper",
+    "MedianStoppingRuleWrapper",
 ]

@@ -67,6 +67,16 @@ class Properties(BaseModel):
             search algorithms ('hopt', 'optuna') run before their surrogate
             model starts guiding the search. When None, the default of the
             underlying library is kept. Ignored by the other strategies.
+        min_samples_required (Optional[int]): Minimum number of trials the
+            'median' scheduler computes its median over. When None, the Ray
+            default is kept. Ignored by the other schedulers.
+        min_time_slice (Optional[int]): How long a trial runs before yielding
+            under the 'median' scheduler, in the units of 'time_attr'. When
+            None, the Ray default is kept. Ignored by the other schedulers.
+        hard_stop (Optional[bool]): Whether the 'median' scheduler stops trials
+            outright. When False, trials are paused instead and resumed FIFO
+            once the others have finished. When None, the Ray default is kept.
+            Ignored by the other schedulers.
     """
 
     mode: Optional[str] = "max"
@@ -77,6 +87,9 @@ class Properties(BaseModel):
     grace_period: Optional[int] = None
     reduction_factor: Optional[float] = None
     n_startup_trials: Optional[int] = None
+    min_samples_required: Optional[int] = None
+    min_time_slice: Optional[int] = None
+    hard_stop: Optional[bool] = None
 
     @field_validator("mode")
     @classmethod
@@ -106,6 +119,22 @@ class Properties(BaseModel):
         """Validate n_startup_trials."""
         if v is not None and v <= 0:
             raise ValueError("Value for n_startup_trials must be >0.")
+        return v
+
+    @field_validator("min_samples_required")
+    @classmethod
+    def check_min_samples_required(cls, v: Optional[int]):
+        """Validate min_samples_required."""
+        if v is not None and v <= 0:
+            raise ValueError("Value for min_samples_required must be >0.")
+        return v
+
+    @field_validator("min_time_slice")
+    @classmethod
+    def check_min_time_slice(cls, v: Optional[int]):
+        """Validate min_time_slice."""
+        if v is not None and v < 0:
+            raise ValueError("Value for min_time_slice must be >=0.")
         return v
 
 
@@ -174,6 +203,8 @@ class Optimization(BaseModel):
             - bohb: HyperBand scheduler for BOHB. It must be paired with the
                 'bohb' strategy, more information can be found at:
                 https://docs.ray.io/en/latest/tune/api/doc/ray.tune.schedulers.HyperBandForBOHB.html.
+            - median: Median stopping rule, more information can be found at:
+                https://docs.ray.io/en/latest/tune/api/doc/ray.tune.schedulers.MedianStoppingRule.html.
         eval_every_n (Optional[int]): The number of epochs to wait before evaluating the model.
             Defaults to 1.
         lr_scheduler (Optional[LRSchedulerConfig]): The learning rate scheduling options.
@@ -332,6 +363,25 @@ class Optimization(BaseModel):
                 "scheduling does not require it."
             )
 
+    def _validate_median_scheduler(self) -> None:
+        """Checks the properties used by the median stopping rule.
+
+        Raises:
+            ValueError: If a property required by the median stopping rule has
+                not been provided.
+        """
+        if self.properties.grace_period is None:
+            raise ValueError(
+                "Grace_period property is required for median stopping scheduling. "
+                "Change type of scheduling or provide the grace_period attribute."
+            )
+        for field in ("max_t", "reduction_factor"):
+            if getattr(self.properties, field) is not None:
+                logger.attention(
+                    f"You have passed the field {field} but median stopping "
+                    "scheduling does not require it."
+                )
+
     @model_validator(mode="after")
     def model_validation(self):
         """Optimization model validation."""
@@ -346,6 +396,7 @@ class Optimization(BaseModel):
             Schedulers.FIFO: self._validate_fifo_scheduler,
             Schedulers.ASHA: self._validate_asha_scheduler,
             Schedulers.BOHB: self._validate_bohb_scheduler,
+            Schedulers.MEDIAN: self._validate_median_scheduler,
         }
         validate_scheduler = scheduler_validators.get(self.scheduler)
         if validate_scheduler is not None:
@@ -357,6 +408,13 @@ class Optimization(BaseModel):
                 "scheduler. The search will run, but without the HyperBand "
                 "early stopping that BOHB is designed around."
             )
+        if self.scheduler != Schedulers.MEDIAN:
+            for field in ("min_samples_required", "min_time_slice", "hard_stop"):
+                if getattr(self.properties, field) is not None:
+                    logger.attention(
+                        f"You have passed the field {field} but only the "
+                        "'median' scheduler makes use of it."
+                    )
         if self.properties.n_startup_trials is not None and self.strategy not in (
             SearchAlgorithms.HYPEROPT,
             SearchAlgorithms.OPTUNA,

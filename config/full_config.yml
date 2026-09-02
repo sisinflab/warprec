@@ -140,7 +140,7 @@ models:
       load_from: path/to/model/checkpoint
     optimization:
       strategy: [grid, random, hopt, optuna, bohb]
-      scheduler: [fifo, asha, bohb]
+      scheduler: [fifo, asha, bohb, median]
       lr_scheduler:
         name: [StepLR, MultiStepLR, LinearLR, ExponentialLR, PolynomialLR, CosineAnnealingLR, ReduceLROnPlateau, CosineAnnealingWarmRestarts]
         params: {...}
@@ -156,6 +156,9 @@ models:
         grace_period: 50
         reduction_factor: 2.0
         n_startup_trials: 10
+        min_samples_required: 3
+        min_time_slice: 0
+        hard_stop: [True, False]
       device: [cpu, cuda]
       cpu_per_trial: 1
       gpu_per_trial: 0

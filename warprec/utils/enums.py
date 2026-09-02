@@ -129,11 +129,16 @@ class Schedulers(str, Enum):
         - BOHB: HyperBand scheduler for BOHB. It must be paired with the 'bohb'
             search algorithm, more information can be found at
             https://docs.ray.io/en/latest/tune/api/doc/ray.tune.schedulers.HyperBandForBOHB.html.
+        - MEDIAN: Median stopping rule, which stops a trial whose performance
+            falls below the median of the trials seen so far, more information
+            can be found at
+            https://docs.ray.io/en/latest/tune/api/doc/ray.tune.schedulers.MedianStoppingRule.html.
     """
 
     FIFO = "fifo"
     ASHA = "asha"
     BOHB = "bohb"
+    MEDIAN = "median"
 
 
 class SearchSpace(str, Enum):
