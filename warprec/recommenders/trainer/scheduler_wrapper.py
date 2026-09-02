@@ -48,24 +48,30 @@ class ASHASchedulerWrapper(ASHAScheduler, BaseSchedulerWrapper):
     """Wrapper for the ASHA scheduler.
 
     Args:
-        time_attr (str): The measure of time that will be used
-            by the scheduler.
         max_t (int): Maximum number of iterations.
         grace_period (int): Min time unit given to each trial.
         reduction_factor (float): Halving rate of trials.
+        time_attr (Optional[str]): The measure of time that will be used
+            by the scheduler. Defaults to 'training_iteration' when not given.
         **kwargs (Any): Keyword arguments.
+
+    Note:
+        A time attribute must always reach Ray Tune. ASHA compares it against
+        the reported results and, when it does not appear among them, lets every
+        trial continue: a scheduler configured without one would silently stop
+        pruning and behave like FIFO.
     """
 
     def __init__(
         self,
-        time_attr: str,
         max_t: int,
         grace_period: int,
         reduction_factor: float,
+        time_attr: Optional[str] = None,
         **kwargs: Any,
     ):
         super().__init__(
-            time_attr=time_attr,
+            time_attr=time_attr or "training_iteration",
             max_t=max_t,
             grace_period=grace_period,
             reduction_factor=reduction_factor,

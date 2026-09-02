@@ -137,7 +137,10 @@ class OptunaWrapper(OptunaSearch, BaseSearchWrapper):
 
 @search_algorithm_registry.register(SearchAlgorithms.BOHB)
 class BOHBWrapper(TuneBOHB, BaseSearchWrapper):
-    """Wrapper for the HyperOpt algorithm in Ray Tune.
+    """Wrapper for the BOHB algorithm in Ray Tune.
+
+    This is the Bayesian half of BOHB and is meant to be paired with the 'bohb'
+    scheduler, which provides the HyperBand half.
 
     Args:
         mode (str): The mode to run the optimization. Must be
