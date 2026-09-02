@@ -126,10 +126,14 @@ class Schedulers(str, Enum):
         - FIFO: Classic First In First Out trial optimization.
         - ASHA: ASHA Scheduler, more information can be found
             at https://docs.ray.io/en/latest/tune/api/doc/ray.tune.schedulers.ASHAScheduler.html.
+        - BOHB: HyperBand scheduler for BOHB. It must be paired with the 'bohb'
+            search algorithm, more information can be found at
+            https://docs.ray.io/en/latest/tune/api/doc/ray.tune.schedulers.HyperBandForBOHB.html.
     """
 
     FIFO = "fifo"
     ASHA = "asha"
+    BOHB = "bohb"
 
 
 class SearchSpace(str, Enum):

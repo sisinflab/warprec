@@ -7,6 +7,7 @@ from importlib.metadata import PackageNotFoundError, version
 from io import BytesIO
 from typing import Any, Dict, Optional, TYPE_CHECKING
 
+import numpy as np
 import torch
 
 from warprec.utils.logger import logger
@@ -227,6 +228,29 @@ class RunState:
         return state
 
 
+def _json_default(value: Any) -> Any:
+    """Converts values the JSON encoder cannot handle into native Python ones.
+
+    Search algorithms hand back NumPy scalars rather than Python builtins, so a
+    best-parameter block coming from a Bayesian strategy such as 'optuna',
+    'hopt' or 'bohb' cannot be serialized as it is.
+
+    Args:
+        value (Any): The value the encoder could not serialize.
+
+    Returns:
+        Any: A JSON-serializable equivalent of the value.
+
+    Raises:
+        TypeError: If the value has no native equivalent.
+    """
+    if isinstance(value, np.generic):
+        return value.item()
+    if isinstance(value, np.ndarray):
+        return value.tolist()
+    raise TypeError(f"Object of type {type(value).__name__} is not JSON serializable")
+
+
 def _digest(payload: Any) -> str:
     """Computes a stable SHA-256 digest of a JSON-serializable payload.
 
@@ -385,7 +409,8 @@ class RunStateStore:
         """
         state.updated_at = datetime.now().isoformat(timespec="seconds")
         self._writer._write_text(  # pylint: disable=protected-access
-            self.state_path, json.dumps(state.to_dict(), indent=4)
+            self.state_path,
+            json.dumps(state.to_dict(), indent=4, default=_json_default),
         )
 
     def save_eval_results(self, model_name: str, results: Dict[Any, Any]) -> None:

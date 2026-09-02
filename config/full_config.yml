@@ -140,7 +140,7 @@ models:
       load_from: path/to/model/checkpoint
     optimization:
       strategy: [grid, random, hopt, optuna, bohb]
-      scheduler: [fifo, asha]
+      scheduler: [fifo, asha, bohb]
       lr_scheduler:
         name: [StepLR, MultiStepLR, LinearLR, ExponentialLR, PolynomialLR, CosineAnnealingLR, ReduceLROnPlateau, CosineAnnealingWarmRestarts]
         params: {...}

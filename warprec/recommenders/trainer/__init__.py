@@ -11,6 +11,7 @@ from .search_algorithm_wrapper import (
 from .scheduler_wrapper import (
     FIFOSchedulerWrapper,
     ASHASchedulerWrapper,
+    BOHBSchedulerWrapper,
 )
 
 __all__ = [
@@ -24,4 +25,5 @@ __all__ = [
     "BOHBWrapper",
     "FIFOSchedulerWrapper",
     "ASHASchedulerWrapper",
+    "BOHBSchedulerWrapper",
 ]

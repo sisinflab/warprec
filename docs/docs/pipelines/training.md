@@ -131,6 +131,7 @@ When the splitting strategy is `k_fold_cross_validation`, the pipeline trains an
 |---|---|
 | `fifo` | First-In-First-Out. Runs all trials to completion. |
 | `asha` | Asynchronous Successive Halving. Aggressively prunes underperforming trials based on intermediate results. |
+| `bohb` | HyperBand for BOHB. Pauses underperforming trials and reallocates their budget. Must be paired with the `bohb` strategy. |
 
 ### Search Space Syntax
 

@@ -88,6 +88,7 @@ WarpRec provides extra dependencies for specific use cases:
 | dashboard | Dashboard functionalities like MLflow and Weights & Biases. |
 | remote-io | Remote communication with cloud services like Azure. |
 | serving | Optional dependencies to serve your recommendation models. |
+| bohb | Dependencies required by the `bohb` search strategy and scheduler. |
 | all | All of the above. |
 
 You can install them at any moment using the following command:

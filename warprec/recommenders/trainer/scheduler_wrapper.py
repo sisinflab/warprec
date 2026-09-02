@@ -11,12 +11,13 @@ Author: Avolio Marco
 Date: 03/03/2025
 """
 
-from typing import Any
+from typing import Any, Optional
 from abc import ABC, abstractmethod
 
 from ray.tune.schedulers import (
     FIFOScheduler,
     ASHAScheduler,
+    HyperBandForBOHB,
 )
 from warprec.utils.enums import Schedulers
 from warprec.utils.registry import scheduler_registry
@@ -67,5 +68,37 @@ class ASHASchedulerWrapper(ASHAScheduler, BaseSchedulerWrapper):
             time_attr=time_attr,
             max_t=max_t,
             grace_period=grace_period,
+            reduction_factor=reduction_factor,
+        )
+
+
+@scheduler_registry.register(Schedulers.BOHB)
+class BOHBSchedulerWrapper(HyperBandForBOHB, BaseSchedulerWrapper):
+    """Wrapper for the BOHB scheduler.
+
+    This scheduler is the HyperBand half of BOHB and must be paired with the
+    'bohb' search algorithm: it pauses trials, and only the BOHB search
+    algorithm knows how to resume them and insert new ones in their place.
+
+    Unlike ASHA, this scheduler has no grace period.
+
+    Args:
+        max_t (int): Maximum number of iterations.
+        reduction_factor (float): Halving rate of trials.
+        time_attr (Optional[str]): The measure of time that will be used
+            by the scheduler. Defaults to 'training_iteration' when not given.
+        **kwargs (Any): Keyword arguments.
+    """
+
+    def __init__(
+        self,
+        max_t: int,
+        reduction_factor: float,
+        time_attr: Optional[str] = None,
+        **kwargs: Any,
+    ):
+        super().__init__(
+            time_attr=time_attr or "training_iteration",
+            max_t=max_t,
             reduction_factor=reduction_factor,
         )

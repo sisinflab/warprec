@@ -171,6 +171,9 @@ class Optimization(BaseModel):
             - fifo: Classic First In First Out trial optimization.
             - asha: ASHA Scheduler, more information can be found at:
                 https://docs.ray.io/en/latest/tune/api/doc/ray.tune.schedulers.ASHAScheduler.html.
+            - bohb: HyperBand scheduler for BOHB. It must be paired with the
+                'bohb' strategy, more information can be found at:
+                https://docs.ray.io/en/latest/tune/api/doc/ray.tune.schedulers.HyperBandForBOHB.html.
         eval_every_n (Optional[int]): The number of epochs to wait before evaluating the model.
             Defaults to 1.
         lr_scheduler (Optional[LRSchedulerConfig]): The learning rate scheduling options.
@@ -327,6 +330,35 @@ class Optimization(BaseModel):
                     "Reduction_factor property is required for ASHA scheduling. "
                     "Change type of scheduling or provide the reduction_factor attribute."
                 )
+        if self.scheduler == Schedulers.BOHB:
+            if self.strategy != SearchAlgorithms.BOHB:
+                raise ValueError(
+                    "The 'bohb' scheduler pauses trials that only the 'bohb' "
+                    "search algorithm can resume, so the two must be used "
+                    f"together. The current strategy is '{self.strategy.value}'. "
+                    "Either set the strategy to 'bohb' or choose another scheduler."
+                )
+            if self.properties.max_t is None:
+                raise ValueError(
+                    "Max_t property is required for BOHB scheduling. "
+                    "Change type of scheduling or provide the max_t attribute."
+                )
+            if self.properties.reduction_factor is None:
+                raise ValueError(
+                    "Reduction_factor property is required for BOHB scheduling. "
+                    "Change type of scheduling or provide the reduction_factor attribute."
+                )
+            if self.properties.grace_period is not None:
+                logger.attention(
+                    "You have passed the field grace_period but BOHB "
+                    "scheduling does not require it."
+                )
+        if self.strategy == SearchAlgorithms.BOHB and self.scheduler != Schedulers.BOHB:
+            logger.attention(
+                "You are using the 'bohb' search strategy without the 'bohb' "
+                "scheduler. The search will run, but without the HyperBand "
+                "early stopping that BOHB is designed around."
+            )
         if self.properties.n_startup_trials is not None and self.strategy not in (
             SearchAlgorithms.HYPEROPT,
             SearchAlgorithms.OPTUNA,
