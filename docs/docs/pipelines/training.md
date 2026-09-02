@@ -167,3 +167,9 @@ The Training Pipeline persists the following artifacts via the Writer module:
 - **Hyperparameters:** Optimal hyperparameters per model (JSON).
 - **Statistical significance:** Paired test results and correction tables (CSV).
 - **Time reports:** Execution timing and CodeCarbon energy reports (when enabled).
+
+## Pausing and Resuming
+
+The Training Pipeline can be **paused with a signal and resumed later**. Press `Ctrl+C` (or send `SIGTERM`) and WarpRec stops at the next safe point, saves the state of the run and exits cleanly. Running the same command again continues from there: models that already finished are skipped, and an interrupted hyperparameter search resumes from its last Ray Tune checkpoint.
+
+This is configured through the optional [run](../configuration/run.md) section. See [Pause & Resume](pause-resume.md) for the full workflow.

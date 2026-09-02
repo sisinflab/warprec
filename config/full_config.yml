@@ -218,3 +218,8 @@ general:
   azure:
     storage_account_name: storage-account-name
     container_name: container-name
+run:
+  name: my_experiment_run
+  resume: [auto, force, never]
+  errored_trials: [skip, resume, restart]
+  pause_on_signal: [True, False]

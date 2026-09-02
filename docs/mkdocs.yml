@@ -17,6 +17,7 @@ nav:
     - Evaluation: pipelines/evaluation.md
     - Estimate: pipelines/estimate.md
     - Callbacks: pipelines/callbacks.md
+    - Pause & Resume: pipelines/pause-resume.md
   - Data Management:
     - Reader: data-management/reader.md
     - Writer: data-management/writer.md
@@ -32,6 +33,7 @@ nav:
       - Evaluation: configuration/evaluation.md
       - Estimate: configuration/estimate.md
       - General: configuration/general.md
+      - Run: configuration/run.md
   - Recommenders:
       - Module Overview: recommenders/index.md
       - Models Taxonomy: recommenders/taxonomy.md

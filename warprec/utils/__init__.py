@@ -13,6 +13,7 @@ from .enums import (
     MetricBlock,
     DataLoaderType,
 )
+from .pause import PauseController, RunPaused, is_pause_requested
 from .helpers import (
     load_custom_modules,
     is_python_module,
@@ -48,6 +49,9 @@ __all__ = [
     "SearchSpace",
     "MetricBlock",
     "DataLoaderType",
+    "PauseController",
+    "RunPaused",
+    "is_pause_requested",
     "load_custom_modules",
     "is_python_module",
     "retrieve_evaluation_dataloader",

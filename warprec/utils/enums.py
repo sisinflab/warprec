@@ -287,3 +287,31 @@ class DataLoaderType(Enum):
     def fixed_params(self) -> dict:
         """Getter method for fixed parameters."""
         return self.value.fixed_params
+
+
+class ResumeMode(str, Enum):
+    """Represents how a run should treat previously saved run state.
+
+    This enum is used to track the possible resume policies:
+        - AUTO: Resume when compatible saved state exists, otherwise start fresh.
+        - FORCE: Resume, and fail if no compatible saved state exists.
+        - NEVER: Always start fresh, discarding any saved state for the run name.
+    """
+
+    AUTO = "auto"
+    FORCE = "force"
+    NEVER = "never"
+
+
+class ErroredTrialPolicy(str, Enum):
+    """Represents how a resumed run should treat trials that errored before the pause.
+
+    This enum is used to track the possible policies:
+        - SKIP: Leave errored trials as they are.
+        - RESUME: Continue each errored trial from its last checkpoint.
+        - RESTART: Rerun each errored trial from scratch.
+    """
+
+    SKIP = "skip"
+    RESUME = "resume"
+    RESTART = "restart"

@@ -87,4 +87,25 @@ ray job submit \
 
 Make sure to replace `path/to/config.yml` with the path to your WarpRec configuration file (relative to your current directory).
 
+## Surviving Preemption
+
+Cloud nodes get reclaimed, and a spot instance can disappear mid-experiment. WarpRec runs can be **paused and resumed**, so a preemption need not cost the whole experiment.
+
+Give the driver a stable run name and make a missing state a hard error rather than a silent restart:
+
+```yaml
+run:
+    name: ml1m_baselines
+    resume: force
+```
+
+Arrange for the pod or job to receive `SIGTERM` before it is reclaimed, with enough grace time for WarpRec to reach a safe point. On Kubernetes this is `terminationGracePeriodSeconds`; the run then pauses cleanly, saves its state alongside the other experiment artifacts, and exits with status 0.
+
+Resubmitting the same job resumes the experiment: models that already finished are skipped, and interrupted hyperparameter searches continue from their last Ray Tune checkpoint. Because resource requests are deliberately excluded from the compatibility check, a paused run can be resumed on a cluster of a different size.
+
+!!! important
+    The run state and the Ray Tune checkpoints must outlive the node. Use a storage backend that persists beyond the pod, such as Azure Blob Storage via the writer configuration, or a shared volume mounted at the experiment path.
+
+See [Pause & Resume](../pipelines/pause-resume.md) for the full workflow.
+
 And with this, you are all set to run WarpRec experiments using cloud clustering! Enjoy the scalability and efficiency that comes with distributed training on the cloud.
