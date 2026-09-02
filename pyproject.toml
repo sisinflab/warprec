@@ -85,6 +85,17 @@ bohb = [
     "hpbandster",
     "configspace",
 ]
+all = [
+    "wandb",
+    "codecarbon",
+    "mlflow",
+    "azure-storage-blob",
+    "azure-identity",
+    "fastapi",
+    "fastmcp",
+    "hpbandster",
+    "configspace",
+]
 
 
 [tool.semantic_release]
