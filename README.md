@@ -73,7 +73,7 @@ An **Application Layer** exposes trained models through a REST API (FastAPI) and
 
 ## ⚙️ Installation
 
-WarpRec is designed to be easily installed via **pip** or via **Conda**. This ensures that all dependencies and the Python environment are managed consistently. Conda environment is available both for CPU and GPU.
+WarpRec is designed to be easily installed via **pip** or via **Conda**. This ensures that all dependencies and the Python environment are managed consistently.
 
 ### 🚀 Quick Install (PyPI)
 The easiest way to get started is using pip:
@@ -89,6 +89,7 @@ WarpRec provides extra dependencies for specific use cases:
 | remote-io | Remote communication with cloud services like Azure. |
 | serving | Optional dependencies to serve your recommendation models. |
 | bohb | Dependencies required by the `bohb` search strategy and scheduler. |
+| graph | PyTorch Geometric, required by the graph-based recommenders. |
 | all | All of the above. |
 
 You can install them at any moment using the following command:
@@ -116,7 +117,7 @@ If you use [Poetry](https://python-poetry.org/) for dependency management, you c
 
 ### 🛠️ Development Setup (Conda)
 
-If you want to contribute or need a specific environment (CPU/GPU), we recommend using Conda. The conda environment already contains all the extra dependencies:
+If you want to contribute, we recommend using Conda. The environment installs WarpRec with all extra dependencies:
 
 1. **Clone the repository**
    Open your terminal and clone the WarpRec repository:
@@ -126,18 +127,23 @@ If you want to contribute or need a specific environment (CPU/GPU), we recommend
    ```
 
 2. **Create the Conda environment**
-    Use the provided environment.gpu.yml (or environment.cpu.yml) file to create the virtual environment. This will install Python 3.12 and the necessary core dependencies.
+    Use the provided `environment.yml` file. It installs Python 3.12 and then WarpRec itself with all extras, so the dependency set always matches `pyproject.toml`.
     ```bash
-    # For GPU support
-    conda env create --file environment.gpu.yml
-    # Or for CPU only
-    conda env create --file environment.cpu.yml
+    conda env create --file environment.yml
     ```
 
 3.  **Activate the environment:**
 
     ```bash
     conda activate warprec
+    ```
+
+4.  **CPU-only machines (optional)**
+
+    The environment installs the default PyTorch build, which is CUDA-enabled on Linux. On a machine without a GPU you can replace it with the smaller CPU build:
+
+    ```bash
+    pip install torch==2.7.* --index-url https://download.pytorch.org/whl/cpu
     ```
 
 ## 🚂 Usage

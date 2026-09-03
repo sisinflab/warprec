@@ -2,11 +2,8 @@
 from typing import Tuple, Any, Optional
 
 import torch
-import torch_geometric
 import numpy as np
 from torch import nn, Tensor
-from torch_geometric.nn import LGConv
-from torch_sparse import SparseTensor
 from scipy.sparse import coo_matrix
 
 from warprec.data.entities import Interactions, Sessions
@@ -19,6 +16,9 @@ from warprec.recommenders.collaborative_filtering_recommender.graph_based import
 from warprec.recommenders.losses import BPRLoss, EmbLoss
 from warprec.utils.enums import DataLoaderType
 from warprec.utils.registry import model_registry
+from warprec.recommenders.collaborative_filtering_recommender.graph_based.graph_utils import (
+    SparseAdjacency,
+)
 
 
 @model_registry.register(name="LightGCNpp")
@@ -79,17 +79,6 @@ class LightGCNpp(IterativeRecommender, GraphRecommenderUtils):
             self.n_items + 1, self.embedding_size, padding_idx=self.n_items
         )
 
-        # LightGCN++ requires custom weights baked into the adjacency matrix,
-        # so we must disable LGConv's internal normalization.
-        propagation_network_list = []
-        for _ in range(self.n_layers):
-            propagation_network_list.append(
-                (LGConv(normalize=False), "x, edge_index -> x")
-            )
-        self.propagation_network = torch_geometric.nn.Sequential(
-            "x, edge_index", propagation_network_list
-        )
-
         # Compute the adjacency matrix with the weighted version
         self.adj = self._get_weighted_adj_mat(
             interactions.get_sparse().tocoo(),
@@ -107,7 +96,7 @@ class LightGCNpp(IterativeRecommender, GraphRecommenderUtils):
         interaction_matrix: coo_matrix,
         n_users: int,
         n_items: int,
-    ) -> SparseTensor:
+    ) -> SparseAdjacency:
         """Computes the weighted adjacency matrix based on Alpha and Beta.
 
         Formula: E_ij = 1 / (deg_i^alpha * deg_j^beta)
@@ -145,12 +134,12 @@ class LightGCNpp(IterativeRecommender, GraphRecommenderUtils):
         edge_index = torch.tensor(np.vstack([row, col]), dtype=torch.int64)
         edge_weights = torch.tensor(values, dtype=torch.float32)
 
-        # Create SparseTensor with explicit values (weights)
-        adj = SparseTensor(
+        # Create SparseAdjacency with explicit values (weights)
+        adj = SparseAdjacency(
             row=edge_index[0],
             col=edge_index[1],
             value=edge_weights,
-            sparse_sizes=(n_users + n_items, n_users + n_items),
+            size=(n_users + n_items, n_users + n_items),
         )
 
         return adj
@@ -207,9 +196,8 @@ class LightGCNpp(IterativeRecommender, GraphRecommenderUtils):
         embeddings_list = [ego_embeddings]
 
         current_embeddings = ego_embeddings
-        for layer_module in self.propagation_network.children():
-            # LGConv(normalize=False) will use the weights in self.adj
-            current_embeddings = layer_module(current_embeddings, self.adj)
+        for _ in range(self.n_layers):
+            current_embeddings = self.adj.matmul(current_embeddings)
             embeddings_list.append(current_embeddings)
 
         # LightGCN++ Pooling Strategy

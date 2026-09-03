@@ -20,6 +20,18 @@ runs:
         path: .venv
         key: venv-${{ runner.os }}-${{ hashFiles('poetry.lock') }}-${{ hashFiles('pyproject.toml') }}
 
+    # mypy re-analyses the whole dependency graph without this, which costs
+    # about a minute per run. mypy invalidates its own cache, so reusing it
+    # across runs is safe.
+    - name: Cache mypy
+      uses: actions/cache@v4
+      with:
+        path: .mypy_cache
+        key: mypy-${{ runner.os }}-${{ hashFiles('poetry.lock') }}-${{ github.sha }}
+        restore-keys: |
+          mypy-${{ runner.os }}-${{ hashFiles('poetry.lock') }}-
+          mypy-${{ runner.os }}-
+
     - name: Install Poetry
       uses: snok/install-poetry@v1
       with:

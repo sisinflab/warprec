@@ -193,7 +193,7 @@ Graph-based recommenders exploit the structure of the user-item interaction grap
 
 !!! warning
 
-    Graph-based models require PyTorch Geometric (PyG) dependencies to be installed correctly. Check the [installation guide](../get-started/installation.md) for more information on how to install them.
+    Graph-based models require PyTorch Geometric, which is an optional dependency. Install it with `pip install "warprec[graph]"` — see the [installation guide](../get-started/installation.md#graph-based-recommenders) for details.
 
 ### DGCF
 

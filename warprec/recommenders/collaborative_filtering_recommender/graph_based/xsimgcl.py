@@ -133,7 +133,7 @@ class XSimGCL(IterativeRecommender, GraphRecommenderUtils):
 
         for layer_idx in range(self.n_layers):
             # Graph Convolution: E(l) = A * E(l-1)
-            # SparseTensor matmul is efficient
+            # Sparse matmul is efficient
             current_embeddings = self.adj.matmul(current_embeddings)
 
             # XSimGCL Perturbation

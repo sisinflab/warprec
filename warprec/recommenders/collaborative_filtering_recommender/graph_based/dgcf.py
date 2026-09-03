@@ -81,7 +81,7 @@ class DGCF(IterativeRecommender, GraphRecommenderUtils):
         )
 
         # Graph Structure
-        # We extract indices once. We do NOT use SparseTensor for propagation
+        # We extract indices once. We do NOT use the sparse adjacency for propagation
         # because weights change every iteration. Raw scatter/gather is faster.
         self._init_graph_indices(interactions)
 
