@@ -22,19 +22,21 @@ repos:
     hooks:
       - id: mypy
         name: mypy
-        entry: poetry run mypy
+        entry: poetry run mypy warprec serving callbacks sample_pipelines
         language: system
         types: [python]
-        args: [--no-strict-optional, --ignore-missing-imports, --no-incremental]
+        pass_filenames: false
+        args: [--no-strict-optional, --ignore-missing-imports]
         exclude: ^tests/|^docs/
 
   - repo: local
     hooks:
       - id: pylint
         name: pylint
-        entry: poetry run pylint
+        entry: poetry run pylint warprec serving callbacks sample_pipelines
         language: system
         types: [python]
+        pass_filenames: false
         args:
           [
             "--jobs=0",
