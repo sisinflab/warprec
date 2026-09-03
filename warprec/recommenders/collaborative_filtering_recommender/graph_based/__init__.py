@@ -15,7 +15,7 @@ try:
     from .lightgcnpp import LightGCNpp  # noqa: F401
     from .lightgode import LightGODE  # noqa: F401
     from .macrgcn import MACRGCN  # noqa: F401
-    from .mixrec import MixRec
+    from .mixrec import MixRec  # noqa: F401
     from .ngcf import NGCF  # noqa: F401
     from .paac import PAAC  # noqa: F401
     from .popdcl import PopDCL  # noqa: F401
@@ -25,7 +25,7 @@ try:
     from .simgcl import SimGCL  # noqa: F401
     from .simrec import SimRec  # noqa: F401
     from .ultragcn import UltraGCN  # noqa: F401
-    from .xsimgcl import XSimGCL
+    from .xsimgcl import XSimGCL  # noqa: F401
 
     __all__.extend(
         [
@@ -57,235 +57,64 @@ try:
     )
 
 except ImportError:
+    from typing import Any
+
     from warprec.utils.registry import model_registry
 
-    @model_registry.register("DGCF")
-    class DGCF:  # type: ignore[no-redef]
-        """Placeholder for DGCF model when PyG dependencies are not installed."""
+    # Every model above needs PyTorch Geometric. Registering a stand-in for each
+    # keeps the registry complete, so a configuration naming one of them fails
+    # with a useful message instead of an unknown-model error.
+    _PYG_MODELS = [
+        "DGCF",
+        "EGCF",
+        "ESIGCF",
+        "GCMC",
+        "GraphRecommenderUtils",
+        "LightCCF",
+        "LightGCL",
+        "LightGCN",
+        "LightGCNpp",
+        "LightGODE",
+        "MACRGCN",
+        "MixRec",
+        "NGCF",
+        "PAAC",
+        "PopDCL",
+        "RecDCL",
+        "SGCL",
+        "SGL",
+        "SimGCL",
+        "SimRec",
+        "SparseDropout",
+        "UltraGCN",
+        "XSimGCL",
+    ]
 
-        def __init__(self, *args, **kwargs):
-            raise ImportError(
-                "DGCF model requires PyG dependencies. "
-                "Please install following the documentation you can find here: "
-                "https://pytorch-geometric.readthedocs.io/en/latest/install/installation.html"
-            )
+    def _unavailable(model_name: str) -> type:
+        """Builds a stand-in that explains the missing dependency when used.
 
-    @model_registry.register("GCMC")
-    class GCMC:  # type: ignore[no-redef]
-        """Placeholder for GCMC model when PyG dependencies are not installed."""
+        Args:
+            model_name (str): The name of the unavailable model.
 
-        def __init__(self, *args, **kwargs):
-            raise ImportError(
-                "GCMC model requires PyG dependencies. "
-                "Please install following the documentation you can find here: "
-                "https://pytorch-geometric.readthedocs.io/en/latest/install/installation.html"
-            )
+        Returns:
+            type: A class raising ImportError when instantiated.
+        """
 
-    @model_registry.register("EGCF")
-    class EGCF:  # type: ignore[no-redef]
-        """Placeholder for EGCF model when PyG dependencies are not installed."""
+        class _Unavailable:
+            """Placeholder used when PyTorch Geometric is not installed."""
 
-        def __init__(self, *args, **kwargs):
-            raise ImportError(
-                "EGCF model requires PyG dependencies. "
-                "Please install following the documentation you can find here: "
-                "https://pytorch-geometric.readthedocs.io/en/latest/install/installation.html"
-            )
+            def __init__(self, *args: Any, **kwargs: Any):
+                raise ImportError(
+                    f"The {model_name} model requires PyTorch Geometric. "
+                    'Install it with: pip install "warprec[graph]"'
+                )
 
-    @model_registry.register("ESIGCF")
-    class ESIGCF:  # type: ignore[no-redef]
-        """Placeholder for ESIGCF model when PyG dependencies are not installed."""
+        _Unavailable.__name__ = model_name
+        _Unavailable.__qualname__ = model_name
+        return _Unavailable
 
-        def __init__(self, *args, **kwargs):
-            raise ImportError(
-                "ESIGCF model requires PyG dependencies. "
-                "Please install following the documentation you can find here: "
-                "https://pytorch-geometric.readthedocs.io/en/latest/install/installation.html"
-            )
+    for _name in _PYG_MODELS:
+        globals()[_name] = _unavailable(_name)
+        model_registry.register(_name)(globals()[_name])
 
-    @model_registry.register("LightCCF")
-    class LightCCF:  # type: ignore[no-redef]
-        """Placeholder for LightCCF model when PyG dependencies are not installed."""
-
-        def __init__(self, *args, **kwargs):
-            raise ImportError(
-                "LightCCF model requires PyG dependencies. "
-                "Please install following the documentation you can find here: "
-                "https://pytorch-geometric.readthedocs.io/en/latest/install/installation.html"
-            )
-
-    @model_registry.register("LightGCL")
-    class LightGCL:  # type: ignore[no-redef]
-        """Placeholder for LightGCL model when PyG dependencies are not installed."""
-
-        def __init__(self, *args, **kwargs):
-            raise ImportError(
-                "LightGCL model requires PyG dependencies. "
-                "Please install following the documentation you can find here: "
-                "https://pytorch-geometric.readthedocs.io/en/latest/install/installation.html"
-            )
-
-    @model_registry.register("LightGCN")
-    class LightGCN:  # type: ignore[no-redef]
-        """Placeholder for LightGCN model when PyG dependencies are not installed."""
-
-        def __init__(self, *args, **kwargs):
-            raise ImportError(
-                "LightGCN model requires PyG dependencies. "
-                "Please install following the documentation you can find here: "
-                "https://pytorch-geometric.readthedocs.io/en/latest/install/installation.html"
-            )
-
-    @model_registry.register("LightGCNpp")
-    class LightGCNpp:  # type: ignore[no-redef]
-        """Placeholder for LightGCNpp model when PyG dependencies are not installed."""
-
-        def __init__(self, *args, **kwargs):
-            raise ImportError(
-                "LightGCNpp model requires PyG dependencies. "
-                "Please install following the documentation you can find here: "
-                "https://pytorch-geometric.readthedocs.io/en/latest/install/installation.html"
-            )
-
-    @model_registry.register("LightGODE")
-    class LightGODE:  # type: ignore[no-redef]
-        """Placeholder for LightGODE model when PyG dependencies are not installed."""
-
-        def __init__(self, *args, **kwargs):
-            raise ImportError(
-                "LightGODE model requires PyG dependencies. "
-                "Please install following the documentation you can find here: "
-                "https://pytorch-geometric.readthedocs.io/en/latest/install/installation.html"
-            )
-
-    @model_registry.register("MACRGCN")
-    class MACRGCN:  # type: ignore[no-redef]
-        """Placeholder for MACRGCN model when PyG dependencies are not installed."""
-
-        def __init__(self, *args, **kwargs):
-            raise ImportError(
-                "MACRGCN model requires PyG dependencies. "
-                "Please install following the documentation you can find here: "
-                "https://pytorch-geometric.readthedocs.io/en/latest/install/installation.html"
-            )
-
-    @model_registry.register("MixRec")
-    class MixRec:  # type: ignore[no-redef]
-        """Placeholder for MixRec model when PyG dependencies are not installed."""
-
-        def __init__(self, *args, **kwargs):
-            raise ImportError(
-                "MixRec model requires PyG dependencies. "
-                "Please install following the documentation you can find here: "
-                "https://pytorch-geometric.readthedocs.io/en/latest/install/installation.html"
-            )
-
-    @model_registry.register("NGCF")
-    class NGCF:  # type: ignore[no-redef]
-        """Placeholder for NGCF model when PyG dependencies are not installed."""
-
-        def __init__(self, *args, **kwargs):
-            raise ImportError(
-                "NGCF model requires PyG dependencies. "
-                "Please install following the documentation you can find here: "
-                "https://pytorch-geometric.readthedocs.io/en/latest/install/installation.html"
-            )
-
-    @model_registry.register("PAAC")
-    class PAAC:  # type: ignore[no-redef]
-        """Placeholder for PAAC model when PyG dependencies are not installed."""
-
-        def __init__(self, *args, **kwargs):
-            raise ImportError(
-                "PAAC model requires PyG dependencies. "
-                "Please install following the documentation you can find here: "
-                "https://pytorch-geometric.readthedocs.io/en/latest/install/installation.html"
-            )
-
-    @model_registry.register("PopDCL")
-    class PopDCL:  # type: ignore[no-redef]
-        """Placeholder for PopDCL model when PyG dependencies are not installed."""
-
-        def __init__(self, *args, **kwargs):
-            raise ImportError(
-                "PopDCL model requires PyG dependencies. "
-                "Please install following the documentation you can find here: "
-                "https://pytorch-geometric.readthedocs.io/en/latest/install/installation.html"
-            )
-
-    @model_registry.register("RecDCL")
-    class RecDCL:  # type: ignore[no-redef]
-        """Placeholder for RecDCL model when PyG dependencies are not installed."""
-
-        def __init__(self, *args, **kwargs):
-            raise ImportError(
-                "RecDCL model requires PyG dependencies. "
-                "Please install following the documentation you can find here: "
-                "https://pytorch-geometric.readthedocs.io/en/latest/install/installation.html"
-            )
-
-    @model_registry.register("SGCL")
-    class SGCL:  # type: ignore[no-redef]
-        """Placeholder for SGCL model when PyG dependencies are not installed."""
-
-        def __init__(self, *args, **kwargs):
-            raise ImportError(
-                "SGCL model requires PyG dependencies. "
-                "Please install following the documentation you can find here: "
-                "https://pytorch-geometric.readthedocs.io/en/latest/install/installation.html"
-            )
-
-    @model_registry.register("SGL")
-    class SGL:  # type: ignore[no-redef]
-        """Placeholder for SGL model when PyG dependencies are not installed."""
-
-        def __init__(self, *args, **kwargs):
-            raise ImportError(
-                "SGL model requires PyG dependencies. "
-                "Please install following the documentation you can find here: "
-                "https://pytorch-geometric.readthedocs.io/en/latest/install/installation.html"
-            )
-
-    @model_registry.register("SimGCL")
-    class SimGCL:  # type: ignore[no-redef]
-        """Placeholder for SimGCL model when PyG dependencies are not installed."""
-
-        def __init__(self, *args, **kwargs):
-            raise ImportError(
-                "SimGCL model requires PyG dependencies. "
-                "Please install following the documentation you can find here: "
-                "https://pytorch-geometric.readthedocs.io/en/latest/install/installation.html"
-            )
-
-    @model_registry.register("SimRec")
-    class SimRec:  # type: ignore[no-redef]
-        """Placeholder for SimRec model when PyG dependencies are not installed."""
-
-        def __init__(self, *args, **kwargs):
-            raise ImportError(
-                "SimRec model requires PyG dependencies. "
-                "Please install following the documentation you can find here: "
-                "https://pytorch-geometric.readthedocs.io/en/latest/install/installation.html"
-            )
-
-    @model_registry.register("UltraGCN")
-    class UltraGCN:  # type: ignore[no-redef]
-        """Placeholder for UltraGCN model when PyG dependencies are not installed."""
-
-        def __init__(self, *args, **kwargs):
-            raise ImportError(
-                "UltraGCN model requires PyG dependencies. "
-                "Please install following the documentation you can find here: "
-                "https://pytorch-geometric.readthedocs.io/en/latest/install/installation.html"
-            )
-
-    @model_registry.register("XSimGCL")
-    class XSimGCL:  # type: ignore[no-redef]
-        """Placeholder for XSimGCL model when PyG dependencies are not installed."""
-
-        def __init__(self, *args, **kwargs):
-            raise ImportError(
-                "XSimGCL model requires PyG dependencies. "
-                "Please install following the documentation you can find here: "
-                "https://pytorch-geometric.readthedocs.io/en/latest/install/installation.html"
-            )
+    __all__.extend(_PYG_MODELS)

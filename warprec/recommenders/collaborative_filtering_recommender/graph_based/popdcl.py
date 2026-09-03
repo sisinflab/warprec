@@ -3,10 +3,8 @@ from typing import Tuple, Any, Optional
 
 import torch
 import numpy as np
-import torch_geometric
 from torch import nn, Tensor
 from torch.nn import functional as F
-from torch_geometric.nn import LGConv
 
 from warprec.data.entities import Interactions, Sessions
 from warprec.recommenders.base_recommender import IterativeRecommender
@@ -92,14 +90,7 @@ class PopDCL(GraphRecommenderUtils, IterativeRecommender):
             interactions.get_sparse().tocoo(),
             self.n_users,
             self.n_items + 1,  # +1 for padding index
-        )
-
-        # ---- LGConv propagation network (K layers) ----
-        propagation_network_list = []
-        for _ in range(self.n_layers):
-            propagation_network_list.append((LGConv(), "x, edge_index -> x"))
-        self.propagation_network = torch_geometric.nn.Sequential(
-            "x, edge_index", propagation_network_list
+            normalize=True,
         )
 
         # ---- Precompute popularity statistics from training interactions ----
@@ -193,8 +184,8 @@ class PopDCL(GraphRecommenderUtils, IterativeRecommender):
 
         embeddings_list = [ego_embeddings]
         current_embeddings = ego_embeddings
-        for layer_module in self.propagation_network.children():
-            current_embeddings = layer_module(current_embeddings, self.adj)
+        for _ in range(self.n_layers):
+            current_embeddings = self.adj.matmul(current_embeddings)
             embeddings_list.append(current_embeddings)
 
         # Mean pooling across layers 0..K  (LightGCN Eq. 11 / Section 3.2.1)

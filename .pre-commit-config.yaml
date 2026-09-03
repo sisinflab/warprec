@@ -49,7 +49,7 @@ repos:
             # PyTorch Geometric is an optional dependency and its wheel index is
             # not always reachable, so linting must not require it to be
             # installed. Attribute checks on these modules are off anyway (E1101).
-            "--ignored-modules=torch_geometric,torch_sparse",
+            "--ignored-modules=torch_geometric",
           ]
         exclude: ^tests/|^docs/
 

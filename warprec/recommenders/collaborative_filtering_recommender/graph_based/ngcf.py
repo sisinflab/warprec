@@ -6,7 +6,6 @@ import scipy.sparse as sp
 import torch
 import torch.nn.functional as F
 from torch import nn, Tensor
-from torch_sparse import SparseTensor
 from scipy.sparse import coo_matrix
 
 from warprec.data.entities import Interactions, Sessions
@@ -20,6 +19,9 @@ from warprec.recommenders.collaborative_filtering_recommender.graph_based import
 from warprec.recommenders.losses import BPRLoss, EmbLoss
 from warprec.utils.enums import DataLoaderType
 from warprec.utils.registry import model_registry
+from warprec.recommenders.collaborative_filtering_recommender.graph_based.graph_utils import (
+    SparseAdjacency,
+)
 
 
 class NGCFLayer(nn.Module):
@@ -61,13 +63,13 @@ class NGCFLayer(nn.Module):
         nn.init.zeros_(self.b1.data)
         nn.init.zeros_(self.b2.data)
 
-    def forward(self, ego_embeddings: Tensor, adj_matrix: SparseTensor) -> Tensor:
+    def forward(self, ego_embeddings: Tensor, adj_matrix: SparseAdjacency) -> Tensor:
         """
         Performs a single NGCF propagation step.
 
         Args:
             ego_embeddings (Tensor): Current embeddings of all nodes (users + items).
-            adj_matrix (SparseTensor): Normalized adjacency matrix (A_hat).
+            adj_matrix (SparseAdjacency): Normalized adjacency matrix (A_hat).
 
         Returns:
             Tensor: Propagated embeddings for the next layer.
@@ -260,7 +262,7 @@ class NGCF(IterativeRecommender, GraphRecommenderUtils):
         interaction_matrix: coo_matrix,
         n_users: int,
         n_items: int,
-    ) -> SparseTensor:
+    ) -> SparseAdjacency:
         """Get the normalized interaction matrix of users and items specific to NGCF.
         This includes constructing the full adjacency matrix and applying symmetric normalization.
 
@@ -270,7 +272,7 @@ class NGCF(IterativeRecommender, GraphRecommenderUtils):
             n_items (int): The number of items.
 
         Returns:
-            SparseTensor: The sparse normalized adjacency matrix (A_hat).
+            SparseAdjacency: The sparse normalized adjacency matrix (A_hat).
         """
         # Build adjacency matrix (A)
         # [num_user + n_items x num_user + n_items]
@@ -299,13 +301,17 @@ class NGCF(IterativeRecommender, GraphRecommenderUtils):
         # L = D^{-0.5} A D^{-0.5}
         L = D_inv_sqrt.dot(A).dot(D_inv_sqrt)
 
-        # Convert to COO format for SparseTensor
+        # Convert to COO format for SparseAdjacency
         L_coo = L.tocoo()
         indices = torch.LongTensor(np.vstack((L_coo.row, L_coo.col)))
         values = torch.FloatTensor(L_coo.data)
-        shape = torch.Size(L_coo.shape)
 
-        return torch.sparse_coo_tensor(indices, values, shape).coalesce()
+        return SparseAdjacency(
+            row=indices[0],
+            col=indices[1],
+            value=values,
+            size=(L_coo.shape[0], L_coo.shape[1]),
+        )
 
     def predict(
         self,
