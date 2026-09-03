@@ -14,8 +14,6 @@ jobs:
 
       - name: Setup Environment
         uses: ./.github/actions/setup-env
-        with:
-          install-pyg: 'true'
 
       - name: Run pre-commit
         run: poetry run pre-commit run --all-files

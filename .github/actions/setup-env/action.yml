@@ -5,10 +5,6 @@ inputs:
     description: 'Python version'
     required: true
     default: '3.12'
-  install-pyg:
-    description: 'Whether to install PyG dependencies'
-    required: false
-    default: 'false'
 
 runs:
   using: "composite"
@@ -34,9 +30,4 @@ runs:
 
     - name: Install dependencies
       shell: bash
-      run: |
-        poetry install --no-interaction --all-extras
-        if [ "${{ inputs.install-pyg }}" = "true" ]; then
-          poetry run pip install pyg_lib torch_scatter torch_sparse torch_cluster torch_spline_conv -f https://data.pyg.org/whl/torch-2.7.0+cpu.html
-          poetry run pip install torch_geometric
-        fi
+      run: poetry install --no-interaction --all-extras

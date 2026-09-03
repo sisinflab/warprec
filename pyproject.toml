@@ -41,6 +41,8 @@ azure-storage-blob = {version = "^12.26.0", optional = true}
 azure-identity = {version = "^1.25.1", optional = true}
 fastapi = {version = "^0.135.1", optional = true}
 fastmcp = {version = "^3.1.0", optional = true}
+hpbandster = {version = "^0.7.4", optional = true}
+configspace = {version = "^1.2.2", optional = true}
 lightning = "^2.6.1"
 coolname = "^5.0.0"
 
@@ -78,6 +80,21 @@ remote-io = [
 serving = [
     "fastapi",
     "fastmcp",
+]
+bohb = [
+    "hpbandster",
+    "configspace",
+]
+all = [
+    "wandb",
+    "codecarbon",
+    "mlflow",
+    "azure-storage-blob",
+    "azure-identity",
+    "fastapi",
+    "fastmcp",
+    "hpbandster",
+    "configspace",
 ]
 
 

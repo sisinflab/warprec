@@ -64,9 +64,10 @@ An **Application Layer** exposes trained models through a REST API (FastAPI) and
 - **40 GPU-Accelerated Metrics**: The evaluation suite covers 40 metrics across 7 families — Accuracy, Rating, Coverage, Novelty, Diversity, Bias, and Fairness — including multi-objective metrics for simultaneous optimization of competing goals. All metrics are computed with full GPU acceleration for large-scale experiments.
 - **Statistical Rigor**: WarpRec automates hypothesis testing with paired (Student's t-test, Wilcoxon signed-rank) and independent-group (Mann-Whitney U) tests, and applies multiple comparison corrections via **Bonferroni** and **FDR (Benjamini-Hochberg)** to prevent p-hacking and ensure statistically robust conclusions.
 - **Distributed Training & HPO**: Seamless vertical and horizontal scaling from single-GPU to multi-node Ray clusters. Hyperparameter optimization supports Grid, Random, Bayesian, HyperOpt, Optuna, and BoHB strategies, with ASHA pruning and model-level early stopping to maximize computational efficiency.
+- **Pausable & Resumable Runs**: Long experiments can be stopped with a signal (`Ctrl+C` or `SIGTERM`) and resumed later from the same command. Unfinished Ray Tune trials continue from their last checkpoint and models that already completed are skipped, so a preemption on a spot instance or a cluster reclaim costs minutes rather than the whole experiment.
 - **Green AI & Carbon Tracking**: WarpRec is the first recommendation framework with native [CodeCarbon](https://codecarbon.io/) integration, automatically quantifying energy consumption and CO₂ emissions for every experiment and persisting carbon footprint reports alongside standard results.
-- **Agentic AI via MCP**: WarpRec natively implements a [Model Context Protocol](https://modelcontextprotocol.io/) server (`infer-api/mcp_server.py`), exposing trained recommenders as callable tools within LLM and autonomous agent workflows — transforming the framework from a static predictor into an interactive, agent-ready component.
-- **REST API & Model Serving**: Trained models are instantly deployable as RESTful microservices via the built-in FastAPI server (`infer-api/server.py`), decoupling the modeling core from serving infrastructure with zero additional engineering effort.
+- **Agentic AI via MCP**: WarpRec natively implements a [Model Context Protocol](https://modelcontextprotocol.io/) server (`serving/mcp/mcp_server.py`), exposing trained recommenders as callable tools within LLM and autonomous agent workflows — transforming the framework from a static predictor into an interactive, agent-ready component.
+- **REST API & Model Serving**: Trained models are instantly deployable as RESTful microservices via the built-in FastAPI server (`serving/restAPI/server.py`), decoupling the modeling core from serving infrastructure with zero additional engineering effort.
 - **Experiment Tracking**: Native integrations with `TensorBoard`, `Weights & Biases`, and `MLflow` for real-time monitoring of metrics, training dynamics, and multi-run management.
 - **Custom Pipelines & Callbacks**: Alongside the standard Training, Design, Evaluation, Swarm, and Estimate workflows, WarpRec exposes an event-driven Callback system for injecting custom logic at any stage — enabling complex experiments without modifying framework internals.
 
@@ -87,6 +88,7 @@ WarpRec provides extra dependencies for specific use cases:
 | dashboard | Dashboard functionalities like MLflow and Weights & Biases. |
 | remote-io | Remote communication with cloud services like Azure. |
 | serving | Optional dependencies to serve your recommendation models. |
+| bohb | Dependencies required by the `bohb` search strategy and scheduler. |
 | all | All of the above. |
 
 You can install them at any moment using the following command:

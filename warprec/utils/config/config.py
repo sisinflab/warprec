@@ -18,6 +18,7 @@ from warprec.utils.config import (
     RecomModel,
     EvaluationConfig,
     EstimateConfig,
+    WarpRecRunConfig,
 )
 from warprec.utils.callback import WarpRecCallback
 from warprec.utils.enums import ReadingMethods, WritingMethods
@@ -128,12 +129,15 @@ class TrainConfiguration(WarpRecConfiguration):
         splitter (SplittingConfig): Configuration of the splitting process.
         dashboard (DashboardConfig): Configuration of the dashboard process.
         evaluation (EvaluationConfig): Configuration of the evaluation process.
+        run (WarpRecRunConfig): Configuration of the run identity and of the
+            pause and resume behaviour.
     """
 
     writer: WriterConfig
     splitter: SplittingConfig = None
     dashboard: DashboardConfig = Field(default_factory=DashboardConfig)
     evaluation: EvaluationConfig
+    run: WarpRecRunConfig = Field(default_factory=WarpRecRunConfig)
 
     @model_validator(mode="after")
     def train_validation(self) -> "TrainConfiguration":

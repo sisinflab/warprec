@@ -4,7 +4,8 @@ import os
 # Set Ray environment variable to enable new features
 os.environ["RAY_TRAIN_V2_ENABLED"] = "1"
 import math
-from typing import List, Tuple, Optional, Dict, Union, Any
+from dataclasses import dataclass, field
+from typing import List, Optional, Dict, Union, Any
 from pathlib import Path
 
 import torch
@@ -25,6 +26,8 @@ from warprec.utils.config import (
     DashboardConfig,
     ComplexMetricConfig,
 )
+from warprec.utils.enums import ErroredTrialPolicy
+from warprec.utils.pause import is_pause_requested
 from warprec.utils.helpers import validation_metric
 from warprec.utils.callback import WarpRecCallback
 from warprec.utils.logger import logger
@@ -46,6 +49,45 @@ except ImportError:
     DASHBOARD_AVAILABLE = False
 
 
+@dataclass(frozen=True)
+class TrainingOutcome:
+    """The result of a hyperparameter optimization run for one model.
+
+    Attributes:
+        status (str): One of 'completed', 'interrupted' or 'failed'.
+        model (Optional[Recommender]): The best model, when one was produced.
+        best_params (Optional[dict]): The best hyperparameters found.
+        report (dict): Summary report of the optimization.
+        best_iter (int): The best training iteration.
+        best_checkpoint_path (Optional[str]): Path of the best trial checkpoint.
+    """
+
+    status: str
+    model: Optional[Recommender] = None
+    best_params: Optional[dict] = None
+    report: dict = field(default_factory=dict)
+    best_iter: int = 0
+    best_checkpoint_path: Optional[str] = None
+
+    @property
+    def interrupted(self) -> bool:
+        """Returns whether the optimization was interrupted by a pause.
+
+        Returns:
+            bool: True when the run was paused before completing.
+        """
+        return self.status == "interrupted"
+
+    @property
+    def failed(self) -> bool:
+        """Returns whether the optimization produced no usable model.
+
+        Returns:
+            bool: True when the optimization failed.
+        """
+        return self.status == "failed"
+
+
 class Trainer:
     """Trainer class for training and hyperparameter optimization using Ray Tune.
     Delegates configuration details to TrainConfiguration object.
@@ -56,6 +98,12 @@ class Trainer:
         custom_modules (Optional[Union[str, List[str]]]): List of custom models to load.
         dashboard_config (Optional[DashboardConfig]): Configuration for logging dashboards
             (WandB, MLFlow, CodeCarbon). Defaults to None.
+        run_name (Optional[str]): The identifier of the run. When provided, Ray Tune
+            experiments are given deterministic names so that an interrupted run
+            can be restored. When None, Ray Tune generates a random experiment
+            name and the run cannot be resumed.
+        errored_trials (ErroredTrialPolicy): How to treat trials that errored
+            before a pause when restoring a run. Defaults to skipping them.
     """
 
     def __init__(
@@ -64,10 +112,53 @@ class Trainer:
         custom_callback: WarpRecCallback = WarpRecCallback(),
         custom_modules: Optional[Union[str, List[str]]] = None,
         dashboard_config: Optional[DashboardConfig] = None,
+        run_name: Optional[str] = None,
+        errored_trials: ErroredTrialPolicy = ErroredTrialPolicy.SKIP,
     ):
         self._stg_path = storage_path
         self._custom_modules = custom_modules or []
         self._callbacks = self._setup_callbacks(custom_callback, dashboard_config)
+        self._run_name = run_name
+        self._errored_trials = errored_trials
+
+    def experiment_name(self, model_name: str) -> Optional[str]:
+        """Builds the deterministic Ray Tune experiment name for a model.
+
+        Args:
+            model_name (str): The name of the model.
+
+        Returns:
+            Optional[str]: The experiment name, or None when the trainer has no
+                run name and Ray Tune should generate one.
+        """
+        if self._run_name is None:
+            return None
+        return f"{self._run_name}__{model_name}"
+
+    @staticmethod
+    def is_interrupted(results: tune.ResultGrid) -> bool:
+        """Detects whether a Ray Tune sweep was interrupted before finishing.
+
+        Ray Tune returns from 'fit' normally after an interrupted sweep rather
+        than raising, and the trials it reports afterwards have already been
+        cleaned up, so their states do not distinguish a paused sweep from a
+        finished one. The pause controller is therefore the authoritative
+        signal; the trial states are only a fallback for the case where the
+        sweep was stopped without one installed.
+
+        Args:
+            results (tune.ResultGrid): The result grid returned by 'Tuner.fit'.
+
+        Returns:
+            bool: True when the sweep was interrupted.
+        """
+        if is_pause_requested():
+            return True
+
+        total = len(results)
+        if total == 0:
+            return False
+        return (results.num_terminated + results.num_errors) < total
 
     def train_single_fold(
         self,
@@ -82,7 +173,7 @@ class Trainer:
         num_negatives: int = 99,
         complex_metrics: List[ComplexMetricConfig] = None,
         ray_verbose: int = 1,
-    ) -> Tuple[Optional[Recommender], dict, int]:
+    ) -> TrainingOutcome:
         """Main method of the Trainer class.
 
         This method will execute the training of the model and evaluation,
@@ -103,10 +194,11 @@ class Trainer:
             ray_verbose (int): The Ray level of verbosity.
 
         Returns:
-            Tuple[Optional[Recommender], dict, int]:
-                - Recommender: The model trained.
-                - dict: Summary report of the training.
-                - int: The best training iteration.
+            TrainingOutcome: The outcome of the optimization, carrying the best
+                model, its parameters, the summary report, the best training
+                iteration and the checkpoint it was loaded from. When the sweep
+                was paused or produced no usable model, the outcome carries the
+                corresponding status and no model.
         """
 
         mode = params.optimization.properties.mode
@@ -127,17 +219,26 @@ class Trainer:
 
         results = tuner.fit()
 
+        # Ray Tune returns normally from an interrupted sweep, so a partial
+        # result grid must never be mistaken for a finished optimization.
+        if self.is_interrupted(results):
+            logger.attention(
+                f"Hyperparameter optimization for {model_name} was interrupted. "
+                "No best model will be selected from this partial sweep."
+            )
+            return TrainingOutcome(status="interrupted")
+
         # Check if any trial succeeded
         if results.errors and len(results) == len(results.errors):
             logger.negative(f"All trials failed for {model_name}.")
-            return None, {}, 0
+            return TrainingOutcome(status="failed")
 
         # Retrieve best result using Ray API
         best_result = results.get_best_result(metric=validation_score, mode=mode)
 
         if not best_result:
             logger.negative(f"Could not determine best result for {model_name}.")
-            return None, {}, 0
+            return TrainingOutcome(status="failed")
 
         best_params = best_result.config
         best_params = {k: v for k, v in best_params.items() if not k.startswith("_")}
@@ -155,7 +256,7 @@ class Trainer:
         logger.positive(f"HPO for {model_name} ended successfully.")
 
         # Load Best Model
-        best_model = self._load_best_model(
+        best_model = self.load_best_model(
             model_name,
             best_checkpoint_path,
             best_params,
@@ -163,7 +264,14 @@ class Trainer:
         )
 
         report = self._create_report(results, best_model)
-        return best_model, report, best_iter
+        return TrainingOutcome(
+            status="completed",
+            model=best_model,
+            best_params=best_params,
+            report=report,
+            best_iter=best_iter,
+            best_checkpoint_path=str(best_checkpoint_path),
+        )
 
     def train_multiple_fold(
         self,
@@ -179,7 +287,7 @@ class Trainer:
         complex_metrics: List[ComplexMetricConfig] = None,
         desired_training_it: str = "median",
         ray_verbose: int = 1,
-    ) -> Tuple[Optional[Dict], Dict]:
+    ) -> TrainingOutcome:
         """Main method of the Trainer class for cross-validation.
 
         Args:
@@ -201,9 +309,11 @@ class Trainer:
             ray_verbose (int): The Ray level of verbosity.
 
         Returns:
-            Tuple[Optional[Dict], Dict]:
-                - Dict: The best hyperparameters found.
-                - Dict: Summary report of the training.
+            TrainingOutcome: The outcome of the optimization, carrying the best
+                hyperparameters and the summary report. Cross-validation
+                produces no single best checkpoint, so the outcome carries no
+                model. When the sweep was paused or produced no usable result,
+                the outcome carries the corresponding status.
         """
 
         mode = params.optimization.properties.mode
@@ -223,6 +333,16 @@ class Trainer:
         )
 
         results = tuner.fit()
+
+        # Ray Tune returns normally from an interrupted sweep, so a partial
+        # result grid must never be mistaken for a finished optimization.
+        if self.is_interrupted(results):
+            logger.attention(
+                f"Cross-validated optimization for {model_name} was interrupted. "
+                "No best hyperparameters will be selected from this partial sweep."
+            )
+            return TrainingOutcome(status="interrupted")
+
         result_df = results.get_dataframe(
             filter_metric=validation_score, filter_mode=mode
         )
@@ -231,7 +351,7 @@ class Trainer:
             mode == "max" and result_df[validation_score].max() == -torch.inf
         ):
             logger.negative(f"All trials failed for {model_name}.")
-            return None, {}
+            return TrainingOutcome(status="failed")
 
         # Aggregate results logic
         best_hyperparameters, best_stats = self._aggregate_cv_results(
@@ -245,7 +365,12 @@ class Trainer:
         logger.positive(f"CV HPO for {model_name} ended successfully.")
 
         report = self._create_report(results)
-        return best_hyperparameters, report
+        return TrainingOutcome(
+            status="completed",
+            best_params=best_hyperparameters,
+            report=report,
+            best_iter=best_hyperparameters["iterations"],
+        )
 
     def _setup_tuner(
         self,
@@ -358,6 +483,7 @@ class Trainer:
 
         # Configs
         run_config = ray.tune.RunConfig(
+            name=self.experiment_name(model_name),
             callbacks=self._callbacks,
             verbose=ray_verbose,
             storage_path=self._stg_path,
@@ -393,6 +519,62 @@ class Trainer:
             # The inner TorchTrainer will request the actual worker bundles.
             resources={"CPU": 0.05},
         )
+
+        return self._build_or_restore_tuner(
+            trainable=trainable,
+            param_space=param_space,
+            tune_config=tune_config,
+            run_config=run_config,
+            experiment_name=self.experiment_name(model_name),
+        )
+
+    def _build_or_restore_tuner(
+        self,
+        trainable: Any,
+        param_space: dict,
+        tune_config: TuneConfig,
+        run_config: Any,
+        experiment_name: Optional[str],
+    ) -> Tuner:
+        """Builds a new Tuner, or restores the one left behind by a paused run.
+
+        The trainable is rebuilt rather than reused, because 'tune.with_parameters'
+        captures a fresh object store reference for the dataset in every process.
+
+        Args:
+            trainable (Any): The trainable to run.
+            param_space (dict): The search space of the optimization.
+            tune_config (TuneConfig): The tuning configuration.
+            run_config (Any): The Ray Tune run configuration.
+            experiment_name (Optional[str]): The deterministic experiment name,
+                or None when the run is not resumable.
+
+        Returns:
+            Tuner: A fresh Tuner, or one restored from a previous run.
+        """
+        if experiment_name is None:
+            return Tuner(
+                trainable,
+                param_space=param_space,
+                tune_config=tune_config,
+                run_config=run_config,
+            )
+
+        experiment_path = os.path.join(self._stg_path, experiment_name)
+
+        if Tuner.can_restore(experiment_path):
+            logger.positive(
+                f"Found a resumable Ray Tune experiment at {experiment_path}. "
+                "Unfinished trials will continue from their last checkpoint."
+            )
+            return Tuner.restore(
+                experiment_path,
+                trainable=trainable,
+                param_space=param_space,
+                resume_unfinished=True,
+                resume_errored=self._errored_trials == ErroredTrialPolicy.RESUME,
+                restart_errored=self._errored_trials == ErroredTrialPolicy.RESTART,
+            )
 
         return Tuner(
             trainable,
@@ -498,8 +680,24 @@ class Trainer:
         max_concurrent_trials = min(concurrency_limits)
         return max_concurrent_trials if max_concurrent_trials > 0 else None
 
-    def _load_best_model(self, model_name, checkpoint_path, best_params, dataset):
-        """Loads the model state from the best checkpoint."""
+    def load_best_model(
+        self,
+        model_name: str,
+        checkpoint_path: str,
+        best_params: dict,
+        dataset: Dataset,
+    ) -> Recommender:
+        """Loads the model state from a trial checkpoint.
+
+        Args:
+            model_name (str): The name of the model.
+            checkpoint_path (str): The path of the checkpoint to load.
+            best_params (dict): The hyperparameters of the model.
+            dataset (Dataset): The dataset the model was trained on.
+
+        Returns:
+            Recommender: The reconstructed model.
+        """
         model_class = model_registry.get_class(model_name)
 
         if issubclass(model_class, IterativeRecommender):
