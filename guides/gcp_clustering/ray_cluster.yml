@@ -55,8 +55,7 @@ available_node_types:
 
 head_node_type: ray_head_default
 
-file_mounts:
-    "/home/ray/environment.yml": "./environment.yml"
+file_mounts: {}
 
 initialization_commands:
     - curl -fsSL https://get.docker.com -o get-docker.sh
@@ -79,9 +78,13 @@ setup_commands:
     - rm -rf bin
 
     # Setup Environment
+    # The cluster nodes have no source checkout, so WarpRec is installed from
+    # PyPI rather than from the development environment.yml, which uses an
+    # editable install of the local repository.
     - sudo mkdir -p /home/ray
     - sudo chown -R ray /home/ray
-    - /usr/local/bin/micromamba create -f /home/ray/environment.yml -r /home/ray/micromamba -y || true
+    - /usr/local/bin/micromamba create -n warprec python=3.12 -r /home/ray/micromamba -y
+    - /usr/local/bin/micromamba run -r /home/ray/micromamba -n warprec pip install "warprec[all]"
     - /usr/local/bin/micromamba run -r /home/ray/micromamba -n warprec pip install --upgrade grpcio google-api-python-client
 
     # Create the shared directory
