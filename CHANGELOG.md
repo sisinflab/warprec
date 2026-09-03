@@ -2,6 +2,24 @@
 
 <!-- version list -->
 
+## v1.5.1 (2026-09-03)
+
+### Bug Fixes
+
+- Removed PyG dependency from graph recommendation models
+  ([`f559a61`](https://github.com/sisinflab/warprec/commit/f559a61208c001f84f325a1b010f5fca92fb88f6))
+
+### Chores
+
+- Lightweight linting process
+  ([`82ff5ac`](https://github.com/sisinflab/warprec/commit/82ff5acd3340bff929eb126bab17a4c13390130d))
+
+### Documentation
+
+- Updated documentation and env files with new dependency
+  ([`0ba2b35`](https://github.com/sisinflab/warprec/commit/0ba2b35b1264b995bc2896023a7dfd3e58eeb1f5))
+
+
 ## v1.5.0 (2026-09-03)
 
 ### Chores
