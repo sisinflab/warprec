@@ -2,6 +2,22 @@
 
 <!-- version list -->
 
+## v1.5.2 (2026-09-04)
+
+### Bug Fixes
+
+- Updated dependencies
+  ([`ba3b563`](https://github.com/sisinflab/warprec/commit/ba3b563a73484a706499b3514fd799212d2a9d2a))
+
+### Continuous Integration
+
+- Added specific check for lock file to fast fail PR merges
+  ([`9d2cb86`](https://github.com/sisinflab/warprec/commit/9d2cb86eb2cf201f5aab00dd452fa8555d4d8fca))
+
+- Updated CI to solve race condition of docstring_parser
+  ([`4b2b1c7`](https://github.com/sisinflab/warprec/commit/4b2b1c7b4a8e4e691ac673dedaee32bbc995f7ed))
+
+
 ## v1.5.1 (2026-09-03)
 
 ### Bug Fixes
