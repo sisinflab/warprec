@@ -18,7 +18,10 @@ runs:
       uses: actions/cache@v4
       with:
         path: .venv
-        key: venv-${{ runner.os }}-${{ hashFiles('poetry.lock') }}-${{ hashFiles('pyproject.toml') }}
+        # The action file is part of the key so that changing which extras are
+        # installed rebuilds the environment instead of reusing a cached one
+        # that still contains the old set.
+        key: venv-${{ runner.os }}-${{ hashFiles('poetry.lock') }}-${{ hashFiles('pyproject.toml') }}-${{ hashFiles('.github/actions/setup-env/action.yml') }}
 
     # mypy re-analyses the whole dependency graph without this, which costs
     # about a minute per run. mypy invalidates its own cache, so reusing it
@@ -40,6 +43,19 @@ runs:
         installer-parallel: true
         version: 2.1.2
 
+    # Fails in half a second with a clear message when pyproject.toml has
+    # changed without `poetry lock` being re-run, instead of surfacing the same
+    # problem minutes later from inside the install step.
+    - name: Verify lock file matches pyproject.toml
+      shell: bash
+      run: poetry check --lock
+
+    # Every extra except 'serving'. fastmcp pulls in cyclopts, which depends
+    # on docstring-parser, and that ships the same 'docstring_parser' module
+    # directory as the docstring_parser_fork pydoclint requires. Installing
+    # both makes pydoclint's import order-dependent and it crashes when the
+    # upstream package wins. Serving code is still linted; pylint is told to
+    # ignore those imports.
     - name: Install dependencies
       shell: bash
-      run: poetry install --no-interaction --all-extras
+      run: poetry install --no-interaction --sync --extras "dashboard remote-io bohb graph"

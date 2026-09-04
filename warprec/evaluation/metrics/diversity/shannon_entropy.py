@@ -14,6 +14,7 @@ class ShannonEntropy(TopKMetric):
 
     Attributes:
         item_counts (Tensor): Cumulative count of each item's recommendations
+        total_recs (Tensor): Total number of recommendations counted so far
         users (Tensor): Total number of users evaluated
 
     Args:
@@ -26,6 +27,7 @@ class ShannonEntropy(TopKMetric):
     _REQUIRED_COMPONENTS: Set[MetricBlock] = {MetricBlock.TOP_K_INDICES}
 
     item_counts: Tensor
+    total_recs: Tensor
     users: Tensor
 
     def __init__(

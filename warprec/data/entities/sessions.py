@@ -172,7 +172,7 @@ class Sessions:
             # Only for users that actually exist in data
             valid_u = np.where(ends > starts)[0]
             self._cached_user_histories = {
-                u: self._flat_items[starts[u] : ends[u]].tolist() for u in valid_u
+                int(u): self._flat_items[starts[u] : ends[u]].tolist() for u in valid_u
             }
 
         seqs, lens = [], []
