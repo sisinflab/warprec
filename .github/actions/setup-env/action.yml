@@ -40,6 +40,13 @@ runs:
         installer-parallel: true
         version: 2.1.2
 
+    # Fails in half a second with a clear message when pyproject.toml has
+    # changed without `poetry lock` being re-run, instead of surfacing the same
+    # problem minutes later from inside the install step.
+    - name: Verify lock file matches pyproject.toml
+      shell: bash
+      run: poetry check --lock
+
     - name: Install dependencies
       shell: bash
       run: poetry install --no-interaction --all-extras
