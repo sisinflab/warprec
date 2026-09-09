@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v1.5.3 (2026-09-09)
+
+### Bug Fixes
+
+- Fixed rating metrics inf error
+  ([`1126878`](https://github.com/sisinflab/warprec/commit/1126878961219d26a6c08ad8fbd26241a7475e80))
+
+
 ## v1.5.2 (2026-09-04)
 
 ### Bug Fixes
