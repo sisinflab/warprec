@@ -34,13 +34,20 @@ class BaseMetric(Metric, ABC):
     def discounted_relevance(cls, target: Tensor) -> Tensor:
         """Compute the discounted relevance tensor.
 
+        The exponential is computed under the mask: `torch.where` evaluates
+        both branches, materializing the discarded one over the whole item
+        catalogue.
+
         Args:
             target (Tensor): The target tensor.
 
         Returns:
             Tensor: The discounted relevance tensor.
         """
-        return torch.where(target > 0, 2 ** (target + 1) - 1, target)
+        out = target.clone()
+        mask = target > 0
+        out[mask] = 2 ** (target[mask] + 1) - 1
+        return out
 
     @classmethod
     def valid_users(cls, target: Tensor) -> Tensor:

@@ -1,4 +1,3 @@
-import os
 import time
 from typing import Dict, Any
 
@@ -11,6 +10,7 @@ from warprec.utils.callback import WarpRecCallback
 from warprec.utils.config import load_eval_configuration, load_callback
 from warprec.utils.helpers import (
     build_evaluation_dataloader_kwargs,
+    resolve_available_cpus,
     resolve_num_workers,
     retrieve_evaluation_dataloader,
     model_param_from_dict,
@@ -96,7 +96,7 @@ def eval_pipeline(path: str):
         chunk_size = params.optimization.chunk_size
         num_workers = resolve_num_workers(
             params.optimization.num_workers,
-            os.cpu_count(),
+            resolve_available_cpus(params.optimization.cpu_per_trial),
         )
 
         # Model device

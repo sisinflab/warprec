@@ -44,7 +44,7 @@ The **optimization** section defines how hyperparameter optimization is performe
 - **custom_resources_per_trial**: A dictionary containing custom resources to request per trial during optimization. Defaults to an empty dictionary.
 - **max_concurrent_trials**: Maximum number of trials allowed to run concurrently. Defaults to `None`, in which case WarpRec estimates a safe cap from the current Ray cluster resources.
 - **label_selector**: A dictionary containing a set of labels with respective rules.
-- **num_workers**: Number of worker processes for data loading. Defaults to `None` (main process).
+- **num_workers**: Number of worker processes for data loading, used for both the training and the evaluation DataLoader. Defaults to `None`, in which case WarpRec derives it from the CPUs granted to the trial rather than from the cores of the whole node.
 - **block_size**: Number of items to predict at once for efficiency. Defaults to `50`.
 - **checkpoint_to_keep**: Number of checkpoints to retain in Ray. Defaults to `5`.
 

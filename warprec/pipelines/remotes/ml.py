@@ -1,4 +1,3 @@
-import os
 import time
 from typing import Optional, Tuple, Dict, List
 
@@ -10,6 +9,7 @@ from torch import Tensor
 from warprec.data import Dataset
 from warprec.utils.helpers import (
     build_evaluation_dataloader_kwargs,
+    resolve_available_cpus,
     resolve_num_workers,
     retrieve_evaluation_dataloader,
 )
@@ -86,7 +86,7 @@ def remote_evaluation_and_timing(
 
     # Retrieve dataloader
     evaluation_dataloader_kwargs = build_evaluation_dataloader_kwargs(
-        num_workers=resolve_num_workers(num_workers, os.cpu_count()),
+        num_workers=resolve_num_workers(num_workers, resolve_available_cpus()),
         device=device,
         reuse_loader=False,
     )
@@ -229,7 +229,7 @@ def remote_model_retraining(
         )
 
         if num_workers is None:
-            available_cpus = os.cpu_count()
+            available_cpus = resolve_available_cpus()
             num_workers = max(available_cpus - 1, 1)
 
         persistent_workers = num_workers > 0

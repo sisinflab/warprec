@@ -1,4 +1,5 @@
 import importlib
+import os
 from typing import Any, Optional, Dict, List, Tuple, TYPE_CHECKING
 from pathlib import Path
 
@@ -164,3 +165,47 @@ def resolve_num_workers(
 
     resolved_cpus = available_cpus or 1
     return max(resolved_cpus - 1, 1)
+
+
+def resolve_available_cpus(cpu_per_trial: Optional[float] = None) -> int:
+    """The CPU budget this process should size its DataLoader from.
+
+    ``os.cpu_count()`` reports the whole node, which is the wrong number in
+    every context WarpRec runs in: a Ray task is granted a slice of the node,
+    and a locally-run pipeline has a budget declared in the configuration.
+    Falling back to the node's core count is how a trial granted 4 CPUs ends up
+    spawning 31 DataLoader workers, each holding prefetched batches.
+
+    The sources are tried in order of how much they know:
+
+        1. what Ray actually granted this task, when running inside one;
+        2. the configured ``cpu_per_trial``, when the caller has it;
+        3. the node's cores, as a last resort.
+
+    Args:
+        cpu_per_trial (Optional[float]): The CPU budget declared in the
+            configuration, when the caller has access to it.
+
+    Returns:
+        int: The number of CPUs this process may use, at least 1.
+    """
+    try:  # inside a Ray task: ask what was granted
+        import ray  # pylint: disable = import-outside-toplevel
+
+        assigned = ray.get_runtime_context().get_assigned_resources()
+        granted = int(assigned.get("CPU", 0))
+    except Exception:  # pylint: disable = broad-except
+        # Ray is unavailable, or this process is not running inside a task:
+        # fall through to the configured budget.
+        granted = 0
+
+    if granted > 0:
+        return granted
+
+    if cpu_per_trial:
+        try:
+            return max(int(cpu_per_trial), 1)
+        except (TypeError, ValueError):
+            pass
+
+    return os.cpu_count() or 1

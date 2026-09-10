@@ -220,6 +220,14 @@ class Evaluator:
                             (len(user_indices), self.num_items), device=device
                         )
                         eval_batch.scatter_(1, target_item.unsqueeze(1), 1.0)
+                    elif "gt_rows" in batch_data:
+                        # Sparse full evaluation, densified on the device
+                        eval_batch = torch.zeros(
+                            (len(user_indices), self.num_items), device=device
+                        )
+                        eval_batch[batch_data["gt_rows"], batch_data["gt_cols"]] = (
+                            batch_data["gt_vals"]
+                        )
                     else:
                         # Classic full evaluation
                         eval_batch = batch_data["ground_truth"]
@@ -266,6 +274,11 @@ class Evaluator:
             if len(batch) == 2:
                 # Standard: (users, ground_truth)
                 data["ground_truth"] = batch[1]
+            elif len(batch) == 4:
+                # Sparse: (users, row_indices, item_indices, values)
+                data["gt_rows"] = batch[1]
+                data["gt_cols"] = batch[2]
+                data["gt_vals"] = batch[3]
             elif len(batch) == 3:
                 # Contextual: (users, target_item, context)
                 data["target_item"] = batch[1]

@@ -1,4 +1,3 @@
-import os
 import logging
 import warnings
 from typing import Union, Any, List
@@ -23,6 +22,7 @@ from warprec.utils.config import RecomModel
 from warprec.utils.helpers import (
     build_evaluation_dataloader_kwargs,
     load_custom_modules,
+    resolve_available_cpus,
     resolve_num_workers,
     retrieve_evaluation_dataloader,
 )
@@ -128,11 +128,11 @@ def objective_function(config: dict) -> None:
             model_params.validate_single_trial_params()
         except ValueError as e:
             logger.negative(str(e))  # Log the custom message from Pydantic validation
-            # Report failure to Ray Train
-            if train.get_context().get_world_rank() == 0:
-                train.report(
-                    {validation_score: -float("inf") if mode == "max" else float("inf")}
-                )
+            # Report failure to Ray Train from every rank: report() is
+            # collective, and a single rank calling it deadlocks the others
+            train.report(
+                {validation_score: -float("inf") if mode == "max" else float("inf")}
+            )
             return
 
     # Proceed with normal model training behavior
@@ -162,7 +162,9 @@ def objective_function(config: dict) -> None:
                     resources = train.get_context().get_trial_resources()
                     allocated_cpus = int(resources.get("CPU", 1))
                 except Exception:
-                    allocated_cpus = os.cpu_count() or 1
+                    allocated_cpus = resolve_available_cpus(
+                        config.get("cpu_per_worker")
+                    )
                 num_workers = resolve_num_workers(num_workers, allocated_cpus)
 
             persistent_workers = num_workers > 0
@@ -211,6 +213,7 @@ def objective_function(config: dict) -> None:
                 strategy=pl_strategy,  # Ray handles DDP communication
                 plugins=pl_plugins,  # Ray handles environment variables
                 num_sanity_val_steps=0,
+                limit_val_batches=1,  # The callback re-iterates the loader itself
                 logger=False,
                 enable_checkpointing=False,  # Handled by our custom callback
                 enable_model_summary=False,
@@ -226,7 +229,10 @@ def objective_function(config: dict) -> None:
 
         else:
             evaluation_dataloader_kwargs = build_evaluation_dataloader_kwargs(
-                num_workers=resolve_num_workers(num_workers, os.cpu_count()),
+                num_workers=resolve_num_workers(
+                    num_workers,
+                    resolve_available_cpus(config.get("cpu_per_worker")),
+                ),
                 device=device,
                 reuse_loader=False,
             )
@@ -248,25 +254,25 @@ def objective_function(config: dict) -> None:
             results = evaluator.compute_results()
 
             # Metrics to report
-            if train.get_context().get_world_rank() == 0:
-                metric_report = {
-                    f"{metric_name}@{k}": value.nanmean().item()
-                    if isinstance(value, Tensor)
-                    else value
-                    for k, metrics_results in results.items()
-                    for metric_name, value in metrics_results.items()
-                }
-                metric_report.update(_get_memory_usage())
+            metric_report = {
+                f"{metric_name}@{k}": value.nanmean().item()
+                if isinstance(value, Tensor)
+                else value
+                for k, metrics_results in results.items()
+                for metric_name, value in metrics_results.items()
+            }
+            metric_report.update(_get_memory_usage())
 
-                # Report to Ray Tune
-                train.report(metrics=metric_report)
+            # Report to Ray Tune from every rank: report() is collective
+            train.report(metrics=metric_report)
 
     except Exception as e:  # pylint: disable=broad-exception-caught
         logger.negative(
             f"The fitting of the model {model_name}, failed "
             f"with parameters: {params}. Error: {e}"
         )
-        if train.get_context().get_world_rank() == 0:
-            train.report(
-                {validation_score: -float("inf") if mode == "max" else float("inf")}
-            )
+        # Every rank: guarding this one turns any failure during fit() into a
+        # deadlock instead of a reported error
+        train.report(
+            {validation_score: -float("inf") if mode == "max" else float("inf")}
+        )

@@ -222,8 +222,9 @@ class Optimization(BaseModel):
             concurrently. Defaults to None, which means WarpRec will estimate a safe
             value from the Ray cluster resources.
         label_selector (Optional[Dict[str, str]]): Custom labels to use during trial assignment.
-        num_workers (Optional[int]): The number of workers to assign to the training dataloader.
-            Defaults to None.
+        num_workers (Optional[int]): The number of workers to assign to the training
+            and evaluation dataloaders. Defaults to None, in which case it is derived
+            from the CPUs granted to the trial.
         block_size (Optional[int]): The number of items to process during prediction.
             Used by some neural models, increasing this value will affect memory usage.
         chunk_size (Optional[int]): The size of the chunk processed during prediction.
