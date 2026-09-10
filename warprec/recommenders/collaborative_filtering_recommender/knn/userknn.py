@@ -1,7 +1,6 @@
 # pylint: disable = R0801, E1102
 from typing import Any, Optional
 
-import torch
 from torch import Tensor
 
 from warprec.data.entities import Interactions
@@ -45,10 +44,12 @@ class UserKNN(Recommender):
         n_users = info["n_users"]
 
         train_matrix_mb = cls._sparse_size_mb(X)
-        similarity_matrix_mb = cls._dense_size_mb((n_users, n_users), X.dtype)
+        similarity_peak_mb, _ = cls._topk_similarity_size_mb(
+            side_len=n_users, k=params["k"], data_dtype=X.dtype
+        )
 
         return {
-            "train_ram_mb": train_matrix_mb + similarity_matrix_mb,
+            "train_ram_mb": train_matrix_mb + similarity_peak_mb,
             "notes": "UserKNN analytical train-space estimate",
         }
 
@@ -69,14 +70,8 @@ class UserKNN(Recommender):
         X = self.train_matrix
         similarity = similarities_registry.get(self.similarity)
 
-        # Compute similarity matrix
-        sim_matrix = torch.from_numpy(similarity.compute(X))
-
-        # Compute top_k filtering
-        filtered_sim_matrix = self._apply_topk_filtering(sim_matrix, self.k)
-
-        # Update item_similarity
-        self.user_similarity = filtered_sim_matrix.numpy()
+        # Compute the top-k similarity blockwise, keeping it sparse throughout
+        self.user_similarity = self._blockwise_topk_similarity(X, similarity, self.k)
 
     def predict(
         self,
@@ -97,9 +92,12 @@ class UserKNN(Recommender):
         Returns:
             Tensor: The score matrix {user x item}.
         """
-        # Compute predictions and convert to Tensor
-        predictions = self.user_similarity[user_indices.cpu(), :] @ self.train_matrix
-        predictions = torch.from_numpy(predictions)
+        # Compute predictions and convert to Tensor. The similarity matrix may
+        # be stored sparsely, which keeps the product sparse until densified.
+        rows = user_indices.cpu().tolist()
+        predictions = self._as_dense_tensor(
+            self.user_similarity[rows, :] @ self.train_matrix
+        )
 
         if item_indices is None:
             # Case 'full': prediction on all items

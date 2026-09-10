@@ -13,10 +13,16 @@ from torch import nn, Tensor
 from torch.nn.init import xavier_normal_, xavier_uniform_, constant_
 from torch.utils.data import DataLoader
 
+from scipy.sparse import csr_matrix, issparse
+
 from warprec.data.entities import Interactions, Sessions
 from warprec.utils.enums import DataLoaderType
 from warprec.utils.config.model_configuration import LRSchedulerConfig, OptimizerConfig
 from warprec.utils.registry import lr_scheduler_registry, optimizer_registry
+
+
+# Memory budget for a single dense similarity block, in bytes
+SIMILARITY_BLOCK_BYTES = 64 * 1024**2
 
 
 class Recommender(nn.Module, ABC):
@@ -267,24 +273,137 @@ class Recommender(nn.Module, ABC):
         model.load_state_dict(checkpoint["state_dict"], strict=strict)
         return model
 
-    def _apply_topk_filtering(self, sim_matrix: Tensor, k: int) -> Tensor:
-        """Keep only top-k similarities per item.
+    @staticmethod
+    def _similarity_block_rows(side_len: int, block_bytes: int) -> int:
+        """Rows per block for the blocked similarity builder.
+
+        Sized against the widest element the similarities may return, so the
+        slab honours the budget whatever dtype comes back, and never larger
+        than the matrix itself.
 
         Args:
-            sim_matrix (Tensor): The similarity tensor to filter.
-            k (int): The top k values to filter.
+            side_len (int): The side of the square similarity matrix.
+            block_bytes (int): Memory budget for a single dense block.
 
         Returns:
-            Tensor: The filtered similarity tensor.
+            int: The number of rows to process per block.
         """
-        # Safety check for k size
-        k = min(k, sim_matrix.size(1) - 1)
+        widest_itemsize = np.dtype(np.float64).itemsize
+        rows = max(1, block_bytes // (side_len * widest_itemsize))
+        return min(rows, side_len)
 
-        # Get top-k values and indices
-        values, indices = torch.topk(sim_matrix, k=k, dim=1)
+    @staticmethod
+    def _blockwise_topk_similarity(
+        matrix: Any,
+        similarity: Any,
+        k: int,
+        block_bytes: int = SIMILARITY_BLOCK_BYTES,
+    ) -> csr_matrix:
+        """Build a top-k similarity matrix without materializing it densely.
 
-        # Create sparse similarity matrix with top-k values
-        return torch.zeros_like(sim_matrix).scatter_(1, indices, values)
+        Computing ``similarity.compute(matrix)`` in one shot allocates a dense
+        ``n x n`` array, and filtering it down to the top-k allocates a second
+        one, even though only ``n * k`` entries survive.
+        This method walks the rows in blocks, keeps the top-k of each block and
+        accumulates the survivors directly in sparse form, so the peak
+        allocation is one ``block x n`` slab plus the ``n * k`` result.
+
+        ``torch.topk`` is row independent, so blocking returns exactly the same
+        values and column indices as the dense path, ties included.
+
+        Args:
+            matrix (Any): The row-entity matrix to correlate with itself.
+            similarity (Any): The similarity measure to apply.
+            k (int): The number of neighbours to keep per row.
+            block_bytes (int): Memory budget for a single dense block.
+
+        Returns:
+            csr_matrix: The {n x n} top-k similarity matrix.
+        """
+        n_rows = matrix.shape[0]
+
+        # Safety check for k size, matching the dense implementation
+        k = min(k, n_rows - 1)
+        if k <= 0:
+            return csr_matrix((n_rows, n_rows), dtype=matrix.dtype)
+
+        rows_per_block = Recommender._similarity_block_rows(n_rows, block_bytes)
+
+        total_nnz = n_rows * k
+        rows = np.repeat(np.arange(n_rows, dtype=np.int32), k)
+        cols = np.empty(total_nnz, dtype=np.int32)
+        values: Optional[np.ndarray] = None
+
+        for start in range(0, n_rows, rows_per_block):
+            stop = min(start + rows_per_block, n_rows)
+
+            # One {block x n} dense slab at a time instead of the full matrix
+            block = torch.from_numpy(similarity.compute(matrix[start:stop], matrix))
+            block_values, block_indices = torch.topk(block, k=k, dim=1)
+
+            # The result dtype is decided by the similarity, not by the input
+            block_values_np = block_values.numpy()
+            if values is None:
+                values = np.empty(total_nnz, dtype=block_values_np.dtype)
+
+            cursor = start * k
+            cols[cursor : stop * k] = block_indices.numpy().ravel()
+            values[cursor : stop * k] = block_values_np.ravel()
+
+        return csr_matrix((values, (rows, cols)), shape=(n_rows, n_rows))
+
+    @staticmethod
+    def _as_dense_tensor(predictions: Any) -> Tensor:
+        """Convert a score matrix to a dense Tensor, sparse or dense alike.
+
+        Similarity matrices may be stored sparsely, in which case the product
+        with the training matrix stays sparse and has to be densified before
+        it can be handed back as a Tensor.
+
+        Args:
+            predictions (Any): The computed scores, sparse or dense.
+
+        Returns:
+            Tensor: The dense score Tensor.
+        """
+        if issparse(predictions):
+            predictions = predictions.toarray()
+        return torch.from_numpy(np.asarray(predictions))
+
+    @classmethod
+    def _topk_similarity_size_mb(
+        cls,
+        side_len: int,
+        k: int,
+        data_dtype: Any,
+        block_bytes: int = SIMILARITY_BLOCK_BYTES,
+    ) -> tuple:
+        """Size the sparse top-k similarity produced by the blocked builder.
+
+        Args:
+            side_len (int): The side of the square similarity matrix.
+            k (int): The number of neighbours kept per row.
+            data_dtype (Any): The dtype of the similarity values.
+            block_bytes (int): Memory budget for a single dense block.
+
+        Returns:
+            tuple: The (peak, resident) footprint in MB.
+        """
+        nnz = min(side_len * side_len, side_len * k)
+
+        resident_mb = cls._compressed_sparse_size_mb(
+            nnz=nnz, ptr_len=side_len + 1, data_dtype=data_dtype
+        )
+
+        # While building: the COO staging arrays plus one dense block, then the
+        # COO arrays plus the CSR they are converted into
+        staging_mb = cls._coo_size_mb(nnz=nnz, data_dtype=data_dtype)
+        block_mb = cls._dense_size_mb(
+            (cls._similarity_block_rows(side_len, block_bytes), side_len), data_dtype
+        )
+
+        peak_mb = staging_mb + cls._peak_size_mb(block_mb, resident_mb)
+        return peak_mb, resident_mb
 
     @classmethod
     def get_name_from_params(cls, params: dict) -> str:
@@ -968,9 +1087,10 @@ class ItemSimRecommender(Recommender):
         Returns:
             Tensor: The score matrix {user x item}.
         """
-        # Compute predictions and convert to Tensor
+        # Compute predictions and convert to Tensor. The similarity matrix may
+        # be stored sparsely, which keeps the product sparse until densified.
         predictions = self.train_matrix[user_indices.tolist(), :] @ self.item_similarity
-        predictions = torch.from_numpy(predictions)
+        predictions = self._as_dense_tensor(predictions)
 
         # Return full or sampled predictions
         if item_indices is None:
