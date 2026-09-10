@@ -15,6 +15,7 @@ from warprec.data.eval_loaders import (
     ContextualEvaluationDataset,
     SampledEvaluationDataset,
     SampledContextualEvaluationDataset,
+    sparse_eval_collate,
 )
 from warprec.utils.enums import RatingType
 from warprec.utils.logger import logger
@@ -581,6 +582,7 @@ class Dataset:
                 dataset,
                 batch_size=self.batch_size,
                 shuffle=False,
+                collate_fn=sparse_eval_collate,
                 **kwargs,
             )
 

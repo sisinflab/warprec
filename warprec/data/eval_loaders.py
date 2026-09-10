@@ -13,7 +13,11 @@ from scipy.sparse import csr_matrix
 
 class EvaluationDataset(TorchDataset):
     """
-    Yields: (user_idx, dense_ground_truth)
+    Yields: (user_idx, item_indices, values)
+
+    The ground truth stays sparse until it reaches the device, where the
+    Evaluator densifies it once. Expanding a row here would cost the full item
+    catalogue for a handful of values, and send it through the DataLoader.
     """
 
     def __init__(
@@ -30,12 +34,18 @@ class EvaluationDataset(TorchDataset):
     def __len__(self) -> int:
         return len(self.users_with_eval)
 
-    def __getitem__(self, idx: int) -> Tuple[int, Tensor]:
+    def __getitem__(self, idx: int) -> Tuple[int, Tensor, Tensor]:
         user_idx = self.users_with_eval[idx]
-        eval_row = self.eval_interactions.getrow(user_idx)
-        ground_truth = torch.from_numpy(eval_row.toarray()).to(torch.float32).squeeze(0)
+        start = self.eval_interactions.indptr[user_idx]
+        end = self.eval_interactions.indptr[user_idx + 1]
+        cols = torch.from_numpy(
+            self.eval_interactions.indices[start:end].astype(np.int64)
+        )
+        vals = torch.from_numpy(
+            self.eval_interactions.data[start:end].astype(np.float32)
+        )
 
-        return user_idx, ground_truth
+        return user_idx, cols, vals
 
 
 class ContextualEvaluationDataset(TorchDataset):
@@ -288,3 +298,29 @@ class SampledContextualEvaluationDataset(TorchDataset):
             tensor_neg_items,
             tensor_context_features,
         )
+
+
+def sparse_eval_collate(
+    samples: List[Tuple[int, Tensor, Tensor]],
+) -> Tuple[Tensor, Tensor, Tensor, Tensor]:
+    """Collate the sparse rows of EvaluationDataset into flat COO arrays.
+
+    Four tensors rather than three: three would collide with the contextual
+    batch shape that `Evaluator._parse_batch` dispatches on.
+
+    Args:
+        samples (List[Tuple[int, Tensor, Tensor]]): The per-user rows.
+
+    Returns:
+        Tuple[Tensor, Tensor, Tensor, Tensor]: The user indices, the row index
+            of each value within the batch, the item indices, and the values.
+    """
+    users = torch.tensor([s[0] for s in samples], dtype=torch.long)
+    counts = torch.tensor([s[1].numel() for s in samples], dtype=torch.long)
+    rows = torch.repeat_interleave(
+        torch.arange(len(samples), dtype=torch.long), counts
+    )
+    cols = torch.cat([s[1] for s in samples])
+    vals = torch.cat([s[2] for s in samples])
+
+    return users, rows, cols, vals

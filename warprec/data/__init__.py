@@ -4,6 +4,7 @@ from .eval_loaders import (
     ContextualEvaluationDataset,
     SampledEvaluationDataset,
     SampledContextualEvaluationDataset,
+    sparse_eval_collate,
 )
 from . import entities
 from . import reader
@@ -17,6 +18,7 @@ __all__ = [
     "ContextualEvaluationDataset",
     "SampledEvaluationDataset",
     "SampledContextualEvaluationDataset",
+    "sparse_eval_collate",
     "entities",
     "reader",
     "splitting",
