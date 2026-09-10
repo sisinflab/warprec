@@ -194,10 +194,13 @@ def resolve_available_cpus(cpu_per_trial: Optional[float] = None) -> int:
 
         assigned = ray.get_runtime_context().get_assigned_resources()
         granted = int(assigned.get("CPU", 0))
-        if granted > 0:
-            return granted
     except Exception:  # pylint: disable = broad-except
-        pass
+        # Ray is unavailable, or this process is not running inside a task:
+        # fall through to the configured budget.
+        granted = 0
+
+    if granted > 0:
+        return granted
 
     if cpu_per_trial:
         try:

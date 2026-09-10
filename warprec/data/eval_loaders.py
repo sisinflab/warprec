@@ -317,9 +317,7 @@ def sparse_eval_collate(
     """
     users = torch.tensor([s[0] for s in samples], dtype=torch.long)
     counts = torch.tensor([s[1].numel() for s in samples], dtype=torch.long)
-    rows = torch.repeat_interleave(
-        torch.arange(len(samples), dtype=torch.long), counts
-    )
+    rows = torch.repeat_interleave(torch.arange(len(samples), dtype=torch.long), counts)
     cols = torch.cat([s[1] for s in samples])
     vals = torch.cat([s[2] for s in samples])
 

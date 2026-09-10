@@ -225,9 +225,9 @@ class Evaluator:
                         eval_batch = torch.zeros(
                             (len(user_indices), self.num_items), device=device
                         )
-                        eval_batch[
-                            batch_data["gt_rows"], batch_data["gt_cols"]
-                        ] = batch_data["gt_vals"]
+                        eval_batch[batch_data["gt_rows"], batch_data["gt_cols"]] = (
+                            batch_data["gt_vals"]
+                        )
                     else:
                         # Classic full evaluation
                         eval_batch = batch_data["ground_truth"]
