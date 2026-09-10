@@ -128,11 +128,11 @@ def objective_function(config: dict) -> None:
             model_params.validate_single_trial_params()
         except ValueError as e:
             logger.negative(str(e))  # Log the custom message from Pydantic validation
-            # Report failure to Ray Train
-            if train.get_context().get_world_rank() == 0:
-                train.report(
-                    {validation_score: -float("inf") if mode == "max" else float("inf")}
-                )
+            # Report failure to Ray Train from every rank: report() is
+            # collective, and a single rank calling it deadlocks the others
+            train.report(
+                {validation_score: -float("inf") if mode == "max" else float("inf")}
+            )
             return
 
     # Proceed with normal model training behavior
@@ -254,25 +254,25 @@ def objective_function(config: dict) -> None:
             results = evaluator.compute_results()
 
             # Metrics to report
-            if train.get_context().get_world_rank() == 0:
-                metric_report = {
-                    f"{metric_name}@{k}": value.nanmean().item()
-                    if isinstance(value, Tensor)
-                    else value
-                    for k, metrics_results in results.items()
-                    for metric_name, value in metrics_results.items()
-                }
-                metric_report.update(_get_memory_usage())
+            metric_report = {
+                f"{metric_name}@{k}": value.nanmean().item()
+                if isinstance(value, Tensor)
+                else value
+                for k, metrics_results in results.items()
+                for metric_name, value in metrics_results.items()
+            }
+            metric_report.update(_get_memory_usage())
 
-                # Report to Ray Tune
-                train.report(metrics=metric_report)
+            # Report to Ray Tune from every rank: report() is collective
+            train.report(metrics=metric_report)
 
     except Exception as e:  # pylint: disable=broad-exception-caught
         logger.negative(
             f"The fitting of the model {model_name}, failed "
             f"with parameters: {params}. Error: {e}"
         )
-        if train.get_context().get_world_rank() == 0:
-            train.report(
-                {validation_score: -float("inf") if mode == "max" else float("inf")}
-            )
+        # Every rank: guarding this one turns any failure during fit() into a
+        # deadlock instead of a reported error
+        train.report(
+            {validation_score: -float("inf") if mode == "max" else float("inf")}
+        )

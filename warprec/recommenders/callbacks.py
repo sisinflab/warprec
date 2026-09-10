@@ -97,6 +97,7 @@ class WarpRecLightningIntegrationCallback(L.Callback):
 
         # Correctly format the Lightning logging
         metric_report = {}
+        synced_keys = set()
         for k, metrics in results.items():
             for metric_name, value in metrics.items():
                 val_scalar = (
@@ -115,6 +116,7 @@ class WarpRecLightningIntegrationCallback(L.Callback):
 
                 # Store metric for Ray reporting
                 metric_report[metric_key] = val_scalar
+                synced_keys.add(metric_key)
 
         # Retrieve callback metrics from Lightning Trainer
         for key, val in trainer.callback_metrics.items():
@@ -163,7 +165,10 @@ class WarpRecLightningIntegrationCallback(L.Callback):
                         # This trigger will stop Lightning Trainer
                         trainer.should_stop = True
 
-        # Log all metrics to Lightning
-        # NOTE: We don't need synching here as we already did it before
+        # Log the remaining metrics to Lightning
+        # NOTE: We don't need synching here as we already did it before, and
+        # re-logging a key with a different sync_dist is rejected by Lightning
         for key, val in metric_report.items():
+            if key in synced_keys:
+                continue
             pl_module.log(key, val, prog_bar=True, on_epoch=True, sync_dist=False)
