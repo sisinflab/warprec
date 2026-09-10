@@ -32,6 +32,7 @@ Optionally, you can also provide:
 - filtering
 - dashboard
 - general
+- run
 
 A minimal training configuration example:
 
@@ -71,6 +72,9 @@ python -m warprec.run --config path/to/the/config.yml --pipeline train
     ```bash
     python -m warprec.run --config path/to/the/config.yml --pipeline swarm
     ```
+
+!!! tip
+    Both the training and the swarm pipelines can be **paused with a signal and resumed later**, continuing from the last Ray Tune checkpoint. This is controlled by the optional [run](run.md) section. See [Pause & Resume](../pipelines/pause-resume.md).
 
 ### Design Pipeline
 

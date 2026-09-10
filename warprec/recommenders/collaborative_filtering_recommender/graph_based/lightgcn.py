@@ -2,9 +2,7 @@
 from typing import Tuple, Any, Optional
 
 import torch
-import torch_geometric
 from torch import nn, Tensor
-from torch_geometric.nn import LGConv
 
 from warprec.data.entities import Interactions, Sessions
 from warprec.recommenders.base_recommender import (
@@ -71,14 +69,7 @@ class LightGCN(GraphRecommenderUtils, IterativeRecommender):
             interactions.get_sparse().tocoo(),
             self.n_users,
             self.n_items + 1,  # Adjust for padding idx
-        )
-
-        # Initialization of the propagation network
-        propagation_network_list = []
-        for _ in range(self.n_layers):
-            propagation_network_list.append((LGConv(), "x, edge_index -> x"))
-        self.propagation_network = torch_geometric.nn.Sequential(
-            "x, edge_index", propagation_network_list
+            normalize=True,
         )
 
         # Init embedding weights
@@ -145,8 +136,8 @@ class LightGCN(GraphRecommenderUtils, IterativeRecommender):
         # This is used later to correctly multiply each layer by
         # the corresponding value of alpha
         current_embeddings = ego_embeddings
-        for layer_module in self.propagation_network.children():
-            current_embeddings = layer_module(current_embeddings, self.adj)
+        for _ in range(self.n_layers):
+            current_embeddings = self.adj.matmul(current_embeddings)
             embeddings_list.append(current_embeddings)
 
         # Stack and average the embeddings (this is equivalent to multiplying by alpha and summing)

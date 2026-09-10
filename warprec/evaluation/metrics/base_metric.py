@@ -298,15 +298,22 @@ class RatingMetric(BaseMetric):
         # Mask for valid ratings
         mask = target > 0
 
+        # Neutralize the predictions of non-rated items
+        preds = torch.where(mask, preds, torch.zeros_like(preds))
+
         # Compute error
         errors = self._compute_element_error(preds, target)
 
         # Zero out errors for non-rated items to be safe
-        errors = errors * mask.float()
+        errors = torch.where(mask, errors, torch.zeros_like(errors))
 
         # Accumulate per user
-        self.error_sum.index_add_(0, user_indices, errors.sum(dim=1))
-        self.total_count.index_add_(0, user_indices, mask.sum(dim=1).float())
+        self.error_sum.index_add_(
+            0, user_indices, errors.sum(dim=1).to(self.error_sum.dtype)
+        )
+        self.total_count.index_add_(
+            0, user_indices, mask.sum(dim=1).to(self.total_count.dtype)
+        )
 
     def compute(self):
         """Computes the final metric value."""

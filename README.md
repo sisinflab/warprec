@@ -64,15 +64,16 @@ An **Application Layer** exposes trained models through a REST API (FastAPI) and
 - **40 GPU-Accelerated Metrics**: The evaluation suite covers 40 metrics across 7 families — Accuracy, Rating, Coverage, Novelty, Diversity, Bias, and Fairness — including multi-objective metrics for simultaneous optimization of competing goals. All metrics are computed with full GPU acceleration for large-scale experiments.
 - **Statistical Rigor**: WarpRec automates hypothesis testing with paired (Student's t-test, Wilcoxon signed-rank) and independent-group (Mann-Whitney U) tests, and applies multiple comparison corrections via **Bonferroni** and **FDR (Benjamini-Hochberg)** to prevent p-hacking and ensure statistically robust conclusions.
 - **Distributed Training & HPO**: Seamless vertical and horizontal scaling from single-GPU to multi-node Ray clusters. Hyperparameter optimization supports Grid, Random, Bayesian, HyperOpt, Optuna, and BoHB strategies, with ASHA pruning and model-level early stopping to maximize computational efficiency.
+- **Pausable & Resumable Runs**: Long experiments can be stopped with a signal (`Ctrl+C` or `SIGTERM`) and resumed later from the same command. Unfinished Ray Tune trials continue from their last checkpoint and models that already completed are skipped, so a preemption on a spot instance or a cluster reclaim costs minutes rather than the whole experiment.
 - **Green AI & Carbon Tracking**: WarpRec is the first recommendation framework with native [CodeCarbon](https://codecarbon.io/) integration, automatically quantifying energy consumption and CO₂ emissions for every experiment and persisting carbon footprint reports alongside standard results.
-- **Agentic AI via MCP**: WarpRec natively implements a [Model Context Protocol](https://modelcontextprotocol.io/) server (`infer-api/mcp_server.py`), exposing trained recommenders as callable tools within LLM and autonomous agent workflows — transforming the framework from a static predictor into an interactive, agent-ready component.
-- **REST API & Model Serving**: Trained models are instantly deployable as RESTful microservices via the built-in FastAPI server (`infer-api/server.py`), decoupling the modeling core from serving infrastructure with zero additional engineering effort.
+- **Agentic AI via MCP**: WarpRec natively implements a [Model Context Protocol](https://modelcontextprotocol.io/) server (`serving/mcp/mcp_server.py`), exposing trained recommenders as callable tools within LLM and autonomous agent workflows — transforming the framework from a static predictor into an interactive, agent-ready component.
+- **REST API & Model Serving**: Trained models are instantly deployable as RESTful microservices via the built-in FastAPI server (`serving/restAPI/server.py`), decoupling the modeling core from serving infrastructure with zero additional engineering effort.
 - **Experiment Tracking**: Native integrations with `TensorBoard`, `Weights & Biases`, and `MLflow` for real-time monitoring of metrics, training dynamics, and multi-run management.
 - **Custom Pipelines & Callbacks**: Alongside the standard Training, Design, Evaluation, Swarm, and Estimate workflows, WarpRec exposes an event-driven Callback system for injecting custom logic at any stage — enabling complex experiments without modifying framework internals.
 
 ## ⚙️ Installation
 
-WarpRec is designed to be easily installed via **pip** or via **Conda**. This ensures that all dependencies and the Python environment are managed consistently. Conda environment is available both for CPU and GPU.
+WarpRec is designed to be easily installed via **pip** or via **Conda**. This ensures that all dependencies and the Python environment are managed consistently.
 
 ### 🚀 Quick Install (PyPI)
 The easiest way to get started is using pip:
@@ -87,6 +88,8 @@ WarpRec provides extra dependencies for specific use cases:
 | dashboard | Dashboard functionalities like MLflow and Weights & Biases. |
 | remote-io | Remote communication with cloud services like Azure. |
 | serving | Optional dependencies to serve your recommendation models. |
+| bohb | Dependencies required by the `bohb` search strategy and scheduler. |
+| graph | PyTorch Geometric, required by the graph-based recommenders. |
 | all | All of the above. |
 
 You can install them at any moment using the following command:
@@ -114,7 +117,7 @@ If you use [Poetry](https://python-poetry.org/) for dependency management, you c
 
 ### 🛠️ Development Setup (Conda)
 
-If you want to contribute or need a specific environment (CPU/GPU), we recommend using Conda. The conda environment already contains all the extra dependencies:
+If you want to contribute, we recommend using Conda. The environment installs WarpRec with all extra dependencies:
 
 1. **Clone the repository**
    Open your terminal and clone the WarpRec repository:
@@ -124,18 +127,23 @@ If you want to contribute or need a specific environment (CPU/GPU), we recommend
    ```
 
 2. **Create the Conda environment**
-    Use the provided environment.gpu.yml (or environment.cpu.yml) file to create the virtual environment. This will install Python 3.12 and the necessary core dependencies.
+    Use the provided `environment.yml` file. It installs Python 3.12 and then WarpRec itself with all extras, so the dependency set always matches `pyproject.toml`.
     ```bash
-    # For GPU support
-    conda env create --file environment.gpu.yml
-    # Or for CPU only
-    conda env create --file environment.cpu.yml
+    conda env create --file environment.yml
     ```
 
 3.  **Activate the environment:**
 
     ```bash
     conda activate warprec
+    ```
+
+4.  **CPU-only machines (optional)**
+
+    The environment installs the default PyTorch build, which is CUDA-enabled on Linux. On a machine without a GPU you can replace it with the smaller CPU build:
+
+    ```bash
+    pip install torch==2.7.* --index-url https://download.pytorch.org/whl/cpu
     ```
 
 ## 🚂 Usage

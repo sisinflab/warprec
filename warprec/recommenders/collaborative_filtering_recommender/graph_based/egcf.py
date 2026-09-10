@@ -3,7 +3,6 @@ from typing import Tuple, Any, Optional
 
 import torch
 from torch import nn, Tensor
-from torch_sparse import SparseTensor
 
 from warprec.data.entities import Interactions, Sessions
 from warprec.recommenders.base_recommender import IterativeRecommender
@@ -13,6 +12,9 @@ from warprec.recommenders.collaborative_filtering_recommender.graph_based import
 from warprec.recommenders.losses import BPRLoss, EmbLoss, InfoNCELoss
 from warprec.utils.enums import DataLoaderType
 from warprec.utils.registry import model_registry
+from warprec.recommenders.collaborative_filtering_recommender.graph_based.graph_utils import (
+    SparseAdjacency,
+)
 
 
 @model_registry.register(name="EGCF")
@@ -143,15 +145,14 @@ class EGCF(IterativeRecommender, GraphRecommenderUtils):
         return R_adj
 
     def _sparse_mm(self, sparse_mat: Any, dense_mat: Tensor) -> Tensor:
-        """Wrapper to handle both torch.Tensor (sparse) and torch_sparse.SparseTensor
+        """Wrapper to handle both torch.Tensor (sparse) and SparseAdjacency
         matrix multiplication.
         """
+        if isinstance(sparse_mat, SparseAdjacency):
+            return sparse_mat.matmul(dense_mat)
         if isinstance(sparse_mat, Tensor):
             # Standard PyTorch sparse tensor
             return torch.sparse.mm(sparse_mat, dense_mat)
-        if isinstance(sparse_mat, SparseTensor):
-            # torch_sparse.SparseTensor
-            return sparse_mat.matmul(dense_mat)
         raise TypeError(f"Unsupported sparse matrix type: {type(sparse_mat)}")
 
     def get_dataloader(

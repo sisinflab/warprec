@@ -30,6 +30,22 @@ from warprec.utils.logger import logger
 class Writer(ABC):
     """Writer is the base definition of a writer that centralizes processing logic
     and delegates I/O operations to subclasses.
+
+    Args:
+        timestamp (Optional[str]): The timestamp to embed in output file names.
+            When None, the current time is used. A resumed run passes the
+            timestamp recorded in its run state so that its output files keep
+            merging into the files created by the original run.
+
+    Attributes:
+        experiment_path (str | Path): Root path of the experiment.
+        experiment_evaluation_path (str | Path): Path of the evaluation outputs.
+        experiment_recommendation_path (str | Path): Path of the recommendation
+            outputs.
+        experiment_serialized_models_path (str | Path): Path of the serialized
+            models.
+        experiment_params_path (str | Path): Path of the hyperparameter outputs.
+        experiment_split_path (str | Path): Path of the dataset splits.
     """
 
     experiment_path: str | Path
@@ -39,8 +55,17 @@ class Writer(ABC):
     experiment_params_path: str | Path
     experiment_split_path: str | Path
 
-    def __init__(self):
-        self._timestamp = datetime.now().strftime("%d.%m.%Y_%H-%M-%S")
+    def __init__(self, timestamp: Optional[str] = None):
+        self._timestamp = timestamp or datetime.now().strftime("%d.%m.%Y_%H-%M-%S")
+
+    @property
+    def timestamp(self) -> str:
+        """Returns the timestamp embedded in this writer's output file names.
+
+        Returns:
+            str: The timestamp string.
+        """
+        return self._timestamp
 
     @abstractmethod
     def setup_experiment(self):
@@ -57,6 +82,10 @@ class Writer(ABC):
     @abstractmethod
     def _write_bytes(self, path: str, content: bytes):
         """Writes binary data to a specific destination."""
+
+    @abstractmethod
+    def _read_bytes(self, path: str) -> Optional[bytes]:
+        """Reads binary data from a destination. Returns None if it doesn't exist."""
 
     @abstractmethod
     def _path_join(self, *args: Any) -> str:
@@ -606,13 +635,17 @@ class WriterFactory:  # pylint: disable=C0415, R0903
 
     @classmethod
     def get_writer(
-        cls, config: TrainConfiguration | EvalConfiguration | EstimateConfiguration
+        cls,
+        config: TrainConfiguration | EvalConfiguration | EstimateConfiguration,
+        timestamp: Optional[str] = None,
     ) -> Writer:
         """Factory method to get the appropriate Writer instance based on the configuration.
 
         Args:
             config (TrainConfiguration | EvalConfiguration | EstimateConfiguration): The configuration
                 of the experiment.
+            timestamp (Optional[str]): The timestamp to embed in output file names.
+                When None, the current time is used.
 
         Returns:
             Writer: An instance of a class that extends the Writer abstract class.
@@ -633,6 +666,7 @@ class WriterFactory:  # pylint: disable=C0415, R0903
                 return LocalWriter(
                     dataset_name=dataset_name,
                     local_path=local_path,
+                    timestamp=timestamp,
                 )
             case WritingMethods.AZURE_BLOB:
                 from warprec.data.writer import AzureBlobWriter
@@ -649,6 +683,7 @@ class WriterFactory:  # pylint: disable=C0415, R0903
                     container_name=container_name,
                     dataset_name=dataset_name,
                     blob_experiment_container=blob_experiment_container,
+                    timestamp=timestamp,
                 )
 
         raise ValueError(f"Unknown writer type: {writer_type}")

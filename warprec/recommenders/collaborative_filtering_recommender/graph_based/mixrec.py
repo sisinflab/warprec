@@ -4,7 +4,6 @@ from typing import Tuple, Any, Optional
 import torch
 import torch.nn.functional as F
 from torch import nn, Tensor
-from torch_geometric.nn import LGConv
 
 from warprec.data.entities import Interactions, Sessions
 from warprec.recommenders.base_recommender import IterativeRecommender
@@ -79,11 +78,11 @@ class MixRec(IterativeRecommender, GraphRecommenderUtils):
             self.n_items + 1,
             normalize=True,
         )
+        # The adjacency is normalized once, here. It previously went through
+        # LGConv(normalize=True) as well, which normalized it a second time.
+        # Removing that double normalization changed this model's output.
 
         # Propagation Network
-        self.propagation_network = nn.ModuleList(
-            [LGConv() for _ in range(self.n_layers)]
-        )
 
         # Vectorized normalization for embedding aggregation (Mean pooling)
         alpha_tensor = torch.full(
@@ -121,8 +120,8 @@ class MixRec(IterativeRecommender, GraphRecommenderUtils):
         embeddings_list = [ego_embeddings]
         current_embeddings = ego_embeddings
 
-        for conv_layer in self.propagation_network:
-            current_embeddings = conv_layer(current_embeddings, self.adj)
+        for _ in range(self.n_layers):
+            current_embeddings = self.adj.matmul(current_embeddings)
             embeddings_list.append(current_embeddings)
 
         # Weighted sum

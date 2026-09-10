@@ -5,7 +5,6 @@ import numpy as np
 import scipy.sparse as sp
 import torch
 from torch import nn, Tensor
-from torch_sparse import SparseTensor
 
 from warprec.data.entities import Interactions, Sessions
 from warprec.recommenders.base_recommender import IterativeRecommender
@@ -15,6 +14,9 @@ from warprec.recommenders.collaborative_filtering_recommender.graph_based import
 from warprec.recommenders.losses import BPRLoss, EmbLoss, InfoNCELoss
 from warprec.utils.enums import DataLoaderType
 from warprec.utils.registry import model_registry
+from warprec.recommenders.collaborative_filtering_recommender.graph_based.graph_utils import (
+    SparseAdjacency,
+)
 
 
 @model_registry.register(name="LightGCL")
@@ -161,10 +163,10 @@ class LightGCL(IterativeRecommender, GraphRecommenderUtils):
             **kwargs,
         )
 
-    def _dropout_adj(self, adj: SparseTensor) -> SparseTensor:
-        """Applies edge dropout to the torch_sparse.SparseTensor."""
+    def _dropout_adj(self, adj: SparseAdjacency) -> SparseAdjacency:
+        """Applies edge dropout to the SparseAdjacency."""
         if self.training and self.dropout > 0:
-            # Extract values from SparseTensor
+            # Extract values from SparseAdjacency
             _, _, val = adj.coo()
 
             # Create dropout mask
@@ -174,7 +176,7 @@ class LightGCL(IterativeRecommender, GraphRecommenderUtils):
             # We cast mask to float to perform multiplication
             val = val * mask.to(val.dtype) / (1.0 - self.dropout)
 
-            # Return a new SparseTensor with updated values
+            # Return a new SparseAdjacency with updated values
             # set_value is efficient as it reuses the index storage
             return adj.set_value(val, layout="coo")
 

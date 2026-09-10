@@ -5,7 +5,6 @@ import torch
 import torch.nn.functional as F
 from torch import nn, Tensor
 from torch.nn import Module
-from torch_sparse import SparseTensor
 
 from warprec.data.entities import Interactions, Sessions
 from warprec.recommenders.base_recommender import (
@@ -17,6 +16,9 @@ from warprec.recommenders.collaborative_filtering_recommender.graph_based import
 )
 from warprec.utils.enums import DataLoaderType
 from warprec.utils.registry import model_registry
+from warprec.recommenders.collaborative_filtering_recommender.graph_based.graph_utils import (
+    SparseAdjacency,
+)
 
 
 class GCMCEncoderLayer(Module):
@@ -41,7 +43,7 @@ class GCMCEncoderLayer(Module):
         self,
         user_features: Tensor,
         item_features: Tensor,
-        adj_tensors: List[SparseTensor],
+        adj_tensors: List[SparseAdjacency],
     ) -> Tuple[Tensor, Tensor]:
         """Performs the message passing for one layer."""
         user_outputs, item_outputs = [], []
@@ -159,9 +161,9 @@ class GCMC(IterativeRecommender, GraphRecommenderUtils):
             row = torch.from_numpy(matrix.row).long()
             col = torch.from_numpy(matrix.col).long()
 
-            # Create rectangular SparseTensor (Bipartite graph)
-            adj_tensor = SparseTensor(
-                row=row, col=col, sparse_sizes=(self.n_users, self.n_items + 1)
+            # Create rectangular SparseAdjacency (Bipartite graph)
+            adj_tensor = SparseAdjacency(
+                row=row, col=col, size=(self.n_users, self.n_items + 1)
             )
 
             self.adj_tensors.append(adj_tensor)

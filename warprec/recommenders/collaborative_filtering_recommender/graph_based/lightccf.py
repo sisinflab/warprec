@@ -3,7 +3,6 @@ from typing import Tuple, Any, Optional
 
 import torch
 from torch import nn, Tensor
-from torch_geometric.nn import LGConv
 
 from warprec.data.entities import Interactions, Sessions
 from warprec.recommenders.base_recommender import IterativeRecommender
@@ -79,9 +78,7 @@ class LightCCF(IterativeRecommender, GraphRecommenderUtils):
                 interactions.get_sparse().tocoo(),
                 self.n_users,
                 self.n_items + 1,  # Adjust for padding idx
-            )
-            self.propagation_network = nn.ModuleList(
-                [LGConv() for _ in range(self.n_layers)]
+                normalize=True,
             )
         else:
             self.adj = None
@@ -161,8 +158,8 @@ class LightCCF(IterativeRecommender, GraphRecommenderUtils):
             embeddings_list = [all_embeddings]
             current_embeddings = all_embeddings
 
-            for conv_layer in self.propagation_network:
-                current_embeddings = conv_layer(current_embeddings, self.adj)
+            for _ in range(self.n_layers):
+                current_embeddings = self.adj.matmul(current_embeddings)
                 embeddings_list.append(current_embeddings)
 
             final_embeddings = torch.stack(embeddings_list, dim=1).mean(dim=1)

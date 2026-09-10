@@ -1,0 +1,22 @@
+# WarpRec development environment.
+#
+# Dependencies are NOT duplicated here: they are installed from pyproject.toml
+#
+#   conda env create --file environment.yml
+#   conda activate warprec
+#
+# This installs the default PyTorch build, which is CUDA-enabled on Linux and
+# CPU-only on macOS. On a CPU-only Linux machine, install the smaller CPU build
+# first to avoid downloading the bundled CUDA libraries:
+#
+#   conda activate warprec
+#   pip install torch==2.7.* --index-url https://download.pytorch.org/whl/cpu
+#
+name: warprec
+channels:
+  - conda-forge
+dependencies:
+  - python=3.12
+  - pip
+  - pip:
+      - -e .[all]

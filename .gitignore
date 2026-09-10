@@ -65,3 +65,11 @@ junit_result.xml
 .coverage
 experiment/
 tests/
+
+# MkDocs build output
+docs/site/
+
+# Linter caches
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/

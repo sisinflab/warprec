@@ -12,3 +12,12 @@ The Swarm Pipeline represents an alternative execution strategy to the standard 
 - Performing large-scale model training and hyperparameter optimization tasks
 - Aiming to maximize utilization of all available cluster resources
 - Minimizing end-to-end training time is a primary objective
+
+## Pausing and Resuming
+
+The Swarm Pipeline supports [pause and resume](pause-resume.md) through the same [run](../configuration/run.md) section as the training pipeline, but with a **weaker guarantee**.
+
+Each model's tuning loop runs inside a Ray task on a worker process, so a signal delivered to the driver never reaches Ray Tune's own graceful handler. The driver cancels the running tasks instead and relies on Ray Tune's *periodic* experiment-state checkpoint, which means a swarm pause can lose progress back to the last such checkpoint. Individual trial checkpoints are unaffected, so the loss is bounded and typically small.
+
+!!! tip
+    For a run you expect to pause deliberately, prefer the [train pipeline](training.md), whose pause is graceful at the trial level.

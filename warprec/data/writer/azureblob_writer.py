@@ -23,6 +23,8 @@ class AzureBlobWriter(Writer):
         container_name (str): The name of the blob container where results will be stored.
         dataset_name (str): The name of the dataset.
         blob_experiment_container (str): The root container for experiments. Defaults to "experiments".
+        timestamp (Optional[str]): The timestamp to embed in output file names.
+            When None, the current time is used.
     """
 
     def __init__(
@@ -31,8 +33,9 @@ class AzureBlobWriter(Writer):
         container_name: str,
         dataset_name: str,
         blob_experiment_container: str = "experiments",
+        timestamp: Optional[str] = None,
     ):
-        super().__init__()
+        super().__init__(timestamp=timestamp)
 
         credential = DefaultAzureCredential()
         account_url = f"https://{storage_account_name}.blob.core.windows.net"
@@ -137,6 +140,21 @@ class AzureBlobWriter(Writer):
         try:
             blob_client = self.container_client.get_blob_client(path)
             return blob_client.download_blob(encoding="utf-8").readall()
+        except ResourceNotFoundError:
+            return None
+
+    def _read_bytes(self, path: str) -> Optional[bytes]:
+        """Reads binary content from a blob if it exists.
+
+        Args:
+            path (str): The blob key to read from.
+
+        Returns:
+            Optional[bytes]: The blob content, or None when the blob is absent.
+        """
+        try:
+            blob_client = self.container_client.get_blob_client(path)
+            return blob_client.download_blob().readall()
         except ResourceNotFoundError:
             return None
 

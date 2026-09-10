@@ -12,8 +12,6 @@ jobs:
       - uses: actions/checkout@v4
       - name: Setup Environment
         uses: ./.github/actions/setup-env
-        with:
-          install-pyg: 'true'
       - name: Run pre-commit
         run: poetry run pre-commit run --all-files
 
@@ -34,8 +32,6 @@ jobs:
 
       - name: Setup Environment
         uses: ./.github/actions/setup-env
-        with:
-          install-pyg: 'false'
 
       - name: Install Python Semantic Release
         run: pip install python-semantic-release

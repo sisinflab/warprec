@@ -15,10 +15,14 @@ class LocalWriter(Writer):
     Args:
         dataset_name (str): The name of the dataset.
         local_path (str): The root path for saving experiments.
+        timestamp (Optional[str]): The timestamp to embed in output file names.
+            When None, the current time is used.
     """
 
-    def __init__(self, dataset_name: str, local_path: str):
-        super().__init__()
+    def __init__(
+        self, dataset_name: str, local_path: str, timestamp: Optional[str] = None
+    ):
+        super().__init__(timestamp=timestamp)
 
         # Setup
         self.experiment_path = Path(self._path_join(local_path, dataset_name))
@@ -37,6 +41,9 @@ class LocalWriter(Writer):
         self.experiment_split_path = Path(
             self._path_join(self.experiment_path, "split")
         )
+        self.experiment_run_state_path = Path(
+            self._path_join(self.experiment_path, "run_state")
+        )
 
         self.setup_experiment()
 
@@ -54,6 +61,7 @@ class LocalWriter(Writer):
             self.experiment_serialized_models_path,
             self.experiment_params_path,
             self.experiment_split_path,
+            self.experiment_run_state_path,
         ]:
             path.mkdir(parents=True, exist_ok=True)
         logger.msg("Experiment folder created successfully.")
@@ -95,8 +103,10 @@ class LocalWriter(Writer):
             logger.negative(f"Error writing recommendations to {path}: {e}")
 
     def _write_text(self, path: str, content: str) -> None:
-        """Writes text content to a local file."""
-        Path(path).write_text(content, encoding="utf-8")
+        """Writes text content to a local file, creating parent directories."""
+        p = Path(path)
+        p.parent.mkdir(parents=True, exist_ok=True)
+        p.write_text(content, encoding="utf-8")
 
     def _read_text(self, path: str) -> Optional[str]:
         """Reads text content from a local file if it exists."""
@@ -106,5 +116,22 @@ class LocalWriter(Writer):
         return None
 
     def _write_bytes(self, path: str, content: bytes) -> None:
-        """Writes binary content to a local file."""
-        Path(path).write_bytes(content)
+        """Writes binary content to a local file, creating parent directories."""
+        p = Path(path)
+        p.parent.mkdir(parents=True, exist_ok=True)
+        p.write_bytes(content)
+
+    def _read_bytes(self, path: str) -> Optional[bytes]:
+        """Reads binary content from a local file if it exists.
+
+        Args:
+            path (str): The path to read from.
+
+        Returns:
+            Optional[bytes]: The file content, or None when the file is absent
+                or empty.
+        """
+        p = Path(path)
+        if p.exists() and p.stat().st_size > 0:
+            return p.read_bytes()
+        return None

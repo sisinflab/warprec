@@ -2,6 +2,80 @@
 
 <!-- version list -->
 
+## v1.5.3 (2026-09-09)
+
+### Bug Fixes
+
+- Fixed rating metrics inf error
+  ([`1126878`](https://github.com/sisinflab/warprec/commit/1126878961219d26a6c08ad8fbd26241a7475e80))
+
+
+## v1.5.2 (2026-09-04)
+
+### Bug Fixes
+
+- Updated dependencies
+  ([`ba3b563`](https://github.com/sisinflab/warprec/commit/ba3b563a73484a706499b3514fd799212d2a9d2a))
+
+### Continuous Integration
+
+- Added specific check for lock file to fast fail PR merges
+  ([`9d2cb86`](https://github.com/sisinflab/warprec/commit/9d2cb86eb2cf201f5aab00dd452fa8555d4d8fca))
+
+- Updated CI to solve race condition of docstring_parser
+  ([`4b2b1c7`](https://github.com/sisinflab/warprec/commit/4b2b1c7b4a8e4e691ac673dedaee32bbc995f7ed))
+
+
+## v1.5.1 (2026-09-03)
+
+### Bug Fixes
+
+- Removed PyG dependency from graph recommendation models
+  ([`f559a61`](https://github.com/sisinflab/warprec/commit/f559a61208c001f84f325a1b010f5fca92fb88f6))
+
+### Chores
+
+- Lightweight linting process
+  ([`82ff5ac`](https://github.com/sisinflab/warprec/commit/82ff5acd3340bff929eb126bab17a4c13390130d))
+
+### Documentation
+
+- Updated documentation and env files with new dependency
+  ([`0ba2b35`](https://github.com/sisinflab/warprec/commit/0ba2b35b1264b995bc2896023a7dfd3e58eeb1f5))
+
+
+## v1.5.0 (2026-09-03)
+
+### Chores
+
+- Added correctly the 'all' extra
+  ([`8e721b9`](https://github.com/sisinflab/warprec/commit/8e721b9ec8b1d7f42290514d5e6c1e617edfc8a2))
+
+### Continuous Integration
+
+- Lightweight CI
+  ([`4dc7176`](https://github.com/sisinflab/warprec/commit/4dc7176f8e92bc7eaaf2f08ab098b164f5b05702))
+
+### Documentation
+
+- Minor changes to documentation
+  ([`6846a17`](https://github.com/sisinflab/warprec/commit/6846a174377dd58cfd76c5461196513f17912dd2))
+
+- Updated docstrings
+  ([`d169c63`](https://github.com/sisinflab/warprec/commit/d169c637aa4c2b0bd71d0ec2595947cc889acb31))
+
+### Features
+
+- Added BOHB scheduler
+  ([`71eb63d`](https://github.com/sisinflab/warprec/commit/71eb63d1a5a541f6b69251e3b44cbf2e20d9dfe6))
+
+- Added MediaStoppingRule scheduler
+  ([`bb80fe0`](https://github.com/sisinflab/warprec/commit/bb80fe0d3648dab4023ecd03380eef92084b50c0))
+
+- Added pause and resume options for train runs
+  ([`385358e`](https://github.com/sisinflab/warprec/commit/385358ed5f4586088babbec3a09c3ed5fa1ba282))
+
+
 ## v1.4.8 (2026-08-13)
 
 ### Bug Fixes

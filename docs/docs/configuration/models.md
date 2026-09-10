@@ -32,6 +32,8 @@ The **optimization** section defines how hyperparameter optimization is performe
 - **scheduler**: Scheduling algorithm for trials. Defaults to `fifo`. Supported schedulers:
     - `fifo`: First In First Out.
     - `asha`: ASHA scheduler for optimized early stopping and trial pruning.
+    - `bohb`: HyperBand scheduler for BOHB. Must be paired with the `bohb` strategy.
+    - `median`: Median stopping rule. Stops a trial whose performance falls below the median of the trials seen so far.
 
 - **lr_scheduler**: Scheduling algorithm to adjust the learning rate at run time. Defaults to `None`.
 - **optimizer**: Optimizer to use during the training process. Defaults to `None`.
@@ -138,10 +140,13 @@ The **properties** subsection provides additional parameters to the optimization
 - **mode**: Whether to maximize or minimize the validation metric. Accepted values: `min` / `max`. Defaults to `max`.
 - **desired_training_it**: Defines the number of iterations for final training after cross-validation. Strategies: `median`, `mean`, `min`, `max`. Defaults to `median`.
 - **seed**: Random seed for reproducibility. Defaults to `42`.
-- **time_attr**: Attribute used to measure time in the scheduler.
-- **max_t**: Maximum time units per trial.
-- **grace_period**: Minimum time units per trial.
-- **reduction_factor**: ASHA scheduler reduction rate.
+- **time_attr**: Attribute used to measure time in the scheduler. Used by the `asha`, `bohb` and `median` schedulers, all of which fall back to `training_iteration` when it is not provided.
+- **max_t**: Maximum time units per trial. Required by the `asha` and `bohb` schedulers.
+- **grace_period**: Minimum time units per trial. Required by the `asha` and `median` schedulers, and ignored by `bohb`, which has no grace period.
+- **reduction_factor**: Reduction rate of the `asha` and `bohb` schedulers. Required by both.
+- **min_samples_required**: Minimum number of trials the `median` scheduler computes its median over. Must be greater than `0`. Defaults to `None`, in which case the Ray default of `3` is kept. Ignored by the other schedulers.
+- **min_time_slice**: How long a trial runs before yielding under the `median` scheduler, in the units of `time_attr`. Must be greater than or equal to `0`. Defaults to `None`, in which case the Ray default of `0` is kept. Ignored by the other schedulers.
+- **hard_stop**: Whether the `median` scheduler stops trials outright. When `False`, trials are paused instead and resumed FIFO once the others have finished. Defaults to `None`, in which case the Ray default of `True` is kept. Ignored by the other schedulers.
 - **n_startup_trials**: Number of random trials the Bayesian strategies (`hopt`, `optuna`) run before their surrogate model starts guiding the search. Must be greater than `0`. Defaults to `None`, in which case the default of the underlying library is kept. Ignored by the other strategies.
 
 !!! Example "Warm-up for Bayesian Search Strategies"
@@ -219,6 +224,83 @@ The **early_stopping** section optionally adds stopping criteria for each trial:
     4. **`max_t: 200`**: The absolute maximum number of iterations any trial is allowed to reach. This should generally match your model's `epochs` parameter.
 
     *Result:* By pruning unpromising trials early, ASHA allows you to test 100 configurations in a fraction of the time and compute cost it would take using the standard `fifo` scheduler.
+
+!!! Example "BOHB: Bayesian Optimization with HyperBand"
+    !!! important
+        BOHB requires extra dependencies that are not installed by default. Install them with `pip install "warprec[bohb]"` (or `poetry install --extras bohb`) before using either the `bohb` strategy or the `bohb` scheduler.
+
+    **BOHB** combines two halves that only work together. The `bohb` *strategy* is the Bayesian half: it models the search space and proposes promising configurations. The `bohb` *scheduler* is the HyperBand half: it runs many configurations briefly, **pauses** the weak ones and gives their budget to the survivors.
+
+    Unlike ASHA, which stops a bad trial permanently, BOHB pauses trials and can resume them later. Only the `bohb` strategy knows how to resume a paused trial and insert new configurations in its place, so the two must always be used together.
+
+    **Configuration Example:**
+    ```yaml
+    models:
+        LightGCN:
+            optimization:
+                strategy: bohb
+                num_samples: 100
+                scheduler: bohb
+                properties:
+                    time_attr: training_iteration  # The metric used to track time/progress
+                    max_t: 200                     # Maximum iterations a trial can run
+                    reduction_factor: 3.0          # Keeps the top 1/3 at each rung
+
+            # Model parameters
+            embedding_size: [choice, 64, 128, 256]
+            n_layers: [choice, 1, 2, 3]
+            learning_rate: [loguniform, 1e-5, 1e-2]
+            epochs: 200
+    ```
+
+    **How this works in practice:**
+
+    1. **`time_attr: training_iteration`**: Tells the scheduler to measure a trial's progress by the number of training iterations completed.
+    2. **`reduction_factor: 3.0`**: At the end of each rung, only the top 33% (1/3) of trials continue to the next one. The rest are paused.
+    3. **`max_t: 200`**: The largest budget any single trial may reach. This should generally match your model's `epochs` parameter.
+    4. **The Bayesian half**: as trials report results, the `bohb` strategy builds a model of which configurations do well at each budget, and samples new trials from it rather than at random.
+
+    !!! warning
+        `grace_period` does not apply to `bohb` and is ignored if provided: the scheduler derives its own rung sizes from `max_t` and `reduction_factor`. Pairing `scheduler: bohb` with any other strategy raises a configuration error, because the paused trials would never be resumed.
+
+    *Result:* BOHB reaches strong configurations faster than random search plus HyperBand alone, because the budget it saves by pausing weak trials is reinvested in configurations its Bayesian model considers promising.
+
+!!! Example "Median Stopping Rule"
+    The **median stopping rule** is the simplest of the pruning schedulers: at each point in time it compares a trial against the median of every trial observed so far, and stops the ones falling below it. Unlike ASHA it has no rungs and no reduction factor, and unlike BOHB it works with any search strategy.
+
+    It suits searches where trials are comparable at the same point in training and you want a cheap, predictable rule rather than a budget-allocation scheme.
+
+    **Configuration Example:**
+    ```yaml
+    models:
+        LightGCN:
+            optimization:
+                strategy: optuna
+                num_samples: 100
+                scheduler: median
+                properties:
+                    time_attr: training_iteration  # The metric used to track time/progress
+                    grace_period: 20               # Trials younger than this are never stopped
+                    min_samples_required: 5        # Median is only computed once 5 trials reported
+                    hard_stop: true                # Stop trials outright rather than pausing them
+
+            # Model parameters
+            embedding_size: [choice, 64, 128, 256]
+            n_layers: [choice, 1, 2, 3]
+            learning_rate: [loguniform, 1e-5, 1e-2]
+            epochs: 200
+    ```
+
+    **How this works in practice:**
+
+    1. **`grace_period: 20`**: A trial is never stopped before iteration 20, so a slow starter is not killed prematurely.
+    2. **`min_samples_required: 5`**: Until five trials have reported, there is no meaningful median and nothing is stopped. Raising this makes the rule more conservative early in a search.
+    3. **`hard_stop: true`**: Stopped trials end for good. Set it to `false` to pause them instead: paused trials are resumed FIFO once every other trial has finished, which is useful when a late bloomer is still worth revisiting.
+
+    !!! warning
+        `max_t` and `reduction_factor` do not apply to `median` and are ignored if provided. `grace_period` and `min_time_slice` are expressed in the units of `time_attr`, so with the default `training_iteration` they count iterations, not seconds.
+
+    *Result:* A cheap, strategy-agnostic pruning rule. It is less aggressive than ASHA at reallocating budget, but it makes no assumptions about the search algorithm and has only one required parameter.
 
 ## Example Model Configuration
 

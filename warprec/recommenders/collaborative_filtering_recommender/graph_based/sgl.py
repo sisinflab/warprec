@@ -3,7 +3,6 @@ from typing import Tuple, Any, Optional
 
 import torch
 from torch import nn, Tensor
-from torch_sparse import SparseTensor
 
 from warprec.data.entities import Interactions, Sessions
 from warprec.recommenders.base_recommender import IterativeRecommender
@@ -13,6 +12,9 @@ from warprec.recommenders.collaborative_filtering_recommender.graph_based import
 from warprec.recommenders.losses import BPRLoss, EmbLoss, InfoNCELoss
 from warprec.utils.enums import DataLoaderType
 from warprec.utils.registry import model_registry
+from warprec.recommenders.collaborative_filtering_recommender.graph_based.graph_utils import (
+    SparseAdjacency,
+)
 
 
 @model_registry.register(name="SGL")
@@ -118,7 +120,7 @@ class SGL(IterativeRecommender, GraphRecommenderUtils):
             **kwargs,
         )
 
-    def _graph_augmentation(self) -> SparseTensor:
+    def _graph_augmentation(self) -> SparseAdjacency:
         """Fast generation of Edge Dropout view using cached indices."""
         if self.dropout == 0:
             return self.adj
@@ -135,12 +137,12 @@ class SGL(IterativeRecommender, GraphRecommenderUtils):
         _, _, vals = self.adj.coo()
         new_val = vals[keep_mask]
 
-        # Create temporary SparseTensor before normalization
-        temp_adj = SparseTensor(
+        # Create temporary SparseAdjacency before normalization
+        temp_adj = SparseAdjacency(
             row=new_row,
             col=new_col,
             value=new_val,
-            sparse_sizes=self.adj_size,
+            size=self.adj_size,
             is_sorted=True,
         )
 
@@ -157,11 +159,11 @@ class SGL(IterativeRecommender, GraphRecommenderUtils):
         new_norm_vals = d_mat_rows * d_mat_cols
 
         # Fast construction using is_sorted=True
-        return SparseTensor(
+        return SparseAdjacency(
             row=new_row,
             col=new_col,
             value=new_norm_vals,
-            sparse_sizes=self.adj_size,
+            size=self.adj_size,
             is_sorted=True,
         )
 
@@ -172,7 +174,7 @@ class SGL(IterativeRecommender, GraphRecommenderUtils):
         return (torch.rand(num_nodes, 1, device=self.device) > self.dropout).float()
 
     def forward(
-        self, adj: SparseTensor, augment: bool = False
+        self, adj: SparseAdjacency, augment: bool = False
     ) -> Tuple[Tensor, Tensor]:
         """Forward pass with optional augmentation logic."""
         ego_u = self.user_embedding.weight

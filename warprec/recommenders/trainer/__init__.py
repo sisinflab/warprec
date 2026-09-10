@@ -1,5 +1,5 @@
 from .objectives import objective_function
-from .trainer import Trainer
+from .trainer import Trainer, TrainingOutcome
 from .search_algorithm_wrapper import (
     GridSearchWrapper,
     RandomSearchWrapper,
@@ -11,11 +11,14 @@ from .search_algorithm_wrapper import (
 from .scheduler_wrapper import (
     FIFOSchedulerWrapper,
     ASHASchedulerWrapper,
+    BOHBSchedulerWrapper,
+    MedianStoppingRuleWrapper,
 )
 
 __all__ = [
     "objective_function",
     "Trainer",
+    "TrainingOutcome",
     "GridSearchWrapper",
     "RandomSearchWrapper",
     "HyperOptWrapper",
@@ -23,4 +26,6 @@ __all__ = [
     "BOHBWrapper",
     "FIFOSchedulerWrapper",
     "ASHASchedulerWrapper",
+    "BOHBSchedulerWrapper",
+    "MedianStoppingRuleWrapper",
 ]

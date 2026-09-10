@@ -2,10 +2,8 @@
 from typing import Tuple, Any, Optional
 
 import torch
-import torch_geometric
 import torch.nn.functional as F
 from torch import nn, Tensor
-from torch_geometric.nn import LGConv
 
 from warprec.data.entities import Interactions, Sessions
 from warprec.recommenders.base_recommender import IterativeRecommender
@@ -145,22 +143,13 @@ class RecDCL(GraphRecommenderUtils, IterativeRecommender):
         )
 
         # ---- Graph adjacency matrix ----
-        # ASSUMPTION: The LightGCN adjacency is built without explicit symmetric
-        # normalization here (same as the canonical WarpRec LightGCN); LGConv
-        # internally applies the degree normalization during message passing.
+        # The LightGCN adjacency is symmetrically normalized once, here (same
+        # as the canonical WarpRec LightGCN), and reused for every layer.
         self.adj = self.get_adj_mat(
             interactions.get_sparse().tocoo(),
             self.n_users,
             self.n_items + 1,  # +1 for padding idx
-        )
-
-        # ---- LGConv propagation network (L layers) ----
-        # Section 4.2: "we adopt [LightGCN] as the graph encoder f_theta"
-        propagation_network_list = []
-        for _ in range(self.n_layers):
-            propagation_network_list.append((LGConv(), "x, edge_index -> x"))
-        self.propagation_network = torch_geometric.nn.Sequential(
-            "x, edge_index", propagation_network_list
+            normalize=True,
         )
 
         # ---- BCL projector h(·) — Figure 3 / Eq. 9 ----
@@ -363,8 +352,8 @@ class RecDCL(GraphRecommenderUtils, IterativeRecommender):
         current_embeddings = ego_embeddings
 
         # L-layer message passing — LightGCN backbone (He et al. SIGIR 2020)
-        for layer_module in self.propagation_network.children():
-            current_embeddings = layer_module(current_embeddings, self.adj)
+        for _ in range(self.n_layers):
+            current_embeddings = self.adj.matmul(current_embeddings)
             embeddings_list.append(current_embeddings)
 
         # Mean pooling across layers 0 … L (equivalent to alpha=1/(L+1) weighting)
