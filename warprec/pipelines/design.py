@@ -1,5 +1,4 @@
 import time
-import os
 
 import lightning as L
 
@@ -12,6 +11,7 @@ from warprec.utils.callback import WarpRecCallback
 from warprec.utils.config import load_design_configuration, load_callback
 from warprec.utils.helpers import (
     build_evaluation_dataloader_kwargs,
+    resolve_available_cpus,
     resolve_num_workers,
     retrieve_evaluation_dataloader,
     model_param_from_dict,
@@ -105,12 +105,18 @@ def design_pipeline(path: str):
             )
 
             # Dataloader settings
-            num_workers = resolve_num_workers(num_workers, os.cpu_count())
+            num_workers = resolve_num_workers(
+                num_workers,
+                resolve_available_cpus(params.optimization.cpu_per_trial),
+            )
 
             persistent_workers = num_workers > 0
             pin_memory = device == "cuda"
         else:
-            num_workers = resolve_num_workers(num_workers, os.cpu_count())
+            num_workers = resolve_num_workers(
+                num_workers,
+                resolve_available_cpus(params.optimization.cpu_per_trial),
+            )
 
         evaluation_dataloader_kwargs = build_evaluation_dataloader_kwargs(
             num_workers=num_workers,

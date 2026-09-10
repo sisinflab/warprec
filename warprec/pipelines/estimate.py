@@ -30,6 +30,7 @@ from warprec.utils.helpers import (
     build_evaluation_dataloader_kwargs,
     load_custom_modules,
     model_param_from_dict,
+    resolve_available_cpus,
     resolve_num_workers,
     retrieve_evaluation_dataloader,
 )
@@ -602,7 +603,7 @@ def _run_estimate_setup(
 
     eval_num_workers = resolve_num_workers(
         params.optimization.num_workers,
-        os.cpu_count(),
+        resolve_available_cpus(params.optimization.cpu_per_trial),
     )
     evaluation_dataloader_kwargs = build_evaluation_dataloader_kwargs(
         num_workers=eval_num_workers,

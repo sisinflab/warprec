@@ -1,4 +1,3 @@
-import os
 import logging
 import warnings
 from typing import Union, Any, List
@@ -23,6 +22,7 @@ from warprec.utils.config import RecomModel
 from warprec.utils.helpers import (
     build_evaluation_dataloader_kwargs,
     load_custom_modules,
+    resolve_available_cpus,
     resolve_num_workers,
     retrieve_evaluation_dataloader,
 )
@@ -162,7 +162,9 @@ def objective_function(config: dict) -> None:
                     resources = train.get_context().get_trial_resources()
                     allocated_cpus = int(resources.get("CPU", 1))
                 except Exception:
-                    allocated_cpus = os.cpu_count() or 1
+                    allocated_cpus = resolve_available_cpus(
+                        config.get("cpu_per_worker")
+                    )
                 num_workers = resolve_num_workers(num_workers, allocated_cpus)
 
             persistent_workers = num_workers > 0
@@ -226,7 +228,10 @@ def objective_function(config: dict) -> None:
 
         else:
             evaluation_dataloader_kwargs = build_evaluation_dataloader_kwargs(
-                num_workers=resolve_num_workers(num_workers, os.cpu_count()),
+                num_workers=resolve_num_workers(
+                    num_workers,
+                    resolve_available_cpus(config.get("cpu_per_worker")),
+                ),
                 device=device,
                 reuse_loader=False,
             )

@@ -315,6 +315,9 @@ class Trainer:
             "chunk_size": opt_config.chunk_size,
             "custom_modules": self._custom_modules,
             "early_stopping_config": params.early_stopping,
+            "num_workers": opt_config.num_workers,
+            "cpu_per_worker": (scaling_config_dict.get("resources_per_worker")
+                               or {}).get("CPU"),
         }
 
         num_folds = len(dataset) if isinstance(dataset, list) else 0
