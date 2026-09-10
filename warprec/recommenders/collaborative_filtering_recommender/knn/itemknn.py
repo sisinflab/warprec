@@ -1,7 +1,6 @@
 # pylint: disable = R0801, E1102
 from typing import Any, Optional
 
-import torch
 from warprec.data.entities import Interactions
 from warprec.recommenders.base_recommender import ItemSimRecommender
 from warprec.utils.registry import model_registry, similarities_registry
@@ -43,10 +42,12 @@ class ItemKNN(ItemSimRecommender):
         n_items = info["n_items"]
 
         train_matrix_mb = cls._sparse_size_mb(X)
-        similarity_matrix_mb = cls._dense_size_mb((n_items, n_items), X.dtype)
+        similarity_peak_mb, _ = cls._topk_similarity_size_mb(
+            side_len=n_items, k=params["k"], data_dtype=X.dtype
+        )
 
         return {
-            "train_ram_mb": train_matrix_mb + similarity_matrix_mb,
+            "train_ram_mb": train_matrix_mb + similarity_peak_mb,
             "notes": "ItemKNN analytical train-space estimate",
         }
 
@@ -64,11 +65,7 @@ class ItemKNN(ItemSimRecommender):
         X = self.train_matrix
         similarity = similarities_registry.get(self.similarity)
 
-        # Compute similarity matrix
-        sim_matrix = torch.from_numpy(similarity.compute(X.T))
-
-        # Compute top_k filtering
-        filtered_sim_matrix = self._apply_topk_filtering(sim_matrix, self.k)
-
-        # Update item_similarity
-        self.item_similarity = filtered_sim_matrix.numpy()
+        # Compute the top-k similarity blockwise, keeping it sparse throughout
+        self.item_similarity = self._blockwise_topk_similarity(
+            X.T.tocsr(), similarity, self.k
+        )
