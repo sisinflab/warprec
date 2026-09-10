@@ -213,6 +213,7 @@ def objective_function(config: dict) -> None:
                 strategy=pl_strategy,  # Ray handles DDP communication
                 plugins=pl_plugins,  # Ray handles environment variables
                 num_sanity_val_steps=0,
+                limit_val_batches=1,  # The callback re-iterates the loader itself
                 logger=False,
                 enable_checkpointing=False,  # Handled by our custom callback
                 enable_model_summary=False,
