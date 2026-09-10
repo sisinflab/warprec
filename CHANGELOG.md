@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v1.5.5 (2026-09-10)
+
+### Bug Fixes
+
+- Fixed knn models which used dense similarity matrices instead of sparse
+  ([`d3ca8ae`](https://github.com/sisinflab/warprec/commit/d3ca8ae2e3a0ec12a7b4d42fa7eb8b238266e8b4))
+
+
 ## v1.5.4 (2026-09-10)
 
 
