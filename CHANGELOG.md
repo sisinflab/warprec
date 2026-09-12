@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v1.5.6 (2026-09-12)
+
+### Bug Fixes
+
+- Fixed random and grid search ignoring the configured seed
+  ([`fec265d`](https://github.com/sisinflab/warprec/commit/fec265de2f5ad466f901d2adb000ac393871bc75))
+
+
 ## v1.5.5 (2026-09-10)
 
 ### Bug Fixes
