@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v1.5.7 (2026-09-12)
+
+### Bug Fixes
+
+- Fixed random and grid search ignoring max_concurrent_trials
+  ([`14a974a`](https://github.com/sisinflab/warprec/commit/14a974acfe1402f14a67e6697895d7b83cba8a52))
+
+
 ## v1.5.6 (2026-09-12)
 
 ### Bug Fixes
