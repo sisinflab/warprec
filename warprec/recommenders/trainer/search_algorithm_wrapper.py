@@ -42,14 +42,28 @@ class GridSearchWrapper(BaseSearchWrapper):
 
     Args:
         seed (Optional[int]): The seed to make the experiment reproducible.
+        max_concurrent_trials (Optional[int]): The concurrency cap. Ray only
+            applies it to a searcher it builds itself, so it is set here.
         **kwargs (Any): Keyword arguments.
     """
 
-    def __init__(self, seed: Optional[int] = None, **kwargs: Any):
+    def __init__(
+        self,
+        seed: Optional[int] = None,
+        max_concurrent_trials: Optional[int] = None,
+        **kwargs: Any,
+    ):
         pass
 
-    def __new__(cls, seed: Optional[int] = None, **kwargs: Any):
-        return BasicVariantGenerator(random_state=seed)
+    def __new__(
+        cls,
+        seed: Optional[int] = None,
+        max_concurrent_trials: Optional[int] = None,
+        **kwargs: Any,
+    ):
+        return BasicVariantGenerator(
+            random_state=seed, max_concurrent=max_concurrent_trials or 0
+        )
 
 
 @search_algorithm_registry.register(SearchAlgorithms.RANDOM)
@@ -62,14 +76,28 @@ class RandomSearchWrapper(BaseSearchWrapper):
 
     Args:
         seed (Optional[int]): The seed to make the experiment reproducible.
+        max_concurrent_trials (Optional[int]): The concurrency cap. Ray only
+            applies it to a searcher it builds itself, so it is set here.
         **kwargs (Any): Keyword arguments.
     """
 
-    def __init__(self, seed: Optional[int] = None, **kwargs: Any):
+    def __init__(
+        self,
+        seed: Optional[int] = None,
+        max_concurrent_trials: Optional[int] = None,
+        **kwargs: Any,
+    ):
         pass
 
-    def __new__(cls, seed: Optional[int] = None, **kwargs: Any):
-        return BasicVariantGenerator(random_state=seed)
+    def __new__(
+        cls,
+        seed: Optional[int] = None,
+        max_concurrent_trials: Optional[int] = None,
+        **kwargs: Any,
+    ):
+        return BasicVariantGenerator(
+            random_state=seed, max_concurrent=max_concurrent_trials or 0
+        )
 
 
 @search_algorithm_registry.register(SearchAlgorithms.HYPEROPT)

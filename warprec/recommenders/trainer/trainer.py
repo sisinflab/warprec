@@ -14,6 +14,7 @@ import ray
 from ray import tune
 from ray.tune import Tuner, TuneConfig
 from ray.tune.experiment import Trial
+from ray.tune.search.basic_variant import BasicVariantGenerator
 from ray.tune.integration.ray_train import TuneReportCallback
 from ray.train.torch import TorchTrainer
 from ray.train import ScalingConfig
@@ -476,9 +477,15 @@ class Trainer:
             trainer.fit()
 
         # Search Algorithm & Scheduler
+        max_concurrent_trials = (
+            opt_config.max_concurrent_trials
+            if opt_config.max_concurrent_trials is not None
+            else self._estimate_max_concurrent_trials(scaling_config_dict)
+        )
         search_alg = search_algorithm_registry.get(
             opt_config.strategy,
             metric=validation_score,
+            max_concurrent_trials=max_concurrent_trials,
             **opt_config.properties.model_dump(),
         )
         scheduler = scheduler_registry.get(
@@ -505,10 +512,12 @@ class Trainer:
             search_alg=search_alg,  # type: ignore[arg-type]
             scheduler=scheduler,  # type: ignore[arg-type]
             num_samples=opt_config.num_samples,
+            # A variant generator caps itself, and Ray logs that it is ignoring
+            # the value when it gets one it cannot apply.
             max_concurrent_trials=(
-                opt_config.max_concurrent_trials
-                if opt_config.max_concurrent_trials is not None
-                else self._estimate_max_concurrent_trials(scaling_config_dict)
+                None
+                if isinstance(search_alg, BasicVariantGenerator)
+                else max_concurrent_trials
             ),
             trial_name_creator=self._trial_name_creator(model_name),
             trial_dirname_creator=self._trial_dirname_creator(model_name),
