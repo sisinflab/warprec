@@ -15,6 +15,7 @@ from typing import Any, Optional
 from abc import ABC, abstractmethod
 
 from optuna.samplers import TPESampler
+from ray.tune.search.basic_variant import BasicVariantGenerator
 from ray.tune.search.hyperopt import HyperOptSearch
 from ray.tune.search.optuna import OptunaSearch
 from ray.tune.search.bohb import TuneBOHB
@@ -34,36 +35,41 @@ class BaseSearchWrapper(ABC):
 class GridSearchWrapper(BaseSearchWrapper):
     """Wrapper for the GridSearch algorithm in Ray Tune.
 
-    This wrapper is empty in order to be registered inside
-    the search_algorithm_registry but return None to Ray Tune.
+    Returns the searcher Ray Tune uses by default, seeded. A grid space is
+    enumerated deterministically, but the search space is chosen per parameter:
+    a 'choice' entry under this strategy is sampled, and would be unseeded
+    without the explicit searcher.
 
     Args:
+        seed (Optional[int]): The seed to make the experiment reproducible.
         **kwargs (Any): Keyword arguments.
     """
 
-    def __init__(self, **kwargs: Any):
+    def __init__(self, seed: Optional[int] = None, **kwargs: Any):
         pass
 
-    def __new__(cls, **kwargs: Any):
-        return None
+    def __new__(cls, seed: Optional[int] = None, **kwargs: Any):
+        return BasicVariantGenerator(random_state=seed)
 
 
 @search_algorithm_registry.register(SearchAlgorithms.RANDOM)
 class RandomSearchWrapper(BaseSearchWrapper):
     """Wrapper for the RandomSearch algorithm in Ray Tune.
 
-    This wrapper is empty in order to be registered inside
-    the search_algorithm_registry but return None to Ray Tune.
+    Returns the searcher Ray Tune uses by default, seeded. Leaving Ray to
+    build it makes the sampling unreproducible, since its random state is
+    then never set.
 
     Args:
+        seed (Optional[int]): The seed to make the experiment reproducible.
         **kwargs (Any): Keyword arguments.
     """
 
-    def __init__(self, **kwargs: Any):
+    def __init__(self, seed: Optional[int] = None, **kwargs: Any):
         pass
 
-    def __new__(cls, **kwargs: Any):
-        return None
+    def __new__(cls, seed: Optional[int] = None, **kwargs: Any):
+        return BasicVariantGenerator(random_state=seed)
 
 
 @search_algorithm_registry.register(SearchAlgorithms.HYPEROPT)
