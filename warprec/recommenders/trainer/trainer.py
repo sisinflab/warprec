@@ -757,7 +757,7 @@ class Trainer:
                 )
 
         agg_df = (
-            df.groupby(hyperparam_cols)
+            df.groupby(hyperparam_cols or (lambda _: 0))
             .agg(
                 mean_score=(metric, "mean"),
                 std_score=(metric, "std"),
