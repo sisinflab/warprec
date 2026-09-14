@@ -21,6 +21,7 @@ from ray.tune.schedulers import (
     ASHAScheduler,
     HyperBandForBOHB,
     MedianStoppingRule,
+    TrialScheduler,
 )
 from warprec.recommenders.callbacks import COMPLETED_EPOCHS
 from warprec.utils.enums import Schedulers
@@ -138,6 +139,10 @@ class BOHBSchedulerWrapper(HyperBandForBOHB, BaseSchedulerWrapper):
 
     Unlike ASHA, this scheduler has no grace period.
 
+    A report without the time attribute, such as the one of a failed trial or
+    of a non-iterative model, lets the trial continue, as ASHA and the median
+    stopping rule already do.
+
     Args:
         max_t (int): Maximum number of iterations.
         reduction_factor (float): Halving rate of trials.
@@ -158,6 +163,12 @@ class BOHBSchedulerWrapper(HyperBandForBOHB, BaseSchedulerWrapper):
             max_t=max_t,
             reduction_factor=reduction_factor,
         )
+
+    def on_trial_result(self, tune_controller, trial, result):
+        if self._time_attr not in result:
+            result["hyperband_info"] = {}
+            return TrialScheduler.CONTINUE
+        return super().on_trial_result(tune_controller, trial, result)
 
 
 @scheduler_registry.register(Schedulers.MEDIAN)
