@@ -2,6 +2,17 @@
 
 <!-- version list -->
 
+## v1.5.8 (2026-09-14)
+
+### Bug Fixes
+
+- Fixed cross-validation failing for models without hyperparameters
+  ([`4bc3731`](https://github.com/sisinflab/warprec/commit/4bc3731c849fe1bbaf3b7e640a4f32fceaa8b8ef))
+
+- Fixed resumed trials restarting from their first epoch
+  ([`4712b68`](https://github.com/sisinflab/warprec/commit/4712b68ef0c78951262c7c62f29e8ab4209e7cda))
+
+
 ## v1.5.7 (2026-09-12)
 
 ### Bug Fixes
