@@ -1,5 +1,5 @@
 import os
-from typing import Dict, Optional
+from typing import Any, Dict, Optional
 
 import psutil
 import torch
@@ -68,6 +68,28 @@ class WarpRecLightningIntegrationCallback(L.Callback):
             self.grace_period = self.early_stopping_config.grace_period
             self.es_best_score = None
             self.wait = 0
+
+    def state_dict(self) -> Dict[str, Any]:
+        """PyTorch Lightning hook used to save the callback state.
+
+        Returns:
+            Dict[str, Any]: The best score and the early stopping state.
+        """
+        state = {"absolute_best_score": self.absolute_best_score}
+        if self.early_stopping_config:
+            state.update(es_best_score=self.es_best_score, wait=self.wait)
+        return state
+
+    def load_state_dict(self, state_dict: Dict[str, Any]) -> None:
+        """PyTorch Lightning hook used to restore the callback state.
+
+        Args:
+            state_dict (Dict[str, Any]): The state saved by 'state_dict'.
+        """
+        self.absolute_best_score = state_dict["absolute_best_score"]
+        if self.early_stopping_config:
+            self.es_best_score = state_dict.get("es_best_score")
+            self.wait = state_dict.get("wait", 0)
 
     def on_train_epoch_end(self, trainer, pl_module):
         # Capture memory stats

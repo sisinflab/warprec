@@ -3,6 +3,7 @@ import os
 
 # Set Ray environment variable to enable new features
 os.environ["RAY_TRAIN_V2_ENABLED"] = "1"
+import logging
 import math
 from dataclasses import dataclass, field
 from typing import List, Optional, Dict, Union, Any
@@ -244,10 +245,10 @@ class Trainer:
         best_params = best_result.config
         best_params = {k: v for k, v in best_params.items() if not k.startswith("_")}
         best_row = self._get_best_result_row(
-            best_result.metrics_dataframe, validation_score, mode
+            self._trial_history(best_result), validation_score, mode
         )
         best_score = best_row.get(validation_score).item()
-        best_iter = best_row.get("training_iteration").item()
+        best_iter = self._training_iterations(best_row)
         best_checkpoint_path = best_row.get("checkpoint_path")
 
         logger.msg(
@@ -353,6 +354,17 @@ class Trainer:
         ):
             logger.negative(f"All trials failed for {model_name}.")
             return TrainingOutcome(status="failed")
+
+        best_rows = {
+            result.metrics["trial_id"]: self._get_best_result_row(
+                self._trial_history(result), validation_score, mode
+            )
+            for result in results  # type: ignore[attr-defined]
+            if result.metrics
+        }
+        trial_rows = [best_rows[trial_id] for trial_id in result_df["trial_id"]]
+        result_df[validation_score] = [row[validation_score] for row in trial_rows]
+        result_df["iterations"] = [self._training_iterations(row) for row in trial_rows]
 
         # Aggregate results logic
         best_hyperparameters, best_stats = self._aggregate_cv_results(
@@ -743,6 +755,33 @@ class Trainer:
             best_idx = df[metric].idxmin()
         return df.loc[best_idx]
 
+    def _trial_history(self, result):
+        """Returns the reports of a trial, including those made before a pause."""
+        history = result.metrics_dataframe
+        if "checkpoint_path" not in history:
+            return history
+
+        logging.getLogger(
+            "ray.train.v2._internal.execution.checkpoint.checkpoint_manager"
+        ).setLevel(logging.WARNING)
+        run = ray.train.Result.from_path(
+            os.path.join(
+                self._stg_path, f"ray_train_trial_id={result.metrics['trial_id']}"
+            )
+        )
+        history = run.metrics_dataframe
+        history["checkpoint_path"] = [
+            checkpoint.path for checkpoint, _ in run.best_checkpoints
+        ]
+        return history
+
+    @staticmethod
+    def _training_iterations(row) -> int:
+        """Counts the epochs trained up to a report, which survive a trial resume."""
+        if "epoch" in row and not math.isnan(row["epoch"]):
+            return int(row["epoch"]) + 1
+        return int(row["training_iteration"])
+
     def _aggregate_cv_results(self, df, metric, mode, desired_it_stat):
         """Aggregates Cross-Validation results to find best hyperparameters."""
         hyperparam_cols = [
@@ -761,7 +800,7 @@ class Trainer:
             .agg(
                 mean_score=(metric, "mean"),
                 std_score=(metric, "std"),
-                desired_training_iterations=("training_iteration", desired_it_stat),
+                desired_training_iterations=("iterations", desired_it_stat),
             )
             .reset_index()
         )

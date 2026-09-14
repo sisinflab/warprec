@@ -1,5 +1,7 @@
 import logging
 import warnings
+from contextlib import nullcontext
+from pathlib import Path
 from typing import Union, Any, List
 
 import lightning as L
@@ -221,11 +223,20 @@ def objective_function(config: dict) -> None:
                 check_val_every_n_epoch=eval_every_n,
                 callbacks=[integration_callback, RayTrainReportCallback()],
             )
-            trainer.fit(
-                model,
-                train_dataloaders=train_dataloader,
-                val_dataloaders=eval_dataloader,
-            )
+            checkpoint = train.get_checkpoint()
+            resume = checkpoint.as_directory() if checkpoint else nullcontext()
+            with resume as checkpoint_dir:
+                trainer.fit(
+                    model,
+                    train_dataloaders=train_dataloader,
+                    val_dataloaders=eval_dataloader,
+                    ckpt_path=(
+                        Path(checkpoint_dir) / RayTrainReportCallback.CHECKPOINT_NAME
+                        if checkpoint_dir
+                        else None
+                    ),
+                    weights_only=False,
+                )
 
         else:
             evaluation_dataloader_kwargs = build_evaluation_dataloader_kwargs(
