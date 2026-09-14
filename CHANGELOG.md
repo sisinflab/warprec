@@ -2,6 +2,17 @@
 
 <!-- version list -->
 
+## v1.5.9 (2026-09-14)
+
+### Bug Fixes
+
+- Fixed ASHA pruning fewer trials after a resume
+  ([`53acafa`](https://github.com/sisinflab/warprec/commit/53acafa34c6c2d876d1fb4f81e2896bd9695513f))
+
+- Fixed BOHB sweeps failing on reports without completed_epochs
+  ([`ed10456`](https://github.com/sisinflab/warprec/commit/ed10456f03132f4c367e0196e4a7627861ee668a))
+
+
 ## v1.5.8 (2026-09-14)
 
 ### Bug Fixes
