@@ -42,9 +42,11 @@ from warprec.utils.registry import (
 
 # Optional imports handling
 try:
-    from ray.air.integrations.wandb import WandbLoggerCallback
     from ray.air.integrations.mlflow import MLflowLoggerCallback
-    from codecarbon import EmissionsTracker
+    from warprec.recommenders.trainer.dashboard_callbacks import (
+        CodeCarbonCallback,
+        WarpRecWandbLoggerCallback,
+    )
 
     DASHBOARD_AVAILABLE = True
 except ImportError:
@@ -889,7 +891,7 @@ class Trainer:
 
         if dashboard.wandb.enabled:
             callbacks.append(
-                WandbLoggerCallback(
+                WarpRecWandbLoggerCallback(
                     project=dashboard.wandb.project,
                     group=dashboard.wandb.group,
                     api_key_file=dashboard.wandb.api_key_file,
@@ -955,45 +957,3 @@ class Trainer:
             )
 
         return report
-
-
-# type: ignore[unused-argument]
-class CodeCarbonCallback(tune.Callback):
-    """Custom CodeCarbon callback for Ray Tune."""
-
-    def __init__(
-        self,
-        save_to_api=False,
-        save_to_file=False,
-        output_dir="./",
-        tracking_mode="machine",
-    ):
-        self.save_to_api = save_to_api
-        self.save_to_file = save_to_file
-        self.output_dir = output_dir
-        self.tracking_mode = tracking_mode
-        self.trackers: Dict[str, EmissionsTracker] = {}
-        os.makedirs(self.output_dir, exist_ok=True)
-
-    def on_trial_start(self, iteration, trials, trial, **info):
-        tracker = EmissionsTracker(
-            project_name=trial.trial_id,  # Tag each row with its trial
-            save_to_api=self.save_to_api,
-            save_to_file=self.save_to_file,
-            output_dir=self.output_dir,
-            tracking_mode=self.tracking_mode,
-            log_level="error",  # Reduce noise
-        )
-        tracker.start()
-        self.trackers[trial.trial_id] = tracker
-
-    def on_trial_complete(self, iteration, trials, trial, **info):
-        self._stop_tracker(trial.trial_id)
-
-    def on_trial_fail(self, iteration, trials, trial, **info):
-        self._stop_tracker(trial.trial_id)
-
-    def _stop_tracker(self, trial_id):
-        tracker = self.trackers.pop(trial_id, None)
-        if tracker:
-            tracker.stop()
