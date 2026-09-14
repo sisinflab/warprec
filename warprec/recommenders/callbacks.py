@@ -4,6 +4,7 @@ from typing import Any, Dict, Optional
 import psutil
 import torch
 import lightning as L
+from ray import train
 from torch import Tensor
 
 from warprec.data.dataset import Dataset
@@ -40,6 +41,9 @@ class WarpRecLightningIntegrationCallback(L.Callback):
         early_stopping_config (Optional[EarlyStopping]): The configuration of the early stopping.
         validation_score (str): The score used to validate the model.
         mode (str): The mode of optimization.
+        last_logged_epoch (Optional[int]): The last epoch Ray Tune logged for the
+            trial in a previous session, or None when it logged none.
+        session_id (Optional[str]): The id of the session running the sweep.
     """
 
     def __init__(
@@ -50,11 +54,18 @@ class WarpRecLightningIntegrationCallback(L.Callback):
         early_stopping_config: Optional[EarlyStopping] = None,
         validation_score: str = "nDCG@10",
         mode: str = "max",
+        last_logged_epoch: Optional[int] = None,
+        session_id: Optional[str] = None,
     ):
         super().__init__()
         self.evaluator = evaluator
         self.dataset = dataset
         self.strategy = strategy
+        self.last_logged_epoch = last_logged_epoch
+        self.session_id = session_id
+        self.last_report: Optional[Dict[str, Any]] = None
+        self.resumed_report: Optional[Dict[str, Any]] = None
+        self.resumed_session: Optional[str] = None
 
         # Early Stopping configuration
         self.early_stopping_config = early_stopping_config
@@ -75,9 +86,14 @@ class WarpRecLightningIntegrationCallback(L.Callback):
         """PyTorch Lightning hook used to save the callback state.
 
         Returns:
-            Dict[str, Any]: The best score and the early stopping state.
+            Dict[str, Any]: The best score, the early stopping state and the
+                report of the epoch, with the session that wrote it.
         """
-        state = {"absolute_best_score": self.absolute_best_score}
+        state = {
+            "absolute_best_score": self.absolute_best_score,
+            "last_report": self.last_report,
+            "session_id": self.session_id,
+        }
         if self.early_stopping_config:
             state.update(es_best_score=self.es_best_score, wait=self.wait)
         return state
@@ -89,9 +105,29 @@ class WarpRecLightningIntegrationCallback(L.Callback):
             state_dict (Dict[str, Any]): The state saved by 'state_dict'.
         """
         self.absolute_best_score = state_dict["absolute_best_score"]
+        self.resumed_report = state_dict.get("last_report")
+        self.resumed_session = state_dict.get("session_id")
         if self.early_stopping_config:
             self.es_best_score = state_dict.get("es_best_score")
             self.wait = state_dict.get("wait", 0)
+
+    def on_train_start(self, trainer, pl_module):  # pylint: disable=unused-argument
+        """PyTorch Lightning hook used to report the epoch a trial resumes from.
+
+        Ray Tune never receives the report of an epoch that ends while a run is
+        pausing, although its checkpoint is saved. When a later session resumes
+        from that checkpoint and the epoch was not logged, it is reported once.
+        """
+        report = self.resumed_report
+        if (
+            report is not None
+            and self.resumed_session != self.session_id
+            and (
+                self.last_logged_epoch is None
+                or report["epoch"] > self.last_logged_epoch
+            )
+        ):
+            train.report(metrics=report)
 
     def on_train_epoch_end(self, trainer, pl_module):
         pl_module.log(
@@ -102,6 +138,9 @@ class WarpRecLightningIntegrationCallback(L.Callback):
         mem_stats = _get_memory_usage()
         for k, v in mem_stats.items():
             pl_module.log(k, v, on_epoch=True, prog_bar=False, sync_dist=True)
+
+        self.last_report = {k: v.item() for k, v in trainer.callback_metrics.items()}
+        self.last_report.update(epoch=trainer.current_epoch, step=trainer.global_step)
 
         super().on_train_epoch_end(trainer, pl_module)
 

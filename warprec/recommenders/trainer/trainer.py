@@ -5,6 +5,7 @@ import os
 os.environ["RAY_TRAIN_V2_ENABLED"] = "1"
 import logging
 import math
+import uuid
 from dataclasses import dataclass, field
 from typing import List, Optional, Dict, Union, Any
 from pathlib import Path
@@ -22,6 +23,11 @@ from ray.train import ScalingConfig
 
 from warprec.recommenders.base_recommender import Recommender, IterativeRecommender
 from warprec.data import Dataset
+from warprec.recommenders.trainer.logger_callbacks import (
+    WarpRecCSVLoggerCallback,
+    WarpRecJsonLoggerCallback,
+    read_logged_epochs,
+)
 from warprec.recommenders.trainer.objectives import objective_function
 from warprec.utils.config import (
     RecomModel,
@@ -463,6 +469,13 @@ class Trainer:
 
         num_folds = len(dataset) if isinstance(dataset, list) else 0
         param_space = self._parse_params(params, num_folds)
+        experiment_name = self.experiment_name(model_name)
+        logged_epochs = (
+            read_logged_epochs(os.path.join(self._stg_path, experiment_name))
+            if experiment_name
+            else {}
+        )
+        session_id = uuid.uuid4().hex
 
         # Driver function that will be launched by Ray Tune and will
         # initialize Ray Train
@@ -470,7 +483,12 @@ class Trainer:
             scaling_config = ScalingConfig(**scaling_config_dict)
             trial_id = tune.get_context().get_trial_id()
 
-            train_loop_config = {**data_bundle, "params": config}
+            train_loop_config = {
+                **data_bundle,
+                "params": config,
+                "last_logged_epoch": logged_epochs.get(trial_id),
+                "session_id": session_id,
+            }
 
             trainer = TorchTrainer(
                 train_loop_per_worker=objective_function,
@@ -869,7 +887,11 @@ class Trainer:
         custom_callback: WarpRecCallback,
         dashboard: Optional[DashboardConfig] = None,
     ) -> List[tune.Callback | WarpRecCallback]:
-        callbacks: List[tune.Callback | WarpRecCallback] = [custom_callback]
+        callbacks: List[tune.Callback | WarpRecCallback] = [
+            custom_callback,
+            WarpRecJsonLoggerCallback(),
+            WarpRecCSVLoggerCallback(),
+        ]
 
         # If dashboard config is not provided, return only the custom callback
         if dashboard is None:

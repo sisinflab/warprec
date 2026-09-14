@@ -117,6 +117,8 @@ def objective_function(config: dict) -> None:
         early_stopping_config=early_stopping_config,
         validation_score=validation_score,
         mode=mode,
+        last_logged_epoch=config.get("last_logged_epoch"),
+        session_id=config.get("session_id"),
     )
 
     # Trial parameter configuration check for consistency
