@@ -1,4 +1,4 @@
-# pylint: disable=unused-argument, too-few-public-methods
+# pylint: disable=unused-argument, too-few-public-methods, protected-access
 """
 This script contains the wrapper of the Ray wrappers for the schedulers.
 At the time of writing this there is no common interface provided by Ray.
@@ -11,6 +11,8 @@ Author: Avolio Marco
 Date: 03/03/2025
 """
 
+import json
+from pathlib import Path
 from typing import Any, Dict, Optional
 from abc import ABC, abstractmethod
 
@@ -20,8 +22,11 @@ from ray.tune.schedulers import (
     HyperBandForBOHB,
     MedianStoppingRule,
 )
+from warprec.recommenders.callbacks import COMPLETED_EPOCHS
 from warprec.utils.enums import Schedulers
 from warprec.utils.registry import scheduler_registry
+
+ASHA_RUNGS_FILE = "asha_rungs.json"
 
 
 class BaseSchedulerWrapper(ABC):
@@ -48,12 +53,17 @@ class FIFOSchedulerWrapper(FIFOScheduler, BaseSchedulerWrapper):
 class ASHASchedulerWrapper(ASHAScheduler, BaseSchedulerWrapper):
     """Wrapper for the ASHA scheduler.
 
+    Ray Tune does not save a scheduler with its experiment, so a resumed run
+    would start again from rungs with no recorded scores. The scores are saved
+    with the experiment state, which Ray Tune syncs to the storage path, and
+    restored for the trials of the resumed run.
+
     Args:
         max_t (int): Maximum number of iterations.
         grace_period (int): Min time unit given to each trial.
         reduction_factor (float): Halving rate of trials.
         time_attr (Optional[str]): The measure of time that will be used
-            by the scheduler. Defaults to 'training_iteration' when not given.
+            by the scheduler. Defaults to 'completed_epochs' when not given.
         **kwargs (Any): Keyword arguments.
 
     Note:
@@ -72,11 +82,50 @@ class ASHASchedulerWrapper(ASHAScheduler, BaseSchedulerWrapper):
         **kwargs: Any,
     ):
         super().__init__(
-            time_attr=time_attr or "training_iteration",
+            time_attr=time_attr or COMPLETED_EPOCHS,
             max_t=max_t,
             grace_period=grace_period,
             reduction_factor=reduction_factor,
         )
+        self._rungs_path: Optional[Path] = None
+        self._saved_rungs: Dict[str, Dict[str, float]] = {}
+
+    def on_trial_add(self, tune_controller, trial):
+        super().on_trial_add(tune_controller, trial)
+        if self._rungs_path is None:
+            self._rungs_path = Path(
+                trial.storage.experiment_driver_staging_path, ASHA_RUNGS_FILE
+            )
+            if self._rungs_path.exists():
+                self._saved_rungs = json.loads(
+                    self._rungs_path.read_text(encoding="utf-8")
+                )
+        for milestone, recorded in self._trial_info[trial.trial_id]._rungs:
+            score = self._saved_rungs.get(str(milestone), {}).get(trial.trial_id)
+            if score is not None:
+                recorded[trial.trial_id] = score
+
+    def on_trial_result(self, tune_controller, trial, result):
+        action = super().on_trial_result(tune_controller, trial, result)
+        self._save_rungs()
+        return action
+
+    def on_trial_complete(self, tune_controller, trial, result):
+        super().on_trial_complete(tune_controller, trial, result)
+        self._save_rungs()
+
+    def _save_rungs(self) -> None:
+        """Writes the scores recorded at every rung next to the experiment state."""
+        if self._rungs_path is None:
+            return
+        rungs: Dict[str, Dict[str, float]] = {}
+        for bracket in self._brackets:
+            for milestone, recorded in bracket._rungs:
+                rungs.setdefault(str(milestone), {}).update(
+                    {trial_id: float(score) for trial_id, score in recorded.items()}
+                )
+        self._rungs_path.parent.mkdir(parents=True, exist_ok=True)
+        self._rungs_path.write_text(json.dumps(rungs), encoding="utf-8")
 
 
 @scheduler_registry.register(Schedulers.BOHB)
@@ -93,7 +142,7 @@ class BOHBSchedulerWrapper(HyperBandForBOHB, BaseSchedulerWrapper):
         max_t (int): Maximum number of iterations.
         reduction_factor (float): Halving rate of trials.
         time_attr (Optional[str]): The measure of time that will be used
-            by the scheduler. Defaults to 'training_iteration' when not given.
+            by the scheduler. Defaults to 'completed_epochs' when not given.
         **kwargs (Any): Keyword arguments.
     """
 
@@ -105,7 +154,7 @@ class BOHBSchedulerWrapper(HyperBandForBOHB, BaseSchedulerWrapper):
         **kwargs: Any,
     ):
         super().__init__(
-            time_attr=time_attr or "training_iteration",
+            time_attr=time_attr or COMPLETED_EPOCHS,
             max_t=max_t,
             reduction_factor=reduction_factor,
         )
@@ -122,7 +171,7 @@ class MedianStoppingRuleWrapper(MedianStoppingRule, BaseSchedulerWrapper):
         grace_period (float): How old a trial must be before it can be stopped.
             The unit is the one named by 'time_attr'.
         time_attr (Optional[str]): The measure of time that will be used
-            by the scheduler. Defaults to 'training_iteration' when not given.
+            by the scheduler. Defaults to 'completed_epochs' when not given.
         min_samples_required (Optional[int]): Minimum number of trials to
             compute the median over. Ray's default is kept when not given.
         min_time_slice (Optional[int]): How long a trial runs before yielding.
@@ -135,11 +184,11 @@ class MedianStoppingRuleWrapper(MedianStoppingRule, BaseSchedulerWrapper):
 
     Note:
         Ray defaults 'time_attr' to 'time_total_s' for this scheduler, but
-        WarpRec defaults it to 'training_iteration' as it does for the other
+        WarpRec defaults it to 'completed_epochs' as it does for the other
         schedulers. Since 'grace_period' and 'min_time_slice' are expressed in
         the units of 'time_attr', keeping one default across schedulers stops
         the same configuration value from meaning seconds under one scheduler
-        and iterations under another.
+        and epochs under another.
     """
 
     def __init__(
@@ -160,7 +209,7 @@ class MedianStoppingRuleWrapper(MedianStoppingRule, BaseSchedulerWrapper):
             "hard_stop": hard_stop,
         }
         super().__init__(
-            time_attr=time_attr or "training_iteration",
+            time_attr=time_attr or COMPLETED_EPOCHS,
             grace_period=grace_period,
             **{k: v for k, v in optional_params.items() if v is not None},
         )
