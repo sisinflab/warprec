@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v1.5.10 (2026-09-14)
+
+### Bug Fixes
+
+- Fixed paused sweeps hanging with W&B and losing CodeCarbon emissions
+  ([`d239b95`](https://github.com/sisinflab/warprec/commit/d239b954a7e8e218fe6c6974c34f8192e268d596))
+
+
 ## v1.5.9 (2026-09-14)
 
 ### Bug Fixes
