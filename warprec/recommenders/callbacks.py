@@ -11,6 +11,8 @@ from warprec.evaluation.evaluator import Evaluator
 from warprec.utils.config.model_configuration import EarlyStopping
 from warprec.utils.logger import logger
 
+COMPLETED_EPOCHS = "completed_epochs"
+
 
 def _get_memory_usage() -> Dict[str, float]:
     """Calculates and returns a dictionary with peak RAM and VRAM usage.
@@ -92,6 +94,10 @@ class WarpRecLightningIntegrationCallback(L.Callback):
             self.wait = state_dict.get("wait", 0)
 
     def on_train_epoch_end(self, trainer, pl_module):
+        pl_module.log(
+            COMPLETED_EPOCHS, trainer.current_epoch + 1, on_epoch=True, sync_dist=True
+        )
+
         # Capture memory stats
         mem_stats = _get_memory_usage()
         for k, v in mem_stats.items():

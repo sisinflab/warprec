@@ -140,7 +140,7 @@ The **properties** subsection provides additional parameters to the optimization
 - **mode**: Whether to maximize or minimize the validation metric. Accepted values: `min` / `max`. Defaults to `max`.
 - **desired_training_it**: Defines the number of iterations for final training after cross-validation. Strategies: `median`, `mean`, `min`, `max`. Defaults to `median`.
 - **seed**: Random seed for reproducibility. Defaults to `42`.
-- **time_attr**: Attribute used to measure time in the scheduler. Used by the `asha`, `bohb` and `median` schedulers, all of which fall back to `training_iteration` when it is not provided.
+- **time_attr**: Attribute used to measure time in the scheduler. Used by the `asha`, `bohb` and `median` schedulers, all of which fall back to `completed_epochs`, the number of training epochs a trial has completed, when it is not provided. Unlike `training_iteration`, `completed_epochs` keeps counting when a paused run is resumed.
 - **max_t**: Maximum time units per trial. Required by the `asha` and `bohb` schedulers.
 - **grace_period**: Minimum time units per trial. Required by the `asha` and `median` schedulers, and ignored by `bohb`, which has no grace period.
 - **reduction_factor**: Reduction rate of the `asha` and `bohb` schedulers. Required by both.
@@ -204,9 +204,9 @@ The **early_stopping** section optionally adds stopping criteria for each trial:
                 num_samples: 100
                 scheduler: asha
                 properties:
-                    time_attr: training_iteration  # The metric used to track time/progress
-                    max_t: 200                     # Maximum iterations a trial can run
-                    grace_period: 20               # Minimum iterations before pruning begins
+                    time_attr: completed_epochs    # The metric used to track time/progress
+                    max_t: 200                     # Maximum epochs a trial can run
+                    grace_period: 20               # Minimum epochs before pruning begins
                     reduction_factor: 3.0          # Halving rate (keeps top 1/3 of trials)
 
             # Model parameters
@@ -218,10 +218,12 @@ The **early_stopping** section optionally adds stopping criteria for each trial:
 
     **How this works in practice:**
 
-    1. **`time_attr: training_iteration`**: Tells the scheduler to evaluate the progress of the trials based on the number of training epochs/iterations completed.
-    2. **`grace_period: 20`**: Every single trial is guaranteed to run for at least 20 iterations. This prevents the scheduler from killing a model that just has a slow start.
-    3. **`reduction_factor: 3.0`**: At iteration 20, the scheduler compares all running trials. Only the top 33% (1/3) of the trials are allowed to continue. The bottom 66% are permanently stopped. This process repeats at iterations 60 (20 * 3) and 180 (60 * 3).
-    4. **`max_t: 200`**: The absolute maximum number of iterations any trial is allowed to reach. This should generally match your model's `epochs` parameter.
+    1. **`time_attr: completed_epochs`**: Tells the scheduler to evaluate the progress of the trials based on the number of training epochs completed.
+    2. **`grace_period: 20`**: Every single trial is guaranteed to run for at least 20 epochs. This prevents the scheduler from killing a model that just has a slow start.
+    3. **`reduction_factor: 3.0`**: At epoch 20, the scheduler compares all running trials. Only the top 33% (1/3) of the trials are allowed to continue. The bottom 66% are permanently stopped. This process repeats at epochs 60 (20 * 3) and 180 (60 * 3).
+    4. **`max_t: 200`**: The absolute maximum number of epochs any trial is allowed to reach. This should generally match your model's `epochs` parameter.
+
+    When a paused run is resumed, ASHA keeps the scores it recorded at each rung, and `completed_epochs` carries on from where each trial stopped, so a resume neither makes ASHA forget the trials it has already compared nor delays the rungs of the resumed ones.
 
     *Result:* By pruning unpromising trials early, ASHA allows you to test 100 configurations in a fraction of the time and compute cost it would take using the standard `fifo` scheduler.
 
@@ -242,8 +244,8 @@ The **early_stopping** section optionally adds stopping criteria for each trial:
                 num_samples: 100
                 scheduler: bohb
                 properties:
-                    time_attr: training_iteration  # The metric used to track time/progress
-                    max_t: 200                     # Maximum iterations a trial can run
+                    time_attr: completed_epochs    # The metric used to track time/progress
+                    max_t: 200                     # Maximum epochs a trial can run
                     reduction_factor: 3.0          # Keeps the top 1/3 at each rung
 
             # Model parameters
@@ -255,7 +257,7 @@ The **early_stopping** section optionally adds stopping criteria for each trial:
 
     **How this works in practice:**
 
-    1. **`time_attr: training_iteration`**: Tells the scheduler to measure a trial's progress by the number of training iterations completed.
+    1. **`time_attr: completed_epochs`**: Tells the scheduler to measure a trial's progress by the number of training epochs completed.
     2. **`reduction_factor: 3.0`**: At the end of each rung, only the top 33% (1/3) of trials continue to the next one. The rest are paused.
     3. **`max_t: 200`**: The largest budget any single trial may reach. This should generally match your model's `epochs` parameter.
     4. **The Bayesian half**: as trials report results, the `bohb` strategy builds a model of which configurations do well at each budget, and samples new trials from it rather than at random.
@@ -279,7 +281,7 @@ The **early_stopping** section optionally adds stopping criteria for each trial:
                 num_samples: 100
                 scheduler: median
                 properties:
-                    time_attr: training_iteration  # The metric used to track time/progress
+                    time_attr: completed_epochs    # The metric used to track time/progress
                     grace_period: 20               # Trials younger than this are never stopped
                     min_samples_required: 5        # Median is only computed once 5 trials reported
                     hard_stop: true                # Stop trials outright rather than pausing them
@@ -293,12 +295,12 @@ The **early_stopping** section optionally adds stopping criteria for each trial:
 
     **How this works in practice:**
 
-    1. **`grace_period: 20`**: A trial is never stopped before iteration 20, so a slow starter is not killed prematurely.
+    1. **`grace_period: 20`**: A trial is never stopped before epoch 20, so a slow starter is not killed prematurely.
     2. **`min_samples_required: 5`**: Until five trials have reported, there is no meaningful median and nothing is stopped. Raising this makes the rule more conservative early in a search.
     3. **`hard_stop: true`**: Stopped trials end for good. Set it to `false` to pause them instead: paused trials are resumed FIFO once every other trial has finished, which is useful when a late bloomer is still worth revisiting.
 
     !!! warning
-        `max_t` and `reduction_factor` do not apply to `median` and are ignored if provided. `grace_period` and `min_time_slice` are expressed in the units of `time_attr`, so with the default `training_iteration` they count iterations, not seconds.
+        `max_t` and `reduction_factor` do not apply to `median` and are ignored if provided. `grace_period` and `min_time_slice` are expressed in the units of `time_attr`, so with the default `completed_epochs` they count epochs, not seconds.
 
     *Result:* A cheap, strategy-agnostic pruning rule. It is less aggressive than ASHA at reallocating budget, but it makes no assumptions about the search algorithm and has only one required parameter.
 
