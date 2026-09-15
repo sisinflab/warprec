@@ -27,11 +27,15 @@ def read_logged_epochs(experiment_path: str) -> Dict[str, int]:
         if filesystem.get_file_info(result_file).type != pyarrow.fs.FileType.File:
             continue
         with filesystem.open_input_stream(result_file) as stream:
-            lines = stream.read().decode().splitlines()
-        reports = [json.loads(line) for line in lines if line.strip()]
-        logged = [report for report in reports if "epoch" in report]
-        if logged:
-            epochs[logged[-1]["trial_id"]] = int(logged[-1]["epoch"])
+            lines = stream.read().decode(errors="replace").splitlines()
+        for line in reversed(lines):
+            try:
+                report = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            if "epoch" in report:
+                epochs[report["trial_id"]] = int(report["epoch"])
+                break
     return epochs
 
 
@@ -42,6 +46,9 @@ class _StoredHistoryRestore:  # pylint: disable=too-few-public-methods
     has a Tune checkpoint. A WarpRec trial never has one, since its checkpoints
     belong to the Ray Train run inside it, so a resumed trial would start an
     empty file and the next sync would overwrite its history in storage.
+
+    A run killed outright can leave the last line of a stored file half written.
+    That line is dropped, so that new results do not continue it.
     """
 
     def _restore_from_remote(self, file_name, trial):
@@ -50,10 +57,14 @@ class _StoredHistoryRestore:  # pylint: disable=too-few-public-methods
             return
         stored_file = Path(trial.storage.trial_fs_path, file_name).as_posix()
         filesystem = trial.storage.storage_filesystem
-        if filesystem.get_file_info(stored_file).type == pyarrow.fs.FileType.File:
-            pyarrow.fs.copy_files(
-                stored_file, local_file.as_posix(), source_filesystem=filesystem
-            )
+        if filesystem.get_file_info(stored_file).type != pyarrow.fs.FileType.File:
+            return
+        pyarrow.fs.copy_files(
+            stored_file, local_file.as_posix(), source_filesystem=filesystem
+        )
+        content = local_file.read_bytes()
+        if not content.endswith(b"\n"):
+            local_file.write_bytes(content[: content.rfind(b"\n") + 1])
 
 
 class WarpRecJsonLoggerCallback(_StoredHistoryRestore, JsonLoggerCallback):

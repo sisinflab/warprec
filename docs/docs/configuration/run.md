@@ -26,7 +26,7 @@ This section is optional. Omitting it gives every run an automatically derived n
 
 These map onto Ray Tune's two mutually exclusive restore flags, exposed as a single keyword so that an invalid combination cannot be expressed:
 
-- **skip**: Leave errored trials as they are. Only unfinished trials are resumed.
+- **skip**: Leave errored trials as they are. Only unfinished trials are resumed. This includes a trial that errored after an earlier resume: it stays errored in every later session, unless the run is resumed with `resume` or `restart`.
 - **restart**: Rerun each errored trial from scratch. Use this when the errors came from a bug you have since fixed.
 - **resume**: Continue each errored trial from its last checkpoint. Use this when the errors were transient, such as a worker that ran out of memory on a node you have since replaced.
 

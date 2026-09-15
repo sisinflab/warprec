@@ -111,13 +111,18 @@ class WarpRecLightningIntegrationCallback(L.Callback):
             self.es_best_score = state_dict.get("es_best_score")
             self.wait = state_dict.get("wait", 0)
 
-    def on_train_start(self, trainer, pl_module):  # pylint: disable=unused-argument
-        """PyTorch Lightning hook used to report the epoch a trial resumes from.
+    def on_fit_start(self, trainer, pl_module):  # pylint: disable=unused-argument
+        """PyTorch Lightning hook used to restore what a trial did before a pause.
 
         Ray Tune never receives the report of an epoch that ends while a run is
         pausing, although its checkpoint is saved. When a later session resumes
         from that checkpoint and the epoch was not logged, it is reported once.
+        A stop already decided by early stopping is restored too, since Lightning
+        does not save it. Both happen before the fit loop starts, which skips
+        training entirely when a trial resumes from its last epoch.
         """
+        if self.early_stopping_config and self.wait >= self.patience:
+            trainer.should_stop = True
         report = self.resumed_report
         if (
             report is not None
