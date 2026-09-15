@@ -2,6 +2,17 @@
 
 <!-- version list -->
 
+## v1.5.11 (2026-09-15)
+
+### Bug Fixes
+
+- Fixed resumed trials losing their history and the epoch ending during a pause
+  ([`48a02ab`](https://github.com/sisinflab/warprec/commit/48a02ab726b39291765372a76e7f4d6392610123))
+
+- Fixed resumed trials missing their last epoch, early stopping stop and truncated result lines
+  ([`c1f3cc5`](https://github.com/sisinflab/warprec/commit/c1f3cc59841add5aaecc0166398947f404467e0a))
+
+
 ## v1.5.10 (2026-09-14)
 
 ### Bug Fixes
