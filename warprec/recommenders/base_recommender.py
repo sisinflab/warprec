@@ -13,7 +13,8 @@ from torch import nn, Tensor
 from torch.nn.init import xavier_normal_, xavier_uniform_, constant_
 from torch.utils.data import DataLoader
 
-from scipy.sparse import csr_matrix, issparse
+from scipy.sparse import csr_matrix, diags, issparse
+from sklearn.preprocessing import normalize
 
 from warprec.data.entities import Interactions, Sessions
 from warprec.utils.enums import DataLoaderType
@@ -291,6 +292,45 @@ class Recommender(nn.Module, ABC):
         widest_itemsize = np.dtype(np.float64).itemsize
         rows = max(1, block_bytes // (side_len * widest_itemsize))
         return min(rows, side_len)
+
+    @staticmethod
+    def _tfidf(matrix: csr_matrix, normalize_tf: bool = False) -> csr_matrix:
+        """Apply a TF-IDF weighting to a {row x feature} profile matrix.
+
+        The inverse document frequency is taken over the rows of the matrix
+        itself, so an item profile is weighted by how many items carry each
+        feature and a user profile by how many users carry it. Weighting a user
+        profile by the *item* frequencies, or skipping the term altogether,
+        leaves a per-row scaling, and a per-row scaling cannot reorder a row:
+        it cancels in cosine and factors out of a dot product.
+
+        Args:
+            matrix (csr_matrix): The profile matrix to weight.
+            normalize_tf (bool): Whether to turn the raw counts into per-row
+                frequencies before weighting. Item profiles keep the raw counts,
+                user profiles are aggregations over a history whose length
+                varies, so they are normalized first.
+
+        Returns:
+            csr_matrix: The L2 normalized TF-IDF profile.
+        """
+        matrix = matrix.tocsr()
+        n_rows = matrix.shape[0]
+
+        # Document frequency: the rows each feature appears in
+        df = np.diff(matrix.tocsc().indptr)
+
+        # IDF with smoothing
+        idf = np.log((n_rows + 1) / (df + 1)) + 1
+
+        tf = matrix
+        if normalize_tf:
+            row_sums = np.asarray(tf.sum(axis=1)).ravel()
+            row_sums[row_sums == 0] = 1  # Avoid division by zero
+            tf = csr_matrix(tf.multiply(1 / row_sums[:, np.newaxis]))
+
+        # L2 normalize
+        return normalize(tf @ diags(idf), norm="l2", axis=1)
 
     @staticmethod
     def _blockwise_topk_similarity(
