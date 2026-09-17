@@ -2,6 +2,20 @@
 
 <!-- version list -->
 
+## v1.5.12 (2026-09-17)
+
+### Bug Fixes
+
+- Fixed content-based models side matrix integration and TF-IDF weighting
+  ([`00b4fff`](https://github.com/sisinflab/warprec/commit/00b4fff3ea20b40eb3713f02cc5910321944246f))
+
+### Documentation
+
+- Update documentation for side information and model parameters in content-based and hybrid
+  recommenders
+  ([`e5577cc`](https://github.com/sisinflab/warprec/commit/e5577cc7b78819cc89e425b67f9b9424067570d2))
+
+
 ## v1.5.11 (2026-09-15)
 
 ### Bug Fixes
