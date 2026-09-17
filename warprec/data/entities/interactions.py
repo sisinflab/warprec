@@ -34,6 +34,8 @@ class Interactions:
         user_mapping (dict): Mapping of user ID -> user idx.
         item_mapping (dict): Mapping of item ID -> item idx.
         side_data (Optional[DataFrame[Any]]): The side information features in DataFrame format.
+        side_matrix (Optional[csr_matrix]): The {item x feature} content matrix, already
+            aligned on the item indices. Built by the Dataset, which owns the mappings.
         user_cluster (Optional[dict]): The user cluster information.
         item_cluster (Optional[dict]): The item cluster information.
         batch_size (int): The batch size that will be used to
@@ -52,6 +54,7 @@ class Interactions:
         user_mapping: dict,
         item_mapping: dict,
         side_data: Optional[DataFrame[Any]] = None,
+        side_matrix: Optional[csr_matrix] = None,
         user_cluster: Optional[dict] = None,
         item_cluster: Optional[dict] = None,
         batch_size: int = 1024,
@@ -71,7 +74,7 @@ class Interactions:
         # Setup the training variables
         self._inter_dict: Optional[dict] = None
         self._inter_sparse: csr_matrix = None
-        self._inter_side_sparse: csr_matrix = None
+        self._inter_side_sparse: Optional[csr_matrix] = side_matrix
         self._inter_side_tensor: Tensor = None
         self._inter_side_labels: List[str] = []
         self._history_matrix: Tensor = None
@@ -348,26 +351,18 @@ class Interactions:
             (values, (users, items)), shape=(self._og_nuid, self._og_niid)
         )
 
-    def get_side_sparse(self) -> csr_matrix:
+    def get_side_sparse(self) -> Optional[csr_matrix]:
         """This method retrieves the sparse representation of side data.
 
-        This method also checks if the sparse structure has
-        already been created, if not then it also create it first.
+        The matrix is the {item x feature} content space built by the Dataset,
+        where row i belongs to item index i. It is deliberately not derived from
+        the side DataFrame held here: that one carries the embedding indices the
+        context-aware models consume, which are labels rather than features.
 
         Returns:
-            csr_matrix: Sparse representation of the features (CSR Format).
+            Optional[csr_matrix]: Sparse representation of the features (CSR Format),
+                or None when no side information is available.
         """
-        if isinstance(self._inter_side_sparse, csr_matrix):
-            return self._inter_side_sparse
-        if self._inter_side is None:
-            return None
-
-        # Drop item label and convert to sparse
-        side_features = self._inter_side.drop(self.item_label)
-        # Convert to numpy first
-        side_np = side_features.to_numpy()
-
-        self._inter_side_sparse = csr_matrix(side_np)
         return self._inter_side_sparse
 
     def get_side_tensor(self) -> Tensor:

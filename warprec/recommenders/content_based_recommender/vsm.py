@@ -4,8 +4,6 @@ from typing import Any, Optional
 import torch
 import numpy as np
 from torch import Tensor
-from scipy.sparse import csr_matrix, diags
-from sklearn.preprocessing import normalize
 
 from warprec.data.entities import Interactions
 from warprec.recommenders.base_recommender import Recommender
@@ -118,62 +116,19 @@ class VSM(Recommender):
         self.sim_function = similarities_registry.get(self.similarity)
 
         if self.item_profile == "tfidf":
-            # Compute TF-IDF
-            item_profile = self._compute_item_tfidf(item_profile)
+            # Compute TF-IDF over the items carrying each feature
+            item_profile = self._tfidf(item_profile)
 
-        # Compute binary user profile
+        # Aggregate the profiles of the items the user interacted with
         user_profile = X @ item_profile  # [user x side]
 
         if self.user_profile == "tfidf":
-            user_profile = self._compute_user_tfidf(user_profile)
+            # Compute TF-IDF over the users carrying each feature
+            user_profile = self._tfidf(user_profile, normalize_tf=True)
 
         # Save profiles
         self.i_profile = item_profile
         self.u_profile = user_profile
-
-    def _compute_item_tfidf(self, item_profile: csr_matrix) -> csr_matrix:
-        """Computes TF-IDF for item features.
-
-        Args:
-            item_profile (csr_matrix): The profile of the items.
-
-        Returns:
-            csr_matrix: The computed TF-IDF for items.
-        """
-        n_items = item_profile.shape[0]
-
-        # Document Frequency (per feature)
-        df = np.diff(item_profile.tocsc().indptr)
-
-        # IDF with smoothing
-        idf = np.log((n_items + 1) / (df + 1)) + 1
-
-        # TF remains as raw counts
-        tf = item_profile.copy()
-
-        # TF-IDF calculation
-        idf_diag = diags(idf)
-        tfidf = tf @ idf_diag
-
-        # L2 normalize
-        return normalize(tfidf, norm="l2", axis=1)
-
-    def _compute_user_tfidf(self, user_profile: csr_matrix) -> csr_matrix:
-        """Computes TF-IDF for user features.
-
-        Args:
-            user_profile (csr_matrix): The profile of the users.
-
-        Returns:
-            csr_matrix: The computed TF-IDF for users.
-        """
-        # Convert to average instead of sum
-        user_counts = user_profile.sum(axis=1).A.ravel()
-        user_counts[user_counts == 0] = 1  # Avoid division by zero
-        user_profile = user_profile.multiply(1 / user_counts[:, np.newaxis])
-
-        # L2 normalize
-        return normalize(user_profile, norm="l2", axis=1)
 
     def predict(
         self,
