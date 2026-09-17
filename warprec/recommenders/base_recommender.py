@@ -670,6 +670,12 @@ class IterativeRecommender(Recommender, L.LightningModule):
         elif isinstance(module, nn.Embedding):
             xavier_normal_(module.weight.data)
 
+            # Xavier fills the whole matrix, padding row included. That row is
+            # excluded from every gradient update, so a random value there would
+            # never be corrected.
+            if module.padding_idx is not None:
+                module.weight.data[module.padding_idx].zero_()
+
         # Recurrent Layers
         elif isinstance(module, (nn.GRU, nn.LSTM, nn.RNN)):
             for name, param in module.named_parameters():
