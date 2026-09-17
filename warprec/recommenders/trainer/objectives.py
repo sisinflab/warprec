@@ -74,6 +74,7 @@ def objective_function(config: dict) -> None:
     eval_every_n = config.get("eval_every_n", 1)
     strategy = config.get("strategy", "full")
     num_negatives = config.get("num_negatives", 99)
+    mask_seen = config.get("mask_seen", "auto")
     complex_metrics = config.get("complex_metrics", None)
     lr_scheduler_config = config.get("lr_scheduler", None)
     optimizer_config = config.get("optimizer", None)
@@ -107,6 +108,7 @@ def objective_function(config: dict) -> None:
         feature_lookup=dataset.get_features_lookup(),
         user_cluster=dataset.get_user_cluster(),
         item_cluster=dataset.get_item_cluster(),
+        mask_seen=mask_seen,
     )
 
     # Initialize WarpRec + Lightning integration callback
@@ -145,6 +147,7 @@ def objective_function(config: dict) -> None:
             name=model_name,
             params=params,
             interactions=dataset.train_set,
+            transactions=dataset.train_transactions,
             sessions=dataset.train_session,
             seed=seed,
             info=dataset.info(),

@@ -532,6 +532,7 @@ def remote_model_pipeline(
             complex_metrics=config.evaluation.complex_metrics,
             strategy=config.evaluation.strategy,
             num_negatives=config.evaluation.num_negatives,
+            mask_seen=config.evaluation.mask_seen,
             num_workers=params.optimization.num_workers,
             device=device,
             requires_timing=config.general.time_report,

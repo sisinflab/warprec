@@ -19,6 +19,7 @@ from sklearn.preprocessing import normalize
 from warprec.data.entities import Interactions, Sessions
 from warprec.utils.enums import DataLoaderType
 from warprec.utils.config.model_configuration import LRSchedulerConfig, OptimizerConfig
+from warprec.utils.logger import logger
 from warprec.utils.registry import lr_scheduler_registry, optimizer_registry
 
 
@@ -771,7 +772,8 @@ class ContextRecommenderUtils(nn.Module, ABC):
         info (dict): The dictionary containing dataset information.
         *args (Any): Variable length argument list.
         interactions (Optional[Interactions]): The training interactions.
-        **kwargs (Any): Arbitrary keyword arguments.
+        **kwargs (Any): Arbitrary keyword arguments. ``transactions`` carries the
+            row-oriented training records, passed through by the pipelines.
 
     Attributes:
         n_users (int): Number of users.
@@ -818,6 +820,10 @@ class ContextRecommenderUtils(nn.Module, ABC):
         # Context info extraction
         self.context_dims: dict = info.get("context_dims", {})
         self.context_labels = list(self.context_dims.keys())
+
+        # Row-oriented source of training examples. Absent for a dataset with no
+        # contextual columns, in which case the matrix view is used instead.
+        self._transactions = kwargs.get("transactions")
 
         # Call super init to populate n_users, n_items, embedding_size
         super().__init__(params, info, *args, **kwargs)  # type: ignore[call-arg]
@@ -885,6 +891,10 @@ class ContextRecommenderUtils(nn.Module, ABC):
     ) -> DataLoader:
         """Common dataloader retrieval used by contextual models.
 
+        The rows are preferred over the matrix: a matrix cell cannot hold the
+        same pair seen in several contexts, so sourcing from it would drop every
+        record but one and leave the contexts attached to nothing.
+
         Args:
             interactions (Interactions): The interaction of users with items.
             sessions (Sessions): The sessions of the users.
@@ -893,7 +903,16 @@ class ContextRecommenderUtils(nn.Module, ABC):
         Returns:
             DataLoader: The appropriate dataloader for the training.
         """
-        return interactions.get_pointwise_dataloader(
+        source: Any = self._transactions
+
+        if source is None:
+            logger.attention(
+                f"{self.__class__.__name__} received no transactions and will read the "
+                "interaction matrix instead. Contexts cannot be aligned this way."
+            )
+            source = interactions
+
+        return source.get_pointwise_dataloader(
             neg_samples=self.neg_samples,
             include_side_info=bool(self.feature_dims),
             include_context=bool(self.context_dims),

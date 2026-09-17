@@ -305,6 +305,7 @@ def _create_evaluator(dataset: Dataset, config: EstimateConfiguration) -> Evalua
         feature_lookup=dataset.get_features_lookup(),
         user_cluster=dataset.get_user_cluster(),
         item_cluster=dataset.get_item_cluster(),
+        mask_seen=config.evaluation.mask_seen,
     )
 
 
@@ -426,6 +427,7 @@ def _build_model(
         name=model_name,
         params=setup,
         interactions=dataset.train_set,
+        transactions=dataset.train_transactions,
         sessions=dataset.train_session,
         seed=seed,
         info=dataset.info(),

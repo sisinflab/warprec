@@ -35,6 +35,7 @@ def remote_evaluation_and_timing(
     complex_metrics: List[ComplexMetricConfig],
     strategy: str,
     num_negatives: int,
+    mask_seen: str,
     num_workers: Optional[int],
     device: str,
     requires_timing: bool,
@@ -52,6 +53,7 @@ def remote_evaluation_and_timing(
         complex_metrics (List[ComplexMetricConfig]): The configuration of the complex metrics.
         strategy (str): The evaluation strategy.
         num_negatives (int): The number of negative samples to use with 'sampled' strategy.
+        mask_seen (str): Which already-seen items are excluded from the ranking.
         num_workers (Optional[int]): The number of dataloader workers to use for evaluation.
         device (str): The device to use for evaluation.
         requires_timing (bool): Wether or not to calculate timings.
@@ -82,6 +84,7 @@ def remote_evaluation_and_timing(
         feature_lookup=main_dataset.get_features_lookup(),
         user_cluster=main_dataset.get_user_cluster(),
         item_cluster=main_dataset.get_item_cluster(),
+        mask_seen=mask_seen,
     )
 
     # Retrieve dataloader
@@ -213,6 +216,7 @@ def remote_model_retraining(
         name=model_name,
         params=best_params,
         interactions=main_dataset.train_set,
+        transactions=main_dataset.train_transactions,
         sessions=main_dataset.train_session,
         seed=seed,
         info=main_dataset.info(),
