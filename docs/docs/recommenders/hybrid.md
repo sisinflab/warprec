@@ -2,7 +2,7 @@
 
 The **Hybrid Recommenders** module of WarpRec contains models that combine collaborative filtering signals with side information (content). By leveraging both user-item interactions and item/user attributes, these models aim to overcome limitations such as data sparsity and the cold-start problem, providing more robust recommendations than pure collaborative or pure content-based approaches.
 
-In the following sections, you will find the list of available hybrid models within WarpRec, together with their respective parameters.
+In the following sections, you will find the list of available hybrid models within WarpRec, together with their respective parameters. Every model on this page reads item attributes as described in [Reading Side Information](../data-management/reader.md#reading-side-information).
 
 !!! info "API Reference"
 
@@ -66,6 +66,8 @@ models:
     similarity: cosine
 ```
 
+Similarities are computed over the item attributes rather than over the interactions, so `similarity` compares two items by their content and `k` is the number of neighbours retained per item.
+
 ### AttributeUserKNN
 
 AttributeUserKNN: A user-based KNN model that uses content-based profiles (e.g., TF-IDF) to define user similarity. **This model requires side information to function properly**.
@@ -79,3 +81,9 @@ models:
     similarity: cosine
     user_profile: tfidf
 ```
+
+**Parameters**
+
+- `user_profile`: how a user is represented in the item feature space, by aggregating the attributes of the items they interacted with. `binary` keeps that aggregation, while `tfidf` turns it into per-user feature frequencies, weights every feature by how many **users** carry it, and L2 normalizes the result. Neighbours are then searched in that space.
+- `k`: the number of neighbours retained per user.
+- `similarity`: the measure used to compare two user profiles.

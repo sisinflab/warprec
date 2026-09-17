@@ -65,21 +65,51 @@ split_dir/
 
 ## Reading Side Information
 
-Side information is used to train certain models and evaluate specific metrics. WarpRec expects the side information file to be formatted as:
+Side information describes the **items** of the dataset. It feeds content-based and hybrid models, provides item features to context-aware models, and is used to evaluate specific metrics. WarpRec expects the file to be formatted as:
 
 ```
-item_id,feature_1,feature_2,...
-1,2,1,...
-2,3,1,...
-3,1,5,...
+item_id,Action,Comedy,Drama
+1,0,1,0
+2,1,0,1
+3,0,0,1
 ...
 ```
 
 - **Column Ordering is Crucial:**
     - The **first column** must contain the **item ID**.
     - All other columns will be interpreted as features.
-- **Data Type:** WarpRec expects all feature data in this file to be **numerical**. The user must provide preprocessed input.
+- **Data Type:** both numeric and textual columns are accepted, and the two are interpreted differently. See [How Columns Are Interpreted](#how-columns-are-interpreted) below.
 - **Error Handling:** During the configuration evaluation process, you will be notified if you attempt to use a model that requires side information but none has been provided. In that case, the experiment will be terminated.
+
+### How Columns Are Interpreted
+
+WarpRec derives two representations from the same file, because model families consume attributes in different ways. Content-based and hybrid models (`VSM`, `AttributeItemKNN`, `AttributeUserKNN`, `CEASE`, `AddEASE`) need an item-by-feature matrix to take similarities over, while context-aware models (`DeepFM`, `NFM`, `xDeepFM`, ...) need one embedding per attribute value. Both are built automatically, from the same columns:
+
+| Column kind | Interpretation | Features produced |
+|---|---|---|
+| Numeric | kept as feature **values** | one per column |
+| Non-numeric | treated as **categorical** and expanded into indicators | one per distinct value |
+
+This means the wide layout shown above, where each attribute is already a binary column, is preserved exactly as written. A compact categorical layout works just as well, and is expanded for you:
+
+```
+item_id,genre,director
+1,comedy,Lubitsch
+2,drama,Wilder
+...
+```
+
+!!! warning "Categorical attributes encoded as integers"
+
+    A numeric column is taken at face value, which is what you want for a genuine measurement such as a release year or a duration. A column holding category **codes** (`genre = 1, 2, 3`) therefore becomes a single ordinal feature, in which genre `1` and genre `2` look far more alike than genre `1` and genre `5`. That is rarely the intent for a similarity-based model. Either leave such attributes as text and let WarpRec expand them, or one-hot encode them yourself.
+
+!!! tip "Several rows per item"
+
+    A file may carry more than one row for the same item, as is natural for a tag list. Every row contributes its features to that item, so a long layout works as well as a wide one.
+
+!!! note "Items without attributes"
+
+    Items that do not appear in the side information file are removed from the experiment together with their interactions, so that every model in the run is compared on the same catalogue.
 
 ---
 
