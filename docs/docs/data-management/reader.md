@@ -113,6 +113,28 @@ item_id,genre,director
 
 ---
 
+## Reading Contextual Information
+
+Contextual columns describe the **circumstances of an interaction** rather than the user or the item: the time of day, the weather, the device, whoever the user was with. They are named in `reader.labels.context_labels` and live in the interaction file itself, one row per interaction:
+
+```
+user_id,item_id,rating,daytime,weather
+1,42,4,morning,sunny
+1,42,5,evening,rainy
+2,17,3,evening,sunny
+...
+```
+
+- **Repeated pairs are expected and preserved.** The first two rows above describe the same user and the same item in two different situations. Both are used for training: that is the signal a context-aware model exists to learn.
+- **Every context column is categorical.** Values are mapped to integer indices, with `0` reserved for values that were not seen during training, so a value appearing only in the test set is treated as unknown rather than as a new category.
+- **The interaction matrix still holds one cell per pair.** Models that work on the matrix rather than on the rows — collaborative filtering, content-based — aggregate the repeated rows according to `reader.duplicates`, which defaults to `max`.
+
+!!! note "Contexts and the models that ignore them"
+
+    Only context-aware models read these columns. Providing them does not change what a collaborative model sees, beyond the duplicate aggregation described above.
+
+---
+
 ## Reading Clustering Information
 
 When reading clustering information, WarpRec expects the file to be formatted as follows:

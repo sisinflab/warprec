@@ -15,6 +15,8 @@ It provides flexible control over ranking cutoffs, sampling strategies, statisti
 - **batch_size**: Batch size used during evaluation. Defaults to `1024`.
 - **strategy**: Evaluation strategy: `full` or `sampled`. `sampled` is recommended for large datasets. Defaults to `full`.
 - **num_negatives**: Number of negative samples used in the `sampled` strategy.
+
+- **mask_seen**: Which already-seen items are excluded from the ranking, under the `full` strategy: `auto`, `context`, `pair` or `none`. Defaults to `auto`, which excludes items the user has seen **in the same context** when the dataset has contextual columns, and every item the user has seen otherwise. `context` and `pair` force either behaviour and `none` excludes nothing.
 - **seed**: Random seed used for reproducibility in sampling. Defaults to `42`.
 - **stat_significance**: Nested section defining statistical significance tests.
 - **full_evaluation_on_report**: Whether to perform full evaluation each epoch. Defaults to `False`.
