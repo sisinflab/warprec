@@ -31,3 +31,11 @@ models:
     user_profile: binary
     item_profile: tfidf
 ```
+
+**Parameters**
+
+- `item_profile`: how an item is represented in the feature space. `binary` uses the attributes as they are read from the side information file, while `tfidf` weights every feature by how many **items** carry it, so that a feature shared by most of the catalogue counts for less than a rare one, and L2 normalizes the result.
+- `user_profile`: how a user is represented, by aggregating the profiles of the items they interacted with. `binary` keeps that aggregation, while `tfidf` turns it into per-user feature frequencies, weights every feature by how many **users** carry it, and L2 normalizes the result.
+- `similarity`: the measure used to score an item against a user profile.
+
+The attributes themselves are read as described in [Reading Side Information](../data-management/reader.md#reading-side-information).

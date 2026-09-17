@@ -4,7 +4,6 @@ from typing import Any, Optional
 import numpy as np
 from torch import Tensor
 from scipy.sparse import csr_matrix
-from sklearn.preprocessing import normalize
 from warprec.data.entities import Interactions
 from warprec.recommenders.base_recommender import Recommender
 from warprec.utils.registry import model_registry, similarities_registry
@@ -112,29 +111,12 @@ class AttributeUserKNN(Recommender):
 
         # Compute tfidf profile if requested
         if self.user_profile == "tfidf":
-            X_profile = self._compute_user_tfidf(X_profile)
+            X_profile = self._tfidf(csr_matrix(X_profile), normalize_tf=True)
 
         # Compute the top-k similarity blockwise, keeping it sparse throughout
         self.user_similarity = self._blockwise_topk_similarity(
             X_profile.tocsr(), similarity, self.k
         )
-
-    def _compute_user_tfidf(self, user_profile: csr_matrix) -> csr_matrix:
-        """Computes TF-IDF for user features.
-
-        Args:
-            user_profile (csr_matrix): The profile of the users.
-
-        Returns:
-            csr_matrix: The computed TF-IDF for users.
-        """
-        # Convert to average instead of sum
-        user_counts = user_profile.sum(axis=1).A.ravel()
-        user_counts[user_counts == 0] = 1  # Avoid division by zero
-        user_profile = user_profile.multiply(1 / user_counts[:, np.newaxis])
-
-        # L2 normalize
-        return normalize(user_profile, norm="l2", axis=1)
 
     def predict(
         self,

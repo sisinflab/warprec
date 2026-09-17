@@ -1,9 +1,11 @@
 # pylint: disable = too-many-branches, too-many-statements
 from typing import Tuple, Optional, List, Any, Dict
 
+import numpy as np
 import torch
 from torch import Tensor
 from torch.utils.data import DataLoader
+from scipy.sparse import csr_matrix, coo_matrix
 
 import narwhals as nw
 from narwhals.typing import FrameT
@@ -96,6 +98,7 @@ class Dataset:
         self._imap: dict[Any, int] = {}
         self._feature_maps: dict[str, dict[Any, int]] = {}
         self._feature_dims: dict[str, int] = {}
+        self._side_matrix: Optional[csr_matrix] = None
         self._context_maps: dict[str, dict[Any, int]] = {}
         self._context_dims: dict[str, int] = {}
         self._feat_lookup: Tensor = None
@@ -157,6 +160,10 @@ class Dataset:
         # Process the side information data and filter not valid columns
         self.side = None
         if mat_side_data is not None:
+            # The content models consume the raw attributes as a feature matrix,
+            # so it is built before the embedding encoding rewrites the values.
+            self._side_matrix = self._build_feature_matrix(mat_side_data, item_id_label)
+            self._nfeat = self._side_matrix.shape[1]
             self.side = self._process_side_data(mat_side_data, item_id_label)
 
         # Save user and item cluster information inside the dataset
@@ -220,6 +227,7 @@ class Dataset:
         self.train_set = self._create_inner_set(
             mat_train_data,
             side_data=self.side,
+            side_matrix=self._side_matrix,
             user_cluster=self.user_cluster,
             item_cluster=self.item_cluster,
             batch_size=batch_size,
@@ -233,6 +241,7 @@ class Dataset:
             self.eval_set = self._create_inner_set(
                 mat_eval_data,
                 side_data=self.side,
+                side_matrix=self._side_matrix,
                 user_cluster=self.user_cluster,
                 item_cluster=self.item_cluster,
                 header_msg=evaluation_set,
@@ -355,6 +364,7 @@ class Dataset:
         self,
         data: DataFrame[Any],
         side_data: Optional[DataFrame[Any]] = None,
+        side_matrix: Optional[csr_matrix] = None,
         user_cluster: Optional[dict] = None,
         item_cluster: Optional[dict] = None,
         header_msg: str = "Train",
@@ -369,6 +379,7 @@ class Dataset:
         Args:
             data (DataFrame[Any]): The data used to create the interaction object.
             side_data (Optional[DataFrame[Any]]): The side data information about the dataset.
+            side_matrix (Optional[csr_matrix]): The {item x feature} content matrix.
             user_cluster (Optional[dict]): The user cluster information.
             item_cluster (Optional[dict]): The item cluster information.
             header_msg (str): The header of the logger output.
@@ -388,6 +399,7 @@ class Dataset:
             self._umap,
             self._imap,
             side_data=side_data,
+            side_matrix=side_matrix,
             user_cluster=user_cluster,
             item_cluster=item_cluster,
             batch_size=batch_size,
@@ -408,6 +420,102 @@ class Dataset:
         )
 
         return inter_set
+
+    def _build_feature_matrix(
+        self, side_data: DataFrame[Any], item_id_label: str
+    ) -> csr_matrix:
+        """Build the {item x feature} matrix consumed by the content models.
+
+        This is the counterpart of :meth:`_process_side_data`: that one encodes
+        the attributes as embedding indices, which is what the context-aware
+        models need, while the content and hybrid models need the attributes as
+        a numeric feature space they can take similarities over.
+
+        Numeric columns keep their values, so an already one-hot encoded file is
+        preserved as-is. Every other column is expanded into one indicator column
+        per distinct value, so a categorical file works too. Rows are placed at
+        the item index they belong to, which leaves an all-zero row for an item
+        that carries no side information and keeps every other item aligned.
+
+        Args:
+            side_data (DataFrame[Any]): The raw side data DataFrame.
+            item_id_label (str): The label of the item ID.
+
+        Returns:
+            csr_matrix: The {n_items x n_features} feature matrix.
+        """
+        feature_cols = [c for c in side_data.columns if c != item_id_label]
+        if not feature_cols:
+            return csr_matrix((self._niid, 0), dtype=np.float32)
+
+        # Resolve every side row to the item index it describes. The inner join
+        # drops attributes of items that are not part of the experiment.
+        imap_df = nw.from_dict(
+            {
+                item_id_label: list(self._imap.keys()),
+                "__item_idx__": list(self._imap.values()),
+            },
+            native_namespace=nw.get_native_namespace(side_data),
+        )
+        aligned = side_data.join(imap_df, on=item_id_label, how="inner")
+        item_idx = aligned.select("__item_idx__").to_numpy().flatten()
+
+        rows: List[np.ndarray] = []
+        cols: List[np.ndarray] = []
+        data: List[np.ndarray] = []
+        offset = 0
+
+        for col in feature_cols:
+            values = aligned.select(col).to_numpy().flatten()
+
+            if np.issubdtype(values.dtype, np.number):
+                # Numeric column: one feature, values kept as they are
+                values = np.nan_to_num(values.astype(np.float32, copy=False))
+                nonzero = np.flatnonzero(values)
+                rows.append(item_idx[nonzero])
+                cols.append(np.full(nonzero.size, offset, dtype=np.int64))
+                data.append(values[nonzero])
+                offset += 1
+                continue
+
+            # Categorical column: one indicator feature per distinct value
+            present = np.array([v is not None and v == v for v in values])
+            codes, uniques = self._factorize(values[present])
+            rows.append(item_idx[present])
+            cols.append(codes + offset)
+            data.append(np.ones(codes.size, dtype=np.float32))
+            offset += uniques
+
+        matrix = coo_matrix(
+            (
+                np.concatenate(data) if data else np.empty(0, dtype=np.float32),
+                (
+                    np.concatenate(rows) if rows else np.empty(0, dtype=np.int64),
+                    np.concatenate(cols) if cols else np.empty(0, dtype=np.int64),
+                ),
+            ),
+            shape=(self._niid, offset),
+            dtype=np.float32,
+        ).tocsr()
+
+        logger.msg(
+            f"Content feature matrix: {matrix.shape[0]} items x "
+            f"{matrix.shape[1]} features ({matrix.nnz} non-zero)."
+        )
+        return matrix
+
+    @staticmethod
+    def _factorize(values: np.ndarray) -> Tuple[np.ndarray, int]:
+        """Map the distinct values of a column to contiguous integer codes.
+
+        Args:
+            values (np.ndarray): The column values.
+
+        Returns:
+            Tuple[np.ndarray, int]: The codes and the number of distinct values.
+        """
+        uniques, codes = np.unique(values, return_inverse=True)
+        return codes.astype(np.int64), len(uniques)
 
     def _process_side_data(
         self, side_data: DataFrame[Any], item_id_label: str
