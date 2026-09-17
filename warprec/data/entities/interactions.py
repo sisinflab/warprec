@@ -41,6 +41,8 @@ class Interactions:
         batch_size (int): The batch size that will be used to
             iterate over the interactions.
         rating_type (RatingType): The type of rating to be used.
+        duplicates (str): How repeated (user, item) rows are aggregated into the
+            matrix. One of 'max', 'mean', 'first', 'last' or 'sum'.
         rating_label (str): The label of the rating column.
         timestamp_label (str): The label of the timestamp column.
         context_labels (Optional[List[str]]): The list of labels of the
@@ -59,6 +61,7 @@ class Interactions:
         item_cluster: Optional[dict] = None,
         batch_size: int = 1024,
         rating_type: RatingType = RatingType.IMPLICIT,
+        duplicates: str = "max",
         rating_label: str = None,
         timestamp_label: str = None,
         context_labels: Optional[List[str]] = None,
@@ -70,6 +73,7 @@ class Interactions:
         self._inter_item_cluster = item_cluster if item_cluster is not None else None
         self.batch_size = batch_size
         self.rating_type = rating_type
+        self.duplicates = duplicates
 
         # Setup the training variables
         self._inter_dict: Optional[dict] = None
@@ -620,12 +624,58 @@ class Interactions:
             csr_matrix: Sparse representation of the transactions (CSR Format).
         """
         users, items, ratings, _ = self.get_flat()
+        users, items, ratings = self._aggregate_duplicates(users, items, ratings)
 
         self._inter_sparse = coo_matrix(
             (ratings, (users, items)), shape=(self._og_nuid, self._og_niid)
         ).tocsr()
 
         return self._inter_sparse
+
+    def _aggregate_duplicates(
+        self, users: np.ndarray, items: np.ndarray, ratings: np.ndarray
+    ) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+        """Collapse repeated (user, item) rows with the configured policy.
+
+        A dataset may hold several rows for the same pair, either because the
+        same interaction was recorded more than once or because it happened in
+        several contexts. Letting them reach the COO constructor makes SciPy sum
+        them, which turns a rating into an arbitrary multiple of itself.
+
+        ``get_flat`` returns the rows sorted by (user, item), so duplicates are
+        adjacent and one pass over the group boundaries is enough.
+
+        Args:
+            users (np.ndarray): The user indices, sorted by (user, item).
+            items (np.ndarray): The item indices, aligned with the users.
+            ratings (np.ndarray): The ratings, aligned with the users.
+
+        Returns:
+            Tuple[np.ndarray, np.ndarray, np.ndarray]: The deduplicated users,
+                items and aggregated ratings.
+        """
+        if self.duplicates == "sum" or len(users) == 0:
+            # 'sum' is what SciPy does on its own when duplicates are kept
+            return users, items, ratings
+
+        # First index of every (user, item) group
+        new_group = np.empty(len(users), dtype=bool)
+        new_group[0] = True
+        np.not_equal(users[1:], users[:-1], out=new_group[1:])
+        np.logical_or(new_group[1:], items[1:] != items[:-1], out=new_group[1:])
+        starts = np.flatnonzero(new_group)
+
+        if self.duplicates == "max":
+            values = np.maximum.reduceat(ratings, starts)
+        elif self.duplicates == "mean":
+            counts = np.diff(np.append(starts, len(users)))
+            values = np.add.reduceat(ratings, starts) / counts
+        elif self.duplicates == "first":
+            values = ratings[starts]
+        else:  # "last"
+            values = ratings[np.append(starts[1:], len(users)) - 1]
+
+        return users[starts], items[starts], values
 
     def _to_history(self) -> Tuple[Tensor, Tensor, Tensor]:
         """Creates three Tensor which contains information of the

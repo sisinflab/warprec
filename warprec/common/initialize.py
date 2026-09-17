@@ -283,6 +283,7 @@ def initialize_datasets(
         "item_cluster": item_cluster,
         "batch_size": config.evaluation.batch_size,
         "rating_type": config.reader.rating_type,
+        "duplicates": config.reader.duplicates,
         "user_id_label": config.reader.labels.user_id_label,
         "item_id_label": config.reader.labels.item_id_label,
         "rating_label": config.reader.labels.rating_label,

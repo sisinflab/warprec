@@ -34,6 +34,8 @@ class Dataset:
         item_cluster (Optional[FrameT]): The item cluster data.
         batch_size (int): The batch size that will be used evaluation.
         rating_type (RatingType): The type of rating used.
+        duplicates (str): How repeated (user, item) rows are aggregated into the
+            interaction matrix. One of 'max', 'mean', 'first', 'last' or 'sum'.
         user_id_label (str): The label of the user id column.
         item_id_label (str): The label of the item id column.
         rating_label (str): The label of the rating column.
@@ -70,6 +72,7 @@ class Dataset:
         item_cluster: Optional[FrameT] = None,
         batch_size: int = 1024,
         rating_type: RatingType = RatingType.IMPLICIT,
+        duplicates: str = "max",
         user_id_label: str = "user_id",
         item_id_label: str = "item_id",
         rating_label: str = None,
@@ -127,6 +130,7 @@ class Dataset:
             (len(mat_side_data.columns) - 1) if mat_side_data is not None else 0
         )
         self.batch_size = batch_size
+        self._duplicates = duplicates
 
         # Values that will be used to calculate mappings
         _uid = (
@@ -232,6 +236,7 @@ class Dataset:
             item_cluster=self.item_cluster,
             batch_size=batch_size,
             rating_type=rating_type,
+            duplicates=duplicates,
             rating_label=rating_label,
             timestamp_label=timestamp_label,
             context_labels=context_labels,
@@ -247,6 +252,7 @@ class Dataset:
                 header_msg=evaluation_set,
                 batch_size=batch_size,
                 rating_type=rating_type,
+                duplicates=duplicates,
                 rating_label=rating_label,
                 context_labels=context_labels,
             )
@@ -370,6 +376,7 @@ class Dataset:
         header_msg: str = "Train",
         batch_size: int = 1024,
         rating_type: RatingType = RatingType.IMPLICIT,
+        duplicates: str = "max",
         rating_label: str = None,
         timestamp_label: str = None,
         context_labels: Optional[List[str]] = None,
@@ -385,6 +392,7 @@ class Dataset:
             header_msg (str): The header of the logger output.
             batch_size (int): The batch size of the interaction.
             rating_type (RatingType): The type of rating used.
+            duplicates (str): How repeated (user, item) rows are aggregated.
             rating_label (str): The label of the rating column.
             timestamp_label (str): The label of the timestamp column.
             context_labels (Optional[List[str]]): The list of labels of the
@@ -404,6 +412,7 @@ class Dataset:
             item_cluster=item_cluster,
             batch_size=batch_size,
             rating_type=rating_type,
+            duplicates=duplicates,
             rating_label=rating_label,
             timestamp_label=timestamp_label,
             context_labels=context_labels,
