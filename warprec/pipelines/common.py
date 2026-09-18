@@ -287,7 +287,10 @@ def report_statistical_significance(
     for stat_name, enabled in stat_significance.items():
         if enabled:
             test_results = compute_paired_statistical_test(
-                model_results, stat_name, **corrections
+                model_results,
+                stat_name,
+                backend=context.config.general.backend,
+                **corrections,
             )
             context.writer.write_statistical_significance_test(test_results, stat_name)
 

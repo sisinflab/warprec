@@ -1,5 +1,5 @@
 # pylint: disable = too-few-public-methods
-from typing import Dict, Tuple, Optional, Set, Any
+from typing import Any, Dict, Literal, Optional, Set, Tuple, cast
 from abc import ABC, abstractmethod
 from itertools import combinations
 
@@ -220,6 +220,7 @@ def compute_paired_statistical_test(
     bonferroni: bool = False,
     holm_bonferroni: bool = False,
     fdr: bool = False,
+    backend: str = "polars",
 ) -> DataFrame[Any]:
     """Compute pairwise statistical significance tests on evaluation results.
 
@@ -238,6 +239,8 @@ def compute_paired_statistical_test(
         bonferroni (bool): Whether to apply Bonferroni correction.
         holm_bonferroni (bool): Whether to apply Holm-Bonferroni correction.
         fdr (bool): Whether to apply False Discovery Rate correction.
+        backend (str): The dataframe backend the results are built with, so that
+            they match the rest of the experiment's frames.
 
     Returns:
         DataFrame[Any]: A DataFrame containing the results of the pairwise statistical tests.
@@ -310,7 +313,12 @@ def compute_paired_statistical_test(
 
     # Convert to DataFrame
     data_dict = {k: [r[k] for r in rows] for k in rows[0].keys()}
-    stat_test_df = nw.from_dict(data_dict)
+    # GeneralConfig validates the backend, so it is one of the two supported
+    # here. Narwhals types the argument as a Literal, which the configuration
+    # cannot express, hence the cast.
+    stat_test_df = nw.from_dict(
+        data_dict, backend=cast(Literal["pandas", "polars"], backend)
+    )
 
     # Apply corrections
     if bonferroni:
