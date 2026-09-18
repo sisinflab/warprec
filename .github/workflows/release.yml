@@ -16,7 +16,6 @@ jobs:
         run: poetry run pre-commit run --all-files
 
   tests:
-    needs: lint-check
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -30,7 +29,9 @@ jobs:
         run: poetry run pytest tests/ -q
 
   release:
-    needs: tests
+    # Linting and tests are independent checks, so they run side by side; the
+    # release waits for both.
+    needs: [lint-check, tests]
     runs-on: ubuntu-latest
     concurrency: release
     environment: pypi
