@@ -202,7 +202,10 @@ def eval_pipeline(path: str):
             for stat_name, enabled in stat_significance.items():
                 if enabled:
                     test_results = compute_paired_statistical_test(
-                        model_results, stat_name, **corrections
+                        model_results,
+                        stat_name,
+                        backend=config.general.backend,
+                        **corrections,
                     )
                     writer.write_statistical_significance_test(test_results, stat_name)
 
