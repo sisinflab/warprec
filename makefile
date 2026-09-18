@@ -12,4 +12,4 @@ lint:
 
 .PHONY: test
 test:
-	poetry run pytest --junit-xml=junit_result.xml --cov-report=xml:coverage.xml --cov=src
+	poetry run pytest tests/ -q

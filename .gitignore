@@ -63,8 +63,11 @@ powermetrics_log.txt
 coverage.xml
 junit_result.xml
 .coverage
-experiment/
-tests/
+experiment*/
+
+# Datasets
+# Anchored to the repository root, otherwise this also swallows warprec/data/.
+/data*/
 
 # MkDocs build output
 docs/site/
