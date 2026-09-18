@@ -39,6 +39,9 @@ class Dataset:
         rating_type (RatingType): The type of rating used.
         duplicates (str): How repeated (user, item) rows are aggregated into the
             interaction matrix. One of 'max', 'mean', 'first', 'last' or 'sum'.
+        keep_unseen_items (bool): Whether items that carry side information but no
+            interaction stay in the catalogue, so that the models scoring from
+            attributes can recommend them.
         user_id_label (str): The label of the user id column.
         item_id_label (str): The label of the item id column.
         rating_label (str): The label of the rating column.
@@ -81,6 +84,7 @@ class Dataset:
         batch_size: int = 1024,
         rating_type: RatingType = RatingType.IMPLICIT,
         duplicates: str = "max",
+        keep_unseen_items: bool = False,
         user_id_label: str = "user_id",
         item_id_label: str = "item_id",
         rating_label: str = None,
@@ -137,6 +141,7 @@ class Dataset:
         # Define dimensions that will lead the experiment
         self._nuid = mat_train_data.select(nw.col(user_id_label).n_unique()).item()
         self._niid = mat_train_data.select(nw.col(item_id_label).n_unique()).item()
+        self._keep_unseen_items = keep_unseen_items
         self._nfeat = (
             (len(mat_side_data.columns) - 1) if mat_side_data is not None else 0
         )
@@ -157,9 +162,29 @@ class Dataset:
             .to_dict(as_series=False)[item_id_label]
         )
 
+        # An item with attributes but no interaction is exactly the cold-start case:
+        # keeping it in the catalogue is what lets a content model reach it. It stays
+        # an all-zero column of the interaction matrix, so the collaborative models
+        # score it last and are otherwise unaffected.
+        if keep_unseen_items and mat_side_data is not None:
+            side_items = (
+                mat_side_data.select(item_id_label)
+                .unique()
+                .to_dict(as_series=False)[item_id_label]
+            )
+            unseen = sorted(set(side_items) - set(_iid))
+            if unseen:
+                _iid = sorted(set(_iid) | set(unseen))
+                logger.attention(
+                    f"Kept {len(unseen)} items that carry side information but no "
+                    "interaction. They can only be recommended by models that score "
+                    "from attributes."
+                )
+
         # Calculate mapping for users and items
         self._umap = {user: i for i, user in enumerate(_uid)}
         self._imap = {item: i for i, item in enumerate(_iid)}
+        self._niid = len(self._imap)
 
         # Process contextual data
         if context_labels:

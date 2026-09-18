@@ -59,6 +59,10 @@ class SideInformationReading(BaseModel):
         header (Optional[bool]): Whether the file has a header or not. Defaults to True.
         column_names (Optional[List[str]]): The names of the columns, required when the
             file has no header row. The first name must be the item ID column.
+        keep_unseen_items (Optional[bool]): Whether items that carry attributes but no
+            interaction are kept in the catalogue. They can then be recommended by the
+            models that score from attributes, which is what cold start asks for.
+            Defaults to False, which drops them.
     """
 
     local_path: Optional[str] = None
@@ -67,6 +71,7 @@ class SideInformationReading(BaseModel):
     sep: Optional[str] = "\t"
     header: Optional[bool] = True
     column_names: Optional[List[str]] = None
+    keep_unseen_items: Optional[bool] = False
 
     @field_validator("sep")
     @classmethod

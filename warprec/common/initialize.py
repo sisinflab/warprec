@@ -293,6 +293,9 @@ def initialize_datasets(
         "batch_size": config.evaluation.batch_size,
         "rating_type": config.reader.rating_type,
         "duplicates": config.reader.duplicates,
+        "keep_unseen_items": (
+            config.reader.side.keep_unseen_items if config.reader.side else False
+        ),
         "user_id_label": config.reader.labels.user_id_label,
         "item_id_label": config.reader.labels.item_id_label,
         "rating_label": config.reader.labels.rating_label,
