@@ -288,6 +288,8 @@ class ClozeDataset(Dataset):
         niid: int,
         seed: int = 42,
     ):
+        # pylint: disable = too-many-arguments, too-many-positional-arguments
+        # Each argument is a distinct part of the data schema.
         self.flat_items = flat_items
         self.window_starts = window_starts
         self.window_ends = window_ends

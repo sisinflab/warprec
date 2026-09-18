@@ -177,6 +177,14 @@ class SampledEvaluationDataset(TorchDataset):
     def collate_fn(
         self, batch: List[Tuple[int, Tensor, Tensor]]
     ) -> Tuple[Tensor, Tensor, Tensor]:
+        """Collate the sampled evaluation rows into padded batches.
+
+        Args:
+            batch (List[Tuple[int, Tensor, Tensor]]): The rows to collate.
+
+        Returns:
+            Tuple[Tensor, Tensor, Tensor]: The users, positives and negatives.
+        """
         user_indices, positive_tensors, negative_tensors = zip(*batch)
         user_indices_tensor = torch.tensor(list(user_indices), dtype=torch.long)
 
@@ -285,6 +293,15 @@ class SampledContextualEvaluationDataset(TorchDataset):
     def collate_fn(
         self, batch: List[Tuple[Tensor, Tensor, Tensor, Tensor]]
     ) -> Tuple[Tensor, Tensor, Tensor, Tensor]:
+        """Collate the sampled contextual evaluation rows into batches.
+
+        Args:
+            batch (List[Tuple[Tensor, Tensor, Tensor, Tensor]]): The rows to collate.
+
+        Returns:
+            Tuple[Tensor, Tensor, Tensor, Tensor]: The users, positives, negatives
+                and contexts.
+        """
         user_indices, pos_items, neg_items, context_features = zip(*batch)
 
         tensor_user_indices = torch.stack(user_indices)

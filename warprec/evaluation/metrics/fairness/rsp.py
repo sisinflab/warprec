@@ -22,7 +22,8 @@ class RSP(TopKMetric):
     Attributes:
         item_clusters (Tensor): A tensor mapping item index to its cluster ID.
         cluster_recommendations (Tensor): Accumulator for the total count of recommended items per cluster in the top-k.
-        denominator_counts (Tensor): Pre-calculated total count of items per cluster not in the training set across all users.
+        denominator_counts (Tensor): Pre-calculated total count of items per cluster
+            not in the training set across all users.
         n_effective_clusters (int): The total number of unique item clusters.
         n_item_clusters (int): The total number of unique item clusters, including fallback cluster.
         user_interactions (Tensor): Accumulator for counting how many times each user has been evaluated.

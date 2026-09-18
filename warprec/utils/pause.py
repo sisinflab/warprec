@@ -82,12 +82,12 @@ class PauseController:
         if self.pause_requested:
             raise RunPaused()
 
-    def _handle_sigint(self, signum: int, frame: Optional[FrameType]) -> None:
+    def _handle_sigint(self, _signum: int, _frame: Optional[FrameType]) -> None:
         """Handles SIGINT by requesting a pause, or aborting on a second signal.
 
         Args:
-            signum (int): The received signal number.
-            frame (Optional[FrameType]): The interrupted stack frame.
+            _signum (int): The received signal number.
+            _frame (Optional[FrameType]): The interrupted stack frame.
 
         Raises:
             KeyboardInterrupt: If a pause had already been requested.
@@ -108,7 +108,7 @@ class PauseController:
         if hasattr(signal, "SIGUSR1"):
             signal.raise_signal(signal.SIGUSR1)
 
-    def _handle_sigusr1(self, signum: int, frame: Optional[FrameType]) -> None:
+    def _handle_sigusr1(self, _signum: int, _frame: Optional[FrameType]) -> None:
         """Absorbs SIGUSR1 when no Ray Tune sweep is running.
 
         The default action for SIGUSR1 is to terminate the process, so a
@@ -116,17 +116,17 @@ class PauseController:
         raise at any point of the run.
 
         Args:
-            signum (int): The received signal number.
-            frame (Optional[FrameType]): The interrupted stack frame.
+            _signum (int): The received signal number.
+            _frame (Optional[FrameType]): The interrupted stack frame.
         """
         self._pause_requested.set()
 
-    def _handle_sigterm(self, signum: int, frame: Optional[FrameType]) -> None:
+    def _handle_sigterm(self, _signum: int, _frame: Optional[FrameType]) -> None:
         """Handles SIGTERM by re-raising it as SIGINT.
 
         Args:
-            signum (int): The received signal number.
-            frame (Optional[FrameType]): The interrupted stack frame.
+            _signum (int): The received signal number.
+            _frame (Optional[FrameType]): The interrupted stack frame.
         """
         signal.raise_signal(signal.SIGINT)
 

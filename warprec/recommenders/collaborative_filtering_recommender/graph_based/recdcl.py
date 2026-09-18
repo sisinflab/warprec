@@ -211,7 +211,7 @@ class RecDCL(GraphRecommenderUtils, IterativeRecommender):
             Tensor: Scalar UIBT loss.
         """
         # Eq. 5 — Section 4.1 ("Eliminate redundancy between users and items")
-        B, F = e_u.shape
+        batch_size, n_features = e_u.shape
 
         # Cross-correlation matrix C [F, F] — Eq. 3 / Eq. 5
         # C_mn = (E_U[:, m])^T E_I[:, n] / B
@@ -219,17 +219,17 @@ class RecDCL(GraphRecommenderUtils, IterativeRecommender):
         # means embeddings reaching here are approximately zero-mean.
         # The paper divides by B (batch size) rather than by ||Z^:m|| * ||Z_hat^:n||
         # as in the original Barlow Twins; Algorithm 2 shows: C = mm(e_u.T, e_i).div(B)
-        C = torch.mm(e_u.t(), e_i) / B  # [F, F] — Algorithm 2
+        C = torch.mm(e_u.t(), e_i) / batch_size  # [F, F] — Algorithm 2
 
         # Invariance term: (1 - C_mm)^2 summed, divided by F — Eq. 5
-        on_diag = torch.diagonal(C).add_(-1).pow_(2).sum().div(F)
+        on_diag = torch.diagonal(C).add_(-1).pow_(2).sum().div(n_features)
 
         # Redundancy reduction term: gamma * sum_{m != n} C_mn^2 / F — Eq. 5
         # off_diagonal mask: all elements minus diagonal
         off_diag = C.clone()
-        diag_idx = torch.arange(F, device=C.device)
+        diag_idx = torch.arange(n_features, device=C.device)
         off_diag[diag_idx, diag_idx] = 0.0
-        off_diag_loss = gamma * off_diag.pow(2).sum().div(F)
+        off_diag_loss = gamma * off_diag.pow(2).sum().div(n_features)
 
         return on_diag + off_diag_loss  # Eq. 5
 

@@ -6,8 +6,8 @@ from warprec.common import initialize_datasets, log_evaluation
 from warprec.data.reader import ReaderFactory
 from warprec.recommenders.base_recommender import IterativeRecommender
 from warprec.recommenders.callbacks import WarpRecLightningIntegrationCallback
-from warprec.evaluation.evaluator import Evaluator
 from warprec.utils.callback import WarpRecCallback
+from warprec.evaluation import build_evaluator
 from warprec.utils.config import load_design_configuration, load_callback
 from warprec.utils.helpers import (
     build_evaluation_dataloader_kwargs,
@@ -53,17 +53,7 @@ def design_pipeline(path: str):
     )
 
     # Create instance of main evaluator used to evaluate the main dataset
-    evaluator = Evaluator(
-        list(config.evaluation.metrics),
-        list(config.evaluation.top_k),
-        train_set=main_dataset.train_set.get_sparse(),
-        additional_data=main_dataset.get_stash(),
-        complex_metrics=config.evaluation.complex_metrics,
-        feature_lookup=main_dataset.get_features_lookup(),
-        user_cluster=main_dataset.get_user_cluster(),
-        item_cluster=main_dataset.get_item_cluster(),
-        mask_seen=config.evaluation.mask_seen,
-    )
+    evaluator = build_evaluator(config.evaluation, main_dataset)
 
     # Experiment device
     general_device = config.general.device

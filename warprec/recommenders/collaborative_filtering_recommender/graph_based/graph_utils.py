@@ -163,6 +163,7 @@ class SparseAdjacency:
         return int(self._value.numel())
 
 
+# pylint: disable = abstract-method  # forward() is supplied by the concrete model
 class GraphRecommenderUtils(nn.Module):
     """Common definition for graph recommenders.
 

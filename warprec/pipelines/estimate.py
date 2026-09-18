@@ -11,6 +11,7 @@ import torch
 
 from warprec.common import initialize_datasets
 from warprec.data import Dataset
+from warprec.evaluation import build_evaluator
 from warprec.data.reader import ReaderFactory
 from warprec.data.writer import WriterFactory
 from warprec.evaluation.evaluator import Evaluator
@@ -293,20 +294,6 @@ def _expand_model_setups(model_name: str, model_params: dict) -> List[dict]:
         setup.update(dict(zip(param_fields, values)))
         setups.append(setup)
     return setups
-
-
-def _create_evaluator(dataset: Dataset, config: EstimateConfiguration) -> Evaluator:
-    return Evaluator(
-        list(config.evaluation.metrics),
-        list(config.evaluation.top_k),
-        train_set=dataset.train_set.get_sparse(),
-        additional_data=dataset.get_stash(),
-        complex_metrics=config.evaluation.complex_metrics,
-        feature_lookup=dataset.get_features_lookup(),
-        user_cluster=dataset.get_user_cluster(),
-        item_cluster=dataset.get_item_cluster(),
-        mask_seen=config.evaluation.mask_seen,
-    )
 
 
 def _estimate_eval_loop(
@@ -622,7 +609,7 @@ def _run_estimate_setup(
     model.to(device)
 
     eval_tracker = EstimateStageTracker(baseline_rss_mb=baseline_rss_mb, device=device)
-    evaluator = _create_evaluator(eval_dataset, config)
+    evaluator = build_evaluator(config.evaluation, eval_dataset)
     eval_estimate = _estimate_eval_loop(
         evaluator=evaluator,
         model=model,

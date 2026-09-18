@@ -14,7 +14,7 @@ from ray.train.lightning import (
 )
 from torch import Tensor
 
-from warprec.evaluation.evaluator import Evaluator
+from warprec.evaluation import build_evaluator
 from warprec.recommenders.callbacks import (
     WarpRecLightningIntegrationCallback,
     _get_memory_usage,
@@ -64,18 +64,14 @@ def objective_function(config: dict) -> None:
     params = config.get("params", {})
     model_name = config["model_name"]
     dataset_folds = config["dataset_folds"]
-    metrics = config["metrics"]
-    topk = config["topk"]
+    evaluation = config["evaluation"]
     validation_top_k = config["validation_top_k"]
     validation_metric_name = config["validation_metric_name"]
     mode = config["mode"]
     device = config["device"]
     num_workers = config.get("num_workers", None)
     eval_every_n = config.get("eval_every_n", 1)
-    strategy = config.get("strategy", "full")
-    num_negatives = config.get("num_negatives", 99)
-    mask_seen = config.get("mask_seen", "auto")
-    complex_metrics = config.get("complex_metrics", None)
+    strategy = evaluation.strategy
     lr_scheduler_config = config.get("lr_scheduler", None)
     optimizer_config = config.get("optimizer", None)
     seed = config.get("seed", 42)
@@ -99,17 +95,7 @@ def objective_function(config: dict) -> None:
         dataset = dataset_folds
 
     # Initialize the Evaluator for current Trial
-    evaluator = Evaluator(
-        metrics,
-        topk,
-        train_set=dataset.train_set.get_sparse(),
-        additional_data=dataset.get_stash(),
-        complex_metrics=complex_metrics,
-        feature_lookup=dataset.get_features_lookup(),
-        user_cluster=dataset.get_user_cluster(),
-        item_cluster=dataset.get_item_cluster(),
-        mask_seen=mask_seen,
-    )
+    evaluator = build_evaluator(evaluation, dataset)
 
     # Initialize WarpRec + Lightning integration callback
     integration_callback = WarpRecLightningIntegrationCallback(
@@ -194,7 +180,7 @@ def objective_function(config: dict) -> None:
                 dataset=dataset,
                 model=model,
                 strategy=strategy,
-                num_negatives=num_negatives,
+                num_negatives=evaluation.num_negatives,
                 **evaluation_dataloader_kwargs,
             )
             epochs = model.epochs
@@ -256,7 +242,7 @@ def objective_function(config: dict) -> None:
                 dataset=dataset,
                 model=model,
                 strategy=strategy,
-                num_negatives=num_negatives,
+                num_negatives=evaluation.num_negatives,
                 **evaluation_dataloader_kwargs,
             )
             # Model is trained in the __init__ we can directly evaluate it

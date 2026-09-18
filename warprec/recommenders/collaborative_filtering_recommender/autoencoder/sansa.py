@@ -163,11 +163,11 @@ class SANSA(ItemSimRecommender):
             # Note: The inverse of a sparse matrix can have significant fill-in
             P = sp.linalg.inv(G)
             return P
-        except RuntimeError:
+        except RuntimeError as exc:
             raise RuntimeError(
                 "SANSA: Matrix inversion failed. The dataset might be too large "
                 "or the matrix is singular."
-            )
+            ) from exc
 
     def _sparsify_matrix(self, matrix: sp.spmatrix, density: float) -> sp.csr_matrix:
         """Retains only the top-k elements globally to achieve target density.

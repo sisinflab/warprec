@@ -1,6 +1,8 @@
 # pylint: disable = too-many-branches, too-many-statements
 from typing import Tuple, Optional, List, Any, Dict
 
+import math
+
 import numpy as np
 import torch
 from torch import Tensor
@@ -24,6 +26,7 @@ from warprec.utils.logger import logger
 
 
 class Dataset:
+    # pylint: disable = too-many-instance-attributes  # this class is the state it holds
     """The definition of the Dataset class that will handle transaction data.
 
     Args:
@@ -86,6 +89,8 @@ class Dataset:
         context_labels: Optional[List[str]] = None,
         evaluation_set: str = "Test",
     ):
+        # pylint: disable = too-many-arguments, too-many-positional-arguments
+        # Each argument is a distinct part of the data schema.
         # Check evaluation set
         if evaluation_set not in ["Test", "Validation"]:
             raise ValueError("Evaluation set must be either 'Test' or 'Validation'.")
@@ -419,6 +424,8 @@ class Dataset:
         timestamp_label: str = None,
         context_labels: Optional[List[str]] = None,
     ) -> Interactions:
+        # pylint: disable = too-many-arguments, too-many-positional-arguments
+        # Each argument is a distinct part of the data schema.
         """Functionality to create Interaction data from DataFrame.
 
         Args:
@@ -526,7 +533,12 @@ class Dataset:
                 continue
 
             # Categorical column: one indicator feature per distinct value
-            present = np.array([v is not None and v == v for v in values])
+            present = np.array(
+                [
+                    v is not None and not (isinstance(v, float) and math.isnan(v))
+                    for v in values
+                ]
+            )
             codes, uniques = self._factorize(values[present])
             rows.append(item_idx[present])
             cols.append(codes + offset)

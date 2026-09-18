@@ -572,13 +572,9 @@ class Writer(ABC):
 
         for col in report_df.columns:
             if "Time" in col:
-                report_df[col] = report_df[col].apply(
-                    lambda value: self._format_duration(value)
-                )
+                report_df[col] = report_df[col].apply(self._format_duration)
             elif "RAM" in col or "VRAM" in col:
-                report_df[col] = report_df[col].apply(
-                    lambda value: self._format_memory(value)
-                )
+                report_df[col] = report_df[col].apply(self._format_memory)
 
         merge_keys = ["Model Name"]
         combined_df = pd.concat([existing_df, report_df], ignore_index=True)

@@ -57,6 +57,8 @@ class Evaluator:
         seed: int = 42,
         mask_seen: str = "auto",
     ):
+        # pylint: disable = too-many-arguments, too-many-positional-arguments
+        # Each argument is a distinct part of the data schema.
         self.k_values = k_values
         self.metric_list = metric_list
         self.mask_seen = mask_seen

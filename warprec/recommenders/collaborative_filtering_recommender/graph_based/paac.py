@@ -418,7 +418,7 @@ class PAAC(GraphRecommenderUtils, IterativeRecommender):
             # Full prediction over all items (exclude padding index)
             item_emb = item_all_emb[:-1, :]  # [N, D]
             return torch.einsum("be,ie->bi", user_emb, item_emb)
-        else:
-            # Sampled prediction
-            item_emb = item_all_emb[item_indices]  # [B, K, D]
-            return torch.einsum("be,bke->bk", user_emb, item_emb)
+
+        # Sampled prediction
+        item_emb = item_all_emb[item_indices]  # [B, K, D]
+        return torch.einsum("be,bke->bk", user_emb, item_emb)

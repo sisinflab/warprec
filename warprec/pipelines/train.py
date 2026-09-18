@@ -6,27 +6,21 @@ import ray
 from warprec.common import (
     ModelState,
     ModelStatus,
-    RunState,
-    RunStateStore,
     log_evaluation,
     model_fingerprint,
-    resolve_run_name,
-    run_fingerprint,
-    warprec_version,
 )
-from warprec.data.reader import ReaderFactory
-from warprec.data.writer import WriterFactory
 from warprec.data import Dataset
+from warprec.pipelines.common import (
+    bootstrap_pipeline,
+    prepare_datasets,
+    report_statistical_significance,
+)
 from warprec.pipelines.remotes import (
-    remote_data_preparation,
     remote_model_retraining,
     remote_evaluation_and_timing,
     remote_generate_recs,
 )
-from warprec.utils.callback import WarpRecCallback
 from warprec.utils.config import (
-    load_train_configuration,
-    load_callback,
     TrainConfiguration,
     RecomModel,
 )
@@ -35,10 +29,8 @@ from warprec.utils.helpers import (
     validation_metric,
 )
 from warprec.utils.pause import PauseController, RunPaused
-from warprec.utils.enums import ResumeMode
 from warprec.utils.logger import logger
 from warprec.recommenders.trainer import Trainer, TrainingOutcome
-from warprec.evaluation.statistical_significance import compute_paired_statistical_test
 
 
 def resolve_model_outcome(
@@ -120,135 +112,12 @@ def train_pipeline(path: str):
 
     Args:
         path (str): Path to the configuration file.
-
-    Raises:
-        ConnectionError: If unable to connect to Ray cluster.
-        ValueError: If the file format is not supported.
     """
-    logger.msg("Starting experiment.")
-    experiment_start_time = time.time()
+    context = bootstrap_pipeline(path, "train", "Starting experiment.")
+    config = context.config
 
-    # Parse configuration
-    config = load_train_configuration(path)
-
-    # Before starting training process, initialize Ray
-    py_modules = (
-        [] if config.general.custom_modules is None else config.general.custom_modules
-    )
-    py_modules.extend(["warprec"])  # type: ignore[union-attr]
-
-    try:
-        address = config.general.ray_address
-        ray.init(address=address, runtime_env={"py_modules": py_modules})
-        logger.positive("Connected to existing Ray cluster.")
-    except ConnectionError as e:
-        raise ConnectionError(
-            "Unable to connect to Ray cluster. Please ensure Ray is running."
-        ) from e
-
-    # Load custom callback if specified
-    callback: WarpRecCallback = load_callback(
-        config.general.callback,
-        *config.general.callback.args,
-        **config.general.callback.kwargs,
-    )
-
-    # Initialize I/O modules
-    reader = ReaderFactory.get_reader(config=config)
-
-    # Resolve the identity of this run and load any state a previous,
-    # interrupted run of the same experiment left behind.
-    run_name = resolve_run_name(config)
-    fingerprint = run_fingerprint(config)
-    logger.msg(f"Run name: {run_name}")
-
-    probe_writer = WriterFactory.get_writer(config=config)
-    state_store = RunStateStore(probe_writer, run_name)
-    previous_state = state_store.load()
-
-    if previous_state is not None and config.run.resume == ResumeMode.NEVER:
-        logger.attention(
-            f"Run state for '{run_name}' exists but resume is set to 'never'. "
-            "It will be discarded and the run will start from scratch."
-        )
-        previous_state = None
-    elif (
-        previous_state is not None and previous_state.config_fingerprint != fingerprint
-    ):
-        message = (
-            f"Run state for '{run_name}' was produced by a different configuration "
-            "(the reader, filtering, splitter, evaluation or the set of models "
-            "changed). It cannot be resumed."
-        )
-        if config.run.resume == ResumeMode.FORCE:
-            raise ValueError(message)
-        logger.attention(f"{message} The run will start from scratch.")
-        previous_state = None
-
-    if previous_state is None and config.run.resume == ResumeMode.FORCE:
-        raise ValueError(
-            "Resume is set to 'force' but no resumable state was found for run "
-            f"'{run_name}' at {state_store.state_path}."
-        )
-
-    if previous_state is None:
-        state = RunState(
-            run_name=run_name,
-            pipeline="train",
-            warprec_version=warprec_version(),
-            writer_timestamp=probe_writer.timestamp,
-            config_fingerprint=fingerprint,
-        )
-    else:
-        state = previous_state
-        logger.positive(f"Resuming run '{run_name}' created at {state.created_at}.")
-
-    # The writer reuses the timestamp of the original run so that a resumed run
-    # keeps merging into the output files that run created.
-    writer = WriterFactory.get_writer(config=config, timestamp=state.writer_timestamp)
-    state_store = RunStateStore(writer, run_name)
-    state_store.save(state)
-
-    # Load datasets using common utility
-    logger.msg("Delegating data preparation to Ray cluster")
-    cpu_data_prep = config.general.cpu_data_prep
-    custom_res_data_prep = config.general.custom_resources_data_prep
-    label_selector_data_prep = config.general.label_selector_data_prep
-    main_dataset, val_dataset, fold_dataset = ray.get(
-        remote_data_preparation.options(
-            num_cpus=cpu_data_prep,
-            resources=custom_res_data_prep if custom_res_data_prep else None,
-            label_selector=label_selector_data_prep
-            if label_selector_data_prep
-            else None,
-        ).remote(
-            reader=reader,
-            callback=callback,
-            config=config,
-        )  # type: ignore[call-arg]
-    )
-
-    # Write split information if required
-    if config.splitter and config.writer.save_split:
-        file_format = config.writer.split.file_format
-
-        match file_format:
-            case "tabular":
-                writer.write_tabular_split(
-                    main_dataset,
-                    val_dataset,
-                    fold_dataset,
-                    **config.writer.split.model_dump(),
-                )
-            case "parquet":
-                writer.write_parquet_split(
-                    main_dataset,
-                    val_dataset,
-                    fold_dataset,
-                    **config.writer.split.model_dump(),
-                )
-            case _:
-                raise ValueError(f"File format '{file_format}'not supported.")
+    # Build the datasets on the cluster and persist the splits if asked to
+    main_dataset, val_dataset, fold_dataset = prepare_datasets(context)
 
     # List of models to train
     models = list(config.models.keys())
@@ -260,7 +129,7 @@ def train_pipeline(path: str):
     if requires_stat_significance:
         model_results: Dict[str, Any] = {}
 
-    data_preparation_time = time.time() - experiment_start_time
+    data_preparation_time = time.time() - context.started_at
     logger.positive(
         f"Data preparation completed in {data_preparation_time:.2f} seconds."
     )
@@ -271,12 +140,14 @@ def train_pipeline(path: str):
     with PauseController(enabled=config.run.pause_on_signal) as pause:
         try:
             for model_name in models:
-                model_state = state.model_state(model_name)
+                model_state = context.state.model_state(model_name)
 
                 if model_state.status == ModelStatus.COMPLETED:
                     logger.msg(f"Skipping {model_name}: already completed in this run.")
                     if requires_stat_significance:
-                        stored_results = state_store.load_eval_results(model_name)
+                        stored_results = context.state_store.load_eval_results(
+                            model_name
+                        )
                         if stored_results is not None:
                             model_results[model_name] = stored_results
                         else:
@@ -295,12 +166,12 @@ def train_pipeline(path: str):
                 model_exploration_start_time = time.time()
 
                 # Retrieve storage path for Ray results
-                # based on the writer configuration
+                # based on the context.writer configuration
                 storage_path = config.get_storage_path()
 
                 params = model_param_from_dict(model_name, config.models[model_name])
 
-                # A model whose configuration changed cannot reuse its saved state
+                # A model whose configuration changed cannot reuse its saved context.state
                 current_fingerprint = model_fingerprint(
                     model_name, config.models[model_name]
                 )
@@ -310,19 +181,19 @@ def train_pipeline(path: str):
                 ):
                     logger.attention(
                         f"The configuration of {model_name} changed since the last run. "
-                        "Its saved state will be discarded and the model will be "
+                        "Its saved context.state will be discarded and the model will be "
                         "optimized from scratch."
                     )
                     model_state = ModelState()
-                    state.models[model_name] = model_state
+                    context.state.models[model_name] = model_state
                 model_state.fingerprint = current_fingerprint
 
                 trainer = Trainer(
                     storage_path=storage_path,
-                    custom_callback=callback,
+                    custom_callback=context.callback,
                     custom_modules=config.general.custom_modules,
                     dashboard_config=config.dashboard,
-                    run_name=run_name,
+                    run_name=context.run_name,
                     errored_trials=config.run.errored_trials,
                 )
                 model_state.tune_experiment_name = trainer.experiment_name(model_name)
@@ -342,7 +213,7 @@ def train_pipeline(path: str):
                     # An interrupted sweep is a pause, whether the signal was
                     # observed here or inferred from the sweep itself.
                     model_state.status = ModelStatus.INTERRUPTED
-                    state_store.save(state)
+                    context.state_store.save(context.state)
                     pause.request_pause()
                     pause.check()
 
@@ -351,7 +222,7 @@ def train_pipeline(path: str):
                         f"Hyperparameter optimization for {model_name} returned no valid model."
                     )
                     model_state.status = ModelStatus.FAILED
-                    state_store.save(state)
+                    context.state_store.save(context.state)
                     continue
 
                 best_model = outcome.model
@@ -365,14 +236,14 @@ def train_pipeline(path: str):
                 model_state.best_iter = outcome.best_iter
                 model_state.best_checkpoint_path = outcome.best_checkpoint_path
                 model_state.ray_report = ray_report
-                state_store.save(state)
+                context.state_store.save(context.state)
 
                 model_exploration_total_time = (
                     time.time() - model_exploration_start_time
                 )
 
                 # Callback on training complete
-                callback.on_training_complete(model=best_model)
+                context.callback.on_training_complete(model=best_model)
 
                 # Prepare device for current model
                 general_device = config.general.device
@@ -403,12 +274,7 @@ def train_pipeline(path: str):
                     ).remote(
                         model=best_model,
                         main_dataset=main_dataset,
-                        metrics=config.evaluation.metrics,
-                        top_k=config.evaluation.top_k,
-                        complex_metrics=config.evaluation.complex_metrics,
-                        strategy=config.evaluation.strategy,
-                        num_negatives=config.evaluation.num_negatives,
-                        mask_seen=config.evaluation.mask_seen,
+                        evaluation=config.evaluation,
                         num_workers=params.optimization.num_workers,
                         device=device,
                         requires_timing=config.general.time_report,
@@ -425,14 +291,14 @@ def train_pipeline(path: str):
                     )
 
                 # Callback after complete evaluation
-                callback.on_evaluation_complete(
+                context.callback.on_evaluation_complete(
                     model=best_model,
                     params=params.model_dump(),
                     results=results,
                 )
 
                 # Write results of current model
-                writer.write_results(
+                context.writer.write_results(
                     results,
                     model_name,
                     **config.writer.results.model_dump(),
@@ -441,7 +307,7 @@ def train_pipeline(path: str):
                 # Check if per-user results are needed
                 if config.evaluation.save_per_user:
                     i_umap, _ = main_dataset.get_inverse_mappings()
-                    writer.write_results_per_user(
+                    context.writer.write_results_per_user(
                         results,
                         model_name,
                         i_umap,
@@ -460,7 +326,7 @@ def train_pipeline(path: str):
                             resources=custom_res if custom_res else None,
                             label_selector=label_selector if label_selector else None,
                         ).remote(
-                            writer=writer,
+                            writer=context.writer,
                             model=best_model,
                             dataset=main_dataset,
                             config=config,
@@ -475,11 +341,11 @@ def train_pipeline(path: str):
                         "Best Training Iteration": best_iter,
                     }
                 }
-                writer.write_params(model_params)
+                context.writer.write_params(model_params)
 
                 # Model serialization
                 if params.meta.save_model:
-                    writer.write_model(best_model)
+                    context.writer.write_model(best_model)
 
                 if config.general.time_report:
                     # Timing report for the current model
@@ -498,64 +364,35 @@ def train_pipeline(path: str):
                     )
 
                     # Update time report
-                    writer.write_time_report(model_timing_report)
+                    context.writer.write_time_report(model_timing_report)
 
                 if requires_stat_significance:
-                    state_store.save_eval_results(model_name, results)
+                    context.state_store.save_eval_results(model_name, results)
 
                 model_state.status = ModelStatus.COMPLETED
                 model_state.timing = (
                     model_timing_report[-1] if model_timing_report else {}
                 )
-                state_store.save(state)
+                context.state_store.save(context.state)
 
                 pause.check()
 
         except RunPaused:
             paused = True
-            state_store.save(state)
+            context.state_store.save(context.state)
 
     if paused:
         logger.attention(
-            f"Run '{run_name}' has been paused. Progress is saved at "
-            f"{state_store.state_path}."
+            f"Run '{context.run_name}' has been paused. Progress is saved at "
+            f"{context.state_store.state_path}."
         )
         logger.msg(
             "Resume it by running the same command again with run.name set to "
-            f"'{run_name}' and run.resume set to 'auto' or 'force'."
+            f"'{context.run_name}' and run.resume set to 'auto' or 'force'."
         )
     else:
         if requires_stat_significance:
-            # Check if enough models have been evaluated
-            if len(model_results) >= 2:
-                logger.msg(
-                    f"Computing statistical significance tests for {len(models)} models."
-                )
-
-                stat_significance = config.evaluation.stat_significance.model_dump(
-                    exclude=["corrections"]  # type: ignore[arg-type]
-                )
-                corrections = (
-                    config.evaluation.stat_significance.corrections.model_dump()
-                )
-
-                for stat_name, enabled in stat_significance.items():
-                    if enabled:
-                        test_results = compute_paired_statistical_test(
-                            model_results, stat_name, **corrections
-                        )
-                        writer.write_statistical_significance_test(
-                            test_results, stat_name
-                        )
-
-                logger.positive(
-                    "Statistical significance tests completed successfully."
-                )
-            else:
-                logger.attention(
-                    "Statistical significance tests require at least two evaluated models. "
-                    "Skipping statistical significance computation."
-                )
+            report_statistical_significance(context, model_results, models)
         logger.positive("All experiments concluded. WarpRec is shutting down.")
 
 
@@ -592,14 +429,15 @@ def single_split_flow(
     logger.attention(
         f"Validation metric for this experiment has been set to: {validation_score}"
     )
-    if eval_config.full_evaluation_on_report:
-        metrics = eval_config.metrics
-        topk = eval_config.top_k
-        complex_metrics = eval_config.complex_metrics
-    else:
-        metrics = [val_metric]
-        topk = [val_k]
-        complex_metrics = []
+    # Per-report evaluation is narrowed to the validation metric unless the
+    # configuration asks for the full set on every report.
+    report_evaluation = (
+        eval_config
+        if eval_config.full_evaluation_on_report
+        else eval_config.model_copy(
+            update={"metrics": [val_metric], "top_k": [val_k], "complex_metrics": []}
+        )
+    )
 
     # Start HPO phase on test set,
     # no need of further training
@@ -607,14 +445,9 @@ def single_split_flow(
         model_name,
         params,
         dataset,
-        metrics=metrics,
-        topk=topk,
+        evaluation=report_evaluation,
         validation_score=validation_score,
         device=device,
-        evaluation_strategy=config.evaluation.strategy,
-        mask_seen=config.evaluation.mask_seen,
-        num_negatives=config.evaluation.num_negatives,
-        complex_metrics=complex_metrics,
         ray_verbose=config.general.ray_verbose,
     )
 
@@ -658,28 +491,24 @@ def multiple_fold_validation_flow(
     logger.attention(
         f"Validation metric for this experiment has been set to: {validation_score}"
     )
-    if eval_config.full_evaluation_on_report:
-        metrics = eval_config.metrics
-        topk = eval_config.top_k
-        complex_metrics = eval_config.complex_metrics
-    else:
-        metrics = [val_metric]
-        topk = [val_k]
-        complex_metrics = []
+    # Per-report evaluation is narrowed to the validation metric unless the
+    # configuration asks for the full set on every report.
+    report_evaluation = (
+        eval_config
+        if eval_config.full_evaluation_on_report
+        else eval_config.model_copy(
+            update={"metrics": [val_metric], "top_k": [val_k], "complex_metrics": []}
+        )
+    )
 
     # Start HPO phase on validation folds
     outcome = trainer.train_multiple_fold(
         model_name,
         params,
         val_datasets,
-        metrics=metrics,
-        topk=topk,
+        evaluation=report_evaluation,
         validation_score=validation_score,
         device=device,
-        evaluation_strategy=config.evaluation.strategy,
-        mask_seen=config.evaluation.mask_seen,
-        num_negatives=config.evaluation.num_negatives,
-        complex_metrics=complex_metrics,
         desired_training_it=desired_training_it,
         ray_verbose=config.general.ray_verbose,
     )
