@@ -41,6 +41,9 @@ class Dataset:
             interaction matrix. One of 'max', 'mean', 'first', 'last' or 'sum'.
         negative_sampling (str): How negatives are drawn during training, 'uniform'
             or 'popularity'.
+        context_separators (Optional[Dict[str, str]]): The separator of each contextual
+            column holding several values in one cell. Such a column becomes a
+            multi-valued field.
         keep_unseen_items (bool): Whether items that carry side information but no
             interaction stay in the catalogue, so that the models scoring from
             attributes can recommend them.
@@ -87,6 +90,7 @@ class Dataset:
         rating_type: RatingType = RatingType.IMPLICIT,
         duplicates: str = "max",
         negative_sampling: str = "uniform",
+        context_separators: Optional[Dict[str, str]] = None,
         keep_unseen_items: bool = False,
         user_id_label: str = "user_id",
         item_id_label: str = "item_id",
@@ -122,6 +126,8 @@ class Dataset:
         self._context_maps: dict[str, dict[Any, int]] = {}
         self._context_dims: dict[str, int] = {}
         self._context_types: dict[str, str] = {}
+        self._context_max_len: dict[str, int] = {}
+        self._context_separators: dict[str, str] = context_separators or {}
         self._feat_lookup: Tensor = None
         self._uc: Tensor = None
         self._ic: Tensor = None
@@ -309,6 +315,8 @@ class Dataset:
                 self._imap,
                 context_labels=context_labels,
                 field_types=self._context_types,
+                context_types=self._context_types,
+                context_max_len=max(self._context_max_len.values(), default=1),
                 side_tensor=self.train_set.get_side_tensor(),
                 rating_type=rating_type,
                 rating_label=rating_label,
@@ -325,6 +333,8 @@ class Dataset:
                     self._imap,
                     context_labels=context_labels,
                     field_types=self._context_types,
+                    context_types=self._context_types,
+                    context_max_len=max(self._context_max_len.values(), default=1),
                     side_tensor=self.eval_set.get_side_tensor(),
                     rating_type=rating_type,
                     rating_label=rating_label,
@@ -497,6 +507,8 @@ class Dataset:
             rating_label=rating_label,
             timestamp_label=timestamp_label,
             context_labels=context_labels,
+            context_types=self._context_types,
+            context_max_len=max(self._context_max_len.values(), default=1),
         )
         nuid, niid = inter_set.get_dims()
         transactions = inter_set.get_transactions()
@@ -683,6 +695,59 @@ class Dataset:
 
         return df_processed
 
+    def _encode_sequence_context(
+        self, df: DataFrame[Any], col: str, separator: str, fit: bool
+    ) -> DataFrame[Any]:
+        """Encode a column whose cells hold several values into their indices.
+
+        The values share one vocabulary and each cell becomes the indices of its own
+        values joined by a space, which keeps the frame rectangular. The models pool
+        those indices into the single vector the field contributes.
+
+        Args:
+            df (DataFrame[Any]): The frame holding the column.
+            col (str): The name of the context column.
+            separator (str): The separator between values inside a cell.
+            fit (bool): Whether this is the fitting pass.
+
+        Returns:
+            DataFrame[Any]: The frame with the column replaced by its indices.
+
+        Raises:
+            ValueError: If the column was not fitted on the training data first.
+        """
+        cells = [
+            "" if value is None else str(value)
+            for value in df.select(col).to_numpy().flatten().tolist()
+        ]
+        split_cells = [[v for v in cell.split(separator) if v] for cell in cells]
+
+        if fit:
+            vocabulary = sorted({value for values in split_cells for value in values})
+            # Index 0 is the padding, so the values themselves start at 1.
+            self._context_maps[col] = {v: i + 1 for i, v in enumerate(vocabulary)}
+            self._context_dims[col] = len(vocabulary) + 1
+            self._context_types[col] = "seq"
+            self._context_max_len[col] = max(
+                (len(values) for values in split_cells), default=1
+            )
+            logger.msg(
+                f"Context '{col}': multi-valued, {len(vocabulary)} distinct values, "
+                f"up to {self._context_max_len[col]} per row."
+            )
+
+        mapping = self._context_maps.get(col)
+        if mapping is None:
+            raise ValueError(
+                f"Mapping for context '{col}' not found. Fit on train first."
+            )
+
+        encoded = [
+            " ".join(str(mapping.get(value, 0)) for value in values) or "0"
+            for values in split_cells
+        ]
+        return df.with_columns(nw.new_series(col, encoded, backend=df.implementation))
+
     def _is_float_context(self, df: DataFrame[Any], col: str, fit: bool) -> bool:
         """Decide whether a context column is a measurement rather than a category.
 
@@ -732,6 +797,13 @@ class Dataset:
         for col in context_labels:
             if col not in df_processed.columns:
                 raise ValueError(f"Context label '{col}' not found in DataFrame.")
+
+            separator = self._context_separators.get(col)
+            if separator or self._context_types.get(col) == "seq":
+                df_processed = self._encode_sequence_context(
+                    df_processed, col, separator or " ", fit
+                )
+                continue
 
             if self._is_float_context(df_processed, col, fit):
                 # One embedding for the field, scaled by the value, so the ordering
@@ -1131,6 +1203,7 @@ class Dataset:
         if self._context_dims:
             base_info["context_dims"] = self._context_dims
             base_info["context_types"] = self._context_types
+            base_info["context_max_len"] = self._context_max_len
 
         return base_info
 

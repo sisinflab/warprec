@@ -294,6 +294,7 @@ def initialize_datasets(
         "rating_type": config.reader.rating_type,
         "duplicates": config.reader.duplicates,
         "negative_sampling": config.reader.negative_sampling,
+        "context_separators": config.reader.dtypes.context_separators,
         "keep_unseen_items": (
             config.reader.side.keep_unseen_items if config.reader.side else False
         ),

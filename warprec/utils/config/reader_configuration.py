@@ -8,6 +8,7 @@ from warprec.utils.logger import logger
 FileFormat = Literal["tabular", "parquet"]
 DuplicatePolicy = Literal["max", "mean", "first", "last", "sum"]
 NegativeSampling = Literal["uniform", "popularity"]
+SequencePooling = Literal["mean", "sum", "max"]
 
 
 class SplitReading(BaseModel):
@@ -135,6 +136,9 @@ class CustomDtype(BaseModel):
         cluster_type (Optional[AllowedDtype]): The dtype to format the cluster column.
         context_types (Optional[Dict[str, AllowedDtype]]): The dtypes to format the
             contextual columns.
+        context_separators (Optional[Dict[str, str]]): The separator of each contextual
+            column that holds several values in one cell, such as a list of tags.
+            A column named here becomes a multi-valued field.
     """
 
     user_id_type: Optional[AllowedDtype] = "int32"
@@ -143,6 +147,7 @@ class CustomDtype(BaseModel):
     timestamp_type: Optional[AllowedDtype] = "int32"
     cluster_type: Optional[AllowedDtype] = "int32"
     context_types: Optional[Dict[str, AllowedDtype]] = {}
+    context_separators: Optional[Dict[str, str]] = {}
 
 
 class ReaderConfig(BaseModel):
@@ -165,6 +170,10 @@ class ReaderConfig(BaseModel):
         negative_sampling (Optional[NegativeSampling]): How negatives are drawn during
             training. 'uniform' gives every item the same chance, 'popularity' draws
             proportionally to a dampened interaction count. Defaults to 'uniform'.
+        sequence_pooling (Optional[SequencePooling]): How the values of a multi-valued
+            field are combined into the single vector the field contributes. Defaults
+            to 'mean', which matches the normalised multi-hot encoding the
+            factorisation-machine literature defines these models over.
         split (Optional[SplitReading]): The information of the split reading process.
         side (Optional[SideInformationReading]): The side information of the dataset.
         clustering (Optional[ClusteringInformationReading]): The clustering information
@@ -184,6 +193,7 @@ class ReaderConfig(BaseModel):
     rating_type: RatingType
     duplicates: Optional[DuplicatePolicy] = "max"
     negative_sampling: Optional[NegativeSampling] = "uniform"
+    sequence_pooling: Optional[SequencePooling] = "mean"
     split: Optional[SplitReading] = Field(default_factory=SplitReading)
     side: Optional[SideInformationReading] = None
     clustering: Optional[ClusteringInformationReading] = None

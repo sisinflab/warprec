@@ -8,6 +8,7 @@ from torch.utils.data import DataLoader
 from narwhals.dataframe import DataFrame
 from scipy.sparse import csr_matrix, coo_matrix
 
+from warprec.data.entities.context import build_context_array
 from warprec.data.entities.train_structures import (
     InteractionDataset,
     PointWiseDataset,
@@ -54,6 +55,8 @@ class Interactions:
         timestamp_label (str): The label of the timestamp column.
         context_labels (Optional[List[str]]): The list of labels of the
             contextual data.
+        context_types (Optional[dict]): The type of each context field.
+        context_max_len (int): The widest multi-valued field, 1 when there is none.
     """
 
     def __init__(
@@ -73,6 +76,8 @@ class Interactions:
         rating_label: str = None,
         timestamp_label: str = None,
         context_labels: Optional[List[str]] = None,
+        context_types: Optional[dict] = None,
+        context_max_len: int = 1,
     ) -> None:
         # pylint: disable = too-many-arguments, too-many-positional-arguments
         # Each argument is a distinct part of the data schema.
@@ -102,6 +107,8 @@ class Interactions:
         self.rating_label = rating_label if rating_type == RatingType.EXPLICIT else None
         self.timestamp_label = timestamp_label
         self.context_labels = context_labels if context_labels else []
+        self.context_types = context_types if context_types else {}
+        self.context_max_len = context_max_len
 
         # Setup flat views cache
         self._flat_users: Optional[np.ndarray] = None
@@ -456,7 +463,16 @@ class Interactions:
         context_tensor = None
         if include_context and self.context_labels:
             ctx_vals = self._inter_df.select(self.context_labels).to_numpy()
-            context_tensor = torch.tensor(ctx_vals, dtype=torch.float32)
+            context_tensor = torch.from_numpy(
+                build_context_array(
+                    ctx_vals,
+                    [
+                        self.context_types.get(name, "token")
+                        for name in self.context_labels
+                    ],
+                    self.context_max_len,
+                )
+            )
 
         # Create the Dataset
         dataset = PointWiseDataset(
