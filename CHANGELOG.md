@@ -2,6 +2,30 @@
 
 <!-- version list -->
 
+## v1.6.0 (2026-09-18)
+
+### Bug Fixes
+
+- Added an explicit duplicate policy when building the interaction matrix
+  ([`c6f24d2`](https://github.com/sisinflab/warprec/commit/c6f24d2a229851c63a88fa1d85229b4a73c30981))
+
+- Added need_context validation for context-aware models
+  ([`183e013`](https://github.com/sisinflab/warprec/commit/183e0136ca7bd0d0088b12f080eafb98c04425e8))
+
+- Zeroed embedding padding rows after weight initialization
+  ([`ed87094`](https://github.com/sisinflab/warprec/commit/ed87094e2027be04903397a50a89beebd9654592))
+
+### Documentation
+
+- Update documentation for contextual data, duplicate policy and seen-item masking
+  ([`f35e5f5`](https://github.com/sisinflab/warprec/commit/f35e5f54c120fdba1f7ccb12343243d3418ebc3d))
+
+### Features
+
+- Context-aware models now train and evaluate on interaction rows
+  ([`f3d014f`](https://github.com/sisinflab/warprec/commit/f3d014f50a031a4da8923490dfec548448f8f960))
+
+
 ## v1.5.12 (2026-09-17)
 
 ### Bug Fixes
