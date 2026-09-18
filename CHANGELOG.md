@@ -2,6 +2,28 @@
 
 <!-- version list -->
 
+## v1.6.1 (2026-09-18)
+
+### Bug Fixes
+
+- Fixed statistical significance tests crashing when building the results frame
+  ([`c5a159d`](https://github.com/sisinflab/warprec/commit/c5a159dd27a3eccb46a5358ffd6e4a8697b2cb35))
+
+### Chores
+
+- Cleaned up mechanical linting findings across the codebase
+  ([`fdb5f46`](https://github.com/sisinflab/warprec/commit/fdb5f467f73b5bd1027cc94b1f4e531136219bf1))
+
+- Collapsed exploded configuration arguments into config slices
+  ([`357afdf`](https://github.com/sisinflab/warprec/commit/357afdf786d8deb5058bf32eada8a0652d324916))
+
+- Extracted shared base classes for the paired novelty and bias metrics
+  ([`8730919`](https://github.com/sisinflab/warprec/commit/8730919d17449d2b64314aa504ecf94c7ca64b19))
+
+- Extracted the shared pipeline lifecycle into a common module
+  ([`ff1ca24`](https://github.com/sisinflab/warprec/commit/ff1ca24f0d2a48c531fe6f0ef469b8a6cd544ad5))
+
+
 ## v1.6.0 (2026-09-18)
 
 ### Bug Fixes
