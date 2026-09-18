@@ -216,7 +216,7 @@ class MacridVAE(IterativeRecommender):
                 reg_tensors.append(param)
 
         reg_loss = self.reg_weight * self.reg_loss(
-            self.item_embedding.weight, self.k_embedding.weight * reg_tensors
+            self.item_embedding.weight, self.k_embedding.weight, *reg_tensors
         )
 
         # Loss logging
