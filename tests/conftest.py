@@ -4,13 +4,14 @@ Every fixture here is generated in memory. The datasets live outside the
 repository, so a test that reads one would pass locally and fail in CI.
 """
 
-from typing import List
+from typing import Any, Dict, List
 
 import numpy as np
 import pandas as pd
 import pytest
 
 from warprec.data.dataset import Dataset
+from warprec.utils.registry import params_registry
 
 N_USERS = 40
 N_ITEMS = 25
@@ -102,3 +103,121 @@ def dataset(interactions_frame: pd.DataFrame, side_frame: pd.DataFrame) -> Datas
         context_labels=CONTEXT_LABELS,
         batch_size=64,
     )
+
+
+# Values that keep every model small and fast while staying schema-valid. Names
+# are matched first, then the annotation, so a new hyperparameter only needs an
+# entry here when its name carries meaning the type cannot express.
+BY_NAME: Dict[str, Any] = {
+    "epochs": 1,
+    "batch_size": 32,
+    "batch_size_kd": 32,
+    "teacher_epochs": 1,
+    "embedding_size": 8,
+    "mf_embedding_size": 8,
+    "mlp_embedding_size": 8,
+    "hidden_size": 8,
+    "inner_size": 8,
+    "latent_dim": 8,
+    "intermediate_dim": 8,
+    "attention_size": 8,
+    "n_dims": 8,
+    "factors": 8,
+    "n_factors": 4,
+    "k_fac": 2,
+    "k_interests": 2,
+    "n_layers": 1,
+    "num_layers": 1,
+    "n_teacher_layers": 1,
+    "n_student_layers": 1,
+    "n_heads": 2,
+    "n_h": 2,
+    "n_v": 2,
+    "n_iterations": 1,
+    "n_ode_steps": 1,
+    "max_seq_len": 5,
+    "order_len": 2,
+    "k": 5,
+    "ii_k": 5,
+    "neg_samples": 1,
+    "mn_ratio": 1,
+    "split_to": 1,
+    "expert_num": 2,
+    "low_rank": 4,
+    "cross_layer_num": 1,
+    "layer_cl": 1,
+    "it": 1,
+    "mlp_hidden_size": [8],
+    "encoder_hidden_dims": [8],
+    "user_mlp_hidden": 8,
+    "item_mlp_hidden": 8,
+    "weight_size": [8],
+    "cin_layer_size": [8],
+    "cnn_channels": [2],
+    "cnn_kernels": [2],
+    "cnn_strides": [1],
+    "similarity": "cosine",
+    "sim_type": "cos",
+    "user_profile": "binary",
+    "item_profile": "binary",
+    "model_structure": "stacked",
+    "hid_activation": "relu",
+    "out_activation": "relu",
+    "loss_type": "BCE",
+    "mode": "parallel",
+    "aug_type": "ED",
+    "ssl_type": "us",
+    "dnn_type": "trm",
+    "confidence_type": "linear",
+    "target_density": 0.5,
+    "pop_ratio": 0.8,
+    "mask_prob": 0.2,
+    "corruption": 0.1,
+    "anneal_cap": 0.2,
+    "total_anneal_steps": 10,
+    "anneal_step": 10,
+    "learning_rate": 0.01,
+}
+DEFAULT_BY_TYPE = {"int": 2, "float": 0.1, "bool": True, "str": "cosine", "list": [8]}
+SKIP_FIELDS = {"meta", "optimization", "early_stopping"}
+
+
+def _value_for(field_name: str, annotation: Any) -> Any:
+    """Pick a small, schema-valid value for one hyperparameter.
+
+    Args:
+        field_name (str): The name of the hyperparameter.
+        annotation (Any): Its type annotation.
+
+    Returns:
+        Any: The value to use in the smoke test.
+    """
+    if field_name in BY_NAME:
+        return BY_NAME[field_name]
+    text = str(annotation)
+    if "List[int]" in text or "List[List" in text:
+        return DEFAULT_BY_TYPE["list"]
+    if "bool" in text:
+        return DEFAULT_BY_TYPE["bool"]
+    if "float" in text:
+        return DEFAULT_BY_TYPE["float"]
+    if "int" in text:
+        return DEFAULT_BY_TYPE["int"]
+    return DEFAULT_BY_TYPE["str"]
+
+
+def build_params(model_name: str) -> Dict[str, Any]:
+    """Build a complete, schema-valid parameter set for a model.
+
+    Args:
+        model_name (str): The registered name of the model.
+
+    Returns:
+        Dict[str, Any]: The hyperparameters to instantiate it with.
+    """
+    schema = params_registry.get_class(model_name)
+    return {
+        name: _value_for(name, field.annotation)
+        for name, field in schema.model_fields.items()
+        if name not in SKIP_FIELDS
+    }

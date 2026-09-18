@@ -1,6 +1,7 @@
 # pylint: disable = unused-argument
 import random
 import json
+import inspect
 import hashlib
 from typing import Any, Optional, List, Dict, no_type_check
 from abc import ABC, abstractmethod
@@ -144,8 +145,27 @@ class Recommender(nn.Module, ABC):
             "params": self.get_params(),
             "info": self.info,
             "state_dict": self.state_dict(),
+            "artifacts": self._learned_artifacts(),
         }
         return state
+
+    def _learned_artifacts(self) -> Dict[str, Any]:
+        """The attributes that hold what this model learned.
+
+        Models trained in a single closed-form step keep their result in plain
+        attributes - a similarity matrix, a pair of profiles - rather than in
+        parameters, so ``state_dict`` is empty for them and a checkpoint alone
+        would not be enough to serve them. Capturing the public attributes keeps
+        the fitted model self-contained.
+
+        Returns:
+            Dict[str, Any]: The attribute names and their values.
+        """
+        return {
+            name: value
+            for name, value in self.__dict__.items()
+            if not name.startswith("_") and name != "training"
+        }
 
     @classmethod
     def estimate_space(
@@ -263,6 +283,26 @@ class Recommender(nn.Module, ABC):
                 f"Warning: Loading a {checkpoint['name']} checkpoint into {cls.__name__} class."
             )
 
+        # A model whose constructor fits on the training data cannot be rebuilt
+        # from parameters alone. When the caller has no interactions to hand -
+        # serving, typically - the fitted attributes saved with the checkpoint
+        # are restored instead of refitting.
+        artifacts = checkpoint.get("artifacts")
+        if cls._fits_on_interactions() and "interactions" not in kwargs:
+            # A model fitted in one closed-form step keeps its result in plain
+            # attributes, so restoring those is enough to score again.
+            if artifacts and not issubclass(cls, IterativeRecommender):
+                return cls._from_artifacts(checkpoint, artifacts, strict=strict)
+
+            # An iteratively trained model keeps its result in parameters, but
+            # its constructor still derives the graph or the matrix shapes from
+            # the interactions, so those have to be supplied.
+            raise ValueError(
+                f"{cls.__name__} derives its structure from the training "
+                "interactions, so they must be passed to from_checkpoint() "
+                "alongside the checkpoint."
+            )
+
         # Common initialization params + additional parameters
         init_args = {
             "params": checkpoint["params"],
@@ -273,6 +313,47 @@ class Recommender(nn.Module, ABC):
         # Initialize the model and return the instance
         model = cls(**init_args)
         model.load_state_dict(checkpoint["state_dict"], strict=strict)
+        return model
+
+    @classmethod
+    def _fits_on_interactions(cls) -> bool:
+        """Whether this model requires the training interactions to be built.
+
+        Returns:
+            bool: True when ``interactions`` is a required constructor argument.
+        """
+        parameter = inspect.signature(cls.__init__).parameters.get("interactions")
+        return parameter is not None and parameter.default is inspect.Parameter.empty
+
+    @classmethod
+    def _from_artifacts(
+        cls, checkpoint: Any, artifacts: Dict[str, Any], strict: bool = True
+    ) -> "Recommender":
+        """Rebuild a fitted model from its saved attributes, without refitting.
+
+        Args:
+            checkpoint (Any): The checkpoint being loaded.
+            artifacts (Dict[str, Any]): The attributes saved with it.
+            strict (bool): Whether to load the state dict in strict mode.
+
+        Returns:
+            Recommender: The restored model.
+        """
+        model = cls.__new__(cls)
+        nn.Module.__init__(model)
+
+        for name, value in artifacts.items():
+            setattr(model, name, value)
+
+        # Some of these models keep their result in buffers rather than in plain
+        # attributes. The constructor that would have registered them has been
+        # skipped, so they are declared here before the state is loaded into them.
+        state_dict = checkpoint["state_dict"]
+        for name, value in state_dict.items():
+            if "." not in name and not hasattr(model, name):
+                model.register_buffer(name, torch.empty_like(value))
+
+        model.load_state_dict(state_dict, strict=strict)
         return model
 
     @staticmethod

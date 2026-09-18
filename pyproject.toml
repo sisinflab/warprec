@@ -115,6 +115,13 @@ commit_message = "chore(release): {version} [skip ci]"
 commit_author = "github-actions [bot] <github-actions[bot]@users.noreply.github.com>"
 
 
+[tool.pytest.ini_options]
+# conftest.py holds helpers the suites share, so the test directory itself is
+# importable rather than relying on a package __init__.
+pythonpath = ["tests"]
+testpaths = ["tests"]
+
+
 [build-system]
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
