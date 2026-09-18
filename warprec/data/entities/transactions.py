@@ -114,8 +114,10 @@ class Transactions:
 
         self._contexts: Optional[np.ndarray] = None
         if self.context_labels:
+            # A categorical field stores its index here and a numeric field its value,
+            # so one array serves both and the batch keeps its shape.
             self._contexts = (
-                mapped.select(self.context_labels).to_numpy().astype(np.int64)
+                mapped.select(self.context_labels).to_numpy().astype(np.float32)
             )
 
         self._seen_index: Optional[csr_matrix] = None

@@ -456,7 +456,7 @@ class Interactions:
         context_tensor = None
         if include_context and self.context_labels:
             ctx_vals = self._inter_df.select(self.context_labels).to_numpy()
-            context_tensor = torch.tensor(ctx_vals, dtype=torch.long)
+            context_tensor = torch.tensor(ctx_vals, dtype=torch.float32)
 
         # Create the Dataset
         dataset = PointWiseDataset(

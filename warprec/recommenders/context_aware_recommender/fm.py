@@ -135,8 +135,7 @@ class FM(ContextRecommenderUtils, IterativeRecommender):
 
         # Add Context Embeddings
         if contexts is not None and self.context_labels:
-            global_ctx = contexts + self.context_offsets
-            c_emb = self.merged_context_embedding(global_ctx)
+            c_emb = self._get_context_embeddings(contexts)
             components.append(c_emb)
 
         fm_input = torch.cat(components, dim=1)
@@ -176,12 +175,11 @@ class FM(ContextRecommenderUtils, IterativeRecommender):
         # Process Contexts
         if contexts is not None and self.context_labels:
             # Linear Context
-            global_ctx = contexts + self.context_offsets
-            ctx_bias = self.merged_context_bias(global_ctx).sum(dim=1).squeeze(-1)
+            ctx_bias = self._get_context_bias(contexts)
             fixed_linear += ctx_bias
 
             # FM Context
-            ctx_emb = self.merged_context_embedding(global_ctx)
+            ctx_emb = self._get_context_embeddings(contexts)
             sum_v_fixed += ctx_emb.sum(dim=1)
             sum_sq_v_fixed += ctx_emb.pow(2).sum(dim=1)
 

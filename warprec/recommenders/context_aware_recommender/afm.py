@@ -216,8 +216,7 @@ class AFM(ContextRecommenderUtils, IterativeRecommender):
 
         # Add Context Embeddings
         if contexts is not None and self.context_labels:
-            global_ctx = contexts + self.context_offsets
-            c_emb = self.merged_context_embedding(global_ctx)
+            c_emb = self._get_context_embeddings(contexts)
             components.append(c_emb)
 
         # Concatenate on Field dimension
@@ -316,8 +315,7 @@ class AFM(ContextRecommenderUtils, IterativeRecommender):
         # Linear Fixed
         fixed_linear = self.global_bias + self.user_bias(user_indices).squeeze(-1)
         if contexts is not None and self.context_dims:
-            global_ctx = contexts + self.context_offsets
-            ctx_bias = self.merged_context_bias(global_ctx).sum(dim=1).squeeze(-1)
+            ctx_bias = self._get_context_bias(contexts)
             fixed_linear += ctx_bias
 
         # Embeddings Fixed

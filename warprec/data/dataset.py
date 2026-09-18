@@ -683,6 +683,25 @@ class Dataset:
 
         return df_processed
 
+    def _is_float_context(self, df: DataFrame[Any], col: str, fit: bool) -> bool:
+        """Decide whether a context column is a measurement rather than a category.
+
+        On the training pass the decision is taken from the column's own dtype and
+        remembered, so that the evaluation pass treats the column the same way even
+        if its values happen to read differently.
+
+        Args:
+            df (DataFrame[Any]): The frame holding the column.
+            col (str): The name of the context column.
+            fit (bool): Whether this is the fitting pass.
+
+        Returns:
+            bool: True when the column is a float field.
+        """
+        if not fit:
+            return self._context_types.get(col) == "float"
+        return df.schema[col].is_float()
+
     def _process_context_data(
         self, df: DataFrame[Any], context_labels: List[str], fit: bool = False
     ) -> DataFrame[Any]:
@@ -713,6 +732,18 @@ class Dataset:
         for col in context_labels:
             if col not in df_processed.columns:
                 raise ValueError(f"Context label '{col}' not found in DataFrame.")
+
+            if self._is_float_context(df_processed, col, fit):
+                # One embedding for the field, scaled by the value, so the ordering
+                # the numbers carry survives.
+                if fit:
+                    self._context_types[col] = "float"
+                    self._context_dims[col] = 1
+                    logger.msg(f"Context '{col}': numeric, kept as a value.")
+                df_processed = df_processed.with_columns(
+                    nw.col(col).cast(nw.Float32).fill_null(0.0)
+                )
+                continue
 
             if fit:
                 # Create mapping based on unique values in this column
@@ -1099,6 +1130,7 @@ class Dataset:
         # Optionally add contextual dimensions if present
         if self._context_dims:
             base_info["context_dims"] = self._context_dims
+            base_info["context_types"] = self._context_types
 
         return base_info
 
