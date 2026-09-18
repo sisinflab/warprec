@@ -1,5 +1,3 @@
-"""Shaping of the contextual columns into the array the models consume."""
-
 from typing import List
 
 import numpy as np
