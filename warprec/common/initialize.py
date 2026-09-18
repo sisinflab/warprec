@@ -159,11 +159,18 @@ def initialize_datasets(
 
     # Side information reading
     if config.reader.side:
-        file_format = config.reader.split.file_format
+        side_format = config.reader.side.file_format
 
-        match file_format:
+        # The item column has to be read with the same dtype as the interactions,
+        # otherwise the join that attaches the attributes matches nothing.
+        side_dtypes = {
+            config.reader.labels.item_id_label: config.reader.dtypes.item_id_type
+        }
+
+        match side_format:
             case "tabular":
                 side_data = reader.read_tabular(
+                    dtypes=side_dtypes,
                     **config.reader.side.model_dump(),
                 )
             case "parquet":
@@ -171,7 +178,7 @@ def initialize_datasets(
                     **config.reader.side.model_dump(),
                 )
             case _:
-                raise ValueError(f"File format '{file_format}'not supported.")
+                raise ValueError(f"File format '{side_format}' not supported.")
 
     # Cluster information reading
     if config.reader.clustering:
@@ -286,6 +293,11 @@ def initialize_datasets(
         "batch_size": config.evaluation.batch_size,
         "rating_type": config.reader.rating_type,
         "duplicates": config.reader.duplicates,
+        "negative_sampling": config.reader.negative_sampling,
+        "context_separators": config.reader.dtypes.context_separators,
+        "keep_unseen_items": (
+            config.reader.side.keep_unseen_items if config.reader.side else False
+        ),
         "user_id_label": config.reader.labels.user_id_label,
         "item_id_label": config.reader.labels.item_id_label,
         "rating_label": config.reader.labels.rating_label,

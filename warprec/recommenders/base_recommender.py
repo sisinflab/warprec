@@ -908,6 +908,11 @@ class ContextRecommenderUtils(nn.Module, ABC):
         # Context info extraction
         self.context_dims: dict = info.get("context_dims", {})
         self.context_labels = list(self.context_dims.keys())
+        context_types: dict = info.get("context_types", {})
+        self.context_is_float = [
+            context_types.get(name) == "float" for name in self.context_labels
+        ]
+        self.context_pooling: str = info.get("sequence_pooling", "mean")
 
         # Row-oriented source of training examples. Absent for a dataset with no
         # contextual columns, in which case the matrix view is used instead.
@@ -1042,9 +1047,7 @@ class ContextRecommenderUtils(nn.Module, ABC):
 
         # Add context biases
         if contexts is not None and self.merged_context_bias is not None:
-            global_indices = contexts + self.context_offsets
-            ctx_bias = self.merged_context_bias(global_indices).sum(dim=1).squeeze(-1)
-            linear_part += ctx_bias
+            linear_part += self._get_context_bias(contexts)
 
         return linear_part
 
@@ -1079,7 +1082,8 @@ class ContextRecommenderUtils(nn.Module, ABC):
             reg_params.append(self.merged_feature_bias(global_indices))
 
         if contexts is not None and self.merged_context_embedding is not None:
-            global_indices = contexts + self.context_offsets
+            flat_contexts = contexts[:, :, 0] if contexts.dim() == 3 else contexts
+            global_indices = flat_contexts.long() + self.context_offsets
             reg_params.append(self.merged_context_embedding(global_indices))
             reg_params.append(self.merged_context_bias(global_indices))
 
@@ -1107,12 +1111,103 @@ class ContextRecommenderUtils(nn.Module, ABC):
         )
 
     def _get_context_embeddings(self, contexts: Tensor) -> Optional[Tensor]:
-        """Retrieves context embeddings as a single Tensor."""
+        """Retrieve one embedding per context field.
+
+        A categorical field looks its value up in the merged table. A numeric field
+        owns a single row of that table and scales it by the value it carries, which
+        is what lets a measurement keep its ordering instead of being spread over an
+        invented vocabulary. Either way a field contributes exactly one vector, so
+        the number of fields a model sees never changes.
+
+        Args:
+            contexts (Tensor): The context row, indices and values together.
+
+        Returns:
+            Optional[Tensor]: The per-field embeddings, or None without contexts.
+        """
         if not self.context_dims or self.merged_context_embedding is None:
             return None
 
-        global_indices = contexts + self.context_offsets
-        return self.merged_context_embedding(global_indices)
+        # A multi-valued field arrives as its padded values on a third dimension.
+        if contexts.dim() == 3:
+            return self._pool_context_values(contexts)
+
+        offsets = self.context_offsets
+        indices = contexts.long() + offsets
+        if not any(self.context_is_float):
+            return self.merged_context_embedding(indices)
+
+        # A numeric field always sits at its own offset; only the scaling differs.
+        numeric = torch.tensor(self.context_is_float, device=contexts.device)
+        indices = torch.where(numeric, offsets.expand_as(indices), indices)
+        embeddings = self.merged_context_embedding(indices)
+        scale = torch.where(numeric, contexts, torch.ones_like(contexts))
+        return embeddings * scale.unsqueeze(-1)
+
+    def _pool_context_values(self, contexts: Tensor) -> Tensor:
+        """Combine the values of every context field into one vector per field.
+
+        A multi-valued field is pooled over the values it carries. The default,
+        the mean, is the embedding equivalent of the normalised multi-hot block the
+        factorisation-machine literature defines these models over, so a field's
+        contribution does not grow with the number of values it happens to hold.
+
+        Args:
+            contexts (Tensor): The context values, [batch, fields, values].
+
+        Returns:
+            Tensor: One embedding per field, [batch, fields, embedding].
+        """
+        offsets = self.context_offsets.unsqueeze(-1)
+        numeric = torch.tensor(self.context_is_float, device=contexts.device)
+        numeric = numeric.view(1, -1, 1)
+
+        indices = torch.where(
+            numeric, offsets.expand_as(contexts), contexts.long() + offsets
+        )
+        embeddings = self.merged_context_embedding(indices)
+
+        # Padding carries index 0, and a numeric field lives entirely in its first slot.
+        occupied = (contexts != 0) | numeric
+        occupied[:, :, 0] |= True
+        scale = torch.where(numeric, contexts, occupied.to(contexts.dtype))
+        embeddings = embeddings * scale.unsqueeze(-1)
+
+        if self.context_pooling == "sum":
+            return embeddings.sum(dim=2)
+        if self.context_pooling == "max":
+            return (
+                embeddings.masked_fill(~occupied.unsqueeze(-1), float("-inf"))
+                .max(dim=2)
+                .values
+            )
+        counts = occupied.sum(dim=2, keepdim=True).clamp(min=1).to(embeddings.dtype)
+        return embeddings.sum(dim=2) / counts
+
+    def _get_context_bias(self, contexts: Tensor) -> Tensor:
+        """Sum the first-order term contributed by the context fields.
+
+        Args:
+            contexts (Tensor): The context row, indices and values together.
+
+        Returns:
+            Tensor: The summed context bias, one value per row.
+        """
+        if contexts.dim() == 3:
+            # Mirror the pooling used for the embeddings, on the first slot only,
+            # so the linear term stays consistent with the interaction term.
+            contexts = contexts[:, :, 0]
+
+        offsets = self.context_offsets
+        indices = contexts.long() + offsets
+        if not any(self.context_is_float):
+            return self.merged_context_bias(indices).sum(dim=1).squeeze(-1)
+
+        numeric = torch.tensor(self.context_is_float, device=contexts.device)
+        indices = torch.where(numeric, offsets.expand_as(indices), indices)
+        biases = self.merged_context_bias(indices).squeeze(-1)
+        scale = torch.where(numeric, contexts, torch.ones_like(contexts))
+        return (biases * scale).sum(dim=1)
 
     def _get_feature_bias(self, target_items: Tensor) -> Tensor:
         """Helper to retrieve the sum of feature biases for a set of items."""

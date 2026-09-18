@@ -39,6 +39,14 @@ class Dataset:
         rating_type (RatingType): The type of rating used.
         duplicates (str): How repeated (user, item) rows are aggregated into the
             interaction matrix. One of 'max', 'mean', 'first', 'last' or 'sum'.
+        negative_sampling (str): How negatives are drawn during training, 'uniform'
+            or 'popularity'.
+        context_separators (Optional[Dict[str, str]]): The separator of each contextual
+            column holding several values in one cell. Such a column becomes a
+            multi-valued field.
+        keep_unseen_items (bool): Whether items that carry side information but no
+            interaction stay in the catalogue, so that the models scoring from
+            attributes can recommend them.
         user_id_label (str): The label of the user id column.
         item_id_label (str): The label of the item id column.
         rating_label (str): The label of the rating column.
@@ -81,6 +89,9 @@ class Dataset:
         batch_size: int = 1024,
         rating_type: RatingType = RatingType.IMPLICIT,
         duplicates: str = "max",
+        negative_sampling: str = "uniform",
+        context_separators: Optional[Dict[str, str]] = None,
+        keep_unseen_items: bool = False,
         user_id_label: str = "user_id",
         item_id_label: str = "item_id",
         rating_label: str = None,
@@ -115,6 +126,8 @@ class Dataset:
         self._context_maps: dict[str, dict[Any, int]] = {}
         self._context_dims: dict[str, int] = {}
         self._context_types: dict[str, str] = {}
+        self._context_max_len: dict[str, int] = {}
+        self._context_separators: dict[str, str] = context_separators or {}
         self._feat_lookup: Tensor = None
         self._uc: Tensor = None
         self._ic: Tensor = None
@@ -137,11 +150,13 @@ class Dataset:
         # Define dimensions that will lead the experiment
         self._nuid = mat_train_data.select(nw.col(user_id_label).n_unique()).item()
         self._niid = mat_train_data.select(nw.col(item_id_label).n_unique()).item()
+        self._keep_unseen_items = keep_unseen_items
         self._nfeat = (
             (len(mat_side_data.columns) - 1) if mat_side_data is not None else 0
         )
         self.batch_size = batch_size
         self._duplicates = duplicates
+        self._negative_sampling = negative_sampling
 
         # Values that will be used to calculate mappings
         _uid = (
@@ -157,9 +172,29 @@ class Dataset:
             .to_dict(as_series=False)[item_id_label]
         )
 
+        # An item with attributes but no interaction is exactly the cold-start case:
+        # keeping it in the catalogue is what lets a content model reach it. It stays
+        # an all-zero column of the interaction matrix, so the collaborative models
+        # score it last and are otherwise unaffected.
+        if keep_unseen_items and mat_side_data is not None:
+            side_items = (
+                mat_side_data.select(item_id_label)
+                .unique()
+                .to_dict(as_series=False)[item_id_label]
+            )
+            unseen = sorted(set(side_items) - set(_iid))
+            if unseen:
+                _iid = sorted(set(_iid) | set(unseen))
+                logger.attention(
+                    f"Kept {len(unseen)} items that carry side information but no "
+                    "interaction. They can only be recommended by models that score "
+                    "from attributes."
+                )
+
         # Calculate mapping for users and items
         self._umap = {user: i for i, user in enumerate(_uid)}
         self._imap = {item: i for i, item in enumerate(_iid)}
+        self._niid = len(self._imap)
 
         # Process contextual data
         if context_labels:
@@ -248,6 +283,7 @@ class Dataset:
             batch_size=batch_size,
             rating_type=rating_type,
             duplicates=duplicates,
+            negative_sampling=negative_sampling,
             rating_label=rating_label,
             timestamp_label=timestamp_label,
             context_labels=context_labels,
@@ -264,6 +300,7 @@ class Dataset:
                 batch_size=batch_size,
                 rating_type=rating_type,
                 duplicates=duplicates,
+                negative_sampling=negative_sampling,
                 rating_label=rating_label,
                 context_labels=context_labels,
             )
@@ -278,11 +315,14 @@ class Dataset:
                 self._imap,
                 context_labels=context_labels,
                 field_types=self._context_types,
+                context_types=self._context_types,
+                context_max_len=max(self._context_max_len.values(), default=1),
                 side_tensor=self.train_set.get_side_tensor(),
                 rating_type=rating_type,
                 rating_label=rating_label,
                 timestamp_label=timestamp_label,
                 batch_size=batch_size,
+                negative_sampling=negative_sampling,
             )
 
             if mat_eval_data is not None:
@@ -293,11 +333,14 @@ class Dataset:
                     self._imap,
                     context_labels=context_labels,
                     field_types=self._context_types,
+                    context_types=self._context_types,
+                    context_max_len=max(self._context_max_len.values(), default=1),
                     side_tensor=self.eval_set.get_side_tensor(),
                     rating_type=rating_type,
                     rating_label=rating_label,
                     timestamp_label=timestamp_label,
                     batch_size=batch_size,
+                    negative_sampling=negative_sampling,
                 )
 
         # Save side information inside the dataset
@@ -420,6 +463,7 @@ class Dataset:
         batch_size: int = 1024,
         rating_type: RatingType = RatingType.IMPLICIT,
         duplicates: str = "max",
+        negative_sampling: str = "uniform",
         rating_label: str = None,
         timestamp_label: str = None,
         context_labels: Optional[List[str]] = None,
@@ -438,6 +482,7 @@ class Dataset:
             batch_size (int): The batch size of the interaction.
             rating_type (RatingType): The type of rating used.
             duplicates (str): How repeated (user, item) rows are aggregated.
+            negative_sampling (str): How negatives are drawn during training.
             rating_label (str): The label of the rating column.
             timestamp_label (str): The label of the timestamp column.
             context_labels (Optional[List[str]]): The list of labels of the
@@ -458,9 +503,12 @@ class Dataset:
             batch_size=batch_size,
             rating_type=rating_type,
             duplicates=duplicates,
+            negative_sampling=negative_sampling,
             rating_label=rating_label,
             timestamp_label=timestamp_label,
             context_labels=context_labels,
+            context_types=self._context_types,
+            context_max_len=max(self._context_max_len.values(), default=1),
         )
         nuid, niid = inter_set.get_dims()
         transactions = inter_set.get_transactions()
@@ -647,6 +695,78 @@ class Dataset:
 
         return df_processed
 
+    def _encode_sequence_context(
+        self, df: DataFrame[Any], col: str, separator: str, fit: bool
+    ) -> DataFrame[Any]:
+        """Encode a column whose cells hold several values into their indices.
+
+        The values share one vocabulary and each cell becomes the indices of its own
+        values joined by a space, which keeps the frame rectangular. The models pool
+        those indices into the single vector the field contributes.
+
+        Args:
+            df (DataFrame[Any]): The frame holding the column.
+            col (str): The name of the context column.
+            separator (str): The separator between values inside a cell.
+            fit (bool): Whether this is the fitting pass.
+
+        Returns:
+            DataFrame[Any]: The frame with the column replaced by its indices.
+
+        Raises:
+            ValueError: If the column was not fitted on the training data first.
+        """
+        cells = [
+            "" if value is None else str(value)
+            for value in df.select(col).to_numpy().flatten().tolist()
+        ]
+        split_cells = [[v for v in cell.split(separator) if v] for cell in cells]
+
+        if fit:
+            vocabulary = sorted({value for values in split_cells for value in values})
+            # Index 0 is the padding, so the values themselves start at 1.
+            self._context_maps[col] = {v: i + 1 for i, v in enumerate(vocabulary)}
+            self._context_dims[col] = len(vocabulary) + 1
+            self._context_types[col] = "seq"
+            self._context_max_len[col] = max(
+                (len(values) for values in split_cells), default=1
+            )
+            logger.msg(
+                f"Context '{col}': multi-valued, {len(vocabulary)} distinct values, "
+                f"up to {self._context_max_len[col]} per row."
+            )
+
+        mapping = self._context_maps.get(col)
+        if mapping is None:
+            raise ValueError(
+                f"Mapping for context '{col}' not found. Fit on train first."
+            )
+
+        encoded = [
+            " ".join(str(mapping.get(value, 0)) for value in values) or "0"
+            for values in split_cells
+        ]
+        return df.with_columns(nw.new_series(col, encoded, backend=df.implementation))
+
+    def _is_float_context(self, df: DataFrame[Any], col: str, fit: bool) -> bool:
+        """Decide whether a context column is a measurement rather than a category.
+
+        On the training pass the decision is taken from the column's own dtype and
+        remembered, so that the evaluation pass treats the column the same way even
+        if its values happen to read differently.
+
+        Args:
+            df (DataFrame[Any]): The frame holding the column.
+            col (str): The name of the context column.
+            fit (bool): Whether this is the fitting pass.
+
+        Returns:
+            bool: True when the column is a float field.
+        """
+        if not fit:
+            return self._context_types.get(col) == "float"
+        return df.schema[col].is_float()
+
     def _process_context_data(
         self, df: DataFrame[Any], context_labels: List[str], fit: bool = False
     ) -> DataFrame[Any]:
@@ -677,6 +797,25 @@ class Dataset:
         for col in context_labels:
             if col not in df_processed.columns:
                 raise ValueError(f"Context label '{col}' not found in DataFrame.")
+
+            separator = self._context_separators.get(col)
+            if separator or self._context_types.get(col) == "seq":
+                df_processed = self._encode_sequence_context(
+                    df_processed, col, separator or " ", fit
+                )
+                continue
+
+            if self._is_float_context(df_processed, col, fit):
+                # One embedding for the field, scaled by the value, so the ordering
+                # the numbers carry survives.
+                if fit:
+                    self._context_types[col] = "float"
+                    self._context_dims[col] = 1
+                    logger.msg(f"Context '{col}': numeric, kept as a value.")
+                df_processed = df_processed.with_columns(
+                    nw.col(col).cast(nw.Float32).fill_null(0.0)
+                )
+                continue
 
             if fit:
                 # Create mapping based on unique values in this column
@@ -1063,6 +1202,8 @@ class Dataset:
         # Optionally add contextual dimensions if present
         if self._context_dims:
             base_info["context_dims"] = self._context_dims
+            base_info["context_types"] = self._context_types
+            base_info["context_max_len"] = self._context_max_len
 
         return base_info
 

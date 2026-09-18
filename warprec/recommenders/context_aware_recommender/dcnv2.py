@@ -286,8 +286,7 @@ class DCNv2(ContextRecommenderUtils, IterativeRecommender):
 
         # Add Context Embeddings
         if contexts is not None and self.context_labels:
-            global_ctx = contexts + self.context_offsets
-            c_emb = self.merged_context_embedding(global_ctx)
+            c_emb = self._get_context_embeddings(contexts)
             components.append(c_emb)
 
         # Concatenate on Field dimension

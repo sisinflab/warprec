@@ -7,6 +7,8 @@ from warprec.utils.logger import logger
 
 FileFormat = Literal["tabular", "parquet"]
 DuplicatePolicy = Literal["max", "mean", "first", "last", "sum"]
+NegativeSampling = Literal["uniform", "popularity"]
+SequencePooling = Literal["mean", "sum", "max"]
 
 
 class SplitReading(BaseModel):
@@ -57,6 +59,12 @@ class SideInformationReading(BaseModel):
         file_format (Optional[FileFormat]): The file format to use during the reading process.
         sep (Optional[str]): The separator of the split files.
         header (Optional[bool]): Whether the file has a header or not. Defaults to True.
+        column_names (Optional[List[str]]): The names of the columns, required when the
+            file has no header row. The first name must be the item ID column.
+        keep_unseen_items (Optional[bool]): Whether items that carry attributes but no
+            interaction are kept in the catalogue. They can then be recommended by the
+            models that score from attributes, which is what cold start asks for.
+            Defaults to False, which drops them.
     """
 
     local_path: Optional[str] = None
@@ -64,6 +72,8 @@ class SideInformationReading(BaseModel):
     file_format: Optional[FileFormat] = "tabular"
     sep: Optional[str] = "\t"
     header: Optional[bool] = True
+    column_names: Optional[List[str]] = None
+    keep_unseen_items: Optional[bool] = False
 
     @field_validator("sep")
     @classmethod
@@ -126,6 +136,9 @@ class CustomDtype(BaseModel):
         cluster_type (Optional[AllowedDtype]): The dtype to format the cluster column.
         context_types (Optional[Dict[str, AllowedDtype]]): The dtypes to format the
             contextual columns.
+        context_separators (Optional[Dict[str, str]]): The separator of each contextual
+            column that holds several values in one cell, such as a list of tags.
+            A column named here becomes a multi-valued field.
     """
 
     user_id_type: Optional[AllowedDtype] = "int32"
@@ -134,6 +147,7 @@ class CustomDtype(BaseModel):
     timestamp_type: Optional[AllowedDtype] = "int32"
     cluster_type: Optional[AllowedDtype] = "int32"
     context_types: Optional[Dict[str, AllowedDtype]] = {}
+    context_separators: Optional[Dict[str, str]] = {}
 
 
 class ReaderConfig(BaseModel):
@@ -153,6 +167,13 @@ class ReaderConfig(BaseModel):
         duplicates (Optional[DuplicatePolicy]): How repeated (user, item) rows are
             aggregated when building the interaction matrix. Defaults to 'max'.
             With implicit feedback every policy except 'sum' yields a binary matrix.
+        negative_sampling (Optional[NegativeSampling]): How negatives are drawn during
+            training. 'uniform' gives every item the same chance, 'popularity' draws
+            proportionally to a dampened interaction count. Defaults to 'uniform'.
+        sequence_pooling (Optional[SequencePooling]): How the values of a multi-valued
+            field are combined into the single vector the field contributes. Defaults
+            to 'mean', which matches the normalised multi-hot encoding the
+            factorisation-machine literature defines these models over.
         split (Optional[SplitReading]): The information of the split reading process.
         side (Optional[SideInformationReading]): The side information of the dataset.
         clustering (Optional[ClusteringInformationReading]): The clustering information
@@ -171,6 +192,8 @@ class ReaderConfig(BaseModel):
     header: Optional[bool] = True
     rating_type: RatingType
     duplicates: Optional[DuplicatePolicy] = "max"
+    negative_sampling: Optional[NegativeSampling] = "uniform"
+    sequence_pooling: Optional[SequencePooling] = "mean"
     split: Optional[SplitReading] = Field(default_factory=SplitReading)
     side: Optional[SideInformationReading] = None
     clustering: Optional[ClusteringInformationReading] = None

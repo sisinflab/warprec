@@ -67,8 +67,10 @@ class ContextualEvaluationDataset(TorchDataset):
         self.item_indices = torch.from_numpy(
             eval_data.select(item_id_label).to_numpy().flatten().astype(np.int64)
         )
+        # Categorical fields store an index and numeric fields a value, so the
+        # evaluation contexts are read the same way the training ones are.
         self.context_features = torch.from_numpy(
-            eval_data.select(context_labels).to_numpy().astype(np.int64)
+            eval_data.select(context_labels).to_numpy().astype(np.float32)
         )
 
     def __len__(self) -> int:
@@ -228,8 +230,10 @@ class SampledContextualEvaluationDataset(TorchDataset):
         self.pos_item_indices = torch.from_numpy(
             eval_data.select(item_id_label).to_numpy().flatten().astype(np.int64)
         )
+        # Categorical fields store an index and numeric fields a value, so the
+        # evaluation contexts are read the same way the training ones are.
         self.context_features = torch.from_numpy(
-            eval_data.select(context_labels).to_numpy().astype(np.int64)
+            eval_data.select(context_labels).to_numpy().astype(np.float32)
         )
 
         n_train_users = train_interactions.shape[0]

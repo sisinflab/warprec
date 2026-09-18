@@ -112,10 +112,12 @@ class Sessions:
                         if self.timestamp_label in self._inter_df.columns
                         else []
                     ),
-                    # Keep context if exists
+                    # Keep context if exists. The columns are carried through as
+                    # they are: a numeric field would lose its value to an integer
+                    # cast, and a multi-valued one holds several indices per cell.
                     *(
                         [
-                            nw.col(c).cast(nw.Int64)
+                            nw.col(c)
                             for c in self.context_labels
                             if c in self._inter_df.columns
                         ]

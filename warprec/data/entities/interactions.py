@@ -8,6 +8,7 @@ from torch.utils.data import DataLoader
 from narwhals.dataframe import DataFrame
 from scipy.sparse import csr_matrix, coo_matrix
 
+from warprec.data.entities.context import build_context_array
 from warprec.data.entities.train_structures import (
     InteractionDataset,
     PointWiseDataset,
@@ -49,10 +50,13 @@ class Interactions:
         rating_type (RatingType): The type of rating to be used.
         duplicates (str): How repeated (user, item) rows are aggregated into the
             matrix. One of 'max', 'mean', 'first', 'last' or 'sum'.
+        negative_sampling (str): How negatives are drawn, 'uniform' or 'popularity'.
         rating_label (str): The label of the rating column.
         timestamp_label (str): The label of the timestamp column.
         context_labels (Optional[List[str]]): The list of labels of the
             contextual data.
+        context_types (Optional[dict]): The type of each context field.
+        context_max_len (int): The widest multi-valued field, 1 when there is none.
     """
 
     def __init__(
@@ -68,9 +72,12 @@ class Interactions:
         batch_size: int = 1024,
         rating_type: RatingType = RatingType.IMPLICIT,
         duplicates: str = "max",
+        negative_sampling: str = "uniform",
         rating_label: str = None,
         timestamp_label: str = None,
         context_labels: Optional[List[str]] = None,
+        context_types: Optional[dict] = None,
+        context_max_len: int = 1,
     ) -> None:
         # pylint: disable = too-many-arguments, too-many-positional-arguments
         # Each argument is a distinct part of the data schema.
@@ -82,6 +89,7 @@ class Interactions:
         self.batch_size = batch_size
         self.rating_type = rating_type
         self.duplicates = duplicates
+        self.negative_sampling = negative_sampling
 
         # Setup the training variables
         self._inter_dict: Optional[dict] = None
@@ -99,6 +107,8 @@ class Interactions:
         self.rating_label = rating_label if rating_type == RatingType.EXPLICIT else None
         self.timestamp_label = timestamp_label
         self.context_labels = context_labels if context_labels else []
+        self.context_types = context_types if context_types else {}
+        self.context_max_len = context_max_len
 
         # Setup flat views cache
         self._flat_users: Optional[np.ndarray] = None
@@ -453,7 +463,16 @@ class Interactions:
         context_tensor = None
         if include_context and self.context_labels:
             ctx_vals = self._inter_df.select(self.context_labels).to_numpy()
-            context_tensor = torch.tensor(ctx_vals, dtype=torch.long)
+            context_tensor = torch.from_numpy(
+                build_context_array(
+                    ctx_vals,
+                    [
+                        self.context_types.get(name, "token")
+                        for name in self.context_labels
+                    ],
+                    self.context_max_len,
+                )
+            )
 
         # Create the Dataset
         dataset = PointWiseDataset(
@@ -464,6 +483,7 @@ class Interactions:
             niid=self._niid,
             side_information=side_info_tensor,
             contexts=context_tensor,
+            negative_sampling=self.negative_sampling,
         )
 
         # Set the generator for the Dataloader for reproducibility
@@ -505,6 +525,7 @@ class Interactions:
             item_ids=pos_items,
             sparse_matrix=self.get_sparse(),
             niid=self._niid,
+            negative_sampling=self.negative_sampling,
         )
 
         # Set the generator for the Dataloader for reproducibility
