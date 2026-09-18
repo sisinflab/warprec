@@ -2,6 +2,41 @@
 
 <!-- version list -->
 
+## v1.7.0 (2026-09-18)
+
+### Bug Fixes
+
+- Bounded the AddEASE and CEASE alpha to a convex combination
+  ([`dc5d070`](https://github.com/sisinflab/warprec/commit/dc5d070d2868c25aa2df98d25e0746889eba2382))
+
+- Read the side information with its own format, columns and item dtype
+  ([`888ad71`](https://github.com/sisinflab/warprec/commit/888ad715874312967c5a1d4f1188caaf96ee27f3))
+
+### Chores
+
+- Removed unused comments
+  ([`a69dff2`](https://github.com/sisinflab/warprec/commit/a69dff2078663cbbce4a7a3232861ad6883681b5))
+
+### Documentation
+
+- Updated the algorithm count to the 73 models actually shipped
+  ([`f37b8f2`](https://github.com/sisinflab/warprec/commit/f37b8f239999f15b757a05bfbf724e62ef3dbbfb))
+
+### Features
+
+- Added multi-valued context fields pooled into a single field vector
+  ([`e6951e2`](https://github.com/sisinflab/warprec/commit/e6951e28c4ce5987ec317ed9fd2243b41ec99f16))
+
+- Added numeric context fields kept as values instead of categories
+  ([`4f2195a`](https://github.com/sisinflab/warprec/commit/4f2195acd697fca67bd6005d84b29b049676ad2c))
+
+- Added popularity-based negative sampling alongside the uniform default
+  ([`ad39a30`](https://github.com/sisinflab/warprec/commit/ad39a301bcfdc9cdf9e9faf03e16b1b03ab013d2))
+
+- Added the option to keep items that carry only side information
+  ([`d68ad7c`](https://github.com/sisinflab/warprec/commit/d68ad7cd23139a41283ba4c766518d098f03d86e))
+
+
 ## v1.6.2 (2026-09-18)
 
 ### Bug Fixes
