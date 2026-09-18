@@ -7,6 +7,7 @@ from warprec.common import initialize_datasets, log_evaluation
 from warprec.data.reader import ReaderFactory
 from warprec.data.writer import WriterFactory
 from warprec.utils.callback import WarpRecCallback
+from warprec.evaluation import build_evaluator
 from warprec.utils.config import load_eval_configuration, load_callback
 from warprec.utils.helpers import (
     build_evaluation_dataloader_kwargs,
@@ -18,7 +19,6 @@ from warprec.utils.helpers import (
 from warprec.utils.logger import logger
 from warprec.utils.registry import model_registry
 from warprec.recommenders.base_recommender import IterativeRecommender
-from warprec.pipelines.common import build_evaluator
 from warprec.evaluation.statistical_significance import compute_paired_statistical_test
 
 
@@ -69,7 +69,7 @@ def eval_pipeline(path: str):
         model_results: Dict[str, Any] = {}
 
     # Create instance of main evaluator used to evaluate the main dataset
-    evaluator = build_evaluator(config, main_dataset)
+    evaluator = build_evaluator(config.evaluation, main_dataset)
 
     # Experiment device
     general_device = config.general.device

@@ -29,6 +29,7 @@ def seed_worker(worker_id: int):
 
 
 class Interactions:
+    # pylint: disable = too-many-instance-attributes  # this class is the state it holds
     """Interactions class will handle the data of the transactions.
 
     Args:
@@ -71,6 +72,8 @@ class Interactions:
         timestamp_label: str = None,
         context_labels: Optional[List[str]] = None,
     ) -> None:
+        # pylint: disable = too-many-arguments, too-many-positional-arguments
+        # Each argument is a distinct part of the data schema.
         # Setup the variables
         self._inter_df = data
         self._inter_side = side_data.clone() if side_data is not None else None

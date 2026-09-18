@@ -40,6 +40,8 @@ class Splitter:
         val_timestamp: Optional[Union[int, str]] = None,
         val_seed: int = 42,
     ) -> SplitResult:
+        # pylint: disable = too-many-arguments, too-many-positional-arguments
+        # Each argument is a distinct part of the data schema.
         """The main method of the class. This method must be called to split the data.
 
         When called, this method will return the splitting calculated by
@@ -185,6 +187,8 @@ class Splitter:
         timestamp: Optional[Union[int, str]] = None,
         seed: int = 42,
     ) -> List[Tuple[DataFrame[Any], DataFrame[Any]]]:
+        # pylint: disable = too-many-arguments, too-many-positional-arguments
+        # Each argument is a distinct part of the data schema.
         """Process the splitting based on the selected strategy.
 
         Args:

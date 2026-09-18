@@ -1,6 +1,6 @@
 import time
 from dataclasses import dataclass
-from typing import List, Optional, Tuple, Union
+from typing import List, Optional, Tuple
 
 import ray
 
@@ -12,7 +12,6 @@ from warprec.common import (
     warprec_version,
 )
 from warprec.data import Dataset
-from warprec.evaluation.evaluator import Evaluator
 from warprec.evaluation.statistical_significance import compute_paired_statistical_test
 from warprec.data.reader import ReaderFactory
 from warprec.data.reader.base_reader import Reader
@@ -20,9 +19,6 @@ from warprec.data.writer import WriterFactory
 from warprec.data.writer.base_writer import Writer
 from warprec.utils.callback import WarpRecCallback
 from warprec.utils.config import (
-    DesignConfiguration,
-    EstimateConfiguration,
-    EvalConfiguration,
     TrainConfiguration,
     load_callback,
     load_train_configuration,
@@ -262,37 +258,6 @@ def prepare_datasets(
                 raise ValueError(f"File format '{file_format}'not supported.")
 
     return main_dataset, val_dataset, fold_dataset
-
-
-PipelineConfiguration = Union[
-    TrainConfiguration,
-    EstimateConfiguration,
-    EvalConfiguration,
-    DesignConfiguration,
-]
-
-
-def build_evaluator(config: PipelineConfiguration, dataset: Dataset) -> Evaluator:
-    """Build the evaluator every pipeline uses for its main dataset.
-
-    Args:
-        config (PipelineConfiguration): The configuration of the experiment.
-        dataset (Dataset): The dataset the models are evaluated on.
-
-    Returns:
-        Evaluator: The evaluator bound to that dataset.
-    """
-    return Evaluator(
-        list(config.evaluation.metrics),
-        list(config.evaluation.top_k),
-        train_set=dataset.train_set.get_sparse(),
-        additional_data=dataset.get_stash(),
-        complex_metrics=config.evaluation.complex_metrics,
-        feature_lookup=dataset.get_features_lookup(),
-        user_cluster=dataset.get_user_cluster(),
-        item_cluster=dataset.get_item_cluster(),
-        mask_seen=config.evaluation.mask_seen,
-    )
 
 
 def report_statistical_significance(

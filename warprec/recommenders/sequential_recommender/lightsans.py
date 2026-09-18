@@ -16,6 +16,7 @@ from warprec.utils.registry import model_registry
 
 
 class LightSANsLayer(nn.Module):
+    # pylint: disable = too-many-instance-attributes  # this class is the state it holds
     """Implements the Low-Rank Decomposed Self-Attention and Decoupled Position Encoding."""
 
     def __init__(

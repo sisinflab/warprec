@@ -7,6 +7,7 @@ import torch
 from torch import Tensor
 
 from warprec.data import Dataset
+from warprec.evaluation import build_evaluator
 from warprec.utils.helpers import (
     build_evaluation_dataloader_kwargs,
     resolve_available_cpus,
@@ -19,10 +20,9 @@ from warprec.recommenders.base_recommender import (
     SequentialRecommenderUtils,
     ContextRecommenderUtils,
 )
-from warprec.evaluation import Evaluator
 from warprec.utils.helpers import load_custom_modules
 from warprec.utils.config import RecomModel
-from warprec.utils.config.evaluation_configuration import ComplexMetricConfig
+from warprec.utils.config.evaluation_configuration import EvaluationConfig
 from warprec.utils.registry import model_registry
 
 
@@ -30,12 +30,7 @@ from warprec.utils.registry import model_registry
 def remote_evaluation_and_timing(
     model: Recommender,
     main_dataset: Dataset,
-    metrics: List[str],
-    top_k: List[int],
-    complex_metrics: List[ComplexMetricConfig],
-    strategy: str,
-    num_negatives: int,
-    mask_seen: str,
+    evaluation: EvaluationConfig,
     num_workers: Optional[int],
     device: str,
     requires_timing: bool,
@@ -48,12 +43,7 @@ def remote_evaluation_and_timing(
     Args:
         model (Recommender): The trained model to evaluate.
         main_dataset (Dataset): The dataset on which evaluate the model.
-        metrics (List[str]): The name of the metrics to compute.
-        top_k (List[int]): The cutoff values.
-        complex_metrics (List[ComplexMetricConfig]): The configuration of the complex metrics.
-        strategy (str): The evaluation strategy.
-        num_negatives (int): The number of negative samples to use with 'sampled' strategy.
-        mask_seen (str): Which already-seen items are excluded from the ranking.
+        evaluation (EvaluationConfig): The evaluation section of the configuration.
         num_workers (Optional[int]): The number of dataloader workers to use for evaluation.
         device (str): The device to use for evaluation.
         requires_timing (bool): Wether or not to calculate timings.
@@ -75,17 +65,7 @@ def remote_evaluation_and_timing(
     model.set_seed(model.seed)
 
     # Instantiate the Evaluator locally on the worker node
-    evaluator = Evaluator(
-        metric_list=metrics,
-        k_values=top_k,
-        train_set=main_dataset.train_set.get_sparse(),
-        additional_data=main_dataset.get_stash(),
-        complex_metrics=complex_metrics,
-        feature_lookup=main_dataset.get_features_lookup(),
-        user_cluster=main_dataset.get_user_cluster(),
-        item_cluster=main_dataset.get_item_cluster(),
-        mask_seen=mask_seen,
-    )
+    evaluator = build_evaluator(evaluation, main_dataset)
 
     # Retrieve dataloader
     evaluation_dataloader_kwargs = build_evaluation_dataloader_kwargs(
@@ -96,8 +76,8 @@ def remote_evaluation_and_timing(
     dataloader = retrieve_evaluation_dataloader(
         dataset=main_dataset,
         model=model,
-        strategy=strategy,
-        num_negatives=num_negatives,
+        strategy=evaluation.strategy,
+        num_negatives=evaluation.num_negatives,
         **evaluation_dataloader_kwargs,
     )
 
@@ -106,7 +86,7 @@ def remote_evaluation_and_timing(
     evaluator.evaluate(
         model=model,
         dataloader=dataloader,
-        strategy=strategy,
+        strategy=evaluation.strategy,
         dataset=main_dataset,
         device=device,
         verbose=True,

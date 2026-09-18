@@ -30,9 +30,9 @@ from warprec.recommenders.trainer.logger_callbacks import (
 )
 from warprec.recommenders.trainer.objectives import objective_function
 from warprec.utils.config import (
+    EvaluationConfig,
     RecomModel,
     DashboardConfig,
-    ComplexMetricConfig,
 )
 from warprec.utils.enums import ErroredTrialPolicy
 from warprec.utils.pause import is_pause_requested
@@ -175,14 +175,9 @@ class Trainer:
         model_name: str,
         params: RecomModel,
         dataset: Dataset,
-        metrics: List[str],
-        topk: List[int],
+        evaluation: EvaluationConfig,
         validation_score: str,
         device: str = "cpu",
-        evaluation_strategy: str = "full",
-        num_negatives: int = 99,
-        mask_seen: str = "auto",
-        complex_metrics: List[ComplexMetricConfig] = None,
         ray_verbose: int = 1,
     ) -> TrainingOutcome:
         """Main method of the Trainer class.
@@ -194,15 +189,9 @@ class Trainer:
             model_name (str): The name of the model to optimize.
             params (RecomModel): The parameters of the model.
             dataset (Dataset): The dataset to use during training.
-            metrics (List[str]): List of metrics to compute on each report.
-            topk (List[int]): List of cutoffs for metrics.
+            evaluation (EvaluationConfig): The evaluation section of the configuration.
             validation_score (str): The metric to monitor during training.
             device (str): The device that will be used for tensor operations.
-            evaluation_strategy (str): Evaluation strategy, either "full" or "sampled".
-            num_negatives (int): Number of negative samples to use in "sampled" strategy.
-            mask_seen (str): Which already-seen items are excluded from the ranking.
-            complex_metrics (List[ComplexMetricConfig]): List of complex metrics
-                to compute.
             ray_verbose (int): The Ray level of verbosity.
 
         Returns:
@@ -219,14 +208,9 @@ class Trainer:
             model_name=model_name,
             params=params,
             dataset=dataset,
-            metrics=metrics,
-            topk=topk,
+            evaluation=evaluation,
             validation_score=validation_score,
             device=device,
-            evaluation_strategy=evaluation_strategy,
-            num_negatives=num_negatives,
-            mask_seen=mask_seen,
-            complex_metrics=complex_metrics,
             ray_verbose=ray_verbose,
         )
 
@@ -291,14 +275,9 @@ class Trainer:
         model_name: str,
         params: RecomModel,
         datasets: List[Dataset],
-        metrics: List[str],
-        topk: List[int],
+        evaluation: EvaluationConfig,
         validation_score: str,
         device: str = "cpu",
-        evaluation_strategy: str = "full",
-        num_negatives: int = 99,
-        mask_seen: str = "auto",
-        complex_metrics: List[ComplexMetricConfig] = None,
         desired_training_it: str = "median",
         ray_verbose: int = 1,
     ) -> TrainingOutcome:
@@ -308,15 +287,9 @@ class Trainer:
             model_name (str): The name of the model to optimize.
             params (RecomModel): The parameters of the model.
             datasets (List[Dataset]): The list of datasets to use during training.
-            metrics (List[str]): List of metrics to compute on each report.
-            topk (List[int]): List of cutoffs for metrics.
+            evaluation (EvaluationConfig): The evaluation section of the configuration.
             validation_score (str): The metric to monitor during training.
             device (str): The device that will be used for tensor operations.
-            evaluation_strategy (str): Evaluation strategy, either "full" or "sampled".
-            num_negatives (int): Number of negative samples to use in "sampled" strategy.
-            mask_seen (str): Which already-seen items are excluded from the ranking.
-            complex_metrics (List[ComplexMetricConfig]): List of complex metrics
-                to compute.
             desired_training_it (str): The type of statistic to use to
                 select the number of training iterations to use
                 when training on the full dataset. Either "min", "max",
@@ -337,14 +310,9 @@ class Trainer:
             model_name=model_name,
             params=params,
             dataset=datasets,
-            metrics=metrics,
-            topk=topk,
+            evaluation=evaluation,
             validation_score=validation_score,
             device=device,
-            evaluation_strategy=evaluation_strategy,
-            num_negatives=num_negatives,
-            mask_seen=mask_seen,
-            complex_metrics=complex_metrics,
             ray_verbose=ray_verbose,
         )
 
@@ -404,14 +372,9 @@ class Trainer:
         model_name: str,
         params: RecomModel,
         dataset: Union[Dataset, List[Dataset]],
-        metrics: List[str],
-        topk: List[int],
+        evaluation: EvaluationConfig,
         validation_score: str,
         device: str,
-        evaluation_strategy: str,
-        num_negatives: int,
-        mask_seen: str,
-        complex_metrics: List[ComplexMetricConfig],
         ray_verbose: int,
     ) -> Tuner:
         """Prepares the Ray Tuner instance.
@@ -421,14 +384,9 @@ class Trainer:
             params (RecomModel): The parameters of the model.
             dataset (Union[Dataset, List[Dataset]]): The dataset(s) to use during
                 training.
-            metrics (List[str]): List of metrics to compute on each report.
-            topk (List[int]): List of cutoffs for metrics.
+            evaluation (EvaluationConfig): The evaluation section of the configuration.
             validation_score (str): The metric to monitor during training.
             device (str): The device that will be used for tensor operations.
-            evaluation_strategy (str): Evaluation strategy, either "full" or "sampled".
-            num_negatives (int): Number of negative samples to use in "sampled" strategy.
-            mask_seen (str): Which already-seen items are excluded from the ranking.
-            complex_metrics (List[ComplexMetricConfig]): List of complex metrics to compute.
             ray_verbose (int): The Ray level of verbosity.
 
         Returns:
@@ -452,17 +410,12 @@ class Trainer:
         data_bundle = {
             "model_name": model_name,
             "dataset_folds": ray.put(dataset),
-            "metrics": metrics,
-            "topk": topk,
+            "evaluation": evaluation,
             "validation_top_k": validation_top_k,
             "validation_metric_name": validation_metric_name,
             "mode": opt_config.properties.mode,
             "device": device,
             "eval_every_n": opt_config.eval_every_n,
-            "strategy": evaluation_strategy,
-            "num_negatives": num_negatives,
-            "mask_seen": mask_seen,
-            "complex_metrics": complex_metrics,
             "lr_scheduler": opt_config.lr_scheduler,
             "optimizer": opt_config.optimizer,
             "seed": opt_config.properties.seed,

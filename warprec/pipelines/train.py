@@ -274,12 +274,7 @@ def train_pipeline(path: str):
                     ).remote(
                         model=best_model,
                         main_dataset=main_dataset,
-                        metrics=config.evaluation.metrics,
-                        top_k=config.evaluation.top_k,
-                        complex_metrics=config.evaluation.complex_metrics,
-                        strategy=config.evaluation.strategy,
-                        num_negatives=config.evaluation.num_negatives,
-                        mask_seen=config.evaluation.mask_seen,
+                        evaluation=config.evaluation,
                         num_workers=params.optimization.num_workers,
                         device=device,
                         requires_timing=config.general.time_report,
@@ -434,14 +429,15 @@ def single_split_flow(
     logger.attention(
         f"Validation metric for this experiment has been set to: {validation_score}"
     )
-    if eval_config.full_evaluation_on_report:
-        metrics = eval_config.metrics
-        topk = eval_config.top_k
-        complex_metrics = eval_config.complex_metrics
-    else:
-        metrics = [val_metric]
-        topk = [val_k]
-        complex_metrics = []
+    # Per-report evaluation is narrowed to the validation metric unless the
+    # configuration asks for the full set on every report.
+    report_evaluation = (
+        eval_config
+        if eval_config.full_evaluation_on_report
+        else eval_config.model_copy(
+            update={"metrics": [val_metric], "top_k": [val_k], "complex_metrics": []}
+        )
+    )
 
     # Start HPO phase on test set,
     # no need of further training
@@ -449,14 +445,9 @@ def single_split_flow(
         model_name,
         params,
         dataset,
-        metrics=metrics,
-        topk=topk,
+        evaluation=report_evaluation,
         validation_score=validation_score,
         device=device,
-        evaluation_strategy=config.evaluation.strategy,
-        mask_seen=config.evaluation.mask_seen,
-        num_negatives=config.evaluation.num_negatives,
-        complex_metrics=complex_metrics,
         ray_verbose=config.general.ray_verbose,
     )
 
@@ -500,28 +491,24 @@ def multiple_fold_validation_flow(
     logger.attention(
         f"Validation metric for this experiment has been set to: {validation_score}"
     )
-    if eval_config.full_evaluation_on_report:
-        metrics = eval_config.metrics
-        topk = eval_config.top_k
-        complex_metrics = eval_config.complex_metrics
-    else:
-        metrics = [val_metric]
-        topk = [val_k]
-        complex_metrics = []
+    # Per-report evaluation is narrowed to the validation metric unless the
+    # configuration asks for the full set on every report.
+    report_evaluation = (
+        eval_config
+        if eval_config.full_evaluation_on_report
+        else eval_config.model_copy(
+            update={"metrics": [val_metric], "top_k": [val_k], "complex_metrics": []}
+        )
+    )
 
     # Start HPO phase on validation folds
     outcome = trainer.train_multiple_fold(
         model_name,
         params,
         val_datasets,
-        metrics=metrics,
-        topk=topk,
+        evaluation=report_evaluation,
         validation_score=validation_score,
         device=device,
-        evaluation_strategy=config.evaluation.strategy,
-        mask_seen=config.evaluation.mask_seen,
-        num_negatives=config.evaluation.num_negatives,
-        complex_metrics=complex_metrics,
         desired_training_it=desired_training_it,
         ray_verbose=config.general.ray_verbose,
     )

@@ -765,6 +765,7 @@ class IterativeRecommender(Recommender, L.LightningModule):
 
 
 class ContextRecommenderUtils(nn.Module, ABC):
+    # pylint: disable = too-many-instance-attributes  # this class is the state it holds
     """Common definition for context-aware recommenders.
 
     This Mixin handles:

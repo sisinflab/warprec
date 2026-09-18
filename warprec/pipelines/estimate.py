@@ -11,10 +11,10 @@ import torch
 
 from warprec.common import initialize_datasets
 from warprec.data import Dataset
+from warprec.evaluation import build_evaluator
 from warprec.data.reader import ReaderFactory
 from warprec.data.writer import WriterFactory
 from warprec.evaluation.evaluator import Evaluator
-from warprec.pipelines.common import build_evaluator
 from warprec.recommenders.base_recommender import (
     IterativeRecommender,
     Recommender,
@@ -609,7 +609,7 @@ def _run_estimate_setup(
     model.to(device)
 
     eval_tracker = EstimateStageTracker(baseline_rss_mb=baseline_rss_mb, device=device)
-    evaluator = build_evaluator(config, eval_dataset)
+    evaluator = build_evaluator(config.evaluation, eval_dataset)
     eval_estimate = _estimate_eval_loop(
         evaluator=evaluator,
         model=model,

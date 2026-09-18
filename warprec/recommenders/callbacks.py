@@ -32,6 +32,7 @@ def _get_memory_usage() -> Dict[str, float]:
 
 
 class WarpRecLightningIntegrationCallback(L.Callback):
+    # pylint: disable = too-many-instance-attributes  # this class is the state it holds
     """PyTorch Lightning callback implementation using WarpRec's custom Evaluator.
 
     Args:

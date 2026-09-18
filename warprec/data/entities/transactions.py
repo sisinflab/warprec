@@ -14,6 +14,7 @@ from warprec.utils.enums import RatingType
 
 
 class Transactions:
+    # pylint: disable = too-many-instance-attributes  # this class is the state it holds
     """Row-oriented view of the interaction records of a split.
 
     ``Interactions`` represents a split as a sparse user x item matrix. A matrix
@@ -57,6 +58,8 @@ class Transactions:
         timestamp_label: Optional[str] = None,
         batch_size: int = 1024,
     ) -> None:
+        # pylint: disable = too-many-arguments, too-many-positional-arguments
+        # Each argument is a distinct part of the data schema.
         self._df = data
         self._umap = user_mapping
         self._imap = item_mapping
