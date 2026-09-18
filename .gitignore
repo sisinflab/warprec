@@ -63,8 +63,15 @@ powermetrics_log.txt
 coverage.xml
 junit_result.xml
 .coverage
-experiment/
-tests/
+experiment*/
+# Local scratch output only: anchored to the repository root so that the
+# versioned test suite, and any package directory called 'tests', survive.
+/test*/
+!/tests/
+
+# Datasets
+# Anchored to the repository root, otherwise this also swallows warprec/data/.
+/data*/
 
 # MkDocs build output
 docs/site/
