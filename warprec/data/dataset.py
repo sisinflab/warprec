@@ -39,6 +39,8 @@ class Dataset:
         rating_type (RatingType): The type of rating used.
         duplicates (str): How repeated (user, item) rows are aggregated into the
             interaction matrix. One of 'max', 'mean', 'first', 'last' or 'sum'.
+        negative_sampling (str): How negatives are drawn during training, 'uniform'
+            or 'popularity'.
         keep_unseen_items (bool): Whether items that carry side information but no
             interaction stay in the catalogue, so that the models scoring from
             attributes can recommend them.
@@ -84,6 +86,7 @@ class Dataset:
         batch_size: int = 1024,
         rating_type: RatingType = RatingType.IMPLICIT,
         duplicates: str = "max",
+        negative_sampling: str = "uniform",
         keep_unseen_items: bool = False,
         user_id_label: str = "user_id",
         item_id_label: str = "item_id",
@@ -147,6 +150,7 @@ class Dataset:
         )
         self.batch_size = batch_size
         self._duplicates = duplicates
+        self._negative_sampling = negative_sampling
 
         # Values that will be used to calculate mappings
         _uid = (
@@ -273,6 +277,7 @@ class Dataset:
             batch_size=batch_size,
             rating_type=rating_type,
             duplicates=duplicates,
+            negative_sampling=negative_sampling,
             rating_label=rating_label,
             timestamp_label=timestamp_label,
             context_labels=context_labels,
@@ -289,6 +294,7 @@ class Dataset:
                 batch_size=batch_size,
                 rating_type=rating_type,
                 duplicates=duplicates,
+                negative_sampling=negative_sampling,
                 rating_label=rating_label,
                 context_labels=context_labels,
             )
@@ -308,6 +314,7 @@ class Dataset:
                 rating_label=rating_label,
                 timestamp_label=timestamp_label,
                 batch_size=batch_size,
+                negative_sampling=negative_sampling,
             )
 
             if mat_eval_data is not None:
@@ -323,6 +330,7 @@ class Dataset:
                     rating_label=rating_label,
                     timestamp_label=timestamp_label,
                     batch_size=batch_size,
+                    negative_sampling=negative_sampling,
                 )
 
         # Save side information inside the dataset
@@ -445,6 +453,7 @@ class Dataset:
         batch_size: int = 1024,
         rating_type: RatingType = RatingType.IMPLICIT,
         duplicates: str = "max",
+        negative_sampling: str = "uniform",
         rating_label: str = None,
         timestamp_label: str = None,
         context_labels: Optional[List[str]] = None,
@@ -463,6 +472,7 @@ class Dataset:
             batch_size (int): The batch size of the interaction.
             rating_type (RatingType): The type of rating used.
             duplicates (str): How repeated (user, item) rows are aggregated.
+            negative_sampling (str): How negatives are drawn during training.
             rating_label (str): The label of the rating column.
             timestamp_label (str): The label of the timestamp column.
             context_labels (Optional[List[str]]): The list of labels of the
@@ -483,6 +493,7 @@ class Dataset:
             batch_size=batch_size,
             rating_type=rating_type,
             duplicates=duplicates,
+            negative_sampling=negative_sampling,
             rating_label=rating_label,
             timestamp_label=timestamp_label,
             context_labels=context_labels,

@@ -49,6 +49,7 @@ class Interactions:
         rating_type (RatingType): The type of rating to be used.
         duplicates (str): How repeated (user, item) rows are aggregated into the
             matrix. One of 'max', 'mean', 'first', 'last' or 'sum'.
+        negative_sampling (str): How negatives are drawn, 'uniform' or 'popularity'.
         rating_label (str): The label of the rating column.
         timestamp_label (str): The label of the timestamp column.
         context_labels (Optional[List[str]]): The list of labels of the
@@ -68,6 +69,7 @@ class Interactions:
         batch_size: int = 1024,
         rating_type: RatingType = RatingType.IMPLICIT,
         duplicates: str = "max",
+        negative_sampling: str = "uniform",
         rating_label: str = None,
         timestamp_label: str = None,
         context_labels: Optional[List[str]] = None,
@@ -82,6 +84,7 @@ class Interactions:
         self.batch_size = batch_size
         self.rating_type = rating_type
         self.duplicates = duplicates
+        self.negative_sampling = negative_sampling
 
         # Setup the training variables
         self._inter_dict: Optional[dict] = None
@@ -464,6 +467,7 @@ class Interactions:
             niid=self._niid,
             side_information=side_info_tensor,
             contexts=context_tensor,
+            negative_sampling=self.negative_sampling,
         )
 
         # Set the generator for the Dataloader for reproducibility
@@ -505,6 +509,7 @@ class Interactions:
             item_ids=pos_items,
             sparse_matrix=self.get_sparse(),
             niid=self._niid,
+            negative_sampling=self.negative_sampling,
         )
 
         # Set the generator for the Dataloader for reproducibility

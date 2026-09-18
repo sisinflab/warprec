@@ -42,6 +42,7 @@ class Transactions:
         rating_label (Optional[str]): The label of the rating column.
         timestamp_label (Optional[str]): The label of the timestamp column.
         batch_size (int): The default batch size for the dataloaders.
+        negative_sampling (str): How negatives are drawn, 'uniform' or 'popularity'.
     """
 
     def __init__(
@@ -57,6 +58,7 @@ class Transactions:
         rating_label: Optional[str] = None,
         timestamp_label: Optional[str] = None,
         batch_size: int = 1024,
+        negative_sampling: str = "uniform",
     ) -> None:
         # pylint: disable = too-many-arguments, too-many-positional-arguments
         # Each argument is a distinct part of the data schema.
@@ -74,6 +76,7 @@ class Transactions:
         self.rating_label = rating_label if rating_type == RatingType.EXPLICIT else None
         self.timestamp_label = timestamp_label
         self.batch_size = batch_size
+        self.negative_sampling = negative_sampling
 
         namespace = nw.get_native_namespace(data)
         umap_df = nw.from_dict(
@@ -211,6 +214,7 @@ class Transactions:
             niid=self._og_niid,
             side_information=side_info_tensor,
             contexts=context_tensor,
+            negative_sampling=self.negative_sampling,
         )
 
         generator = torch.Generator()

@@ -7,6 +7,7 @@ from warprec.utils.logger import logger
 
 FileFormat = Literal["tabular", "parquet"]
 DuplicatePolicy = Literal["max", "mean", "first", "last", "sum"]
+NegativeSampling = Literal["uniform", "popularity"]
 
 
 class SplitReading(BaseModel):
@@ -161,6 +162,9 @@ class ReaderConfig(BaseModel):
         duplicates (Optional[DuplicatePolicy]): How repeated (user, item) rows are
             aggregated when building the interaction matrix. Defaults to 'max'.
             With implicit feedback every policy except 'sum' yields a binary matrix.
+        negative_sampling (Optional[NegativeSampling]): How negatives are drawn during
+            training. 'uniform' gives every item the same chance, 'popularity' draws
+            proportionally to a dampened interaction count. Defaults to 'uniform'.
         split (Optional[SplitReading]): The information of the split reading process.
         side (Optional[SideInformationReading]): The side information of the dataset.
         clustering (Optional[ClusteringInformationReading]): The clustering information
@@ -179,6 +183,7 @@ class ReaderConfig(BaseModel):
     header: Optional[bool] = True
     rating_type: RatingType
     duplicates: Optional[DuplicatePolicy] = "max"
+    negative_sampling: Optional[NegativeSampling] = "uniform"
     split: Optional[SplitReading] = Field(default_factory=SplitReading)
     side: Optional[SideInformationReading] = None
     clustering: Optional[ClusteringInformationReading] = None

@@ -44,6 +44,77 @@ class InteractionDataset(Dataset):
         return (user_tensor,)
 
 
+class NegativeSampler:
+    """Draws items a user has not interacted with.
+
+    Uniform sampling treats every item as equally likely, which under-samples the
+    head of the catalogue relative to how often it is actually seen. Popularity
+    sampling draws proportionally to a dampened interaction count, the standard
+    alternative, which produces harder negatives for the popular items a model is
+    most likely to over-recommend.
+
+    Args:
+        sparse_matrix (csr_matrix): The user-item interaction matrix, used to reject
+            items the user has already interacted with.
+        niid (int): The number of items to sample from.
+        strategy (str): Either 'uniform' or 'popularity'.
+        damping (float): The exponent applied to the interaction counts under the
+            'popularity' strategy. The usual choice, 0.75, keeps the head likely
+            without letting it dominate.
+    """
+
+    def __init__(
+        self,
+        sparse_matrix: csr_matrix,
+        niid: int,
+        strategy: str = "uniform",
+        damping: float = 0.75,
+    ):
+        self.sparse_matrix = sparse_matrix
+        self.niid = niid
+        self.strategy = strategy
+        self._cumulative: Optional[np.ndarray] = None
+
+        if strategy == "popularity":
+            counts = np.asarray((sparse_matrix > 0).sum(axis=0)).ravel()[:niid]
+            weights = np.power(counts.astype(np.float64), damping)
+            total = weights.sum()
+            # A catalogue nobody has touched carries no popularity signal, so the
+            # only meaningful thing left to do is sample uniformly.
+            if total <= 0:
+                self.strategy = "uniform"
+            else:
+                self._cumulative = np.cumsum(weights / total)
+
+    def sample(self, user_idx: int) -> int:
+        """Draw one item the user has not interacted with.
+
+        Args:
+            user_idx (int): The index of the user to sample a negative for.
+
+        Returns:
+            int: The sampled item index.
+        """
+        start = self.sparse_matrix.indptr[user_idx]
+        end = self.sparse_matrix.indptr[user_idx + 1]
+        seen_items = self.sparse_matrix.indices[start:end]
+
+        while True:
+            if self._cumulative is None:
+                candidate = np.random.randint(0, self.niid)
+            else:
+                candidate = int(
+                    np.searchsorted(self._cumulative, np.random.random_sample())
+                )
+                candidate = min(candidate, self.niid - 1)
+
+            # Fast check on sorted array (CSR indices are sorted by default)
+            idx_ins = np.searchsorted(seen_items, candidate)
+            if idx_ins < len(seen_items) and seen_items[idx_ins] == candidate:
+                continue
+            return candidate
+
+
 class PointWiseDataset(Dataset):
     """A PyTorch Dataset for (user, item, rating) triplets that generates samples on-the-fly.
 
@@ -62,6 +133,8 @@ class PointWiseDataset(Dataset):
             of each interaction.
         contexts (Optional[Tensor]): The tensor containing the context information
             of each interaction.
+        negative_sampling (str): The strategy used to draw negatives, either
+            'uniform' or 'popularity'.
     """
 
     def __init__(
@@ -73,6 +146,7 @@ class PointWiseDataset(Dataset):
         niid: int,
         side_information: Optional[Tensor] = None,
         contexts: Optional[Tensor] = None,
+        negative_sampling: str = "uniform",
     ):
         # Keep a copy of positive values
         self.user_ids = user_ids
@@ -85,6 +159,7 @@ class PointWiseDataset(Dataset):
         self.niid = niid
         self.side_information = side_information
         self.contexts = contexts
+        self.sampler = NegativeSampler(sparse_matrix, niid, negative_sampling)
 
         self.num_positives = len(self.user_ids)
         self.total_samples = self.num_positives * (1 + self.neg_samples)
@@ -107,25 +182,9 @@ class PointWiseDataset(Dataset):
         else:
             rating_val = 0.0
 
-            # Fast lookup with csr matrix
             # user_tensor is a 0-d tensor, we need its integer value for indexing
-            user_idx = user_tensor.item()
-            start = self.sparse_matrix.indptr[user_idx]
-            end = self.sparse_matrix.indptr[user_idx + 1]
-            seen_items = self.sparse_matrix.indices[start:end]
-
-            # Negative sampling
-            while True:
-                # NumPy random is generally faster than torch.randint for single scalars
-                candidate = np.random.randint(0, self.niid)
-
-                # Fast check on sorted array (CSR indices are sorted by default)
-                idx_ins = np.searchsorted(seen_items, candidate)
-                if idx_ins < len(seen_items) and seen_items[idx_ins] == candidate:
-                    continue
-
-                item_tensor = torch.tensor(candidate, dtype=torch.long)
-                break
+            candidate = self.sampler.sample(int(user_tensor.item()))
+            item_tensor = torch.tensor(candidate, dtype=torch.long)
 
         # Rating
         rating_tensor = torch.tensor(rating_val, dtype=torch.float)
@@ -154,6 +213,8 @@ class ContrastiveDataset(Dataset):
         item_ids (Tensor): Tensor of item indices for positive interactions.
         sparse_matrix (csr_matrix): The user-item interaction matrix in CSR format.
         niid (int): Total number of items available.
+        negative_sampling (str): The strategy used to draw negatives, either
+            'uniform' or 'popularity'.
     """
 
     def __init__(
@@ -162,11 +223,13 @@ class ContrastiveDataset(Dataset):
         item_ids: Tensor,
         sparse_matrix: csr_matrix,
         niid: int,
+        negative_sampling: str = "uniform",
     ):
         self.user_ids = user_ids
         self.item_ids = item_ids
         self.sparse_matrix = sparse_matrix
         self.niid = niid
+        self.sampler = NegativeSampler(sparse_matrix, niid, negative_sampling)
 
     def __len__(self) -> int:
         return len(self.user_ids)
@@ -177,23 +240,8 @@ class ContrastiveDataset(Dataset):
         pos_item_tensor = self.item_ids[idx]
 
         # Negative Sampling
-        # Retrieve seen items for this user using CSR slicing
-        user_idx = user_tensor.item()
-        start = self.sparse_matrix.indptr[user_idx]
-        end = self.sparse_matrix.indptr[user_idx + 1]
-        seen_items = self.sparse_matrix.indices[start:end]
-
-        while True:
-            # Sample a random item
-            candidate = np.random.randint(0, self.niid)
-
-            # Check if it is a true negative
-            idx_ins = np.searchsorted(seen_items, candidate)
-            if idx_ins < len(seen_items) and seen_items[idx_ins] == candidate:
-                continue
-
-            neg_item_tensor = torch.tensor(candidate, dtype=torch.long)
-            break
+        candidate = self.sampler.sample(int(user_tensor.item()))
+        neg_item_tensor = torch.tensor(candidate, dtype=torch.long)
 
         # Return triplet (user, pos, neg)
         return user_tensor, pos_item_tensor, neg_item_tensor
