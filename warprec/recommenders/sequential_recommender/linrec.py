@@ -42,7 +42,16 @@ class LinRecAttention(nn.Module):
         self.out_proj = nn.Linear(emb_size, emb_size)
         self.dropout = nn.Dropout(dropout)
 
-    def forward(self, x: Tensor, mask=None):
+    def forward(self, x: Tensor, mask: Optional[Tensor] = None) -> Tensor:
+        """Apply linear attention to the sequence representations.
+
+        Args:
+            x (Tensor): The input representations, shaped [batch, seq, embedding].
+            mask (Optional[Tensor]): The padding mask of the sequences, when provided.
+
+        Returns:
+            Tensor: The attended representations.
+        """
         # x shape: [B, S, E]
         b, n, d = x.shape
 
@@ -101,7 +110,15 @@ class LinRecBlock(nn.Module):
         )
         self.norm2 = nn.LayerNorm(emb_size)
 
-    def forward(self, x):
+    def forward(self, x: Tensor) -> Tensor:
+        """Apply one attention block with its residual connections.
+
+        Args:
+            x (Tensor): The input representations.
+
+        Returns:
+            Tensor: The transformed representations.
+        """
         # Attention -> Residual -> Norm
         att_out = self.attention(x)
         x = self.norm1(x + self.dropout1(att_out))

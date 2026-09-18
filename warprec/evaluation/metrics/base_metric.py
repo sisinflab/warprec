@@ -289,7 +289,6 @@ class RatingMetric(BaseMetric):
     @abstractmethod
     def _compute_element_error(self, preds: Tensor, target: Tensor) -> Tensor:
         """Computes the error between predictions and target."""
-        pass
 
     def update(self, preds: Tensor, user_indices: Tensor, **kwargs: Any):
         """Unified update logic using index_add_."""
@@ -463,7 +462,6 @@ class UserAverageTopKMetric(TopKMetric):
         Returns:
             Tensor: The computed metric values per user.
         """
-        pass
 
     def update(self, preds: Tensor, user_indices: Tensor, **kwargs: Any):
         """Unified update logic."""

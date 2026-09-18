@@ -51,7 +51,7 @@ class Hypervolume(TopKMetric):
         self.higher_better = higher_is_better
 
         # Ensure all input lists have the same length to avoid indexing errors
-        if not (len(metric_names) == len(nadir_points) == len(higher_is_better)):
+        if not len(metric_names) == len(nadir_points) == len(higher_is_better):
             raise ValueError(
                 "The lists (names, nadir points, directions) must have the same length."
             )

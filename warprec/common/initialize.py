@@ -139,7 +139,9 @@ def initialize_datasets(
                 )
                 if len(eval_set) == 0:
                     raise ValueError(
-                        "After aligning the split with the training set, it resulted in an empty set. Please check the consistency of your splits and the filtering process."
+                        "After aligning the split with the training set, it resulted in "
+                        "an empty set. Please check the consistency of your splits and "
+                        "the filtering process."
                     )
                 return eval_set
 

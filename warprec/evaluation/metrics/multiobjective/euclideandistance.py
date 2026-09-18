@@ -45,7 +45,7 @@ class EucDistance(TopKMetric):
         super().__init__(k, dist_sync_on_step)
         self.num_users = num_users
 
-        if not (len(metric_names) == len(utopia_points)):
+        if len(metric_names) != len(utopia_points):
             raise ValueError(
                 "The lists (names, utopia points) must have the same length."
             )

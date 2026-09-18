@@ -1,6 +1,7 @@
 # pylint: disable = unused-argument
 import random
 import json
+import hashlib
 from typing import Any, Optional, List, Dict, no_type_check
 from abc import ABC, abstractmethod
 
@@ -8,7 +9,6 @@ import torch
 import lightning as L
 import numpy as np
 import coolname
-import hashlib
 from torch import nn, Tensor
 from torch.nn.init import xavier_normal_, xavier_uniform_, constant_
 from torch.utils.data import DataLoader
@@ -552,6 +552,12 @@ class IterativeRecommender(Recommender, L.LightningModule):
         optimizer_config: Optional[OptimizerConfig] = None,
         lr_scheduler_config: Optional[LRSchedulerConfig] = None,
     ):
+        """Set the optimizer and scheduler used during training.
+
+        Args:
+            optimizer_config (Optional[OptimizerConfig]): The optimizer configuration.
+            lr_scheduler_config (Optional[LRSchedulerConfig]): The scheduler configuration.
+        """
         # Set the optimizer values
         if optimizer_config:
             self._optimizer_name = optimizer_config.name

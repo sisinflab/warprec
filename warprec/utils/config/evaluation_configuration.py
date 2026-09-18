@@ -56,12 +56,20 @@ class StatSignificance(BaseModel):
 
 
 class ComplexMetricConfig(BaseModel):
+    """Definition of a metric that carries its own parameters.
+
+    Attributes:
+        name (str): The registered name of the metric.
+        params (Dict[str, Any]): The parameters passed to the metric on construction.
+    """
+
     name: str
     params: Dict[str, Any] = Field(default_factory=dict)
 
     @field_validator("name")
     @classmethod
     def validate_name(cls, v: str):
+        """Validate the metric name against the registry."""
         if v.upper() not in metric_registry.list_registered():
             raise ValueError(f"Metric {v} not found in registry.")
         return v

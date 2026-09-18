@@ -1,6 +1,8 @@
 # pylint: disable = too-many-branches, too-many-statements
 from typing import Tuple, Optional, List, Any, Dict
 
+import math
+
 import numpy as np
 import torch
 from torch import Tensor
@@ -526,7 +528,12 @@ class Dataset:
                 continue
 
             # Categorical column: one indicator feature per distinct value
-            present = np.array([v is not None and v == v for v in values])
+            present = np.array(
+                [
+                    v is not None and not (isinstance(v, float) and math.isnan(v))
+                    for v in values
+                ]
+            )
             codes, uniques = self._factorize(values[present])
             rows.append(item_idx[present])
             cols.append(codes + offset)

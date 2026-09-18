@@ -14,6 +14,7 @@ from warprec.utils.enums import SplittingStrategies
 
 
 def main():
+    """Run the custom pipeline example."""
     reader = LocalReader()
     data = reader.read_tabular(
         local_path="tests/test_dataset/movielens.csv",

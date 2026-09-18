@@ -25,6 +25,16 @@ class SampledSoftmaxLoss(nn.Module):
     def forward(
         self, seq_output: Tensor, pos_item_emb: Tensor, neg_item_emb: Tensor
     ) -> Tensor:
+        """Compute the loss for one batch of sequences.
+
+        Args:
+            seq_output (Tensor): The sequence representations.
+            pos_item_emb (Tensor): The positive item embeddings.
+            neg_item_emb (Tensor): The negative item embeddings.
+
+        Returns:
+            Tensor: The computed loss.
+        """
         pos_score = torch.sum(seq_output * pos_item_emb, dim=-1, keepdim=True)
         neg_score = torch.matmul(seq_output.unsqueeze(1), neg_item_emb.transpose(1, 2))
         neg_score = neg_score.squeeze(1)
@@ -73,6 +83,16 @@ class LiGRBlock(nn.Module):
         attn_mask: Tensor,
         padding_mask: Tensor,
     ) -> Tensor:
+        """Apply one transformer block to the sequence representations.
+
+        Args:
+            hidden_states (Tensor): The input representations.
+            attn_mask (Tensor): The causal attention mask.
+            padding_mask (Tensor): The padding mask of the sequences.
+
+        Returns:
+            Tensor: The transformed representations.
+        """
         attn_input = self.attn_norm(hidden_states)
         attn_output, _ = self.attention(
             attn_input,

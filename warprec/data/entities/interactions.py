@@ -18,7 +18,12 @@ from warprec.utils.enums import RatingType
 
 
 # Worker seed function for reproducibility
-def seed_worker(worker_id):
+def seed_worker(worker_id: int):
+    """Seed a DataLoader worker so that sampling is reproducible.
+
+    Args:
+        worker_id (int): The index of the worker being seeded.
+    """
     worker_seed = torch.initial_seed() % 2**32
     np.random.seed(worker_seed)
 

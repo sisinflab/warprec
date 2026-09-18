@@ -115,10 +115,10 @@ def remote_evaluation_and_timing(
     eval_time = time.time() - eval_start_time
 
     # Move metrics back to CPU to avoid CUDA errors on the driver node
-    for k, metric_dict in results.items():
+    for metric_dict in results.values():
         for metric_name, value in metric_dict.items():
             if isinstance(value, Tensor):
-                results[k][metric_name] = value.cpu()
+                metric_dict[metric_name] = value.cpu()
 
     # Time Report (if requested)
     inference_time = 0.0

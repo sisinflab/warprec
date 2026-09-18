@@ -542,8 +542,6 @@ def remote_model_pipeline(
 
     # Recommendation writing
     if params.meta.save_recs:
-        from warprec.data.writer import WriterFactory
-
         writer = WriterFactory.get_writer(config=config, timestamp=writer_timestamp)
         ray.get(
             remote_generate_recs.options(

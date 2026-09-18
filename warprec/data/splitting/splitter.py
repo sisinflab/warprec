@@ -10,6 +10,13 @@ from warprec.utils.registry import splitting_registry
 from warprec.utils.logger import logger
 
 
+SplitResult = Tuple[
+    DataFrame[Any],
+    Optional[List[Tuple[DataFrame[Any], DataFrame[Any]]] | DataFrame[Any]],
+    DataFrame[Any],
+]
+
+
 class Splitter:
     """Splitter class will handle the splitting of the data."""
 
@@ -32,11 +39,7 @@ class Splitter:
         val_folds: Optional[int] = None,
         val_timestamp: Optional[Union[int, str]] = None,
         val_seed: int = 42,
-    ) -> Tuple[
-        DataFrame[Any],
-        Optional[List[Tuple[DataFrame[Any], DataFrame[Any]]] | DataFrame[Any]],
-        DataFrame[Any],
-    ]:
+    ) -> SplitResult:
         """The main method of the class. This method must be called to split the data.
 
         When called, this method will return the splitting calculated by
@@ -68,7 +71,7 @@ class Splitter:
             val_seed (int): The seed value for validation set.  Defaults to 42.
 
         Returns:
-            Tuple[DataFrame[Any], Optional[List[Tuple[DataFrame[Any], DataFrame[Any]]] | DataFrame[Any]], DataFrame[Any]]:
+            SplitResult:
                 - DataFrame[Any]: The original train data, used to train
                     the final model of the experiment.
                 - Optional[List[Tuple[DataFrame[Any], DataFrame[Any]]] | DataFrame[Any]]: Either return a list of tuples

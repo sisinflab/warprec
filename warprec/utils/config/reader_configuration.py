@@ -38,6 +38,7 @@ class SplitReading(BaseModel):
 
     @model_validator(mode="after")
     def check_model(self):
+        """Apply the defaults that depend on other fields."""
         # Default the extension to '.parquet'
         if self.file_format == "parquet":
             if self.ext is None or self.ext == ".tsv":

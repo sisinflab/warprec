@@ -449,10 +449,10 @@ class Reader(ABC):
                 # Polars read_parquet
                 pl_df = pl.read_parquet(source, columns=desired_cols)
                 return nw.from_native(pl_df)
-            else:
-                # Pandas read_parquet
-                pd_df = pd.read_parquet(source, columns=desired_cols)
-                return nw.from_native(pd_df)
+
+            # Pandas read_parquet
+            pd_df = pd.read_parquet(source, columns=desired_cols)
+            return nw.from_native(pd_df)
         except Exception as e:
             logger.negative(f"Error reading Parquet with {self.backend}: {e}")
             return nw.from_native(pd.DataFrame())
