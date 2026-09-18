@@ -78,6 +78,7 @@ def eval_pipeline(path: str):
         feature_lookup=main_dataset.get_features_lookup(),
         user_cluster=main_dataset.get_user_cluster(),
         item_cluster=main_dataset.get_item_cluster(),
+        mask_seen=config.evaluation.mask_seen,
     )
 
     # Experiment device
@@ -112,6 +113,7 @@ def eval_pipeline(path: str):
             name=model_name,
             params=model_params,
             interactions=main_dataset.train_set,
+            transactions=main_dataset.train_transactions,
             sessions=main_dataset.train_session,
             seed=42,
             info=main_dataset.info(),

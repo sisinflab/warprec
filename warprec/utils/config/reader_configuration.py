@@ -6,6 +6,7 @@ from warprec.utils.config.common import check_separator, Labels
 from warprec.utils.logger import logger
 
 FileFormat = Literal["tabular", "parquet"]
+DuplicatePolicy = Literal["max", "mean", "first", "last", "sum"]
 
 
 class SplitReading(BaseModel):
@@ -148,6 +149,9 @@ class ReaderConfig(BaseModel):
         header (Optional[bool]): Whether the file has a header or not. Defaults to True.
         rating_type (RatingType): The type of rating to be used. If 'implicit' is chosen,
             the reader will not look for a score.
+        duplicates (Optional[DuplicatePolicy]): How repeated (user, item) rows are
+            aggregated when building the interaction matrix. Defaults to 'max'.
+            With implicit feedback every policy except 'sum' yields a binary matrix.
         split (Optional[SplitReading]): The information of the split reading process.
         side (Optional[SideInformationReading]): The side information of the dataset.
         clustering (Optional[ClusteringInformationReading]): The clustering information
@@ -165,6 +169,7 @@ class ReaderConfig(BaseModel):
     sep: Optional[str] = "\t"
     header: Optional[bool] = True
     rating_type: RatingType
+    duplicates: Optional[DuplicatePolicy] = "max"
     split: Optional[SplitReading] = Field(default_factory=SplitReading)
     side: Optional[SideInformationReading] = None
     clustering: Optional[ClusteringInformationReading] = None

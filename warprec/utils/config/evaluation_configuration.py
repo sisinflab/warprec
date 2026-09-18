@@ -1,4 +1,4 @@
-from typing import List, Optional, Dict, Any
+from typing import List, Literal, Optional, Dict, Any
 
 from pydantic import BaseModel, field_validator, Field
 from warprec.utils.registry import metric_registry
@@ -80,6 +80,11 @@ class EvaluationConfig(BaseModel):
         batch_size (Optional[int]): Batch size used during evaluation.
         strategy (Optional[str]): Evaluation strategy, either "full" or "sampled".
         num_negatives (Optional[int]): Number of negative samples to use in "sampled" strategy.
+        mask_seen (Optional[Literal["auto", "context", "pair", "none"]]): Which
+            already-seen items are excluded from the ranking. 'auto' excludes items
+            seen in the same context when the dataset has contextual columns and
+            every seen item otherwise, 'context' and 'pair' force either behaviour,
+            'none' excludes nothing. Defaults to 'auto'.
         seed (Optional[int]): Random seed for reproducibility. Used in negative sampling.
         stat_significance (Optional[StatSignificance]): Statistical significance configuration.
         full_evaluation_on_report (Optional[bool]): Wether or not to compute all metric
@@ -96,6 +101,7 @@ class EvaluationConfig(BaseModel):
     batch_size: Optional[int] = 1024
     strategy: Optional[str] = "full"  # or "sampled"
     num_negatives: Optional[int] = 99
+    mask_seen: Optional[Literal["auto", "context", "pair", "none"]] = "auto"
     seed: Optional[int] = 42
     stat_significance: Optional[StatSignificance] = Field(
         default_factory=StatSignificance

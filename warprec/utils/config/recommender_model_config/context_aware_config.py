@@ -1,4 +1,6 @@
 # pylint: disable=duplicate-code
+from typing import ClassVar
+
 from pydantic import field_validator
 
 from warprec.utils.config.model_configuration import (
@@ -33,6 +35,7 @@ class AFM(RecomModel):
         epochs (INT_FIELD): List of values for epochs.
         learning_rate (FLOAT_FIELD): List of values for learning rate.
         neg_samples (INT_FIELD): List of values for neg_samples.
+        need_context (ClassVar[bool]): Wether or not the model needs contextual information.
     """
 
     embedding_size: INT_FIELD
@@ -44,6 +47,7 @@ class AFM(RecomModel):
     epochs: INT_FIELD
     learning_rate: FLOAT_FIELD
     neg_samples: INT_FIELD
+    need_context: ClassVar[bool] = True
 
     @field_validator("embedding_size")
     @classmethod
@@ -115,6 +119,7 @@ class DCN(RecomModel):
         epochs (INT_FIELD): List of values for epochs.
         learning_rate (FLOAT_FIELD): List of values for learning rate.
         neg_samples (INT_FIELD): List of values for neg_samples.
+        need_context (ClassVar[bool]): Wether or not the model needs contextual information.
     """
 
     embedding_size: INT_FIELD
@@ -127,6 +132,7 @@ class DCN(RecomModel):
     epochs: INT_FIELD
     learning_rate: FLOAT_FIELD
     neg_samples: INT_FIELD
+    need_context: ClassVar[bool] = True
 
     @field_validator("embedding_size")
     @classmethod
@@ -208,6 +214,7 @@ class DCNv2(RecomModel):
         epochs (INT_FIELD): List of values for epochs.
         learning_rate (FLOAT_FIELD): List of values for learning rate.
         neg_samples (INT_FIELD): List of values for neg_samples.
+        need_context (ClassVar[bool]): Wether or not the model needs contextual information.
     """
 
     embedding_size: INT_FIELD
@@ -224,6 +231,7 @@ class DCNv2(RecomModel):
     epochs: INT_FIELD
     learning_rate: FLOAT_FIELD
     neg_samples: INT_FIELD
+    need_context: ClassVar[bool] = True
 
     @field_validator("embedding_size")
     @classmethod
@@ -325,6 +333,7 @@ class DeepFM(RecomModel):
         epochs (INT_FIELD): List of values for epochs.
         learning_rate (FLOAT_FIELD): List of values for learning rate.
         neg_samples (INT_FIELD): List of values for neg_samples.
+        need_context (ClassVar[bool]): Wether or not the model needs contextual information.
     """
 
     embedding_size: INT_FIELD
@@ -336,6 +345,7 @@ class DeepFM(RecomModel):
     epochs: INT_FIELD
     learning_rate: FLOAT_FIELD
     neg_samples: INT_FIELD
+    need_context: ClassVar[bool] = True
 
     @field_validator("embedding_size")
     @classmethod
@@ -403,6 +413,7 @@ class FM(RecomModel):
         epochs (INT_FIELD): List of values for epochs.
         learning_rate (FLOAT_FIELD): List of values for learning rate.
         neg_samples (INT_FIELD): List of values for neg_samples.
+        need_context (ClassVar[bool]): Wether or not the model needs contextual information.
     """
 
     embedding_size: INT_FIELD
@@ -411,6 +422,7 @@ class FM(RecomModel):
     epochs: INT_FIELD
     learning_rate: FLOAT_FIELD
     neg_samples: INT_FIELD
+    need_context: ClassVar[bool] = True
 
     @field_validator("embedding_size")
     @classmethod
@@ -463,6 +475,7 @@ class NFM(RecomModel):
         epochs (INT_FIELD): List of values for epochs.
         learning_rate (FLOAT_FIELD): List of values for learning rate.
         neg_samples (INT_FIELD): List of values for neg_samples.
+        need_context (ClassVar[bool]): Wether or not the model needs contextual information.
     """
 
     embedding_size: INT_FIELD
@@ -474,6 +487,7 @@ class NFM(RecomModel):
     epochs: INT_FIELD
     learning_rate: FLOAT_FIELD
     neg_samples: INT_FIELD
+    need_context: ClassVar[bool] = True
 
     @field_validator("embedding_size")
     @classmethod
@@ -544,6 +558,7 @@ class WideAndDeep(RecomModel):
         epochs (INT_FIELD): List of values for epochs.
         learning_rate (FLOAT_FIELD): List of values for learning rate.
         neg_samples (INT_FIELD): List of values for neg_samples.
+        need_context (ClassVar[bool]): Wether or not the model needs contextual information.
     """
 
     embedding_size: INT_FIELD
@@ -555,6 +570,7 @@ class WideAndDeep(RecomModel):
     epochs: INT_FIELD
     learning_rate: FLOAT_FIELD
     neg_samples: INT_FIELD
+    need_context: ClassVar[bool] = True
 
     @field_validator("embedding_size")
     @classmethod
@@ -627,6 +643,7 @@ class xDeepFM(RecomModel):
         epochs (INT_FIELD): List of values for epochs.
         learning_rate (FLOAT_FIELD): List of values for learning rate.
         neg_samples (INT_FIELD): List of values for neg_samples.
+        need_context (ClassVar[bool]): Wether or not the model needs contextual information.
     """
 
     embedding_size: INT_FIELD
@@ -640,6 +657,7 @@ class xDeepFM(RecomModel):
     epochs: INT_FIELD
     learning_rate: FLOAT_FIELD
     neg_samples: INT_FIELD
+    need_context: ClassVar[bool] = True
 
     @field_validator("embedding_size")
     @classmethod

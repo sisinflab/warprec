@@ -248,6 +248,12 @@ class TrainConfiguration(WarpRecConfiguration):
                     "but none have been provided. Check the configuration file."
                 )
 
+            if model_class.need_context and not self.reader.labels.context_labels:
+                raise ValueError(
+                    f"The model {model_name} requires contextual information to be provided, "
+                    "but no context_labels have been configured. Check the configuration file."
+                )
+
             # Check if there is at least one valid combination
             model_class.validate_all_combinations()
 

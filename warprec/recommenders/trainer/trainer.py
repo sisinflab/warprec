@@ -181,6 +181,7 @@ class Trainer:
         device: str = "cpu",
         evaluation_strategy: str = "full",
         num_negatives: int = 99,
+        mask_seen: str = "auto",
         complex_metrics: List[ComplexMetricConfig] = None,
         ray_verbose: int = 1,
     ) -> TrainingOutcome:
@@ -199,6 +200,7 @@ class Trainer:
             device (str): The device that will be used for tensor operations.
             evaluation_strategy (str): Evaluation strategy, either "full" or "sampled".
             num_negatives (int): Number of negative samples to use in "sampled" strategy.
+            mask_seen (str): Which already-seen items are excluded from the ranking.
             complex_metrics (List[ComplexMetricConfig]): List of complex metrics
                 to compute.
             ray_verbose (int): The Ray level of verbosity.
@@ -223,6 +225,7 @@ class Trainer:
             device=device,
             evaluation_strategy=evaluation_strategy,
             num_negatives=num_negatives,
+            mask_seen=mask_seen,
             complex_metrics=complex_metrics,
             ray_verbose=ray_verbose,
         )
@@ -294,6 +297,7 @@ class Trainer:
         device: str = "cpu",
         evaluation_strategy: str = "full",
         num_negatives: int = 99,
+        mask_seen: str = "auto",
         complex_metrics: List[ComplexMetricConfig] = None,
         desired_training_it: str = "median",
         ray_verbose: int = 1,
@@ -310,6 +314,7 @@ class Trainer:
             device (str): The device that will be used for tensor operations.
             evaluation_strategy (str): Evaluation strategy, either "full" or "sampled".
             num_negatives (int): Number of negative samples to use in "sampled" strategy.
+            mask_seen (str): Which already-seen items are excluded from the ranking.
             complex_metrics (List[ComplexMetricConfig]): List of complex metrics
                 to compute.
             desired_training_it (str): The type of statistic to use to
@@ -338,6 +343,7 @@ class Trainer:
             device=device,
             evaluation_strategy=evaluation_strategy,
             num_negatives=num_negatives,
+            mask_seen=mask_seen,
             complex_metrics=complex_metrics,
             ray_verbose=ray_verbose,
         )
@@ -404,6 +410,7 @@ class Trainer:
         device: str,
         evaluation_strategy: str,
         num_negatives: int,
+        mask_seen: str,
         complex_metrics: List[ComplexMetricConfig],
         ray_verbose: int,
     ) -> Tuner:
@@ -420,6 +427,7 @@ class Trainer:
             device (str): The device that will be used for tensor operations.
             evaluation_strategy (str): Evaluation strategy, either "full" or "sampled".
             num_negatives (int): Number of negative samples to use in "sampled" strategy.
+            mask_seen (str): Which already-seen items are excluded from the ranking.
             complex_metrics (List[ComplexMetricConfig]): List of complex metrics to compute.
             ray_verbose (int): The Ray level of verbosity.
 
@@ -453,6 +461,7 @@ class Trainer:
             "eval_every_n": opt_config.eval_every_n,
             "strategy": evaluation_strategy,
             "num_negatives": num_negatives,
+            "mask_seen": mask_seen,
             "complex_metrics": complex_metrics,
             "lr_scheduler": opt_config.lr_scheduler,
             "optimizer": opt_config.optimizer,
@@ -753,6 +762,7 @@ class Trainer:
                     map_location="cpu",
                 ),
                 interactions=dataset.train_set,
+                transactions=dataset.train_transactions,
                 sessions=dataset.train_session,
                 **dataset.get_stash(),
             )
@@ -760,6 +770,7 @@ class Trainer:
             model = model_class(
                 params=best_params,
                 interactions=dataset.train_set,
+                transactions=dataset.train_transactions,
                 sessions=dataset.train_session,
                 info=dataset.info(),
                 **dataset.get_stash(),

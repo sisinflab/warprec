@@ -40,6 +40,8 @@ class Evaluator:
         user_cluster (Optional[Tensor]): The user cluster lookup tensor.
         item_cluster (Optional[Tensor]): The item cluster lookup tensor.
         seed (int): The random seed for reproducibility.
+        mask_seen (str): Which already-seen items are excluded from the ranking.
+            One of 'auto', 'context', 'pair' or 'none'.
     """
 
     def __init__(
@@ -53,9 +55,11 @@ class Evaluator:
         user_cluster: Optional[Tensor] = None,
         item_cluster: Optional[Tensor] = None,
         seed: int = 42,
+        mask_seen: str = "auto",
     ):
         self.k_values = k_values
         self.metric_list = metric_list
+        self.mask_seen = mask_seen
         self.num_items = train_set.shape[1]
         self.metrics: Dict[int, List[BaseMetric]] = {}
         self.required_blocks: Dict[int, Set[MetricBlock]] = {}
@@ -160,6 +164,24 @@ class Evaluator:
         train_sparse = dataset.train_set.get_sparse()
         padding_idx = train_sparse.shape[1]
 
+        # Resolve the masking policy. With no contextual columns, "seen in this
+        # context" is the same question as "seen", so both paths agree.
+        transactions = dataset.train_transactions
+        policy = self.mask_seen
+        if policy == "auto":
+            policy = (
+                "context"
+                if transactions is not None and transactions.context_labels
+                else "pair"
+            )
+
+        context_index: Optional[dict] = None
+        context_ids: Optional[dict] = None
+        if policy == "context" and transactions is not None:
+            context_index, context_ids = transactions.get_context_index()
+
+        repeated_triples = 0
+
         for batch in dataloader:
             # Parse the batch
             batch_data = self._parse_batch(batch, strategy, device)
@@ -233,7 +255,23 @@ class Evaluator:
                         eval_batch = batch_data["ground_truth"]
 
                     # Mask seen items
-                    predictions[train_batch.nonzero()] = -torch.inf
+                    if policy == "none":
+                        pass
+                    elif context_index is not None and context is not None:
+                        context_rows = context.cpu().numpy()
+                        for row, user in enumerate(user_indices.tolist()):
+                            key = context_ids.get(tuple(context_rows[row].tolist()), -1)
+                            if key < 0:
+                                continue
+                            seen = context_index.get((user, key))
+                            if seen is None:
+                                continue
+                            predictions[row, seen] = -torch.inf
+                            if "target_item" in batch_data:
+                                target = int(batch_data["target_item"][row])
+                                repeated_triples += int(target in seen)
+                    else:
+                        predictions[train_batch.nonzero()] = -torch.inf
 
                 elif strategy == "sampled":
                     # Mask seen items
@@ -246,6 +284,13 @@ class Evaluator:
                     user_indices=user_indices,
                     candidates=candidates if strategy == "sampled" else None,
                 )
+
+        if repeated_triples:
+            logger.attention(
+                f"{repeated_triples} evaluation rows repeat a training "
+                "(user, item, context) triple exactly and were masked. Check the splitting "
+                "strategy: these rows can never be ranked."
+            )
 
         if verbose:
             self._log_results(eval_start_time, model.name)

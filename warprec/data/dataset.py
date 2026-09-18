@@ -11,7 +11,7 @@ import narwhals as nw
 from narwhals.typing import FrameT
 from narwhals.dataframe import DataFrame
 
-from warprec.data.entities import Interactions, Sessions
+from warprec.data.entities import Interactions, Sessions, Transactions
 from warprec.data.eval_loaders import (
     EvaluationDataset,
     ContextualEvaluationDataset,
@@ -34,6 +34,8 @@ class Dataset:
         item_cluster (Optional[FrameT]): The item cluster data.
         batch_size (int): The batch size that will be used evaluation.
         rating_type (RatingType): The type of rating used.
+        duplicates (str): How repeated (user, item) rows are aggregated into the
+            interaction matrix. One of 'max', 'mean', 'first', 'last' or 'sum'.
         user_id_label (str): The label of the user id column.
         item_id_label (str): The label of the item id column.
         rating_label (str): The label of the rating column.
@@ -48,6 +50,9 @@ class Dataset:
         train_set (Interactions): Training set used by recommendation models.
         eval_set (Interactions): Evaluation set used by recommendation models.
         train_session (Sessions): Training session used by sequential models.
+        train_transactions (Optional[Transactions]): Row-oriented view of the training
+            split, built only when contextual columns are configured.
+        eval_transactions (Optional[Transactions]): Row-oriented view of the evaluation split.
         user_cluster (Optional[dict]): User cluster information.
         item_cluster (Optional[dict]): Item cluster information.
 
@@ -58,6 +63,8 @@ class Dataset:
     train_set: Interactions = None
     eval_set: Interactions = None
     train_session: Sessions = None
+    train_transactions: Optional[Transactions] = None
+    eval_transactions: Optional[Transactions] = None
     user_cluster: Optional[dict] = None
     item_cluster: Optional[dict] = None
 
@@ -70,6 +77,7 @@ class Dataset:
         item_cluster: Optional[FrameT] = None,
         batch_size: int = 1024,
         rating_type: RatingType = RatingType.IMPLICIT,
+        duplicates: str = "max",
         user_id_label: str = "user_id",
         item_id_label: str = "item_id",
         rating_label: str = None,
@@ -101,6 +109,7 @@ class Dataset:
         self._side_matrix: Optional[csr_matrix] = None
         self._context_maps: dict[str, dict[Any, int]] = {}
         self._context_dims: dict[str, int] = {}
+        self._context_types: dict[str, str] = {}
         self._feat_lookup: Tensor = None
         self._uc: Tensor = None
         self._ic: Tensor = None
@@ -127,6 +136,7 @@ class Dataset:
             (len(mat_side_data.columns) - 1) if mat_side_data is not None else 0
         )
         self.batch_size = batch_size
+        self._duplicates = duplicates
 
         # Values that will be used to calculate mappings
         _uid = (
@@ -232,6 +242,7 @@ class Dataset:
             item_cluster=self.item_cluster,
             batch_size=batch_size,
             rating_type=rating_type,
+            duplicates=duplicates,
             rating_label=rating_label,
             timestamp_label=timestamp_label,
             context_labels=context_labels,
@@ -247,9 +258,42 @@ class Dataset:
                 header_msg=evaluation_set,
                 batch_size=batch_size,
                 rating_type=rating_type,
+                duplicates=duplicates,
                 rating_label=rating_label,
                 context_labels=context_labels,
             )
+
+        # Context-aware models read the rows, not the matrix: a matrix cell
+        # cannot hold the same pair seen in several contexts.
+        if context_labels:
+            self.train_transactions = Transactions(
+                mat_train_data,
+                (self._nuid, self._niid),
+                self._umap,
+                self._imap,
+                context_labels=context_labels,
+                field_types=self._context_types,
+                side_tensor=self.train_set.get_side_tensor(),
+                rating_type=rating_type,
+                rating_label=rating_label,
+                timestamp_label=timestamp_label,
+                batch_size=batch_size,
+            )
+
+            if mat_eval_data is not None:
+                self.eval_transactions = Transactions(
+                    mat_eval_data,
+                    (self._nuid, self._niid),
+                    self._umap,
+                    self._imap,
+                    context_labels=context_labels,
+                    field_types=self._context_types,
+                    side_tensor=self.eval_set.get_side_tensor(),
+                    rating_type=rating_type,
+                    rating_label=rating_label,
+                    timestamp_label=timestamp_label,
+                    batch_size=batch_size,
+                )
 
         # Save side information inside the dataset
         if self.side is not None:
@@ -370,6 +414,7 @@ class Dataset:
         header_msg: str = "Train",
         batch_size: int = 1024,
         rating_type: RatingType = RatingType.IMPLICIT,
+        duplicates: str = "max",
         rating_label: str = None,
         timestamp_label: str = None,
         context_labels: Optional[List[str]] = None,
@@ -385,6 +430,7 @@ class Dataset:
             header_msg (str): The header of the logger output.
             batch_size (int): The batch size of the interaction.
             rating_type (RatingType): The type of rating used.
+            duplicates (str): How repeated (user, item) rows are aggregated.
             rating_label (str): The label of the rating column.
             timestamp_label (str): The label of the timestamp column.
             context_labels (Optional[List[str]]): The list of labels of the
@@ -404,6 +450,7 @@ class Dataset:
             item_cluster=item_cluster,
             batch_size=batch_size,
             rating_type=rating_type,
+            duplicates=duplicates,
             rating_label=rating_label,
             timestamp_label=timestamp_label,
             context_labels=context_labels,
@@ -633,6 +680,10 @@ class Dataset:
                 self._context_maps[col] = mapping
                 # Dimension is len(uniques) + 1 (for the UNK token)
                 self._context_dims[col] = len(uniques) + 1
+
+                # Every context field is categorical today; float and
+                # multi-valued fields declare themselves here.
+                self._context_types[col] = "token"
 
                 logger.msg(f"Context '{col}': found {len(uniques)} unique values.")
             else:

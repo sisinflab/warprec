@@ -30,6 +30,8 @@ The following keywords are available to configure the reader:
 
 - **header**: Boolean flag to indicate whether the first row of the file is a header. Defaults to `True`.
 
+- **duplicates**: How repeated `(user_id, item_id)` rows are aggregated when the interaction matrix is built: `max`, `mean`, `first`, `last` or `sum`. Defaults to `max`. With implicit feedback every policy except `sum` yields a binary matrix, while `sum` yields interaction counts.
+
 - **rating_type**: Specifies the feedback type:
 
     - `implicit` -- Each transaction is automatically assigned a score of 1.

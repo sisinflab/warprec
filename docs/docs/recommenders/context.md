@@ -10,7 +10,16 @@ The **Context Recommenders** module of WarpRec contains models designed to incor
 
     For class signatures, parameters, and source code, see the [Context-Aware API Reference](../api-reference/recommenders/context.md).
 
-In the following sections, you will find the list of available context-aware models within WarpRec, together with their respective parameters.
+In the following sections, you will find the list of available context-aware models within WarpRec, together with their respective parameters. The contextual columns themselves are read as described in [Reading Contextual Information](../data-management/reader.md#reading-contextual-information).
+
+## Training and Evaluation
+
+A few behaviours are shared by every model on this page:
+
+- **Training examples are interaction rows.** Each row of the training split becomes a positive example carrying its own context, so the same (user, item) pair appearing in several contexts contributes several examples.
+- **Labels are binary.** Positives are labelled 1 and sampled negatives 0, whatever `rating_type` says, because these models optimise a binary objective. An explicit rating therefore acts as a filter on which interactions exist, not as a target value.
+- **Negatives reuse the positive's context.** A negative sample is a different item in the *same* situation, which is what makes the context discriminative.
+- **Ranking excludes items already seen in the same context.** This is governed by `evaluation.mask_seen`, which defaults to `auto`. Recommending an item the user has consumed before, in a situation where they have not, is a legitimate recommendation for these models, so excluding every seen item as a plain top-N run does would discard most of a contextual test set.
 
 ## Summary of Available Context-Aware Models
 
