@@ -57,6 +57,8 @@ class SideInformationReading(BaseModel):
         file_format (Optional[FileFormat]): The file format to use during the reading process.
         sep (Optional[str]): The separator of the split files.
         header (Optional[bool]): Whether the file has a header or not. Defaults to True.
+        column_names (Optional[List[str]]): The names of the columns, required when the
+            file has no header row. The first name must be the item ID column.
     """
 
     local_path: Optional[str] = None
@@ -64,6 +66,7 @@ class SideInformationReading(BaseModel):
     file_format: Optional[FileFormat] = "tabular"
     sep: Optional[str] = "\t"
     header: Optional[bool] = True
+    column_names: Optional[List[str]] = None
 
     @field_validator("sep")
     @classmethod
