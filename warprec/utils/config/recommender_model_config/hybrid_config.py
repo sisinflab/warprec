@@ -10,7 +10,7 @@ from warprec.utils.config.model_configuration import (
 )
 from warprec.utils.config.common import (
     validate_greater_than_zero,
-    validate_greater_equal_than_zero,
+    validate_between_zero_and_one,
     validate_profile,
     validate_similarity,
 )
@@ -23,7 +23,8 @@ class AddEASE(RecomModel):
 
     Attributes:
         l2 (FLOAT_FIELD): List of values that l2 regularization can take.
-        alpha (FLOAT_FIELD): List of values for alpha regularization.
+        alpha (FLOAT_FIELD): List of values for the weight of the collaborative term,
+            between 0 and 1. The content term is weighted by its complement.
         need_side_information (ClassVar[bool]): Wether or not the model needs side information.
     """
 
@@ -41,7 +42,7 @@ class AddEASE(RecomModel):
     @classmethod
     def check_alpha(cls, v: list):
         """Validate alpha."""
-        return validate_greater_equal_than_zero(cls, v, "alpha")
+        return validate_between_zero_and_one(cls, v, "alpha")
 
 
 @params_registry.register("AttributeItemKNN")
@@ -112,7 +113,8 @@ class CEASE(RecomModel):
 
     Attributes:
         l2 (FLOAT_FIELD): List of values that l2 regularization can take.
-        alpha (FLOAT_FIELD): List of values for alpha regularization.
+        alpha (FLOAT_FIELD): List of values for the weight of the collaborative term,
+            between 0 and 1. The content term is weighted by its complement.
         need_side_information (ClassVar[bool]): Wether or not the model needs side information.
     """
 
@@ -130,4 +132,4 @@ class CEASE(RecomModel):
     @classmethod
     def check_alpha(cls, v: list):
         """Validate alpha."""
-        return validate_greater_equal_than_zero(cls, v, "alpha")
+        return validate_between_zero_and_one(cls, v, "alpha")
