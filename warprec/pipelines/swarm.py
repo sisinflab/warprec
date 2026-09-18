@@ -6,19 +6,17 @@ import ray
 from warprec.common import (
     ModelState,
     ModelStatus,
-    RunState,
-    RunStateStore,
     log_evaluation,
     model_fingerprint,
-    resolve_run_name,
-    run_fingerprint,
-    warprec_version,
 )
-from warprec.data.reader import ReaderFactory
 from warprec.data.writer import WriterFactory
 from warprec.data import Dataset
+from warprec.pipelines.common import (
+    bootstrap_pipeline,
+    prepare_datasets,
+    report_statistical_significance,
+)
 from warprec.pipelines.remotes import (
-    remote_data_preparation,
     remote_evaluation_and_timing,
     remote_generate_recs,
 )
@@ -27,15 +25,12 @@ from warprec.recommenders.trainer import Trainer
 from warprec.recommenders.base_recommender import Recommender
 from warprec.utils.callback import WarpRecCallback
 from warprec.utils.config import (
-    load_train_configuration,
-    load_callback,
     TrainConfiguration,
 )
 from warprec.utils.pause import PauseController
-from warprec.utils.enums import ErroredTrialPolicy, ResumeMode
+from warprec.utils.enums import ErroredTrialPolicy
 from warprec.utils.helpers import model_param_from_dict
 from warprec.utils.logger import logger
-from warprec.evaluation.statistical_significance import compute_paired_statistical_test
 
 
 def swarm_pipeline(path: str):
@@ -46,141 +41,15 @@ def swarm_pipeline(path: str):
 
     Args:
         path (str): Path to the configuration file.
-
-    Raises:
-        ConnectionError: If unable to connect to Ray cluster.
-        ValueError: If the file format is not supported.
     """
     logger.attention(
         "WARNING: Swarm pipeline is experimental. Please submit bug reports via GitHub Issues."
     )
-    logger.msg("Start experiment swarming.")
-    experiment_start_time = time.time()
+    context = bootstrap_pipeline(path, "swarm", "Start experiment swarming.")
+    config = context.config
 
-    # Parse configuration
-    config = load_train_configuration(path)
-
-    # Before starting training process, initialize Ray
-    py_modules = (
-        [] if config.general.custom_modules is None else config.general.custom_modules
-    )
-    py_modules.extend(["warprec"])  # type: ignore[union-attr]
-
-    try:
-        address = config.general.ray_address
-        ray.init(address=address, runtime_env={"py_modules": py_modules})
-        logger.positive("Connected to existing Ray cluster.")
-    except ConnectionError as e:
-        raise ConnectionError(
-            "Unable to connect to Ray cluster. Please ensure Ray is running."
-        ) from e
-
-    # Load custom callback if specified
-    callback: WarpRecCallback = load_callback(
-        config.general.callback,
-        *config.general.callback.args,
-        **config.general.callback.kwargs,
-    )
-
-    # Initialize I/O modules
-    reader = ReaderFactory.get_reader(config=config)
-
-    # Resolve the identity of this run and load any state a previous,
-    # interrupted run of the same experiment left behind.
-    run_name = resolve_run_name(config)
-    fingerprint = run_fingerprint(config)
-    logger.msg(f"Run name: {run_name}")
-
-    probe_writer = WriterFactory.get_writer(config=config)
-    state_store = RunStateStore(probe_writer, run_name)
-    previous_state = state_store.load()
-
-    if previous_state is not None and config.run.resume == ResumeMode.NEVER:
-        logger.attention(
-            f"Run state for '{run_name}' exists but resume is set to 'never'. "
-            "It will be discarded and the run will start from scratch."
-        )
-        previous_state = None
-    elif (
-        previous_state is not None and previous_state.config_fingerprint != fingerprint
-    ):
-        message = (
-            f"Run state for '{run_name}' was produced by a different configuration "
-            "(the reader, filtering, splitter, evaluation or the set of models "
-            "changed). It cannot be resumed."
-        )
-        if config.run.resume == ResumeMode.FORCE:
-            raise ValueError(message)
-        logger.attention(f"{message} The run will start from scratch.")
-        previous_state = None
-
-    if previous_state is None and config.run.resume == ResumeMode.FORCE:
-        raise ValueError(
-            "Resume is set to 'force' but no resumable state was found for run "
-            f"'{run_name}' at {state_store.state_path}."
-        )
-
-    if previous_state is None:
-        state = RunState(
-            run_name=run_name,
-            pipeline="swarm",
-            warprec_version=warprec_version(),
-            writer_timestamp=probe_writer.timestamp,
-            config_fingerprint=fingerprint,
-        )
-    else:
-        state = previous_state
-        logger.positive(f"Resuming run '{run_name}' created at {state.created_at}.")
-
-    # The writer reuses the timestamp of the original run so that a resumed run
-    # keeps merging into the output files that run created.
-    writer = WriterFactory.get_writer(config=config, timestamp=state.writer_timestamp)
-    state_store = RunStateStore(writer, run_name)
-    state_store.save(state)
-
-    # Load datasets using common utility
-    cpu_data_prep = config.general.cpu_data_prep
-    custom_res_data_prep = config.general.custom_resources_data_prep
-    label_selector_data_prep = config.general.label_selector_data_prep
-    main_dataset, val_dataset, fold_dataset = ray.get(
-        remote_data_preparation.options(
-            num_cpus=cpu_data_prep,
-            resources=custom_res_data_prep if custom_res_data_prep else None,
-            label_selector=label_selector_data_prep
-            if label_selector_data_prep
-            else None,
-        ).remote(
-            reader=reader,
-            callback=callback,
-            config=config,
-        )  # type: ignore[call-arg]
-    )
-
-    data_preparation_time = time.time() - experiment_start_time
-    logger.positive(
-        f"Data preparation completed in {data_preparation_time:.2f} seconds."
-    )
-
-    # Write split information if required
-    if config.splitter and config.writer.save_split:
-        file_format = config.writer.split.file_format
-        match file_format:
-            case "tabular":
-                writer.write_tabular_split(
-                    main_dataset,
-                    val_dataset,
-                    fold_dataset,
-                    **config.writer.split.model_dump(),
-                )
-            case "parquet":
-                writer.write_parquet_split(
-                    main_dataset,
-                    val_dataset,
-                    fold_dataset,
-                    **config.writer.split.model_dump(),
-                )
-            case _:
-                raise ValueError(f"File format '{file_format}'not supported.")
+    # Build the datasets on the cluster and persist the splits if asked to
+    main_dataset, val_dataset, fold_dataset = prepare_datasets(context)
 
     # List of models to train
     models = list(config.models.keys())
@@ -192,11 +61,11 @@ def swarm_pipeline(path: str):
     if requires_stat_significance:
         model_results: Dict[str, Any] = {}
 
-    data_preparation_time = time.time() - experiment_start_time
+    data_preparation_time = time.time() - context.started_at
     logger.positive(
         f"Data preparation completed in {data_preparation_time:.2f} seconds."
     )
-    model_timing_report = []
+    model_timing_report: List[Dict[str, Any]] = []
 
     # Starting the model swarming
     logger.msg(
@@ -211,12 +80,12 @@ def swarm_pipeline(path: str):
     # Only launch the models that are not already finished
     pending_models = []
     for model_name in models:
-        model_state = state.model_state(model_name)
+        model_state = context.state.model_state(model_name)
 
         if model_state.status == ModelStatus.COMPLETED:
             logger.msg(f"Skipping {model_name}: already completed in this run.")
             if requires_stat_significance:
-                stored_results = state_store.load_eval_results(model_name)
+                stored_results = context.state_store.load_eval_results(model_name)
                 if stored_results is not None:
                     model_results[model_name] = stored_results
                 else:
@@ -234,14 +103,14 @@ def swarm_pipeline(path: str):
         if model_state.fingerprint and model_state.fingerprint != current_fingerprint:
             logger.attention(
                 f"The configuration of {model_name} changed since the last run. "
-                "Its saved state will be discarded and the model will be "
+                "Its saved context.state will be discarded and the model will be "
                 "optimized from scratch."
             )
-            state.models[model_name] = ModelState()
-        state.model_state(model_name).fingerprint = current_fingerprint
+            context.state.models[model_name] = ModelState()
+        context.state.model_state(model_name).fingerprint = current_fingerprint
         pending_models.append(model_name)
 
-    state_store.save(state)
+    context.state_store.save(context.state)
 
     futures = []
     for model_name in pending_models:
@@ -251,11 +120,11 @@ def swarm_pipeline(path: str):
             main_dataset=main_ds_ref,
             val_dataset=val_ds_ref,
             fold_dataset=fold_ds_ref,
-            callback=callback,
+            callback=context.callback,
             data_preparation_time=data_preparation_time,
-            run_name=run_name,
+            run_name=context.run_name,
             errored_trials=config.run.errored_trials,
-            writer_timestamp=state.writer_timestamp,
+            writer_timestamp=context.state.writer_timestamp,
         )  # type: ignore[call-arg]
         futures.append(future)
 
@@ -275,12 +144,12 @@ def swarm_pipeline(path: str):
                 paused = True
                 logger.attention(
                     "Pause requested. Cancelling the models still running. Their "
-                    "Ray Tune experiments will resume from their last saved state."
+                    "Ray Tune experiments will resume from their last saved context.state."
                 )
                 for name, future in pending.items():
                     ray.cancel(future, force=False, recursive=True)
-                    state.model_state(name).status = ModelStatus.INTERRUPTED
-                state_store.save(state)
+                    context.state.model_state(name).status = ModelStatus.INTERRUPTED
+                context.state_store.save(context.state)
                 break
 
             ready, _ = ray.wait(list(pending.values()), num_returns=1, timeout=5.0)
@@ -297,8 +166,8 @@ def swarm_pipeline(path: str):
                 ray.exceptions.TaskCancelledError,
             ) as e:
                 logger.negative(f"Model {name} did not complete: {e}")
-                state.model_state(name).status = ModelStatus.INTERRUPTED
-                state_store.save(state)
+                context.state.model_state(name).status = ModelStatus.INTERRUPTED
+                context.state_store.save(context.state)
 
     # Final result logging of driver
     logger.msg("Swarming completed. Aggregating and saving results.")
@@ -314,17 +183,17 @@ def swarm_pipeline(path: str):
         if best_model is None:
             status = ray_report.get("status", "failed") if ray_report else "failed"
             logger.attention(f"HPO for {model_name} returned no valid model.")
-            state.model_state(model_name).status = (
+            context.state.model_state(model_name).status = (
                 ModelStatus.INTERRUPTED
                 if status == "interrupted"
                 else ModelStatus.FAILED
             )
-            state_store.save(state)
+            context.state_store.save(context.state)
             continue
 
         # Callbacks
-        callback.on_training_complete(model=best_model)
-        callback.on_evaluation_complete(
+        context.callback.on_training_complete(model=best_model)
+        context.callback.on_evaluation_complete(
             model=best_model,
             params=model_params[model_name]["Best Params"],
             results=results,
@@ -335,85 +204,30 @@ def swarm_pipeline(path: str):
 
         # Collect for statistical significance
         if requires_stat_significance:
-            model_results[model_name] = results
+            context.state_store.save_eval_results(model_name, results)
 
-        # Write Results
-        writer.write_results(results, model_name, **config.writer.results.model_dump())
-
-        # Write Per-User Results
-        if config.evaluation.save_per_user:
-            i_umap, _ = main_dataset.get_inverse_mappings()
-            writer.write_results_per_user(
-                results, model_name, i_umap, **config.writer.results.model_dump()
-            )
-
-        # Write Params
-        writer.write_params(model_params)
-
-        # Write Model Checkpoint
-        if config.models[model_name]["meta"]["save_model"]:
-            writer.write_model(best_model)
-
-        # Collect timing report
-        if config.general.time_report:
-            model_timing_report.append(timing_report)
-
-        # Persist the evaluation results so that a resumed run can still run the
-        # paired statistical significance tests over every model.
-        if requires_stat_significance:
-            state_store.save_eval_results(model_name, results)
-
-        model_state = state.model_state(model_name)
+        model_state = context.state.model_state(model_name)
         model_state.status = ModelStatus.COMPLETED
         model_state.timing = timing_report
-        state_store.save(state)
+        context.state_store.save(context.state)
 
     # Write aggregated time report (if requested)
     if config.general.time_report and model_timing_report:
-        writer.write_time_report(model_timing_report)
+        context.writer.write_time_report(model_timing_report)
 
     if paused:
         logger.attention(
-            f"Swarm run '{run_name}' has been paused. Progress is saved at "
-            f"{state_store.state_path}."
+            f"Swarm run '{context.run_name}' has been paused. Progress is saved at "
+            f"{context.state_store.state_path}."
         )
         logger.msg(
             "Resume it by running the same command again with run.name set to "
-            f"'{run_name}' and run.resume set to 'auto' or 'force'."
+            f"'{context.run_name}' and run.resume set to 'auto' or 'force'."
         )
     else:
         # Compute statistical significance (if requested)
         if requires_stat_significance:
-            # Check if enough models have been evaluated
-            if len(model_results) >= 2:
-                logger.msg(
-                    f"Computing statistical significance tests for {len(models)} models."
-                )
-
-                stat_significance = config.evaluation.stat_significance.model_dump(
-                    exclude=["corrections"]  # type: ignore[arg-type]
-                )
-                corrections = (
-                    config.evaluation.stat_significance.corrections.model_dump()
-                )
-
-                for stat_name, enabled in stat_significance.items():
-                    if enabled:
-                        test_results = compute_paired_statistical_test(
-                            model_results, stat_name, **corrections
-                        )
-                        writer.write_statistical_significance_test(
-                            test_results, stat_name
-                        )
-
-                logger.positive(
-                    "Statistical significance tests completed successfully."
-                )
-            else:
-                logger.attention(
-                    "Statistical significance tests require at least two evaluated models. "
-                    "Skipping statistical significance computation."
-                )
+            report_statistical_significance(context, model_results, models)
 
         logger.positive("Experiment swarming concluded. WarpRec is shutting down.")
 
