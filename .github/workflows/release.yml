@@ -15,8 +15,22 @@ jobs:
       - name: Run pre-commit
         run: poetry run pre-commit run --all-files
 
-  release:
+  tests:
     needs: lint-check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Environment
+        uses: ./.github/actions/setup-env
+
+      - name: Run tests
+        run: poetry run pytest tests/ -q
+
+  release:
+    needs: tests
     runs-on: ubuntu-latest
     concurrency: release
     environment: pypi
