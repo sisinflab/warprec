@@ -2,6 +2,41 @@
 
 <!-- version list -->
 
+## v1.6.2 (2026-09-18)
+
+### Bug Fixes
+
+- Fixed MacridVAE crashing on its first training step
+  ([`f60cb0f`](https://github.com/sisinflab/warprec/commit/f60cb0f7076134b82ff69474e1b418f48ffbf6ef))
+
+- Made closed-form models restorable from a checkpoint alone
+  ([`e09ef0c`](https://github.com/sisinflab/warprec/commit/e09ef0cee9b0bd06997983b8544e95a6c566a872))
+
+### Chores
+
+- Anchored the ignore patterns so the test suite and warprec/data are versioned
+  ([`182090c`](https://github.com/sisinflab/warprec/commit/182090caa550a8b4c5796ca45ad75f35cf1b3894))
+
+- Removed the test ignore patterns now that the suite is versioned
+  ([`c0e71b9`](https://github.com/sisinflab/warprec/commit/c0e71b98508f8506c86ca39e4d15994aa20f67a3))
+
+### Continuous Integration
+
+- Added a mandatory Tests workflow and gated the release on it
+  ([`8a7289e`](https://github.com/sisinflab/warprec/commit/8a7289e233f819635dd71fb686b7261db29addd7))
+
+- Ran the linting and the tests in parallel before the release
+  ([`6d9c91b`](https://github.com/sisinflab/warprec/commit/6d9c91be5841fbc6ee480baf549f99ca50648f69))
+
+### Testing
+
+- Added smoke coverage for every registered model
+  ([`c7d1bec`](https://github.com/sisinflab/warprec/commit/c7d1bec489e0f223a6341019ffa30efc24860a8a))
+
+- Pinned the ranking and rating metrics to hand-computed values
+  ([`19ea205`](https://github.com/sisinflab/warprec/commit/19ea20524965eaa9295ec5bbfee93c01b3e0c574))
+
+
 ## v1.6.1 (2026-09-18)
 
 ### Bug Fixes
