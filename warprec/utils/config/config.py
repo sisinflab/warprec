@@ -16,6 +16,7 @@ from warprec.utils.config import (
     SplittingConfig,
     DashboardConfig,
     RecomModel,
+    TrainingConfig,
     EvaluationConfig,
     EstimateConfig,
     WarpRecRunConfig,
@@ -36,12 +37,41 @@ class WarpRecConfiguration(BaseModel):
         models (Dict[str, dict]): The dictionary containing model information
             in the format {model_name: dict{param_1: value, param_2: value, ...}, ...}
         general (GeneralConfig): General configuration of the experiment.
+        training (TrainingConfig): The options that shape the training signal.
     """
 
     reader: ReaderConfig
     filtering: Dict[str, dict] = None
     models: Dict[str, dict]
     general: GeneralConfig = Field(default_factory=GeneralConfig)
+    training: TrainingConfig = Field(default_factory=TrainingConfig)
+
+    @model_validator(mode="after")
+    def migrate_reader_training_options(self) -> "WarpRecConfiguration":
+        """Carry the training options still written under the reader across.
+
+        Both were released under 'reader', so a configuration written against
+        1.7 keeps working: the value is moved and the user is told where it
+        belongs now. An explicit 'training' entry always wins.
+
+        Returns:
+            WarpRecConfiguration: The validated configuration.
+        """
+        for field in ("negative_sampling", "sequence_pooling"):
+            legacy = getattr(self.reader, field)
+            if legacy is None:
+                continue
+
+            logger.attention(
+                f"'reader.{field}' has moved to the 'training' section and will "
+                f"be removed in a future release. Write it as "
+                f"'training.{field}: {legacy}' instead."
+            )
+
+            if field not in self.training.model_fields_set:
+                setattr(self.training, field, legacy)
+
+        return self
 
     @model_validator(mode="after")
     def config_validation(self) -> "WarpRecConfiguration":

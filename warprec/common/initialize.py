@@ -293,8 +293,8 @@ def initialize_datasets(
         "batch_size": config.evaluation.batch_size,
         "rating_type": config.reader.rating_type,
         "duplicates": config.reader.duplicates,
-        "negative_sampling": config.reader.negative_sampling,
-        "sequence_pooling": config.reader.sequence_pooling,
+        "negative_sampling": config.training.negative_sampling,
+        "sequence_pooling": config.training.sequence_pooling,
         "context_separators": config.reader.dtypes.context_separators,
         "keep_unseen_items": (
             config.reader.side.keep_unseen_items if config.reader.side else False
