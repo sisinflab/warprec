@@ -51,6 +51,7 @@ coolname = "^5.0.0"
 [tool.poetry.group.dev.dependencies]
 pre-commit = "^4.1.0"
 pytest = "^8.3.4"
+pytest-cov = "^6.0.0"
 ruff = "^0.9.3"
 pydoclint = "^0.6.0"
 mypy = "^1.14.1"

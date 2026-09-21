@@ -26,6 +26,10 @@ repos:
         language: system
         types: [python]
         pass_filenames: false
+        # Whole-package checks: too slow to pay on every commit, and pylint's
+        # duplicate-code rule needs the whole package anyway, so scoping it to
+        # the changed files would silently drop it. Run before the push instead.
+        stages: [pre-push]
         args: [--no-strict-optional, --ignore-missing-imports]
         exclude: ^tests/|^docs/
 
@@ -37,6 +41,7 @@ repos:
         language: system
         types: [python]
         pass_filenames: false
+        stages: [pre-push]
         args:
           [
             "--jobs=0",
