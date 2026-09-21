@@ -401,21 +401,28 @@ class AFM(ContextRecommenderUtils, IterativeRecommender):
             # Case 'full': iterate through all items in memory-safe blocks
             preds_list = []
 
+            # The catalogue does not change while the users are scored, so
+            # the item-side tensors are gathered once and sliced per block.
+            (
+                cat_item_emb,
+                cat_item_bias,
+                cat_feat_emb,
+                cat_feat_bias,
+            ) = self._catalogue_item_side()
+
             for start in range(0, self.n_items, self.block_size):
                 end = min(start + self.block_size, self.n_items)
                 current_block_len = end - start
 
-                items_block = torch.arange(start, end, device=self.device)
-
-                # Item Embeddings and Bias
-                item_emb_block = self.item_embedding(items_block)
-
-                # Retrieve block feature embeddings and bias
-                feat_emb_block_tensor = self._get_feature_embeddings(items_block)
-                feat_bias_block = self._get_feature_bias(items_block)
+                # Slices of the catalogue tensors, shared by every user
+                item_emb_block = cat_item_emb[start:end]
+                item_bias_block = cat_item_bias[start:end]
+                feat_emb_block_tensor = (
+                    None if cat_feat_emb is None else cat_feat_emb[start:end]
+                )
+                feat_bias_block = cat_feat_bias[start:end]
 
                 # Linear Part
-                item_bias_block = self.item_bias(items_block).squeeze(-1)
                 linear_pred = (
                     fixed_linear.unsqueeze(1)
                     + item_bias_block.unsqueeze(0)

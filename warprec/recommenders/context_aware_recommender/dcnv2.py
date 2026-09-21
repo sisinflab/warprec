@@ -400,14 +400,19 @@ class DCNv2(ContextRecommenderUtils, IterativeRecommender):
         if item_indices is None:
             # Case 'full': iterate through all items in memory-safe blocks
             preds_list = []
+
+            # The catalogue does not change while the users are scored, so
+            # the item-side tensors are gathered once and sliced per block.
+            cat_item_emb, _, cat_feat_emb, _ = self._catalogue_item_side()
+
             for start in range(0, self.n_items, self.block_size):
                 end = min(start + self.block_size, self.n_items)
 
-                items_block = torch.arange(start, end, device=self.device)
-                item_emb_block = self.item_embedding(items_block)
-
-                # Get feature embeddings for the block
-                feat_emb_block_tensor = self._get_feature_embeddings(items_block)
+                # Slices of the catalogue tensors, shared by every user
+                item_emb_block = cat_item_emb[start:end]
+                feat_emb_block_tensor = (
+                    None if cat_feat_emb is None else cat_feat_emb[start:end]
+                )
 
                 preds_list.append(process_block(item_emb_block, feat_emb_block_tensor))
             return torch.cat(preds_list, dim=1)
