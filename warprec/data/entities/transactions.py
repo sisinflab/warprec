@@ -1,6 +1,5 @@
 from typing import Any, Dict, List, Optional, Tuple
 
-import narwhals as nw
 import numpy as np
 import torch
 from narwhals.dataframe import DataFrame
@@ -10,7 +9,12 @@ from torch.utils.data import DataLoader
 
 from warprec.data.entities.context import build_context_array, context_key
 from warprec.data.schema import ColumnLabels, ContextSpec, SignalOptions
-from warprec.data.entities.interactions import seed_worker
+from warprec.data.entities.common import (
+    ITEM_INDEX,
+    USER_INDEX,
+    map_to_index_space,
+    seeded_dataloader,
+)
 from warprec.data.entities.train_structures import PointWiseDataset
 from warprec.utils.enums import RatingType
 
@@ -76,32 +80,14 @@ class Transactions:
         self.batch_size = options.batch_size
         self.negative_sampling = options.negative_sampling
 
-        namespace = nw.get_native_namespace(data)
-        umap_df = nw.from_dict(
-            {
-                self.user_label: list(user_mapping.keys()),
-                "__uidx__": list(user_mapping.values()),
-            },
-            native_namespace=namespace,
-        )
-        imap_df = nw.from_dict(
-            {
-                self.item_label: list(item_mapping.keys()),
-                "__iidx__": list(item_mapping.values()),
-            },
-            native_namespace=namespace,
-        )
-
         # One frame in, every array out: this is what keeps the contexts
         # attached to the interaction they describe.
-        mapped = (
-            data.join(umap_df, on=self.user_label, how="inner")
-            .join(imap_df, on=self.item_label, how="inner")
-            .sort(["__uidx__", "__iidx__"])
-        )
+        mapped = map_to_index_space(
+            data, self.user_label, self.item_label, user_mapping, item_mapping
+        ).sort([USER_INDEX, ITEM_INDEX])
 
-        self._users = mapped.select("__uidx__").to_numpy().flatten().astype(np.int64)
-        self._items = mapped.select("__iidx__").to_numpy().flatten().astype(np.int64)
+        self._users = mapped.select(USER_INDEX).to_numpy().flatten().astype(np.int64)
+        self._items = mapped.select(ITEM_INDEX).to_numpy().flatten().astype(np.int64)
 
         if self.rating_label is not None:
             self._ratings = (
@@ -217,17 +203,14 @@ class Transactions:
             side_information=side_info_tensor,
             contexts=context_tensor,
             negative_sampling=self.negative_sampling,
+            seed=seed,
         )
 
-        generator = torch.Generator()
-        generator.manual_seed(seed)
-
-        return DataLoader(
+        return seeded_dataloader(
             dataset,
             batch_size=batch_size,
             shuffle=shuffle,
-            worker_init_fn=seed_worker,
-            generator=generator,
+            seed=seed,
             **kwargs,
         )
 

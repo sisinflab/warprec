@@ -9,18 +9,18 @@ from torch.utils.data import DataLoader
 from torch.nn.utils.rnn import pad_sequence
 from scipy.sparse import csr_matrix
 
+from warprec.data.entities.common import (
+    ITEM_INDEX,
+    USER_INDEX,
+    map_to_index_space,
+    seeded_dataloader,
+)
 from warprec.data.entities.train_structures import (
     SequentialDataset,
     SameTargetSequentialDataset,
     SlidingWindowDataset,
     ClozeDataset,
 )
-
-
-def seed_worker(worker_id):
-    """Ensures reproducibility in DataLoader workers."""
-    worker_seed = torch.initial_seed() % 2**32
-    np.random.seed(worker_seed)
 
 
 class Sessions:
@@ -80,50 +80,34 @@ class Sessions:
         if self._processed_df is not None:
             return self._processed_df
 
-        native_ns = nw.get_native_namespace(self._inter_df)
-
-        # Create mapping frames
-        umap_df = nw.from_dict(
-            {
-                self.user_label: list(self._umap.keys()),
-                "__uidx__": list(self._umap.values()),
-            },
-            native_namespace=native_ns,
-        )
-        imap_df = nw.from_dict(
-            {
-                self.item_label: list(self._imap.keys()),
-                "__iidx__": list(self._imap.values()),
-            },
-            native_namespace=native_ns,
-        )
-
         # Join and Map
-        mapped_df = (
-            self._inter_df.join(umap_df, on=self.user_label, how="inner")
-            .join(imap_df, on=self.item_label, how="inner")
-            .select(
-                [
-                    nw.col("__uidx__").alias(self.user_label).cast(nw.Int64),
-                    nw.col("__iidx__").alias(self.item_label).cast(nw.Int64),
-                    # Keep timestamp if exists
-                    *(
-                        [nw.col(self.timestamp_label)]
-                        if self.timestamp_label in self._inter_df.columns
-                        else []
-                    ),
-                    # Keep context if exists. The columns are carried through as
-                    # they are: a numeric field would lose its value to an integer
-                    # cast, and a multi-valued one holds several indices per cell.
-                    *(
-                        [
-                            nw.col(c)
-                            for c in self.context_labels
-                            if c in self._inter_df.columns
-                        ]
-                    ),
-                ]
-            )
+        mapped_df = map_to_index_space(
+            self._inter_df,
+            self.user_label,
+            self.item_label,
+            self._umap,
+            self._imap,
+        ).select(
+            [
+                nw.col(USER_INDEX).alias(self.user_label).cast(nw.Int64),
+                nw.col(ITEM_INDEX).alias(self.item_label).cast(nw.Int64),
+                # Keep timestamp if exists
+                *(
+                    [nw.col(self.timestamp_label)]
+                    if self.timestamp_label in self._inter_df.columns
+                    else []
+                ),
+                # Keep context if exists. The columns are carried through as
+                # they are: a numeric field would lose its value to an integer
+                # cast, and a multi-valued one holds several indices per cell.
+                *(
+                    [
+                        nw.col(c)
+                        for c in self.context_labels
+                        if c in self._inter_df.columns
+                    ]
+                ),
+            ]
         )
 
         # Sort
@@ -230,17 +214,14 @@ class Sessions:
             neg_samples=neg_samples,
             niid=self._niid,
             include_user_id=include_user_id,
+            seed=seed,
         )
 
-        g = torch.Generator()
-        g.manual_seed(seed)
-
-        return DataLoader(
+        return seeded_dataloader(
             dataset,
             batch_size=batch_size,
             shuffle=shuffle,
-            worker_init_fn=seed_worker,
-            generator=g,
+            seed=seed,
             **kwargs,
         )
 
@@ -277,17 +258,14 @@ class Sessions:
             valid_target_indices=self._valid_sample_indices,
             max_seq_len=max_seq_len,
             niid=self._niid,
+            seed=seed,
         )
 
-        g = torch.Generator()
-        g.manual_seed(seed)
-
-        return DataLoader(
+        return seeded_dataloader(
             dataset,
             batch_size=batch_size,
             shuffle=shuffle,
-            worker_init_fn=seed_worker,
-            generator=g,
+            seed=seed,
             **kwargs,
         )
 
@@ -350,17 +328,14 @@ class Sessions:
             max_seq_len=max_seq_len,
             neg_samples=neg_samples,
             niid=self._niid,
+            seed=seed,
         )
 
-        g = torch.Generator()
-        g.manual_seed(seed)
-
-        return DataLoader(
+        return seeded_dataloader(
             dataset,
             batch_size=batch_size,
             shuffle=shuffle,
-            worker_init_fn=seed_worker,
-            generator=g,
+            seed=seed,
             **kwargs,
         )
 
@@ -404,14 +379,10 @@ class Sessions:
             seed=seed,
         )
 
-        g = torch.Generator()
-        g.manual_seed(seed)
-
-        return DataLoader(
+        return seeded_dataloader(
             dataset,
             batch_size=batch_size,
             shuffle=shuffle,
-            worker_init_fn=seed_worker,
-            generator=g,
+            seed=seed,
             **kwargs,
         )

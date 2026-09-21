@@ -15,21 +15,12 @@ from warprec.data.entities.train_structures import (
     ContrastiveDataset,
     PositiveDataset,
 )
+from warprec.data.entities.common import seeded_dataloader
 from warprec.data.schema import ColumnLabels, ContextSpec, SideData, SignalOptions
 from warprec.utils.enums import RatingType
 
 
 # Worker seed function for reproducibility
-def seed_worker(worker_id: int):
-    """Seed a DataLoader worker so that sampling is reproducible.
-
-    Args:
-        worker_id (int): The index of the worker being seeded.
-    """
-    worker_seed = torch.initial_seed() % 2**32
-    np.random.seed(worker_seed)
-
-
 class Interactions:
     # pylint: disable = too-many-instance-attributes  # this class is the state it holds
     """Interactions class will handle the data of the transactions.
@@ -468,18 +459,14 @@ class Interactions:
             side_information=side_info_tensor,
             contexts=context_tensor,
             negative_sampling=self.negative_sampling,
+            seed=seed,
         )
 
-        # Set the generator for the Dataloader for reproducibility
-        g = torch.Generator()
-        g.manual_seed(seed)
-
-        return DataLoader(
+        return seeded_dataloader(
             dataset,
             batch_size=batch_size,
             shuffle=shuffle,
-            worker_init_fn=seed_worker,
-            generator=g,
+            seed=seed,
             **kwargs,
         )
 
@@ -510,18 +497,14 @@ class Interactions:
             sparse_matrix=self.get_sparse(),
             niid=self._niid,
             negative_sampling=self.negative_sampling,
+            seed=seed,
         )
 
-        # Set the generator for the Dataloader for reproducibility
-        g = torch.Generator()
-        g.manual_seed(seed)
-
-        return DataLoader(
+        return seeded_dataloader(
             dataset,
             batch_size=batch_size,
             shuffle=shuffle,
-            worker_init_fn=seed_worker,
-            generator=g,
+            seed=seed,
             **kwargs,
         )
 
@@ -552,16 +535,11 @@ class Interactions:
             item_ids=pos_items,
         )
 
-        # Set the generator for the Dataloader for reproducibility
-        g = torch.Generator()
-        g.manual_seed(seed)
-
-        return DataLoader(
+        return seeded_dataloader(
             dataset,
             batch_size=batch_size,
             shuffle=shuffle,
-            worker_init_fn=seed_worker,
-            generator=g,
+            seed=seed,
             **kwargs,
         )
 
