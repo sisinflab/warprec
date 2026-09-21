@@ -2,6 +2,55 @@
 
 <!-- version list -->
 
+## v1.7.1 (2026-09-21)
+
+### Bug Fixes
+
+- AFM no longer recomputes the item-independent field pairs per candidate
+  ([`163c333`](https://github.com/sisinflab/warprec/commit/163c33320b1858f5b3320127e13908a6899063fb))
+
+- Configured sequence pooling now reaches the context models
+  ([`5325620`](https://github.com/sisinflab/warprec/commit/5325620aab414bf79ed8c70173b9b9b7f22a2e1c))
+
+- Context models gather the catalogue once per evaluation instead of per user batch
+  ([`b5fd2bd`](https://github.com/sisinflab/warprec/commit/b5fd2bd20ad81ee5e790de5600eaee8374fd8b3d))
+
+- Multi-valued contexts no longer break the seen-item index
+  ([`a95ff0a`](https://github.com/sisinflab/warprec/commit/a95ff0af2a889817cd8d67d36dea697268ab768d))
+
+- Resolved the catalogue gather device through the item embedding
+  ([`a326342`](https://github.com/sisinflab/warprec/commit/a32634259bf71daf2b6199558825301b261bb7f5))
+
+### Chores
+
+- Moved the whole-package linters to the push hook and added coverage
+  ([`6084287`](https://github.com/sisinflab/warprec/commit/60842874c93e575fd4bdde037e350e22301ce1ff))
+
+- Re-enabled the too-many-locals check at a threshold the codebase holds
+  ([`45a3081`](https://github.com/sisinflab/warprec/commit/45a308117e2d2f48c58039cb3315fc032c57ab80))
+
+### Documentation
+
+- Documented every configuration keyword and refreshed the reference config
+  ([`6e44493`](https://github.com/sisinflab/warprec/commit/6e44493da3cf017193ed792f412d9a8c5a07b9bf))
+
+### Refactoring
+
+- Collapsed the data entity constructors onto shared schema values
+  ([`b35698f`](https://github.com/sisinflab/warprec/commit/b35698f45eb349e88f9190a6482ab2ce3a491a4d))
+
+- Collapsed the splitter signatures onto column labels and a split spec
+  ([`612be9c`](https://github.com/sisinflab/warprec/commit/612be9ca812fd1628549332e0d3386d1aa4f3833))
+
+- Moved the training signal options into their own configuration section
+  ([`f8085ce`](https://github.com/sisinflab/warprec/commit/f8085ce3d3062146991f605c2e49f9095e1ab89c))
+
+### Testing
+
+- Added behavioural tests for splitting, filtering, reading, writing and resume
+  ([`3cf1aad`](https://github.com/sisinflab/warprec/commit/3cf1aad62c4ef36b4c79e21f3dd6f7dfff82e070))
+
+
 ## v1.7.0 (2026-09-18)
 
 ### Bug Fixes
