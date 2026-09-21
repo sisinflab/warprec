@@ -1251,7 +1251,7 @@ class ContextRecommenderUtils(nn.Module, ABC):
                 embeddings, the item biases, the feature embeddings and the
                 feature biases.
         """
-        items = torch.arange(self.n_items, device=self.device)
+        items = torch.arange(self.n_items, device=self.item_embedding.weight.device)
         return (
             self.item_embedding(items),
             self.item_bias(items).squeeze(-1),
