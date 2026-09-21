@@ -14,6 +14,7 @@ from narwhals.typing import FrameT
 from narwhals.dataframe import DataFrame
 
 from warprec.data.entities import Interactions, Sessions, Transactions
+from warprec.data.schema import ColumnLabels, ContextSpec, SideData, SignalOptions
 from warprec.data.eval_loaders import (
     EvaluationDataset,
     ContextualEvaluationDataset,
@@ -105,8 +106,10 @@ class Dataset:
     ):
         # pylint: disable = too-many-arguments, too-many-positional-arguments
         # pylint: disable = too-many-locals
-        # Each argument is a distinct part of the data schema, and the build
-        # keeps one name per structure it derives from them.
+        # This is the entry point a user constructs directly, so it keeps a
+        # flat keyword signature rather than asking them to assemble the
+        # value objects it builds internally. The build also keeps one name
+        # per structure it derives from them.
         # Check evaluation set
         if evaluation_set not in ["Test", "Validation"]:
             raise ValueError("Evaluation set must be either 'Test' or 'Validation'.")
@@ -279,36 +282,40 @@ class Dataset:
         padding_value = torch.tensor([0], dtype=torch.long)
         self._ic = torch.cat((self._ic, padding_value), dim=0)
 
-        # Create the main data structures
-        self.train_set = self._create_inner_set(
-            mat_train_data,
-            side_data=self.side,
-            side_matrix=self._side_matrix,
-            user_cluster=self.user_cluster,
-            item_cluster=self.item_cluster,
-            batch_size=batch_size,
+        # The values every structure below is built from, decided once here.
+        self._labels = ColumnLabels(
+            user_id=user_id_label,
+            item_id=item_id_label,
+            rating=rating_label,
+            timestamp=timestamp_label,
+        )
+        self._context_spec = ContextSpec(
+            labels=tuple(context_labels or ()),
+            types=self._context_types,
+            field_types=self._context_types,
+            separators=self._context_separators,
+            max_len=max(self._context_max_len.values(), default=1),
+        )
+        self._options = SignalOptions(
             rating_type=rating_type,
             duplicates=duplicates,
             negative_sampling=negative_sampling,
-            rating_label=rating_label,
-            timestamp_label=timestamp_label,
-            context_labels=context_labels,
+            sequence_pooling=sequence_pooling,
+            batch_size=batch_size,
         )
+        side_payload = SideData(
+            frame=self.side,
+            matrix=self._side_matrix,
+            user_cluster=self.user_cluster,
+            item_cluster=self.item_cluster,
+        )
+
+        # Create the main data structures
+        self.train_set = self._create_inner_set(mat_train_data, side_payload)
 
         if mat_eval_data is not None:
             self.eval_set = self._create_inner_set(
-                mat_eval_data,
-                side_data=self.side,
-                side_matrix=self._side_matrix,
-                user_cluster=self.user_cluster,
-                item_cluster=self.item_cluster,
-                header_msg=evaluation_set,
-                batch_size=batch_size,
-                rating_type=rating_type,
-                duplicates=duplicates,
-                negative_sampling=negative_sampling,
-                rating_label=rating_label,
-                context_labels=context_labels,
+                mat_eval_data, side_payload, header_msg=evaluation_set
             )
 
         # Context-aware models read the rows, not the matrix: a matrix cell
@@ -319,16 +326,10 @@ class Dataset:
                 (self._nuid, self._niid),
                 self._umap,
                 self._imap,
-                context_labels=context_labels,
-                field_types=self._context_types,
-                context_types=self._context_types,
-                context_max_len=max(self._context_max_len.values(), default=1),
                 side_tensor=self.train_set.get_side_tensor(),
-                rating_type=rating_type,
-                rating_label=rating_label,
-                timestamp_label=timestamp_label,
-                batch_size=batch_size,
-                negative_sampling=negative_sampling,
+                labels=self._labels,
+                context=self._context_spec,
+                options=self._options,
             )
 
             if mat_eval_data is not None:
@@ -337,16 +338,10 @@ class Dataset:
                     (self._nuid, self._niid),
                     self._umap,
                     self._imap,
-                    context_labels=context_labels,
-                    field_types=self._context_types,
-                    context_types=self._context_types,
-                    context_max_len=max(self._context_max_len.values(), default=1),
                     side_tensor=self.eval_set.get_side_tensor(),
-                    rating_type=rating_type,
-                    rating_label=rating_label,
-                    timestamp_label=timestamp_label,
-                    batch_size=batch_size,
-                    negative_sampling=negative_sampling,
+                    labels=self._labels,
+                    context=self._context_spec,
+                    options=self._options,
                 )
 
         # Save side information inside the dataset
@@ -461,38 +456,15 @@ class Dataset:
     def _create_inner_set(
         self,
         data: DataFrame[Any],
-        side_data: Optional[DataFrame[Any]] = None,
-        side_matrix: Optional[csr_matrix] = None,
-        user_cluster: Optional[dict] = None,
-        item_cluster: Optional[dict] = None,
+        side: SideData,
         header_msg: str = "Train",
-        batch_size: int = 1024,
-        rating_type: RatingType = RatingType.IMPLICIT,
-        duplicates: str = "max",
-        negative_sampling: str = "uniform",
-        rating_label: str = None,
-        timestamp_label: str = None,
-        context_labels: Optional[List[str]] = None,
     ) -> Interactions:
-        # pylint: disable = too-many-arguments, too-many-positional-arguments
-        # Each argument is a distinct part of the data schema.
         """Functionality to create Interaction data from DataFrame.
 
         Args:
             data (DataFrame[Any]): The data used to create the interaction object.
-            side_data (Optional[DataFrame[Any]]): The side data information about the dataset.
-            side_matrix (Optional[csr_matrix]): The {item x feature} content matrix.
-            user_cluster (Optional[dict]): The user cluster information.
-            item_cluster (Optional[dict]): The item cluster information.
+            side (SideData): The item attributes and the cluster assignments.
             header_msg (str): The header of the logger output.
-            batch_size (int): The batch size of the interaction.
-            rating_type (RatingType): The type of rating used.
-            duplicates (str): How repeated (user, item) rows are aggregated.
-            negative_sampling (str): How negatives are drawn during training.
-            rating_label (str): The label of the rating column.
-            timestamp_label (str): The label of the timestamp column.
-            context_labels (Optional[List[str]]): The list of labels of the
-                contextual data.
 
         Returns:
             Interactions: The final interaction object.
@@ -502,19 +474,10 @@ class Dataset:
             (self._nuid, self._niid),
             self._umap,
             self._imap,
-            side_data=side_data,
-            side_matrix=side_matrix,
-            user_cluster=user_cluster,
-            item_cluster=item_cluster,
-            batch_size=batch_size,
-            rating_type=rating_type,
-            duplicates=duplicates,
-            negative_sampling=negative_sampling,
-            rating_label=rating_label,
-            timestamp_label=timestamp_label,
-            context_labels=context_labels,
-            context_types=self._context_types,
-            context_max_len=max(self._context_max_len.values(), default=1),
+            side=side,
+            labels=self._labels,
+            context=self._context_spec,
+            options=self._options,
         )
         nuid, niid = inter_set.get_dims()
         transactions = inter_set.get_transactions()

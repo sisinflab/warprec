@@ -1,7 +1,9 @@
-from dataclasses import dataclass
-from typing import Optional, Union
+from dataclasses import dataclass, field
+from typing import Any, Dict, List, Optional, Tuple, Union
 
-from warprec.utils.enums import SplittingStrategies
+from scipy.sparse import csr_matrix
+
+from warprec.utils.enums import RatingType, SplittingStrategies
 
 
 @dataclass(frozen=True)
@@ -58,3 +60,71 @@ class SplitSpec:
         if isinstance(self.strategy, str):
             return SplittingStrategies(self.strategy)
         return self.strategy
+
+
+@dataclass(frozen=True)
+class ContextSpec:
+    """Everything the data layer needs to know about the contextual columns.
+
+    The four pieces are decided together when the dataset is read and are then
+    needed together by every structure that carries contexts, so they travel as
+    one value rather than as four parallel arguments.
+
+    Attributes:
+        labels (Tuple[str, ...]): The contextual columns, in order.
+        types (Dict[str, str]): The declared type of each column.
+        field_types (Dict[str, str]): How each field is encoded, 'token',
+            'float' or 'seq'.
+        separators (Dict[str, str]): The separator of each multi-valued column.
+        max_len (int): The widest multi-valued field, or 1 when there is none.
+    """
+
+    labels: Tuple[str, ...] = ()
+    types: Dict[str, str] = field(default_factory=dict)
+    field_types: Dict[str, str] = field(default_factory=dict)
+    separators: Dict[str, str] = field(default_factory=dict)
+    max_len: int = 1
+
+    def label_list(self) -> List[str]:
+        """The contextual columns as the list the entities store.
+
+        Returns:
+            List[str]: The labels.
+        """
+        return list(self.labels)
+
+
+@dataclass(frozen=True)
+class SignalOptions:
+    """The options that decide what a model is trained on, not what is read.
+
+    Attributes:
+        rating_type (RatingType): Whether the feedback is implicit or explicit.
+        duplicates (str): How repeated (user, item) rows are aggregated.
+        negative_sampling (str): How negatives are drawn during training.
+        sequence_pooling (str): How a multi-valued field's values are pooled.
+        batch_size (int): The batch size the structures are built for.
+    """
+
+    rating_type: RatingType = RatingType.IMPLICIT
+    duplicates: str = "max"
+    negative_sampling: str = "uniform"
+    sequence_pooling: str = "mean"
+    batch_size: int = 1024
+
+
+@dataclass(frozen=True)
+class SideData:
+    """The item attributes and the cluster assignments, when a run has them.
+
+    Attributes:
+        frame (Optional[Any]): The raw side information frame.
+        matrix (Optional[csr_matrix]): The {item x feature} content matrix.
+        user_cluster (Optional[dict]): The user cluster assignments.
+        item_cluster (Optional[dict]): The item cluster assignments.
+    """
+
+    frame: Optional[Any] = None
+    matrix: Optional[csr_matrix] = None
+    user_cluster: Optional[dict] = None
+    item_cluster: Optional[dict] = None
