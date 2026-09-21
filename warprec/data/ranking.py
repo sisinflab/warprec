@@ -82,3 +82,45 @@ def resolve_mask_policy(policy: str, transactions: Any) -> str:
         if transactions is not None and transactions.context_labels
         else "pair"
     )
+
+
+def cold_item_candidates(train_set: csr_matrix, candidates: str) -> Optional[Tensor]:
+    """Which items a run is allowed to rank, under a cold-start protocol.
+
+    An item nobody interacted with during training is a cold one. Ranking over the
+    whole catalogue mixes the two populations, and since the warm items are both
+    far more numerous and far better served by a collaborative model, a cold-start
+    result computed over everything mostly measures warm-item ranking instead.
+
+    Args:
+        train_set (csr_matrix): The training interaction matrix.
+        candidates (str): Which population to keep, 'all', 'cold' or 'warm'.
+
+    Returns:
+        Optional[Tensor]: A boolean mask over the items, or None when every item
+            is eligible and there is nothing to restrict.
+
+    Raises:
+        ValueError: If the candidate set is not one WarpRec knows.
+    """
+    if candidates == "all":
+        return None
+
+    if candidates not in ("cold", "warm"):
+        raise ValueError(
+            f"Candidate set '{candidates}' is not supported. "
+            "Use 'all', 'cold' or 'warm'."
+        )
+
+    is_cold = torch.as_tensor(train_set.getnnz(axis=0) == 0)
+    return is_cold if candidates == "cold" else ~is_cold
+
+
+def restrict_to_candidates(predictions: Tensor, candidates: Tensor) -> None:
+    """Exclude from the ranking every item outside the candidate set.
+
+    Args:
+        predictions (Tensor): The score matrix, modified in place.
+        candidates (Tensor): A boolean mask over the items, True to keep.
+    """
+    predictions[:, ~candidates] = -torch.inf

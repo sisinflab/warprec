@@ -8,9 +8,11 @@ from scipy.sparse import csr_matrix
 
 from warprec.data import Dataset
 from warprec.data.ranking import (
+    cold_item_candidates,
     mask_seen_in_context,
     mask_seen_pairs,
     resolve_mask_policy,
+    restrict_to_candidates,
 )
 from warprec.evaluation.metrics.base_metric import BaseMetric
 from warprec.recommenders.base_recommender import (
@@ -49,6 +51,7 @@ class Evaluator:
             One of 'auto', 'context', 'pair' or 'none'.
         propensity (Optional[Tensor]): The probability that each item was observed,
             read by the debiased estimators. None when no correction is configured.
+        candidates (str): Which items may be ranked, 'all', 'cold' or 'warm'.
     """
 
     def __init__(
@@ -64,6 +67,7 @@ class Evaluator:
         seed: int = 42,
         mask_seen: str = "auto",
         propensity: Optional[Tensor] = None,
+        candidates: str = "all",
     ):
         # pylint: disable = too-many-arguments, too-many-positional-arguments
         # Metrics, cut-offs and the lookups they need are independent of one
@@ -78,6 +82,29 @@ class Evaluator:
 
         # Set the seed for random permutation in sampled evaluation
         self.g = torch.Generator().manual_seed(seed)
+
+        self.candidate_mask = cold_item_candidates(train_set, candidates)
+        if self.candidate_mask is not None:
+            pool = int(self.candidate_mask.sum())
+            if pool == 0:
+                logger.attention(
+                    f"No item qualifies as '{candidates}', so every ranking would "
+                    "be empty. The restriction is ignored. A cold candidate set "
+                    "needs a cold-start splitting strategy to produce the items."
+                )
+                self.candidate_mask = None
+            else:
+                # A restricted pool is small, so the score a model gets for
+                # guessing is large. Stating it is what stops a number being read
+                # as skill when it is the floor.
+                largest_k = max(k_values) if k_values else 0
+                floor = min(1.0, largest_k / pool) if pool else 0.0
+                logger.attention(
+                    f"Ranking restricted to {pool} '{candidates}' items. At "
+                    f"k={largest_k} a model that scores them all alike already "
+                    f"retrieves about {floor:.0%} of them, so read every result "
+                    "against that floor rather than against zero."
+                )
 
         # Safety check if additional_data is not provided
         if additional_data is None:
@@ -260,6 +287,11 @@ class Evaluator:
                     else:
                         # Classic full evaluation
                         eval_batch = batch_data["ground_truth"]
+
+                    # Restrict the ranking to the population under test before
+                    # anything else looks at the scores.
+                    if self.candidate_mask is not None:
+                        restrict_to_candidates(predictions, self.candidate_mask)
 
                     # Mask seen items
                     if policy == "none":

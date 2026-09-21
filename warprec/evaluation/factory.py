@@ -26,6 +26,7 @@ def build_evaluator(evaluation: EvaluationConfig, dataset: Dataset) -> Evaluator
         user_cluster=dataset.get_user_cluster(),
         item_cluster=dataset.get_item_cluster(),
         mask_seen=evaluation.mask_seen,
+        candidates=evaluation.candidates,
         propensity=build_propensity(
             train_sparse.getnnz(axis=0),
             estimator=evaluation.propensity.estimator,

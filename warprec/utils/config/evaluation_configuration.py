@@ -124,6 +124,11 @@ class EvaluationConfig(BaseModel):
         batch_size (Optional[int]): Batch size used during evaluation.
         strategy (Optional[str]): Evaluation strategy, either "full" or "sampled".
         num_negatives (Optional[int]): Number of negative samples to use in "sampled" strategy.
+        candidates (Optional[Literal["all", "cold", "warm"]]): Which items a run is
+            allowed to rank. 'cold' keeps only the items with no training
+            interaction and 'warm' only the rest, which is what makes a cold-start
+            protocol measure cold-start rather than the warm catalogue around it.
+            Defaults to 'all'. Item-side only, and ignored by sampled evaluation.
         mask_seen (Optional[Literal["auto", "context", "pair", "none"]]): Which
             already-seen items are excluded from the ranking. 'auto' excludes items
             seen in the same context when the dataset has contextual columns and
@@ -146,6 +151,7 @@ class EvaluationConfig(BaseModel):
     batch_size: Optional[int] = 1024
     strategy: Optional[str] = "full"  # or "sampled"
     num_negatives: Optional[int] = 99
+    candidates: Optional[Literal["all", "cold", "warm"]] = "all"
     mask_seen: Optional[Literal["auto", "context", "pair", "none"]] = "auto"
     seed: Optional[int] = 42
     stat_significance: Optional[StatSignificance] = Field(
