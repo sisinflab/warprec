@@ -47,6 +47,9 @@ class SplittingStrategies(str, Enum):
             the splitting will be deterministic.
         - K_FOLD_CROSS_VALIDATION: The splitting will generate n 'folds' used for a more robust
             validation step. Cannot be used on test set.
+        - ITEM_COLD_START: Every interaction of a sampled fraction of the items is held
+            out, so that those items are unseen at training time.
+        - USER_COLD_START: The same, for a sampled fraction of the users.
     """
 
     TEMPORAL_HOLDOUT = "temporal_holdout"
@@ -55,6 +58,8 @@ class SplittingStrategies(str, Enum):
     RANDOM_HOLDOUT = "random_holdout"
     RANDOM_LEAVE_K_OUT = "random_leave_k_out"
     K_FOLD_CROSS_VALIDATION = "k_fold_cross_validation"
+    ITEM_COLD_START = "item_cold_start"
+    USER_COLD_START = "user_cold_start"
 
 
 class ReadingMethods(str, Enum):
