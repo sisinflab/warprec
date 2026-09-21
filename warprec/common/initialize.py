@@ -48,6 +48,10 @@ def initialize_datasets(
     side_data = None
     user_cluster = None
     item_cluster = None
+
+    # Only a cold-start splitting strategy sets this; a run reading pre-split
+    # files has no strategy to read it from.
+    cold_start: Optional[str] = None
     splitter = Splitter()
     if config.reader.loading_strategy == "dataset":
         file_format = config.reader.file_format
@@ -75,6 +79,12 @@ def initialize_datasets(
         # Splitter testing
         if config.splitter:
             if config.reader.data_type == "transaction":
+                # A cold-start protocol needs the entities it held out to stay
+                # in the catalogue, which the dataset cannot work out on its own.
+                cold_start = splitter.cold_dimension(
+                    SplitSpec(**config.splitter.test_splitting.model_dump())
+                )
+
                 # Compute splitting
                 train_data, val_data, test_data = splitter.split_transaction(
                     data,
@@ -290,6 +300,7 @@ def initialize_datasets(
         "negative_sampling": config.training.negative_sampling,
         "sequence_pooling": config.training.sequence_pooling,
         "context_separators": config.reader.dtypes.context_separators,
+        "cold_start": cold_start,
         "keep_unseen_items": (
             config.reader.side.keep_unseen_items if config.reader.side else False
         ),
