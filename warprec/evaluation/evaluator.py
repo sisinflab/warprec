@@ -13,6 +13,7 @@ from warprec.data.ranking import (
     mask_seen_pairs,
     resolve_mask_policy,
     restrict_to_candidates,
+    top_k_breaking_ties,
 )
 from warprec.evaluation.metrics.base_metric import BaseMetric
 from warprec.recommenders.base_recommender import (
@@ -82,6 +83,10 @@ class Evaluator:
 
         # Set the seed for random permutation in sampled evaluation
         self.g = torch.Generator().manual_seed(seed)
+
+        # Ties are broken from a stream of their own, so that turning the tie
+        # break on does not shift the permutations sampled evaluation draws.
+        self.tie_g = torch.Generator().manual_seed(seed)
 
         self.candidate_mask = cold_item_candidates(train_set, candidates)
         if self.candidate_mask is not None:
@@ -425,8 +430,8 @@ class Evaluator:
             ]
         ):
             max_k = max(self.k_values)
-            top_k_values_full, top_k_indices_full = BaseMetric.top_k_values_indices(
-                predictions, max_k
+            top_k_values_full, top_k_indices_full = top_k_breaking_ties(
+                predictions, max_k, self.tie_g
             )
 
             for k in self.k_values:

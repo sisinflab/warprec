@@ -124,3 +124,37 @@ def restrict_to_candidates(predictions: Tensor, candidates: Tensor) -> None:
         candidates (Tensor): A boolean mask over the items, True to keep.
     """
     predictions[:, ~candidates] = -torch.inf
+
+
+def top_k_breaking_ties(
+    predictions: Tensor, k: int, generator: Optional[torch.Generator] = None
+) -> Tuple[Tensor, Tensor]:
+    """Take the top k scores, deciding ties by chance rather than by item id.
+
+    ``torch.topk`` resolves equal scores by position, which is not a neutral rule:
+    a model that scores a whole population alike then always returns its lowest
+    item ids, and in most catalogues those are the oldest and best known entries.
+    Under a cold-start protocol that is the difference between a model that has
+    learned nothing scoring at the random floor and appearing to beat it.
+
+    Shuffling the columns before the selection and mapping the indices back makes
+    tied items equally likely while leaving any genuine ordering untouched.
+
+    Args:
+        predictions (Tensor): The score matrix.
+        k (int): The cutoff.
+        generator (Optional[torch.Generator]): The generator that makes the
+            shuffle reproducible. Without one the ordering falls back to the
+            deterministic behaviour.
+
+    Returns:
+        Tuple[Tensor, Tensor]: The top-k values and the item indices they belong to.
+    """
+    if generator is None:
+        return torch.topk(predictions, k, dim=1)
+
+    order = torch.randperm(
+        predictions.size(1), generator=generator, device=predictions.device
+    )
+    values, shuffled = torch.topk(predictions[:, order], k, dim=1)
+    return values, order[shuffled]
