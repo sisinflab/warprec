@@ -8,6 +8,9 @@ reader:
   header: [True, False]
   file_format: [tabular, parquet]
   rating_type: [implicit, explicit]
+  duplicates: [max, mean, first, last, sum]
+  negative_sampling: [uniform, popularity]
+  sequence_pooling: [mean, sum, max]
   split:
     local_path: path/to/split/dir/
     azure_blob_prefix: path/to/split/blob/
@@ -21,6 +24,8 @@ reader:
     sep: ','
     header: [True, False]
     file_format: [tabular, parquet]
+    column_names: [item_id, feature_1, feature_2, ...]
+    keep_unseen_items: [True, False]
   clustering:
     user_local_path: path/to/user_clustering.csv
     item_local_path: path/to/item_clustering.csv
@@ -43,9 +48,12 @@ reader:
     item_id_type: [int8, int16, int32, int64, float32, float64, str]
     rating_type: [int8, int16, int32, int64, float32, float64, str]
     timestamp_type: [int8, int16, int32, int64, float32, float64, str]
+    cluster_type: [int8, int16, int32, int64, float32, float64, str]
     context_types:
       context_label_1: [int8, int16, int32, int64, float32, float64, str]
       context_label_2: [int8, int16, int32, int64, float32, float64, str]
+    context_separators:
+      context_label_1: '|'
 writer:
   dataset_name: MyDataset
   writing_method: local
@@ -185,10 +193,15 @@ models:
 evaluation:
   top_k: [5, 10, ...]
   metrics: [Precision, Recall, nDCG, ...]
+  complex_metrics:
+    - name: MetricRequiringParameters
+      params:
+        parameter_name: parameter_value
   validation_metric: Recall@20
   batch_size: 4096
   strategy: [full, sampled]
   num_negatives: 99
+  mask_seen: [auto, context, pair, none]
   seed: 42
   stat_significance:
     paired_t_test: [True, False]

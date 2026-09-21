@@ -111,6 +111,10 @@ item_id,genre,director
 
     Items that do not appear in the side information file are removed from the experiment together with their interactions, so that every model in the run is compared on the same catalogue.
 
+!!! tip "Items without interactions: cold start"
+
+    The opposite case, an item that carries attributes but was never interacted with, is dropped by default. Setting `reader.side.keep_unseen_items: True` keeps it in the catalogue, which is what a cold-start experiment needs: the item becomes an all-zero column of the interaction matrix, so a content-based or hybrid model can recommend it from its attributes while the collaborative models score it last.
+
 ---
 
 ## Reading Contextual Information
@@ -124,6 +128,36 @@ user_id,item_id,rating,daytime,weather
 2,17,3,evening,sunny
 ...
 ```
+
+### How a Contextual Column Is Interpreted
+
+A context column is read as one of three kinds of field, and each contributes exactly one vector to the models, so the number of fields never changes:
+
+| Kind | When | How it is used |
+|---|---|---|
+| **Categorical** | the default | The value is mapped to an index, with `0` reserved for values unseen during training |
+| **Numeric** | the column holds floats, or is declared as a float type in `dtypes.context_types` | The value is kept as it is and scales a single embedding, so the ordering the numbers carry survives |
+| **Multi-valued** | the column is named in `dtypes.context_separators` | The cell is split on the separator, the values share one vocabulary, and their embeddings are pooled into one vector |
+
+```yaml
+reader:
+    sequence_pooling: mean      # how multi-valued fields are combined
+    labels:
+        context_labels: [weather, temperature, genres]
+    dtypes:
+        context_types:
+            temperature: float32      # a measurement, not a category
+        context_separators:
+            genres: '|'               # "action|comedy" is two values, not one category
+```
+
+!!! warning "A measurement encoded as a category"
+
+    A numeric column is only treated as a measurement when it reads as a float. An integer column such as a year or a rating count is taken as categorical, which invents one token per distinct value and throws the ordering away. Declare it as `float32` under `dtypes.context_types` when you want it treated as a quantity.
+
+!!! note "Why the default pooling is the mean"
+
+    `mean` is the embedding equivalent of the normalised multi-hot block that the factorization-machine literature defines these models over, so a field's contribution does not grow with the number of values a row happens to hold. `sum` and `max` are available through `sequence_pooling`.
 
 - **Repeated pairs are expected and preserved.** The first two rows above describe the same user and the same item in two different situations. Both are used for training: that is the signal a context-aware model exists to learn.
 - **Every context column is categorical.** Values are mapped to integer indices, with `0` reserved for values that were not seen during training, so a value appearing only in the test set is treated as unknown rather than as a new category.
