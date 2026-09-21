@@ -104,7 +104,9 @@ class Dataset:
         evaluation_set: str = "Test",
     ):
         # pylint: disable = too-many-arguments, too-many-positional-arguments
-        # Each argument is a distinct part of the data schema.
+        # pylint: disable = too-many-locals
+        # Each argument is a distinct part of the data schema, and the build
+        # keeps one name per structure it derives from them.
         # Check evaluation set
         if evaluation_set not in ["Test", "Validation"]:
             raise ValueError("Evaluation set must be either 'Test' or 'Validation'.")

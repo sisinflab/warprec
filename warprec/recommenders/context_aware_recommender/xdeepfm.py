@@ -360,6 +360,8 @@ class xDeepFM(ContextRecommenderUtils, IterativeRecommender):
         Returns:
             Tensor: The score matrix {user x item}.
         """
+        # pylint: disable = too-many-locals
+        # One name per intermediate tensor of the blockwise score.
         batch_size = user_indices.size(0)
 
         # Linear Parts (User + Context)
