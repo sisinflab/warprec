@@ -2,6 +2,24 @@
 
 <!-- version list -->
 
+## v1.7.2 (2026-09-21)
+
+### Bug Fixes
+
+- Sampling draws from a seeded generator instead of the global one
+  ([`8c1862f`](https://github.com/sisinflab/warprec/commit/8c1862f07ff29b87be63037e916f246503758f3d))
+
+### Refactoring
+
+- Shared the entity id mapping, loader construction and worker seeding
+  ([`fb2af1c`](https://github.com/sisinflab/warprec/commit/fb2af1ca8cab8b6ad5175c26a4c74ebab391ad61))
+
+### Testing
+
+- Added regression tests for seeded sampling
+  ([`6354530`](https://github.com/sisinflab/warprec/commit/635453084f72d657c93abc08235d0c7c85675495))
+
+
 ## v1.7.1 (2026-09-21)
 
 ### Bug Fixes
