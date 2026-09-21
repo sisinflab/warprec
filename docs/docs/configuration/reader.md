@@ -32,6 +32,10 @@ The following keywords are available to configure the reader:
 
 - **duplicates**: How repeated `(user_id, item_id)` rows are aggregated when the interaction matrix is built: `max`, `mean`, `first`, `last` or `sum`. Defaults to `max`. With implicit feedback every policy except `sum` yields a binary matrix, while `sum` yields interaction counts.
 
+- **negative_sampling**: How negative examples are drawn during training: `uniform` or `popularity`. Defaults to `uniform`, which gives every item the same chance. `popularity` draws proportionally to a dampened interaction count (`count^0.75`), producing harder negatives among the items a model is most likely to over-recommend.
+
+- **sequence_pooling**: How the values of a multi-valued contextual field are combined into the single vector that field contributes: `mean`, `sum` or `max`. Defaults to `mean`, which matches the normalised multi-hot encoding the factorization-machine literature defines these models over, so a field's contribution does not grow with the number of values it happens to hold.
+
 - **rating_type**: Specifies the feedback type:
 
     - `implicit` -- Each transaction is automatically assigned a score of 1.
@@ -85,6 +89,10 @@ This can be configured using the `side` nested section:
 - **sep**: Column separator for the side information file.
 - **header**: Whether the first row of the file is a header. Defaults to `True`.
 - **file_format**: The format of the side information file. Supported values are `tabular` and `parquet`.
+
+- **column_names**: The names of the columns, required when the file has no header row. The first name must be the item ID column.
+
+- **keep_unseen_items**: Whether items that carry attributes but no interaction stay in the catalogue. Defaults to `False`, which drops them. Set it to `True` for cold-start experiments: such an item becomes an all-zero column of the interaction matrix, so a content-based or hybrid model can still recommend it from its attributes while the collaborative models score it last.
 
 !!! tip
     Side information can improve model performance, especially in **cold-start scenarios**. Not every model uses side information, check the [Recommenders Documentation](../recommenders/index.md) for further details on each model.
@@ -144,7 +152,9 @@ To override these defaults, use the `dtypes` section:
 - **item_id_type**: Datatype for item IDs.
 - **rating_type**: Datatype for ratings.
 - **timestamp_type**: Datatype for timestamps.
-- **context_types**: Datatype for context information.
+- **cluster_type**: Datatype for the cluster column of the clustering files.
+- **context_types**: Datatype for context information. A context column declared as a float type is treated as a **measurement** rather than a category: it keeps its value and contributes a single embedding scaled by it, so the ordering the numbers carry is preserved.
+- **context_separators**: The separator of each context column that holds several values in one cell, given per column. A column named here becomes a **multi-valued** field: its values share one vocabulary and are pooled into the single vector the field contributes, according to `sequence_pooling`.
 
 !!! note
     When `header=False`, dtype specifications will be **ignored**. Supported datatypes include:
@@ -162,8 +172,11 @@ reader:
     loading_strategy: dataset
     data_type: transaction
     reading_method: local
-    local_path: tests/test_dataset/movielens.csv
+    local_path: data/movielens.csv
     rating_type: explicit
+    duplicates: max
+    negative_sampling: popularity
+    sequence_pooling: mean
     sep: ','
     labels:
         user_id_label: uid
@@ -173,11 +186,11 @@ reader:
     dtypes:
         user_id_type: str
     side:
-        local_path: tests/test_dataset/movielens_side.csv
+        local_path: data/movielens_side.csv
         sep: ','
     clustering:
-        user_local_path: tests/test_dataset/movielens_user_cluster.csv
-        item_local_path: tests/test_dataset/movielens_item_cluster.csv
+        user_local_path: data/movielens_user_cluster.csv
+        item_local_path: data/movielens_item_cluster.csv
         user_sep: ','
         item_sep: ','
 ```

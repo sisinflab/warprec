@@ -30,7 +30,7 @@ reader:
         "homework_work",
     ]
   split:
-    local_path: tests/frappe/
+    local_path: data/frappe/
     ext: .csv
 writer:
   dataset_name: Frappe
