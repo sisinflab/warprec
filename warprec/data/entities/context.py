@@ -34,3 +34,19 @@ def build_context_array(
             indices = [int(v) for v in str(cell).split() if v][:max_len]
             array[row, field, : len(indices)] = indices
     return array
+
+
+def context_key(row: np.ndarray) -> tuple:
+    """Turn one context row into the hashable key the seen-item index is built on.
+
+    A multi-valued field makes the row two-dimensional, so it is flattened. Both
+    the index and the evaluator go through here, which is what keeps the key the
+    evaluator looks up identical to the one the index was built with.
+
+    Args:
+        row (np.ndarray): One row of the context array.
+
+    Returns:
+        tuple: The key identifying the context.
+    """
+    return tuple(np.asarray(row).ravel().tolist())

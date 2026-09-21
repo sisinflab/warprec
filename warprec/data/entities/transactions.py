@@ -8,7 +8,7 @@ from scipy.sparse import coo_matrix, csr_matrix
 from torch import Tensor
 from torch.utils.data import DataLoader
 
-from warprec.data.entities.context import build_context_array
+from warprec.data.entities.context import build_context_array, context_key
 from warprec.data.entities.interactions import seed_worker
 from warprec.data.entities.train_structures import PointWiseDataset
 from warprec.utils.enums import RatingType
@@ -263,7 +263,7 @@ class Transactions:
         else:
             uniques, keys = np.unique(self._contexts, axis=0, return_inverse=True)
             keys = keys.astype(np.int64).ravel()
-            context_ids = {tuple(row.tolist()): idx for idx, row in enumerate(uniques)}
+            context_ids = {context_key(row): idx for idx, row in enumerate(uniques)}
 
         grouped: Dict[Tuple[int, int], List[int]] = {}
         for user, context_id, item in zip(self._users, keys, self._items):
