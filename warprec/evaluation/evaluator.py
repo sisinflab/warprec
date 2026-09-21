@@ -47,6 +47,8 @@ class Evaluator:
         seed (int): The random seed for reproducibility.
         mask_seen (str): Which already-seen items are excluded from the ranking.
             One of 'auto', 'context', 'pair' or 'none'.
+        propensity (Optional[Tensor]): The probability that each item was observed,
+            read by the debiased estimators. None when no correction is configured.
     """
 
     def __init__(
@@ -61,6 +63,7 @@ class Evaluator:
         item_cluster: Optional[Tensor] = None,
         seed: int = 42,
         mask_seen: str = "auto",
+        propensity: Optional[Tensor] = None,
     ):
         # pylint: disable = too-many-arguments, too-many-positional-arguments
         # Metrics, cut-offs and the lookups they need are independent of one
@@ -89,6 +92,7 @@ class Evaluator:
             "feature_lookup": feature_lookup,
             "user_cluster": user_cluster,
             "item_cluster": item_cluster,
+            "propensity": propensity,
             **additional_data,
         }
         self._init_metrics(metric_list, complex_metrics)
