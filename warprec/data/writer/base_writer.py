@@ -13,6 +13,7 @@ from narwhals.dataframe import DataFrame
 from torch import Tensor
 from tqdm import tqdm
 
+from warprec.data.ranking import mask_seen_pairs
 from warprec.data import Dataset
 from warprec.recommenders.base_recommender import (
     Recommender,
@@ -194,7 +195,7 @@ class Writer(ABC):
                     user_seq=user_seq,
                     seq_len=seq_len,
                 )
-                predictions[train_batch.nonzero()] = -torch.inf
+                mask_seen_pairs(predictions, train_batch)
                 top_k_scores, top_k_items = torch.topk(predictions, k, dim=1)
 
             batch_users = user_indices.unsqueeze(1).expand(-1, k).flatten()

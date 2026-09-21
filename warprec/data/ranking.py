@@ -1,0 +1,84 @@
+from typing import Any, Dict, Optional, Tuple
+
+import numpy as np
+import torch
+from scipy.sparse import csr_matrix
+from torch import Tensor
+
+from warprec.data.entities.context import context_key
+
+
+def mask_seen_pairs(predictions: Tensor, seen: csr_matrix) -> None:
+    """Exclude from the ranking every item a user has already interacted with.
+
+    Args:
+        predictions (Tensor): The score matrix, modified in place.
+        seen (csr_matrix): The rows of the training matrix for this batch of users.
+    """
+    predictions[seen.nonzero()] = -torch.inf
+
+
+def mask_seen_in_context(
+    predictions: Tensor,
+    user_indices: Tensor,
+    context_rows: np.ndarray,
+    context_index: Dict[Tuple[int, int], np.ndarray],
+    context_ids: Dict[tuple, int],
+    target_items: Optional[Tensor] = None,
+) -> int:
+    """Exclude the items a user has seen *in this situation*, rather than at all.
+
+    A context-aware run asks a different question of the training history: an item
+    the user watched on a weekday morning is a fair recommendation for a Saturday
+    night. A row whose context never appeared in training has nothing to exclude.
+
+    Args:
+        predictions (Tensor): The score matrix, modified in place.
+        user_indices (Tensor): The users of this batch.
+        context_rows (np.ndarray): The context of each row of the batch.
+        context_index (Dict[Tuple[int, int], np.ndarray]): The items each user saw,
+            per context id.
+        context_ids (Dict[tuple, int]): The id of each known context vector.
+        target_items (Optional[Tensor]): The ground-truth item of each row, when the
+            evaluation has one. Used only to count how often the answer was a
+            repetition the run has just masked away.
+
+    Returns:
+        int: How many rows had their ground-truth item masked as already seen.
+    """
+    repeated = 0
+    for row, user in enumerate(user_indices.tolist()):
+        key = context_ids.get(context_key(context_rows[row]), -1)
+        if key < 0:
+            continue
+
+        seen = context_index.get((user, key))
+        if seen is None:
+            continue
+
+        predictions[row, seen] = -torch.inf
+        if target_items is not None:
+            repeated += int(int(target_items[row]) in seen)
+
+    return repeated
+
+
+def resolve_mask_policy(policy: str, transactions: Any) -> str:
+    """Decide which seen-item rule a run follows.
+
+    Args:
+        policy (str): The configured policy, one of 'auto', 'context', 'pair' or
+            'none'.
+        transactions (Any): The row-oriented training records, or None when the
+            dataset has no contextual columns.
+
+    Returns:
+        str: The resolved policy, never 'auto'.
+    """
+    if policy != "auto":
+        return policy
+    return (
+        "context"
+        if transactions is not None and transactions.context_labels
+        else "pair"
+    )

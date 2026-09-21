@@ -7,7 +7,11 @@ from torch.utils.data import DataLoader
 from scipy.sparse import csr_matrix
 
 from warprec.data import Dataset
-from warprec.data.entities.context import context_key
+from warprec.data.ranking import (
+    mask_seen_in_context,
+    mask_seen_pairs,
+    resolve_mask_policy,
+)
 from warprec.evaluation.metrics.base_metric import BaseMetric
 from warprec.recommenders.base_recommender import (
     Recommender,
@@ -172,13 +176,7 @@ class Evaluator:
         # Resolve the masking policy. With no contextual columns, "seen in this
         # context" is the same question as "seen", so both paths agree.
         transactions = dataset.train_transactions
-        policy = self.mask_seen
-        if policy == "auto":
-            policy = (
-                "context"
-                if transactions is not None and transactions.context_labels
-                else "pair"
-            )
+        policy = resolve_mask_policy(self.mask_seen, transactions)
 
         context_index: Optional[dict] = None
         context_ids: Optional[dict] = None
@@ -263,20 +261,16 @@ class Evaluator:
                     if policy == "none":
                         pass
                     elif context_index is not None and context is not None:
-                        context_rows = context.cpu().numpy()
-                        for row, user in enumerate(user_indices.tolist()):
-                            key = context_ids.get(context_key(context_rows[row]), -1)
-                            if key < 0:
-                                continue
-                            seen = context_index.get((user, key))
-                            if seen is None:
-                                continue
-                            predictions[row, seen] = -torch.inf
-                            if "target_item" in batch_data:
-                                target = int(batch_data["target_item"][row])
-                                repeated_triples += int(target in seen)
+                        repeated_triples += mask_seen_in_context(
+                            predictions,
+                            user_indices,
+                            context.cpu().numpy(),
+                            context_index,
+                            context_ids,
+                            batch_data.get("target_item"),
+                        )
                     else:
-                        predictions[train_batch.nonzero()] = -torch.inf
+                        mask_seen_pairs(predictions, train_batch)
 
                 elif strategy == "sampled":
                     # Mask seen items
