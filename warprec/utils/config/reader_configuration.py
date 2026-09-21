@@ -3,12 +3,14 @@ from typing import Optional, List, Dict, Literal
 from pydantic import BaseModel, Field, field_validator, model_validator
 from warprec.utils.enums import RatingType, ReadingMethods
 from warprec.utils.config.common import check_separator, Labels
+from warprec.utils.config.training_configuration import (
+    NegativeSampling,
+    SequencePooling,
+)
 from warprec.utils.logger import logger
 
 FileFormat = Literal["tabular", "parquet"]
 DuplicatePolicy = Literal["max", "mean", "first", "last", "sum"]
-NegativeSampling = Literal["uniform", "popularity"]
-SequencePooling = Literal["mean", "sum", "max"]
 
 
 class SplitReading(BaseModel):
@@ -167,13 +169,10 @@ class ReaderConfig(BaseModel):
         duplicates (Optional[DuplicatePolicy]): How repeated (user, item) rows are
             aggregated when building the interaction matrix. Defaults to 'max'.
             With implicit feedback every policy except 'sum' yields a binary matrix.
-        negative_sampling (Optional[NegativeSampling]): How negatives are drawn during
-            training. 'uniform' gives every item the same chance, 'popularity' draws
-            proportionally to a dampened interaction count. Defaults to 'uniform'.
-        sequence_pooling (Optional[SequencePooling]): How the values of a multi-valued
-            field are combined into the single vector the field contributes. Defaults
-            to 'mean', which matches the normalised multi-hot encoding the
-            factorisation-machine literature defines these models over.
+        negative_sampling (Optional[NegativeSampling]): Deprecated, moved to the
+            'training' section. Read from here only when 'training' leaves it unset.
+        sequence_pooling (Optional[SequencePooling]): Deprecated, moved to the
+            'training' section. Read from here only when 'training' leaves it unset.
         split (Optional[SplitReading]): The information of the split reading process.
         side (Optional[SideInformationReading]): The side information of the dataset.
         clustering (Optional[ClusteringInformationReading]): The clustering information
@@ -192,8 +191,12 @@ class ReaderConfig(BaseModel):
     header: Optional[bool] = True
     rating_type: RatingType
     duplicates: Optional[DuplicatePolicy] = "max"
-    negative_sampling: Optional[NegativeSampling] = "uniform"
-    sequence_pooling: Optional[SequencePooling] = "mean"
+
+    # Kept so a configuration written against 1.7 still loads. The training
+    # section is the home of both, and a value set here is copied over with a
+    # warning by WarpRecConfiguration.
+    negative_sampling: Optional[NegativeSampling] = None
+    sequence_pooling: Optional[SequencePooling] = None
     split: Optional[SplitReading] = Field(default_factory=SplitReading)
     side: Optional[SideInformationReading] = None
     clustering: Optional[ClusteringInformationReading] = None

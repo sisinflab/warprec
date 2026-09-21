@@ -1,5 +1,5 @@
 # pylint: disable = R0801, E1102
-from typing import Any, Optional
+from typing import Any, Optional, Tuple
 
 import torch
 from torch import nn, Tensor
@@ -32,6 +32,20 @@ class AttentionLayer(nn.Module):
             nn.Linear(attention_size, 1),
         )
 
+    def logits(self, x: Tensor) -> Tensor:
+        """The unnormalised attention score of each pair.
+
+        Prediction normalises over pair groups that are computed separately, so
+        it needs the logits before the softmax rather than after it.
+
+        Args:
+            x (Tensor): The input tensor.
+
+        Returns:
+            Tensor: The unnormalised score tensor.
+        """
+        return self.mlp(x)
+
     def forward(self, x: Tensor) -> Tensor:
         """The forward step of the attention layer.
 
@@ -43,8 +57,7 @@ class AttentionLayer(nn.Module):
         """
         # x: [batch_size, num_pairs, embedding_size]
         # scores: [batch_size, num_pairs, 1]
-        logits = self.mlp(x)
-        return torch.softmax(logits, dim=1)
+        return torch.softmax(self.logits(x), dim=1)
 
 
 @model_registry.register(name="AFM")
@@ -111,6 +124,9 @@ class AFM(ContextRecommenderUtils, IterativeRecommender):
 
         # Dropout
         self.dropout_layer = nn.Dropout(self.dropout)
+
+        # Pair indices of a field group, built on first use
+        self._pair_cache: dict[int, Tensor] = {}
 
         # Pre-compute Pair Indices
         # Total fields = User (1) + Item (1) + Features (N) + Contexts (M)
@@ -227,67 +243,126 @@ class AFM(ContextRecommenderUtils, IterativeRecommender):
 
         return linear_part + afm_part
 
+    def _pair_indices(self, num_fields: int, device: torch.device) -> Tensor:
+        """The (i, j) index pairs of one field group, cached per group size.
+
+        Args:
+            num_fields (int): The number of fields in the group.
+            device (torch.device): The device the indices are needed on.
+
+        Returns:
+            Tensor: The [2, num_pairs] index tensor, empty when the group holds
+                fewer than two fields.
+        """
+        cached = self._pair_cache.get(num_fields)
+        if cached is None or cached.device != device:
+            cached = torch.triu_indices(num_fields, num_fields, offset=1, device=device)
+            self._pair_cache[num_fields] = cached
+        return cached
+
+    def _group_terms(self, pairs: Tensor) -> Tuple[Tensor, Tensor]:
+        """Reduce a group of pair vectors to its attention logit and its score.
+
+        The projection onto ``p`` is linear, so it can be applied to each pair
+        before the attention weights rather than to their weighted sum. That
+        drops the embedding dimension immediately and leaves one scalar per
+        pair to carry around.
+
+        Args:
+            pairs (Tensor): The pair vectors, [..., num_pairs, embedding_size].
+
+        Returns:
+            Tuple[Tensor, Tensor]: The logits and the projected scores, both
+                [..., num_pairs].
+        """
+        pairs = self.dropout_layer(pairs)
+        return (
+            self.attention_layer.logits(pairs).squeeze(-1),
+            (pairs * self.p).sum(-1),
+        )
+
     def _compute_network_scores(
         self,
         u_emb: Tensor,
-        i_emb: Tensor,
+        item_emb: Tensor,
         feat_emb_tensor: Optional[Tensor],
         ctx_emb_tensor: Optional[Tensor],
         batch_size: int,
         num_items: int,
     ) -> Tensor:
-        """Compute scores of AFM interaction part efficiently using chunking."""
-        total_rows = batch_size * num_items
+        """Compute the AFM interaction part for a block of candidate items.
 
-        # Create memory efficient views
-        u_view = (
-            u_emb.unsqueeze(1)
-            .unsqueeze(2)
-            .expand(-1, num_items, -1, -1)
-            .reshape(total_rows, 1, -1)
-        )
-        i_view = i_emb.unsqueeze(2).reshape(total_rows, 1, -1)
-        views = [u_view, i_view]
+        The fields split in two: the user and the contexts are fixed for a row,
+        while the item and its features change with the candidate. A pair drawn
+        from the fixed side is therefore identical for every candidate, and a
+        pair drawn from the varying side is identical for every row, so only the
+        pairs that cross the two sides depend on both. Computing the other two
+        groups once is an exact rewrite, not an approximation: the softmax still
+        normalises over the same set of pairs, and a sum does not care in which
+        order they arrive.
 
-        # Handle Feature views
-        if feat_emb_tensor is not None:
-            f_view = (
-                feat_emb_tensor.unsqueeze(0)
-                .expand(batch_size, -1, -1, -1)
-                .reshape(total_rows, -1, self.embedding_size)
-            )
-            views.append(f_view)
+        Args:
+            u_emb (Tensor): The user embeddings, [batch_size, embedding_size].
+            item_emb (Tensor): The candidate item embeddings,
+                [num_items, embedding_size].
+            feat_emb_tensor (Optional[Tensor]): The item feature embeddings,
+                [num_items, num_features, embedding_size].
+            ctx_emb_tensor (Optional[Tensor]): The context embeddings,
+                [batch_size, num_contexts, embedding_size].
+            batch_size (int): The number of rows scored.
+            num_items (int): The number of candidate items in the block.
 
-        # Handle Context views
+        Returns:
+            Tensor: The interaction scores, [batch_size, num_items].
+        """
+        device = u_emb.device
+
+        # Fields that are fixed for a row, and fields that follow the candidate
+        fixed = [u_emb.unsqueeze(1)]
         if ctx_emb_tensor is not None:
-            c_view = (
-                ctx_emb_tensor.unsqueeze(1)
-                .expand(-1, num_items, -1, -1)
-                .reshape(total_rows, -1, self.embedding_size)
+            fixed.append(ctx_emb_tensor)
+        fixed_emb = torch.cat(fixed, dim=1)  # [batch_size, n_fixed, emb]
+
+        varying = [item_emb.unsqueeze(1)]
+        if feat_emb_tensor is not None:
+            varying.append(feat_emb_tensor)
+        var_emb = torch.cat(varying, dim=1)  # [num_items, n_varying, emb]
+
+        n_fixed = fixed_emb.size(1)
+        n_varying = var_emb.size(1)
+
+        logits: list[Tensor] = []
+        scores: list[Tensor] = []
+
+        # Fixed x fixed: one value per row, shared by every candidate
+        if n_fixed > 1:
+            idx = self._pair_indices(n_fixed, device)
+            ff_logit, ff_score = self._group_terms(
+                fixed_emb[:, idx[0]] * fixed_emb[:, idx[1]]
             )
-            views.append(c_view)
+            logits.append(ff_logit.unsqueeze(1).expand(-1, num_items, -1))
+            scores.append(ff_score.unsqueeze(1).expand(-1, num_items, -1))
 
-        # Pre-allocate tensor to memory
-        all_scores = torch.empty(total_rows, device=self.device)
+        # Varying x varying: one value per candidate, shared by every row
+        if n_varying > 1:
+            idx = self._pair_indices(n_varying, device)
+            vv_logit, vv_score = self._group_terms(
+                var_emb[:, idx[0]] * var_emb[:, idx[1]]
+            )
+            logits.append(vv_logit.unsqueeze(0).expand(batch_size, -1, -1))
+            scores.append(vv_score.unsqueeze(0).expand(batch_size, -1, -1))
 
-        # Loop on chunk size parameter
-        for start in range(0, total_rows, self.chunk_size):
-            end = min(start + self.chunk_size, total_rows)
+        # Fixed x varying: the only group that genuinely depends on both, and
+        # the only one still paid for per (row, candidate)
+        cross = fixed_emb.unsqueeze(1).unsqueeze(3) * var_emb.unsqueeze(0).unsqueeze(2)
+        cross = cross.reshape(batch_size, num_items, n_fixed * n_varying, -1)
+        fv_logit, fv_score = self._group_terms(cross)
+        logits.append(fv_logit)
+        scores.append(fv_score)
 
-            # Slice the views and concatenate
-            # Each view is [Total_Rows, Num_Fields_Subset, Emb]
-            chunk_components = [v[start:end] for v in views]
-
-            # Concatenate on Field dimension (dim=1)
-            chunk_stack = torch.cat(chunk_components, dim=1)
-
-            # Compute AFM Interaction
-            afm_s = self._compute_afm_interaction(chunk_stack)
-
-            # Save in place
-            all_scores[start:end] = afm_s
-
-        return all_scores.view(batch_size, num_items)
+        # One softmax over every pair, exactly as the monolithic path does
+        weights = torch.softmax(torch.cat(logits, dim=2), dim=2)
+        return (weights * torch.cat(scores, dim=2)).sum(-1)
 
     def predict(
         self,
@@ -326,36 +401,38 @@ class AFM(ContextRecommenderUtils, IterativeRecommender):
             # Case 'full': iterate through all items in memory-safe blocks
             preds_list = []
 
+            # The catalogue does not change while the users are scored, so
+            # the item-side tensors are gathered once and sliced per block.
+            (
+                cat_item_emb,
+                cat_item_bias,
+                cat_feat_emb,
+                cat_feat_bias,
+            ) = self._catalogue_item_side()
+
             for start in range(0, self.n_items, self.block_size):
                 end = min(start + self.block_size, self.n_items)
                 current_block_len = end - start
 
-                items_block = torch.arange(start, end, device=self.device)
-
-                # Item Embeddings and Bias
-                item_emb_block = self.item_embedding(items_block)
-
-                # Retrieve block feature embeddings and bias
-                feat_emb_block_tensor = self._get_feature_embeddings(items_block)
-                feat_bias_block = self._get_feature_bias(items_block)
+                # Slices of the catalogue tensors, shared by every user
+                item_emb_block = cat_item_emb[start:end]
+                item_bias_block = cat_item_bias[start:end]
+                feat_emb_block_tensor = (
+                    None if cat_feat_emb is None else cat_feat_emb[start:end]
+                )
+                feat_bias_block = cat_feat_bias[start:end]
 
                 # Linear Part
-                item_bias_block = self.item_bias(items_block).squeeze(-1)
                 linear_pred = (
                     fixed_linear.unsqueeze(1)
                     + item_bias_block.unsqueeze(0)
                     + feat_bias_block.unsqueeze(0)
                 )
 
-                # Expand Item to match batch size
-                item_emb_expanded = item_emb_block.unsqueeze(0).expand(
-                    batch_size, -1, -1
-                )
-
                 # Compute AFM scores efficiently
                 afm_scores = self._compute_network_scores(
                     u_emb,
-                    item_emb_expanded,
+                    item_emb_block,
                     feat_emb_block_tensor,
                     ctx_emb_tensor,
                     batch_size,

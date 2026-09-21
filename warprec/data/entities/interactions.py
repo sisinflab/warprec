@@ -15,6 +15,7 @@ from warprec.data.entities.train_structures import (
     ContrastiveDataset,
     PositiveDataset,
 )
+from warprec.data.schema import ColumnLabels, ContextSpec, SideData, SignalOptions
 from warprec.utils.enums import RatingType
 
 
@@ -40,23 +41,10 @@ class Interactions:
             int: Number of items.
         user_mapping (dict): Mapping of user ID -> user idx.
         item_mapping (dict): Mapping of item ID -> item idx.
-        side_data (Optional[DataFrame[Any]]): The side information features in DataFrame format.
-        side_matrix (Optional[csr_matrix]): The {item x feature} content matrix, already
-            aligned on the item indices. Built by the Dataset, which owns the mappings.
-        user_cluster (Optional[dict]): The user cluster information.
-        item_cluster (Optional[dict]): The item cluster information.
-        batch_size (int): The batch size that will be used to
-            iterate over the interactions.
-        rating_type (RatingType): The type of rating to be used.
-        duplicates (str): How repeated (user, item) rows are aggregated into the
-            matrix. One of 'max', 'mean', 'first', 'last' or 'sum'.
-        negative_sampling (str): How negatives are drawn, 'uniform' or 'popularity'.
-        rating_label (str): The label of the rating column.
-        timestamp_label (str): The label of the timestamp column.
-        context_labels (Optional[List[str]]): The list of labels of the
-            contextual data.
-        context_types (Optional[dict]): The type of each context field.
-        context_max_len (int): The widest multi-valued field, 1 when there is none.
+        side (Optional[SideData]): The item attributes and the cluster assignments.
+        labels (Optional[ColumnLabels]): The names the core columns carry.
+        context (Optional[ContextSpec]): The contextual columns and how they are encoded.
+        options (Optional[SignalOptions]): The options that shape the training signal.
     """
 
     def __init__(
@@ -65,36 +53,30 @@ class Interactions:
         original_dims: Tuple[int, int],
         user_mapping: dict,
         item_mapping: dict,
-        side_data: Optional[DataFrame[Any]] = None,
-        side_matrix: Optional[csr_matrix] = None,
-        user_cluster: Optional[dict] = None,
-        item_cluster: Optional[dict] = None,
-        batch_size: int = 1024,
-        rating_type: RatingType = RatingType.IMPLICIT,
-        duplicates: str = "max",
-        negative_sampling: str = "uniform",
-        rating_label: str = None,
-        timestamp_label: str = None,
-        context_labels: Optional[List[str]] = None,
-        context_types: Optional[dict] = None,
-        context_max_len: int = 1,
+        side: Optional[SideData] = None,
+        labels: Optional[ColumnLabels] = None,
+        context: Optional[ContextSpec] = None,
+        options: Optional[SignalOptions] = None,
     ) -> None:
-        # pylint: disable = too-many-arguments, too-many-positional-arguments
-        # Each argument is a distinct part of the data schema.
+        side = side or SideData()
+        labels = labels or ColumnLabels()
+        context = context or ContextSpec()
+        options = options or SignalOptions()
+
         # Setup the variables
         self._inter_df = data
-        self._inter_side = side_data.clone() if side_data is not None else None
-        self._inter_user_cluster = user_cluster if user_cluster is not None else None
-        self._inter_item_cluster = item_cluster if item_cluster is not None else None
-        self.batch_size = batch_size
-        self.rating_type = rating_type
-        self.duplicates = duplicates
-        self.negative_sampling = negative_sampling
+        self._inter_side = side.frame.clone() if side.frame is not None else None
+        self._inter_user_cluster = side.user_cluster
+        self._inter_item_cluster = side.item_cluster
+        self.batch_size = options.batch_size
+        self.rating_type = options.rating_type
+        self.duplicates = options.duplicates
+        self.negative_sampling = options.negative_sampling
 
         # Setup the training variables
         self._inter_dict: Optional[dict] = None
         self._inter_sparse: csr_matrix = None
-        self._inter_side_sparse: Optional[csr_matrix] = side_matrix
+        self._inter_side_sparse: Optional[csr_matrix] = side.matrix
         self._inter_side_tensor: Tensor = None
         self._inter_side_labels: List[str] = []
         self._history_matrix: Tensor = None
@@ -104,11 +86,13 @@ class Interactions:
         # Set DataFrame labels
         self.user_label = data.columns[0]
         self.item_label = data.columns[1]
-        self.rating_label = rating_label if rating_type == RatingType.EXPLICIT else None
-        self.timestamp_label = timestamp_label
-        self.context_labels = context_labels if context_labels else []
-        self.context_types = context_types if context_types else {}
-        self.context_max_len = context_max_len
+        self.rating_label = (
+            labels.rating if options.rating_type == RatingType.EXPLICIT else None
+        )
+        self.timestamp_label = labels.timestamp
+        self.context_labels = context.label_list()
+        self.context_types = dict(context.types)
+        self.context_max_len = context.max_len
 
         # Setup flat views cache
         self._flat_users: Optional[np.ndarray] = None

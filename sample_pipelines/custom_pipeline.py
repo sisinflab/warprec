@@ -7,6 +7,7 @@ This approach is advised for expert user of the framework.
 
 from warprec.data.dataset import Dataset
 from warprec.data.reader import LocalReader
+from warprec.data.schema import SplitSpec
 from warprec.data.splitting import Splitter
 from warprec.recommenders.collaborative_filtering_recommender.knn import ItemKNN
 from warprec.evaluation import Evaluator
@@ -24,7 +25,8 @@ def main():
 
     splitter = Splitter()
     train, _, test = splitter.split_transaction(
-        data, test_strategy=SplittingStrategies.TEMPORAL_HOLDOUT, test_ratio=0.1
+        data,
+        test=SplitSpec(strategy=SplittingStrategies.TEMPORAL_HOLDOUT, ratio=0.1),
     )
 
     dataset = Dataset(

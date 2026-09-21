@@ -3,7 +3,7 @@ import random
 import json
 import inspect
 import hashlib
-from typing import Any, Optional, List, Dict, no_type_check
+from typing import Any, Optional, List, Dict, Tuple, no_type_check
 from abc import ABC, abstractmethod
 
 import torch
@@ -893,6 +893,10 @@ class ContextRecommenderUtils(nn.Module, ABC):
     merged_context_bias: Optional[nn.Embedding]
     context_offsets: Optional[Tensor]
 
+    # Item-side tensors of the whole catalogue, held only while the module is
+    # in evaluation mode and dropped the moment it goes back to training.
+    _item_side_cache: Optional[Tuple[Tensor, Tensor, Optional[Tensor], Tensor]] = None
+
     def __init__(
         self,
         params: dict,
@@ -1208,6 +1212,64 @@ class ContextRecommenderUtils(nn.Module, ABC):
         biases = self.merged_context_bias(indices).squeeze(-1)
         scale = torch.where(numeric, contexts, torch.ones_like(contexts))
         return (biases * scale).sum(dim=1)
+
+    def _catalogue_item_side(
+        self,
+    ) -> Tuple[Tensor, Tensor, Optional[Tensor], Tensor]:
+        """The item-side tensors of the whole catalogue, gathered once.
+
+        Scoring walks the catalogue in blocks, once per batch of users, and the
+        item embedding, the item bias and the feature lookups that each block
+        needs do not depend on the users being scored. Gathering them per batch
+        repeats the same work as many times as there are batches, and the
+        feature lookup pays a host round-trip each time. They are gathered once
+        here and sliced per block instead.
+
+        The result is only cached outside training, so a step that moves the
+        parameters can never be served a stale tensor, and the cache is dropped
+        whenever the module returns to training mode.
+
+        Returns:
+            Tuple[Tensor, Tensor, Optional[Tensor], Tensor]: The item
+                embeddings, the item biases, the feature embeddings (None when
+                the model has no side information) and the feature biases.
+        """
+        if self.training:
+            return self._gather_item_side()
+
+        if self._item_side_cache is None:
+            self._item_side_cache = self._gather_item_side()
+        return self._item_side_cache
+
+    def _gather_item_side(
+        self,
+    ) -> Tuple[Tensor, Tensor, Optional[Tensor], Tensor]:
+        """Gather the item-side tensors of the whole catalogue.
+
+        Returns:
+            Tuple[Tensor, Tensor, Optional[Tensor], Tensor]: The item
+                embeddings, the item biases, the feature embeddings and the
+                feature biases.
+        """
+        items = torch.arange(self.n_items, device=self.item_embedding.weight.device)
+        return (
+            self.item_embedding(items),
+            self.item_bias(items).squeeze(-1),
+            self._get_feature_embeddings(items),
+            self._get_feature_bias(items),
+        )
+
+    def train(self, mode: bool = True) -> "ContextRecommenderUtils":
+        """Switch the module between training and evaluation.
+
+        Args:
+            mode (bool): Whether to put the module in training mode.
+
+        Returns:
+            ContextRecommenderUtils: The module itself.
+        """
+        self._item_side_cache = None
+        return super().train(mode)
 
     def _get_feature_bias(self, target_items: Tensor) -> Tensor:
         """Helper to retrieve the sum of feature biases for a set of items."""

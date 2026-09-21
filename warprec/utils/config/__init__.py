@@ -12,6 +12,11 @@ from .reader_configuration import (
     ClusteringInformationReading,
 )
 from .run_configuration import WarpRecRunConfig
+from .training_configuration import (
+    TrainingConfig,
+    NegativeSampling,
+    SequencePooling,
+)
 from .search_space_wrapper import SearchSpaceWrapper
 from .splitter_configuration import SplittingConfig, SplitStrategy
 from .writer_configuration import (
@@ -55,6 +60,9 @@ __all__ = [
     "SideInformationReading",
     "ClusteringInformationReading",
     "WarpRecRunConfig",
+    "TrainingConfig",
+    "NegativeSampling",
+    "SequencePooling",
     "SearchSpaceWrapper",
     "SplittingConfig",
     "SplitStrategy",

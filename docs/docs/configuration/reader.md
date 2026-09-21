@@ -32,9 +32,10 @@ The following keywords are available to configure the reader:
 
 - **duplicates**: How repeated `(user_id, item_id)` rows are aggregated when the interaction matrix is built: `max`, `mean`, `first`, `last` or `sum`. Defaults to `max`. With implicit feedback every policy except `sum` yields a binary matrix, while `sum` yields interaction counts.
 
-- **negative_sampling**: How negative examples are drawn during training: `uniform` or `popularity`. Defaults to `uniform`, which gives every item the same chance. `popularity` draws proportionally to a dampened interaction count (`count^0.75`), producing harder negatives among the items a model is most likely to over-recommend.
-
-- **sequence_pooling**: How the values of a multi-valued contextual field are combined into the single vector that field contributes: `mean`, `sum` or `max`. Defaults to `mean`, which matches the normalised multi-hot encoding the factorization-machine literature defines these models over, so a field's contribution does not grow with the number of values it happens to hold.
+!!! warning "Moved"
+    `negative_sampling` and `sequence_pooling` were released here in 1.7 and now live
+    in the [Training Configuration](training.md). Writing them under `reader` still
+    works and logs a warning, but it will stop being accepted in a future release.
 
 - **rating_type**: Specifies the feedback type:
 
@@ -154,7 +155,7 @@ To override these defaults, use the `dtypes` section:
 - **timestamp_type**: Datatype for timestamps.
 - **cluster_type**: Datatype for the cluster column of the clustering files.
 - **context_types**: Datatype for context information. A context column declared as a float type is treated as a **measurement** rather than a category: it keeps its value and contributes a single embedding scaled by it, so the ordering the numbers carry is preserved.
-- **context_separators**: The separator of each context column that holds several values in one cell, given per column. A column named here becomes a **multi-valued** field: its values share one vocabulary and are pooled into the single vector the field contributes, according to `sequence_pooling`.
+- **context_separators**: The separator of each context column that holds several values in one cell, given per column. A column named here becomes a **multi-valued** field: its values share one vocabulary and are pooled into the single vector the field contributes, according to `training.sequence_pooling`.
 
 !!! note
     When `header=False`, dtype specifications will be **ignored**. Supported datatypes include:
@@ -175,8 +176,6 @@ reader:
     local_path: data/movielens.csv
     rating_type: explicit
     duplicates: max
-    negative_sampling: popularity
-    sequence_pooling: mean
     sep: ','
     labels:
         user_id_label: uid
@@ -193,4 +192,7 @@ reader:
         item_local_path: data/movielens_item_cluster.csv
         user_sep: ','
         item_sep: ','
+training:
+    negative_sampling: popularity
+    sequence_pooling: mean
 ```

@@ -8,7 +8,8 @@ from scipy.sparse import coo_matrix, csr_matrix
 from torch import Tensor
 from torch.utils.data import DataLoader
 
-from warprec.data.entities.context import build_context_array
+from warprec.data.entities.context import build_context_array, context_key
+from warprec.data.schema import ColumnLabels, ContextSpec, SignalOptions
 from warprec.data.entities.interactions import seed_worker
 from warprec.data.entities.train_structures import PointWiseDataset
 from warprec.utils.enums import RatingType
@@ -34,18 +35,10 @@ class Transactions:
         original_dims (Tuple[int, int]): The number of users and items.
         user_mapping (dict): Mapping of user ID -> user idx.
         item_mapping (dict): Mapping of item ID -> item idx.
-        context_labels (Optional[List[str]]): The labels of the contextual columns.
-        field_types (Optional[Dict[str, str]]): The declared type of each context
-            field. Stored for the models that consume them; every field is
-            currently emitted as a categorical index.
-        context_types (Optional[Dict[str, str]]): The type of each context field.
-        context_max_len (int): The widest multi-valued field, 1 when there is none.
         side_tensor (Optional[Tensor]): The item feature lookup, indexed by item.
-        rating_type (RatingType): The type of rating to be used.
-        rating_label (Optional[str]): The label of the rating column.
-        timestamp_label (Optional[str]): The label of the timestamp column.
-        batch_size (int): The default batch size for the dataloaders.
-        negative_sampling (str): How negatives are drawn, 'uniform' or 'popularity'.
+        labels (Optional[ColumnLabels]): The names the core columns carry.
+        context (Optional[ContextSpec]): The contextual columns and how they are encoded.
+        options (Optional[SignalOptions]): The options that shape the training signal.
     """
 
     def __init__(
@@ -54,19 +47,15 @@ class Transactions:
         original_dims: Tuple[int, int],
         user_mapping: dict,
         item_mapping: dict,
-        context_labels: Optional[List[str]] = None,
-        field_types: Optional[Dict[str, str]] = None,
-        context_types: Optional[Dict[str, str]] = None,
-        context_max_len: int = 1,
         side_tensor: Optional[Tensor] = None,
-        rating_type: RatingType = RatingType.IMPLICIT,
-        rating_label: Optional[str] = None,
-        timestamp_label: Optional[str] = None,
-        batch_size: int = 1024,
-        negative_sampling: str = "uniform",
+        labels: Optional[ColumnLabels] = None,
+        context: Optional[ContextSpec] = None,
+        options: Optional[SignalOptions] = None,
     ) -> None:
-        # pylint: disable = too-many-arguments, too-many-positional-arguments
-        # Each argument is a distinct part of the data schema.
+        labels = labels or ColumnLabels()
+        context = context or ContextSpec()
+        options = options or SignalOptions()
+
         self._df = data
         self._umap = user_mapping
         self._imap = item_mapping
@@ -75,15 +64,17 @@ class Transactions:
 
         self.user_label = data.columns[0]
         self.item_label = data.columns[1]
-        self.context_labels = context_labels if context_labels else []
-        self.field_types = field_types if field_types else {}
-        self.context_types = context_types if context_types else {}
-        self.context_max_len = context_max_len
-        self.rating_type = rating_type
-        self.rating_label = rating_label if rating_type == RatingType.EXPLICIT else None
-        self.timestamp_label = timestamp_label
-        self.batch_size = batch_size
-        self.negative_sampling = negative_sampling
+        self.context_labels = context.label_list()
+        self.field_types = dict(context.field_types)
+        self.context_types = dict(context.types)
+        self.context_max_len = context.max_len
+        self.rating_type = options.rating_type
+        self.rating_label = (
+            labels.rating if options.rating_type == RatingType.EXPLICIT else None
+        )
+        self.timestamp_label = labels.timestamp
+        self.batch_size = options.batch_size
+        self.negative_sampling = options.negative_sampling
 
         namespace = nw.get_native_namespace(data)
         umap_df = nw.from_dict(
@@ -263,7 +254,7 @@ class Transactions:
         else:
             uniques, keys = np.unique(self._contexts, axis=0, return_inverse=True)
             keys = keys.astype(np.int64).ravel()
-            context_ids = {tuple(row.tolist()): idx for idx, row in enumerate(uniques)}
+            context_ids = {context_key(row): idx for idx, row in enumerate(uniques)}
 
         grouped: Dict[Tuple[int, int], List[int]] = {}
         for user, context_id, item in zip(self._users, keys, self._items):

@@ -5,6 +5,7 @@ from narwhals.dataframe import DataFrame
 
 from warprec.data import Dataset
 from warprec.data.reader import Reader
+from warprec.data.schema import ColumnLabels, SplitSpec
 from warprec.data.splitting import Splitter
 from warprec.data.filtering import apply_filtering
 from warprec.recommenders.base_recommender import ContextRecommenderUtils
@@ -74,26 +75,19 @@ def initialize_datasets(
         # Splitter testing
         if config.splitter:
             if config.reader.data_type == "transaction":
-                # Gather splitting configurations
-                test_configuration = config.splitter.test_splitting.model_dump()
-                val_configuration = config.splitter.validation_splitting.model_dump()
-
-                # Add tag to distinguish test and validation keys
-                test_configuration = {
-                    f"test_{key}": value for key, value in test_configuration.items()
-                }
-                val_configuration = {
-                    f"val_{key}": value for key, value in val_configuration.items()
-                }
-
                 # Compute splitting
                 train_data, val_data, test_data = splitter.split_transaction(
                     data,
-                    **config.reader.labels.model_dump(
-                        exclude=["cluster_label", "context_labels"]  # type: ignore[arg-type]
+                    labels=ColumnLabels(
+                        user_id=config.reader.labels.user_id_label,
+                        item_id=config.reader.labels.item_id_label,
+                        rating=config.reader.labels.rating_label,
+                        timestamp=config.reader.labels.timestamp_label,
                     ),
-                    **test_configuration,
-                    **val_configuration,
+                    test=SplitSpec(**config.splitter.test_splitting.model_dump()),
+                    validation=SplitSpec(
+                        **config.splitter.validation_splitting.model_dump()
+                    ),
                 )
 
             else:
@@ -293,7 +287,8 @@ def initialize_datasets(
         "batch_size": config.evaluation.batch_size,
         "rating_type": config.reader.rating_type,
         "duplicates": config.reader.duplicates,
-        "negative_sampling": config.reader.negative_sampling,
+        "negative_sampling": config.training.negative_sampling,
+        "sequence_pooling": config.training.sequence_pooling,
         "context_separators": config.reader.dtypes.context_separators,
         "keep_unseen_items": (
             config.reader.side.keep_unseen_items if config.reader.side else False

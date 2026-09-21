@@ -7,6 +7,7 @@ from torch.utils.data import DataLoader
 from scipy.sparse import csr_matrix
 
 from warprec.data import Dataset
+from warprec.data.entities.context import context_key
 from warprec.evaluation.metrics.base_metric import BaseMetric
 from warprec.recommenders.base_recommender import (
     Recommender,
@@ -58,7 +59,9 @@ class Evaluator:
         mask_seen: str = "auto",
     ):
         # pylint: disable = too-many-arguments, too-many-positional-arguments
-        # Each argument is a distinct part of the data schema.
+        # Metrics, cut-offs and the lookups they need are independent of one
+        # another and are not passed together anywhere else, so grouping them
+        # would invent a structure rather than reflect one.
         self.k_values = k_values
         self.metric_list = metric_list
         self.mask_seen = mask_seen
@@ -262,7 +265,7 @@ class Evaluator:
                     elif context_index is not None and context is not None:
                         context_rows = context.cpu().numpy()
                         for row, user in enumerate(user_indices.tolist()):
-                            key = context_ids.get(tuple(context_rows[row].tolist()), -1)
+                            key = context_ids.get(context_key(context_rows[row]), -1)
                             if key < 0:
                                 continue
                             seen = context_index.get((user, key))

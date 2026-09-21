@@ -141,7 +141,6 @@ A context column is read as one of three kinds of field, and each contributes ex
 
 ```yaml
 reader:
-    sequence_pooling: mean      # how multi-valued fields are combined
     labels:
         context_labels: [weather, temperature, genres]
     dtypes:
@@ -149,6 +148,8 @@ reader:
             temperature: float32      # a measurement, not a category
         context_separators:
             genres: '|'               # "action|comedy" is two values, not one category
+training:
+    sequence_pooling: mean            # how multi-valued fields are combined
 ```
 
 !!! warning "A measurement encoded as a category"
@@ -157,7 +158,7 @@ reader:
 
 !!! note "Why the default pooling is the mean"
 
-    `mean` is the embedding equivalent of the normalised multi-hot block that the factorization-machine literature defines these models over, so a field's contribution does not grow with the number of values a row happens to hold. `sum` and `max` are available through `sequence_pooling`.
+    `mean` is the embedding equivalent of the normalised multi-hot block that the factorization-machine literature defines these models over, so a field's contribution does not grow with the number of values a row happens to hold. `sum` and `max` are available through `training.sequence_pooling`.
 
 - **Repeated pairs are expected and preserved.** The first two rows above describe the same user and the same item in two different situations. Both are used for training: that is the signal a context-aware model exists to learn.
 - **Every context column is categorical.** Values are mapped to integer indices, with `0` reserved for values that were not seen during training, so a value appearing only in the test set is treated as unknown rather than as a new category.

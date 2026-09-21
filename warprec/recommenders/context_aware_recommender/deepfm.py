@@ -196,6 +196,8 @@ class DeepFM(ContextRecommenderUtils, IterativeRecommender):
         Returns:
             Tensor: The score matrix {user x item}.
         """
+        # pylint: disable = too-many-locals
+        # One name per intermediate tensor of the blockwise score.
         batch_size = user_indices.size(0)
 
         # Linear Fixed
@@ -225,20 +227,25 @@ class DeepFM(ContextRecommenderUtils, IterativeRecommender):
             # Case 'full'
             preds_list = []
 
+            # The catalogue does not change while the users are scored, so
+            # the item-side tensors are gathered once and sliced per block.
+            (
+                cat_item_emb,
+                cat_item_bias,
+                cat_feat_emb,
+                cat_feat_bias,
+            ) = self._catalogue_item_side()
+
             for start in range(0, self.n_items, self.block_size):
                 end = min(start + self.block_size, self.n_items)
                 current_block_size = end - start
 
-                items_block = torch.arange(start, end, device=user_indices.device)
-
-                # Item Embeddings and Bias
-                item_emb = self.item_embedding(items_block)
-                item_b = self.item_bias(items_block).squeeze(-1)
-
-                # Feature Embeddings and Bias
-                # feat_emb_tensor: [Block, Num_Feat, Emb]
-                feat_emb_tensor = self._get_feature_embeddings(items_block)
-                feat_b = self._get_feature_bias(items_block)
+                item_emb = cat_item_emb[start:end]
+                item_b = cat_item_bias[start:end]
+                feat_emb_tensor = (
+                    None if cat_feat_emb is None else cat_feat_emb[start:end]
+                )
+                feat_b = cat_feat_bias[start:end]
 
                 # Linear Part
                 linear_pred = (

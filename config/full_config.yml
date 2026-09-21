@@ -9,8 +9,6 @@ reader:
   file_format: [tabular, parquet]
   rating_type: [implicit, explicit]
   duplicates: [max, mean, first, last, sum]
-  negative_sampling: [uniform, popularity]
-  sequence_pooling: [mean, sum, max]
   split:
     local_path: path/to/split/dir/
     azure_blob_prefix: path/to/split/blob/
@@ -54,6 +52,9 @@ reader:
       context_label_2: [int8, int16, int32, int64, float32, float64, str]
     context_separators:
       context_label_1: '|'
+training:
+  negative_sampling: [uniform, popularity]
+  sequence_pooling: [mean, sum, max]
 writer:
   dataset_name: MyDataset
   writing_method: local

@@ -25,6 +25,7 @@ nav:
   - Configuration:
       - Configuration Structure: configuration/index.md
       - Reader: configuration/reader.md
+      - Training: configuration/training.md
       - Writer: configuration/writer.md
       - Filtering: configuration/filtering.md
       - Splitting: configuration/splitting.md

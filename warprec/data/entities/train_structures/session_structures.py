@@ -289,7 +289,9 @@ class ClozeDataset(Dataset):
         seed: int = 42,
     ):
         # pylint: disable = too-many-arguments, too-many-positional-arguments
-        # Each argument is a distinct part of the data schema.
+        # These arguments are the flat session arrays and the masking
+        # parameters; they form no group that recurs elsewhere, so there is
+        # nothing to collapse them onto.
         self.flat_items = flat_items
         self.window_starts = window_starts
         self.window_ends = window_ends

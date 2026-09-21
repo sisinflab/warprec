@@ -35,7 +35,7 @@ from warprec.utils.registry import (
 from warprec.utils.logger import logger
 
 
-def objective_function(config: dict) -> None:
+def objective_function(config: dict) -> None:  # pylint: disable = too-many-locals
     """Objective function to optimize the hyperparameters.
 
     Args:
