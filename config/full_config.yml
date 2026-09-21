@@ -107,12 +107,12 @@ filtering:
     num_interactions: 10
 splitter:
   test_splitting:
-    strategy: [temporal_holdout, temporal_leave_k_out, random_holdout, random_leave_k_out, timestamp_slicing]
+    strategy: [temporal_holdout, temporal_leave_k_out, random_holdout, random_leave_k_out, timestamp_slicing, item_cold_start, user_cold_start]
     ratio: 0.1
     k: 10
     timestamp: [123456789, best]
   validation_splitting:
-    strategy: [temporal_holdout, temporal_leave_k_out, random_holdout, random_leave_k_out, timestamp_slicing, k_fold_cross_validation]
+    strategy: [temporal_holdout, temporal_leave_k_out, random_holdout, random_leave_k_out, timestamp_slicing, k_fold_cross_validation, item_cold_start, user_cold_start]
     ratio: 0.1
     k: 10
     timestamp: [123456789, best]
@@ -206,6 +206,7 @@ evaluation:
   batch_size: 4096
   strategy: [full, sampled]
   num_negatives: 99
+  candidates: [all, cold, warm]
   mask_seen: [auto, context, pair, none]
   seed: 42
   stat_significance:

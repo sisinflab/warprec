@@ -16,6 +16,7 @@ It provides flexible control over ranking cutoffs, sampling strategies, statisti
 - **strategy**: Evaluation strategy: `full` or `sampled`. `sampled` is recommended for large datasets. Defaults to `full`.
 - **num_negatives**: Number of negative samples used in the `sampled` strategy.
 
+- **candidates**: Which items a run may rank: `all`, `cold` or `warm`. Defaults to `all`. `cold` keeps only the items with no training interaction, which is what makes a cold-start protocol measure cold-start rather than the warm catalogue around it. See [Cold-Start Protocols](../evaluation/cold-start.md).
 - **mask_seen**: Which already-seen items are excluded from the ranking, under the `full` strategy: `auto`, `context`, `pair` or `none`. Defaults to `auto`, which excludes items the user has seen **in the same context** when the dataset has contextual columns, and every item the user has seen otherwise. `context` and `pair` force either behaviour and `none` excludes nothing.
 - **seed**: Random seed used for reproducibility in sampling. Defaults to `42`.
 - **propensity**: Nested section defining the propensity model the debiased estimators read. See [Debiased Evaluation](../evaluation/debiased.md).

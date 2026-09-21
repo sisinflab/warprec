@@ -25,6 +25,8 @@ WarpRec provides multiple splitting strategies that can be tailored to your expe
 | `random_leave_k_out` | Random | Randomly leave K interactions per user for testing. |
 | `timestamp_slicing` | Temporal | Split at a specific timestamp boundary. |
 | `k_fold_cross_validation` | Cross-validation | K-fold partitioning (validation only). |
+| `item_cold_start` | Cold-start | Hold out every interaction of a ratio of the **items**. |
+| `user_cold_start` | Cold-start | Hold out every interaction of a ratio of the **users**. |
 
 **1. Temporal Holdout**
 
@@ -103,6 +105,23 @@ splitter:
 !!! note
     - This strategy is applicable **only for validation sets**, not test sets.
     - Provides less biased and more accurate evaluation metrics, but requires additional training time.
+
+**7. Cold-Start**
+
+```yaml
+splitter:
+  test_splitting:
+    strategy: item_cold_start
+    ratio: 0.1
+```
+
+!!! important
+    `ratio` is a fraction of **entities**, not of interactions, unlike every other
+    strategy. The sampled items keep no training history at all, so only a model that
+    scores from attributes can reach them.
+
+    Pair it with `evaluation.candidates: cold` and read the result against the random
+    floor WarpRec logs. See [Cold-Start Protocols](../evaluation/cold-start.md).
 
 ## Example Splitter Configuration
 

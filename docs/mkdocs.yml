@@ -48,6 +48,7 @@ nav:
   - Evaluation:
       - Evaluation System: evaluation/index.md
       - Sampled Evaluation: evaluation/sampled.md
+      - Cold-Start Protocols: evaluation/cold-start.md
       - Debiased Evaluation: evaluation/debiased.md
       - Statistical Significance: evaluation/statistical-significance.md
       - Metrics:
