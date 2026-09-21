@@ -48,6 +48,7 @@ nav:
   - Evaluation:
       - Evaluation System: evaluation/index.md
       - Sampled Evaluation: evaluation/sampled.md
+      - Debiased Evaluation: evaluation/debiased.md
       - Statistical Significance: evaluation/statistical-significance.md
       - Metrics:
         - Metrics Taxonomy: evaluation/metrics/taxonomy.md
@@ -59,6 +60,7 @@ nav:
         - Multiobjective: evaluation/metrics/multiobjective.md
         - Novelty: evaluation/metrics/novelty.md
         - Rating: evaluation/metrics/rating.md
+        - Debiased: evaluation/metrics/debiased.md
   - Cloud & Deployment:
     - Authentication: cloud/authentication.md
     - Cluster Management: cloud/cluster-management.md
@@ -95,6 +97,7 @@ nav:
       - Novelty: api-reference/metrics/novelty.md
       - Rating: api-reference/metrics/rating.md
       - Multiobjective: api-reference/metrics/multiobjective.md
+      - Debiased: api-reference/metrics/debiased.md
 
 theme:
   name: material

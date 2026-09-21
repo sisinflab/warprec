@@ -29,7 +29,7 @@ Innovation in Recommender Systems is impeded by a fractured ecosystem. Researche
     From matrix factorization to graph-based and sequential architectures, spanning 6 model families.
   </div>
   <div class="feature-card">
-    <strong>40 GPU-Accelerated Metrics</strong>
+    <strong>44 GPU-Accelerated Metrics</strong>
     Accuracy, rating, coverage, novelty, diversity, bias, fairness, and multi-objective evaluation.
   </div>
   <div class="feature-card">

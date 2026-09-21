@@ -193,7 +193,11 @@ models:
     param_5: [qrandint, 10, 10_000, 5]
 evaluation:
   top_k: [5, 10, ...]
-  metrics: [Precision, Recall, nDCG, ...]
+  metrics: [Precision, Recall, nDCG, IPSRecall, SNIPSDCG, ...]
+  propensity:
+    estimator: [uniform, popularity]
+    power: 0.5
+    clip: 0.1
   complex_metrics:
     - name: MetricRequiringParameters
       params:

@@ -1,6 +1,6 @@
 # Metrics Taxonomy
 
-WarpRec includes **40 GPU-accelerated metrics** organized into 8 families. All metrics are implemented as PyTorch modules and support distributed evaluation.
+WarpRec includes **44 GPU-accelerated metrics** organized into 9 families. All metrics are implemented as PyTorch modules and support distributed evaluation.
 
 | Family | Metric | Description | Type |
 |---|---|---|---|
@@ -28,6 +28,10 @@ WarpRec includes **40 GPU-accelerated metrics** organized into 8 families. All m
 | **Diversity** | [Gini@K](diversity.md#gini) | Gini Index measuring inequality of item exposure. | Top-K |
 | | [ShannonEntropy@K](diversity.md#shannonentropy) | Information entropy over item recommendation frequencies. | Top-K |
 | | [SRecall@K](diversity.md#srecall) | Subtopic Recall measuring feature/category coverage. | Top-K |
+| **Debiased** | [IPSRecall@K](debiased.md#ipsrecall) | Recall@K with each hit weighted by the inverse of its propensity. | Top-K |
+| | [SNIPSRecall@K](debiased.md#snipsrecall) | Self-normalised inverse-propensity Recall@K, bounded in [0, 1]. | Top-K |
+| | [IPSDCG@K](debiased.md#ipsdcg) | Discounted gain with each gain weighted by the inverse of its propensity. | Top-K |
+| | [SNIPSDCG@K](debiased.md#snipsdcg) | Self-normalised inverse-propensity discounted gain. | Top-K |
 | **Bias** | [ACLT@K](bias.md#aclt) | Average Coverage of Long-Tail items in recommendations. | Top-K |
 | | [APLT@K](bias.md#aplt) | Average Proportion of Long-Tail items per user. | Top-K |
 | | [ARP@K](bias.md#arp) | Average Recommendation Popularity of top-K items. | Top-K |

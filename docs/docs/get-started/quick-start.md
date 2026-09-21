@@ -224,4 +224,4 @@ Ray will distribute the HPO trials across available GPUs, pruning unpromising co
 - **Configuration Reference:** For a complete guide to all configuration keys, see [Configuration](../configuration/index.md).
 - **Architecture:** For a deep dive into WarpRec's modular design, see [Architecture](architecture.md).
 - **Models:** For the full catalog of 67 algorithms with hyperparameters, see [Recommenders](../recommenders/index.md).
-- **Evaluation:** For the complete suite of 40 metrics, see [Evaluation](../evaluation/index.md).
+- **Evaluation:** For the complete suite of 44 metrics, see [Evaluation](../evaluation/index.md).
