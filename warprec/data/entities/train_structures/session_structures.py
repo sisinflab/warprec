@@ -25,7 +25,11 @@ class SequentialDataset(Dataset):
         neg_samples: int,
         niid: int,
         include_user_id: bool = False,
+        seed: int = 42,
     ):
+        # The dataset owns its stream, so a seed fixes the negatives it draws
+        # rather than leaving them to whatever state the global one is in.
+        self.rng = np.random.default_rng(seed)
         self.flat_items = flat_items
         self.flat_users = flat_users
         self.user_offsets = user_offsets
@@ -76,7 +80,7 @@ class SequentialDataset(Dataset):
             seen_items = self.sparse_matrix.indices[u_start:u_end]
 
             while len(neg_items) < self.neg_samples:
-                cand = np.random.randint(0, self.niid)
+                cand = int(self.rng.integers(0, self.niid))
                 # Fast check on sorted CSR indices
                 idx_ins = np.searchsorted(seen_items, cand)
                 if idx_ins < len(seen_items) and seen_items[idx_ins] == cand:
@@ -106,6 +110,8 @@ class SameTargetSequentialDataset(Dataset):
             valid targets for training (e.g., not the first interaction of a user).
         max_seq_len (int): Maximum length of the input sequence.
         niid (int): Number of items (used for padding and negative sampling).
+        seed (int): The seed of the dataset's own generator, so that two runs with
+            the same seed draw the same negatives.
 
     Sampled Output:
         (Sequence, Length, PosTarget, SemanticSequence, SemanticLength, HasSemanticPositive)
@@ -119,7 +125,11 @@ class SameTargetSequentialDataset(Dataset):
         valid_target_indices: np.ndarray,
         max_seq_len: int,
         niid: int,
+        seed: int = 42,
     ):
+        # The dataset owns its stream, so a seed fixes the negatives it draws
+        # rather than leaving them to whatever state the global one is in.
+        self.rng = np.random.default_rng(seed)
         self.flat_items = flat_items
         self.flat_users = flat_users
         self.user_offsets = user_offsets
@@ -167,7 +177,7 @@ class SameTargetSequentialDataset(Dataset):
 
         if len(other_candidates) > 0:
             sampled_idx = int(
-                other_candidates[np.random.randint(0, len(other_candidates))]
+                other_candidates[int(self.rng.integers(0, len(other_candidates)))]
             )
             sem_seq_tensor, sem_seq_len = self._build_sequence(sampled_idx)
             has_semantic_positive = torch.tensor(True, dtype=torch.bool)
@@ -202,7 +212,11 @@ class SlidingWindowDataset(Dataset):
         max_seq_len: int,
         neg_samples: int,
         niid: int,
+        seed: int = 42,
     ):
+        # The dataset owns its stream, so a seed fixes the negatives it draws
+        # rather than leaving them to whatever state the global one is in.
+        self.rng = np.random.default_rng(seed)
         self.flat_items = flat_items
         self.window_starts = window_starts
         self.window_users = window_users
@@ -246,7 +260,7 @@ class SlidingWindowDataset(Dataset):
                 found = 0
                 while found < self.neg_samples:
                     needed = self.neg_samples - found
-                    candidates = np.random.randint(0, self.niid, size=needed)
+                    candidates = self.rng.integers(0, self.niid, size=needed)
 
                     # Vectorized check
                     idxs = np.searchsorted(seen_items, candidates)
@@ -318,7 +332,7 @@ class ClozeDataset(Dataset):
 
         # Masking Logic
         num_to_mask = max(1, int(real_seq_len * self.mask_prob))
-        masked_indices = np.random.choice(real_seq_len, size=num_to_mask, replace=False)
+        masked_indices = self.rng.choice(real_seq_len, size=num_to_mask, replace=False)
 
         pos_targets = seq_array[masked_indices]
         seq_array[masked_indices] = self.mask_token_id
@@ -337,7 +351,7 @@ class ClozeDataset(Dataset):
                 true_item = pos_targets[i]
                 found_count = 0
                 while found_count < self.neg_samples:
-                    cand = np.random.randint(0, self.niid)
+                    cand = int(self.rng.integers(0, self.niid))
                     if cand == true_item:
                         continue
 

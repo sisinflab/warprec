@@ -61,6 +61,7 @@ class NegativeSampler:
         damping (float): The exponent applied to the interaction counts under the
             'popularity' strategy. The usual choice, 0.75, keeps the head likely
             without letting it dominate.
+        seed (int): The seed of the sampler's own generator.
     """
 
     def __init__(
@@ -69,11 +70,17 @@ class NegativeSampler:
         niid: int,
         strategy: str = "uniform",
         damping: float = 0.75,
+        seed: int = 42,
     ):
         self.sparse_matrix = sparse_matrix
         self.niid = niid
         self.strategy = strategy
         self._cumulative: Optional[np.ndarray] = None
+
+        # The sampler owns its stream rather than drawing from the global one,
+        # which nothing seeds in the single-process case and which any other
+        # caller can disturb between two otherwise identical runs.
+        self.rng = np.random.default_rng(seed)
 
         if strategy == "popularity":
             counts = np.asarray((sparse_matrix > 0).sum(axis=0)).ravel()[:niid]
@@ -101,11 +108,9 @@ class NegativeSampler:
 
         while True:
             if self._cumulative is None:
-                candidate = np.random.randint(0, self.niid)
+                candidate = int(self.rng.integers(0, self.niid))
             else:
-                candidate = int(
-                    np.searchsorted(self._cumulative, np.random.random_sample())
-                )
+                candidate = int(np.searchsorted(self._cumulative, self.rng.random()))
                 candidate = min(candidate, self.niid - 1)
 
             # Fast check on sorted array (CSR indices are sorted by default)
@@ -135,6 +140,8 @@ class PointWiseDataset(Dataset):
             of each interaction.
         negative_sampling (str): The strategy used to draw negatives, either
             'uniform' or 'popularity'.
+        seed (int): The seed of the sampler's generator, so that two runs with the
+            same seed draw the same negatives.
     """
 
     def __init__(
@@ -147,6 +154,7 @@ class PointWiseDataset(Dataset):
         side_information: Optional[Tensor] = None,
         contexts: Optional[Tensor] = None,
         negative_sampling: str = "uniform",
+        seed: int = 42,
     ):
         # Keep a copy of positive values
         self.user_ids = user_ids
@@ -159,7 +167,9 @@ class PointWiseDataset(Dataset):
         self.niid = niid
         self.side_information = side_information
         self.contexts = contexts
-        self.sampler = NegativeSampler(sparse_matrix, niid, negative_sampling)
+        self.sampler = NegativeSampler(
+            sparse_matrix, niid, negative_sampling, seed=seed
+        )
 
         self.num_positives = len(self.user_ids)
         self.total_samples = self.num_positives * (1 + self.neg_samples)
@@ -215,6 +225,8 @@ class ContrastiveDataset(Dataset):
         niid (int): Total number of items available.
         negative_sampling (str): The strategy used to draw negatives, either
             'uniform' or 'popularity'.
+        seed (int): The seed of the sampler's generator, so that two runs with the
+            same seed draw the same negatives.
     """
 
     def __init__(
@@ -224,12 +236,15 @@ class ContrastiveDataset(Dataset):
         sparse_matrix: csr_matrix,
         niid: int,
         negative_sampling: str = "uniform",
+        seed: int = 42,
     ):
         self.user_ids = user_ids
         self.item_ids = item_ids
         self.sparse_matrix = sparse_matrix
         self.niid = niid
-        self.sampler = NegativeSampler(sparse_matrix, niid, negative_sampling)
+        self.sampler = NegativeSampler(
+            sparse_matrix, niid, negative_sampling, seed=seed
+        )
 
     def __len__(self) -> int:
         return len(self.user_ids)
