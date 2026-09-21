@@ -41,6 +41,8 @@ class Dataset:
             interaction matrix. One of 'max', 'mean', 'first', 'last' or 'sum'.
         negative_sampling (str): How negatives are drawn during training, 'uniform'
             or 'popularity'.
+        sequence_pooling (str): How the values of a multi-valued contextual field are
+            pooled into the single vector the field contributes, 'mean', 'sum' or 'max'.
         context_separators (Optional[Dict[str, str]]): The separator of each contextual
             column holding several values in one cell. Such a column becomes a
             multi-valued field.
@@ -90,6 +92,7 @@ class Dataset:
         rating_type: RatingType = RatingType.IMPLICIT,
         duplicates: str = "max",
         negative_sampling: str = "uniform",
+        sequence_pooling: str = "mean",
         context_separators: Optional[Dict[str, str]] = None,
         keep_unseen_items: bool = False,
         user_id_label: str = "user_id",
@@ -157,6 +160,7 @@ class Dataset:
         self.batch_size = batch_size
         self._duplicates = duplicates
         self._negative_sampling = negative_sampling
+        self._sequence_pooling = sequence_pooling
 
         # Values that will be used to calculate mappings
         _uid = (
@@ -1204,6 +1208,7 @@ class Dataset:
             base_info["context_dims"] = self._context_dims
             base_info["context_types"] = self._context_types
             base_info["context_max_len"] = self._context_max_len
+            base_info["sequence_pooling"] = self._sequence_pooling
 
         return base_info
 
