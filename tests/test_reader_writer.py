@@ -12,10 +12,12 @@ from typing import Any, List
 import numpy as np
 import pandas as pd
 import pytest
+import torch
 
 from warprec.data.dataset import Dataset
 from warprec.data.reader import LocalReader
 from warprec.data.writer import LocalWriter
+from warprec.utils.registry import model_registry
 
 COLUMNS = ["user_id", "item_id", "rating", "timestamp"]
 BACKENDS = ["pandas", "polars"]
@@ -164,3 +166,96 @@ def test_a_written_split_reads_back(
     )
     assert len(back) == len(train)
     assert set(back.columns) >= {"user_id", "item_id"}
+
+
+def recommended_pairs(writer: LocalWriter, sep: str = "\t") -> pd.DataFrame:
+    """The recommendations a writer produced.
+
+    Args:
+        writer (LocalWriter): The writer that wrote them.
+        sep (str): The separator the file was written with.
+
+    Returns:
+        pd.DataFrame: The recommendation rows.
+    """
+    written = sorted(Path(writer.experiment_recommendation_path).glob("*.tsv"))
+    return pd.read_csv(written[0], sep=sep)
+
+
+def seen_among(recommendations: pd.DataFrame, dataset: Dataset) -> int:
+    """How many recommended items the user had already interacted with.
+
+    Args:
+        recommendations (pd.DataFrame): The written recommendations.
+        dataset (Dataset): The dataset the model was trained on.
+
+    Returns:
+        int: The number of already-seen recommendations.
+    """
+    train = dataset.train_set.get_sparse()
+    users = dataset.info()["user_mapping"]
+    items = dataset.info()["item_mapping"]
+
+    total = 0
+    for user, item in zip(recommendations["user_id"], recommendations["item_id"]):
+        row, column = users.get(user), items.get(item)
+        if row is not None and column is not None and train[row, column] > 0:
+            total += 1
+    return total
+
+
+def write_with(tmp_path: Path, dataset: Dataset, mask_seen: str) -> pd.DataFrame:
+    """Write recommendations under one seen-item rule.
+
+    Args:
+        tmp_path (Path): The directory pytest provides.
+        dataset (Dataset): The dataset under test.
+        mask_seen (str): The rule to apply.
+
+    Returns:
+        pd.DataFrame: The written recommendations.
+    """
+    torch.manual_seed(42)
+    model = model_registry.get(
+        "ITEMKNN",
+        params={"k": 20, "similarity": "cosine"},
+        info=dataset.info(),
+        interactions=dataset.train_set,
+        sessions=dataset.train_session,
+        transactions=dataset.train_transactions,
+        seed=42,
+    )
+    writer = LocalWriter(dataset_name=f"recs_{mask_seen}", local_path=str(tmp_path))
+    writer.write_recs(model=model, dataset=dataset, k=5, mask_seen=mask_seen)
+    return recommended_pairs(writer)
+
+
+def test_written_recommendations_exclude_seen_items_by_default(
+    tmp_path: Path, dataset: Dataset
+):
+    """The pair rule keeps everything the user already interacted with out."""
+    assert seen_among(write_with(tmp_path, dataset, "pair"), dataset) == 0
+
+
+def test_written_recommendations_honour_a_run_that_masks_nothing(
+    tmp_path: Path, dataset: Dataset
+):
+    """'none' has to reach the written list, not only the evaluation.
+
+    Before this was wired the recommendations were filtered whatever the run
+    asked for, so the file on disk was ranked under a different rule from the
+    numbers reported beside it.
+    """
+    assert seen_among(write_with(tmp_path, dataset, "none"), dataset) > 0
+
+
+def test_a_contextual_rule_falls_back_rather_than_being_ignored(
+    tmp_path: Path, dataset: Dataset
+):
+    """There is no situation to compare against when writing, so 'pair' applies.
+
+    The fixture carries contextual columns, so 'auto' resolves to the contextual
+    rule for evaluation and has to fall back here.
+    """
+    assert dataset.train_transactions is not None
+    assert seen_among(write_with(tmp_path, dataset, "auto"), dataset) == 0
