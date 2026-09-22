@@ -95,3 +95,5 @@ Auto-generated documentation for all collaborative filtering model classes.
 ::: warprec.recommenders.collaborative_filtering_recommender.neural.convncf.ConvNCF
 
 ::: warprec.recommenders.collaborative_filtering_recommender.neural.neumf.NeuMF
+
+::: warprec.recommenders.collaborative_filtering_recommender.neural.twotower.TwoTower

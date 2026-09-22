@@ -52,6 +52,7 @@ The **Collaborative-Filtering Recommenders** module of WarpRec is a collection o
 | | [SLIM](#slim) | Interpretable item similarity model with L1/L2 regularization. |
 | Neural | [ConvNCF](#convncf) | Applies CNNs to user-item embeddings outer product to capture structured interaction patterns. |
 | | [NeuMF](#neumf) | Hybrid neural model combining GMF and MLP layers. |
+| | [TwoTower](#twotower) | Independent user and item encoders scored by inner product, trained with in-batch negatives. |
 
 ## Autoencoders
 
@@ -871,4 +872,29 @@ models:
     epochs: 200
     learning_rate: 0.001
     neg_samples: 1
+```
+
+### TwoTower
+
+TwoTower: Encodes users and items with two independent towers and scores a pair by the inner product of the resulting vectors. Because the item side never sees the user, the whole catalogue can be encoded once and searched rather than scored pair by pair, which is the architecture used for large-scale retrieval.
+
+Training draws its negatives from the batch itself: every other item present acts as a negative for a given user. Items appear there in proportion to how often they occur, so the logits are corrected for that frequency, which stops the model learning to push popular items down.
+
+Setting `use_item_features` to `True` also gives the item tower the item's attributes, so an item carries a vector derived from what it *is* rather than only from an index. This requires `reader.side` to be configured.
+
+For further details, please refer to the [paper](https://dl.acm.org/doi/10.1145/3298689.3346996).
+
+```yaml
+models:
+  TwoTower:
+    embedding_size: 64
+    tower_hidden_size: [64, 32]
+    dropout: 0.1
+    temperature: 0.07
+    use_item_features: False
+    correct_sampling_bias: True
+    reg_weight: 0.000001
+    batch_size: 1024
+    epochs: 100
+    learning_rate: 0.005
 ```
