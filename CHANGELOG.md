@@ -2,6 +2,32 @@
 
 <!-- version list -->
 
+## v1.9.0 (2026-09-22)
+
+### Bug Fixes
+
+- MultiVAE estimates from the posterior mean instead of a single draw
+  ([`f91aa70`](https://github.com/sisinflab/warprec/commit/f91aa708640d531845743eec017193fab9b0af63))
+
+- The Random baseline draws from its own seed
+  ([`8213975`](https://github.com/sisinflab/warprec/commit/82139753d0d44576cdf6e6dfc95ffd1c38dfdf98))
+
+### Documentation
+
+- Documented the TwoTower model
+  ([`c9419f9`](https://github.com/sisinflab/warprec/commit/c9419f93dff9abcd174500b691447dcfd04bc899))
+
+### Features
+
+- Added the TwoTower retrieval model trained with in-batch negatives
+  ([`0fda24f`](https://github.com/sisinflab/warprec/commit/0fda24f29b21dc7dfdff148bc48e61f0008a141b))
+
+### Testing
+
+- The smoke suite checks the sampled path against the full ranking
+  ([`bcb0a0a`](https://github.com/sisinflab/warprec/commit/bcb0a0a5ba2127d52bc03a31ea7faa2617abdae1))
+
+
 ## v1.8.1 (2026-09-22)
 
 ### Bug Fixes
