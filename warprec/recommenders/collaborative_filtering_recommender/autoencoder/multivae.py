@@ -24,8 +24,15 @@ class Sampling(nn.Module):
             z_log_var (Tensor): The log variance value.
 
         Returns:
-            Tensor: The sampled value.
+            Tensor: The sampled value while training, the mean otherwise.
         """
+        # Sampling is what makes the objective variational, and it belongs to
+        # training. At inference the estimate is the mean of the posterior:
+        # drawing from it instead would make a run unreproducible and would
+        # report a single draw as though it were the model's answer.
+        if not self.training:
+            return z_mean
+
         epsilon = torch.randn_like(z_log_var)
         return z_mean + torch.exp(0.5 * z_log_var) * epsilon
 
