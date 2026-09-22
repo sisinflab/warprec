@@ -2,7 +2,7 @@
 import csv
 import posixpath
 from io import StringIO
-from typing import Optional, Generator
+from typing import Any, Generator, Optional
 
 from azure.identity import DefaultAzureCredential
 from azure.core.exceptions import ResourceNotFoundError, ResourceExistsError
@@ -89,6 +89,7 @@ class AzureBlobWriter(Writer):
         user_label: str = "user_id",
         item_label: str = "item_id",
         rating_label: str = "rating",
+        reranker: Optional[Any] = None,
     ) -> None:
         """Uploads recommendations to Azure Blob Storage in a streaming fashion."""
         path = self._path_join(
@@ -98,7 +99,9 @@ class AzureBlobWriter(Writer):
         blob_client = self.container_client.get_blob_client(path)
 
         # Get the generator that yields batches of recommendation rows
-        batch_generator = self._generate_recommendation_batches(model, dataset, k)
+        batch_generator = self._generate_recommendation_batches(
+            model, dataset, k, reranker
+        )
 
         def csv_batch_generator() -> Generator[bytes, None, None]:
             """A generator that yields CSV data in batches as UTF-8 encoded bytes."""

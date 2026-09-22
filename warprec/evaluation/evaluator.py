@@ -53,6 +53,8 @@ class Evaluator:
         propensity (Optional[Tensor]): The probability that each item was observed,
             read by the debiased estimators. None when no correction is configured.
         candidates (str): Which items may be ranked, 'all', 'cold' or 'warm'.
+        reranker (Optional[Any]): The re-ranker applied to the head of each
+            ranking, or None to rank by score alone.
     """
 
     def __init__(
@@ -69,6 +71,7 @@ class Evaluator:
         mask_seen: str = "auto",
         propensity: Optional[Tensor] = None,
         candidates: str = "all",
+        reranker: Optional[Any] = None,
     ):
         # pylint: disable = too-many-arguments, too-many-positional-arguments
         # Metrics, cut-offs and the lookups they need are independent of one
@@ -88,6 +91,7 @@ class Evaluator:
         # break on does not shift the permutations sampled evaluation draws.
         self.tie_g = torch.Generator().manual_seed(seed)
 
+        self.reranker = reranker
         self.candidate_mask = cold_item_candidates(train_set, candidates)
         if self.candidate_mask is not None:
             pool = int(self.candidate_mask.sum())
@@ -430,9 +434,14 @@ class Evaluator:
             ]
         ):
             max_k = max(self.k_values)
-            top_k_values_full, top_k_indices_full = top_k_breaking_ties(
-                predictions, max_k, self.tie_g
-            )
+            if self.reranker is not None:
+                top_k_values_full, top_k_indices_full = self.reranker(
+                    predictions, max_k, user_indices
+                )
+            else:
+                top_k_values_full, top_k_indices_full = top_k_breaking_ties(
+                    predictions, max_k, self.tie_g
+                )
 
             for k in self.k_values:
                 required = self.required_blocks.get(k, set())

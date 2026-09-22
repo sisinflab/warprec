@@ -1,15 +1,26 @@
+from typing import TYPE_CHECKING, Optional
+
 from warprec.data import Dataset
 from warprec.evaluation.evaluator import Evaluator
 from warprec.evaluation.propensity import build_propensity
 from warprec.utils.config import EvaluationConfig
 
+if TYPE_CHECKING:
+    from warprec.recommenders.reranking.base import Reranker
 
-def build_evaluator(evaluation: EvaluationConfig, dataset: Dataset) -> Evaluator:
+
+def build_evaluator(
+    evaluation: EvaluationConfig,
+    dataset: Dataset,
+    reranker: Optional["Reranker"] = None,
+) -> Evaluator:
     """Build the evaluator every pipeline uses for its main dataset.
 
     Args:
         evaluation (EvaluationConfig): The evaluation section of the configuration.
         dataset (Dataset): The dataset the models are evaluated on.
+        reranker (Optional[Reranker]): The re-ranker applied to every list, so that
+            what a run reports is what it would write out.
 
     Returns:
         Evaluator: The evaluator bound to that dataset.
@@ -27,6 +38,7 @@ def build_evaluator(evaluation: EvaluationConfig, dataset: Dataset) -> Evaluator
         item_cluster=dataset.get_item_cluster(),
         mask_seen=evaluation.mask_seen,
         candidates=evaluation.candidates,
+        reranker=reranker,
         propensity=build_propensity(
             train_sparse.getnnz(axis=0),
             estimator=evaluation.propensity.estimator,

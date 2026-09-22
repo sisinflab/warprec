@@ -12,6 +12,7 @@ import torch
 from warprec.common import initialize_datasets
 from warprec.data import Dataset
 from warprec.evaluation import build_evaluator
+from warprec.recommenders.reranking import build_reranker
 from warprec.data.reader import ReaderFactory
 from warprec.data.writer import WriterFactory
 from warprec.evaluation.evaluator import Evaluator
@@ -609,7 +610,9 @@ def _run_estimate_setup(  # pylint: disable = too-many-locals
     model.to(device)
 
     eval_tracker = EstimateStageTracker(baseline_rss_mb=baseline_rss_mb, device=device)
-    evaluator = build_evaluator(config.evaluation, eval_dataset)
+    evaluator = build_evaluator(
+        config.evaluation, eval_dataset, build_reranker(config.rerank, eval_dataset)
+    )
     eval_estimate = _estimate_eval_loop(
         evaluator=evaluator,
         model=model,

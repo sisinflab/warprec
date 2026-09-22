@@ -2,6 +2,7 @@ from typing import List, Tuple, Optional
 
 import ray
 
+from warprec.recommenders.reranking import build_reranker
 from warprec.common import (
     initialize_datasets,
     dataset_preparation,
@@ -82,6 +83,7 @@ def remote_generate_recs(
 
     # Write recommendations in batches on shared file system
     writer.write_recs(
+        reranker=build_reranker(config.rerank, dataset),
         model=model,
         dataset=dataset,
         **config.writer.recommendation.model_dump(),

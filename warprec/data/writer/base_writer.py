@@ -157,7 +157,11 @@ class Writer(ABC):
         return buffer.getvalue()
 
     def _generate_recommendation_batches(
-        self, model: Recommender, dataset: Dataset, k: int
+        self,
+        model: Recommender,
+        dataset: Dataset,
+        k: int,
+        reranker: Optional[Any] = None,
     ) -> Generator[list[tuple], None, None]:
         """A generator that yields batches of recommendation rows.
         Each batch corresponds to the recommendations for a batch of users.
@@ -166,6 +170,8 @@ class Writer(ABC):
             model (Recommender): The trained model from which to produce recommendations.
             dataset (Dataset): The dataset used to train the model.
             k (int): The number of recommendations to produce for each user.
+            reranker (Optional[Any]): The re-ranker applied to each list, so that
+                what is written out matches what was evaluated.
 
         Yields:
             list[tuple]: A list of (user_label, item_label, score) tuples.
@@ -196,7 +202,10 @@ class Writer(ABC):
                     seq_len=seq_len,
                 )
                 mask_seen_pairs(predictions, train_batch)
-                top_k_scores, top_k_items = torch.topk(predictions, k, dim=1)
+                if reranker is not None:
+                    top_k_scores, top_k_items = reranker(predictions, k, user_indices)
+                else:
+                    top_k_scores, top_k_items = torch.topk(predictions, k, dim=1)
 
             batch_users = user_indices.unsqueeze(1).expand(-1, k).flatten()
             user_labels = [umap_i[idx.item()] for idx in batch_users]
