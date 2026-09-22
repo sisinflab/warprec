@@ -52,6 +52,13 @@ reader:
       context_label_2: [int8, int16, int32, int64, float32, float64, str]
     context_separators:
       context_label_1: '|'
+rerank:
+  name: [MMR, Calibration]
+  pool: 100
+  params:
+    diversity: 0.3
+    weight: 0.5
+    smoothing: 0.01
 training:
   negative_sampling: [uniform, popularity]
   sequence_pooling: [mean, sum, max]
