@@ -17,6 +17,7 @@ import torch
 from warprec.data.dataset import Dataset
 from warprec.data.reader import LocalReader
 from warprec.data.writer import LocalWriter
+from conftest import build_params
 from warprec.utils.registry import model_registry
 
 COLUMNS = ["user_id", "item_id", "rating", "timestamp"]
@@ -259,3 +260,54 @@ def test_a_contextual_rule_falls_back_rather_than_being_ignored(
     """
     assert dataset.train_transactions is not None
     assert seen_among(write_with(tmp_path, dataset, "auto"), dataset) == 0
+
+
+def test_a_contextual_model_is_refused_rather_than_left_to_crash(
+    tmp_path: Path, dataset: Dataset
+):
+    """A context model has no situation to score against when writing a file.
+
+    Left alone it reaches for context embeddings that were never passed and
+    fails inside its own forward pass, which says nothing about what went wrong.
+    """
+    torch.manual_seed(42)
+    model = model_registry.get(
+        "FM",
+        params=build_params("FM"),
+        info=dataset.info(),
+        interactions=dataset.train_set,
+        sessions=dataset.train_session,
+        transactions=dataset.train_transactions,
+        seed=42,
+    )
+    writer = LocalWriter(dataset_name="ctx", local_path=str(tmp_path))
+
+    with pytest.raises(NotImplementedError, match="context-aware"):
+        writer.write_recs(model=model, dataset=dataset, k=5)
+
+
+def test_nothing_is_written_when_the_model_is_refused(tmp_path: Path, dataset: Dataset):
+    """The refusal comes before any file is created, so none is left behind."""
+    torch.manual_seed(42)
+    model = model_registry.get(
+        "FM",
+        params=build_params("FM"),
+        info=dataset.info(),
+        interactions=dataset.train_set,
+        sessions=dataset.train_session,
+        transactions=dataset.train_transactions,
+        seed=42,
+    )
+    writer = LocalWriter(dataset_name="ctx_empty", local_path=str(tmp_path))
+
+    with pytest.raises(NotImplementedError):
+        writer.write_recs(model=model, dataset=dataset, k=5)
+
+    assert list(Path(writer.experiment_recommendation_path).glob("*")) == []
+
+
+def test_a_collaborative_model_still_writes(tmp_path: Path, dataset: Dataset):
+    """The refusal must be specific to the models that need a situation."""
+    written = write_with(tmp_path, dataset, "pair")
+
+    assert len(written) > 0
