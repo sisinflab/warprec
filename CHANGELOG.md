@@ -2,6 +2,63 @@
 
 <!-- version list -->
 
+## v1.8.0 (2026-09-22)
+
+### Bug Fixes
+
+- Cold-start protocols keep the entities they hold out of training
+  ([`7116560`](https://github.com/sisinflab/warprec/commit/711656051594a29947dc0214ec2edacb4639fa22))
+
+- Ties in the ranking are broken at random instead of by item id
+  ([`7d030aa`](https://github.com/sisinflab/warprec/commit/7d030aa6ce247b7443eb522f13fe53b42c5e455f))
+
+### Documentation
+
+- Documented how to read a restricted candidate pool
+  ([`3134519`](https://github.com/sisinflab/warprec/commit/313451938e0a4b05eeb2e89facb5e6a62c52eb7b))
+
+- Documented re-ranking
+  ([`9821802`](https://github.com/sisinflab/warprec/commit/98218026a05154b91fd7ef49a5584f49fbdce967))
+
+- Documented the cold-start protocols and the candidate restriction
+  ([`1c82dad`](https://github.com/sisinflab/warprec/commit/1c82dadff19ccf8a754db65f8a25bf763691094a))
+
+- Documented the propensity model and the debiased estimators
+  ([`4341f5d`](https://github.com/sisinflab/warprec/commit/4341f5d94d96032757a4257ad149dec5bf5ade46))
+
+- Refreshed the strategy counts and the capability summaries
+  ([`cb1a101`](https://github.com/sisinflab/warprec/commit/cb1a1016a7ece8a57038c7f00983e403c2e0310d))
+
+### Features
+
+- Added a candidate restriction so cold-start runs measure cold items
+  ([`6c9641f`](https://github.com/sisinflab/warprec/commit/6c9641f384eb8b61dcbd49a4c19cb77fe10061ae))
+
+- Added inverse propensity estimators that correct evaluation for exposure bias
+  ([`bae884f`](https://github.com/sisinflab/warprec/commit/bae884fb906c3b45a933c85c4c8869a2687f3037))
+
+- Added item and user cold-start splitting strategies
+  ([`ae489a1`](https://github.com/sisinflab/warprec/commit/ae489a1d0286b7569745027c7bd485eaf0164f40))
+
+- Added MMR and calibration re-ranking applied to evaluation and written recommendations
+  ([`4aaf60a`](https://github.com/sisinflab/warprec/commit/4aaf60a4bae9520476caad434b61e4405e01a0df))
+
+### Performance Improvements
+
+- The ranking tie break only shuffles the rows that are actually tied
+  ([`66ba80b`](https://github.com/sisinflab/warprec/commit/66ba80b4290c6c952fa9daff31b7054f1facc87f))
+
+### Refactoring
+
+- Shared the seen-item masking between evaluation and recommendation writing
+  ([`f6bee42`](https://github.com/sisinflab/warprec/commit/f6bee42c8038579be9b2716a4e7e3bf0c18ddbf1))
+
+### Testing
+
+- Added behavioural tests for debiased evaluation, cold-start and re-ranking
+  ([`cab3dca`](https://github.com/sisinflab/warprec/commit/cab3dca38a8b227a5efab793c0bae79586166b20))
+
+
 ## v1.7.2 (2026-09-21)
 
 ### Bug Fixes
