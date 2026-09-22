@@ -84,6 +84,66 @@ class SideInformationReading(BaseModel):
         return check_separator(v)
 
 
+class KnowledgeReading(BaseModel):
+    """Definition of the knowledge graph reading sub-configuration.
+
+    A knowledge graph arrives as two files, following the shape the literature
+    and the other frameworks use. One holds the facts, as (head, relation, tail)
+    triples over entities. The other says which catalogue item each entity
+    stands for, because the graph is written about entities and the interactions
+    are written about items, and nothing else connects the two.
+
+    Attributes:
+        local_path (Optional[str]): The path to the file of triples.
+        link_path (Optional[str]): The path to the file aligning items with
+            entities, as (item, entity) pairs.
+        azure_blob_name (Optional[str]): The name of the Azure Blob holding the
+            triples.
+        link_azure_blob_name (Optional[str]): The name of the Azure Blob holding
+            the alignment.
+        file_format (Optional[FileFormat]): The file format of both files.
+        sep (Optional[str]): The separator of both files.
+        header (Optional[bool]): Whether the files carry a header row. Defaults
+            to False, which is how the published graphs are distributed.
+        column_names (Optional[List[str]]): The names of the three columns of the
+            triples file, in order. Required when the file has no header row.
+        link_column_names (Optional[List[str]]): The names of the two columns of
+            the alignment file, in order.
+    """
+
+    local_path: Optional[str] = None
+    link_path: Optional[str] = None
+    azure_blob_name: Optional[str] = None
+    link_azure_blob_name: Optional[str] = None
+    file_format: Optional[FileFormat] = "tabular"
+    sep: Optional[str] = "\t"
+    header: Optional[bool] = False
+    column_names: Optional[List[str]] = ["head", "relation", "tail"]
+    link_column_names: Optional[List[str]] = ["item_id", "entity_id"]
+
+    @field_validator("column_names")
+    @classmethod
+    def check_column_names(cls, v: Optional[List[str]]):
+        """Validate the triple column names."""
+        if v is not None and len(v) != 3:
+            raise ValueError(
+                "A knowledge graph is read as (head, relation, tail), so "
+                f"'column_names' must name three columns, got {len(v)}."
+            )
+        return v
+
+    @field_validator("link_column_names")
+    @classmethod
+    def check_link_column_names(cls, v: Optional[List[str]]):
+        """Validate the alignment column names."""
+        if v is not None and len(v) != 2:
+            raise ValueError(
+                "The alignment pairs an item with an entity, so "
+                f"'link_column_names' must name two columns, got {len(v)}."
+            )
+        return v
+
+
 class ClusteringInformationReading(BaseModel):
     """Definition of the clustering information reading sub-configuration.
 
@@ -175,6 +235,7 @@ class ReaderConfig(BaseModel):
             'training' section. Read from here only when 'training' leaves it unset.
         split (Optional[SplitReading]): The information of the split reading process.
         side (Optional[SideInformationReading]): The side information of the dataset.
+        knowledge (Optional[KnowledgeReading]): The knowledge graph of the dataset.
         clustering (Optional[ClusteringInformationReading]): The clustering information
             of the dataset.
         labels (Labels): The labels sub-configuration. Defaults to Labels default values.
@@ -199,6 +260,7 @@ class ReaderConfig(BaseModel):
     sequence_pooling: Optional[SequencePooling] = None
     split: Optional[SplitReading] = Field(default_factory=SplitReading)
     side: Optional[SideInformationReading] = None
+    knowledge: Optional[KnowledgeReading] = None
     clustering: Optional[ClusteringInformationReading] = None
     labels: Labels = Field(default_factory=Labels)
     dtypes: CustomDtype = Field(default_factory=CustomDtype)

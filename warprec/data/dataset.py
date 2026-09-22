@@ -13,7 +13,12 @@ import narwhals as nw
 from narwhals.typing import FrameT
 from narwhals.dataframe import DataFrame
 
-from warprec.data.entities import Interactions, Sessions, Transactions
+from warprec.data.entities import (
+    Interactions,
+    KnowledgeGraph,
+    Sessions,
+    Transactions,
+)
 from warprec.data.schema import ColumnLabels, ContextSpec, SideData, SignalOptions
 from warprec.data.eval_loaders import (
     EvaluationDataset,
@@ -34,6 +39,8 @@ class Dataset:
         train_data (FrameT): The train data.
         eval_data (Optional[FrameT]): The evaluation data.
         side_data (Optional[FrameT]): The side information data.
+        knowledge_data (Optional[FrameT]): The (head, relation, tail) facts.
+        knowledge_links (Optional[FrameT]): The (item, entity) alignment.
         user_cluster (Optional[FrameT]): The user cluster data.
         item_cluster (Optional[FrameT]): The item cluster data.
         batch_size (int): The batch size that will be used evaluation.
@@ -55,6 +62,8 @@ class Dataset:
             held-out entities have no training interaction at all, so they would
             otherwise never enter the mappings and could not be scored. Set by the
             pipeline from the splitting strategy rather than by hand.
+        knowledge_labels (Optional[Dict[str, str]]): The column names of the two
+            knowledge files.
         user_id_label (str): The label of the user id column.
         item_id_label (str): The label of the item id column.
         rating_label (str): The label of the rating column.
@@ -74,6 +83,8 @@ class Dataset:
         eval_transactions (Optional[Transactions]): Row-oriented view of the evaluation split.
         user_cluster (Optional[dict]): User cluster information.
         item_cluster (Optional[dict]): Item cluster information.
+        knowledge (Optional[KnowledgeGraph]): The facts about the items, built
+            only when a knowledge graph is configured.
 
     Raises:
         ValueError: If the evaluation_set is not supported.
@@ -86,12 +97,15 @@ class Dataset:
     eval_transactions: Optional[Transactions] = None
     user_cluster: Optional[dict] = None
     item_cluster: Optional[dict] = None
+    knowledge: Optional[KnowledgeGraph] = None
 
     def __init__(
         self,
         train_data: FrameT,
         eval_data: Optional[FrameT] = None,
         side_data: Optional[FrameT] = None,
+        knowledge_data: Optional[FrameT] = None,
+        knowledge_links: Optional[FrameT] = None,
         user_cluster: Optional[FrameT] = None,
         item_cluster: Optional[FrameT] = None,
         batch_size: int = 1024,
@@ -102,6 +116,7 @@ class Dataset:
         context_separators: Optional[Dict[str, str]] = None,
         keep_unseen_items: bool = False,
         cold_start: Optional[str] = None,
+        knowledge_labels: Optional[Dict[str, str]] = None,
         user_id_label: str = "user_id",
         item_id_label: str = "item_id",
         rating_label: str = None,
@@ -239,6 +254,22 @@ class Dataset:
         # each side, or the structures built from it come out the wrong shape.
         self._nuid = len(self._umap)
         self._niid = len(self._imap)
+
+        # The graph is aligned against the catalogue, so it is built once the
+        # item mapping is settled and not before.
+        self.knowledge: Optional[KnowledgeGraph] = None
+        if knowledge_data is not None and knowledge_links is not None:
+            labels = knowledge_labels or {}
+            self.knowledge = KnowledgeGraph(
+                self._materialize(knowledge_data),
+                self._materialize(knowledge_links),
+                self._imap,
+                head_label=labels.get("head", "head"),
+                relation_label=labels.get("relation", "relation"),
+                tail_label=labels.get("tail", "tail"),
+                item_label=labels.get("item", "item_id"),
+                entity_label=labels.get("entity", "entity_id"),
+            )
 
         # Process contextual data
         if context_labels:
@@ -1208,6 +1239,12 @@ class Dataset:
             "item_mapping": self._imap,
             "user_mapping": self._umap,
         }
+
+        # Optionally add the knowledge dimensions if a graph was provided
+        if self.knowledge is not None:
+            entities, relations = self.knowledge.get_dims()
+            base_info["n_entities"] = entities
+            base_info["n_relations"] = relations
 
         # Optionally add feature dimensions if present
         if self._feature_dims:

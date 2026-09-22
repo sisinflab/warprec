@@ -46,6 +46,8 @@ def initialize_datasets(
     train_data: DataFrame[Any] = None
     test_data: DataFrame[Any] = None
     side_data = None
+    knowledge_data = None
+    knowledge_links = None
     user_cluster = None
     item_cluster = None
 
@@ -184,6 +186,35 @@ def initialize_datasets(
             case _:
                 raise ValueError(f"File format '{side_format}' not supported.")
 
+    # Knowledge graph reading
+    if config.reader.knowledge:
+        knowledge = config.reader.knowledge
+
+        if knowledge.file_format != "tabular":
+            raise ValueError(
+                f"Knowledge graphs are read as tabular files, got "
+                f"'{knowledge.file_format}'."
+            )
+
+        knowledge_data = reader.read_tabular(
+            local_path=knowledge.local_path,
+            azure_blob_name=knowledge.azure_blob_name,
+            column_names=knowledge.column_names,
+            sep=knowledge.sep,
+            header=knowledge.header,
+        )
+
+        # The item column has to be read as the interactions read it, or the
+        # alignment matches nothing and every item silently loses its facts.
+        knowledge_links = reader.read_tabular(
+            local_path=knowledge.link_path,
+            azure_blob_name=knowledge.link_azure_blob_name,
+            column_names=knowledge.link_column_names,
+            dtypes={knowledge.link_column_names[0]: config.reader.dtypes.item_id_type},
+            sep=knowledge.sep,
+            header=knowledge.header,
+        )
+
     # Cluster information reading
     if config.reader.clustering:
 
@@ -292,6 +323,19 @@ def initialize_datasets(
     # Dataset common information
     common_params: Dict[str, Any] = {
         "side_data": side_data,
+        "knowledge_data": knowledge_data,
+        "knowledge_links": knowledge_links,
+        "knowledge_labels": (
+            {
+                "head": config.reader.knowledge.column_names[0],
+                "relation": config.reader.knowledge.column_names[1],
+                "tail": config.reader.knowledge.column_names[2],
+                "item": config.reader.knowledge.link_column_names[0],
+                "entity": config.reader.knowledge.link_column_names[1],
+            }
+            if config.reader.knowledge
+            else None
+        ),
         "user_cluster": user_cluster,
         "item_cluster": item_cluster,
         "batch_size": config.evaluation.batch_size,
