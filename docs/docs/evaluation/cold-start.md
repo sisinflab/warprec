@@ -50,22 +50,22 @@ restriction to cold users happens by itself because the evaluation set contains 
 those users. Sampled evaluation ignores it, since it already supplies its own
 candidates.
 
-## Read the result against the floor, not against zero
+## Read the result against a baseline, not against zero
 
-!!! warning "A restricted candidate pool has a high random baseline"
+!!! warning "A restricted candidate pool has a random baseline, and it is not zero"
 
-    A cold pool is small. Retrieving 10 items from a pool of 24 gets you about 42% of
-    them **by scoring them all identically**, and that is exactly what a purely
-    collaborative model does: every cold item is an all-zero column, so it assigns them
-    all the same score and the ranking is decided by tie-breaking.
+    A cold pool is much smaller than a catalogue, so retrieving `k` items from it
+    gets a non-trivial share of them by chance alone. Run an unpersonalized baseline
+    such as `Random` under the same protocol and compare against that, not against
+    zero. WarpRec logs the pool size and the implied floor whenever a restriction is
+    active.
 
-    In a run on 120 items with 24 held out, ItemKNN scored `HitRate@10 = 0.7750`. The
-    expected value from tie-breaking alone was `0.7790`. It had learned nothing.
+    Ties are broken at random rather than by item id, which matters here more than it
+    sounds: a purely collaborative model scores every cold item alike, because each is
+    an all-zero column, so its ranking is decided entirely by the tie break. Deciding
+    it by position would hand those models the lowest item ids, and in most catalogues
+    those are the oldest and best-known entries.
 
-    WarpRec logs the pool size and the implied floor whenever a restriction is active.
-    Compare against that number, and against a random baseline you run yourself, before
-    concluding that a model handles cold items well.
-
-A model that genuinely uses item attributes — the content-based and hybrid families —
-is the one to expect a real signal from here. See
+The models to expect a signal from under this protocol are the ones that score from
+item attributes rather than from interactions. See
 [Content-Based](../recommenders/content.md) and [Hybrid](../recommenders/hybrid.md).
