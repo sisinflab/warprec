@@ -34,7 +34,7 @@ Innovation in Recommender Systems is impeded by a fractured ecosystem. Researche
   </div>
   <div class="feature-card">
     <strong>19 Data Strategies</strong>
-    13 filtering and 6 splitting strategies for rigorous, leak-free experimental protocols.
+    13 filtering and 8 splitting strategies for rigorous, leak-free experimental protocols.
   </div>
   <div class="feature-card">
     <strong>Backend-Agnostic</strong>
