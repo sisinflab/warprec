@@ -13,7 +13,7 @@ from narwhals.dataframe import DataFrame
 from torch import Tensor
 from tqdm import tqdm
 
-from warprec.data.ranking import mask_seen_pairs
+from warprec.data.ranking import mask_seen_pairs, resolve_recommendation_mask
 from warprec.data import Dataset
 from warprec.recommenders.base_recommender import (
     Recommender,
@@ -162,6 +162,7 @@ class Writer(ABC):
         dataset: Dataset,
         k: int,
         reranker: Optional[Any] = None,
+        mask_seen: str = "pair",
     ) -> Generator[list[tuple], None, None]:
         """A generator that yields batches of recommendation rows.
         Each batch corresponds to the recommendations for a batch of users.
@@ -172,10 +173,15 @@ class Writer(ABC):
             k (int): The number of recommendations to produce for each user.
             reranker (Optional[Any]): The re-ranker applied to each list, so that
                 what is written out matches what was evaluated.
+            mask_seen (str): Which already-seen items are excluded, following the
+                same setting the evaluation uses so that the list written out is
+                filtered by the rule the run reported under.
 
         Yields:
             list[tuple]: A list of (user_label, item_label, score) tuples.
         """
+        policy = resolve_recommendation_mask(mask_seen, dataset.train_transactions)
+
         train_sparse = dataset.train_set.get_sparse()
         umap_i, imap_i = dataset.get_inverse_mappings()
         num_users = train_sparse.shape[0]
@@ -201,7 +207,8 @@ class Writer(ABC):
                     user_seq=user_seq,
                     seq_len=seq_len,
                 )
-                mask_seen_pairs(predictions, train_batch)
+                if policy != "none":
+                    mask_seen_pairs(predictions, train_batch)
                 if reranker is not None:
                     top_k_scores, top_k_items = reranker(predictions, k, user_indices)
                 else:

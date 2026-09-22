@@ -90,6 +90,7 @@ class AzureBlobWriter(Writer):
         item_label: str = "item_id",
         rating_label: str = "rating",
         reranker: Optional[Any] = None,
+        mask_seen: str = "pair",
     ) -> None:
         """Uploads recommendations to Azure Blob Storage in a streaming fashion."""
         path = self._path_join(
@@ -100,7 +101,7 @@ class AzureBlobWriter(Writer):
 
         # Get the generator that yields batches of recommendation rows
         batch_generator = self._generate_recommendation_batches(
-            model, dataset, k, reranker
+            model, dataset, k, reranker, mask_seen
         )
 
         def csv_batch_generator() -> Generator[bytes, None, None]:
