@@ -6,6 +6,7 @@ from scipy.sparse import csr_matrix
 from torch import Tensor
 
 from warprec.data.entities.context import context_key
+from warprec.utils.logger import logger
 
 
 def mask_seen_pairs(predictions: Tensor, seen: csr_matrix) -> None:
@@ -61,6 +62,40 @@ def mask_seen_in_context(
             repeated += int(int(target_items[row]) in seen)
 
     return repeated
+
+
+def resolve_recommendation_mask(policy: str, transactions: Any) -> str:
+    """Which seen-item rule the written recommendations can follow.
+
+    Evaluation asks a question about a moment: this user, in this situation, was
+    shown this item. Writing recommendations asks a question about a user alone,
+    so there is no situation to compare a history against and a contextual policy
+    has nothing to resolve. It falls back to excluding everything the user has
+    seen, which is the conservative reading, and says so rather than leaving the
+    written list quietly filtered by a rule the configuration did not ask for.
+
+    'none' and 'pair' mean the same here as they do in evaluation, so a run that
+    asks for either gets it.
+
+    Args:
+        policy (str): The configured policy, one of 'auto', 'context', 'pair' or
+            'none'.
+        transactions (Any): The row-oriented training records, or None when the
+            dataset has no contextual columns.
+
+    Returns:
+        str: The rule to apply, either 'pair' or 'none'.
+    """
+    resolved = resolve_mask_policy(policy, transactions)
+    if resolved != "context":
+        return resolved
+
+    logger.attention(
+        "Recommendations are written for a user rather than for a user in a "
+        "situation, so the contextual seen-item rule cannot be applied to them. "
+        "Every item the user has already interacted with is excluded instead."
+    )
+    return "pair"
 
 
 def resolve_mask_policy(policy: str, transactions: Any) -> str:

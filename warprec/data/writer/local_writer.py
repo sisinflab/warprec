@@ -78,8 +78,11 @@ class LocalWriter(Writer):
         item_label: str = "item_id",
         rating_label: str = "rating",
         reranker: Optional[Any] = None,
+        mask_seen: str = "pair",
     ):
         """Writes recommendations to a local file in a streaming fashion."""
+        self._refuse_contextual_recommendations(model)
+
         path = self._path_join(
             self.experiment_recommendation_path,
             f"{model.name}_{self._timestamp}{ext}",
@@ -93,7 +96,7 @@ class LocalWriter(Writer):
 
                 # The generator now yields entire batches of rows
                 batch_generator = self._generate_recommendation_batches(
-                    model, dataset, k, reranker
+                    model, dataset, k, reranker, mask_seen
                 )
 
                 # Iterate over batches and write them to the file

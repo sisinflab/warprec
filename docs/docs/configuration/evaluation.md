@@ -18,6 +18,8 @@ It provides flexible control over ranking cutoffs, sampling strategies, statisti
 
 - **candidates**: Which items a run may rank: `all`, `cold` or `warm`. Defaults to `all`. `cold` keeps only the items with no training interaction, which is what makes a cold-start protocol measure cold-start rather than the warm catalogue around it. See [Cold-Start Protocols](../evaluation/cold-start.md).
 - **mask_seen**: Which already-seen items are excluded from the ranking, under the `full` strategy: `auto`, `context`, `pair` or `none`. Defaults to `auto`, which excludes items the user has seen **in the same context** when the dataset has contextual columns, and every item the user has seen otherwise. `context` and `pair` force either behaviour and `none` excludes nothing.
+
+    This setting also governs the recommendations written to disk, so the list a run reports and the list it writes are filtered by the same rule. A contextual rule is the one exception: a recommendation is produced for a user rather than for a user in a situation, so there is no context to compare a history against and the written list falls back to excluding every item the user has seen. WarpRec says so when it happens.
 - **seed**: Random seed used for reproducibility in sampling. Defaults to `42`.
 - **propensity**: Nested section defining the propensity model the debiased estimators read. See [Debiased Evaluation](../evaluation/debiased.md).
 - **stat_significance**: Nested section defining statistical significance tests.

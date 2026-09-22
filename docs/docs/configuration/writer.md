@@ -68,6 +68,20 @@ The `recommendation` nested section defines the structure of **recommendation ou
     The `k` parameter controls the **top-k recommendations** stored per user.
     Increasing this value may lead to larger files and slower post-processing.
 
+!!! warning "Context-aware models cannot write recommendations"
+    A context-aware model scores an item for a user *in a situation*. A
+    recommendation file carries no situation: it answers "what should this user
+    see", not "what should this user see on a Saturday evening". Asked to write
+    one, WarpRec stops and says so rather than producing a ranking the model did
+    not produce.
+
+    Evaluate these models instead, which does supply the contexts. Writing
+    recommendations for them means deciding which situations to write them for,
+    which is a feature in its own right and not one WarpRec has yet.
+
+    The seen-item rule of the written list follows `evaluation.mask_seen`, so the
+    file on disk is filtered by the same rule the run reported under.
+
 ## Example Configuration
 
 The following example shows a complete writer configuration that saves experiment results locally with customized formatting:

@@ -186,6 +186,7 @@ def eval_pipeline(path: str):
         if params.meta.save_recs:
             writer.write_recs(
                 reranker=reranker,
+                mask_seen=config.evaluation.mask_seen,
                 model=model,
                 dataset=main_dataset,
                 **config.writer.recommendation.model_dump(),
