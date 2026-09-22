@@ -2,6 +2,33 @@
 
 <!-- version list -->
 
+## v1.8.1 (2026-09-22)
+
+### Bug Fixes
+
+- Writing recommendations for a context-aware model refuses instead of crashing
+  ([`6817ced`](https://github.com/sisinflab/warprec/commit/6817ced60d402b382be65d3f0f73934e7f377d71))
+
+- Written recommendations follow the configured seen-item rule
+  ([`fd0273c`](https://github.com/sisinflab/warprec/commit/fd0273c1b65c72dbefb3d5db211ed8ba89948947))
+
+### Documentation
+
+- Noted that context-aware models cannot write recommendations
+  ([`0e6e284`](https://github.com/sisinflab/warprec/commit/0e6e284f2bf31bc35d70da71bd26ef4f7bffcabb))
+
+- Noted that mask_seen governs the written recommendations too
+  ([`13da45b`](https://github.com/sisinflab/warprec/commit/13da45b6f91168b8563662d6ca21e098d4636074))
+
+### Testing
+
+- Added regression tests for the contextual recommendation refusal
+  ([`538b6f5`](https://github.com/sisinflab/warprec/commit/538b6f5c8942b25db6dea847ae29517a9f734766))
+
+- Added regression tests for the seen-item rule of written recommendations
+  ([`0812901`](https://github.com/sisinflab/warprec/commit/0812901d8bdcd072ee6f769cd29e73654d8a2538))
+
+
 ## v1.8.0 (2026-09-22)
 
 ### Bug Fixes
