@@ -382,3 +382,92 @@ class NeuMF(RecomModel):
                 "Invalid NeuMF configuration: Both 'mf_train' and 'mlp_train' are False. "
                 "At least one part of the model (Matrix Factorization or MLP) must be trained."
             )
+
+
+@params_registry.register("TwoTower")
+class TwoTower(RecomModel):
+    """Definition of the model TwoTower.
+
+    Attributes:
+        embedding_size (INT_FIELD): List of values for embedding_size.
+        tower_hidden_size (LIST_INT_FIELD): List of tower_hidden_size values.
+        dropout (FLOAT_FIELD): List of values for dropout.
+        temperature (FLOAT_FIELD): List of values for temperature.
+        use_item_features (BOOL_FIELD): List of values for use_item_features.
+        correct_sampling_bias (BOOL_FIELD): List of values for correct_sampling_bias.
+        reg_weight (FLOAT_FIELD): List of values for reg_weight.
+        batch_size (INT_FIELD): List of values for batch_size.
+        epochs (INT_FIELD): List of values for epochs.
+        learning_rate (FLOAT_FIELD): List of values for learning rate.
+    """
+
+    embedding_size: INT_FIELD
+    tower_hidden_size: LIST_INT_FIELD
+    dropout: FLOAT_FIELD
+    temperature: FLOAT_FIELD
+    use_item_features: BOOL_FIELD
+    correct_sampling_bias: BOOL_FIELD
+    reg_weight: FLOAT_FIELD
+    batch_size: INT_FIELD
+    epochs: INT_FIELD
+    learning_rate: FLOAT_FIELD
+
+    @field_validator("embedding_size")
+    @classmethod
+    def check_embedding_size(cls, v: list):
+        """Validate embedding_size."""
+        return validate_greater_than_zero(cls, v, "embedding_size")
+
+    @field_validator("tower_hidden_size")
+    @classmethod
+    def check_tower_hidden_size(cls, v: list):
+        """Validate tower_hidden_size."""
+        return validate_layer_list(cls, v, "tower_hidden_size")
+
+    @field_validator("dropout")
+    @classmethod
+    def check_dropout(cls, v: list):
+        """Validate dropout."""
+        return validate_greater_equal_than_zero(cls, v, "dropout")
+
+    @field_validator("temperature")
+    @classmethod
+    def check_temperature(cls, v: list):
+        """Validate temperature."""
+        return validate_greater_than_zero(cls, v, "temperature")
+
+    @field_validator("use_item_features")
+    @classmethod
+    def check_use_item_features(cls, v: list):
+        """Validate use_item_features."""
+        return validate_bool_values(v)
+
+    @field_validator("correct_sampling_bias")
+    @classmethod
+    def check_correct_sampling_bias(cls, v: list):
+        """Validate correct_sampling_bias."""
+        return validate_bool_values(v)
+
+    @field_validator("reg_weight")
+    @classmethod
+    def check_reg_weight(cls, v: list):
+        """Validate reg_weight."""
+        return validate_greater_equal_than_zero(cls, v, "reg_weight")
+
+    @field_validator("batch_size")
+    @classmethod
+    def check_batch_size(cls, v: list):
+        """Validate batch_size."""
+        return validate_greater_than_zero(cls, v, "batch_size")
+
+    @field_validator("epochs")
+    @classmethod
+    def check_epochs(cls, v: list):
+        """Validate epochs."""
+        return validate_greater_than_zero(cls, v, "epochs")
+
+    @field_validator("learning_rate")
+    @classmethod
+    def check_learning_rate(cls, v: list):
+        """Validate learning_rate."""
+        return validate_greater_than_zero(cls, v, "learning_rate")
