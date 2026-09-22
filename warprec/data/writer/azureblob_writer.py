@@ -93,6 +93,8 @@ class AzureBlobWriter(Writer):
         mask_seen: str = "pair",
     ) -> None:
         """Uploads recommendations to Azure Blob Storage in a streaming fashion."""
+        self._refuse_contextual_recommendations(model)
+
         path = self._path_join(
             self.experiment_recommendation_path,
             f"{model.name}_{self._timestamp}{ext}",

@@ -16,6 +16,7 @@ from tqdm import tqdm
 from warprec.data.ranking import mask_seen_pairs, resolve_recommendation_mask
 from warprec.data import Dataset
 from warprec.recommenders.base_recommender import (
+    ContextRecommenderUtils,
     Recommender,
     SequentialRecommenderUtils,
 )
@@ -155,6 +156,36 @@ class Writer(ABC):
             )
 
         return buffer.getvalue()
+
+    def _refuse_contextual_recommendations(self, model: Recommender) -> None:
+        """Stop before writing a list a contextual model cannot actually produce.
+
+        These models score a user against an item *in a situation*, and a
+        recommendation file has no situation in it: it answers "what should this
+        user see", not "what should this user see on a Saturday evening". Asked
+        to score without one, the model reaches for context embeddings that were
+        never passed and fails deep inside its own forward pass.
+
+        Rather than let that surface as an attribute error from an embedding
+        lookup, the writer says what is missing. Writing recommendations for a
+        contextual model means deciding which situations to write them for, which
+        is a feature in its own right and not one WarpRec has yet.
+
+        Args:
+            model (Recommender): The model being asked for recommendations.
+
+        Raises:
+            NotImplementedError: If the model scores against contextual fields.
+        """
+        if not isinstance(model, ContextRecommenderUtils) or not model.context_dims:
+            return
+
+        message = (
+            f"{model.name} is context-aware and cannot write recommendations: "
+            "a recommendation file carries no context to score against."
+        )
+        logger.negative(message)
+        raise NotImplementedError(message)
 
     def _generate_recommendation_batches(
         self,
