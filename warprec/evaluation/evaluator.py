@@ -7,7 +7,14 @@ from torch.utils.data import DataLoader
 from scipy.sparse import csr_matrix
 
 from warprec.data import Dataset
-from warprec.data.entities.context import context_key
+from warprec.data.ranking import (
+    cold_item_candidates,
+    mask_seen_in_context,
+    mask_seen_pairs,
+    resolve_mask_policy,
+    restrict_to_candidates,
+    top_k_breaking_ties,
+)
 from warprec.evaluation.metrics.base_metric import BaseMetric
 from warprec.recommenders.base_recommender import (
     Recommender,
@@ -43,6 +50,11 @@ class Evaluator:
         seed (int): The random seed for reproducibility.
         mask_seen (str): Which already-seen items are excluded from the ranking.
             One of 'auto', 'context', 'pair' or 'none'.
+        propensity (Optional[Tensor]): The probability that each item was observed,
+            read by the debiased estimators. None when no correction is configured.
+        candidates (str): Which items may be ranked, 'all', 'cold' or 'warm'.
+        reranker (Optional[Any]): The re-ranker applied to the head of each
+            ranking, or None to rank by score alone.
     """
 
     def __init__(
@@ -57,6 +69,9 @@ class Evaluator:
         item_cluster: Optional[Tensor] = None,
         seed: int = 42,
         mask_seen: str = "auto",
+        propensity: Optional[Tensor] = None,
+        candidates: str = "all",
+        reranker: Optional[Any] = None,
     ):
         # pylint: disable = too-many-arguments, too-many-positional-arguments
         # Metrics, cut-offs and the lookups they need are independent of one
@@ -72,6 +87,34 @@ class Evaluator:
         # Set the seed for random permutation in sampled evaluation
         self.g = torch.Generator().manual_seed(seed)
 
+        # Ties are broken from a stream of their own, so that turning the tie
+        # break on does not shift the permutations sampled evaluation draws.
+        self.tie_g = torch.Generator().manual_seed(seed)
+
+        self.reranker = reranker
+        self.candidate_mask = cold_item_candidates(train_set, candidates)
+        if self.candidate_mask is not None:
+            pool = int(self.candidate_mask.sum())
+            if pool == 0:
+                logger.attention(
+                    f"No item qualifies as '{candidates}', so every ranking would "
+                    "be empty. The restriction is ignored. A cold candidate set "
+                    "needs a cold-start splitting strategy to produce the items."
+                )
+                self.candidate_mask = None
+            else:
+                # A restricted pool is small, so the score a model gets for
+                # guessing is large. Stating it is what stops a number being read
+                # as skill when it is the floor.
+                largest_k = max(k_values) if k_values else 0
+                floor = min(1.0, largest_k / pool) if pool else 0.0
+                logger.attention(
+                    f"Ranking restricted to {pool} '{candidates}' items. At "
+                    f"k={largest_k} a model that scores them all alike already "
+                    f"retrieves about {floor:.0%} of them, so read every result "
+                    "against that floor rather than against zero."
+                )
+
         # Safety check if additional_data is not provided
         if additional_data is None:
             additional_data = {}
@@ -85,6 +128,7 @@ class Evaluator:
             "feature_lookup": feature_lookup,
             "user_cluster": user_cluster,
             "item_cluster": item_cluster,
+            "propensity": propensity,
             **additional_data,
         }
         self._init_metrics(metric_list, complex_metrics)
@@ -172,13 +216,7 @@ class Evaluator:
         # Resolve the masking policy. With no contextual columns, "seen in this
         # context" is the same question as "seen", so both paths agree.
         transactions = dataset.train_transactions
-        policy = self.mask_seen
-        if policy == "auto":
-            policy = (
-                "context"
-                if transactions is not None and transactions.context_labels
-                else "pair"
-            )
+        policy = resolve_mask_policy(self.mask_seen, transactions)
 
         context_index: Optional[dict] = None
         context_ids: Optional[dict] = None
@@ -259,24 +297,25 @@ class Evaluator:
                         # Classic full evaluation
                         eval_batch = batch_data["ground_truth"]
 
+                    # Restrict the ranking to the population under test before
+                    # anything else looks at the scores.
+                    if self.candidate_mask is not None:
+                        restrict_to_candidates(predictions, self.candidate_mask)
+
                     # Mask seen items
                     if policy == "none":
                         pass
                     elif context_index is not None and context is not None:
-                        context_rows = context.cpu().numpy()
-                        for row, user in enumerate(user_indices.tolist()):
-                            key = context_ids.get(context_key(context_rows[row]), -1)
-                            if key < 0:
-                                continue
-                            seen = context_index.get((user, key))
-                            if seen is None:
-                                continue
-                            predictions[row, seen] = -torch.inf
-                            if "target_item" in batch_data:
-                                target = int(batch_data["target_item"][row])
-                                repeated_triples += int(target in seen)
+                        repeated_triples += mask_seen_in_context(
+                            predictions,
+                            user_indices,
+                            context.cpu().numpy(),
+                            context_index,
+                            context_ids,
+                            batch_data.get("target_item"),
+                        )
                     else:
-                        predictions[train_batch.nonzero()] = -torch.inf
+                        mask_seen_pairs(predictions, train_batch)
 
                 elif strategy == "sampled":
                     # Mask seen items
@@ -395,9 +434,14 @@ class Evaluator:
             ]
         ):
             max_k = max(self.k_values)
-            top_k_values_full, top_k_indices_full = BaseMetric.top_k_values_indices(
-                predictions, max_k
-            )
+            if self.reranker is not None:
+                top_k_values_full, top_k_indices_full = self.reranker(
+                    predictions, max_k, user_indices
+                )
+            else:
+                top_k_values_full, top_k_indices_full = top_k_breaking_ties(
+                    predictions, max_k, self.tie_g
+                )
 
             for k in self.k_values:
                 required = self.required_blocks.get(k, set())

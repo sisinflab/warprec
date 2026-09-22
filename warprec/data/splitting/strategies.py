@@ -1,6 +1,6 @@
 # pylint: disable=too-few-public-methods
 # mypy: disable-error-code=override
-from typing import Tuple, Any, Union, List
+from typing import Tuple, Any, Optional, Union, List
 from abc import ABC
 
 import numpy as np
@@ -13,7 +13,16 @@ from warprec.utils.registry import splitting_registry
 
 
 class SplittingStrategy(ABC):
-    """Abstract definition of a splitting strategy."""
+    """Abstract definition of a splitting strategy.
+
+    Attributes:
+        COLD_DIMENSION (Optional[str]): Which side of the catalogue the strategy
+            holds out entirely, 'item', 'user' or None. A strategy that names one
+            produces an evaluation set whose entities are absent from training on
+            purpose, which the rest of the pipeline has to be told not to discard.
+    """
+
+    COLD_DIMENSION: Optional[str] = None
 
     def _prepare_stable_data(self, data: FrameT) -> Tuple[DataFrame[Any], str]:
         """Helper method to ensure data has a stable row index for tie-breaking.
@@ -499,3 +508,130 @@ class KFoldCrossValidation(SplittingStrategy):
             tuple_list.append((train, test))
 
         return tuple_list
+
+
+class ColdStartSplit(SplittingStrategy):
+    """Hold out every interaction of a sampled fraction of one kind of entity.
+
+    The usual strategies hold out *interactions*, leaving every user and item with
+    some history to learn from. A cold-start protocol holds out *entities*: the
+    sampled ones keep nothing, so at evaluation time the model is asked about
+    something it has never seen. That is the only way to measure what a
+    content-based or hybrid model is actually for.
+
+    Each subclass names the entity it samples through ``COLD_DIMENSION``, which is
+    what the splitter and the dataset read to know which side must survive.
+    """
+
+    def _split_on(
+        self,
+        data: FrameT,
+        label: str,
+        ratio: float,
+        seed: int,
+    ) -> List[Tuple[DataFrame[Any], DataFrame[Any]]]:
+        """Hold out every row belonging to a sampled fraction of one column.
+
+        Args:
+            data (FrameT): The data to split.
+            label (str): The column naming the entity to sample.
+            ratio (float): The fraction of *entities* held out, not of rows. A
+                cold-start split is described by how much of the catalogue is
+                unseen, so the number of test rows follows from how active those
+                entities were.
+            seed (int): The seed of the sample.
+
+        Returns:
+            List[Tuple[DataFrame[Any], DataFrame[Any]]]: The single train/test pair.
+
+        Raises:
+            ValueError: If the ratio would leave nothing on one side of the split.
+        """
+        if not 0 < ratio < 1:
+            raise ValueError(
+                f"A cold-start ratio must lie strictly between 0 and 1, got {ratio}."
+            )
+
+        data_prep, idx_col = self._prepare_stable_data(data)
+
+        entities = (
+            data_prep.select(label).unique().sort(label).to_dict(as_series=False)[label]
+        )
+        n_cold = int(round(len(entities) * ratio))
+        if n_cold == 0 or n_cold == len(entities):
+            raise ValueError(
+                f"A ratio of {ratio} over {len(entities)} distinct '{label}' values "
+                f"holds out {n_cold} of them, which leaves one side of the split "
+                "empty. Choose a ratio the catalogue can support."
+            )
+
+        rng = np.random.default_rng(seed)
+        cold = set(
+            np.asarray(entities, dtype=object)[
+                rng.choice(len(entities), size=n_cold, replace=False)
+            ].tolist()
+        )
+
+        is_cold = nw.col(label).is_in(list(cold))
+        train = data_prep.filter(~is_cold).drop([idx_col])
+        test = data_prep.filter(is_cold).drop([idx_col])
+
+        return [(train, test)]
+
+
+@splitting_registry.register(SplittingStrategies.ITEM_COLD_START)
+class ItemColdStartSplit(ColdStartSplit):
+    """Hold out every interaction of a sampled fraction of the items."""
+
+    COLD_DIMENSION: Optional[str] = "item"
+
+    def __call__(
+        self,
+        data: FrameT,
+        item_id_label: str = "item_id",
+        ratio: float = 0.1,
+        seed: int = 42,
+        **kwargs: Any,
+    ) -> List[Tuple[DataFrame[Any], DataFrame[Any]]]:
+        """Split the data so that a fraction of the items is unseen in training.
+
+        Args:
+            data (FrameT): The DataFrame to be splitted.
+            item_id_label (str): The item_id label.
+            ratio (float): The fraction of items held out.
+            seed (int): The seed used for the sample.
+            **kwargs (Any): The additional keyword arguments.
+
+        Returns:
+            List[Tuple[DataFrame[Any], DataFrame[Any]]]: The train and test sets.
+        """
+        return self._split_on(data, item_id_label, ratio, seed)
+
+
+@splitting_registry.register(SplittingStrategies.USER_COLD_START)
+class UserColdStartSplit(ColdStartSplit):
+    """Hold out every interaction of a sampled fraction of the users."""
+
+    COLD_DIMENSION: Optional[str] = "user"
+
+    def __call__(
+        self,
+        data: FrameT,
+        user_id_label: str = "user_id",
+        ratio: float = 0.1,
+        seed: int = 42,
+        **kwargs: Any,
+    ) -> List[Tuple[DataFrame[Any], DataFrame[Any]]]:
+        """Split the data so that a fraction of the users is unseen in training.
+
+        Args:
+            data (FrameT): The DataFrame to be splitted.
+            user_id_label (str): The user_id label.
+            ratio (float): The fraction of users held out.
+            seed (int): The seed used for the sample.
+            **kwargs (Any): The additional keyword arguments.
+
+        Returns:
+            List[Tuple[DataFrame[Any], DataFrame[Any]]]: The train and test sets.
+        """
+        return self._split_on(data, user_id_label, ratio, seed)

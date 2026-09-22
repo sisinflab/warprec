@@ -52,6 +52,13 @@ reader:
       context_label_2: [int8, int16, int32, int64, float32, float64, str]
     context_separators:
       context_label_1: '|'
+rerank:
+  name: [MMR, Calibration]
+  pool: 100
+  params:
+    diversity: 0.3
+    weight: 0.5
+    smoothing: 0.01
 training:
   negative_sampling: [uniform, popularity]
   sequence_pooling: [mean, sum, max]
@@ -107,12 +114,12 @@ filtering:
     num_interactions: 10
 splitter:
   test_splitting:
-    strategy: [temporal_holdout, temporal_leave_k_out, random_holdout, random_leave_k_out, timestamp_slicing]
+    strategy: [temporal_holdout, temporal_leave_k_out, random_holdout, random_leave_k_out, timestamp_slicing, item_cold_start, user_cold_start]
     ratio: 0.1
     k: 10
     timestamp: [123456789, best]
   validation_splitting:
-    strategy: [temporal_holdout, temporal_leave_k_out, random_holdout, random_leave_k_out, timestamp_slicing, k_fold_cross_validation]
+    strategy: [temporal_holdout, temporal_leave_k_out, random_holdout, random_leave_k_out, timestamp_slicing, k_fold_cross_validation, item_cold_start, user_cold_start]
     ratio: 0.1
     k: 10
     timestamp: [123456789, best]
@@ -193,7 +200,11 @@ models:
     param_5: [qrandint, 10, 10_000, 5]
 evaluation:
   top_k: [5, 10, ...]
-  metrics: [Precision, Recall, nDCG, ...]
+  metrics: [Precision, Recall, nDCG, IPSRecall, SNIPSDCG, ...]
+  propensity:
+    estimator: [uniform, popularity]
+    power: 0.5
+    clip: 0.1
   complex_metrics:
     - name: MetricRequiringParameters
       params:
@@ -202,6 +213,7 @@ evaluation:
   batch_size: 4096
   strategy: [full, sampled]
   num_negatives: 99
+  candidates: [all, cold, warm]
   mask_seen: [auto, context, pair, none]
   seed: 42
   stat_significance:

@@ -8,6 +8,7 @@ from warprec.data.reader import ReaderFactory
 from warprec.data.writer import WriterFactory
 from warprec.utils.callback import WarpRecCallback
 from warprec.evaluation import build_evaluator
+from warprec.recommenders.reranking import build_reranker
 from warprec.utils.config import load_eval_configuration, load_callback
 from warprec.utils.helpers import (
     build_evaluation_dataloader_kwargs,
@@ -69,7 +70,9 @@ def eval_pipeline(path: str):
         model_results: Dict[str, Any] = {}
 
     # Create instance of main evaluator used to evaluate the main dataset
-    evaluator = build_evaluator(config.evaluation, main_dataset)
+    # One re-ranker for both paths, so the list reported is the list written.
+    reranker = build_reranker(config.rerank, main_dataset)
+    evaluator = build_evaluator(config.evaluation, main_dataset, reranker)
 
     # Experiment device
     general_device = config.general.device
@@ -182,6 +185,7 @@ def eval_pipeline(path: str):
         # Recommendation
         if params.meta.save_recs:
             writer.write_recs(
+                reranker=reranker,
                 model=model,
                 dataset=main_dataset,
                 **config.writer.recommendation.model_dump(),

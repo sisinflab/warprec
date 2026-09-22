@@ -55,6 +55,40 @@ class StatSignificance(BaseModel):
         return any(self.model_dump(exclude=["corrections"]).values())  # type: ignore[arg-type]
 
 
+class PropensityConfig(BaseModel):
+    """Definition of the propensity model the debiased estimators read.
+
+    Attributes:
+        estimator (Optional[Literal["uniform", "popularity"]]): How the probability
+            that an item was observed is estimated. 'popularity' reads it off the
+            training interaction counts, 'uniform' applies no correction.
+        power (Optional[float]): The exponent applied to the normalised counts.
+            Lower values flatten the correction, 0 removes it.
+        clip (Optional[float]): The smallest propensity any item may carry. The
+            estimators divide by it, so the floor bounds their variance.
+    """
+
+    estimator: Optional[Literal["uniform", "popularity"]] = "uniform"
+    power: Optional[float] = 0.5
+    clip: Optional[float] = 0.1
+
+    @field_validator("power")
+    @classmethod
+    def check_power(cls, v: float):
+        """Validate the exponent."""
+        if v < 0:
+            raise ValueError(f"Propensity power must not be negative, got {v}.")
+        return v
+
+    @field_validator("clip")
+    @classmethod
+    def check_clip(cls, v: float):
+        """Validate the propensity floor."""
+        if not 0 < v <= 1:
+            raise ValueError(f"Propensity clip must lie in (0, 1], got {v}.")
+        return v
+
+
 class ComplexMetricConfig(BaseModel):
     """Definition of a metric that carries its own parameters.
 
@@ -83,11 +117,18 @@ class EvaluationConfig(BaseModel):
         metrics (List[str]): List of metrics to compute during evaluation.
         complex_metrics (List[ComplexMetricConfig]): List of metrics
             which requires further parameters to be instantiated.
+        propensity (PropensityConfig): The propensity model the debiased estimators
+            read. Defaults to applying no correction.
         validation_metric (Optional[str]): The metric/loss that will
             validate each trial in Ray Tune.
         batch_size (Optional[int]): Batch size used during evaluation.
         strategy (Optional[str]): Evaluation strategy, either "full" or "sampled".
         num_negatives (Optional[int]): Number of negative samples to use in "sampled" strategy.
+        candidates (Optional[Literal["all", "cold", "warm"]]): Which items a run is
+            allowed to rank. 'cold' keeps only the items with no training
+            interaction and 'warm' only the rest, which is what makes a cold-start
+            protocol measure cold-start rather than the warm catalogue around it.
+            Defaults to 'all'. Item-side only, and ignored by sampled evaluation.
         mask_seen (Optional[Literal["auto", "context", "pair", "none"]]): Which
             already-seen items are excluded from the ranking. 'auto' excludes items
             seen in the same context when the dataset has contextual columns and
@@ -105,10 +146,12 @@ class EvaluationConfig(BaseModel):
     top_k: List[int]
     metrics: List[str]
     complex_metrics: List[ComplexMetricConfig] = Field(default_factory=list)
+    propensity: PropensityConfig = Field(default_factory=PropensityConfig)
     validation_metric: Optional[str] = "nDCG@10"
     batch_size: Optional[int] = 1024
     strategy: Optional[str] = "full"  # or "sampled"
     num_negatives: Optional[int] = 99
+    candidates: Optional[Literal["all", "cold", "warm"]] = "all"
     mask_seen: Optional[Literal["auto", "context", "pair", "none"]] = "auto"
     seed: Optional[int] = 42
     stat_significance: Optional[StatSignificance] = Field(

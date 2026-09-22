@@ -208,3 +208,55 @@ def test_sampling_does_not_touch_the_global_generator(sampling_dataset: Dataset)
     after = np.random.random()
 
     assert before == after
+
+
+def test_the_ranking_breaks_ties_by_chance_not_by_item_id():
+    """A model that scores every item alike must not return the lowest ids.
+
+    Item ids are rarely neutral: in most catalogues the low ones are the oldest
+    and best known entries, so resolving ties by position hands a model that has
+    learned nothing a ranking that looks informed.
+    """
+    from warprec.data.ranking import top_k_breaking_ties
+
+    tied = torch.zeros(200, 50)
+
+    generator = torch.Generator().manual_seed(0)
+    _, indices = top_k_breaking_ties(tied, 5, generator)
+
+    # Deterministic selection would return the five lowest ids.
+    _, positional = torch.topk(tied, 5, dim=1)
+    assert not torch.equal(indices, positional)
+    assert set(torch.unique(indices).tolist()) != {0, 1, 2, 3, 4}
+
+    # The shuffle is drawn once per call, so the batch shares it. What matters is
+    # that which items it lands on owes nothing to their position.
+    picked = sorted(torch.unique(indices).tolist())
+    assert len(picked) == 5, "the shuffle should be one permutation for the batch"
+    assert max(picked) > 5, "the tie break stayed at the low ids"
+
+
+def test_the_tie_break_follows_the_seed():
+    """Two runs at one seed must agree, and two seeds must not."""
+    from warprec.data.ranking import top_k_breaking_ties
+
+    tied = torch.zeros(20, 40)
+
+    _, first = top_k_breaking_ties(tied, 5, torch.Generator().manual_seed(1))
+    _, again = top_k_breaking_ties(tied, 5, torch.Generator().manual_seed(1))
+    _, other = top_k_breaking_ties(tied, 5, torch.Generator().manual_seed(2))
+
+    torch.testing.assert_close(first, again)
+    assert not torch.equal(first, other)
+
+
+def test_a_genuine_ordering_survives_the_tie_break():
+    """Shuffling may only decide ties; it must not disturb a real ranking."""
+    from warprec.data.ranking import top_k_breaking_ties
+
+    distinct = torch.arange(40, dtype=torch.float).flip(0).repeat(6, 1)
+
+    _, indices = top_k_breaking_ties(distinct, 5, torch.Generator().manual_seed(3))
+    _, expected = torch.topk(distinct, 5, dim=1)
+
+    torch.testing.assert_close(indices, expected)

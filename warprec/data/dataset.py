@@ -50,6 +50,11 @@ class Dataset:
         keep_unseen_items (bool): Whether items that carry side information but no
             interaction stay in the catalogue, so that the models scoring from
             attributes can recommend them.
+        cold_start (Optional[str]): Which side of the catalogue the evaluation set
+            holds out entirely, 'item', 'user' or None. Under such a protocol the
+            held-out entities have no training interaction at all, so they would
+            otherwise never enter the mappings and could not be scored. Set by the
+            pipeline from the splitting strategy rather than by hand.
         user_id_label (str): The label of the user id column.
         item_id_label (str): The label of the item id column.
         rating_label (str): The label of the rating column.
@@ -96,6 +101,7 @@ class Dataset:
         sequence_pooling: str = "mean",
         context_separators: Optional[Dict[str, str]] = None,
         keep_unseen_items: bool = False,
+        cold_start: Optional[str] = None,
         user_id_label: str = "user_id",
         item_id_label: str = "item_id",
         rating_label: str = None,
@@ -153,6 +159,7 @@ class Dataset:
                 eval_set=mat_eval_data,
                 filter_data=mat_side_data,
                 label=item_id_label,
+                keep_eval_values=cold_start == "item",
             )
 
         # Define dimensions that will lead the experiment
@@ -181,6 +188,29 @@ class Dataset:
             .to_dict(as_series=False)[item_id_label]
         )
 
+        # A cold-start protocol holds every interaction of these entities out of
+        # training on purpose. They still have to exist in the mappings, or there
+        # is nothing for a model to score and the evaluation set is empty.
+        if cold_start is not None and mat_eval_data is not None:
+            label, known = (
+                (item_id_label, _iid) if cold_start == "item" else (user_id_label, _uid)
+            )
+            held_out = sorted(
+                set(
+                    mat_eval_data.select(label).unique().to_dict(as_series=False)[label]
+                )
+                - set(known)
+            )
+            if held_out:
+                known.extend(held_out)
+                known.sort()
+                logger.attention(
+                    f"Cold-start protocol: kept {len(held_out)} '{label}' values "
+                    "that the split held out of training entirely. They carry no "
+                    "interaction, so only a model that scores from attributes can "
+                    "reach them."
+                )
+
         # An item with attributes but no interaction is exactly the cold-start case:
         # keeping it in the catalogue is what lets a content model reach it. It stays
         # an all-zero column of the interaction matrix, so the collaborative models
@@ -203,6 +233,11 @@ class Dataset:
         # Calculate mapping for users and items
         self._umap = {user: i for i, user in enumerate(_uid)}
         self._imap = {item: i for i, item in enumerate(_iid)}
+
+        # Both dimensions are read back off the mappings rather than off the
+        # training frame: a catalogue the protocol widened has to be reflected on
+        # each side, or the structures built from it come out the wrong shape.
+        self._nuid = len(self._umap)
         self._niid = len(self._imap)
 
         # Process contextual data
@@ -412,6 +447,7 @@ class Dataset:
         eval_set: Optional[DataFrame[Any]],
         filter_data: DataFrame[Any],
         label: str,
+        keep_eval_values: bool = False,
     ) -> Tuple[DataFrame[Any], DataFrame[Any]]:
         """Filter the data based on a given additional information set and label.
 
@@ -420,20 +456,29 @@ class Dataset:
             eval_set (Optional[DataFrame[Any]]): The evaluation set.
             filter_data (DataFrame[Any]): The additional information dataset.
             label (str): The label used to filter the data.
+            keep_eval_values (bool): Whether values that appear only in the
+                evaluation set survive. Normally they cannot be scored and are
+                dropped, but a cold-start protocol puts them there deliberately,
+                and dropping them would empty the evaluation set.
 
         Returns:
             Tuple[DataFrame[Any], DataFrame[Any]]:
                 - DataFrame[Any]: The filtered train set.
                 - DataFrame[Any]: The filtered evaluation set.
         """
-        train_vals = set(
+        known_vals = set(
             train_set.select(label).unique().to_dict(as_series=False)[label]
         )
+        if keep_eval_values and eval_set is not None:
+            known_vals |= set(
+                eval_set.select(label).unique().to_dict(as_series=False)[label]
+            )
+
         filter_vals = set(
             filter_data.select(label).unique().to_dict(as_series=False)[label]
         )
 
-        shared_data = list(train_vals.intersection(filter_vals))
+        shared_data = list(known_vals.intersection(filter_vals))
 
         # Count the number of data points before filtering
         train_data_before_filter = train_set.select(nw.col(label).n_unique()).item()

@@ -1,7 +1,11 @@
 from . import recommender_model_config
 from .common import Labels
 from .dashboard_configuration import DashboardConfig, Wandb, CodeCarbon, MLflow
-from .evaluation_configuration import EvaluationConfig, ComplexMetricConfig
+from .evaluation_configuration import (
+    EvaluationConfig,
+    ComplexMetricConfig,
+    PropensityConfig,
+)
 from .general_configuration import GeneralConfig, WarpRecCallbackConfig, AzureConfig
 from .model_configuration import RecomModel, LRSchedulerConfig, OptimizerConfig
 from .reader_configuration import (
@@ -11,6 +15,7 @@ from .reader_configuration import (
     SideInformationReading,
     ClusteringInformationReading,
 )
+from .rerank_configuration import RerankConfig
 from .run_configuration import WarpRecRunConfig
 from .training_configuration import (
     TrainingConfig,
@@ -48,6 +53,7 @@ __all__ = [
     "MLflow",
     "EvaluationConfig",
     "ComplexMetricConfig",
+    "PropensityConfig",
     "GeneralConfig",
     "WarpRecCallbackConfig",
     "AzureConfig",
@@ -59,6 +65,7 @@ __all__ = [
     "SplitReading",
     "SideInformationReading",
     "ClusteringInformationReading",
+    "RerankConfig",
     "WarpRecRunConfig",
     "TrainingConfig",
     "NegativeSampling",

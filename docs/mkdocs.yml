@@ -44,10 +44,13 @@ nav:
       - Context-Aware: recommenders/context.md
       - Sequential: recommenders/sequential.md
       - Unpersonalized: recommenders/unpersonalized.md
+      - Re-Ranking: recommenders/reranking.md
       - Cross-Framework Evaluation: recommenders/cross-framework-evaluation.md
   - Evaluation:
       - Evaluation System: evaluation/index.md
       - Sampled Evaluation: evaluation/sampled.md
+      - Cold-Start Protocols: evaluation/cold-start.md
+      - Debiased Evaluation: evaluation/debiased.md
       - Statistical Significance: evaluation/statistical-significance.md
       - Metrics:
         - Metrics Taxonomy: evaluation/metrics/taxonomy.md
@@ -59,6 +62,7 @@ nav:
         - Multiobjective: evaluation/metrics/multiobjective.md
         - Novelty: evaluation/metrics/novelty.md
         - Rating: evaluation/metrics/rating.md
+        - Debiased: evaluation/metrics/debiased.md
   - Cloud & Deployment:
     - Authentication: cloud/authentication.md
     - Cluster Management: cloud/cluster-management.md
@@ -85,6 +89,7 @@ nav:
       - Sequential: api-reference/recommenders/sequential.md
       - Unpersonalized: api-reference/recommenders/unpersonalized.md
       - Proxy: api-reference/recommenders/proxy.md
+      - Re-Ranking: api-reference/recommenders/reranking.md
     - Metrics:
       - Metric Interfaces: api-reference/metrics/base.md
       - Accuracy: api-reference/metrics/accuracy.md
@@ -95,6 +100,7 @@ nav:
       - Novelty: api-reference/metrics/novelty.md
       - Rating: api-reference/metrics/rating.md
       - Multiobjective: api-reference/metrics/multiobjective.md
+      - Debiased: api-reference/metrics/debiased.md
 
 theme:
   name: material

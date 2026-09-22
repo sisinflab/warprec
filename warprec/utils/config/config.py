@@ -16,6 +16,7 @@ from warprec.utils.config import (
     SplittingConfig,
     DashboardConfig,
     RecomModel,
+    RerankConfig,
     TrainingConfig,
     EvaluationConfig,
     EstimateConfig,
@@ -38,6 +39,7 @@ class WarpRecConfiguration(BaseModel):
             in the format {model_name: dict{param_1: value, param_2: value, ...}, ...}
         general (GeneralConfig): General configuration of the experiment.
         training (TrainingConfig): The options that shape the training signal.
+        rerank (RerankConfig): The re-ranking applied to every list produced.
     """
 
     reader: ReaderConfig
@@ -45,6 +47,7 @@ class WarpRecConfiguration(BaseModel):
     models: Dict[str, dict]
     general: GeneralConfig = Field(default_factory=GeneralConfig)
     training: TrainingConfig = Field(default_factory=TrainingConfig)
+    rerank: RerankConfig = Field(default_factory=RerankConfig)
 
     @model_validator(mode="after")
     def migrate_reader_training_options(self) -> "WarpRecConfiguration":
