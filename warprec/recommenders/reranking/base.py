@@ -92,20 +92,25 @@ class Reranker(ABC):
             Tuple[Tensor, Tensor]: The scores and the item indices they belong to,
                 in the order the re-ranker chose.
         """
-        pool = min(self.pool, predictions.size(1))
-        cut = min(k, pool)
+        # Deep enough to fill the cutoff even when it runs past the pool, so that
+        # asking for more than was reconsidered never returns a shorter list.
+        depth = min(max(k, self.pool), predictions.size(1))
+        relevance, candidates = torch.topk(predictions, depth, dim=1)
 
-        relevance, candidates = torch.topk(predictions, pool, dim=1)
-        chosen = self._select(relevance, candidates, cut, user_indices)
+        pooled = min(self.pool, depth)
+        cut = min(k, pooled)
+        chosen = self._select(
+            relevance[:, :pooled], candidates[:, :pooled], cut, user_indices
+        )
 
-        values = relevance.gather(1, chosen)
-        indices = candidates.gather(1, chosen)
+        values = relevance[:, :pooled].gather(1, chosen)
+        indices = candidates[:, :pooled].gather(1, chosen)
 
-        # A cutoff deeper than the pool keeps the ranking the model produced, so
-        # asking for more than was reconsidered never loses items.
-        if cut < k:
-            values = torch.cat([values, relevance[:, cut:k]], dim=1)
-            indices = torch.cat([indices, candidates[:, cut:k]], dim=1)
+        # Whatever the cutoff needs beyond the pool keeps the model's own order.
+        # Those positions sit below the pool, so they cannot repeat a chosen item.
+        if k > pooled:
+            values = torch.cat([values, relevance[:, pooled:k]], dim=1)
+            indices = torch.cat([indices, candidates[:, pooled:k]], dim=1)
 
         return values, indices
 

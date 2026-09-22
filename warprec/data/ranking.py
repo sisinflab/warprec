@@ -140,6 +140,13 @@ def top_k_breaking_ties(
     Shuffling the columns before the selection and mapping the indices back makes
     tied items equally likely while leaving any genuine ordering untouched.
 
+    The shuffle is drawn once per call rather than once per row, which is what
+    keeps it affordable on a large catalogue. So a model that ties everything
+    returns the same list to every user in the batch rather than an independently
+    drawn one each time. That understates such a model rather than flattering it,
+    which is the safe direction, but it does mean the resulting score is not the
+    random baseline: measure that by evaluating an unpersonalized random model.
+
     Args:
         predictions (Tensor): The score matrix.
         k (int): The cutoff.
