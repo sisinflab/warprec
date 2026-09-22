@@ -140,8 +140,12 @@ def top_k_breaking_ties(
     Shuffling the columns before the selection and mapping the indices back makes
     tied items equally likely while leaving any genuine ordering untouched.
 
-    The shuffle is drawn once per call rather than once per row, which is what
-    keeps it affordable on a large catalogue. So a model that ties everything
+    Only the rows whose ranking is genuinely ambiguous are shuffled, so a run whose
+    scores are distinct pays nothing beyond looking one position past the cutoff.
+    On real model scores that is almost every row.
+
+    The shuffle itself is drawn once per call rather than once per row, which is
+    what keeps it affordable on a large catalogue. So a model that ties everything
     returns the same list to every user in the batch rather than an independently
     drawn one each time. That understates such a model rather than flattering it,
     which is the safe direction, but it does mean the resulting score is not the
@@ -160,8 +164,26 @@ def top_k_breaking_ties(
     if generator is None:
         return torch.topk(predictions, k, dim=1)
 
+    # Shuffling means copying the score matrix, which is the dominant cost of the
+    # selection on a large catalogue, and only the rows whose ranking is actually
+    # ambiguous need it. One extra position past the cutoff is enough to find
+    # them: a row with no two equal scores among them has both its membership and
+    # its order already settled, and most rows of a real evaluation do.
+    probe = min(k + 1, predictions.size(1))
+    values, indices = torch.topk(predictions, probe, dim=1)
+
+    ambiguous = (values[:, :-1] == values[:, 1:]).any(dim=1)
+    values, indices = values[:, :k], indices[:, :k]
+    if not bool(ambiguous.any()):
+        return values, indices
+
+    rows = ambiguous.nonzero(as_tuple=True)[0]
     order = torch.randperm(
         predictions.size(1), generator=generator, device=predictions.device
     )
-    values, shuffled = torch.topk(predictions[:, order], k, dim=1)
-    return values, order[shuffled]
+    tied_values, shuffled = torch.topk(predictions[rows][:, order], k, dim=1)
+
+    values, indices = values.clone(), indices.clone()
+    values[rows] = tied_values
+    indices[rows] = order[shuffled]
+    return values, indices
