@@ -47,13 +47,22 @@ class Random(Recommender):
         Returns:
             Tensor: The score matrix {user x item}.
         """
+        # Drawn from the model's own seed rather than the global stream, so that
+        # the baseline one run is compared against is the baseline the next run
+        # is compared against. The draw follows a user's position in the batch
+        # rather than their identity, which is enough for a baseline: the point
+        # is an arbitrary ranking that does not move between runs of the same
+        # configuration.
+        generator = torch.Generator(device=user_indices.device)
+        generator.manual_seed(self.seed)
+
+        shape = (user_indices.size(0), self.n_items)
+        scores = torch.rand(shape, generator=generator, device=user_indices.device)
+
         if item_indices is None:
             # Case 'full': prediction on all items
-            batch_size = user_indices.size(0)
-            shape = (batch_size, self.n_items)
+            return scores  # [batch_size, n_items]
 
-            # Generate random scores
-            return torch.rand(shape)  # [batch_size, n_items]
-
-        # Case 'sampled': prediction on a sampled set of items
-        return torch.rand(item_indices.size())  # [batch_size, pad_seq]
+        # Case 'sampled': taken from the same draw, so that asking about a few
+        # items gives what ranking them all would have given.
+        return scores.gather(1, item_indices.clamp(max=self.n_items - 1))
