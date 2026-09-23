@@ -8,6 +8,8 @@
 
 ::: warprec.data.entities.train_structures.interaction_structures.ContrastiveDataset
 
+::: warprec.data.entities.knowledge.KnowledgeGraph
+
 ::: warprec.data.entities.sessions.Sessions
 
 ::: warprec.data.entities.train_structures.session_structures.SequentialDataset

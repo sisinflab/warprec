@@ -24,6 +24,16 @@ reader:
     file_format: [tabular, parquet]
     column_names: [item_id, feature_1, feature_2, ...]
     keep_unseen_items: [True, False]
+  knowledge:
+    local_path: path/to/kg_final.tsv
+    link_path: path/to/item_list.tsv
+    azure_blob_name: path/to/kg/blob.tsv
+    link_azure_blob_name: path/to/link/blob.tsv
+    sep: '\t'
+    header: [True, False]
+    file_format: [tabular, parquet]
+    column_names: [head, relation, tail]
+    link_column_names: [item_id, entity_id]
   clustering:
     user_local_path: path/to/user_clustering.csv
     item_local_path: path/to/item_clustering.csv

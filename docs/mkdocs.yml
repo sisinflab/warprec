@@ -42,6 +42,7 @@ nav:
       - Content-Based: recommenders/content.md
       - Hybrid: recommenders/hybrid.md
       - Context-Aware: recommenders/context.md
+      - Knowledge-Aware: recommenders/knowledge.md
       - Sequential: recommenders/sequential.md
       - Unpersonalized: recommenders/unpersonalized.md
       - Re-Ranking: recommenders/reranking.md
@@ -86,6 +87,7 @@ nav:
       - Content-Based: api-reference/recommenders/content.md
       - Hybrid: api-reference/recommenders/hybrid.md
       - Context-Aware: api-reference/recommenders/context.md
+      - Knowledge-Aware: api-reference/recommenders/knowledge.md
       - Sequential: api-reference/recommenders/sequential.md
       - Unpersonalized: api-reference/recommenders/unpersonalized.md
       - Proxy: api-reference/recommenders/proxy.md

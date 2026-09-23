@@ -170,6 +170,58 @@ training:
 
 ---
 
+## Reading a Knowledge Graph
+
+A knowledge graph states facts about the **entities** an item stands for: who directed a film, which genre it belongs to, where its director was born. It feeds the knowledge-aware models. WarpRec expects it as **two files**, which is the shape the published graphs are distributed in.
+
+The first holds the facts, as `(head, relation, tail)` triples:
+
+```
+m1	film.directed_by	person.kubrick
+m1	film.genre	genre.drama
+m2	film.genre	genre.drama
+person.kubrick	person.born_in	country.uk
+...
+```
+
+The second says which entity each catalogue item stands for, because the graph is written about entities and the interactions are written about items:
+
+```
+1	m1
+2	m2
+3	m3
+...
+```
+
+- **Column Ordering is Crucial:** both files are read positionally. The triples file is `head`, `relation`, `tail`; the alignment file is `item_id`, `entity_id`. The names are set through `column_names` and `link_column_names`.
+- **Header:** both files are assumed to have **no header row** by default, which is how such graphs are usually published. Set `header: True` when yours does.
+- **Both files are required.** The triples alone do not connect the graph to the catalogue.
+- **Error Handling:** during the configuration evaluation process, you will be notified if you attempt to use a model that requires a knowledge graph but none has been provided. In that case, the experiment will be terminated.
+
+### How the Graph Is Interpreted
+
+Entities and relations are mapped into an index space of their own, in the same way users and items are:
+
+| File content | Interpretation |
+|---|---|
+| A head or a tail | One **entity**; both ends share a single vocabulary, so the same identifier is the same node wherever it appears |
+| A relation | One **relation**, embedded separately from the entities |
+| An alignment row | One item of the catalogue is declared to *be* a given entity |
+
+!!! note "Entities beyond the items"
+
+    An entity that stands for no item is kept. A fact two hops away from an item, such as the country a film's director was born in, is exactly what the propagating models exist to reach, so the graph is never trimmed to the catalogue.
+
+!!! note "Items the graph is silent about"
+
+    An item that is not aligned to any entity, or is aligned to an entity that appears in no triple, keeps all of its interactions and simply carries no facts. Such an item is scored from the collaborative half of the model alone; it is never dropped from the catalogue.
+
+!!! tip "Alignments beyond the catalogue"
+
+    The alignment file is written for the whole graph, not for one split, so it may name items that filtering or splitting removed. Those rows are ignored.
+
+---
+
 ## Reading Clustering Information
 
 When reading clustering information, WarpRec expects the file to be formatted as follows:

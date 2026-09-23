@@ -1,6 +1,6 @@
 # Models Taxonomy
 
-WarpRec ships with **70+ built-in algorithms** spanning 6 model families. All models can run locally or at cluster scale via Ray.
+WarpRec ships with **70+ built-in algorithms** spanning 7 model families. All models can run locally or at cluster scale via Ray.
 
 | Family | Model | Description |
 |---|---|---|
@@ -50,6 +50,7 @@ WarpRec ships with **70+ built-in algorithms** spanning 6 model families. All mo
 | | [Slim](collaborative.md#slim) | Sparse linear method with L1/L2 (ElasticNet) regularization. |
 | **CF / Neural** | [ConvNCF](collaborative.md#convncf) | CNN on user-item embedding outer product for structured interaction patterns. |
 | | [NeuMF](collaborative.md#neumf) | Hybrid neural CF combining GMF and MLP branches. |
+| | [TwoTower](collaborative.md#twotower) | Independent user and item encoders scored by inner product, trained with in-batch negatives. |
 | **Context-Aware** | [AFM](context.md#afm) | Attentional Factorization Machine with attention-weighted feature interactions. |
 | | [DCN](context.md#dcn) | Deep & Cross Network for explicit bounded-degree feature crossing. |
 | | [DCNv2](context.md#dcnv2) | Improved DCN with Mixture-of-Experts and low-rank cross layers. |
@@ -58,6 +59,8 @@ WarpRec ships with **70+ built-in algorithms** spanning 6 model families. All mo
 | | [NFM](context.md#nfm) | Neural FM with Bi-Interaction pooling layer followed by MLP. |
 | | [WideAndDeep](context.md#wideanddeep) | Joint wide (linear) + deep (DNN) model for memorization and generalization. |
 | | [xDeepFM](context.md#xdeepfm) | Compressed Interaction Network (CIN) for vector-wise explicit interactions. |
+| **Knowledge-Aware / Embedding** | [CKE](knowledge.md#cke) | Collaborative knowledge base embedding; a TransR entity factor beside a collaborative one. |
+| **Knowledge-Aware / Propagation** | [KGAT](knowledge.md#kgat) | Attentive propagation over a collaborative knowledge graph. |
 | **Sequential / KNN** | [STAN](sequential.md#stan) | Sequence- and time-aware neighborhood model for session-based recommendation. |
 | **Sequential / CNN** | [Caser](sequential.md#caser) | Convolutional sequence embedding with horizontal and vertical filters. |
 | **Sequential / Markov** | [FOSSIL](sequential.md#fossil) | First-order Markov chain fused with factored item similarity. |

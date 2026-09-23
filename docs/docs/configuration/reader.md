@@ -51,6 +51,8 @@ The following keywords are available to configure the reader:
 
 - **side**: A nested configuration block for loading **side information** associated with items.
 
+- **knowledge**: A nested configuration block for loading a **knowledge graph** over the items.
+
 - **clustering**: A nested configuration block for loading **user or item clustering information**.
 
 - **labels**: A nested configuration block that maps custom dataset column names to WarpRec's internal schema.
@@ -97,6 +99,36 @@ This can be configured using the `side` nested section:
 
 !!! tip
     Side information can improve model performance, especially in **cold-start scenarios**. Not every model uses side information, check the [Recommenders Documentation](../recommenders/index.md) for further details on each model.
+
+## Knowledge Graph Reading
+
+WarpRec can ingest a **knowledge graph** describing the items, which the knowledge-aware models score from. It arrives as two files and is configured under the `knowledge` nested section:
+
+- **local_path**: Path to the file of `(head, relation, tail)` triples.
+- **link_path**: Path to the file aligning catalogue items with graph entities, as `(item, entity)` pairs.
+- **azure_blob_name**: Name of the Azure Blob containing the triples.
+- **link_azure_blob_name**: Name of the Azure Blob containing the alignment.
+- **sep**: Column separator used by both files. Defaults to `'\t'`.
+- **header**: Whether the first row of each file is a header. Defaults to `False`, which is how the published graphs are distributed.
+- **file_format**: The format of both files. Supported values are `tabular` and `parquet`.
+- **column_names**: The names of the three columns of the triples file, in order. Defaults to `[head, relation, tail]`.
+- **link_column_names**: The names of the two columns of the alignment file, in order. Defaults to `[item_id, entity_id]`.
+
+```yaml
+reader:
+    knowledge:
+        local_path: path/to/kg_final.tsv
+        link_path: path/to/item_list.tsv
+        sep: '\t'
+        header: False
+        column_names: [head, relation, tail]
+        link_column_names: [item_id, entity_id]
+```
+
+Both files are required: the triples alone do not say which item any entity stands for. The format of each is described in [Reading a Knowledge Graph](../data-management/reader.md#reading-a-knowledge-graph).
+
+!!! important
+    Configuring a knowledge-aware model without `reader.knowledge` terminates the experiment during configuration validation, in the same way a content-based model without `reader.side` does.
 
 ## Clustering Information Reading
 
