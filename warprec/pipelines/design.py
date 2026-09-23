@@ -85,6 +85,7 @@ def design_pipeline(path: str):
             interactions=main_dataset.train_set,
             transactions=main_dataset.train_transactions,
             knowledge=main_dataset.knowledge,
+            multimodal=main_dataset.multimodal,
             sessions=main_dataset.train_session,
             seed=seed,
             info=main_dataset.info(),

@@ -2,6 +2,7 @@
 from io import StringIO, BytesIO
 from typing import List, Dict, Tuple, Optional, Any, Union
 
+import numpy as np
 import pandas as pd
 import joblib
 import narwhals as nw
@@ -126,6 +127,27 @@ class AzureBlobReader(Reader):
             desired_cols=column_names,
             desired_dtypes=dtypes,
         )
+
+    def read_array(
+        self,
+        azure_blob_name: str,
+        *args: Any,
+        **kwargs: Any,
+    ) -> np.ndarray:
+        """Reads a dense array from an Azure Blob holding a .npy file.
+
+        Args:
+            azure_blob_name (str): The name of the blob holding the array.
+            *args (Any): The additional arguments.
+            **kwargs (Any): The additional keyword arguments.
+
+        Returns:
+            np.ndarray: The array, two-dimensional and float32.
+        """
+        content = self._download_blob_content(azure_blob_name, as_bytes=True)
+        stream = BytesIO(content)  # type: ignore[arg-type]
+
+        return self._process_array(np.load(stream, allow_pickle=False))
 
     def read_parquet(
         self,

@@ -717,6 +717,7 @@ class Trainer:
                 interactions=dataset.train_set,
                 transactions=dataset.train_transactions,
                 knowledge=dataset.knowledge,
+                multimodal=dataset.multimodal,
                 sessions=dataset.train_session,
                 **dataset.get_stash(),
             )
@@ -726,6 +727,7 @@ class Trainer:
                 interactions=dataset.train_set,
                 transactions=dataset.train_transactions,
                 knowledge=dataset.knowledge,
+                multimodal=dataset.multimodal,
                 sessions=dataset.train_session,
                 info=dataset.info(),
                 **dataset.get_stash(),

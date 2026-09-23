@@ -108,6 +108,7 @@ def eval_pipeline(path: str):
             interactions=main_dataset.train_set,
             transactions=main_dataset.train_transactions,
             knowledge=main_dataset.knowledge,
+            multimodal=main_dataset.multimodal,
             sessions=main_dataset.train_session,
             seed=42,
             info=main_dataset.info(),

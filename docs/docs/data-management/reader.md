@@ -222,6 +222,71 @@ Entities and relations are mapped into an index space of their own, in the same 
 
 ---
 
+## Reading Multimodal Features
+
+Multimodal features describe an item by **what it is** rather than by who interacted with it: a product photograph, a description, an audio track. They feed the multimodal models. WarpRec reads **precomputed vectors** and never performs feature extraction itself, because that is the encoder's job and every published multimodal dataset ships the vectors already.
+
+A modality arrives as **two files**. The first is a dense matrix, one row per item, normally a `.npy`:
+
+```
+[[0.12, 0.44, ...],     # row 0
+ [0.03, 0.91, ...],     # row 1
+ ...]
+```
+
+The second names the item each row describes, one per line, in the same order:
+
+```
+B00004STFV
+B000056JDX
+B0000668H5
+...
+```
+
+- **Column Ordering is Crucial:** the row order file is read positionally. Row *i* of the matrix describes the item on line *i*.
+- **Header:** both files are assumed to have **no header row** by default, which is how such features are usually published. Set `header: True` when yours does.
+- **Both files are required** for the `numpy` format. A dense matrix carries no identifiers, so the row order is what connects it to the catalogue.
+- **A tabular alternative** is available for features that already live in a dataframe: set `file_format: tabular`, put the item ID in the first column and the features in the rest, exactly as for side information. No separate row-order file is then needed.
+- **Error Handling:** during the configuration evaluation process, you will be notified if you attempt to use a model that requires multimodal features but none have been provided, or if a model names a modality that was not configured. In either case the experiment will be terminated.
+
+### How the Modalities Are Interpreted
+
+The `multimodal` section is a mapping, so the names are yours to choose and a dataset may carry as many modalities as it has:
+
+```yaml
+reader:
+    multimodal:
+        visual:
+            local_path: data/baby/image_feat.npy
+            item_path: data/baby/item_list.tsv
+        textual:
+            local_path: data/baby/text_feat.npy
+            item_path: data/baby/item_list.tsv
+            normalize: l2
+```
+
+| Configuration | Meaning |
+|---|---|
+| A modality's name | How models refer to it, through their `modalities` parameter |
+| Its width | Read from the file; modalities need not share a width |
+| `normalize: l2` | Each row is scaled to unit length before the models see it |
+
+A model reads **every** configured modality unless its `modalities` parameter names a subset, so adding a modality to this section does not leave it silently unused.
+
+!!! note "Items the features do not cover"
+
+    An item that no row describes keeps all of its interactions and is given a vector of zeros. It is never dropped. A feature dump that misses a few items would otherwise change the catalogue every model in the run is compared on, for a reason that has nothing to do with any of them. Such an item is scored from the collaborative half of the model alone.
+
+!!! tip "Rows beyond the catalogue"
+
+    The row order file is written for a whole dataset, not for one split, so it may name items that filtering or splitting removed. Those rows are ignored.
+
+!!! note "What is read and what is learned"
+
+    What this section provides is read-only data: the vectors as the file holds them never change, and they are stored with the model, so a checkpoint can be served without the feature files still being where they were at training time. What a model learns from them differs by model — some learn only the projection out of the features, others also refine a working copy — and each model's page says which.
+
+---
+
 ## Reading Clustering Information
 
 When reading clustering information, WarpRec expects the file to be formatted as follows:

@@ -106,12 +106,21 @@ class Recommender(nn.Module, ABC):
     def get_params(self) -> dict:
         """Get the model parameters as a dictionary.
 
+        Registered buffers are annotated like hyperparameters, so that they read
+        as the tensors they are rather than as the union a buffer is typed with,
+        but they are not hyperparameters. They are left out here: a run's name is
+        derived from this dictionary, and a buffer a model recomputes while it
+        trains would rename its own output halfway through.
+
         Returns:
             dict: The dictionary containing the model parameters.
         """
         params = {}
         for ann, _ in self.__class__.__annotations__.items():
-            params[ann] = getattr(self, ann)
+            value = getattr(self, ann, None)
+            if isinstance(value, Tensor):
+                continue
+            params[ann] = value
         return params
 
     def set_seed(self, seed: int):

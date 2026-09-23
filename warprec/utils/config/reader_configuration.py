@@ -10,6 +10,8 @@ from warprec.utils.config.training_configuration import (
 from warprec.utils.logger import logger
 
 FileFormat = Literal["tabular", "parquet"]
+ModalityFormat = Literal["numpy", "tabular", "parquet"]
+Normalization = Literal["none", "l2"]
 DuplicatePolicy = Literal["max", "mean", "first", "last", "sum"]
 
 
@@ -144,6 +146,70 @@ class KnowledgeReading(BaseModel):
         return v
 
 
+class ModalityReading(BaseModel):
+    """Definition of the reading sub-configuration of one modality.
+
+    A modality arrives as a matrix of precomputed vectors, one row per item.
+    Nothing here extracts features: the encoders that produce them are outside
+    the scope of a recommendation framework, and every published dataset ships
+    the vectors already.
+
+    A dense matrix carries no identifiers of its own, so 'item_path' names the
+    file that says which item each row describes. It is required whenever the
+    features are read from a binary array, because a matrix silently offset
+    against the catalogue trains without complaint and scores nonsense.
+
+    Attributes:
+        local_path (Optional[str]): The path to the file of feature vectors.
+        item_path (Optional[str]): The path to the file naming the item of each
+            row, one per line. Required when 'file_format' is 'numpy'.
+        azure_blob_name (Optional[str]): The name of the Azure Blob holding the
+            feature vectors.
+        item_azure_blob_name (Optional[str]): The name of the Azure Blob holding
+            the row order.
+        file_format (Optional[ModalityFormat]): The file format of the features.
+            Defaults to 'numpy', which is how the published features are shipped.
+        sep (Optional[str]): The separator, for the tabular formats.
+        header (Optional[bool]): Whether the files carry a header row. Defaults
+            to False.
+        item_column_name (Optional[str]): The name of the item column, both of
+            the row-order file and of a tabular feature file, where it must come
+            first. Defaults to 'item_id'.
+        normalize (Optional[Normalization]): What to do to each row before the
+            models see it. Defaults to 'none', which is what the papers use.
+    """
+
+    local_path: Optional[str] = None
+    item_path: Optional[str] = None
+    azure_blob_name: Optional[str] = None
+    item_azure_blob_name: Optional[str] = None
+    file_format: Optional[ModalityFormat] = "numpy"
+    sep: Optional[str] = "\t"
+    header: Optional[bool] = False
+    item_column_name: Optional[str] = "item_id"
+    normalize: Optional[Normalization] = "none"
+
+    @model_validator(mode="after")
+    def check_row_order_is_named(self) -> "ModalityReading":
+        """Validate that a binary array is accompanied by its row order.
+
+        Returns:
+            ModalityReading: The validated configuration.
+
+        Raises:
+            ValueError: If the features are an array and no row order was given.
+        """
+        if self.file_format != "numpy":
+            return self
+
+        if self.item_path is None and self.item_azure_blob_name is None:
+            raise ValueError(
+                "A feature array carries no item identifiers, so 'item_path' "
+                "must name the file listing the item of each row."
+            )
+        return self
+
+
 class ClusteringInformationReading(BaseModel):
     """Definition of the clustering information reading sub-configuration.
 
@@ -236,6 +302,8 @@ class ReaderConfig(BaseModel):
         split (Optional[SplitReading]): The information of the split reading process.
         side (Optional[SideInformationReading]): The side information of the dataset.
         knowledge (Optional[KnowledgeReading]): The knowledge graph of the dataset.
+        multimodal (Optional[Dict[str, ModalityReading]]): The item features of the
+            dataset, one entry per modality, named by the user.
         clustering (Optional[ClusteringInformationReading]): The clustering information
             of the dataset.
         labels (Labels): The labels sub-configuration. Defaults to Labels default values.
@@ -261,6 +329,7 @@ class ReaderConfig(BaseModel):
     split: Optional[SplitReading] = Field(default_factory=SplitReading)
     side: Optional[SideInformationReading] = None
     knowledge: Optional[KnowledgeReading] = None
+    multimodal: Optional[Dict[str, ModalityReading]] = None
     clustering: Optional[ClusteringInformationReading] = None
     labels: Labels = Field(default_factory=Labels)
     dtypes: CustomDtype = Field(default_factory=CustomDtype)

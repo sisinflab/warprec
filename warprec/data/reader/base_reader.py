@@ -427,6 +427,35 @@ class Reader(ABC):
         return (train_data, fold_data if fold_data else None, test_data)
 
     @abstractmethod
+    def read_array(self, *args: Any, **kwargs: Any) -> np.ndarray:
+        """This method will read a dense array from the source."""
+
+    @staticmethod
+    def _process_array(array: np.ndarray) -> np.ndarray:
+        """Put a freshly read feature array into the shape the models expect.
+
+        Args:
+            array (np.ndarray): The array as it was stored.
+
+        Returns:
+            np.ndarray: The array, two-dimensional and float32.
+
+        Raises:
+            ValueError: If the array is not one row per item.
+        """
+        if array.ndim == 1:
+            # A single feature per item is still a matrix, one column wide.
+            array = array.reshape(-1, 1)
+
+        if array.ndim != 2:
+            raise ValueError(
+                "A feature file holds one vector per item, so it must be a "
+                f"two-dimensional array, got {array.ndim} dimensions."
+            )
+
+        return np.ascontiguousarray(array, dtype=np.float32)
+
+    @abstractmethod
     def read_parquet(self, *args: Any, **kwargs: Any) -> DataFrame[Any]:
         """This method will read the parquet data from the source."""
 

@@ -16,6 +16,7 @@ from narwhals.dataframe import DataFrame
 from warprec.data.entities import (
     Interactions,
     KnowledgeGraph,
+    MultiModalFeatures,
     Sessions,
     Transactions,
 )
@@ -41,6 +42,8 @@ class Dataset:
         side_data (Optional[FrameT]): The side information data.
         knowledge_data (Optional[FrameT]): The (head, relation, tail) facts.
         knowledge_links (Optional[FrameT]): The (item, entity) alignment.
+        multimodal_data (Optional[Dict[str, Any]]): Per modality, the matrix of
+            feature vectors, the item each row describes and what to normalise.
         user_cluster (Optional[FrameT]): The user cluster data.
         item_cluster (Optional[FrameT]): The item cluster data.
         batch_size (int): The batch size that will be used evaluation.
@@ -85,6 +88,8 @@ class Dataset:
         item_cluster (Optional[dict]): Item cluster information.
         knowledge (Optional[KnowledgeGraph]): The facts about the items, built
             only when a knowledge graph is configured.
+        multimodal (Optional[MultiModalFeatures]): The precomputed item features,
+            built only when at least one modality is configured.
 
     Raises:
         ValueError: If the evaluation_set is not supported.
@@ -98,6 +103,7 @@ class Dataset:
     user_cluster: Optional[dict] = None
     item_cluster: Optional[dict] = None
     knowledge: Optional[KnowledgeGraph] = None
+    multimodal: Optional[MultiModalFeatures] = None
 
     def __init__(
         self,
@@ -106,6 +112,7 @@ class Dataset:
         side_data: Optional[FrameT] = None,
         knowledge_data: Optional[FrameT] = None,
         knowledge_links: Optional[FrameT] = None,
+        multimodal_data: Optional[Dict[str, Any]] = None,
         user_cluster: Optional[FrameT] = None,
         item_cluster: Optional[FrameT] = None,
         batch_size: int = 1024,
@@ -269,6 +276,22 @@ class Dataset:
                 tail_label=labels.get("tail", "tail"),
                 item_label=labels.get("item", "item_id"),
                 entity_label=labels.get("entity", "entity_id"),
+            )
+
+        # The features are aligned against the catalogue, so they are built once
+        # the item mapping is settled, exactly as the knowledge graph is.
+        self.multimodal: Optional[MultiModalFeatures] = None
+        if multimodal_data:
+            self.multimodal = MultiModalFeatures(
+                {
+                    name: (payload["features"], payload["items"])
+                    for name, payload in multimodal_data.items()
+                },
+                self._imap,
+                normalize={
+                    name: payload.get("normalize", "none")
+                    for name, payload in multimodal_data.items()
+                },
             )
 
         # Process contextual data
@@ -1245,6 +1268,10 @@ class Dataset:
             entities, relations = self.knowledge.get_dims()
             base_info["n_entities"] = entities
             base_info["n_relations"] = relations
+
+        # Optionally add the modality widths if any features were provided
+        if self.multimodal is not None:
+            base_info["modality_dims"] = self.multimodal.dims()
 
         # Optionally add feature dimensions if present
         if self._feature_dims:
