@@ -53,6 +53,8 @@ The following keywords are available to configure the reader:
 
 - **knowledge**: A nested configuration block for loading a **knowledge graph** over the items.
 
+- **multimodal**: A nested configuration block for loading **precomputed item features**, one entry per modality.
+
 - **clustering**: A nested configuration block for loading **user or item clustering information**.
 
 - **labels**: A nested configuration block that maps custom dataset column names to WarpRec's internal schema.
@@ -129,6 +131,43 @@ Both files are required: the triples alone do not say which item any entity stan
 
 !!! important
     Configuring a knowledge-aware model without `reader.knowledge` terminates the experiment during configuration validation, in the same way a content-based model without `reader.side` does.
+
+## Multimodal Feature Reading
+
+WarpRec can ingest **precomputed item features** — a picture put through a convolutional network, a description put through a sentence encoder — which the multimodal models score from. Nothing here extracts features: WarpRec reads vectors that were produced elsewhere.
+
+The `multimodal` section is a **mapping of named modalities**, so a dataset may carry as many as it has, under whatever names you choose:
+
+```yaml
+reader:
+    multimodal:
+        visual:
+            local_path: data/baby/image_feat.npy
+            item_path: data/baby/item_list.tsv
+        textual:
+            local_path: data/baby/text_feat.npy
+            item_path: data/baby/item_list.tsv
+            normalize: l2
+```
+
+Each entry accepts:
+
+- **local_path**: Path to the file of feature vectors.
+- **item_path**: Path to the file naming the item each row describes, one per line. **Required** when `file_format` is `numpy`.
+- **azure_blob_name**: Name of the Azure Blob containing the feature vectors.
+- **item_azure_blob_name**: Name of the Azure Blob containing the row order.
+- **file_format**: `numpy`, `tabular` or `parquet`. Defaults to `numpy`.
+- **sep**: Column separator, for the tabular formats. Defaults to `'\t'`.
+- **header**: Whether the files carry a header row. Defaults to `False`.
+- **item_column_name**: The name of the item column. Defaults to `item_id`.
+- **normalize**: `none` or `l2`, applied to each row before the models see it. Defaults to `none`.
+
+!!! warning "Why `item_path` is required"
+
+    A dense array carries no identifiers of its own, so nothing in the file says which item any row belongs to. A matrix offset by even one row against the catalogue trains without complaint and scores nonsense, which is why the row order must be named rather than assumed. A `tabular` or `parquet` file carries the identifiers in its first column and needs no separate file.
+
+!!! important
+    Configuring a multimodal model without `reader.multimodal` terminates the experiment during configuration validation, as does asking a model for a modality this section does not define.
 
 ## Clustering Information Reading
 

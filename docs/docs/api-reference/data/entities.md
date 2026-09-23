@@ -10,6 +10,8 @@
 
 ::: warprec.data.entities.knowledge.KnowledgeGraph
 
+::: warprec.data.entities.multimodal.MultiModalFeatures
+
 ::: warprec.data.entities.sessions.Sessions
 
 ::: warprec.data.entities.train_structures.session_structures.SequentialDataset

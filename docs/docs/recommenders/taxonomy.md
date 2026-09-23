@@ -1,6 +1,6 @@
 # Models Taxonomy
 
-WarpRec ships with **70+ built-in algorithms** spanning 7 model families. All models can run locally or at cluster scale via Ray.
+WarpRec ships with **70+ built-in algorithms** spanning 8 model families. All models can run locally or at cluster scale via Ray.
 
 | Family | Model | Description |
 |---|---|---|
@@ -61,6 +61,8 @@ WarpRec ships with **70+ built-in algorithms** spanning 7 model families. All mo
 | | [xDeepFM](context.md#xdeepfm) | Compressed Interaction Network (CIN) for vector-wise explicit interactions. |
 | **Knowledge-Aware / Embedding** | [CKE](knowledge.md#cke) | Collaborative knowledge base embedding; a TransR entity factor beside a collaborative one. |
 | **Knowledge-Aware / Propagation** | [KGAT](knowledge.md#kgat) | Attentive propagation over a collaborative knowledge graph. |
+| **Multimodal / Embedding** | [VBPR](multimodal.md#vbpr) | BPR extended with a learned projection of the item features. |
+| **Multimodal / Graph** | [FREEDOM](multimodal.md#freedom) | A frozen item-item feature graph beside a denoised user-item graph. |
 | **Sequential / KNN** | [STAN](sequential.md#stan) | Sequence- and time-aware neighborhood model for session-based recommendation. |
 | **Sequential / CNN** | [Caser](sequential.md#caser) | Convolutional sequence embedding with horizontal and vertical filters. |
 | **Sequential / Markov** | [FOSSIL](sequential.md#fossil) | First-order Markov chain fused with factored item similarity. |

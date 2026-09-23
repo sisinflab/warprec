@@ -34,6 +34,18 @@ reader:
     file_format: [tabular, parquet]
     column_names: [head, relation, tail]
     link_column_names: [item_id, entity_id]
+  multimodal:
+    # One entry per modality; the names are yours to choose.
+    visual:
+      local_path: path/to/image_feat.npy
+      item_path: path/to/item_list.tsv
+      azure_blob_name: path/to/feature/blob.npy
+      item_azure_blob_name: path/to/item/blob.tsv
+      file_format: [numpy, tabular, parquet]
+      sep: '\t'
+      header: [True, False]
+      item_column_name: item_id
+      normalize: [none, l2]
   clustering:
     user_local_path: path/to/user_clustering.csv
     item_local_path: path/to/item_clustering.csv
