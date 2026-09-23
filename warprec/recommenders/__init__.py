@@ -17,6 +17,7 @@ from .base_recommender import (
 from .callbacks import _get_memory_usage, WarpRecLightningIntegrationCallback
 from .layers import MLP, CNN, FactorizationMachine
 from .losses import BPRLoss, EmbLoss, InfoNCELoss, MultiDAELoss, MultiVAELoss
+from . import knowledge_aware_recommender
 from .proxy import ProxyRecommender
 from .similarities import Similarity
 
@@ -45,6 +46,7 @@ __all__ = [
     "InfoNCELoss",
     "MultiDAELoss",
     "MultiVAELoss",
+    "knowledge_aware_recommender",
     "ProxyRecommender",
     "Similarity",
 ]

@@ -716,6 +716,7 @@ class Trainer:
                 ),
                 interactions=dataset.train_set,
                 transactions=dataset.train_transactions,
+                knowledge=dataset.knowledge,
                 sessions=dataset.train_session,
                 **dataset.get_stash(),
             )
@@ -724,6 +725,7 @@ class Trainer:
                 params=best_params,
                 interactions=dataset.train_set,
                 transactions=dataset.train_transactions,
+                knowledge=dataset.knowledge,
                 sessions=dataset.train_session,
                 info=dataset.info(),
                 **dataset.get_stash(),

@@ -416,6 +416,7 @@ def _build_model(
         params=setup,
         interactions=dataset.train_set,
         transactions=dataset.train_transactions,
+        knowledge=dataset.knowledge,
         sessions=dataset.train_session,
         seed=seed,
         info=dataset.info(),
