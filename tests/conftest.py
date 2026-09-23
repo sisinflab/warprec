@@ -260,6 +260,18 @@ BY_NAME: Dict[str, Any] = {
     # path a user gets by default.
     "modalities": None,
     "modality_weights": None,
+    "neighbour_size": 3,
+    "n_iter": 1,
+    "n_hop": 2,
+    "n_memory": 4,
+    "n_hops": 1,
+    "aggregator": "sum",
+    "independence": "cosine",
+    "lambda_coeff": 0.5,
+    "temperature": 0.2,
+    "cl_weight": 0.1,
+    "kg_weight": 0.01,
+    "ind_weight": 0.01,
 }
 DEFAULT_BY_TYPE = {"int": 2, "float": 0.1, "bool": True, "str": "cosine", "list": [8]}
 SKIP_FIELDS = {"meta", "optimization", "early_stopping"}
