@@ -19,6 +19,8 @@ from warprec.utils.logger import logger
 
 # Accepted field formats for model parameters
 LIST_INT_FIELD = Union[List[Union[str, List[int]]], List[List[int]], List[int]]
+LIST_STR_FIELD = Union[List[Union[str, List[str]]], List[List[str]], List[str]]
+LIST_FLOAT_FIELD = Union[List[Union[str, List[float]]], List[List[float]], List[float]]
 INT_FIELD = Union[List[Union[str, int]], int]
 FLOAT_FIELD = Union[List[Union[str, float]], float]
 STR_FIELD = Union[List[str], str]
@@ -486,6 +488,7 @@ class RecomModel(BaseModel, ABC):
         need_side_information (ClassVar[bool]): Wether or not the model needs side information.
         need_context (ClassVar[bool]): Wether or not the model needs contextual information.
         need_knowledge (ClassVar[bool]): Wether or not the model needs a knowledge graph.
+        need_multimodal (ClassVar[bool]): Wether or not the model needs item features.
         need_single_trial_validation (ClassVar[bool]): Wether or not the model needs to be
             validated during training.
     """
@@ -498,6 +501,7 @@ class RecomModel(BaseModel, ABC):
     need_side_information: ClassVar[bool] = False
     need_context: ClassVar[bool] = False
     need_knowledge: ClassVar[bool] = False
+    need_multimodal: ClassVar[bool] = False
     need_single_trial_validation: ClassVar[bool] = False
 
     @model_validator(mode="after")
@@ -548,6 +552,12 @@ class RecomModel(BaseModel, ABC):
             # that we do not need to handle/validate
             if field == "fold":
                 continue
+
+            # An optional parameter that was left unset has no search space to
+            # validate: the model reads its own default for it.
+            if value is None:
+                continue
+
             typing = field_to_type[field]
             if self.optimization.strategy == SearchAlgorithms.GRID:
                 updated_values[field] = self.validate_grid_search(field, value)
@@ -627,7 +637,8 @@ class RecomModel(BaseModel, ABC):
 
         # If the typing is simple, then we don't need further checks
         if (
-            typing in [STR_FIELD, BOOL_FIELD, LIST_INT_FIELD]
+            typing
+            in [STR_FIELD, BOOL_FIELD, LIST_INT_FIELD, LIST_STR_FIELD, LIST_FLOAT_FIELD]
             or value[0] == SearchSpace.CHOICE
         ):
             return value
@@ -704,7 +715,11 @@ class RecomModel(BaseModel, ABC):
                 f"Strategy {strat} is not valid for field {typing}. "
                 f"Choice strategy will be used instead. "
             )
-        if typing == LIST_INT_FIELD and strat not in [
+        if typing in (
+            LIST_INT_FIELD,
+            LIST_STR_FIELD,
+            LIST_FLOAT_FIELD,
+        ) and strat not in [
             SearchSpace.CHOICE,
         ]:
             value.pop(0)

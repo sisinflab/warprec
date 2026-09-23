@@ -1,6 +1,7 @@
 from typing import List, Dict, Tuple, Optional, Any
 from pathlib import Path
 
+import numpy as np
 import pandas as pd
 import joblib
 import narwhals as nw
@@ -51,6 +52,31 @@ class LocalReader(Reader):
             desired_cols=column_names,
             desired_dtypes=dtypes,
         )
+
+    def read_array(
+        self,
+        local_path: str,
+        *args: Any,
+        **kwargs: Any,
+    ) -> np.ndarray:
+        """Reads a dense array from a local .npy file.
+
+        Args:
+            local_path (str): The local file path to the array.
+            *args (Any): The additional arguments.
+            **kwargs (Any): The additional keyword arguments.
+
+        Returns:
+            np.ndarray: The array, two-dimensional and float32.
+
+        Raises:
+            FileNotFoundError: If the file does not exist.
+        """
+        path = Path(local_path)
+        if not path.exists():
+            raise FileNotFoundError(f"The feature file '{local_path}' does not exist.")
+
+        return self._process_array(np.load(path, allow_pickle=False))
 
     def read_parquet(
         self,

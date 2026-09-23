@@ -10,6 +10,7 @@ from warprec.data.splitting import Splitter
 from warprec.data.filtering import apply_filtering
 from warprec.recommenders.base_recommender import ContextRecommenderUtils
 from warprec.utils.config import (
+    ModalityReading,
     TrainConfiguration,
     DesignConfiguration,
     EvalConfiguration,
@@ -17,6 +18,84 @@ from warprec.utils.config import (
 from warprec.utils.callback import WarpRecCallback
 from warprec.utils.registry import model_registry
 from warprec.utils.logger import logger
+
+
+def _read_modality(
+    name: str,
+    modality: ModalityReading,
+    reader: Reader,
+    config: Union[TrainConfiguration, DesignConfiguration, EvalConfiguration],
+) -> Dict[str, Any]:
+    """Read one modality's features and the items its rows describe.
+
+    Args:
+        name (str): The name the modality was configured under.
+        modality (ModalityReading): That modality's reading configuration.
+        reader (Reader): The reader to read through.
+        config (Union[TrainConfiguration, DesignConfiguration, EvalConfiguration]):
+            The configuration, for the item dtype the interactions were read with.
+
+    Returns:
+        Dict[str, Any]: The feature matrix, the item of each of its rows and the
+            normalisation to apply.
+
+    Raises:
+        ValueError: If the file format is not one features can be read from.
+    """
+    item_label = modality.item_column_name
+    # The item column has to be read as the interactions read it, or the rows
+    # line up against nothing and every item silently loses its features.
+    item_dtypes = {item_label: config.reader.dtypes.item_id_type}
+
+    match modality.file_format:
+        case "numpy":
+            features = reader.read_array(
+                local_path=modality.local_path,
+                azure_blob_name=modality.azure_blob_name,
+            )
+            order = reader.read_tabular(
+                local_path=modality.item_path,
+                azure_blob_name=modality.item_azure_blob_name,
+                column_names=[item_label],
+                dtypes=item_dtypes,
+                sep=modality.sep,
+                header=modality.header,
+            )
+            items = order.select(item_label).to_numpy().flatten().tolist()
+        case "tabular" | "parquet":
+            frame = (
+                reader.read_tabular(
+                    local_path=modality.local_path,
+                    azure_blob_name=modality.azure_blob_name,
+                    dtypes=item_dtypes,
+                    sep=modality.sep,
+                    header=modality.header,
+                )
+                if modality.file_format == "tabular"
+                else reader.read_parquet(
+                    local_path=modality.local_path,
+                    azure_blob_name=modality.azure_blob_name,
+                )
+            )
+
+            # The item column comes first and everything after it is a feature,
+            # which is the layout the side information file uses too.
+            columns = list(frame.columns)
+            items = frame.select(columns[0]).to_numpy().flatten().tolist()
+            features = frame.select(columns[1:]).to_numpy().astype("float32")
+        case _:
+            raise ValueError(
+                f"The modality '{name}' is configured as "
+                f"'{modality.file_format}', which features cannot be read from."
+            )
+
+    logger.msg(f"Read the '{name}' modality: {features.shape[0]} vectors.")
+
+    return {
+        "features": features,
+        "items": items,
+        "normalize": modality.normalize,
+    }
 
 
 def initialize_datasets(
@@ -48,6 +127,7 @@ def initialize_datasets(
     side_data = None
     knowledge_data = None
     knowledge_links = None
+    multimodal_data: Optional[Dict[str, Any]] = None
     user_cluster = None
     item_cluster = None
 
@@ -215,6 +295,13 @@ def initialize_datasets(
             header=knowledge.header,
         )
 
+    # Multimodal feature reading
+    if config.reader.multimodal:
+        multimodal_data = {
+            name: _read_modality(name, modality, reader, config)
+            for name, modality in config.reader.multimodal.items()
+        }
+
     # Cluster information reading
     if config.reader.clustering:
 
@@ -324,6 +411,7 @@ def initialize_datasets(
     common_params: Dict[str, Any] = {
         "side_data": side_data,
         "knowledge_data": knowledge_data,
+        "multimodal_data": multimodal_data,
         "knowledge_links": knowledge_links,
         "knowledge_labels": (
             {

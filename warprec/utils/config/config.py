@@ -294,6 +294,15 @@ class TrainConfiguration(WarpRecConfiguration):
                     "and the item alignment. Check the configuration file."
                 )
 
+            if model_class.need_multimodal and not self.reader.multimodal:
+                raise ValueError(
+                    f"The model {model_name} scores from multimodal item features, but "
+                    "none have been provided. Configure 'reader.multimodal' with one "
+                    "entry per modality. Check the configuration file."
+                )
+
+            self._check_modalities_exist(model_name, model_data)
+
             # Check if there is at least one valid combination
             model_class.validate_all_combinations()
 
@@ -310,6 +319,43 @@ class TrainConfiguration(WarpRecConfiguration):
             parsed_models[model_name] = model_class.model_dump()
 
         return parsed_models
+
+    def _check_modalities_exist(self, model_name: str, model_data: dict) -> None:
+        """Validate that a model only asks for modalities the reader provides.
+
+        A misspelled modality would otherwise surface as an empty feature block
+        at training time, long after the run started.
+
+        Args:
+            model_name (str): The name of the model being validated.
+            model_data (dict): The raw parameters written for that model.
+
+        Raises:
+            ValueError: If the model names a modality that was not configured.
+        """
+        wanted = model_data.get("modalities")
+        if not wanted or not self.reader.multimodal:
+            return
+
+        # A single name may be written unwrapped, as any other parameter may.
+        if isinstance(wanted, str):
+            wanted = [wanted]
+
+        # The parameter is a search space, so it may hold several lists.
+        names = {
+            name
+            for entry in wanted
+            for name in (entry if isinstance(entry, list) else [entry])
+            if isinstance(name, str)
+        }
+
+        missing = sorted(names - set(self.reader.multimodal))
+        if missing:
+            raise ValueError(
+                f"The model {model_name} asks for the modalities {missing}, which "
+                f"'reader.multimodal' does not configure. The configured ones are "
+                f"{sorted(self.reader.multimodal)}. Check the configuration file."
+            )
 
     def get_storage_path(self) -> str:
         """Returns the storage path for the ray results.

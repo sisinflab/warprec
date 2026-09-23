@@ -435,6 +435,42 @@ def validate_layer_list(cls: Type[T], value: Any, field: str) -> list:
     return value
 
 
+def validate_value_list(cls: Type[T], value: Any, field: str) -> list:
+    """Validate a hyperparameter whose value is itself a list.
+
+    A modality list or a weight list is one value, not a set of alternatives, so
+    it is wrapped the way a layer list is before the search space sees it.
+
+    Args:
+        cls (Type[T]): Class type of original Pydantic BaseModel.
+        value (Any): A value or a list of values to be validated.
+        field (str): The name of the field to be validated.
+
+    Returns:
+        list: A list of validated values in the correct format.
+
+    Raises:
+        ValueError: If any of the values is an empty list.
+    """
+    if not isinstance(value, list):
+        value = [value]
+    if not isinstance(value[-1], list):
+        value = [value]
+
+    strat = value.pop(0) if isinstance(value[0], str) else None
+
+    for entry in value:
+        if not entry:
+            raise ValueError(
+                f"Values of {field} for {cls.__name__} model must name at least "
+                f"one entry. Values received as input: {value}"
+            )
+
+    if strat:
+        value.insert(0, strat)
+    return value
+
+
 def validate_bool_values(value: Any) -> list:
     """Validate a hyperparameter.
 
