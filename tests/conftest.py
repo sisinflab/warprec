@@ -110,10 +110,37 @@ def knowledge_frames() -> Tuple[pd.DataFrame, pd.DataFrame]:
 
 
 @pytest.fixture(scope="session")
+def multimodal_frames() -> Dict[str, Dict[str, Any]]:
+    """Two modalities of differing width over most of the catalogue.
+
+    One item is deliberately left out of each so that the padding path is
+    exercised by every model that reads features, and the two widths differ
+    because a model that assumed one width would pass an equal-width fixture.
+
+    Returns:
+        Dict[str, Dict[str, Any]]: The payload the dataset reads modalities from.
+    """
+    rng = np.random.default_rng(21)
+    return {
+        "visual": {
+            "features": rng.normal(size=(N_ITEMS - 1, 12)).astype("float32"),
+            "items": np.arange(N_ITEMS - 1),
+            "normalize": "none",
+        },
+        "textual": {
+            "features": rng.normal(size=(N_ITEMS - 2, 7)).astype("float32"),
+            "items": np.arange(N_ITEMS - 2),
+            "normalize": "l2",
+        },
+    }
+
+
+@pytest.fixture(scope="session")
 def dataset(
     interactions_frame: pd.DataFrame,
     side_frame: pd.DataFrame,
     knowledge_frames: Tuple[pd.DataFrame, pd.DataFrame],
+    multimodal_frames: Dict[str, Dict[str, Any]],
 ) -> Dataset:
     """A Dataset carrying everything the model families need at once.
 
@@ -126,6 +153,8 @@ def dataset(
         side_frame (pd.DataFrame): The generated item features.
         knowledge_frames (Tuple[pd.DataFrame, pd.DataFrame]): The triples and
             the item alignment.
+        multimodal_frames (Dict[str, Dict[str, Any]]): The item features, one
+            entry per modality.
 
     Returns:
         Dataset: The dataset under test.
@@ -147,6 +176,7 @@ def dataset(
         context_labels=CONTEXT_LABELS,
         knowledge_data=triples,
         knowledge_links=links,
+        multimodal_data=multimodal_frames,
         batch_size=64,
     )
 
@@ -223,6 +253,13 @@ BY_NAME: Dict[str, Any] = {
     "total_anneal_steps": 10,
     "anneal_step": 10,
     "learning_rate": 0.01,
+    "feature_size": 8,
+    "knn_k": 3,
+    "n_ui_layers": 1,
+    # Left unset so the models read every configured modality, which is the
+    # path a user gets by default.
+    "modalities": None,
+    "modality_weights": None,
 }
 DEFAULT_BY_TYPE = {"int": 2, "float": 0.1, "bool": True, "str": "cosine", "list": [8]}
 SKIP_FIELDS = {"meta", "optimization", "early_stopping"}

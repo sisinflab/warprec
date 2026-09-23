@@ -62,6 +62,8 @@ def test_checkpoint_restores_without_interactions(model_name: str, dataset: Data
         interactions=dataset.train_set,
         sessions=dataset.train_session,
         transactions=dataset.train_transactions,
+        knowledge=dataset.knowledge,
+        multimodal=dataset.multimodal,
     )
     model.eval()
 
@@ -99,6 +101,8 @@ def test_iterative_models_say_what_they_need(model_name: str, dataset: Dataset):
         interactions=dataset.train_set,
         sessions=dataset.train_session,
         transactions=dataset.train_transactions,
+        knowledge=dataset.knowledge,
+        multimodal=dataset.multimodal,
     )
     model_class = model_registry.get_class(model_name)
 
@@ -111,5 +115,7 @@ def test_iterative_models_say_what_they_need(model_name: str, dataset: Dataset):
         interactions=dataset.train_set,
         sessions=dataset.train_session,
         transactions=dataset.train_transactions,
+        knowledge=dataset.knowledge,
+        multimodal=dataset.multimodal,
     )
     assert isinstance(restored, model_class)
