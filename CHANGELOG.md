@@ -2,6 +2,30 @@
 
 <!-- version list -->
 
+## v1.10.0 (2026-09-23)
+
+### Documentation
+
+- Documented the knowledge-aware family and its configuration
+  ([`1d3546f`](https://github.com/sisinflab/warprec/commit/1d3546f644344a4811e0e6c1d1c8de6799db7589))
+
+### Features
+
+- Added a knowledge graph to the data layer
+  ([`8cf9521`](https://github.com/sisinflab/warprec/commit/8cf95215c23cc9b81ebe95a2bb0b8638cdf5db4c))
+
+- Added the CKE and KGAT knowledge-aware models
+  ([`0b3b2a5`](https://github.com/sisinflab/warprec/commit/0b3b2a5a203ccbdb6057295f1c04f1eebc9697dd))
+
+### Testing
+
+- The knowledge graph and its models are tested behaviourally
+  ([`33d6e14`](https://github.com/sisinflab/warprec/commit/33d6e1494aa4275f7669651e96e8850824f8580a))
+
+- The shared fixture carries a knowledge graph
+  ([`23ad1dc`](https://github.com/sisinflab/warprec/commit/23ad1dc52941a78df03c0e643d41b9eb79ecea74))
+
+
 ## v1.9.0 (2026-09-22)
 
 ### Bug Fixes
