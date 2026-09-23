@@ -14,6 +14,7 @@ from .reader_configuration import (
     SplitReading,
     SideInformationReading,
     ClusteringInformationReading,
+    KnowledgeReading,
 )
 from .rerank_configuration import RerankConfig
 from .run_configuration import WarpRecRunConfig
@@ -65,6 +66,7 @@ __all__ = [
     "SplitReading",
     "SideInformationReading",
     "ClusteringInformationReading",
+    "KnowledgeReading",
     "RerankConfig",
     "WarpRecRunConfig",
     "TrainingConfig",

@@ -134,6 +134,7 @@ def objective_function(config: dict) -> None:  # pylint: disable = too-many-loca
             params=params,
             interactions=dataset.train_set,
             transactions=dataset.train_transactions,
+            knowledge=dataset.knowledge,
             sessions=dataset.train_session,
             seed=seed,
             info=dataset.info(),

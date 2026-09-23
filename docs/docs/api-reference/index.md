@@ -18,6 +18,7 @@ This section contains the auto-generated API documentation for WarpRec's core co
 - [Content-Based](recommenders/content.md) -- Vector Space Model and content-based approaches.
 - [Hybrid](recommenders/hybrid.md) -- Hybrid autoencoder and KNN models.
 - [Context-Aware](recommenders/context.md) -- Factorization Machine variants and deep context models.
+- [Knowledge-Aware](recommenders/knowledge.md) -- Models scoring from a knowledge graph over the items.
 - [Sequential](recommenders/sequential.md) -- CNN, RNN, Markov, and Transformer-based sequential models.
 - [Unpersonalized](recommenders/unpersonalized.md) -- Popularity and Random baselines.
 - [Proxy](recommenders/proxy.md) -- Proxy Recommender for cross-framework evaluation.

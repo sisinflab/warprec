@@ -287,6 +287,13 @@ class TrainConfiguration(WarpRecConfiguration):
                     "but no context_labels have been configured. Check the configuration file."
                 )
 
+            if model_class.need_knowledge and self.reader.knowledge is None:
+                raise ValueError(
+                    f"The model {model_name} scores from a knowledge graph, but none "
+                    "has been provided. Configure 'reader.knowledge' with the triples "
+                    "and the item alignment. Check the configuration file."
+                )
+
             # Check if there is at least one valid combination
             model_class.validate_all_combinations()
 

@@ -54,6 +54,7 @@ def build_model(model_name: str, dataset: Dataset) -> Any:
         interactions=dataset.train_set,
         sessions=dataset.train_session,
         transactions=dataset.train_transactions,
+        knowledge=dataset.knowledge,
     )
 
 

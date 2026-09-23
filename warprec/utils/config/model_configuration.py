@@ -485,6 +485,7 @@ class RecomModel(BaseModel, ABC):
             will be used during training.
         need_side_information (ClassVar[bool]): Wether or not the model needs side information.
         need_context (ClassVar[bool]): Wether or not the model needs contextual information.
+        need_knowledge (ClassVar[bool]): Wether or not the model needs a knowledge graph.
         need_single_trial_validation (ClassVar[bool]): Wether or not the model needs to be
             validated during training.
     """
@@ -496,6 +497,7 @@ class RecomModel(BaseModel, ABC):
     early_stopping: Optional[EarlyStopping] = None
     need_side_information: ClassVar[bool] = False
     need_context: ClassVar[bool] = False
+    need_knowledge: ClassVar[bool] = False
     need_single_trial_validation: ClassVar[bool] = False
 
     @model_validator(mode="after")
