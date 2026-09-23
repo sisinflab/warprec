@@ -70,9 +70,6 @@ class FREEDOM(MultiModalRecommenderUtils, GraphRecommenderUtils, IterativeRecomm
         edge_users (Tensor): The user end of each training interaction.
         edge_items (Tensor): The item end of each training interaction.
         edge_weights (Tensor): How likely each interaction is to survive a drop.
-
-    Raises:
-        ValueError: If the modality weights do not match the modalities.
     """
 
     DATALOADER_TYPE = DataLoaderType.POS_NEG_LOADER
@@ -127,16 +124,6 @@ class FREEDOM(MultiModalRecommenderUtils, GraphRecommenderUtils, IterativeRecomm
         # rather than only the projection out of them, so each modality gets a
         # trainable copy. The frozen originals stay where they are: the item-item
         # graph is built from them once and must not move afterwards.
-        if self.modality_weights is not None and len(self.modality_weights) != len(
-            self.modality_names
-        ):
-            raise ValueError(
-                f"FREEDOM was given {len(self.modality_weights)} modality weights "
-                f"for {len(self.modality_names)} modalities "
-                f"({self.modality_names}). There must be one weight per modality, "
-                "in the same order."
-            )
-
         self.bpr_loss = BPRLoss()
         self.reg_loss = EmbLoss()
 
@@ -154,7 +141,10 @@ class FREEDOM(MultiModalRecommenderUtils, GraphRecommenderUtils, IterativeRecomm
         )
 
         self._build_interaction_graph(interactions)
-        self.register_buffer("item_item", self._build_item_graph())
+        self.register_buffer(
+            "item_item",
+            self.feature_neighbour_graph(self.knn_k, self.modality_weights),
+        )
 
         self._edge_generator = torch.Generator()
         self._edge_generator.manual_seed(seed)
@@ -185,78 +175,6 @@ class FREEDOM(MultiModalRecommenderUtils, GraphRecommenderUtils, IterativeRecomm
         item_degree = torch.bincount(columns, minlength=self.n_items + 1).float()
         weights = (user_degree[rows] * item_degree[columns]).pow(-0.5)
         self.register_buffer("edge_weights", torch.nan_to_num(weights, posinf=0.0))
-
-    @torch.no_grad()
-    def _build_item_graph(self) -> Tensor:
-        """Freeze one item-item graph out of the features.
-
-        Each modality votes for the neighbours of every item by cosine
-        similarity. Each modality's graph is normalised on its own and only then
-        weighted and summed, which is what makes the weights mean anything: a
-        graph normalised after the sum would divide the weights straight back
-        out again. The similarity is taken in blocks, because the full matrix is
-        quadratic in the catalogue and is never needed at once.
-
-        Returns:
-            Tensor: The sparse, normalised item-item adjacency.
-        """
-        weights = self.modality_weights or [1.0 / len(self.modality_names)] * len(
-            self.modality_names
-        )
-
-        side = self.n_items + 1
-        combined: Optional[Tensor] = None
-
-        for table, weight in zip(self.modality_tables(), weights):
-            # The padding row holds nothing, so it takes part in no similarity.
-            features = torch.nn.functional.normalize(table[: self.n_items], p=2, dim=1)
-            neighbours = self._nearest_neighbours(features)
-
-            rows = torch.arange(self.n_items).unsqueeze(1).expand(-1, self.knn_k)
-            indices = torch.stack([rows.flatten(), neighbours.flatten()])
-
-            one_graph = self._normalize_item_graph(indices, side) * weight
-            combined = one_graph if combined is None else combined + one_graph
-
-        return combined.coalesce()
-
-    def _nearest_neighbours(self, features: Tensor) -> Tensor:
-        """Which items each item is closest to.
-
-        Args:
-            features (Tensor): The row-normalised features of the catalogue.
-
-        Returns:
-            Tensor: The {item x knn_k} neighbour indices.
-        """
-        # A block of 2048 rows against the whole catalogue is a few hundred
-        # megabytes at most, whatever the catalogue size.
-        block = 2048
-        found = []
-        for start in range(0, features.size(0), block):
-            similarity = features[start : start + block] @ features.t()
-            found.append(torch.topk(similarity, self.knn_k, dim=-1).indices)
-
-        return torch.cat(found, dim=0)
-
-    @staticmethod
-    def _normalize_item_graph(indices: Tensor, side: int) -> Tensor:
-        """Normalise one modality's neighbour graph so a hop preserves scale.
-
-        Args:
-            indices (Tensor): The (row, column) pairs of the neighbour graph.
-            side (int): The side of the square matrix.
-
-        Returns:
-            Tensor: The normalised sparse adjacency.
-        """
-        ones = torch.ones(indices.size(1))
-        degree = torch.zeros(side).index_add_(0, indices[0], ones) + 1e-7
-
-        inverse = degree.pow(-0.5)
-        values = inverse[indices[0]] * inverse[indices[1]]
-
-        return torch.sparse_coo_tensor(indices, values, (side, side)).coalesce()
 
     def on_train_epoch_start(self) -> None:
         """Draw the interactions this epoch is allowed to see."""
