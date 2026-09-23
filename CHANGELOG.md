@@ -2,6 +2,35 @@
 
 <!-- version list -->
 
+## v1.11.0 (2026-09-23)
+
+### Bug Fixes
+
+- A model's name no longer changes with its buffers
+  ([`6cdf85a`](https://github.com/sisinflab/warprec/commit/6cdf85a99edd0937e051a89420e73f4b3f05f519))
+
+### Documentation
+
+- Documented the multimodal family and its configuration
+  ([`30b19d0`](https://github.com/sisinflab/warprec/commit/30b19d0f5f719b8c5aa8e3999a955f16bee28609))
+
+### Features
+
+- Added multimodal item features to the data layer
+  ([`449d122`](https://github.com/sisinflab/warprec/commit/449d1223f3b47957ccc124c0fb6f309de702ee52))
+
+- Added the VBPR and FREEDOM multimodal models
+  ([`b12321f`](https://github.com/sisinflab/warprec/commit/b12321fdd629dd030f70f1b42bec0d24473c19df))
+
+### Testing
+
+- The multimodal layer and its models are tested behaviourally
+  ([`68c96ca`](https://github.com/sisinflab/warprec/commit/68c96ca62f5a90068a23f57ac8a3f43743ede861))
+
+- The shared fixture carries multimodal features
+  ([`a8913bc`](https://github.com/sisinflab/warprec/commit/a8913bc5e94243b1f09504a6d60c34add363405e))
+
+
 ## v1.10.0 (2026-09-23)
 
 ### Documentation
