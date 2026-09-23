@@ -7,3 +7,9 @@ Auto-generated documentation for knowledge-aware recommender model classes.
 ::: warprec.recommenders.knowledge_aware_recommender.cke.CKE
 
 ::: warprec.recommenders.knowledge_aware_recommender.kgat.KGAT
+
+::: warprec.recommenders.knowledge_aware_recommender.kgcn.KGCN
+
+::: warprec.recommenders.knowledge_aware_recommender.kgin.KGIN
+
+::: warprec.recommenders.knowledge_aware_recommender.ripplenet.RippleNet

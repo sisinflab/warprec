@@ -33,7 +33,11 @@ Left unset, a model reads **all** of them, so adding a modality to the reader do
 | Category | Model | Description |
 |---|---|---|
 | Embedding-Based | [VBPR](#vbpr) | Bayesian Personalized Ranking extended with a learned projection of the item features. |
-| Graph-Based | [FREEDOM](#freedom) | A frozen item-item feature graph beside a denoised user-item graph. |
+| Graph-Based | [MMGCN](#mmgcn) | One bipartite graph per modality, propagated separately and averaged at the end. |
+| | [LATTICE](#lattice) | An item-item graph learned from the projected features. |
+| | [FREEDOM](#freedom) | A frozen item-item feature graph beside a denoised user-item graph. |
+| | [MGCN](#mgcn) | Features purified against behaviour, then split into shared and distinct parts. |
+| Self-Supervised | [BM3](#bm3) | Two views of the same representation pulled together, with no negative samples. |
 
 ## Embedding-Based
 
@@ -102,3 +106,114 @@ models:
 !!! note "Memory"
 
     The frozen graph is built from a similarity between every pair of items, which is quadratic in the catalogue. WarpRec takes that similarity in blocks and keeps only the `knn_k` nearest per item, so what is held is linear in the catalogue, but building it still costs one pass over the pairs.
+
+### MMGCN
+
+MMGCN (Multi-modal Graph Convolution Network): The first multimodal graph model, and its argument is that the modalities should not be mixed before propagation. Two people who like the same look are not the same two people who like the same description, so each modality gets a bipartite user-item graph of its own and is propagated on its own. A user carries a learned preference vector in each modality's space, and a shared identity embedding is folded in at every hop so the separate views stay anchored to one another. Only the final representations are averaged. **This model requires multimodal features to function properly.**
+
+For further details, please refer to the [paper](https://dl.acm.org/doi/10.1145/3343031.3351034).
+
+```yaml
+models:
+  MMGCN:
+    embedding_size: 64
+    feature_size: 64
+    n_layers: 2
+    reg_weight: 0.00001
+    batch_size: 2048
+    epochs: 200
+    learning_rate: 0.001
+```
+
+- **feature_size**: The width each modality is projected to before propagation.
+- **n_layers**: How many hops each modality graph runs. The reference implementation unrolls three by name; here the depth is a parameter and the reference is the `n_layers: 3` case of it.
+
+!!! note "Cost grows with the modalities"
+
+    Every modality has its own graph, its own preference table and its own per-hop weights, so both memory and time scale with how many modalities are configured. The later models on this page share one propagation instead.
+
+### LATTICE
+
+LATTICE: The structure between items is not given, it is learned. LATTICE keeps an item-item graph built by nearest neighbours over the **projected** features, and because the projection is trained the graph moves with it: the model discovers which items are alike rather than being told. The learned graph is mixed with one built from the raw features, so it has somewhere to start from and cannot wander off. **This model requires multimodal features to function properly.**
+
+[FREEDOM](#freedom) is the later argument that this learning is not worth its cost; both are here, and the difference between them is `lambda_coeff` and whether the graph is rebuilt.
+
+For further details, please refer to the [paper](https://arxiv.org/abs/2104.09036).
+
+```yaml
+models:
+  LATTICE:
+    embedding_size: 64
+    feature_size: 64
+    knn_k: 10
+    n_layers: 1
+    n_ui_layers: 2
+    lambda_coeff: 0.9
+    reg_weight: 0.00001
+    batch_size: 2048
+    epochs: 200
+    learning_rate: 0.001
+```
+
+- **knn_k**: How many neighbours each item keeps.
+- **lambda_coeff**: How much of the raw-feature graph is kept. At `1.0` the graph is entirely the frozen one and the learning is switched off; at `0.0` it is entirely learned.
+- **n_layers** / **n_ui_layers**: Hops over the item-item and the user-item graph.
+
+!!! warning "The learned graph is dense"
+
+    Rebuilding it means a full item-by-item similarity that carries a gradient, so unlike the frozen graphs on this page it cannot be kept sparse. Memory grows with the square of the catalogue, which is what FREEDOM's argument is about.
+
+!!! note "Scale does not move the graph"
+
+    The graph is a cosine similarity, so it depends on the direction of a projected feature and not on its magnitude. A projection whose weights grow during training does not, by itself, change which items are neighbours.
+
+### MGCN
+
+MGCN (Multi-View Graph Convolutional Network): A product photograph carries the product, and also a watermark, a background and a house style; most of what a raw feature vector holds is not what makes the item worth recommending. MGCN's answer is to **purify** each modality against behaviour first — the features are gated by the item's collaborative embedding, so what survives is the part of the content people actually responded to. What the modalities then say is split into the part they agree on and the part where they differ, and how much a user cares about each difference is itself gated by their behaviour. A contrastive term keeps the content view and the behaviour view from drifting apart. **This model requires multimodal features to function properly.**
+
+For further details, please refer to the [paper](https://arxiv.org/abs/2308.03588).
+
+```yaml
+models:
+  MGCN:
+    embedding_size: 64
+    knn_k: 10
+    n_layers: 1
+    n_ui_layers: 2
+    cl_weight: 0.001
+    temperature: 0.2
+    reg_weight: 0.00001
+    batch_size: 2048
+    epochs: 200
+    learning_rate: 0.001
+```
+
+- **knn_k**: How many neighbours each item keeps in the frozen feature graph.
+- **cl_weight**: The weight of the content-behaviour agreement.
+- **temperature**: The temperature of that agreement. Lower values make it sharper.
+
+### BM3
+
+BM3 (Bootstrap Multi-Modal): There are no negative samples anywhere in this model, which is its point. Sampling negatives is expensive and the items drawn are often not negative at all, merely unobserved. Instead BM3 makes two views of itself: an online view that is trained, and a target view that is the same representation with dropout applied and the gradient cut. Learning is pulling the online view towards the target by cosine agreement, in three places at once — user against item, each modality against the item, and each modality against its own dropped-out self. **This model requires multimodal features to function properly.**
+
+For further details, please refer to the [paper](https://arxiv.org/abs/2207.05969).
+
+```yaml
+models:
+  BM3:
+    embedding_size: 64
+    n_layers: 2
+    dropout: 0.5
+    cl_weight: 2.0
+    reg_weight: 0.1
+    batch_size: 2048
+    epochs: 200
+    learning_rate: 0.001
+```
+
+- **dropout**: What makes the target view differ from the online one. This is the model's only source of contrast, so it is not an optional regulariser here.
+- **cl_weight**: The weight of the per-modality agreement.
+
+!!! note "No negative sampling"
+
+    BM3 is the one model on this page that trains on positives alone, so `training.negative_sampling` has no effect on it. That also makes an epoch cheaper than for the other models at the same batch size.
