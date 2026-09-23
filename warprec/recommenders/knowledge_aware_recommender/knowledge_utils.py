@@ -4,6 +4,7 @@ import torch
 from torch import Tensor, nn
 
 from warprec.data.entities import KnowledgeGraph
+from warprec.utils.logger import logger
 
 
 class KnowledgeRecommenderUtils(nn.Module):
@@ -25,6 +26,7 @@ class KnowledgeRecommenderUtils(nn.Module):
     Attributes:
         n_entities (int): The number of entities, excluding the padding row.
         n_relations (int): The number of relations.
+        n_items (int): The number of items, from the recommender base class.
         item_entity (Tensor): The entity each item stands for, padding where none.
         triple_heads (Tensor): The head of each fact, in index space.
         triple_relations (Tensor): The relation of each fact, in index space.
@@ -36,6 +38,10 @@ class KnowledgeRecommenderUtils(nn.Module):
 
     n_entities: int
     n_relations: int
+
+    # Set by the recommender base class; declared here so that the coverage
+    # check below reads it as the integer it is.
+    n_items: int
 
     # Registered buffers, annotated so that they read as the tensors they are
     # rather than as the union a buffer is typed with.
@@ -69,6 +75,15 @@ class KnowledgeRecommenderUtils(nn.Module):
         aligned = knowledge.get_item_entities().clone()
         aligned[aligned < 0] = self.n_entities
         self.register_buffer("item_entity", aligned)
+
+        covered = int((knowledge.get_item_entities() >= 0).sum())
+        if covered < 0.5 * self.n_items:
+            logger.attention(
+                f"The knowledge graph covers {covered} of {self.n_items} items. "
+                "Models that read an item as its entity score the uncovered ones "
+                "as one and the same, so a graph this partial will hurt them. "
+                "Consider restricting the catalogue to the items it covers."
+            )
 
         heads, relations, tails = knowledge.get_triples()
         self.register_buffer("triple_heads", heads)
