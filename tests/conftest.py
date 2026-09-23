@@ -4,7 +4,7 @@ Every fixture here is generated in memory. The datasets live outside the
 repository, so a test that reads one would pass locally and fail in CI.
 """
 
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Tuple
 
 import numpy as np
 import pandas as pd
@@ -73,7 +73,48 @@ def side_frame() -> pd.DataFrame:
 
 
 @pytest.fixture(scope="session")
-def dataset(interactions_frame: pd.DataFrame, side_frame: pd.DataFrame) -> Dataset:
+def knowledge_frames() -> Tuple[pd.DataFrame, pd.DataFrame]:
+    """A small knowledge graph over the catalogue, and its alignment.
+
+    Every item is given an entity so that the knowledge-aware models have
+    something to read, and the graph reaches a second hop beyond the items so
+    that a propagating model has somewhere to propagate to.
+
+    Returns:
+        Tuple[pd.DataFrame, pd.DataFrame]: The triples and the alignment.
+    """
+    rng = np.random.default_rng(13)
+
+    # Entities 0..N_ITEMS-1 stand for the items; the rest are attributes only
+    # the graph knows about.
+    attributes = np.arange(N_ITEMS, N_ITEMS + 12)
+    heads, relations, tails = [], [], []
+    for item in range(N_ITEMS):
+        for tail in rng.choice(attributes, 2, replace=False):
+            heads.append(item)
+            relations.append(int(rng.integers(0, 3)))
+            tails.append(int(tail))
+
+    # A few facts between attributes, so the graph is not only one hop deep.
+    for _ in range(8):
+        pair = rng.choice(attributes, 2, replace=False)
+        heads.append(int(pair[0]))
+        relations.append(3)
+        tails.append(int(pair[1]))
+
+    triples = pd.DataFrame({"head": heads, "relation": relations, "tail": tails})
+    links = pd.DataFrame(
+        {"item_id": np.arange(N_ITEMS), "entity_id": np.arange(N_ITEMS)}
+    )
+    return triples, links
+
+
+@pytest.fixture(scope="session")
+def dataset(
+    interactions_frame: pd.DataFrame,
+    side_frame: pd.DataFrame,
+    knowledge_frames: Tuple[pd.DataFrame, pd.DataFrame],
+) -> Dataset:
     """A Dataset carrying everything the model families need at once.
 
     Contexts and side information are both present so that a single fixture
@@ -83,10 +124,13 @@ def dataset(interactions_frame: pd.DataFrame, side_frame: pd.DataFrame) -> Datas
     Args:
         interactions_frame (pd.DataFrame): The generated interactions.
         side_frame (pd.DataFrame): The generated item features.
+        knowledge_frames (Tuple[pd.DataFrame, pd.DataFrame]): The triples and
+            the item alignment.
 
     Returns:
         Dataset: The dataset under test.
     """
+    triples, links = knowledge_frames
     train = interactions_frame.groupby("user_id", group_keys=False).apply(
         lambda g: g.iloc[:-1]
     )
@@ -101,6 +145,8 @@ def dataset(interactions_frame: pd.DataFrame, side_frame: pd.DataFrame) -> Datas
         rating_label="rating",
         timestamp_label="timestamp",
         context_labels=CONTEXT_LABELS,
+        knowledge_data=triples,
+        knowledge_links=links,
         batch_size=64,
     )
 
