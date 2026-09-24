@@ -2,6 +2,50 @@
 
 <!-- version list -->
 
+## v1.13.0 (2026-09-24)
+
+### Bug Fixes
+
+- A model's optional hyperparameters can be left out
+  ([`b3ae21f`](https://github.com/sisinflab/warprec/commit/b3ae21f76c4e10a16abcb8248c738b1189416106))
+
+- The interaction dataloader draws from its own generator
+  ([`1c8f9ef`](https://github.com/sisinflab/warprec/commit/1c8f9ef6231d9ab3fa9826ec220c468365693462))
+
+### Continuous Integration
+
+- Coverage is enforced at a floor
+  ([`b490053`](https://github.com/sisinflab/warprec/commit/b4900531db27fb92c0ef6f01bee92ffafef8519c))
+
+### Documentation
+
+- Documented DiffRec
+  ([`17edc48`](https://github.com/sisinflab/warprec/commit/17edc48101ab789a119a55085462d5a215b9da85))
+
+### Features
+
+- Added the DiffRec diffusion model
+  ([`f005c25`](https://github.com/sisinflab/warprec/commit/f005c25bc764766319f31cdf348f341e12f4e8e8))
+
+### Performance Improvements
+
+- KGCN shares its walk over the graph across users
+  ([`6ef109e`](https://github.com/sisinflab/warprec/commit/6ef109e7b7adf7cb1ddacc33b00edaccae0d5fb5))
+
+### Refactoring
+
+- Interactions maps to index space through the shared helper
+  ([`3c89e3c`](https://github.com/sisinflab/warprec/commit/3c89e3ca42f45aefc700b85126ecea5b34d519a6))
+
+- Sessions works out its valid targets in one place
+  ([`d90d86d`](https://github.com/sisinflab/warprec/commit/d90d86dfab679e2d73ab095ca0e3d700a9679ac2))
+
+### Testing
+
+- DiffRec, the interaction loader and optional defaults
+  ([`0225d11`](https://github.com/sisinflab/warprec/commit/0225d112ee04f6fac32aaf26ba31eeb7cc521cea))
+
+
 ## v1.12.0 (2026-09-24)
 
 ### Bug Fixes
