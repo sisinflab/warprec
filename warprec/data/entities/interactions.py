@@ -351,6 +351,7 @@ class Interactions:
         include_user_id: bool = False,
         batch_size: int = 1024,
         shuffle: bool = True,
+        seed: int = 42,
         **kwargs: Any,
     ) -> DataLoader:
         """Create a PyTorch DataLoader that yields dense tensors of interaction batches.
@@ -363,6 +364,7 @@ class Interactions:
             include_user_id (bool): Whether to include user IDs in the output.
             batch_size (int): The batch size to be used for the DataLoader.
             shuffle (bool): Whether to shuffle the data when loading.
+            seed (int): The seed that makes an epoch's order reproducible.
             **kwargs (Any): The additional keyword arguments to pass the Dataloader.
 
         Returns:
@@ -375,8 +377,16 @@ class Interactions:
         lazy_dataset = InteractionDataset(
             sparse_matrix, include_user_id=include_user_id
         )
-        return DataLoader(
-            lazy_dataset, batch_size=batch_size, shuffle=shuffle, **kwargs
+        # This loader used to build its DataLoader directly, which left the
+        # shuffle order drawn from the global torch stream while every other
+        # loader in the data layer draws from a generator of its own. That made
+        # an epoch's batches depend on whatever else had consumed that stream.
+        return seeded_dataloader(
+            lazy_dataset,
+            batch_size=batch_size,
+            shuffle=shuffle,
+            seed=seed,
+            **kwargs,
         )
 
     def get_pointwise_dataloader(
