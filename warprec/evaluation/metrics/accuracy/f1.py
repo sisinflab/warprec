@@ -91,12 +91,20 @@ class F1(TopKMetric):
             self.metric_2, torch.zeros(self.num_users)
         )
 
-        # Compute the final F1 score
-        f1_score = (
-            (1 + self.beta**2)
-            * (score_1 * score_2)
-            / (self.beta**2 * score_1 + score_2)
-        ).nan_to_num(0)
+        # A user the evaluation set says nothing about scores NaN in both halves,
+        # and has to stay NaN here: every other metric leaves such a user out of
+        # the mean, and turning it into a zero instead would drag the reported
+        # F1 down by however many of them the split happens to contain.
+        evaluable = ~(torch.isnan(score_1) | torch.isnan(score_2))
+
+        denominator = self.beta**2 * score_1 + score_2
+        f1_score = (1 + self.beta**2) * (score_1 * score_2) / denominator
+
+        # An evaluable user that simply found nothing scores zero rather than
+        # the 0/0 the expression above gives it.
+        f1_score = torch.where(
+            evaluable & (denominator == 0), torch.zeros_like(f1_score), f1_score
+        )
         return {self.name: f1_score}
 
     @property
