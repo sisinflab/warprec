@@ -112,6 +112,9 @@ class KGCN(KnowledgeRecommenderUtils, IterativeRecommender):
     def _gather_hops(self, entity: Tensor) -> Tuple[List[Tensor], List[Tensor]]:
         """Walk out from the given entities, one hop at a time.
 
+        Nothing here depends on the user, so a catalogue is walked once however
+        many users are about to be scored against it.
+
         Args:
             entity (Tensor): The entity each row starts from.
 
@@ -123,65 +126,80 @@ class KGCN(KnowledgeRecommenderUtils, IterativeRecommender):
         relations = []
 
         for hop in range(self.n_iter):
-            index = entities[hop].flatten()
+            index = entities[hop].reshape(-1)
             entities.append(self.neighbour_entities[index].view(entity.size(0), -1))
             relations.append(self.neighbour_relations[index].view(entity.size(0), -1))
 
         return entities, relations
 
-    def _mix(self, neighbours: Tensor, relations: Tensor, user_e: Tensor) -> Tensor:
-        """Weigh a neighbourhood by what the user cares about.
-
-        Args:
-            neighbours (Tensor): The neighbour embeddings.
-            relations (Tensor): The embeddings of the relations they sit on.
-            user_e (Tensor): The user embeddings of the batch.
-
-        Returns:
-            Tensor: One vector per node, its neighbourhood summarised.
-        """
-        # The agreement between the user and a relation is what decides how much
-        # that edge carries, normalised across the neighbourhood.
-        scores = (user_e.view(-1, 1, 1, self.embedding_size) * relations).mean(dim=-1)
-        weights = torch.softmax(scores, dim=-1).unsqueeze(-1)
-
-        return (weights * neighbours).mean(dim=2)
-
     def _aggregate(
-        self, user_e: Tensor, entities: List[Tensor], relations: List[Tensor]
+        self,
+        user_e: Tensor,
+        entities: List[Tensor],
+        relations: List[Tensor],
+        paired: bool,
     ) -> Tensor:
         """Fold every hop back into one vector per item.
 
+        Only the attention depends on the user; the walk itself does not. When a
+        whole catalogue is being scored the walk is therefore gathered once and
+        broadcast across the users, which is what keeps ranking from repeating
+        the same gather for every one of them.
+
         Args:
-            user_e (Tensor): The user embeddings of the batch.
+            user_e (Tensor): The user embeddings, {user x embedding}.
             entities (List[Tensor]): The entities reached at each hop.
             relations (List[Tensor]): The relations they were reached by.
+            paired (bool): Whether each walk belongs to the user beside it,
+                rather than being shared across all of them.
 
         Returns:
-            Tensor: One embedding per item of the batch.
+            Tensor: The item embeddings, {user x item x embedding}.
         """
-        batch = user_e.size(0)
-        vectors = [self.entity_embedding(hop) for hop in entities]
-        relation_vectors = [self.relation_embedding(hop) for hop in relations]
+        width = self.embedding_size
+
+        # Two alignments, one contraction. Paired, each walk belongs to the user
+        # beside it, so the walk axis is the user axis and there is a single
+        # item. Blocked, one walk per item is shared by every user, so the user
+        # axis starts at one and broadcasts. Everything after this is the same.
+        axis = 1 if paired else 0
+        items = 1 if paired else entities[0].size(0)
+
+        vectors = [self.entity_embedding(hop).unsqueeze(axis) for hop in entities]
+        relation_vectors = [
+            self.relation_embedding(hop).unsqueeze(axis) for hop in relations
+        ]
 
         for step in range(self.n_iter):
             nearer = []
             for hop in range(self.n_iter - step):
-                shape = (batch, -1, self.neighbour_size, self.embedding_size)
-                summarised = self._mix(
-                    vectors[hop + 1].view(shape),
-                    relation_vectors[hop].view(shape),
-                    user_e,
+                neighbourhood = vectors[hop + 1].view(
+                    vectors[hop + 1].size(0), items, -1, self.neighbour_size, width
                 )
+                edges = relation_vectors[hop].view(
+                    relation_vectors[hop].size(0),
+                    items,
+                    -1,
+                    self.neighbour_size,
+                    width,
+                )
+
+                # The agreement between the user and a relation is what decides
+                # how much that edge carries, normalised across the neighbourhood.
+                scores = (user_e.view(-1, 1, 1, 1, width) * edges).mean(dim=-1)
+                weights = torch.softmax(scores, dim=-1).unsqueeze(-1)
+                summarised = (weights * neighbourhood).mean(dim=3)
 
                 if self.aggregator == "sum":
                     output = vectors[hop] + summarised
                 elif self.aggregator == "neighbour":
                     output = summarised
                 else:
-                    output = torch.cat([vectors[hop], summarised], dim=-1)
+                    output = torch.cat(
+                        [vectors[hop].expand_as(summarised), summarised], dim=-1
+                    )
 
-                output = self.transforms[step](output.view(batch, -1, output.size(-1)))
+                output = self.transforms[step](output)
 
                 # The last hop leaves the representation bounded, the earlier
                 # ones keep it rectified, which is the order the paper uses.
@@ -193,20 +211,33 @@ class KGCN(KnowledgeRecommenderUtils, IterativeRecommender):
 
             vectors = nearer
 
-        return vectors[0].view(batch, self.embedding_size)
+        return vectors[0].squeeze(2)
 
     def item_representation(self, user_e: Tensor, item: Tensor) -> Tensor:
-        """What an item is, read through one user's eyes.
+        """What each item is, read through each user's eyes.
+
+        Args:
+            user_e (Tensor): The user embeddings, {user x embedding}.
+            item (Tensor): The item indices to describe, one per column.
+
+        Returns:
+            Tensor: The item embeddings, {user x item x embedding}.
+        """
+        entities, relations = self._gather_hops(self.entity_of(item))
+        return self._aggregate(user_e, entities, relations, paired=False)
+
+    def _pair_representation(self, user_e: Tensor, item: Tensor) -> Tensor:
+        """What one item is, for the user sitting beside it.
 
         Args:
             user_e (Tensor): The user embeddings of the batch.
-            item (Tensor): The item indices.
+            item (Tensor): One item per user.
 
         Returns:
-            Tensor: One embedding per item.
+            Tensor: One embedding per pair.
         """
         entities, relations = self._gather_hops(self.entity_of(item))
-        return self._aggregate(user_e, entities, relations)
+        return self._aggregate(user_e, entities, relations, paired=True).squeeze(1)
 
     def get_dataloader(
         self,
@@ -223,8 +254,8 @@ class KGCN(KnowledgeRecommenderUtils, IterativeRecommender):
         user, positive, negative = batch
 
         user_e = self.user_embedding(user)
-        positive_e = self.item_representation(user_e, positive)
-        negative_e = self.item_representation(user_e, negative)
+        positive_e = self._pair_representation(user_e, positive)
+        negative_e = self._pair_representation(user_e, negative)
 
         loss = self.rec_loss(
             (user_e * positive_e).sum(dim=1), (user_e * negative_e).sum(dim=1)
@@ -244,7 +275,7 @@ class KGCN(KnowledgeRecommenderUtils, IterativeRecommender):
             Tensor: One score per pair.
         """
         user_e = self.user_embedding(user)
-        return (user_e * self.item_representation(user_e, item)).sum(dim=-1)
+        return (user_e * self._pair_representation(user_e, item)).sum(dim=-1)
 
     def predict(
         self,
@@ -277,11 +308,13 @@ class KGCN(KnowledgeRecommenderUtils, IterativeRecommender):
         else:
             items = item_indices
 
-        flat_users = (
-            user_e.unsqueeze(1)
-            .expand(-1, items.size(1), -1)
-            .reshape(-1, self.embedding_size)
-        )
-        scored = self.item_representation(flat_users, items.reshape(-1))
+        # The walk over the catalogue is shared between the users of the batch,
+        # so it is done once per block of items rather than once per pair.
+        block = 512
+        scores: List[Tensor] = []
+        for start in range(0, items.size(1), block):
+            chunk = items[0, start : start + block]
+            walked = self.item_representation(user_e, chunk)
+            scores.append(torch.einsum("be,bse->bs", user_e, walked))
 
-        return (flat_users * scored).sum(dim=-1).view(items.size(0), items.size(1))
+        return torch.cat(scores, dim=1)
