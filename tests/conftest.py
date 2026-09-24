@@ -272,6 +272,15 @@ BY_NAME: Dict[str, Any] = {
     "cl_weight": 0.1,
     "kg_weight": 0.01,
     "ind_weight": 0.01,
+    "steps": 4,
+    "time_size": 8,
+    "noise_min": 0.001,
+    "noise_max": 0.01,
+    # Start the reverse walk from the real history, and keep it deterministic:
+    # resampling noise at inference makes two identical runs disagree, which is
+    # the trap MultiVAE's posterior sampling was in 1.9.0.
+    "sampling_steps": 0,
+    "sampling_noise": False,
 }
 DEFAULT_BY_TYPE = {"int": 2, "float": 0.1, "bool": True, "str": "cosine", "list": [8]}
 SKIP_FIELDS = {"meta", "optimization", "early_stopping"}

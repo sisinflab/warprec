@@ -174,6 +174,31 @@ class Sessions:
             torch.tensor(lens, dtype=torch.long),
         )
 
+    def _require_valid_targets(self) -> None:
+        """Work out which positions can be predicted, and insist there are some.
+
+        A position can only be a target if something precedes it, so the first
+        interaction of every user is excluded. The result is worked out once and
+        kept, because both sequential loaders ask for the same thing.
+
+        Raises:
+            ValueError: If no position in the data has a predecessor.
+        """
+        if self._valid_sample_indices is None:
+            positions = np.arange(len(self._flat_items))
+            usable = np.ones(len(self._flat_items), dtype=bool)
+
+            # The first item of any user cannot be a target: it has no history.
+            starts = self._user_offsets[:-1]
+            usable[starts[starts < len(self._flat_items)]] = False
+
+            self._valid_sample_indices = positions[usable]
+
+        if len(self._valid_sample_indices) == 0:
+            raise ValueError(
+                "No valid sequences found (min 2 interactions per user needed)."
+            )
+
     def get_sequential_dataloader(
         self,
         max_seq_len: int,
@@ -186,23 +211,7 @@ class Sessions:
     ) -> DataLoader:
         """Standard SASRec/RNN style dataloader (History -> Next Item)."""
 
-        # Identify valid targets (items that have at least 1 predecessor)
-        if self._valid_sample_indices is None:
-            all_indices = np.arange(len(self._flat_items))
-            valid_mask = np.ones(len(self._flat_items), dtype=bool)
-
-            # The first item of any user cannot be a target (no history)
-            user_starts = self._user_offsets[:-1]
-            # Filter only starts that are within bounds (active users)
-            active_starts = user_starts[user_starts < len(self._flat_items)]
-
-            valid_mask[active_starts] = False
-            self._valid_sample_indices = all_indices[valid_mask]
-
-        if len(self._valid_sample_indices) == 0:
-            raise ValueError(
-                "No valid sequences found (min 2 interactions per user needed)."
-            )
+        self._require_valid_targets()
 
         dataset = SequentialDataset(
             flat_items=self._flat_items,
@@ -236,20 +245,7 @@ class Sessions:
     ) -> DataLoader:
         """Sequential dataloader that also samples a same-target positive sequence."""
 
-        if self._valid_sample_indices is None:
-            all_indices = np.arange(len(self._flat_items))
-            valid_mask = np.ones(len(self._flat_items), dtype=bool)
-
-            user_starts = self._user_offsets[:-1]
-            active_starts = user_starts[user_starts < len(self._flat_items)]
-
-            valid_mask[active_starts] = False
-            self._valid_sample_indices = all_indices[valid_mask]
-
-        if len(self._valid_sample_indices) == 0:
-            raise ValueError(
-                "No valid sequences found (min 2 interactions per user needed)."
-            )
+        self._require_valid_targets()
 
         dataset = SameTargetSequentialDataset(
             flat_items=self._flat_items,

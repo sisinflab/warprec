@@ -6,7 +6,7 @@ help:
 	@echo "  install-hooks	- Install the commit and push git hooks"
 	@echo "  lint       	- Run code linters"
 	@echo "  test       	- Run tests"
-	@echo "  coverage   	- Run tests and report coverage"
+	@echo "  coverage   	- Run tests and report coverage (fails under 75%)"
 
 # pylint and mypy run on push rather than on commit, so the push hook has to
 # be installed as well as the commit one.

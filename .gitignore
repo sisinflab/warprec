@@ -63,6 +63,8 @@ powermetrics_log.txt
 coverage.xml
 junit_result.xml
 .coverage
+# Parallel runs write one file per process beside the combined one.
+.coverage.*
 experiment*/
 
 # Datasets

@@ -116,6 +116,24 @@ commit_message = "chore(release): {version} [skip ci]"
 commit_author = "github-actions [bot] <github-actions[bot]@users.noreply.github.com>"
 
 
+[tool.coverage.report]
+# A ratchet, not a target: it sits just under where the suite actually is, so
+# it catches a drop without failing on the noise of a line or two. Raise it
+# when the suite genuinely moves up, never lower it to make a run pass.
+fail_under = 75
+show_missing = true
+exclude_also = [
+    "if TYPE_CHECKING:",
+    "raise NotImplementedError",
+    "@(abc\\.)?abstractmethod",
+]
+
+[tool.coverage.run]
+source = ["warprec"]
+# The serving layer needs a live process to exercise and is covered separately.
+omit = ["*/serving/*"]
+
+
 [tool.pytest.ini_options]
 # conftest.py holds helpers the suites share, so the test directory itself is
 # importable rather than relying on a package __init__.

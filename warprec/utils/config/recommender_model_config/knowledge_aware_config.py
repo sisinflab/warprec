@@ -184,7 +184,7 @@ class KGCN(RecomModel):
     embedding_size: INT_FIELD
     neighbour_size: INT_FIELD
     n_iter: INT_FIELD
-    aggregator: STR_FIELD = "sum"
+    aggregator: STR_FIELD = ["sum"]
     reg_weight: FLOAT_FIELD
     batch_size: INT_FIELD
     epochs: INT_FIELD
@@ -341,7 +341,7 @@ class KGIN(RecomModel):
     n_hops: INT_FIELD
     node_dropout: FLOAT_FIELD
     mess_dropout: FLOAT_FIELD
-    independence: STR_FIELD = "distance"
+    independence: STR_FIELD = ["distance"]
     ind_weight: FLOAT_FIELD
     reg_weight: FLOAT_FIELD
     batch_size: INT_FIELD

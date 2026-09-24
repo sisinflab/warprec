@@ -16,4 +16,4 @@ jobs:
         uses: ./.github/actions/setup-env
 
       - name: Run tests
-        run: poetry run pytest tests/ -q
+        run: poetry run pytest tests/ -q --cov=warprec --cov-report=term

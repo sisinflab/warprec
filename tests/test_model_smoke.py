@@ -20,7 +20,7 @@ from warprec.recommenders.base_recommender import (
 )
 from warprec.utils.registry import model_registry, params_registry
 
-from conftest import build_params
+from conftest import SKIP_FIELDS, build_params
 
 MODELS = sorted(
     name
@@ -155,3 +155,32 @@ def test_scoring_a_few_items_agrees_with_ranking_them_all(
         equal_nan=True,
         msg=f"{model_name}: the sampled path disagrees with the full ranking",
     )
+
+
+@pytest.mark.parametrize("model_name", MODELS)
+def test_optional_hyperparameters_can_be_left_out(model_name: str):
+    """A parameter with a default must be usable by omitting it.
+
+    A default never passes through the field validator, so it reaches the search
+    space in whatever shape it was written. One written as a bare string or bool
+    rather than as a list of candidates makes a minimal configuration fail with
+    a TypeError from inside the validator, which is nobody's idea of an
+    actionable error.
+    """
+    schema = params_registry.get_class(model_name)
+    optional = {
+        name
+        for name, field in schema.model_fields.items()
+        if name not in SKIP_FIELDS and not field.is_required()
+    }
+    if not optional:
+        pytest.skip(f"{model_name} has no optional hyperparameters")
+
+    required = {
+        name: value
+        for name, value in build_params(model_name).items()
+        if name not in optional
+    }
+
+    # Omitting every optional parameter has to leave a usable configuration.
+    params_registry.get(model_name, **required)

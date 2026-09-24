@@ -16,6 +16,7 @@ The **Collaborative-Filtering Recommenders** module of WarpRec is a collection o
 | | [MacridVAE](#macridvae) | Disentangled VAE modeling macro concepts for user intentions. |
 | | [MultiDAE](#multidae) | Denoising autoencoder optimized for implicit data. |
 | | [MultiVAE](#multivae) | Variational autoencoder modeling uncertainty in preferences. |
+| | [DiffRec](#diffrec) | Diffusion model that recommends by learning to repair a corrupted history. |
 | | [SANSA](#sansa) | Scalable autoencoder using sparse matrix approximations and LDLT decomposition. |
 | Graph Based | [DGCF](#dgcf) | Disentangles embeddings into latent factors using iterative routing. |
 | | [EGCF](#egcf) | Embedding-less graph model using contrastive learning. |
@@ -148,6 +149,45 @@ models:
     epochs: 200
     learning_rate: 0.001
 ```
+
+### DiffRec
+
+DiffRec: A generative model that learns to recommend by learning to **repair**. Noise is added to a user's interaction vector in small steps until it is close to formless, and a network is trained to undo one of those steps. Recommending is then running the repair: the user's real history is fed in, the network is asked what it should have been, and the items it puts back that were not there are the recommendation.
+
+The departure from the image diffusion this borrows from is that the corruption is kept deliberately mild. An interaction vector is not a photograph — destroying it entirely would destroy the personalisation along with the noise — so `noise_scale` is small and the schedule is shallow.
+
+For further details, please refer to the [paper](https://arxiv.org/abs/2304.04971).
+
+```yaml
+models:
+  DiffRec:
+    hidden_dims: [300]
+    time_size: 10
+    steps: 100
+    noise_scale: 0.0001
+    noise_min: 0.0005
+    noise_max: 0.005
+    sampling_steps: 0
+    sampling_noise: False
+    dropout: 0.5
+    normalize: False
+    batch_size: 400
+    epochs: 200
+    learning_rate: 0.0005
+```
+
+- **hidden_dims**: The widths of the denoiser's hidden layers. It is an autoencoder, so the decoder mirrors them.
+- **time_size**: The width of the sinusoidal description of the diffusion step, which is how the denoiser knows how much noise it is looking at.
+- **steps**: How many steps the corruption schedule runs for. The reverse walk always runs all of them.
+- **noise_scale**: How much noise a step adds. `0` degenerates the model into a plain denoising autoencoder over the untouched history.
+- **noise_min** / **noise_max**: The ends of the linear schedule, both scaled by `noise_scale`.
+- **sampling_steps**: How far into the schedule the history is placed before the reverse walk begins. `0` starts from the real history and is the usual setting. It cannot exceed `steps`.
+- **sampling_noise**: Whether to resample noise at each reverse step.
+- **normalize**: Whether to scale each history to unit length before the denoiser sees it.
+
+!!! warning "`sampling_noise` makes scoring stochastic"
+
+    With it enabled, two identical runs produce different recommendations, and a reported metric becomes a single draw rather than the model's output. Leave it off unless you specifically want to sample.
 
 ### MultiVAE
 

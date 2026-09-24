@@ -14,6 +14,8 @@ Auto-generated documentation for all collaborative filtering model classes.
 
 ::: warprec.recommenders.collaborative_filtering_recommender.autoencoder.multidae.MultiDAE
 
+::: warprec.recommenders.collaborative_filtering_recommender.autoencoder.diffrec.DiffRec
+
 ::: warprec.recommenders.collaborative_filtering_recommender.autoencoder.multivae.MultiVAE
 
 ::: warprec.recommenders.collaborative_filtering_recommender.autoencoder.sansa.SANSA
