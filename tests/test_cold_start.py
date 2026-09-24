@@ -7,6 +7,7 @@ exception but an empty evaluation set, so the assertions are about what survives
 
 from typing import Any, Set
 
+import narwhals as nw
 import numpy as np
 import pandas as pd
 import pytest
@@ -186,3 +187,47 @@ def test_an_unknown_candidate_set_is_refused(dataset: Dataset):
     """A misspelled candidate set must not silently rank the whole catalogue."""
     with pytest.raises(ValueError, match="not supported"):
         cold_item_candidates(dataset.train_set.get_sparse(), "lukewarm")
+
+
+def test_every_training_item_can_be_drawn_as_a_negative(interactions: pd.DataFrame):
+    """A cold-start split must not shrink the space negatives come from.
+
+    The samplers draw an index in [0, niid), so niid has to be the size of the
+    index space. Passing a *count* of the items the split happens to use instead
+    cuts the space at an arbitrary position: the right number of items is
+    excluded but the wrong ones, so genuine training items become undrawable
+    while the held-out cold items stay drawable.
+    """
+    splitter = Splitter()
+    train, _, evaluation = splitter.split_transaction(
+        nw.from_native(interactions, eager_only=True),
+        labels=ColumnLabels(
+            user_id="user_id", item_id="item_id", rating="rating", timestamp="timestamp"
+        ),
+        test=SplitSpec(strategy="item_cold_start", ratio=0.2),
+        validation=SplitSpec(strategy=None),
+    )
+
+    dataset = Dataset(
+        train_data=train.to_native(),
+        eval_data=evaluation.to_native(),
+        rating_type="implicit",
+        timestamp_label="timestamp",
+        cold_start="item",
+    )
+    entity = dataset.train_set
+
+    # The catalogue is deliberately wider than the training split here, which is
+    # the whole point of the protocol.
+    catalogue = dataset.info()["n_items"]
+    assert catalogue > len(set(np.asarray(entity.get_flat()[1]).tolist()))
+
+    drawn = set()
+    for _, _, negative in entity.get_contrastive_dataloader(
+        batch_size=512, seed=3, shuffle=False
+    ):
+        drawn.update(negative.numpy().tolist())
+
+    in_training = set(np.asarray(entity.get_flat()[1]).tolist())
+    assert not in_training - drawn, "a training item could never be a negative"
+    assert max(drawn) < catalogue
