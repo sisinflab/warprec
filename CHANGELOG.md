@@ -2,6 +2,40 @@
 
 <!-- version list -->
 
+## v1.12.0 (2026-09-24)
+
+### Bug Fixes
+
+- Warn when a knowledge graph covers little of the catalogue
+  ([`a6264bd`](https://github.com/sisinflab/warprec/commit/a6264bddb74925139f2341710a1ebf63be6f5cae))
+
+### Documentation
+
+- Documented the seven new knowledge and multimodal models
+  ([`45ff26f`](https://github.com/sisinflab/warprec/commit/45ff26fdd41f7e7be2ec54f0de65de512593cf5a))
+
+### Features
+
+- Added the KGCN, KGIN and RippleNet knowledge models
+  ([`b7ce3ed`](https://github.com/sisinflab/warprec/commit/b7ce3ed89fd3985beb6331f47ee6a2f293d3d4e4))
+
+- Added the MMGCN, LATTICE, MGCN and BM3 multimodal models
+  ([`2d99100`](https://github.com/sisinflab/warprec/commit/2d99100b0456e7f9e14297c5222ae2ef53546206))
+
+- The knowledge graph exposes entity neighbourhoods
+  ([`8b5d3a4`](https://github.com/sisinflab/warprec/commit/8b5d3a478da8f7f16f3e5123d3e2388e68328ef5))
+
+### Refactoring
+
+- The feature neighbour graph moved to the multimodal mixin
+  ([`4ad4c94`](https://github.com/sisinflab/warprec/commit/4ad4c9479e2ef70736419619412cb7d15c34dfde))
+
+### Testing
+
+- The new knowledge and multimodal models are tested behaviourally
+  ([`cf0cb8f`](https://github.com/sisinflab/warprec/commit/cf0cb8fa2428035c132f8d6e639d197f925fa96a))
+
+
 ## v1.11.0 (2026-09-23)
 
 ### Bug Fixes
