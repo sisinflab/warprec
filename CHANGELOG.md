@@ -2,6 +2,51 @@
 
 <!-- version list -->
 
+## v1.13.1 (2026-09-24)
+
+### Bug Fixes
+
+- F1 leaves out the users it cannot score
+  ([`3da4842`](https://github.com/sisinflab/warprec/commit/3da48423958d3d6a6314d79b78b675ad79697a2d))
+
+- GAUC asks for the block its update needs
+  ([`23154e4`](https://github.com/sisinflab/warprec/commit/23154e422a9d30dc6d4716b5222bcee255061b87))
+
+- Negative sampling draws from the whole catalogue
+  ([`857282a`](https://github.com/sisinflab/warprec/commit/857282a1afad29d10fc7899fa4aadfcb8457e1f5))
+
+- Sampled evaluation refuses an impossible request instead of hanging
+  ([`7901d35`](https://github.com/sisinflab/warprec/commit/7901d35d430299b69637f82df4f7c14d7782ff90))
+
+- SNIPS normalises over the candidates it was given
+  ([`7f3a2fb`](https://github.com/sisinflab/warprec/commit/7f3a2fbabc8b2f53ee8d08f8421a9a4774f9abb6))
+
+- The clustered and feature metrics no longer trip on the padding row
+  ([`0e96cd7`](https://github.com/sisinflab/warprec/commit/0e96cd75c28893a8a3ba934cc14840ea6944e5a8))
+
+### Continuous Integration
+
+- Raise the coverage floor to 76 percent
+  ([`89d2b07`](https://github.com/sisinflab/warprec/commit/89d2b07788953ad34969f646a0f57307d11cb961))
+
+- Raise the coverage floor to 80 percent
+  ([`af0a1fd`](https://github.com/sisinflab/warprec/commit/af0a1fd21a5194829bdbfef53f05dd892a2d9ba7))
+
+### Testing
+
+- A cold-start split keeps every training item drawable
+  ([`3bdba3b`](https://github.com/sisinflab/warprec/commit/3bdba3bb36e89119546269e439d357f9268f6ae1))
+
+- Metrics are pinned against hand-computed values and smoke-tested
+  ([`f6aa63f`](https://github.com/sisinflab/warprec/commit/f6aa63fdab3d562b886fd894e0bcd65785297a19))
+
+- The context array and the cloze collation are covered
+  ([`8982b43`](https://github.com/sisinflab/warprec/commit/8982b439a205f6a9459e6c672f2d64f520bc7166))
+
+- The tie-break test no longer assumes a platform's topk ordering
+  ([`26544f6`](https://github.com/sisinflab/warprec/commit/26544f64a18c20168b03452f866d54a82d0b554c))
+
+
 ## v1.13.0 (2026-09-24)
 
 ### Bug Fixes
