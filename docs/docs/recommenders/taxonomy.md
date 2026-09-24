@@ -1,6 +1,6 @@
 # Models Taxonomy
 
-WarpRec ships with **85 built-in algorithms** spanning 8 model families. All models can run locally or at cluster scale via Ray.
+WarpRec ships with **86 built-in algorithms** spanning 8 model families. All models can run locally or at cluster scale via Ray.
 
 | Family | Model | Description |
 |---|---|---|
@@ -11,6 +11,7 @@ WarpRec ships with **85 built-in algorithms** spanning 8 model families. All mod
 | **CF / Autoencoder** | [EASE](collaborative.md#ease) | Closed-form linear autoencoder via ridge regression for item similarity. |
 | | [ELSA](collaborative.md#elsa) | Scalable EASE approximation using sparse low-rank SGD decomposition. |
 | | [CDAE](collaborative.md#cdae) | Denoising autoencoder with user-specific latent vectors. |
+| | [DiffRec](collaborative.md#diffrec) | Diffusion model that recommends by repairing a corrupted interaction vector. |
 | | [MacridVAE](collaborative.md#macridvae) | Disentangled VAE modeling macro user intentions via concept routing. |
 | | [MultiDAE](collaborative.md#multidae) | Multinomial denoising autoencoder for implicit feedback. |
 | | [MultiVAE](collaborative.md#multivae) | Variational autoencoder with reparameterization for implicit feedback. |
