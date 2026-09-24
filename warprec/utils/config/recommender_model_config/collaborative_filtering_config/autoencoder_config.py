@@ -1,4 +1,6 @@
 # pylint: disable=duplicate-code
+from typing import Any
+
 from pydantic import field_validator
 from warprec.utils.config.model_configuration import (
     RecomModel,
@@ -459,3 +461,110 @@ class SANSA(RecomModel):
     def check_target_density(cls, v: list):
         """Validate target_density."""
         return validate_greater_equal_than_zero(cls, v, "target_density")
+
+
+@params_registry.register("DiffRec")
+class DiffRec(RecomModel):
+    """Definition of the model DiffRec.
+
+    Attributes:
+        hidden_dims (LIST_INT_FIELD): The widths of the denoiser's hidden layers.
+        time_size (INT_FIELD): The width of the diffusion step description.
+        steps (INT_FIELD): How many steps the forward corruption runs for.
+        noise_scale (FLOAT_FIELD): How much noise a step adds.
+        noise_min (FLOAT_FIELD): The smallest noise level of the schedule.
+        noise_max (FLOAT_FIELD): The largest noise level of the schedule.
+        sampling_steps (INT_FIELD): How far in to start when recommending.
+        sampling_noise (BOOL_FIELD): Whether to resample noise while repairing.
+        dropout (FLOAT_FIELD): The dropout applied to the input history.
+        normalize (BOOL_FIELD): Whether to scale each history to unit length.
+        batch_size (INT_FIELD): List of values for batch_size.
+        epochs (INT_FIELD): List of values for epochs.
+        learning_rate (FLOAT_FIELD): List of values for learning rate.
+    """
+
+    hidden_dims: LIST_INT_FIELD
+    time_size: INT_FIELD
+    steps: INT_FIELD
+    noise_scale: FLOAT_FIELD
+    noise_min: FLOAT_FIELD
+    noise_max: FLOAT_FIELD
+    sampling_steps: INT_FIELD
+    sampling_noise: BOOL_FIELD = [False]
+    dropout: FLOAT_FIELD
+    normalize: BOOL_FIELD = [False]
+    batch_size: INT_FIELD
+    epochs: INT_FIELD
+    learning_rate: FLOAT_FIELD
+
+    @field_validator("hidden_dims")
+    @classmethod
+    def check_hidden_dims(cls, v: list):
+        """Validate hidden_dims."""
+        return validate_layer_list(cls, v, "hidden_dims")
+
+    @field_validator("time_size")
+    @classmethod
+    def check_time_size(cls, v: list):
+        """Validate time_size."""
+        return validate_greater_than_zero(cls, v, "time_size")
+
+    @field_validator("steps")
+    @classmethod
+    def check_steps(cls, v: list):
+        """Validate steps."""
+        return validate_greater_than_zero(cls, v, "steps")
+
+    @field_validator("noise_scale")
+    @classmethod
+    def check_noise_scale(cls, v: list):
+        """Validate noise_scale."""
+        return validate_greater_equal_than_zero(cls, v, "noise_scale")
+
+    @field_validator("noise_min")
+    @classmethod
+    def check_noise_min(cls, v: list):
+        """Validate noise_min."""
+        return validate_greater_equal_than_zero(cls, v, "noise_min")
+
+    @field_validator("noise_max")
+    @classmethod
+    def check_noise_max(cls, v: list):
+        """Validate noise_max."""
+        return validate_greater_equal_than_zero(cls, v, "noise_max")
+
+    @field_validator("sampling_steps")
+    @classmethod
+    def check_sampling_steps(cls, v: list):
+        """Validate sampling_steps."""
+        return validate_greater_equal_than_zero(cls, v, "sampling_steps")
+
+    @field_validator("dropout")
+    @classmethod
+    def check_dropout(cls, v: list):
+        """Validate dropout."""
+        return validate_between_zero_and_one(cls, v, "dropout")
+
+    @field_validator("sampling_noise", "normalize")
+    @classmethod
+    def check_flags(cls, v: Any):
+        """Validate the boolean switches."""
+        return validate_bool_values(v)
+
+    @field_validator("batch_size")
+    @classmethod
+    def check_batch_size(cls, v: list):
+        """Validate batch_size."""
+        return validate_greater_than_zero(cls, v, "batch_size")
+
+    @field_validator("epochs")
+    @classmethod
+    def check_epochs(cls, v: list):
+        """Validate epochs."""
+        return validate_greater_than_zero(cls, v, "epochs")
+
+    @field_validator("learning_rate")
+    @classmethod
+    def check_learning_rate(cls, v: list):
+        """Validate learning_rate."""
+        return validate_greater_than_zero(cls, v, "learning_rate")
