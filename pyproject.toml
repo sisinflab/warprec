@@ -122,7 +122,7 @@ commit_author = "github-actions [bot] <github-actions[bot]@users.noreply.github.
 # when the suite genuinely moves up, never lower it to make a run pass.
 # The gap to 100 is almost entirely warprec/pipelines, which cannot run without
 # a Ray cluster; closing it means integration tests, not more unit tests.
-fail_under = 76
+fail_under = 80
 show_missing = true
 exclude_also = [
     "if TYPE_CHECKING:",
