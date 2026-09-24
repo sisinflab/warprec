@@ -70,7 +70,11 @@ class SRecall(UserAverageTopKMetric):
             )  # [batch, k, n_feats]
 
         else:
-            batch_features = self.feature_lookup.unsqueeze(0)  # [1, num_items, n_feats]
+            # The lookup carries one row past the catalogue, for the padding item
+            # every family indexes when a position holds nothing. The relevance
+            # mask below is over the catalogue alone, so the row is dropped here.
+            catalogue = self.feature_lookup[: target.size(1)]
+            batch_features = catalogue.unsqueeze(0)  # [1, num_items, n_feats]
             top_k_features = self.feature_lookup[top_k_indices]  # [batch, k, n_feats]
 
         # Denominator: Unique features in ALL Relevant items

@@ -1222,6 +1222,27 @@ class Dataset:
         """
         return self._feat_lookup
 
+    def get_feature_matrix(self) -> Optional[Tensor]:
+        """The item-by-feature matrix, as the diversity metrics read it.
+
+        This is a different representation from :meth:`get_features_lookup`, and
+        the difference matters. That one gives each attribute *column* an index
+        per distinct value, which is what a context-aware model embeds; every
+        item therefore holds a non-zero in every column. A metric asking "which
+        features does this item have" needs the content-model view instead,
+        where a zero genuinely means the item does not have that feature.
+
+        Returns:
+            Optional[Tensor]: The {(item + padding) x feature} matrix, or None
+                when no side information was provided.
+        """
+        if self._side_matrix is None:
+            return None
+
+        dense = torch.from_numpy(self._side_matrix.toarray()).float()
+        # One row past the catalogue, matching every other item-indexed lookup.
+        return torch.cat([dense, torch.zeros((1, dense.size(1)))], dim=0)
+
     def get_user_cluster(self) -> Tensor:
         """This method retrieves the lookup tensor for user clusters.
 

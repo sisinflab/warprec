@@ -74,7 +74,9 @@ class InversePropensityMetric(UserAverageTopKMetric):
         """
         return top_k_rel.float() / self.propensity[top_k_indices]
 
-    def weight_total(self, target: Tensor) -> Tensor:
+    def weight_total(
+        self, target: Tensor, item_indices: Optional[Tensor] = None
+    ) -> Tensor:
         """The sum of the weights of every relevant item a user has.
 
         This is the self-normalising constant: dividing by it rather than by the
@@ -82,11 +84,25 @@ class InversePropensityMetric(UserAverageTopKMetric):
 
         Args:
             target (Tensor): The relevance of every item, per user.
+            item_indices (Optional[Tensor]): The catalogue item each column of
+                the relevance stands for, when the evaluation is over a sampled
+                candidate list rather than the whole catalogue.
 
         Returns:
             Tensor: The summed weights, [batch_size].
         """
-        return ((target > 0).float() / self.propensity).sum(dim=1)
+        # Under sampling the relevance spans the candidates, not the catalogue,
+        # so the propensities have to be gathered for those same candidates.
+        if item_indices is None:
+            propensity = self.propensity
+        else:
+            # A short candidate list is padded with the row past the catalogue.
+            # Those positions carry no relevance, so which propensity they pick
+            # up does not matter, only that the gather stays in range.
+            propensity = self.propensity[
+                item_indices.clamp(max=self.propensity.numel() - 1)
+            ]
+        return ((target > 0).float() / propensity).sum(dim=1)
 
     def unpack_inputs(
         self, preds: Tensor, **kwargs: Any

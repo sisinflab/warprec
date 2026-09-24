@@ -33,7 +33,7 @@ def build_evaluator(
         train_set=train_sparse,
         additional_data=dataset.get_stash(),
         complex_metrics=evaluation.complex_metrics,
-        feature_lookup=dataset.get_features_lookup(),
+        feature_lookup=dataset.get_feature_matrix(),
         user_cluster=dataset.get_user_cluster(),
         item_cluster=dataset.get_item_cluster(),
         mask_seen=evaluation.mask_seen,

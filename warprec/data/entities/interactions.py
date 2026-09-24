@@ -441,7 +441,7 @@ class Interactions:
             item_ids=pos_items,
             sparse_matrix=self.get_sparse(),
             neg_samples=neg_samples,
-            niid=self._niid,
+            niid=self._og_niid,
             side_information=side_info_tensor,
             contexts=context_tensor,
             negative_sampling=self.negative_sampling,
@@ -481,7 +481,7 @@ class Interactions:
             user_ids=pos_users,
             item_ids=pos_items,
             sparse_matrix=self.get_sparse(),
-            niid=self._niid,
+            niid=self._og_niid,
             negative_sampling=self.negative_sampling,
             seed=seed,
         )

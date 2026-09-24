@@ -151,7 +151,18 @@ class SampledEvaluationDataset(TorchDataset):
             # Remove duplicates in candidates if necessary
             valid_negatives = np.unique(valid_negatives)
 
-            # If we don't have enough, fallback to a loop
+            # Every user must yield the same number of candidates, or the
+            # evaluator cannot line the batch up. A user with fewer unseen items
+            # than were asked for cannot, and the loop below would otherwise
+            # draw for them forever.
+            if self.num_items - n_seen < num_negatives:
+                raise ValueError(
+                    f"Sampled evaluation asks for {num_negatives} negatives per "
+                    f"user, but user {u} has only {self.num_items - n_seen} of "
+                    f"the {self.num_items} items left unseen. Lower "
+                    "'evaluation.num_negatives' or evaluate on the full catalogue."
+                )
+
             if len(valid_negatives) < num_negatives:
                 final_negs = list(valid_negatives)
                 while len(final_negs) < num_negatives:
@@ -267,7 +278,17 @@ class SampledContextualEvaluationDataset(TorchDataset):
             # Remove duplicates
             valid_negatives = np.unique(valid_negatives)
 
-            # If we don't have enough, fallback to a loop
+            # As above: a user without enough unseen items cannot supply the
+            # candidates, and drawing until they can would never return.
+            if self.num_items - len(np.unique(seen_items)) < self.num_negatives:
+                raise ValueError(
+                    f"Sampled evaluation asks for {self.num_negatives} negatives "
+                    f"per user, but user {u} has only "
+                    f"{self.num_items - len(np.unique(seen_items))} of the "
+                    f"{self.num_items} items left unseen. Lower "
+                    "'evaluation.num_negatives' or evaluate on the full catalogue."
+                )
+
             if len(valid_negatives) < self.num_negatives:
                 final_negs = list(valid_negatives)
                 while len(final_negs) < self.num_negatives:

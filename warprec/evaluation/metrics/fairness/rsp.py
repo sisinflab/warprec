@@ -73,7 +73,15 @@ class RSP(TopKMetric):
         cluster_train_counts = torch.zeros(
             self.n_item_clusters, dtype=torch.float, device=item_cluster.device
         )
-        cluster_train_counts.index_add_(0, item_cluster, item_interactions.float())
+        # The cluster lookup carries one row past the catalogue, for the padding
+        # item every family indexes when a position holds nothing. The training
+        # counts do not, so the lookup is trimmed to the catalogue before the two
+        # are put together.
+        cluster_train_counts.index_add_(
+            0,
+            item_cluster[: item_interactions.numel()],
+            item_interactions.float(),
+        )
         self.register_buffer("cluster_train_interaction_counts", cluster_train_counts)
 
         # Accumulators

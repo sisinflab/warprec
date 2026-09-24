@@ -21,6 +21,11 @@ class GAUC(UserAverageTopKMetric):
 
     _REQUIRED_COMPONENTS: Set[MetricBlock] = {
         MetricBlock.BINARY_RELEVANCE,
+        # The shared update divides by the per-user interaction counts, so this
+        # block is needed whether or not compute_scores reads it. Leaving it out
+        # worked only by accident, when some other metric in the same run asked
+        # for it; on its own the metric raised.
+        MetricBlock.VALID_USERS,
     }
 
     def __init__(

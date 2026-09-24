@@ -55,7 +55,7 @@ class SNIPSDCG(InversePropensityMetric):
             Tensor: The metric value per user.
         """
         hits = self.weighted_hits(top_k_rel, self.top_k_indices(preds, **kwargs))
-        total = self.weight_total(target)
+        total = self.weight_total(target, kwargs.get("item_indices"))
 
         return torch.where(
             total > 0,
