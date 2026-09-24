@@ -1,6 +1,6 @@
 # Models Taxonomy
 
-WarpRec ships with **70+ built-in algorithms** spanning 8 model families. All models can run locally or at cluster scale via Ray.
+WarpRec ships with **85 built-in algorithms** spanning 8 model families. All models can run locally or at cluster scale via Ray.
 
 | Family | Model | Description |
 |---|---|---|
@@ -61,8 +61,15 @@ WarpRec ships with **70+ built-in algorithms** spanning 8 model families. All mo
 | | [xDeepFM](context.md#xdeepfm) | Compressed Interaction Network (CIN) for vector-wise explicit interactions. |
 | **Knowledge-Aware / Embedding** | [CKE](knowledge.md#cke) | Collaborative knowledge base embedding; a TransR entity factor beside a collaborative one. |
 | **Knowledge-Aware / Propagation** | [KGAT](knowledge.md#kgat) | Attentive propagation over a collaborative knowledge graph. |
+| | [KGCN](knowledge.md#kgcn) | A sampled entity neighbourhood, weighted per user by relation. |
+| | [KGIN](knowledge.md#kgin) | Propagation split across learned, mutually independent user intents. |
+| **Knowledge-Aware / Memory** | [RippleNet](knowledge.md#ripplenet) | Preferences spread outward from a user's history across the graph. |
 | **Multimodal / Embedding** | [VBPR](multimodal.md#vbpr) | BPR extended with a learned projection of the item features. |
 | **Multimodal / Graph** | [FREEDOM](multimodal.md#freedom) | A frozen item-item feature graph beside a denoised user-item graph. |
+| | [LATTICE](multimodal.md#lattice) | An item-item graph learned from the projected features. |
+| | [MGCN](multimodal.md#mgcn) | Features purified against behaviour, then split into shared and distinct parts. |
+| | [MMGCN](multimodal.md#mmgcn) | One bipartite graph per modality, propagated separately and averaged. |
+| **Multimodal / Self-Supervised** | [BM3](multimodal.md#bm3) | Two bootstrapped views pulled together, with no negative sampling. |
 | **Sequential / KNN** | [STAN](sequential.md#stan) | Sequence- and time-aware neighborhood model for session-based recommendation. |
 | **Sequential / CNN** | [Caser](sequential.md#caser) | Convolutional sequence embedding with horizontal and vertical filters. |
 | **Sequential / Markov** | [FOSSIL](sequential.md#fossil) | First-order Markov chain fused with factored item similarity. |

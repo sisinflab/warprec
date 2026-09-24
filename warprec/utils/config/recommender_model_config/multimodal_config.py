@@ -187,3 +187,363 @@ class FREEDOM(RecomModel):
     def check_learning_rate(cls, v: list):
         """Validate learning_rate."""
         return validate_greater_than_zero(cls, v, "learning_rate")
+
+
+@params_registry.register("MMGCN")
+class MMGCN(RecomModel):
+    """Definition of the model MMGCN.
+
+    Attributes:
+        need_multimodal (ClassVar[bool]): The model scores from item features.
+        embedding_size (INT_FIELD): List of values for embedding_size.
+        feature_size (INT_FIELD): The width each modality is projected to.
+        n_layers (INT_FIELD): How many hops each modality graph runs.
+        modalities (Optional[LIST_STR_FIELD]): The modalities to read.
+        reg_weight (FLOAT_FIELD): List of values for reg_weight.
+        batch_size (INT_FIELD): List of values for batch_size.
+        epochs (INT_FIELD): List of values for epochs.
+        learning_rate (FLOAT_FIELD): List of values for learning rate.
+    """
+
+    need_multimodal: ClassVar[bool] = True
+
+    embedding_size: INT_FIELD
+    feature_size: INT_FIELD
+    n_layers: INT_FIELD
+    modalities: Optional[LIST_STR_FIELD] = None
+    reg_weight: FLOAT_FIELD
+    batch_size: INT_FIELD
+    epochs: INT_FIELD
+    learning_rate: FLOAT_FIELD
+
+    @field_validator("embedding_size")
+    @classmethod
+    def check_embedding_size(cls, v: list):
+        """Validate embedding_size."""
+        return validate_greater_than_zero(cls, v, "embedding_size")
+
+    @field_validator("feature_size")
+    @classmethod
+    def check_feature_size(cls, v: list):
+        """Validate feature_size."""
+        return validate_greater_than_zero(cls, v, "feature_size")
+
+    @field_validator("n_layers")
+    @classmethod
+    def check_n_layers(cls, v: list):
+        """Validate n_layers."""
+        return validate_greater_than_zero(cls, v, "n_layers")
+
+    @field_validator("reg_weight")
+    @classmethod
+    def check_reg_weight(cls, v: list):
+        """Validate reg_weight."""
+        return validate_greater_equal_than_zero(cls, v, "reg_weight")
+
+    @field_validator("batch_size")
+    @classmethod
+    def check_batch_size(cls, v: list):
+        """Validate batch_size."""
+        return validate_greater_than_zero(cls, v, "batch_size")
+
+    @field_validator("epochs")
+    @classmethod
+    def check_epochs(cls, v: list):
+        """Validate epochs."""
+        return validate_greater_than_zero(cls, v, "epochs")
+
+    @field_validator("learning_rate")
+    @classmethod
+    def check_learning_rate(cls, v: list):
+        """Validate learning_rate."""
+        return validate_greater_than_zero(cls, v, "learning_rate")
+
+    @field_validator("modalities")
+    @classmethod
+    def check_modalities(cls, v: Optional[list]):
+        """Validate modalities."""
+        return v if v is None else validate_value_list(cls, v, "modalities")
+
+
+@params_registry.register("LATTICE")
+class LATTICE(RecomModel):
+    """Definition of the model LATTICE.
+
+    Attributes:
+        need_multimodal (ClassVar[bool]): The model scores from item features.
+        embedding_size (INT_FIELD): List of values for embedding_size.
+        feature_size (INT_FIELD): The width the features are projected to.
+        knn_k (INT_FIELD): How many neighbours each item keeps.
+        n_layers (INT_FIELD): How many hops over the item-item graph.
+        n_ui_layers (INT_FIELD): How many hops over the user-item graph.
+        lambda_coeff (FLOAT_FIELD): How much of the raw-feature graph is kept.
+        modalities (Optional[LIST_STR_FIELD]): The modalities to read.
+        reg_weight (FLOAT_FIELD): List of values for reg_weight.
+        batch_size (INT_FIELD): List of values for batch_size.
+        epochs (INT_FIELD): List of values for epochs.
+        learning_rate (FLOAT_FIELD): List of values for learning rate.
+    """
+
+    need_multimodal: ClassVar[bool] = True
+
+    embedding_size: INT_FIELD
+    feature_size: INT_FIELD
+    knn_k: INT_FIELD
+    n_layers: INT_FIELD
+    n_ui_layers: INT_FIELD
+    lambda_coeff: FLOAT_FIELD
+    modalities: Optional[LIST_STR_FIELD] = None
+    reg_weight: FLOAT_FIELD
+    batch_size: INT_FIELD
+    epochs: INT_FIELD
+    learning_rate: FLOAT_FIELD
+
+    @field_validator("embedding_size")
+    @classmethod
+    def check_embedding_size(cls, v: list):
+        """Validate embedding_size."""
+        return validate_greater_than_zero(cls, v, "embedding_size")
+
+    @field_validator("feature_size")
+    @classmethod
+    def check_feature_size(cls, v: list):
+        """Validate feature_size."""
+        return validate_greater_than_zero(cls, v, "feature_size")
+
+    @field_validator("knn_k")
+    @classmethod
+    def check_knn_k(cls, v: list):
+        """Validate knn_k."""
+        return validate_greater_than_zero(cls, v, "knn_k")
+
+    @field_validator("n_layers")
+    @classmethod
+    def check_n_layers(cls, v: list):
+        """Validate n_layers."""
+        return validate_greater_equal_than_zero(cls, v, "n_layers")
+
+    @field_validator("n_ui_layers")
+    @classmethod
+    def check_n_ui_layers(cls, v: list):
+        """Validate n_ui_layers."""
+        return validate_greater_equal_than_zero(cls, v, "n_ui_layers")
+
+    @field_validator("lambda_coeff")
+    @classmethod
+    def check_lambda_coeff(cls, v: list):
+        """Validate lambda_coeff."""
+        return validate_between_zero_and_one(cls, v, "lambda_coeff")
+
+    @field_validator("reg_weight")
+    @classmethod
+    def check_reg_weight(cls, v: list):
+        """Validate reg_weight."""
+        return validate_greater_equal_than_zero(cls, v, "reg_weight")
+
+    @field_validator("batch_size")
+    @classmethod
+    def check_batch_size(cls, v: list):
+        """Validate batch_size."""
+        return validate_greater_than_zero(cls, v, "batch_size")
+
+    @field_validator("epochs")
+    @classmethod
+    def check_epochs(cls, v: list):
+        """Validate epochs."""
+        return validate_greater_than_zero(cls, v, "epochs")
+
+    @field_validator("learning_rate")
+    @classmethod
+    def check_learning_rate(cls, v: list):
+        """Validate learning_rate."""
+        return validate_greater_than_zero(cls, v, "learning_rate")
+
+    @field_validator("modalities")
+    @classmethod
+    def check_modalities(cls, v: Optional[list]):
+        """Validate modalities."""
+        return v if v is None else validate_value_list(cls, v, "modalities")
+
+
+@params_registry.register("BM3")
+class BM3(RecomModel):
+    """Definition of the model BM3.
+
+    Attributes:
+        need_multimodal (ClassVar[bool]): The model scores from item features.
+        embedding_size (INT_FIELD): List of values for embedding_size.
+        n_layers (INT_FIELD): How many hops over the user-item graph.
+        dropout (FLOAT_FIELD): The dropout that makes the target view differ.
+        modalities (Optional[LIST_STR_FIELD]): The modalities to read.
+        cl_weight (FLOAT_FIELD): The weight of the per-modality agreement.
+        reg_weight (FLOAT_FIELD): List of values for reg_weight.
+        batch_size (INT_FIELD): List of values for batch_size.
+        epochs (INT_FIELD): List of values for epochs.
+        learning_rate (FLOAT_FIELD): List of values for learning rate.
+    """
+
+    need_multimodal: ClassVar[bool] = True
+
+    embedding_size: INT_FIELD
+    n_layers: INT_FIELD
+    dropout: FLOAT_FIELD
+    modalities: Optional[LIST_STR_FIELD] = None
+    cl_weight: FLOAT_FIELD
+    reg_weight: FLOAT_FIELD
+    batch_size: INT_FIELD
+    epochs: INT_FIELD
+    learning_rate: FLOAT_FIELD
+
+    @field_validator("embedding_size")
+    @classmethod
+    def check_embedding_size(cls, v: list):
+        """Validate embedding_size."""
+        return validate_greater_than_zero(cls, v, "embedding_size")
+
+    @field_validator("n_layers")
+    @classmethod
+    def check_n_layers(cls, v: list):
+        """Validate n_layers."""
+        return validate_greater_equal_than_zero(cls, v, "n_layers")
+
+    @field_validator("dropout")
+    @classmethod
+    def check_dropout(cls, v: list):
+        """Validate dropout."""
+        return validate_between_zero_and_one(cls, v, "dropout")
+
+    @field_validator("cl_weight")
+    @classmethod
+    def check_cl_weight(cls, v: list):
+        """Validate cl_weight."""
+        return validate_greater_equal_than_zero(cls, v, "cl_weight")
+
+    @field_validator("reg_weight")
+    @classmethod
+    def check_reg_weight(cls, v: list):
+        """Validate reg_weight."""
+        return validate_greater_equal_than_zero(cls, v, "reg_weight")
+
+    @field_validator("batch_size")
+    @classmethod
+    def check_batch_size(cls, v: list):
+        """Validate batch_size."""
+        return validate_greater_than_zero(cls, v, "batch_size")
+
+    @field_validator("epochs")
+    @classmethod
+    def check_epochs(cls, v: list):
+        """Validate epochs."""
+        return validate_greater_than_zero(cls, v, "epochs")
+
+    @field_validator("learning_rate")
+    @classmethod
+    def check_learning_rate(cls, v: list):
+        """Validate learning_rate."""
+        return validate_greater_than_zero(cls, v, "learning_rate")
+
+    @field_validator("modalities")
+    @classmethod
+    def check_modalities(cls, v: Optional[list]):
+        """Validate modalities."""
+        return v if v is None else validate_value_list(cls, v, "modalities")
+
+
+@params_registry.register("MGCN")
+class MGCN(RecomModel):
+    """Definition of the model MGCN.
+
+    Attributes:
+        need_multimodal (ClassVar[bool]): The model scores from item features.
+        embedding_size (INT_FIELD): List of values for embedding_size.
+        knn_k (INT_FIELD): How many neighbours each item keeps.
+        n_layers (INT_FIELD): How many hops over the item-item graph.
+        n_ui_layers (INT_FIELD): How many hops over the user-item graph.
+        modalities (Optional[LIST_STR_FIELD]): The modalities to read.
+        cl_weight (FLOAT_FIELD): The weight of the content-behaviour agreement.
+        temperature (FLOAT_FIELD): The temperature of that agreement.
+        reg_weight (FLOAT_FIELD): List of values for reg_weight.
+        batch_size (INT_FIELD): List of values for batch_size.
+        epochs (INT_FIELD): List of values for epochs.
+        learning_rate (FLOAT_FIELD): List of values for learning rate.
+    """
+
+    need_multimodal: ClassVar[bool] = True
+
+    embedding_size: INT_FIELD
+    knn_k: INT_FIELD
+    n_layers: INT_FIELD
+    n_ui_layers: INT_FIELD
+    modalities: Optional[LIST_STR_FIELD] = None
+    cl_weight: FLOAT_FIELD
+    temperature: FLOAT_FIELD
+    reg_weight: FLOAT_FIELD
+    batch_size: INT_FIELD
+    epochs: INT_FIELD
+    learning_rate: FLOAT_FIELD
+
+    @field_validator("embedding_size")
+    @classmethod
+    def check_embedding_size(cls, v: list):
+        """Validate embedding_size."""
+        return validate_greater_than_zero(cls, v, "embedding_size")
+
+    @field_validator("knn_k")
+    @classmethod
+    def check_knn_k(cls, v: list):
+        """Validate knn_k."""
+        return validate_greater_than_zero(cls, v, "knn_k")
+
+    @field_validator("n_layers")
+    @classmethod
+    def check_n_layers(cls, v: list):
+        """Validate n_layers."""
+        return validate_greater_equal_than_zero(cls, v, "n_layers")
+
+    @field_validator("n_ui_layers")
+    @classmethod
+    def check_n_ui_layers(cls, v: list):
+        """Validate n_ui_layers."""
+        return validate_greater_equal_than_zero(cls, v, "n_ui_layers")
+
+    @field_validator("cl_weight")
+    @classmethod
+    def check_cl_weight(cls, v: list):
+        """Validate cl_weight."""
+        return validate_greater_equal_than_zero(cls, v, "cl_weight")
+
+    @field_validator("temperature")
+    @classmethod
+    def check_temperature(cls, v: list):
+        """Validate temperature."""
+        return validate_greater_than_zero(cls, v, "temperature")
+
+    @field_validator("reg_weight")
+    @classmethod
+    def check_reg_weight(cls, v: list):
+        """Validate reg_weight."""
+        return validate_greater_equal_than_zero(cls, v, "reg_weight")
+
+    @field_validator("batch_size")
+    @classmethod
+    def check_batch_size(cls, v: list):
+        """Validate batch_size."""
+        return validate_greater_than_zero(cls, v, "batch_size")
+
+    @field_validator("epochs")
+    @classmethod
+    def check_epochs(cls, v: list):
+        """Validate epochs."""
+        return validate_greater_than_zero(cls, v, "epochs")
+
+    @field_validator("learning_rate")
+    @classmethod
+    def check_learning_rate(cls, v: list):
+        """Validate learning_rate."""
+        return validate_greater_than_zero(cls, v, "learning_rate")
+
+    @field_validator("modalities")
+    @classmethod
+    def check_modalities(cls, v: Optional[list]):
+        """Validate modalities."""
+        return v if v is None else validate_value_list(cls, v, "modalities")

@@ -70,6 +70,7 @@ class KnowledgeGraph:
         self._tails = self._to_index(raw_tails, self._entity_index)
 
         self._item_entity = self._align(links, item_mapping, item_label, entity_label)
+        self._neighbour_index: Optional[Tuple[Tensor, Tensor, Tensor]] = None
 
         aligned = int((self._item_entity >= 0).sum())
         logger.stat_msg(
@@ -166,6 +167,83 @@ class KnowledgeGraph:
             Tensor: One entity index per item index, -1 where the item has none.
         """
         return self._item_entity
+
+    def neighbour_index(self) -> Tuple[Tensor, Tensor, Tensor]:
+        """The graph as adjacency lists, read in both directions.
+
+        A fact is a statement about both of its ends, so an entity's
+        neighbourhood holds the tails it points at and the heads that point at
+        it. The lists are returned in the compressed form a CSR matrix uses: the
+        neighbours of entity ``e`` are the slice ``offsets[e]:offsets[e + 1]``.
+
+        The result is built once and kept, because every model that walks the
+        graph walks the same lists.
+
+        Returns:
+            Tuple[Tensor, Tensor, Tensor]: The offsets, the neighbour entities
+                and the relation each neighbour was reached by.
+        """
+        if self._neighbour_index is None:
+            heads = torch.cat([self._heads, self._tails])
+            tails = torch.cat([self._tails, self._heads])
+            relations = torch.cat([self._relations, self._relations])
+
+            order = torch.argsort(heads, stable=True)
+            counts = torch.bincount(heads, minlength=self.n_entities)
+
+            offsets = torch.zeros(self.n_entities + 1, dtype=torch.long)
+            offsets[1:] = torch.cumsum(counts, dim=0)
+
+            self._neighbour_index = (offsets, tails[order], relations[order])
+
+        return self._neighbour_index
+
+    def sample_neighbours(
+        self, how_many: int, generator: torch.Generator
+    ) -> Tuple[Tensor, Tensor]:
+        """Draw a fixed-size neighbourhood for every entity.
+
+        A graph has neighbourhoods of wildly differing size and a model that
+        gathers over them wants a rectangle, so each entity is given exactly
+        ``how_many`` neighbours: sampled without replacement where it has enough
+        and with replacement where it does not. An entity no fact mentions is
+        made its own neighbour, which is what keeps a gather over it defined
+        without a branch.
+
+        Args:
+            how_many (int): How many neighbours to draw per entity.
+            generator (torch.Generator): The stream to draw from.
+
+        Returns:
+            Tuple[Tensor, Tensor]: The {entity x how_many} neighbour entities and
+                the relation each was reached by.
+        """
+        offsets, neighbours, relations = self.neighbour_index()
+
+        counts = offsets[1:] - offsets[:-1]
+        # An isolated entity stands in for its own neighbourhood, so the draw
+        # below is over one candidate rather than over none.
+        safe_counts = counts.clamp(min=1)
+
+        draw = torch.rand((self.n_entities, how_many), generator=generator)
+        picked = (
+            (draw * safe_counts.unsqueeze(1))
+            .long()
+            .clamp(max=(safe_counts - 1).unsqueeze(1))
+        )
+        positions = offsets[:-1].unsqueeze(1) + picked
+
+        # Where an entity has no neighbour at all the position above points at
+        # whatever follows it, so those rows are replaced wholesale.
+        isolated = (counts == 0).unsqueeze(1)
+        self_entity = torch.arange(self.n_entities).unsqueeze(1).expand(-1, how_many)
+
+        sampled_entities = torch.where(isolated, self_entity, neighbours[positions])
+        sampled_relations = torch.where(
+            isolated, torch.zeros_like(self_entity), relations[positions]
+        )
+
+        return sampled_entities, sampled_relations
 
     def adjacency(
         self,

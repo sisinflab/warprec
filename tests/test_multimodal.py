@@ -362,3 +362,131 @@ def test_the_dataset_publishes_the_widths_the_models_size_themselves_from(
         name: payload["features"].shape[1]
         for name, payload in multimodal_frames.items()
     }
+
+
+@pytest.mark.parametrize("model_name", ["MMGCN", "LATTICE", "BM3", "MGCN"])
+def test_every_multimodal_model_refuses_a_dataset_without_features(
+    model_name: str, dataset: Dataset
+):
+    """Scoring from features that are not there would quietly become collaborative."""
+    with pytest.raises(ValueError, match="multimodal item features"):
+        model_registry.get(
+            model_name,
+            params=build_params(model_name),
+            info=dataset.info(),
+            interactions=dataset.train_set,
+            sessions=dataset.train_session,
+            transactions=dataset.train_transactions,
+            multimodal=None,
+        )
+
+
+def test_mmgcn_keeps_one_graph_per_modality(dataset: Dataset):
+    """Not mixing the modalities before propagation is MMGCN's whole argument."""
+    model = build("MMGCN", dataset)
+
+    assert len(model.graphs) == len(dataset.multimodal)
+
+    # Each modality carries its own user preference, so two modalities cannot be
+    # collapsed into one set of parameters.
+    preferences = [graph.preference for graph in model.graphs]
+    assert not torch.allclose(preferences[0], preferences[1])
+    assert all(p.requires_grad for p in preferences)
+
+
+def test_lattice_relearns_its_item_graph_while_freedom_does_not(dataset: Dataset):
+    """The learned graph is what separates the two models.
+
+    LATTICE builds the item-item graph from the projected features, so moving
+    the projection has to move the graph. FREEDOM freezes it, so nothing should.
+    """
+    generator = torch.Generator().manual_seed(4)
+
+    lattice = build("LATTICE", dataset, lambda_coeff=0.0)
+    lattice.train()
+    before = lattice._learn_item_graph().clone()
+
+    # The graph is a cosine similarity, so it is blind to the scale of the
+    # projection; only turning the projection changes which items are near.
+    with torch.no_grad():
+        for projection in lattice.projections:
+            projection.weight.copy_(
+                torch.rand(projection.weight.shape, generator=generator)
+            )
+
+    assert not torch.allclose(before, lattice._learn_item_graph())
+
+    freedom = build("FREEDOM", dataset)
+    frozen = freedom.item_item.values().clone()
+    with torch.no_grad():
+        for projection in freedom.projections:
+            projection.weight.copy_(
+                torch.rand(projection.weight.shape, generator=generator)
+            )
+
+    assert torch.equal(frozen, freedom.item_item.values())
+
+
+def test_lattice_anchors_the_learned_graph_to_the_raw_features(dataset: Dataset):
+    """Without an anchor the learned structure has nowhere to start from."""
+    model = build("LATTICE", dataset)
+
+    assert model.frozen_item_graph.is_sparse
+    # The mixing weight decides how much of the anchor survives, so it has to be
+    # something the model can actually vary.
+    assert 0.0 <= model.lambda_coeff <= 1.0
+
+
+def test_bm3_needs_no_negative_samples(dataset: Dataset):
+    """Not sampling negatives is BM3's whole argument."""
+    from warprec.utils.enums import DataLoaderType
+
+    model = build("BM3", dataset)
+    assert model.DATALOADER_TYPE is DataLoaderType.POS_DATALOADER
+
+    # A training step takes a (user, item) pair and nothing else.
+    users = torch.arange(4)
+    items = torch.arange(4)
+    model.train()
+    loss = model.training_step((users, items), 0)
+
+    assert torch.isfinite(loss)
+    assert loss.requires_grad
+
+
+def test_mgcn_purifies_the_features_against_behaviour(dataset: Dataset):
+    """The gate is the purification; an open gate would leave the content raw."""
+    model = build("MGCN", dataset)
+
+    views = model._modality_views()
+    assert len(views) == len(dataset.multimodal)
+
+    # The gate is a sigmoid, so it can only ever keep part of what came in.
+    projected = model.projections[0](model.refined[0].weight)
+    gate = model.purifiers[0](projected)
+    assert float(gate.min()) >= 0.0 and float(gate.max()) <= 1.0
+
+    # And what it produces depends on the collaborative embedding, not only on
+    # the content: moving the item embedding must move the purified view.
+    before = views[0].clone()
+    with torch.no_grad():
+        model.item_embedding.weight.mul_(3.0)
+    assert not torch.allclose(before, model._modality_views()[0])
+
+
+def test_the_learned_graph_is_blind_to_the_scale_of_the_projection(dataset: Dataset):
+    """It is a cosine similarity, so only the direction of a feature matters.
+
+    Worth pinning down: a reader looking at the training curve might otherwise
+    read a growing projection as a moving graph, and it is not.
+    """
+    model = build("LATTICE", dataset)
+    model.train()
+    before = model._learn_item_graph().clone()
+
+    with torch.no_grad():
+        for projection in model.projections:
+            projection.weight.mul_(7.0)
+            projection.bias.mul_(7.0)
+
+    assert torch.allclose(before, model._learn_item_graph(), atol=1e-5)
