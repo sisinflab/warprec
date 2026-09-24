@@ -87,28 +87,41 @@ def test_ties_are_broken_by_chance_rather_than_by_item_id():
     """`torch.topk` settles equal scores by position, which is not neutral.
 
     A model that scores a whole population alike would otherwise always return
-    its lowest-numbered items, which reads as a systematic preference the model
-    does not have.
+    the same items, which reads as a systematic preference the model does not
+    have. Asserting that one seed differs from the deterministic answer would
+    be a coin toss, so the property is checked across seeds instead: over a
+    spread of them the selection has to actually move.
     """
     # Every item scores the same, so the entire ranking is a tie.
     predictions = torch.zeros((1, 8))
 
+    selections = {
+        tuple(
+            top_k_breaking_ties(
+                predictions.clone(), 3, torch.Generator().manual_seed(seed)
+            )[1][0].tolist()
+        )
+        for seed in range(12)
+    }
+
+    assert len(selections) > 1, "the tie was settled the same way every time"
+    # And more than three of the eight items were reachable across the seeds,
+    # so it is not merely permuting one fixed prefix.
+    assert len({item for selection in selections for item in selection}) > 3
+
+
+def test_the_tie_break_is_reproducible_for_a_given_seed():
+    """Chance is not the same as irreproducibility: a run must repeat exactly."""
+    predictions = torch.zeros((1, 8))
+
     first = top_k_breaking_ties(
-        predictions.clone(), 3, torch.Generator().manual_seed(1)
+        predictions.clone(), 3, torch.Generator().manual_seed(4)
     )[1]
     again = top_k_breaking_ties(
-        predictions.clone(), 3, torch.Generator().manual_seed(1)
-    )[1]
-    other = top_k_breaking_ties(
-        predictions.clone(), 3, torch.Generator().manual_seed(2)
+        predictions.clone(), 3, torch.Generator().manual_seed(4)
     )[1]
 
-    # The same seed gives the same answer, a different one does not.
     assert torch.equal(first, again)
-    assert not torch.equal(first, other)
-
-    # And neither is the deterministic prefix that topk would have returned.
-    assert not torch.equal(first, torch.tensor([[0, 1, 2]]))
 
 
 def test_an_unambiguous_ranking_is_left_exactly_as_it_is():
@@ -125,10 +138,20 @@ def test_an_unambiguous_ranking_is_left_exactly_as_it_is():
 
 
 def test_without_a_generator_the_ordering_is_the_deterministic_one():
-    """The fallback has to match `torch.topk` exactly, ties included."""
+    """The fallback has to match `torch.topk` exactly, ties included.
+
+    Which items `torch.topk` returns for a tie is a property of the kernel, not
+    a promise of the API, and it differs between platforms. The contract here is
+    only that the fallback defers to it, so that is what is asserted rather than
+    any particular ordering.
+    """
     predictions = torch.zeros((1, 6))
 
     values, indices = top_k_breaking_ties(predictions, 3)
+    expected = torch.topk(predictions, 3, dim=1)
 
-    assert torch.equal(indices, torch.tensor([[0, 1, 2]]))
-    assert torch.equal(values, torch.zeros((1, 3)))
+    assert torch.equal(indices, expected.indices)
+    assert torch.equal(values, expected.values)
+
+    # And it is stable: without a generator there is nothing to vary.
+    assert torch.equal(indices, top_k_breaking_ties(predictions, 3)[1])
