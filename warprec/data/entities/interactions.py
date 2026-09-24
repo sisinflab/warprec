@@ -15,7 +15,12 @@ from warprec.data.entities.train_structures import (
     ContrastiveDataset,
     PositiveDataset,
 )
-from warprec.data.entities.common import seeded_dataloader
+from warprec.data.entities.common import (
+    ITEM_INDEX,
+    USER_INDEX,
+    map_to_index_space,
+    seeded_dataloader,
+)
 from warprec.data.schema import ColumnLabels, ContextSpec, SideData, SignalOptions
 from warprec.utils.enums import RatingType
 
@@ -240,31 +245,18 @@ class Interactions:
                 self._flat_timestamps,
             )
 
-        umap_df = nw.from_dict(
-            {
-                self.user_label: list(self._umap.keys()),
-                "__uidx__": list(self._umap.values()),
-            },
-            native_namespace=nw.get_native_namespace(self._inter_df),
-        )
+        # Sorted so that the arrays are in a reproducible order and line up
+        # with one another however the frame arrived.
+        mapped_df = map_to_index_space(
+            self._inter_df,
+            self.user_label,
+            self.item_label,
+            self._umap,
+            self._imap,
+        ).sort([USER_INDEX, ITEM_INDEX])
 
-        imap_df = nw.from_dict(
-            {
-                self.item_label: list(self._imap.keys()),
-                "__iidx__": list(self._imap.values()),
-            },
-            native_namespace=nw.get_native_namespace(self._inter_df),
-        )
-
-        # Join and sort to ensure reproducibility and alignment
-        mapped_df = self._inter_df.join(umap_df, on=self.user_label, how="inner").join(
-            imap_df, on=self.item_label, how="inner"
-        )
-        mapped_df = mapped_df.sort(["__uidx__", "__iidx__"])
-
-        # Extract arrays
-        self._flat_users = mapped_df.select("__uidx__").to_numpy().flatten()
-        self._flat_items = mapped_df.select("__iidx__").to_numpy().flatten()
+        self._flat_users = mapped_df.select(USER_INDEX).to_numpy().flatten()
+        self._flat_items = mapped_df.select(ITEM_INDEX).to_numpy().flatten()
 
         if self.rating_type == RatingType.EXPLICIT:
             self._flat_ratings = (
@@ -313,33 +305,17 @@ class Interactions:
         if rating_df.select(nw.len()).item() == 0:
             return coo_matrix((self._og_nuid, self._og_niid))
 
-        umap_df = nw.from_dict(
-            {
-                self.user_label: list(self._umap.keys()),
-                "__uidx__": list(self._umap.values()),
-            },
-            native_namespace=nw.get_native_namespace(rating_df),
-        )
-
-        imap_df = nw.from_dict(
-            {
-                self.item_label: list(self._imap.keys()),
-                "__iidx__": list(self._imap.values()),
-            },
-            native_namespace=nw.get_native_namespace(rating_df),
-        )
-
-        # Join to map
-        mapped_df = rating_df.join(umap_df, on=self.user_label, how="inner").join(
-            imap_df, on=self.item_label, how="inner"
-        )
-
         # Sort to ensure reproducibility
-        mapped_df = mapped_df.sort(["__uidx__", "__iidx__"])
+        mapped_df = map_to_index_space(
+            rating_df,
+            self.user_label,
+            self.item_label,
+            self._umap,
+            self._imap,
+        ).sort([USER_INDEX, ITEM_INDEX])
 
-        # Extract indices
-        users = mapped_df.select("__uidx__").to_numpy().flatten()
-        items = mapped_df.select("__iidx__").to_numpy().flatten()
+        users = mapped_df.select(USER_INDEX).to_numpy().flatten()
+        items = mapped_df.select(ITEM_INDEX).to_numpy().flatten()
 
         # Values are all ones for the presence of interaction
         values = np.ones(len(users))
