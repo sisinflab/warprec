@@ -102,27 +102,13 @@ models:
             gradient_clip_algorithm: norm
 ```
 
-**Precision.** The mixed modes keep the weights in full precision and run the arithmetic in half, which is where the saving comes from. They take effect on a GPU only: requested on a CPU they are ignored with a warning, because the autocast path costs something there and returns nothing. `bf16-mixed` falls back to `16-mixed` on a GPU that does not support bfloat16.
+**Precision.** The mixed modes keep the weights in full precision and run the arithmetic in half, which is where the saving comes from. They take effect on a GPU only: requested on a CPU they are ignored with a warning, because the autocast path costs something there and returns nothing. `bf16-mixed` falls back to `16-mixed` on a GPU that does not support bfloat16. The saving arrives only when the arithmetic dominates — large embeddings, wide batches, big catalogues — and on small workloads the casting overhead can make a run slightly slower instead.
 
-!!! danger "These models cannot use mixed precision"
+!!! warning "Not every family can use mixed precision"
 
-    Nine models raise under **both** mixed modes. Every one propagates over a sparse adjacency matrix, and PyTorch's sparse kernels have no half-precision implementation:
+    Models that propagate over a sparse adjacency matrix — the graph-based collaborative, knowledge-aware and multimodal graph families — raise under both mixed modes, because PyTorch has no half-precision sparse kernels. Some attention-based sequential models raise under `16-mixed` alone, where the sentinel in their attention mask overflows float16, and run under `bf16-mixed`.
 
-    `EGCF`, `ESIGCF`, `FREEDOM`, `KGAT`, `KGIN`, `MGCN`, `MMGCN`, `SGL`, `SimRec`
-
-    Three more raise under `16-mixed` but run under `bf16-mixed`, because they place a large negative sentinel in an attention mask and it overflows the narrower exponent range of float16:
-
-    `DuoRec`, `LightSANs`, `NARM`
-
-    The failure is an exception at the first training step, not a silent wrong answer, so a run configured this way stops rather than producing bad numbers. Leave these models at `32-true`.
-
-!!! warning "Verify before relying on it elsewhere"
-
-    Running is not the same as agreeing. A model that trains under a mixed mode can still reach different parameters, so compare the metrics of a converged mixed-precision run against a full-precision one before trusting them. The default is `32-true` for that reason.
-
-!!! note "Where the benefit comes from"
-
-    Mixed precision pays off when the arithmetic dominates: large embedding tables, wide batches, big catalogues. On small models or small batches the casting overhead can outweigh the saving and the run gets slightly slower. Measure on your own data and hardware rather than assuming a speedup.
+    The failure is an exception at the first training step rather than a silently wrong answer, so a run configured this way stops instead of producing bad numbers. Running is not the same as agreeing, though: compare a converged mixed-precision run against a full-precision one before trusting its metrics.
 
 **Gradient clipping.** Applied by the training loop after gradients are computed and, in a distributed run, after they are synchronised. `norm` rescales the whole gradient when its norm exceeds the bound, preserving direction; `value` clamps each component independently and does not.
 
