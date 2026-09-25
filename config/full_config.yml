@@ -238,6 +238,7 @@ evaluation:
   batch_size: 4096
   strategy: [full, sampled]
   num_negatives: 99
+  negative_sampling: [uniform, popularity]
   candidates: [all, cold, warm]
   mask_seen: [auto, context, pair, none]
   seed: 42

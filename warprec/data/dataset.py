@@ -970,6 +970,7 @@ class Dataset:
         self,
         num_negatives: int = 99,
         seed: int = 42,
+        negative_sampling: str = "uniform",
         **kwargs: Any,
     ) -> DataLoader:
         """Retrieve the sampled evaluation DataLoader for the dataset.
@@ -977,6 +978,8 @@ class Dataset:
         Args:
             num_negatives (int): Number of negative samples per user.
             seed (int): Random seed for negative sampling.
+            negative_sampling (str): How the negatives are drawn, 'uniform' or
+                'popularity'.
             **kwargs (Any): The keyword arguments to pass to DataLoader initialization.
 
         Returns:
@@ -984,7 +987,7 @@ class Dataset:
                 of interactions (pos_items, neg_items, user_indices)
         """
         key = (
-            f"sampled_{num_negatives}_{seed}_"
+            f"sampled_{num_negatives}_{seed}_{negative_sampling}_"
             f"{self._serialize_dataloader_kwargs(kwargs)}"
         )
 
@@ -997,6 +1000,7 @@ class Dataset:
                 eval_interactions=eval_sparse,
                 num_negatives=num_negatives,
                 seed=seed,
+                negative_sampling=negative_sampling,
             )
             self._precomputed_dataloader[key] = DataLoader(
                 dataset,
@@ -1081,6 +1085,7 @@ class Dataset:
         self,
         num_negatives: int = 99,
         seed: int = 42,
+        negative_sampling: str = "uniform",
         **kwargs: Any,
     ) -> DataLoader:
         """Retrieve the sampled contextual evaluation DataLoader for the dataset.
@@ -1088,13 +1093,15 @@ class Dataset:
         Args:
             num_negatives (int): Number of negative samples per transaction.
             seed (int): Random seed.
+            negative_sampling (str): How the negatives are drawn, 'uniform' or
+                'popularity'.
             **kwargs (Any): The keyword arguments to pass to DataLoader initialization.
 
         Returns:
             DataLoader: The sampled contextual loader.
         """
         key = (
-            f"sampled_contextual_{num_negatives}_{seed}_"
+            f"sampled_contextual_{num_negatives}_{seed}_{negative_sampling}_"
             f"{self._serialize_dataloader_kwargs(kwargs)}"
         )
 
@@ -1145,6 +1152,7 @@ class Dataset:
                 num_items=self._niid,
                 num_negatives=num_negatives,
                 seed=seed,
+                negative_sampling=negative_sampling,
             )
             self._precomputed_dataloader[key] = DataLoader(
                 dataset,

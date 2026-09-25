@@ -611,6 +611,7 @@ def _run_estimate_setup(  # pylint: disable = too-many-locals
         model=model,
         strategy=config.evaluation.strategy,
         num_negatives=config.evaluation.num_negatives,
+        negative_sampling=config.evaluation.negative_sampling,
         **evaluation_dataloader_kwargs,
     )
     model.to(device)

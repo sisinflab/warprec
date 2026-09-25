@@ -184,6 +184,7 @@ def objective_function(config: dict) -> None:  # pylint: disable = too-many-loca
                 model=model,
                 strategy=strategy,
                 num_negatives=evaluation.num_negatives,
+                negative_sampling=evaluation.negative_sampling,
                 **evaluation_dataloader_kwargs,
             )
             epochs = model.epochs
@@ -247,6 +248,7 @@ def objective_function(config: dict) -> None:  # pylint: disable = too-many-loca
                 model=model,
                 strategy=strategy,
                 num_negatives=evaluation.num_negatives,
+                negative_sampling=evaluation.negative_sampling,
                 **evaluation_dataloader_kwargs,
             )
             # Model is trained in the __init__ we can directly evaluate it

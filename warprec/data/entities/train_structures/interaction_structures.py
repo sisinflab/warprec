@@ -44,6 +44,32 @@ class InteractionDataset(Dataset):
         return (user_tensor,)
 
 
+def popularity_cumulative(
+    sparse_matrix: csr_matrix, niid: int, damping: float = 0.75
+) -> Optional[np.ndarray]:
+    """The cumulative distribution that draws an item in proportion to its popularity.
+
+    Both the training samplers and the sampled evaluation protocol draw from this,
+    so the shape of the distribution is defined once.
+
+    Args:
+        sparse_matrix (csr_matrix): The interactions the counts are taken from.
+        niid (int): The number of items to sample from.
+        damping (float): The exponent applied to the interaction counts. The usual
+            choice, 0.75, keeps the head likely without letting it dominate.
+
+    Returns:
+        Optional[np.ndarray]: The cumulative weights, or None when no item has been
+            interacted with at all and popularity carries no signal.
+    """
+    counts = np.asarray((sparse_matrix > 0).sum(axis=0)).ravel()[:niid]
+    weights = np.power(counts.astype(np.float64), damping)
+    total = weights.sum()
+    if total <= 0:
+        return None
+    return np.cumsum(weights / total)
+
+
 class NegativeSampler:
     """Draws items a user has not interacted with.
 
@@ -83,15 +109,11 @@ class NegativeSampler:
         self.rng = np.random.default_rng(seed)
 
         if strategy == "popularity":
-            counts = np.asarray((sparse_matrix > 0).sum(axis=0)).ravel()[:niid]
-            weights = np.power(counts.astype(np.float64), damping)
-            total = weights.sum()
+            self._cumulative = popularity_cumulative(sparse_matrix, niid, damping)
             # A catalogue nobody has touched carries no popularity signal, so the
             # only meaningful thing left to do is sample uniformly.
-            if total <= 0:
+            if self._cumulative is None:
                 self.strategy = "uniform"
-            else:
-                self._cumulative = np.cumsum(weights / total)
 
     def sample(self, user_idx: int) -> int:
         """Draw one item the user has not interacted with.
