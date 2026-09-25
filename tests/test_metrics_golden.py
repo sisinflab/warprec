@@ -173,3 +173,77 @@ def test_rating_metric_matches_hand_computed_value(metric_name: str, expected: f
     assert got == pytest.approx(expected, abs=1e-6), (
         f"{metric_name} is {got}, expected {expected}"
     )
+
+
+# --------------------------------------------------------------------------
+# LogLoss, computed directly
+# --------------------------------------------------------------------------
+#
+# LogLoss reads the scores as logits, so each term is log(1 + exp(-x)) when the
+# item is relevant and log(1 + exp(x)) when it is not. Only the items the run
+# scored count: the seen-item mask sets a user's training items to -inf and those
+# are skipped.
+#
+#   user 0 trained on {1, 2}, so it is scored on 0, 3, 4 with logits .7, .8, .9;
+#          items 0 and 3 are its test items, so the labels are 1, 1, 0
+#   user 1 trained on {0, 3}, so it is scored on 1, 2, 4 with logits .9, .7, .8;
+#          item 4 is its test item, so the labels are 0, 0, 1
+#   user 2 has no test item at all and is left out of the evaluation entirely
+def _bce(logit: float, label: int) -> float:
+    """One binary cross-entropy term, written out rather than called from torch.
+
+    Args:
+        logit (float): The score the model gave.
+        label (int): 1 when the item is relevant.
+
+    Returns:
+        float: The loss of that single item.
+    """
+    return math.log(1 + math.exp(-logit if label else logit))
+
+
+EXPECTED_LOGLOSS = (
+    (_bce(0.7, 1) + _bce(0.8, 1) + _bce(0.9, 0)) / 3
+    + (_bce(0.9, 0) + _bce(0.7, 0) + _bce(0.8, 1)) / 3
+) / 2
+
+
+def test_logloss_matches_hand_computed_value(golden_dataset: Dataset):
+    """LogLoss is the cross-entropy of every scored item, averaged per user."""
+    evaluator = Evaluator(
+        ["LogLoss"], [3], train_set=golden_dataset.train_set.get_sparse()
+    )
+
+    evaluator.evaluate(
+        model=_FixedScoreRecommender({}, golden_dataset.info()),
+        dataloader=golden_dataset.get_evaluation_dataloader(),
+        strategy="full",
+        dataset=golden_dataset,
+    )
+
+    got = float(evaluator.compute_results()[3]["LogLoss"].nanmean())
+    assert got == pytest.approx(EXPECTED_LOGLOSS, abs=1e-6), (
+        f"LogLoss is {got}, expected {EXPECTED_LOGLOSS}"
+    )
+
+
+def test_logloss_skips_the_items_the_mask_removed(golden_dataset: Dataset):
+    """A masked item must not be counted as a confidently correct negative.
+
+    The mask sets a seen item to -inf, whose sigmoid is exactly 0 against a label
+    of 0: a free term of zero loss. Counting those would divide the real loss by
+    the size of the catalogue instead of by the number of items actually judged.
+    """
+    evaluator = Evaluator(
+        ["LogLoss"], [3], train_set=golden_dataset.train_set.get_sparse()
+    )
+    evaluator.evaluate(
+        model=_FixedScoreRecommender({}, golden_dataset.info()),
+        dataloader=golden_dataset.get_evaluation_dataloader(),
+        strategy="full",
+        dataset=golden_dataset,
+    )
+
+    counted = evaluator.metrics[3][0].total_count
+    assert counted[0].item() == 3, "user 0 was not judged on exactly its 3 scored items"
+    assert counted[1].item() == 3, "user 1 was not judged on exactly its 3 scored items"
