@@ -340,7 +340,7 @@ class BSARec(IterativeRecommender, SequentialRecommenderUtils):
         seq_len = item_seq.size(1)
 
         # Padding mask to ignore padding tokens
-        padding_mask = item_seq == self.n_items
+        padding_mask = self._padding_mask(item_seq, self.n_items)
 
         # Create position IDs
         position_ids = torch.arange(seq_len, dtype=torch.long).to(item_seq.device)

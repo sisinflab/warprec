@@ -231,3 +231,40 @@ def test_every_training_item_can_be_drawn_as_a_negative(interactions: pd.DataFra
     in_training = set(np.asarray(entity.get_flat()[1]).tolist())
     assert not in_training - drawn, "a training item could never be a negative"
     assert max(drawn) < catalogue
+
+
+def test_a_batch_of_users_without_history_still_has_a_sequence(
+    interactions: pd.DataFrame, attributes: pd.DataFrame
+):
+    """Held-out users batched together must not collapse to a width of zero.
+
+    Padding a batch of empty sequences gives a tensor with no columns, and a
+    sequential model asked to read position zero of it raises rather than
+    scoring the very users the protocol exists to ask about.
+    """
+    spec = SplitSpec(strategy="user_cold_start", ratio=0.25, seed=3)
+    train, _, test = Splitter().split_transaction(
+        interactions, labels=ColumnLabels(), test=spec
+    )
+    dataset = Dataset(
+        train_data=train,
+        eval_data=test,
+        side_data=attributes,
+        rating_type="implicit",
+        timestamp_label="timestamp",
+        cold_start=Splitter().cold_dimension(spec),
+        batch_size=16,
+    )
+
+    warm = values(train, "user_id")
+    cold = sorted(values(test, "user_id") - warm)
+    assert cold, "the protocol held no user out"
+
+    mapping = dataset.info()["user_mapping"]
+    sequences, lengths = dataset.train_session.get_user_history_sequences(
+        [mapping[user] for user in cold], 5
+    )
+
+    assert sequences.shape[0] == len(cold)
+    assert sequences.shape[1] >= 1, "a cold batch was given no position to read"
+    assert bool((lengths == 0).all()), "a held-out user kept a training history"

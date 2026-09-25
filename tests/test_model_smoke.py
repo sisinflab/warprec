@@ -75,9 +75,16 @@ def predict_arguments(
     arguments: Dict[str, Any] = {"user_indices": users}
 
     if isinstance(model, SequentialRecommenderUtils):
-        history, lengths, _ = dataset.train_set.get_history()
-        arguments["user_seq"] = history[users][:, -model.max_seq_len :]
-        arguments["seq_len"] = lengths[users].clamp(max=model.max_seq_len)
+        # The same call the evaluator makes. Taking the tail of the history
+        # matrix instead looks equivalent but is not: that matrix is padded on
+        # the right, so the slice returns padding for every user whose history
+        # is shorter than the window, and the models were then being scored on
+        # sequences no run would ever hand them.
+        user_seq, seq_len = dataset.train_session.get_user_history_sequences(
+            users.tolist(), model.max_seq_len
+        )
+        arguments["user_seq"] = user_seq
+        arguments["seq_len"] = seq_len
 
     if isinstance(model, ContextRecommenderUtils) and model.context_dims:
         _, _, _, contexts = dataset.train_transactions.get_arrays()
@@ -113,7 +120,7 @@ def test_model_builds_trains_and_predicts(model_name: str, dataset: Dataset):
 
     assert scores.shape[0] == len(users), f"{model_name}: wrong number of rows"
     assert scores.shape[1] == dataset.info()["n_items"], f"{model_name}: wrong width"
-    assert torch.isfinite(scores).any(), f"{model_name}: no finite score produced"
+    assert torch.isfinite(scores).all(), f"{model_name}: non-finite score produced"
 
 
 @pytest.mark.parametrize("model_name", MODELS)
@@ -184,3 +191,33 @@ def test_optional_hyperparameters_can_be_left_out(model_name: str):
 
     # Omitting every optional parameter has to leave a usable configuration.
     params_registry.get(model_name, **required)
+
+
+@pytest.mark.parametrize("model_name", MODELS)
+def test_a_user_without_any_history_is_still_scored(model_name: str, dataset: Dataset):
+    """A sequential model must return real numbers for an empty history.
+
+    Under a user cold-start protocol every interaction of the held-out users is
+    in the evaluation set, so the sequence they are scored from is padding from
+    end to end. Nothing about that is malformed, but it drives attention to a
+    softmax over nothing and a length of zero into a negative power, and the
+    NaN that comes back does not stay local: it spreads to every metric that
+    averages over users.
+    """
+    model = build_model(model_name, dataset)
+    if not isinstance(model, SequentialRecommenderUtils):
+        pytest.skip(f"{model_name} is not sequential")
+
+    model.eval()
+    users = torch.arange(min(4, dataset.info()["n_users"]))
+
+    arguments = predict_arguments(model, dataset, users)
+    arguments["user_seq"] = torch.full_like(
+        arguments["user_seq"], dataset.info()["n_items"]
+    )
+    arguments["seq_len"] = torch.zeros_like(arguments["seq_len"])
+
+    with torch.inference_mode():
+        scores = model.predict(**arguments)
+
+    assert torch.isfinite(scores).all(), f"{model_name}: an empty history scores NaN"

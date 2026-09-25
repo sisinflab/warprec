@@ -70,3 +70,7 @@ candidates.
 The models to expect a signal from under this protocol are the ones that score from
 item attributes rather than from interactions. See
 [Content-Based](../recommenders/content.md) and [Hybrid](../recommenders/hybrid.md).
+
+Under `user_cold_start` a sequential model is handed an empty history for every
+held-out user, so it ranks them all from the same empty-sequence representation. The
+scores are real numbers rather than NaN, but they carry no personalization.

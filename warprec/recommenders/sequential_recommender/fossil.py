@@ -219,9 +219,13 @@ class FOSSIL(IterativeRecommender, SequentialRecommenderUtils):
                     the length-based weighting.
                     Expected shape: (batch_size, embedding_dim).
         """
-        # Calculate the coefficient based on sequence length
+        # Calculate the coefficient based on sequence length. A user with no
+        # training history at all has length zero, and a negative power of zero
+        # is infinite, which turns the whole similarity into NaN once it meets
+        # the summed padding embeddings. One leaves the coefficient neutral and
+        # the similarity of an empty history at zero.
         coeff = torch.pow(
-            seq_item_len.unsqueeze(1).float(), -self.alpha
+            seq_item_len.clamp(min=1).unsqueeze(1).float(), -self.alpha
         )  # (batch_size,  1)
 
         # Multiply the coefficient with the summed embeddings to compute similarity

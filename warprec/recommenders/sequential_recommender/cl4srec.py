@@ -361,7 +361,7 @@ class CL4SRec(IterativeRecommender, SequentialRecommenderUtils):
     def forward(self, item_seq: Tensor, item_seq_len: Tensor) -> Tensor:
         """Forward pass of the SASRec-style encoder used by CL4SRec."""
         seq_len = item_seq.size(1)
-        padding_mask = item_seq == self.padding_token_id
+        padding_mask = self._padding_mask(item_seq, self.padding_token_id)
 
         position_ids = torch.arange(seq_len, dtype=torch.long, device=item_seq.device)
         position_ids = position_ids.unsqueeze(0).expand_as(item_seq)

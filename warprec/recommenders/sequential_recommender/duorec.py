@@ -175,7 +175,7 @@ class DuoRec(IterativeRecommender, SequentialRecommenderUtils):
         seq_emb = self.layernorm(item_emb + position_emb)
         seq_emb = self.emb_dropout(seq_emb)
 
-        padding_mask = item_seq == self.n_items
+        padding_mask = self._padding_mask(item_seq, self.n_items)
         attention_mask = self.causal_mask[:seq_len, :seq_len]  # type: ignore[index]
         transformer_output = self.transformer_encoder(
             src=seq_emb,
