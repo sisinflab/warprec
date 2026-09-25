@@ -125,6 +125,7 @@ class Evaluator:
             "num_items": train_set.shape[1],
             "item_interactions": torch.tensor(train_set.getnnz(axis=0)).float(),
             "item_indices": torch.tensor(train_set.indices, dtype=torch.long),
+            "train_matrix": train_set,
             "feature_lookup": feature_lookup,
             "user_cluster": user_cluster,
             "item_cluster": item_cluster,
