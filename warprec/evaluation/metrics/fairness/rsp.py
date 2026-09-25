@@ -21,6 +21,8 @@ class RSP(TopKMetric):
 
     Attributes:
         item_clusters (Tensor): A tensor mapping item index to its cluster ID.
+        cluster_available (Tensor): Accumulator for the items of each cluster
+            that were on offer to be recommended.
         cluster_recommendations (Tensor): Accumulator for the total count of recommended items per cluster in the top-k.
         denominator_counts (Tensor): Pre-calculated total count of items per cluster
             not in the training set across all users.
@@ -43,6 +45,7 @@ class RSP(TopKMetric):
     }
 
     item_clusters: Tensor
+    cluster_available: Tensor
     cluster_recommendations: Tensor
     denominator_counts: Tensor
     n_effective_clusters: int
@@ -69,22 +72,12 @@ class RSP(TopKMetric):
             torch.bincount(item_cluster, minlength=self.n_item_clusters).float(),
         )
 
-        # Global count of items per cluster in the training set
-        cluster_train_counts = torch.zeros(
-            self.n_item_clusters, dtype=torch.float, device=item_cluster.device
-        )
-        # The cluster lookup carries one row past the catalogue, for the padding
-        # item every family indexes when a position holds nothing. The training
-        # counts do not, so the lookup is trimmed to the catalogue before the two
-        # are put together.
-        cluster_train_counts.index_add_(
-            0,
-            item_cluster[: item_interactions.numel()],
-            item_interactions.float(),
-        )
-        self.register_buffer("cluster_train_interaction_counts", cluster_train_counts)
-
         # Accumulators
+        self.add_state(
+            "cluster_available",
+            torch.zeros(self.n_item_clusters, dtype=torch.float),
+            dist_reduce_fx="sum",
+        )
         self.add_state(
             "cluster_recommendations",
             torch.zeros(self.n_item_clusters, dtype=torch.float),
@@ -112,7 +105,24 @@ class RSP(TopKMetric):
         ).float()
         self.cluster_recommendations += batch_rec_counts
 
-        # Accumulate user interactions for denominator
+        # A cluster's rate is how often it was recommended out of how often it
+        # could have been. The evaluator has already put everything unavailable
+        # beyond reach — items the user saw in training, and anything outside a
+        # restricted candidate set — so what stays finite is exactly what was on
+        # offer. Estimating it instead, by spreading the training mass evenly
+        # across users, gave rates above one whenever the users being scored had
+        # shorter histories than the population average.
+        offered = torch.isfinite(preds)
+        if item_indices is None:
+            columns = torch.arange(preds.size(1), device=preds.device).expand_as(preds)
+        else:
+            columns = item_indices
+
+        self.cluster_available += torch.bincount(
+            self.item_clusters[columns[offered]], minlength=self.n_item_clusters
+        ).float()
+
+        # Kept so a run can still report how many users were scored.
         self.user_interactions.index_add_(0, user_indices, users.float())
 
     def compute(self):
@@ -122,19 +132,8 @@ class RSP(TopKMetric):
         if total_interactions == 0:
             return {self.name: 0.0}
 
-        # Total potential items per cluster not in training set
-        total_potential = total_interactions * self.cluster_item_counts
-
-        # Estimate masked items per cluster
-        num_total_users = self.user_interactions.size(0)
-        scaling_factor = total_interactions / num_total_users
-        estimated_masked_items = scaling_factor * self.cluster_train_interaction_counts
-
-        # Final denominator counts
-        denominator_counts = total_potential - estimated_masked_items
-
-        # Safety clamp to avoid negative values
-        denominator_counts = torch.clamp(denominator_counts, min=0.0)
+        # What was actually on offer, counted rather than estimated.
+        denominator_counts = self.cluster_available
 
         # Valid clusters for computation
         valid_mask = denominator_counts > 0

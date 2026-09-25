@@ -24,6 +24,8 @@ class PopRSP(TopKMetric):
         total_long (Tensor): The total number of long tail items.
         short_recs (Tensor): The short head recommendations.
         long_recs (Tensor): The long tail recommendations.
+        avail_short (Tensor): Short head slots that were open to be recommended.
+        avail_long (Tensor): Long tail slots that were open to be recommended.
 
     Args:
         k (int): The cutoff for recommendations.
@@ -44,6 +46,8 @@ class PopRSP(TopKMetric):
     total_long: Tensor
     short_recs: Tensor
     long_recs: Tensor
+    avail_short: Tensor
+    avail_long: Tensor
 
     def __init__(
         self,
@@ -63,30 +67,46 @@ class PopRSP(TopKMetric):
         self.register_buffer("short_head", sh)
         self.register_buffer("long_tail", lt)
 
-        # Store the total number of items in each group
         self.register_buffer("total_short", torch.tensor(len(sh), dtype=torch.float))
         self.register_buffer("total_long", torch.tensor(len(lt), dtype=torch.float))
+
+        self.add_state("avail_short", default=torch.tensor(0.0), dist_reduce_fx="sum")
+        self.add_state("avail_long", default=torch.tensor(0.0), dist_reduce_fx="sum")
 
     def update(self, preds: Tensor, **kwargs: Any):
         top_k_indices = kwargs.get(f"top_{self.k}_indices")
         item_indices = kwargs.get("item_indices")
 
         # Remap top_k_indices to global
-        item_indices = kwargs.get("item_indices")
         top_k_indices = self.remap_indices(top_k_indices, item_indices)
 
         # Accumulate short head and long tail recommendations
         self.short_recs += torch.isin(top_k_indices, self.short_head).sum().float()
         self.long_recs += torch.isin(top_k_indices, self.long_tail).sum().float()
 
+        # A group's rate is how often it was recommended out of how often it
+        # could have been, so the denominator counts what was on offer to each
+        # user rather than the size of the group. The evaluator has already put
+        # everything unavailable beyond reach — items the user saw in training,
+        # and anything outside a restricted candidate set — so what remains
+        # finite is exactly what could have been recommended.
+        offered = torch.isfinite(preds)
+        if item_indices is None:
+            columns = torch.arange(preds.size(1), device=preds.device).expand_as(preds)
+        else:
+            columns = item_indices
+
+        self.avail_short += (offered & torch.isin(columns, self.short_head)).sum()
+        self.avail_long += (offered & torch.isin(columns, self.long_tail)).sum()
+
     def compute(self):
         """Computes the final metric value."""
         # Handle division by zero
-        if self.total_short == 0 or self.total_long == 0:
+        if self.avail_short == 0 or self.avail_long == 0:
             return {self.name: torch.tensor(0.0)}
 
-        pr_short = self.short_recs / self.total_short
-        pr_long = self.long_recs / self.total_long
+        pr_short = self.short_recs / self.avail_short
+        pr_long = self.long_recs / self.avail_long
         pr = torch.stack([pr_short, pr_long])
 
         # Handle the case where mean is zero
