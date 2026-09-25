@@ -39,6 +39,9 @@ The **optimization** section defines how hyperparameter optimization is performe
 - **optimizer**: Optimizer to use during the training process. Defaults to `None`.
 - **properties**: Nested section for strategy and scheduler parameters.
 - **device**: Training device, e.g., `cpu` or `cuda`. Overrides global device.
+- **precision**: The numerical precision to train at: `32-true`, `16-mixed`, `bf16-mixed` or `64-true`. Defaults to `32-true`.
+- **gradient_clip**: The bound to clip gradients to. Defaults to `None`, which is no clipping; `0` means the same.
+- **gradient_clip_algorithm**: Whether the bound applies to the gradient `norm` or to each `value`. Defaults to `norm`.
 - **cpu_per_trial**: Number of CPU cores allocated per trial. Defaults to `1`.
 - **gpu_per_trial**: Number of GPUs allocated per trial. Defaults to `0`.
 - **custom_resources_per_trial**: A dictionary containing custom resources to request per trial during optimization. Defaults to an empty dictionary.
@@ -85,6 +88,27 @@ The **optimization** section defines how hyperparameter optimization is performe
 
     *Tip:* Ray automatically injects hardware labels. You can use `label_selector: {"ray.io/accelerator-type": "A100"}` to target specific GPU architectures without manual node labeling. For more details, refer to the [Ray Scheduling Documentation](https://docs.ray.io/en/latest/ray-core/scheduling/labels.html).
 
+
+### Precision and Gradient Clipping
+
+Both settings apply only to models trained iteratively; a closed-form model such as `EASE` or `ItemKNN` never reaches the training loop and ignores them.
+
+```yaml
+models:
+    LightGCN:
+        optimization:
+            precision: bf16-mixed
+            gradient_clip: 1.0
+            gradient_clip_algorithm: norm
+```
+
+**Precision.** The mixed modes keep the weights in full precision and run the arithmetic in half, which is where the saving comes from. They take effect on a GPU only: requested on a CPU they are ignored with a warning, because the autocast path costs something there and returns nothing. `bf16-mixed` falls back to `16-mixed` on a GPU that does not support bfloat16.
+
+!!! warning "Mixed precision is not safe for every model"
+
+    Several model families in WarpRec propagate over sparse adjacency matrices, and half-precision support for sparse kernels is incomplete: some operations raise, and some losses that take norms or powers overflow. The default is `32-true` for that reason. Verify a model trains and scores as expected under a mixed mode before relying on it, and compare the metrics against a full-precision run rather than assuming they match.
+
+**Gradient clipping.** Applied by the training loop after gradients are computed and, in a distributed run, after they are synchronised. `norm` rescales the whole gradient when its norm exceeds the bound, preserving direction; `value` clamps each component independently and does not.
 
 ### LR Scheduler Section
 
