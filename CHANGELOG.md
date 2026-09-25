@@ -2,6 +2,38 @@
 
 <!-- version list -->
 
+## v1.14.0 (2026-09-25)
+
+### Documentation
+
+- Documented precision and gradient clipping
+  ([`4d98876`](https://github.com/sisinflab/warprec/commit/4d98876a47eb2fe61d336450d960c780368f12f2))
+
+- Named the models that cannot use mixed precision
+  ([`25fb2a8`](https://github.com/sisinflab/warprec/commit/25fb2a887f9bd19903885bd21888b558f3c47d94))
+
+- Say where mixed precision is worth setting
+  ([`3e860ba`](https://github.com/sisinflab/warprec/commit/3e860baa36d0b387505afd4bd9928efa5d1cb6a3))
+
+- Warn about families rather than listing every model
+  ([`7415eac`](https://github.com/sisinflab/warprec/commit/7415eacf493d0bc5963bb757e60a192aab01728a))
+
+### Features
+
+- Mixed precision and gradient clipping are configurable
+  ([`eb518f0`](https://github.com/sisinflab/warprec/commit/eb518f032ec3838ed0c615479853de112ecf0d2c))
+
+### Refactoring
+
+- One place decides how a trainer is built
+  ([`1c5bfb2`](https://github.com/sisinflab/warprec/commit/1c5bfb28ccc7ca0689a92bf1e093ff49b9f68b1c))
+
+### Testing
+
+- The trainer runtime settings are covered
+  ([`c6d1644`](https://github.com/sisinflab/warprec/commit/c6d164467f8701dfabe1164bd218f38e127a0e9a))
+
+
 ## v1.13.1 (2026-09-24)
 
 ### Bug Fixes
