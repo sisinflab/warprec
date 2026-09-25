@@ -17,6 +17,7 @@ from warprec.utils.helpers import (
     retrieve_evaluation_dataloader,
     model_param_from_dict,
 )
+from warprec.recommenders.trainer.runtime import lightning_runtime
 from warprec.utils.logger import logger
 from warprec.utils.registry import model_registry
 
@@ -151,6 +152,7 @@ def design_pipeline(path: str):
                 max_epochs=model.epochs,
                 devices="auto",
                 accelerator=device,
+                **lightning_runtime(params.optimization, device),
                 num_sanity_val_steps=0,
                 logger=False,
                 enable_checkpointing=False,

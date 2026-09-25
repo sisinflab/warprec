@@ -36,6 +36,7 @@ from warprec.utils.helpers import (
     resolve_num_workers,
     retrieve_evaluation_dataloader,
 )
+from warprec.recommenders.trainer.runtime import lightning_runtime
 from warprec.utils.logger import logger
 from warprec.utils.registry import model_registry
 
@@ -567,6 +568,9 @@ def _run_estimate_setup(  # pylint: disable = too-many-locals
             max_epochs=1,
             devices=_lightning_devices(device),
             accelerator=_lightning_accelerator(device),
+            # The estimate has to be taken at the precision the run will use,
+            # or it measures a configuration nobody is going to train with.
+            **lightning_runtime(params.optimization, _lightning_accelerator(device)),
             limit_train_batches=train_limit,
             num_sanity_val_steps=0,
             logger=False,

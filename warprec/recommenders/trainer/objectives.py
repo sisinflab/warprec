@@ -20,6 +20,7 @@ from warprec.recommenders.callbacks import (
     _get_memory_usage,
 )
 from warprec.recommenders.base_recommender import IterativeRecommender
+from warprec.recommenders.trainer.runtime import lightning_runtime
 from warprec.utils.config import RecomModel
 from warprec.utils.helpers import (
     build_evaluation_dataloader_kwargs,
@@ -205,6 +206,7 @@ def objective_function(config: dict) -> None:  # pylint: disable = too-many-loca
                 max_epochs=epochs,
                 devices="auto",
                 accelerator=l_device,
+                **lightning_runtime(model_params.optimization, l_device),
                 strategy=pl_strategy,  # Ray handles DDP communication
                 plugins=pl_plugins,  # Ray handles environment variables
                 num_sanity_val_steps=0,

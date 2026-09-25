@@ -39,6 +39,9 @@ The **optimization** section defines how hyperparameter optimization is performe
 - **optimizer**: Optimizer to use during the training process. Defaults to `None`.
 - **properties**: Nested section for strategy and scheduler parameters.
 - **device**: Training device, e.g., `cpu` or `cuda`. Overrides global device.
+- **precision**: The numerical precision to train at: `32-true`, `16-mixed`, `bf16-mixed` or `64-true`. Defaults to `32-true`.
+- **gradient_clip**: The bound to clip gradients to. Defaults to `None`, which is no clipping; `0` means the same.
+- **gradient_clip_algorithm**: Whether the bound applies to the gradient `norm` or to each `value`. Defaults to `norm`.
 - **cpu_per_trial**: Number of CPU cores allocated per trial. Defaults to `1`.
 - **gpu_per_trial**: Number of GPUs allocated per trial. Defaults to `0`.
 - **custom_resources_per_trial**: A dictionary containing custom resources to request per trial during optimization. Defaults to an empty dictionary.
@@ -85,6 +88,31 @@ The **optimization** section defines how hyperparameter optimization is performe
 
     *Tip:* Ray automatically injects hardware labels. You can use `label_selector: {"ray.io/accelerator-type": "A100"}` to target specific GPU architectures without manual node labeling. For more details, refer to the [Ray Scheduling Documentation](https://docs.ray.io/en/latest/ray-core/scheduling/labels.html).
 
+
+### Precision and Gradient Clipping
+
+Both settings apply only to models trained iteratively; a closed-form model such as `EASE` or `ItemKNN` never reaches the training loop and ignores them.
+
+```yaml
+models:
+    LightGCN:
+        optimization:
+            precision: bf16-mixed
+            gradient_clip: 1.0
+            gradient_clip_algorithm: norm
+```
+
+**Precision.** The mixed modes keep the weights in full precision and run the arithmetic in half. They take effect on a GPU only: requested on a CPU they are ignored with a warning, because the autocast path costs something there and returns nothing. `bf16-mixed` falls back to `16-mixed` on a GPU that does not support bfloat16.
+
+**Where it is worth setting.** The saving comes from dense matrix work, which in a recommendation run means scoring rather than training. A model whose prediction pushes every user-item pair through a multi-layer network — the context-aware family, and the neural collaborative models — has enough arithmetic for it to shorten, and scoring happens on every evaluation epoch. Training is mostly embedding lookups and sparse gathers, which are limited by memory bandwidth rather than by arithmetic, so there is little there to win. A model whose forward pass is small next to the cost of casting, such as an autoencoder over the interaction row, can come out slightly slower instead.
+
+!!! warning "Not every family can use mixed precision"
+
+    Models that propagate over a sparse adjacency matrix — the graph-based collaborative, knowledge-aware and multimodal graph families — raise under both mixed modes, because PyTorch has no half-precision sparse kernels. Some attention-based sequential models raise under `16-mixed` alone, where the sentinel in their attention mask overflows float16, and run under `bf16-mixed`.
+
+    The failure is an exception at the first training step rather than a silently wrong answer, so a run configured this way stops instead of producing bad numbers. Running is not the same as agreeing, though: compare a converged mixed-precision run against a full-precision one before trusting its metrics.
+
+**Gradient clipping.** Applied by the training loop after gradients are computed and, in a distributed run, after they are synchronised. `norm` rescales the whole gradient when its norm exceeds the bound, preserving direction; `value` clamps each component independently and does not.
 
 ### LR Scheduler Section
 
