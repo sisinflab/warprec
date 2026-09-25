@@ -14,6 +14,7 @@ from warprec.utils.helpers import (
     resolve_num_workers,
     retrieve_evaluation_dataloader,
 )
+from warprec.recommenders.trainer.runtime import lightning_runtime
 from warprec.recommenders.base_recommender import (
     Recommender,
     IterativeRecommender,
@@ -232,6 +233,7 @@ def remote_model_retraining(
             max_epochs=best_model.epochs,
             devices="auto",
             accelerator=device,
+            **lightning_runtime(params.optimization, device),
             num_sanity_val_steps=0,
             logger=False,
             enable_checkpointing=False,

@@ -1,4 +1,4 @@
-from typing import List, Optional, Union, ClassVar, Any, Dict
+from typing import List, Literal, Optional, Union, ClassVar, Any, Dict
 from abc import ABC
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator, field_validator
@@ -25,6 +25,10 @@ INT_FIELD = Union[List[Union[str, int]], int]
 FLOAT_FIELD = Union[List[Union[str, float]], float]
 STR_FIELD = Union[List[str], str]
 BOOL_FIELD = Union[List[Union[str, bool]], bool]
+
+# Lightning's own names, so that what a user writes is what it is handed.
+Precision = Literal["32-true", "16-mixed", "bf16-mixed", "64-true"]
+ClipAlgorithm = Literal["norm", "value"]
 
 
 class Meta(BaseModel):
@@ -235,6 +239,13 @@ class Optimization(BaseModel):
             In case of a grid search, this parameter should be set to 1.
         checkpoint_to_keep (Optional[int]): The number of checkpoints to keep
             in the ray directory.
+        precision (Optional[Precision]): The numerical precision to train at.
+            Defaults to '32-true'. The mixed modes only apply on a GPU and are
+            ignored elsewhere.
+        gradient_clip (Optional[float]): The bound to clip gradients to.
+            Defaults to None, which is no clipping. Zero means the same.
+        gradient_clip_algorithm (Optional[ClipAlgorithm]): Whether the bound is
+            on the gradient 'norm' or on each 'value'. Defaults to 'norm'.
     """
 
     strategy: Optional[SearchAlgorithms] = SearchAlgorithms.GRID
@@ -254,6 +265,9 @@ class Optimization(BaseModel):
     chunk_size: Optional[int] = 4096
     num_samples: Optional[int] = 1
     checkpoint_to_keep: Optional[int] = 5
+    precision: Optional[Precision] = "32-true"
+    gradient_clip: Optional[float] = None
+    gradient_clip_algorithm: Optional[ClipAlgorithm] = "norm"
 
     @field_validator("strategy")
     @classmethod
