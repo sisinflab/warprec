@@ -148,7 +148,7 @@ class gSASRec(IterativeRecommender, SequentialRecommenderUtils):
             Tensor: Output of the Transformer encoder [batch_size, seq_len, embedding_size].
         """
         seq_len = item_seq.size(1)
-        padding_mask = item_seq == self.n_items
+        padding_mask = self._padding_mask(item_seq, self.n_items)
 
         position_ids = torch.arange(seq_len, dtype=torch.long).to(item_seq.device)
         position_ids = position_ids.unsqueeze(0).expand_as(item_seq)

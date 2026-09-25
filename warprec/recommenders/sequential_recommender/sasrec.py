@@ -185,7 +185,9 @@ class SASRec(IterativeRecommender, SequentialRecommenderUtils):
         seq_len = item_seq.size(1)
 
         # Padding mask to ignore padding tokens
-        padding_mask = item_seq == self.n_items  # [batch_size, seq_len]
+        padding_mask = self._padding_mask(
+            item_seq, self.n_items
+        )  # [batch_size, seq_len]
 
         # Create position IDs
         position_ids = torch.arange(seq_len, dtype=torch.long).to(item_seq.device)

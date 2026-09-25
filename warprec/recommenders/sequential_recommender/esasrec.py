@@ -341,7 +341,7 @@ class eSASRec(IterativeRecommender, SequentialRecommenderUtils):
     def forward(self, item_seq: Tensor, item_seq_len: Tensor) -> Tensor:
         """Forward pass with shifted-sequence causal masking."""
         seq_len = item_seq.size(1)
-        padding_mask = item_seq == self.n_items
+        padding_mask = self._padding_mask(item_seq, self.n_items)
 
         position_ids = torch.arange(seq_len, dtype=torch.long, device=item_seq.device)
         position_ids = position_ids.unsqueeze(0).expand_as(item_seq)

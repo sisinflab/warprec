@@ -169,10 +169,17 @@ class Sessions:
             seqs.append(torch.tensor(recent, dtype=torch.long))
             lens.append(len(recent))
 
-        return (
-            pad_sequence(seqs, batch_first=True, padding_value=self._niid),
-            torch.tensor(lens, dtype=torch.long),
-        )
+        sequences = pad_sequence(seqs, batch_first=True, padding_value=self._niid)
+
+        # A batch in which no user has any history, which a cold start protocol
+        # produces as soon as the held out users land together, pads to a width
+        # of zero and leaves a sequential model with no position to read at all.
+        # One column of padding is the shortest sequence they can be asked
+        # about, and is what a single cold user in a warm batch already gets.
+        if sequences.shape[1] == 0:
+            sequences = sequences.new_full((len(user_ids), 1), self._niid)
+
+        return sequences, torch.tensor(lens, dtype=torch.long)
 
     def _require_valid_targets(self) -> None:
         """Work out which positions can be predicted, and insist there are some.

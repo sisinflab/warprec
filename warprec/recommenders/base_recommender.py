@@ -1321,9 +1321,38 @@ class SequentialRecommenderUtils(ABC):
         Returns:
             Tensor: The gathered values flattened.
         """
+        # Every sequential model asks for the position one before its sequence
+        # length, which is -1 for a user with no history at all. That is a real
+        # case rather than a malformed one: a cold-start protocol holds every
+        # interaction of some users out, and those users still have to be
+        # scored. Reading position zero of an all-padding sequence gives the
+        # representation the model has of an empty history, which is the
+        # sensible thing to rank from, and is what the alternative of crashing
+        # denies the whole evaluation.
+        gather_index = gather_index.clamp(min=0)
         gather_index = gather_index.view(-1, 1, 1).expand(-1, 1, output.shape[-1])
         output_flatten = output.gather(dim=1, index=gather_index)
         return output_flatten.squeeze(1)
+
+    def _padding_mask(self, item_seq: Tensor, padding_token: int) -> Tensor:
+        """Builds the key padding mask of a batch of item sequences.
+
+        Args:
+            item_seq (Tensor): The padded item sequences, [batch_size, seq_len].
+            padding_token (int): The item identifier reserved for padding.
+
+        Returns:
+            Tensor: True on the positions that must not be attended to.
+        """
+        mask = item_seq == padding_token
+        # A user with no training history at all gives a row that is padding
+        # from end to end, and attending to nothing is a softmax over nothing
+        # but -inf, which comes back as NaN and poisons every score of that
+        # user. Keeping the first position attendable leaves the rows that do
+        # carry items untouched and gives the empty ones the embedding the
+        # model holds for an empty history to rank from.
+        mask[:, 0] &= ~mask.all(dim=1)
+        return mask
 
     def _generate_square_subsequent_mask(self, seq_len: int) -> Tensor:
         """Generate a square mask for the sequence.
