@@ -313,3 +313,59 @@ def test_popreo_accumulates_only_relevant_hits():
     assert float(metric.long_recs) <= float(metric.long_gt)
 
     assert float(metric.compute()["PopREO"]) == pytest.approx(1 / 3, abs=1e-5)
+
+
+def test_poprsp_divides_by_what_was_actually_on_offer(
+    popularity_dataset: Dataset,
+):
+    """Statistical parity is a rate, so its denominator is opportunity.
+
+    An item the user already saw in training is masked out of their ranking and
+    was never available, so counting it among the chances the group had
+    understates that group's rate. Because the popular items are the ones users
+    have mostly already seen, the error does not fall evenly on the two groups,
+    which is exactly the comparison the metric exists to make.
+
+    Both users here saw item 3, leaving three of the four short-head items and
+    both long-tail ones open to them:
+        short  5 recommended of 6 offered
+        long   1 recommended of 4 offered
+        -> std 0.2917 over mean 0.5417 = 7/13
+    """
+    evaluator = Evaluator(
+        ["PopRSP"], [3], train_set=popularity_dataset.train_set.get_sparse()
+    )
+    evaluator.evaluate(
+        model=_PopularityScorer({}, popularity_dataset.info()),
+        dataloader=popularity_dataset.get_evaluation_dataloader(),
+        strategy="full",
+        dataset=popularity_dataset,
+    )
+
+    got = float(evaluator.compute_results()[3]["PopRSP"])
+
+    assert got == pytest.approx(7 / 13, abs=1e-5)
+    # Dividing by the group sizes alone, as it used to, gave 3/7.
+    assert got != pytest.approx(3 / 7, abs=1e-5)
+
+
+def test_poprsp_rates_are_proper_proportions():
+    """Neither group can be recommended more often than it was offered."""
+    interactions = torch.tensor([4.0, 4.0, 4.0, 6.0, 1.0, 1.0])
+    metric = metric_registry.get_class("PopRSP")(k=3, item_interactions=interactions)
+
+    # Item 3 is out of reach for both users, everything else is on offer.
+    preds = torch.zeros(2, 6)
+    preds[:, 3] = -torch.inf
+
+    metric.update(
+        preds=preds,
+        binary_relevance=torch.zeros(2, 6),
+        top_3_indices=torch.tensor([[0, 1, 4], [0, 1, 2]]),
+        item_indices=None,
+    )
+
+    assert float(metric.avail_short) == 6.0
+    assert float(metric.avail_long) == 4.0
+    assert float(metric.short_recs) <= float(metric.avail_short)
+    assert float(metric.long_recs) <= float(metric.avail_long)

@@ -18,6 +18,7 @@ from test_metrics_golden import _FixedScoreRecommender, TEST_ROWS, TRAIN_ROWS
 
 from warprec.data.dataset import Dataset
 from warprec.evaluation import Evaluator
+from warprec.utils.registry import metric_registry
 
 # Two user groups and two item groups over the shared fixture:
 #   users {0, 1} -> group 1,  user 2 -> group 2
@@ -184,3 +185,43 @@ def test_srecall_survives_a_full_ranking_with_features(clustered_dataset: Datase
 
     assert "SRecall" in results
     assert torch.isfinite(results["SRecall"]).any()
+
+
+def test_rsp_rates_are_proper_proportions():
+    """A cluster cannot be recommended more often than it was offered.
+
+    The denominator used to be estimated, by spreading the training interactions
+    evenly across the users and subtracting the share belonging to whoever was
+    being scored. Users with shorter histories than the average therefore had
+    too much subtracted, and the rate went above one — on this fixture it
+    reached 1.75, which is not a proportion.
+    """
+    clusters = torch.tensor([1, 1, 1, 1, 2, 2, 0])
+    interactions = torch.tensor([4.0, 4.0, 4.0, 6.0, 1.0, 1.0])
+    metric = metric_registry.get_class("RSP")(
+        k=3, num_users=7, item_cluster=clusters, item_interactions=interactions
+    )
+
+    # Both users have seen item 3, so it is out of reach for them; the rest of
+    # the catalogue is on offer.
+    preds = torch.zeros(2, 6)
+    preds[:, 3] = -torch.inf
+
+    metric.update(
+        preds=preds,
+        user_indices=torch.tensor([0, 1]),
+        binary_relevance=torch.zeros(2, 6),
+        top_3_indices=torch.tensor([[0, 1, 4], [0, 1, 2]]),
+        valid_users=torch.tensor([1.0, 1.0]),
+        item_indices=None,
+    )
+
+    offered = metric.cluster_available
+    recommended = metric.cluster_recommendations
+
+    assert float(offered[1]) == 6.0 and float(offered[2]) == 4.0
+    for cluster in (1, 2):
+        assert float(recommended[cluster]) <= float(offered[cluster])
+
+    # Which is the same answer PopRSP gives for the same split of the catalogue.
+    assert float(metric.compute()["RSP"]) == pytest.approx(7 / 13, abs=1e-5)
