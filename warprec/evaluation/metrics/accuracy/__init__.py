@@ -3,6 +3,7 @@ from .f1 import F1
 from .gauc import GAUC
 from .hit_rate import HitRate
 from .lauc import LAUC
+from .logloss import LogLoss
 from .map import MAP
 from .mar import MAR
 from .mrr import MRR
@@ -16,6 +17,7 @@ __all__ = [
     "GAUC",
     "HitRate",
     "LAUC",
+    "LogLoss",
     "MAP",
     "MAR",
     "MRR",
