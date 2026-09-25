@@ -5,11 +5,26 @@ on:
     branches:
       - main
 
+  # Publishing can fail on its own, without anything being wrong with the
+  # release: PyPI returns 502 often enough that a version can end up tagged
+  # here and missing from the index. Re-running the push job does not help,
+  # because it checks out the commit that triggered it rather than the release
+  # commit semantic-release created afterwards, so it finds no tag and skips.
+  # This trigger publishes a release that already exists.
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Tag to publish, e.g. v1.14.0. Defaults to the latest one."
+        required: false
+        type: string
+
 jobs:
   lint-check:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.tag || github.sha }}
       - name: Setup Environment
         uses: ./.github/actions/setup-env
       - name: Run pre-commit
@@ -21,6 +36,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          ref: ${{ inputs.tag || github.sha }}
 
       - name: Setup Environment
         uses: ./.github/actions/setup-env
@@ -45,6 +61,16 @@ jobs:
           fetch-depth: 0
           token: ${{ secrets.RELEASE_TOKEN_WARPREC }}
 
+      - name: Select the release to publish
+        if: github.event_name == 'workflow_dispatch'
+        run: |
+          TAG="${{ inputs.tag }}"
+          if [ -z "$TAG" ]; then
+            TAG="$(git describe --tags --abbrev=0)"
+          fi
+          echo "Publishing $TAG"
+          git checkout "$TAG"
+
       - name: Setup Environment
         uses: ./.github/actions/setup-env
 
@@ -58,6 +84,7 @@ jobs:
 
       - name: Python Semantic Release (Version & Push)
         id: psr
+        if: github.event_name == 'push'
         env:
           GH_TOKEN: ${{ secrets.RELEASE_TOKEN_WARPREC }}
         run: |
@@ -69,7 +96,7 @@ jobs:
           fi
 
       - name: Build Package
-        if: steps.psr.outputs.released == 'true'
+        if: steps.psr.outputs.released == 'true' || github.event_name == 'workflow_dispatch'
         run: poetry build
 
       - name: Publish to GitHub Release
@@ -79,5 +106,9 @@ jobs:
         run: semantic-release publish
 
       - name: Publish to PyPI
-        if: steps.psr.outputs.released == 'true'
+        if: steps.psr.outputs.released == 'true' || github.event_name == 'workflow_dispatch'
         uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          # A retry after a partly successful upload must not fail on the files
+          # that already landed.
+          skip-existing: true
