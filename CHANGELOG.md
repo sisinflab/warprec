@@ -2,6 +2,33 @@
 
 <!-- version list -->
 
+## v1.14.1 (2026-09-25)
+
+### Bug Fixes
+
+- PopREO counts only the relevant recommendations
+  ([`d87d162`](https://github.com/sisinflab/warprec/commit/d87d162736d2f78377847254a417322bd65ef3b8))
+
+- PopRSP divides by what was actually on offer
+  ([`84299cc`](https://github.com/sisinflab/warprec/commit/84299cc64e89addc3143edb74802730cf3d9e456))
+
+- RSP counts the available items instead of estimating them
+  ([`040ca63`](https://github.com/sisinflab/warprec/commit/040ca639506aa5a4fae93ce8b9ac4c2cef3021f9))
+
+### Continuous Integration
+
+- A published release can be uploaded again
+  ([`3aee52f`](https://github.com/sisinflab/warprec/commit/3aee52fad82224ebbc38e7bb22b9fb3d8e578ed6))
+
+### Testing
+
+- PopREO is pinned on a fixture that separates the two readings
+  ([`f06b45a`](https://github.com/sisinflab/warprec/commit/f06b45aa47d7061ae8422e350a8fdfe1e9299c37))
+
+- The parity metrics are pinned against hand-computed rates
+  ([`b6f361a`](https://github.com/sisinflab/warprec/commit/b6f361a9f1d104c9da7ad16776d5031aec788878))
+
+
 ## v1.14.0 (2026-09-25)
 
 ### Documentation
