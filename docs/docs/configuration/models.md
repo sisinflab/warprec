@@ -104,9 +104,25 @@ models:
 
 **Precision.** The mixed modes keep the weights in full precision and run the arithmetic in half, which is where the saving comes from. They take effect on a GPU only: requested on a CPU they are ignored with a warning, because the autocast path costs something there and returns nothing. `bf16-mixed` falls back to `16-mixed` on a GPU that does not support bfloat16.
 
-!!! warning "Mixed precision is not safe for every model"
+!!! danger "These models cannot use mixed precision"
 
-    Several model families in WarpRec propagate over sparse adjacency matrices, and half-precision support for sparse kernels is incomplete: some operations raise, and some losses that take norms or powers overflow. The default is `32-true` for that reason. Verify a model trains and scores as expected under a mixed mode before relying on it, and compare the metrics against a full-precision run rather than assuming they match.
+    Nine models raise under **both** mixed modes. Every one propagates over a sparse adjacency matrix, and PyTorch's sparse kernels have no half-precision implementation:
+
+    `EGCF`, `ESIGCF`, `FREEDOM`, `KGAT`, `KGIN`, `MGCN`, `MMGCN`, `SGL`, `SimRec`
+
+    Three more raise under `16-mixed` but run under `bf16-mixed`, because they place a large negative sentinel in an attention mask and it overflows the narrower exponent range of float16:
+
+    `DuoRec`, `LightSANs`, `NARM`
+
+    The failure is an exception at the first training step, not a silent wrong answer, so a run configured this way stops rather than producing bad numbers. Leave these models at `32-true`.
+
+!!! warning "Verify before relying on it elsewhere"
+
+    Running is not the same as agreeing. A model that trains under a mixed mode can still reach different parameters, so compare the metrics of a converged mixed-precision run against a full-precision one before trusting them. The default is `32-true` for that reason.
+
+!!! note "Where the benefit comes from"
+
+    Mixed precision pays off when the arithmetic dominates: large embedding tables, wide batches, big catalogues. On small models or small batches the casting overhead can outweigh the saving and the run gets slightly slower. Measure on your own data and hardware rather than assuming a speedup.
 
 **Gradient clipping.** Applied by the training loop after gradients are computed and, in a distributed run, after they are synchronised. `norm` rescales the whole gradient when its norm exceeds the bound, preserving direction; `value` clamps each component independently and does not.
 
