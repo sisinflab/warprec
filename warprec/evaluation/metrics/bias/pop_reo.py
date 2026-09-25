@@ -11,9 +11,12 @@ from warprec.utils.registry import metric_registry
 class PopREO(TopKMetric):
     """Popularity-based Ranking-based Equal Opportunity (PopREO) metric.
 
-    This metric evaluates the fairness of a recommender system by comparing the
-    proportion of recommended items from the short head (most popular items) and
-    long tail (less popular items) to their respective proportions in the ground truth.
+    This metric evaluates the fairness of a recommender system by comparing, for
+    the short head (most popular items) and the long tail (less popular ones),
+    the share of a group's relevant items that the ranking actually surfaced.
+    Both halves of that ratio are conditioned on relevance, which is what makes
+    it an equal-opportunity measure rather than a statistical-parity one; the
+    unconditioned counterpart is PopRSP.
     It calculates the standard deviation of these proportions divided by their mean,
     providing a measure of how equally the system recommends items
     across different popularity groups.
@@ -37,6 +40,7 @@ class PopREO(TopKMetric):
     _REQUIRED_COMPONENTS: Set[MetricBlock] = {
         MetricBlock.BINARY_RELEVANCE,
         MetricBlock.TOP_K_INDICES,
+        MetricBlock.TOP_K_BINARY_RELEVANCE,
     }
 
     short_head: Tensor
@@ -69,11 +73,18 @@ class PopREO(TopKMetric):
     def update(self, preds: Tensor, **kwargs: Any):
         target = kwargs.get("binary_relevance")
         top_k_indices = kwargs.get(f"top_{self.k}_indices")
+        top_k_rel = kwargs.get(f"top_{self.k}_binary_relevance")
         item_indices = kwargs.get("item_indices")
 
         # Remap top_k_indices to global
-        item_indices = kwargs.get("item_indices")
         top_k_indices = self.remap_indices(top_k_indices, item_indices)
+
+        # Equal opportunity is conditioned on relevance: what is counted is a
+        # recommendation the user actually wanted, not merely one that was made.
+        # Counting every recommended item instead pairs this numerator with a
+        # denominator of relevant items alone, which is a ratio of two different
+        # populations and can exceed one.
+        recommended = top_k_indices[top_k_rel > 0]
 
         # Extract positive item indices from target
         if item_indices is not None:
@@ -84,8 +95,8 @@ class PopREO(TopKMetric):
             _, positive_indices = target.nonzero(as_tuple=True)
 
         # Accumulate short head and long tail recommendations
-        self.short_recs += torch.isin(top_k_indices, self.short_head).sum().float()
-        self.long_recs += torch.isin(top_k_indices, self.long_tail).sum().float()
+        self.short_recs += torch.isin(recommended, self.short_head).sum().float()
+        self.long_recs += torch.isin(recommended, self.long_tail).sum().float()
         self.short_gt += torch.isin(positive_indices, self.short_head).sum().float()
         self.long_gt += torch.isin(positive_indices, self.long_tail).sum().float()
 
