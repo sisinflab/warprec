@@ -2,6 +2,24 @@
 
 <!-- version list -->
 
+## v1.14.2 (2026-09-25)
+
+### Bug Fixes
+
+- A user with no history is scored instead of crashing or returning NaN
+  ([`624101f`](https://github.com/sisinflab/warprec/commit/624101f06a06f2d53818ddb513b8a188f709e00f))
+
+### Documentation
+
+- The cold start guide states what an empty history is scored from
+  ([`2565b6a`](https://github.com/sisinflab/warprec/commit/2565b6a8a0df0183d225407fe90ac086caca89d7))
+
+### Testing
+
+- A user with no history is checked against every sequential model
+  ([`53b1234`](https://github.com/sisinflab/warprec/commit/53b12341e1dfa53c270dee6794ca4d6b0f372581))
+
+
 ## v1.14.1 (2026-09-25)
 
 ### Bug Fixes
