@@ -17,7 +17,7 @@ Training popularity is item0: 2, items 1-4: 1 each, six interactions in all.
 """
 
 import math
-from typing import Dict
+from typing import Any, Dict
 
 import pandas as pd
 import pytest
@@ -27,6 +27,7 @@ from test_metrics_golden import _FixedScoreRecommender, TEST_ROWS, TRAIN_ROWS
 
 from warprec.data.dataset import Dataset
 from warprec.evaluation import Evaluator
+from warprec.utils.registry import metric_registry
 
 # The long tail is what is left after the most popular items covering 80% of the
 # interactions are removed. Sorted counts are [2, 1, 1, 1, 1] over six
@@ -189,3 +190,126 @@ def test_a_user_with_nothing_to_find_is_left_out_of_the_mean(
         assert torch.isnan(results[name][2]), f"{name} counted a user it cannot score"
 
     assert float(results["F1"].nanmean()) == pytest.approx(0.65, abs=1e-5)
+
+
+# --------------------------------------------------------------------------
+# PopREO, on a fixture built to tell the two readings apart
+# --------------------------------------------------------------------------
+#
+# Equal opportunity asks what share of a group's *relevant* items the ranking
+# surfaced, so both halves of the ratio are conditioned on relevance. Counting
+# every recommended item in the numerator instead, against a denominator of
+# relevant items, divides one population by another and can exceed one.
+#
+# The shared fixture cannot see the difference: its two groups come out equal
+# either way, so the metric reads 0 in both. This one is built so that they
+# disagree.
+#
+#   popularity  items 0-3 are popular, 4 and 5 are rare, so the 80% cut puts
+#               {0, 1, 2, 3} in the short head and {4, 5} in the long tail
+#   user 0      wants {4, 5}, both long tail; item 3 is masked; ranks 0, 1, 4
+#               -> found one of its two relevant items
+#   user 1      wants {0, 1}, both short head; item 3 is masked; ranks 0, 1, 2
+#               -> found both
+#
+#   conditioned on relevance   short 2/2 = 1.0, long 1/2 = 0.5
+#                              -> std 0.25 over mean 0.75 = 1/3
+#   counting every recommendation  short 5/2 = 2.5, long 1/2 = 0.5
+#                              -> std 1.0 over mean 1.5 = 2/3
+POP_TRAIN = [(user, item, 1.0) for user in (2, 3, 4, 5) for item in (0, 1, 2, 3)] + [
+    (6, 4, 1.0),
+    (6, 5, 1.0),
+    (0, 3, 1.0),
+    (1, 3, 1.0),
+]
+POP_TEST = [(0, 4, 1.0), (0, 5, 1.0), (1, 0, 1.0), (1, 1, 1.0)]
+
+POP_SCORES = torch.zeros(7, 6)
+POP_SCORES[0] = torch.tensor([0.9, 0.8, 0.1, 0.0, 0.7, 0.2])
+POP_SCORES[1] = torch.tensor([0.9, 0.8, 0.7, 0.0, 0.1, 0.2])
+
+
+class _PopularityScorer(_FixedScoreRecommender):
+    """The fixed-score recommender, driven by the popularity fixture's scores."""
+
+    def __init__(self, params: dict, info: dict, **kwargs: Any):
+        super().__init__(params, info, **kwargs)
+        self.scores = POP_SCORES
+
+
+@pytest.fixture(name="popularity_dataset", scope="module")
+def popularity_dataset_fixture() -> Dataset:
+    """The fixture the PopREO derivation above is taken from.
+
+    Returns:
+        Dataset: The dataset under test.
+    """
+    columns = ["user_id", "item_id", "rating"]
+    return Dataset(
+        train_data=pd.DataFrame(POP_TRAIN, columns=columns),
+        eval_data=pd.DataFrame(POP_TEST, columns=columns),
+        rating_type="explicit",
+        rating_label="rating",
+        batch_size=8,
+    )
+
+
+def test_popreo_counts_only_the_relevant_recommendations(
+    popularity_dataset: Dataset,
+):
+    """The numerator is conditioned on relevance, as equal opportunity requires.
+
+    Before this was fixed the metric read 2/3 on this fixture: it counted every
+    recommended item of a group against that group's relevant items alone.
+    """
+    evaluator = Evaluator(
+        ["PopREO"], [3], train_set=popularity_dataset.train_set.get_sparse()
+    )
+    evaluator.evaluate(
+        model=_PopularityScorer({}, popularity_dataset.info()),
+        dataloader=popularity_dataset.get_evaluation_dataloader(),
+        strategy="full",
+        dataset=popularity_dataset,
+    )
+
+    got = float(evaluator.compute_results()[3]["PopREO"])
+
+    assert got == pytest.approx(1 / 3, abs=1e-5)
+    assert got != pytest.approx(2 / 3, abs=1e-5)
+
+
+def test_popreo_accumulates_only_relevant_hits():
+    """Drive the metric directly, so the two accumulators can be read.
+
+    The ratio the metric publishes hides its halves. Feeding it a batch by hand
+    shows them: a group's numerator must never exceed its denominator, because
+    both count relevant items and one is a subset of the other. Under the old
+    reading the short head accumulated five hits against two relevant items.
+    """
+    # Items 0-3 popular, 4 and 5 rare: short head {0, 1, 2, 3}, long tail {4, 5}.
+    interactions = torch.tensor([4.0, 4.0, 4.0, 6.0, 1.0, 1.0])
+    metric = metric_registry.get_class("PopREO")(k=3, item_interactions=interactions)
+
+    relevance = torch.zeros(2, 6)
+    relevance[0, 4] = relevance[0, 5] = 1.0  # user 0 wants two long-tail items
+    relevance[1, 0] = relevance[1, 1] = 1.0  # user 1 wants two short-head ones
+
+    metric.update(
+        preds=torch.zeros(2, 6),
+        binary_relevance=relevance,
+        top_3_indices=torch.tensor([[0, 1, 4], [0, 1, 2]]),
+        # Of what each user was shown, these are the ones it actually wanted.
+        top_3_binary_relevance=torch.tensor([[0.0, 0.0, 1.0], [1.0, 1.0, 0.0]]),
+        item_indices=None,
+    )
+
+    assert float(metric.short_recs) == 2.0
+    assert float(metric.long_recs) == 1.0
+    assert float(metric.short_gt) == 2.0
+    assert float(metric.long_gt) == 2.0
+
+    # Neither group can surface more of its relevant items than it has.
+    assert float(metric.short_recs) <= float(metric.short_gt)
+    assert float(metric.long_recs) <= float(metric.long_gt)
+
+    assert float(metric.compute()["PopREO"]) == pytest.approx(1 / 3, abs=1e-5)
