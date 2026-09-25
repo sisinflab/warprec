@@ -102,7 +102,9 @@ models:
             gradient_clip_algorithm: norm
 ```
 
-**Precision.** The mixed modes keep the weights in full precision and run the arithmetic in half, which is where the saving comes from. They take effect on a GPU only: requested on a CPU they are ignored with a warning, because the autocast path costs something there and returns nothing. `bf16-mixed` falls back to `16-mixed` on a GPU that does not support bfloat16. The saving arrives only when the arithmetic dominates — large embeddings, wide batches, big catalogues — and on small workloads the casting overhead can make a run slightly slower instead.
+**Precision.** The mixed modes keep the weights in full precision and run the arithmetic in half. They take effect on a GPU only: requested on a CPU they are ignored with a warning, because the autocast path costs something there and returns nothing. `bf16-mixed` falls back to `16-mixed` on a GPU that does not support bfloat16.
+
+**Where it is worth setting.** The saving comes from dense matrix work, which in a recommendation run means scoring rather than training. A model whose prediction pushes every user-item pair through a multi-layer network — the context-aware family, and the neural collaborative models — has enough arithmetic for it to shorten, and scoring happens on every evaluation epoch. Training is mostly embedding lookups and sparse gathers, which are limited by memory bandwidth rather than by arithmetic, so there is little there to win. A model whose forward pass is small next to the cost of casting, such as an autoencoder over the interaction row, can come out slightly slower instead.
 
 !!! warning "Not every family can use mixed precision"
 
