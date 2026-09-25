@@ -9,6 +9,7 @@ WarpRec includes **44 GPU-accelerated metrics** organized into 9 families. All m
 | | [GAUC](accuracy.md#gauc) | Per-user AUC averaged across all users. | Global |
 | | [HitRate@K](accuracy.md#hitrate) | Fraction of users with at least one relevant item in top K. | Top-K |
 | | [LAUC@K](accuracy.md#lauc) | AUC limited to the top-K ranked items. | Top-K |
+| | [LogLoss](accuracy.md#logloss) | Cross-entropy of the scores against the labels; measures calibration, not ordering. | Global |
 | | [MAP@K](accuracy.md#map) | Mean Average Precision rewarding higher-ranked correct items. | Top-K |
 | | [MAR@K](accuracy.md#mar) | Mean Average Recall indicating progressive retrieval quality. | Top-K |
 | | [MRR@K](accuracy.md#mrr) | Mean Reciprocal Rank of the first relevant item. | Top-K |

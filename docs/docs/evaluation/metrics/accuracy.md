@@ -93,6 +93,30 @@ evaluation:
     metrics: [LAUC]
 ```
 
+## LogLoss
+
+**Logarithmic Loss (LogLoss).** The binary cross-entropy between a model's scores and the relevance labels. Every other metric here judges an *ordering*, which says nothing about calibration: a model can rank perfectly while being confidently wrong about how likely any single interaction is. LogLoss is the counterpart, and it is what the click-through-rate literature reports, so it is what makes the context-aware models comparable with their published numbers. Lower is better.
+
+$$
+\text{LogLoss} = -\frac{1}{N}\sum_{i=1}^{N} y_i \log(\hat{p}_i) + (1 - y_i)\log(1 - \hat{p}_i)
+$$
+
+!!! warning "The scores are read as logits"
+
+    Nothing in WarpRec constrains a model's output to $[0, 1]$, so $\hat{p}$ is the
+    sigmoid of the score. A model that already emits a probability is not the one to
+    read this on. Items removed by the seen-item mask are skipped rather than counted
+    as confident negatives.
+
+It pairs naturally with the `sampled` strategy, where every user contributes one positive and a fixed number of negatives. Under `full` ranking the labels are overwhelmingly negative and the value reflects that imbalance.
+
+```yaml
+evaluation:
+    strategy: sampled
+    num_negatives: 99
+    metrics: [LogLoss]
+```
+
 ## MAP
 
 **Mean Average Precision (MAP@K).** Measures the mean of average precision scores across all users, rewarding correct recommendations ranked higher.
