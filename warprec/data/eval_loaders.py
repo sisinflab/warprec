@@ -1,4 +1,4 @@
-from typing import Tuple, List, Any
+from typing import Tuple, List, Any, Optional
 
 import torch
 import numpy as np
@@ -9,6 +9,35 @@ from torch import Tensor
 from torch.utils.data import Dataset as TorchDataset
 from torch.nn.utils.rnn import pad_sequence
 from scipy.sparse import csr_matrix
+
+from warprec.data.entities.train_structures.interaction_structures import (
+    popularity_cumulative,
+)
+
+
+def draw_candidates(
+    rng: np.random.RandomState,
+    cumulative: Optional[np.ndarray],
+    num_items: int,
+    size: int,
+) -> np.ndarray:
+    """Draw item candidates from the configured negative-sampling distribution.
+
+    Args:
+        rng (np.random.RandomState): The stream the draws come from.
+        cumulative (Optional[np.ndarray]): The cumulative popularity weights, or
+            None to draw every item with equal probability.
+        num_items (int): The size of the catalogue.
+        size (int): How many candidates to draw.
+
+    Returns:
+        np.ndarray: The drawn item indices, which may repeat and may be items the
+            user has already seen; the caller rejects those.
+    """
+    if cumulative is None:
+        return rng.randint(0, num_items, size=size)
+    drawn = np.searchsorted(cumulative, rng.random_sample(size))
+    return np.minimum(drawn, num_items - 1)
 
 
 class EvaluationDataset(TorchDataset):
@@ -95,6 +124,7 @@ class SampledEvaluationDataset(TorchDataset):
         eval_interactions: csr_matrix,
         num_negatives: int = 99,
         seed: int = 42,
+        negative_sampling: str = "uniform",
     ):
         super().__init__()
         self.num_users, self.num_items = train_interactions.shape
@@ -121,7 +151,15 @@ class SampledEvaluationDataset(TorchDataset):
         self.positive_items_list = []
         self.negative_items_list = []
 
-        np.random.seed(seed)
+        # The sampler owns its stream: seeding the global one made the draws
+        # depend on whatever else had touched it. RandomState is the same
+        # algorithm, so the uniform draws are unchanged.
+        rng = np.random.RandomState(seed)
+        cumulative = (
+            popularity_cumulative(train_interactions, self.num_items)
+            if negative_sampling == "popularity"
+            else None
+        )
 
         for u in self.users_with_eval:
             # Store positives
@@ -142,7 +180,9 @@ class SampledEvaluationDataset(TorchDataset):
             # Sample one time 2x the number of negatives
             # NOTE: In most cases this will skip the while loop
             num_to_generate = num_negatives * 2
-            candidates = np.random.randint(0, self.num_items, size=num_to_generate)
+            candidates = draw_candidates(
+                rng, cumulative, self.num_items, num_to_generate
+            )
 
             # Fast filtering using numpy boolean masking
             mask = np.isin(candidates, seen_items, invert=True)
@@ -166,7 +206,7 @@ class SampledEvaluationDataset(TorchDataset):
             if len(valid_negatives) < num_negatives:
                 final_negs = list(valid_negatives)
                 while len(final_negs) < num_negatives:
-                    cand = np.random.randint(0, self.num_items)
+                    cand = int(draw_candidates(rng, cumulative, self.num_items, 1)[0])
                     if cand not in seen_items and cand not in final_negs:
                         final_negs.append(cand)
                 valid_negatives = np.array(final_negs)
@@ -229,6 +269,7 @@ class SampledContextualEvaluationDataset(TorchDataset):
         num_items: int,
         num_negatives: int = 99,
         seed: int = 42,
+        negative_sampling: str = "uniform",
     ):
         # pylint: disable = too-many-nested-blocks
         self.num_negatives = num_negatives
@@ -250,7 +291,12 @@ class SampledContextualEvaluationDataset(TorchDataset):
         n_train_users = train_interactions.shape[0]
 
         self.negatives_list: list[Tensor] = []
-        np.random.seed(seed)
+        rng = np.random.RandomState(seed)
+        cumulative = (
+            popularity_cumulative(train_interactions, self.num_items)
+            if negative_sampling == "popularity"
+            else None
+        )
 
         for idx, user_idx_tensor in enumerate(self.user_indices):
             u = int(user_idx_tensor.item())
@@ -269,7 +315,9 @@ class SampledContextualEvaluationDataset(TorchDataset):
 
             # Generate 2x candidates to avoid loops in most cases
             num_to_generate = self.num_negatives * 2
-            candidates = np.random.randint(0, self.num_items, size=num_to_generate)
+            candidates = draw_candidates(
+                rng, cumulative, self.num_items, num_to_generate
+            )
 
             # Filter out seen items using optimized numpy boolean masking
             mask = np.isin(candidates, seen_items, invert=True)
@@ -292,7 +340,7 @@ class SampledContextualEvaluationDataset(TorchDataset):
             if len(valid_negatives) < self.num_negatives:
                 final_negs = list(valid_negatives)
                 while len(final_negs) < self.num_negatives:
-                    cand = np.random.randint(0, self.num_items)
+                    cand = int(draw_candidates(rng, cumulative, self.num_items, 1)[0])
                     if cand not in final_negs:
                         if cand != target_item:
                             if cand not in train_items:

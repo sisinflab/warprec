@@ -79,6 +79,7 @@ def remote_evaluation_and_timing(
         model=model,
         strategy=evaluation.strategy,
         num_negatives=evaluation.num_negatives,
+        negative_sampling=evaluation.negative_sampling,
         **evaluation_dataloader_kwargs,
     )
 

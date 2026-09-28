@@ -8,7 +8,6 @@ from torch.utils.data import DataLoader
 from narwhals.dataframe import DataFrame
 from scipy.sparse import csr_matrix, coo_matrix
 
-from warprec.data.entities.context import build_context_array
 from warprec.data.entities.train_structures import (
     InteractionDataset,
     PointWiseDataset,
@@ -404,36 +403,37 @@ class Interactions:
         Args:
             neg_samples (int): Number of negative samples per user.
             include_side_info (bool): Whether to include side information features in the output.
-            include_context (bool): Wether to include the context in the output.
+            include_context (bool): Must be False. Kept so that a caller asking
+                for contexts is refused rather than quietly given rows whose
+                contexts belong to other interactions.
             batch_size (int): The batch size that will be used to
             shuffle (bool): Whether to shuffle the data.
             seed (int): Seed for Numpy random number generator for reproducibility.
             **kwargs (Any): The additional keyword arguments to pass the Dataloader.
 
         Returns:
-            DataLoader: Yields (user, item, rating) with negative samples or
-                (user, item, rating, context) if flagged.
+            DataLoader: Yields (user, item, rating) with negative samples.
+
+        Raises:
+            NotImplementedError: If contexts are asked for. This entity cannot
+                supply them.
         """
+        if include_context:
+            raise NotImplementedError(
+                "Interactions cannot supply contexts: its rows come from the "
+                "interaction matrix, which holds one cell per (user, item) pair "
+                "and so cannot carry the same pair seen in several situations. "
+                "Contextual training reads Transactions instead, which keeps "
+                "one row per record. Configure 'reader.context' so that entity "
+                "is built."
+            )
+
         pos_users, pos_items = self._get_mapped_indices()
 
-        # Prepare side information and context if requested
+        # Prepare side information if requested
         side_info_tensor = None
         if include_side_info and self._inter_side_tensor is not None:
             side_info_tensor = self._inter_side_tensor
-
-        context_tensor = None
-        if include_context and self.context_labels:
-            ctx_vals = self._inter_df.select(self.context_labels).to_numpy()
-            context_tensor = torch.from_numpy(
-                build_context_array(
-                    ctx_vals,
-                    [
-                        self.context_types.get(name, "token")
-                        for name in self.context_labels
-                    ],
-                    self.context_max_len,
-                )
-            )
 
         # Create the Dataset
         dataset = PointWiseDataset(
@@ -443,7 +443,7 @@ class Interactions:
             neg_samples=neg_samples,
             niid=self._og_niid,
             side_information=side_info_tensor,
-            contexts=context_tensor,
+            contexts=None,
             negative_sampling=self.negative_sampling,
             seed=seed,
         )

@@ -1,6 +1,7 @@
 from typing import List, Literal, Optional, Dict, Any
 
 from pydantic import BaseModel, field_validator, Field
+from warprec.utils.config.training_configuration import NegativeSampling
 from warprec.utils.registry import metric_registry
 from warprec.utils.logger import logger
 
@@ -124,6 +125,11 @@ class EvaluationConfig(BaseModel):
         batch_size (Optional[int]): Batch size used during evaluation.
         strategy (Optional[str]): Evaluation strategy, either "full" or "sampled".
         num_negatives (Optional[int]): Number of negative samples to use in "sampled" strategy.
+        negative_sampling (Optional[NegativeSampling]): How the candidates of the
+            "sampled" strategy are drawn. 'uniform' gives every item the same
+            chance; 'popularity' draws in proportion to a dampened interaction
+            count, which asks the model to separate a relevant item from popular
+            distractors rather than from obscure ones. Defaults to 'uniform'.
         candidates (Optional[Literal["all", "cold", "warm"]]): Which items a run is
             allowed to rank. 'cold' keeps only the items with no training
             interaction and 'warm' only the rest, which is what makes a cold-start
@@ -151,6 +157,7 @@ class EvaluationConfig(BaseModel):
     batch_size: Optional[int] = 1024
     strategy: Optional[str] = "full"  # or "sampled"
     num_negatives: Optional[int] = 99
+    negative_sampling: Optional[NegativeSampling] = "uniform"
     candidates: Optional[Literal["all", "cold", "warm"]] = "all"
     mask_seen: Optional[Literal["auto", "context", "pair", "none"]] = "auto"
     seed: Optional[int] = 42

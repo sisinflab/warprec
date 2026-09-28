@@ -19,6 +19,7 @@ from scipy.sparse import csr_matrix
 from warprec.data.eval_loaders import (
     ContextualEvaluationDataset,
     SampledContextualEvaluationDataset,
+    SampledEvaluationDataset,
 )
 
 CONTEXTS: List[str] = ["daytime", "weather"]
@@ -151,3 +152,117 @@ def test_asking_for_more_candidates_than_the_catalogue_holds_is_refused():
     """
     with pytest.raises(ValueError, match="left unseen"):
         sampled_contextual(num_negatives=20, num_items=12)
+
+
+def skewed_train(num_users: int = 40, num_items: int = 60) -> csr_matrix:
+    """A catalogue with a real head and a real tail.
+
+    Items 0-9 are held by half the users each and items 10-49 by one user each,
+    so for any given user the head is both popular and still mostly unseen. That
+    is the situation popularity sampling exists for: an item everybody else likes
+    and this user has not touched is a far harder distractor than an item nobody
+    has touched at all. Items 50-59 stay out of training so they can be the
+    evaluation positives.
+
+    Args:
+        num_users (int): How many users to generate.
+        num_items (int): The catalogue size.
+
+    Returns:
+        csr_matrix: The training interactions.
+    """
+    rows, cols = [], []
+    for user in range(num_users):
+        for item in range(10):
+            if (user + item) % 2 == 0:
+                rows.append(user)
+                cols.append(item)
+    for item in range(10, 50):
+        rows.append(item % num_users)
+        cols.append(item)
+    return csr_matrix((np.ones(len(rows)), (rows, cols)), shape=(num_users, num_items))
+
+
+def sampled(strategy: str, seed: int = 5) -> SampledEvaluationDataset:
+    """Build the sampled evaluation dataset under one negative-sampling strategy.
+
+    Args:
+        strategy (str): Either 'uniform' or 'popularity'.
+        seed (int): The seed of the draw.
+
+    Returns:
+        SampledEvaluationDataset: The dataset under test.
+    """
+    train = skewed_train()
+    evaluation = csr_matrix((np.ones(40), (list(range(40)), [50] * 40)), shape=(40, 60))
+    return SampledEvaluationDataset(
+        train_interactions=train,
+        eval_interactions=evaluation,
+        num_negatives=8,
+        seed=seed,
+        negative_sampling=strategy,
+    )
+
+
+def mean_popularity(dataset: SampledEvaluationDataset, train: csr_matrix) -> float:
+    """The average training count of the drawn negatives.
+
+    Args:
+        dataset (SampledEvaluationDataset): The dataset whose negatives to read.
+        train (csr_matrix): The interactions the counts come from.
+
+    Returns:
+        float: The mean count.
+    """
+    counts = np.asarray((train > 0).sum(axis=0)).ravel()
+    drawn = torch.cat(dataset.negative_items_list).numpy()
+    return float(counts[drawn].mean())
+
+
+def test_popularity_sampling_draws_harder_negatives():
+    """The point of the protocol: the distractors come from the head.
+
+    Uniform sampling fills a candidate list with items almost nobody has touched,
+    which any model separates from a relevant item without having learned much.
+    """
+    train = skewed_train()
+
+    uniform = mean_popularity(sampled("uniform"), train)
+    popularity = mean_popularity(sampled("popularity"), train)
+
+    assert popularity > uniform, (
+        f"popularity sampling drew no harder than uniform ({popularity} vs {uniform})"
+    )
+
+
+def test_the_negatives_are_still_unseen_under_popularity():
+    """Drawing from the head must not start handing back the user's own items."""
+    train = skewed_train()
+    dataset = sampled("popularity")
+
+    for position, user in enumerate(dataset.users_with_eval):
+        seen = set(train.indices[train.indptr[user] : train.indptr[user + 1]].tolist())
+        drawn = set(dataset.negative_items_list[position].tolist())
+        assert not (drawn & seen), f"user {user} was given an item they had seen"
+
+
+@pytest.mark.parametrize("strategy", ["uniform", "popularity"])
+def test_the_draw_is_reproducible_and_leaves_the_global_stream_alone(strategy: str):
+    """Two runs at one seed must agree, and neither may disturb numpy's global RNG.
+
+    The loader used to call np.random.seed, which reseeds the stream every other
+    caller shares. Anything drawing after an evaluation dataset was built had its
+    own sequence silently reset.
+    """
+    np.random.seed(1234)
+    before = np.random.rand(3)
+
+    np.random.seed(1234)
+    first = sampled(strategy)
+    after = np.random.rand(3)
+
+    second = sampled(strategy)
+
+    assert np.array_equal(before, after), "building the dataset moved the global RNG"
+    for one, two in zip(first.negative_items_list, second.negative_items_list):
+        assert torch.equal(one, two), f"{strategy} did not reproduce at a fixed seed"

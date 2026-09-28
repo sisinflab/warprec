@@ -12,6 +12,8 @@ Auto-generated documentation for accuracy metric classes.
 
 ::: warprec.evaluation.metrics.accuracy.lauc.LAUC
 
+::: warprec.evaluation.metrics.accuracy.logloss.LogLoss
+
 ::: warprec.evaluation.metrics.accuracy.map.MAP
 
 ::: warprec.evaluation.metrics.accuracy.mar.MAR

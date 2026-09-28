@@ -52,7 +52,7 @@ evaluation:
 
 ## BiasDisparityBS
 
-**Bias Disparity - Bias Scores (BiasDisparityBS).** Measures the **disparity in the average bias scores** of recommended items across user groups, assessing score-level bias.
+**Bias Disparity - Bias Source (BiasDisparityBS).** Measures the bias each user group **already carries in the training data**, which is the baseline [BiasDisparityBR](#biasdisparitybr) is read against. It describes the split rather than a model, so it does not depend on the cutoff.
 
 $$
 \text{BS}(u, c) = \frac{P_{\text{train}}(u, c)}{P_{\text{global}}(c)}

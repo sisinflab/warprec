@@ -17,6 +17,7 @@ In the following sections, you will find the list of available context-aware mod
 A few behaviours are shared by every model on this page:
 
 - **Training examples are interaction rows.** Each row of the training split becomes a positive example carrying its own context, so the same (user, item) pair appearing in several contexts contributes several examples.
+- **This requires `reader.context` to be configured.** The rows come from it. The interaction matrix cannot stand in: it holds one cell per (user, item) pair, so it can neither carry that pair in several situations nor say which situation a cell belongs to. A model asked to train on contexts without it is refused rather than given rows whose contexts describe other interactions.
 - **Labels are binary.** Positives are labelled 1 and sampled negatives 0, whatever `rating_type` says, because these models optimise a binary objective. An explicit rating therefore acts as a filter on which interactions exist, not as a target value.
 - **Contextual fields may be categorical, numeric or multi-valued.** Each contributes one vector: a category is looked up, a measurement scales a single embedding by its value, and a multi-valued field is pooled over its values. See [How a Contextual Column Is Interpreted](../data-management/reader.md#how-a-contextual-column-is-interpreted).
 - **Negatives reuse the positive's context.** A negative sample is a different item in the *same* situation, which is what makes the context discriminative. How those items are drawn is set by `training.negative_sampling`.

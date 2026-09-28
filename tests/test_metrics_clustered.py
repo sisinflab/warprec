@@ -32,7 +32,17 @@ SIDE = pd.DataFrame(
     {"item_id": [0, 1, 2, 3, 4], "a": [1, 1, 0, 0, 0], "b": [0, 0, 1, 1, 1]}
 )
 
-CLUSTERED = ["REO", "RSP", "PopREO", "PopRSP", "ItemMADRanking", "UserMADRanking"]
+CLUSTERED = [
+    "REO",
+    "RSP",
+    "PopREO",
+    "PopRSP",
+    "ItemMADRanking",
+    "UserMADRanking",
+    "BiasDisparityBS",
+    "BiasDisparityBR",
+    "BiasDisparityBD",
+]
 
 
 @pytest.fixture(name="clustered_dataset", scope="module")
@@ -225,3 +235,66 @@ def test_rsp_rates_are_proper_proportions():
 
     # Which is the same answer PopRSP gives for the same split of the catalogue.
     assert float(metric.compute()["RSP"]) == pytest.approx(7 / 13, abs=1e-5)
+
+
+def test_bias_disparity_bs_counts_the_training_interactions(
+    clustered_dataset: Dataset,
+):
+    """BS is Bias Source: the bias of the data the model learned from.
+
+    It read the evaluation set instead, which is not a quantity the definition
+    has a name for, and left BD = (BR - BS)/BS resting on it. Hand-computed from
+    TRAIN_ROWS: user cluster 1 (users 0 and 1) holds items 1, 2, 0 in item
+    cluster 1 and item 3 in item cluster 2, so 3/4 against 4/4; user cluster 2
+    (user 2) holds one of each, 1/2 against 1/2. Item cluster 1 is 3 of the 5
+    items and item cluster 2 the other 2, so the shares divide by 0.6 and 0.4.
+    """
+    results = evaluate(["BiasDisparityBS"], clustered_dataset)
+
+    assert results["BiasDisparityBS_UC1_IC1"] == pytest.approx((3 / 4) / 0.6)
+    assert results["BiasDisparityBS_UC1_IC2"] == pytest.approx((1 / 4) / 0.4)
+    assert results["BiasDisparityBS_UC2_IC1"] == pytest.approx((1 / 2) / 0.6)
+    assert results["BiasDisparityBS_UC2_IC2"] == pytest.approx((1 / 2) / 0.4)
+
+
+def test_bias_disparity_bs_ignores_the_evaluation_set():
+    """The same training split must give the same bias source, whatever is held out.
+
+    This is the property the old implementation did not have, and the one that
+    makes BS comparable across the runs BD is read over.
+    """
+    columns = ["user_id", "item_id", "rating"]
+    common = {
+        "train_data": pd.DataFrame(TRAIN_ROWS, columns=columns),
+        "side_data": SIDE,
+        "user_cluster": USER_CLUSTERS,
+        "item_cluster": ITEM_CLUSTERS,
+        "cluster_label": "cluster",
+        "rating_type": "explicit",
+        "rating_label": "rating",
+        "batch_size": 8,
+    }
+    first = Dataset(eval_data=pd.DataFrame(TEST_ROWS, columns=columns), **common)
+    second = Dataset(
+        eval_data=pd.DataFrame([(2, 1, 5.0), (0, 3, 5.0)], columns=columns), **common
+    )
+
+    assert evaluate(["BiasDisparityBS"], first) == evaluate(["BiasDisparityBS"], second)
+
+
+def test_bias_disparity_bd_rests_on_a_non_zero_bias_source(
+    clustered_dataset: Dataset,
+):
+    """BD divides by BS, so a BS of zero silently flattened a whole user cluster.
+
+    Reading the evaluation set gave user cluster 2 no interactions at all here,
+    because its only user has no relevant test item and is dropped. Every BD of
+    that cluster was then 0/0 forced to zero, which reads as 'no disparity'.
+    """
+    results = evaluate(["BiasDisparityBD", "BiasDisparityBS"], clustered_dataset)
+
+    assert results["BiasDisparityBS_UC2_IC1"] > 0
+    assert results["BiasDisparityBS_UC2_IC2"] > 0
+    assert any(results[f"BiasDisparityBD_UC2_IC{ic}"] != 0.0 for ic in (1, 2)), (
+        "user cluster 2 reports no disparity at all"
+    )
