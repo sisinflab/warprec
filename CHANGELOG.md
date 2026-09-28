@@ -2,6 +2,34 @@
 
 <!-- version list -->
 
+## v1.15.1 (2026-09-28)
+
+### Bug Fixes
+
+- The popularity sampling exponent is configurable instead of hard-coded
+  ([`efba294`](https://github.com/sisinflab/warprec/commit/efba294a20d1e980c5c9f677eb3c71bad72fc502))
+
+### Continuous Integration
+
+- The coverage floor leaves headroom instead of tracking the suite
+  ([`aaaf54d`](https://github.com/sisinflab/warprec/commit/aaaf54dea8e0535bb33b5cfbc7c6f8bc41f10420))
+
+### Documentation
+
+- The popularity sampling exponent is documented
+  ([`f122515`](https://github.com/sisinflab/warprec/commit/f122515515fb9996d42b1a0c4231d4958325ee60))
+
+### Refactoring
+
+- Interactions drops the context state it no longer reads
+  ([`8709c2d`](https://github.com/sisinflab/warprec/commit/8709c2dca031517f0480174ad7e07dab3a0da06b))
+
+### Testing
+
+- The popularity sampling exponent is checked to move the draw
+  ([`65f2a85`](https://github.com/sisinflab/warprec/commit/65f2a85b22e4a5e8d279fe732d2255fc6a0d4d4c))
+
+
 ## v1.15.0 (2026-09-28)
 
 ### Bug Fixes
