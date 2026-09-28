@@ -56,6 +56,28 @@ runs:
     # both makes pydoclint's import order-dependent and it crashes when the
     # upstream package wins. Serving code is still linted; pylint is told to
     # ignore those imports.
+    #
+    # The install is retried because it fails for reasons that have nothing to
+    # do with the project: PyPI's index intermittently reports no candidates for
+    # a package that is plainly published, and a cold cache -- which is every
+    # run on a branch that has not built before -- fetches over 250 of them, so
+    # the chance that one request fails is not small. Poetry does not retry on
+    # its own, and a single failed request takes the whole job with it.
     - name: Install dependencies
       shell: bash
-      run: poetry install --no-interaction --sync --extras "dashboard remote-io bohb graph"
+      run: |
+        install() {
+          poetry sync --no-interaction --extras "dashboard remote-io bohb graph"
+        }
+        for attempt in 1 2 3; do
+          if install; then
+            exit 0
+          fi
+          if [ "$attempt" -lt 3 ]; then
+            delay=$((attempt * 15))
+            echo "::warning::poetry sync failed (attempt ${attempt}/3), retrying in ${delay}s"
+            sleep "$delay"
+          fi
+        done
+        echo "::error::poetry sync failed after 3 attempts"
+        exit 1
