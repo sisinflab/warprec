@@ -2,6 +2,58 @@
 
 <!-- version list -->
 
+## v1.15.0 (2026-09-28)
+
+### Bug Fixes
+
+- BiasDisparityBS measures the training data it is named after
+  ([`b4f3cfe`](https://github.com/sisinflab/warprec/commit/b4f3cfefa4c8ebbdeee43fabaeab648a9b84a870))
+
+- The interaction matrix refuses contexts instead of misaligning them
+  ([`8b8fbf7`](https://github.com/sisinflab/warprec/commit/8b8fbf75a75152540f8382967ca2fec6f1117e68))
+
+### Continuous Integration
+
+- The dependency install is retried when the package index fails
+  ([`7516bb9`](https://github.com/sisinflab/warprec/commit/7516bb9e1626819d3ccf3dc0a454b4a3eb8f7c60))
+
+### Documentation
+
+- BiasDisparityBS is described as the bias source, not a score
+  ([`f1cef9c`](https://github.com/sisinflab/warprec/commit/f1cef9ca81f0fef28544e6b2cf7c539a6a1e2b34))
+
+- Contextual training states that it needs the reader context section
+  ([`1fc8671`](https://github.com/sisinflab/warprec/commit/1fc86714e1b4c7b92bb0a7b540287c04a35e67ed))
+
+- LogLoss is documented and the metric count is updated
+  ([`aa11a69`](https://github.com/sisinflab/warprec/commit/aa11a69a31a3b8c4309a7a9ad0f784be225424b2))
+
+- The sampled evaluation negative sampling keyword is documented
+  ([`51ee70c`](https://github.com/sisinflab/warprec/commit/51ee70cd6ed43a3130615f092ebf26522f54816b))
+
+### Features
+
+- LogLoss measures how calibrated a model's scores are
+  ([`c7e1e2b`](https://github.com/sisinflab/warprec/commit/c7e1e2bb822b0af955c085ec9187c578f58c96c4))
+
+- Sampled evaluation can draw its negatives by popularity
+  ([`e1e55f8`](https://github.com/sisinflab/warprec/commit/e1e55f8adad86b180f7254526bc114b9cecbc97c))
+
+### Testing
+
+- LogLoss is pinned against a hand-computed cross-entropy
+  ([`43cad5a`](https://github.com/sisinflab/warprec/commit/43cad5ae344cb6112bda57904e6ab28330f7d070))
+
+- Popularity-sampled evaluation is checked to draw harder negatives
+  ([`f985761`](https://github.com/sisinflab/warprec/commit/f985761a23f99992088498a848de50d0a9caea6c))
+
+- The BiasDisparity metrics are pinned against hand-computed bias
+  ([`8c0647a`](https://github.com/sisinflab/warprec/commit/8c0647a553bac4c5722c46fc1b7a1446e125d6ee))
+
+- The two pointwise datasets are pinned where they agree and where they differ
+  ([`ef99296`](https://github.com/sisinflab/warprec/commit/ef992963743a36f52bf835603643bca97d64cadd))
+
+
 ## v1.14.2 (2026-09-25)
 
 ### Bug Fixes
