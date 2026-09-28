@@ -86,8 +86,6 @@ class Interactions:
         )
         self.timestamp_label = labels.timestamp
         self.context_labels = context.label_list()
-        self.context_types = dict(context.types)
-        self.context_max_len = context.max_len
 
         # Setup flat views cache
         self._flat_users: Optional[np.ndarray] = None
