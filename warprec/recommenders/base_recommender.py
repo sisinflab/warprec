@@ -1012,9 +1012,13 @@ class ContextRecommenderUtils(nn.Module, ABC):
         source: Any = self._transactions
 
         if source is None:
+            # Without contexts configured there is nothing to align, so the
+            # matrix is a perfectly good source. With them, it is not: the
+            # entity now says so itself rather than returning rows whose
+            # contexts describe other interactions.
             logger.attention(
                 f"{self.__class__.__name__} received no transactions and will read the "
-                "interaction matrix instead. Contexts cannot be aligned this way."
+                "interaction matrix instead."
             )
             source = interactions
 
