@@ -79,6 +79,7 @@ class Transactions:
         self.timestamp_label = labels.timestamp
         self.batch_size = options.batch_size
         self.negative_sampling = options.negative_sampling
+        self.neg_alpha = options.neg_alpha
 
         # One frame in, every array out: this is what keeps the contexts
         # attached to the interaction they describe.
@@ -203,6 +204,7 @@ class Transactions:
             side_information=side_info_tensor,
             contexts=context_tensor,
             negative_sampling=self.negative_sampling,
+            neg_alpha=self.neg_alpha,
             seed=seed,
         )
 

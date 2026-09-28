@@ -7,7 +7,8 @@ examples drawn from it during training differ.
 
 ## Available Keywords
 
-- **negative_sampling**: How negative examples are drawn during training: `uniform` or `popularity`. Defaults to `uniform`, which gives every item the same chance. `popularity` draws proportionally to a dampened interaction count (`count^0.75`), producing harder negatives among the items a model is most likely to over-recommend.
+- **negative_sampling**: How negative examples are drawn during training: `uniform` or `popularity`. Defaults to `uniform`, which gives every item the same chance. `popularity` draws proportionally to a dampened interaction count, producing harder negatives among the items a model is most likely to over-recommend.
+- **neg_alpha**: The exponent `popularity` applies to the interaction counts before drawing, `count^alpha`. Defaults to `0.75`. Zero weighs every item equally, which recovers `uniform`; one draws in exact proportion to the counts, and higher concentrates the draw on the head. Must not be negative, and is ignored by `uniform`.
 
 - **sequence_pooling**: How the values of a multi-valued contextual field are combined into the single vector that field contributes: `mean`, `sum` or `max`. Defaults to `mean`, which matches the normalised multi-hot encoding the factorization-machine literature defines these models over, so a field's contribution does not grow with the number of values it happens to hold.
 

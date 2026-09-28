@@ -16,6 +16,10 @@ import pytest
 import torch
 from scipy.sparse import csr_matrix
 
+from warprec.data.entities.train_structures.interaction_structures import (
+    NegativeSampler,
+    popularity_cumulative,
+)
 from warprec.data.eval_loaders import (
     ContextualEvaluationDataset,
     SampledContextualEvaluationDataset,
@@ -183,12 +187,15 @@ def skewed_train(num_users: int = 40, num_items: int = 60) -> csr_matrix:
     return csr_matrix((np.ones(len(rows)), (rows, cols)), shape=(num_users, num_items))
 
 
-def sampled(strategy: str, seed: int = 5) -> SampledEvaluationDataset:
+def sampled(
+    strategy: str, seed: int = 5, alpha: float = 0.75
+) -> SampledEvaluationDataset:
     """Build the sampled evaluation dataset under one negative-sampling strategy.
 
     Args:
         strategy (str): Either 'uniform' or 'popularity'.
         seed (int): The seed of the draw.
+        alpha (float): The exponent applied to the interaction counts.
 
     Returns:
         SampledEvaluationDataset: The dataset under test.
@@ -201,6 +208,7 @@ def sampled(strategy: str, seed: int = 5) -> SampledEvaluationDataset:
         num_negatives=8,
         seed=seed,
         negative_sampling=strategy,
+        neg_alpha=alpha,
     )
 
 
@@ -266,3 +274,67 @@ def test_the_draw_is_reproducible_and_leaves_the_global_stream_alone(strategy: s
     assert np.array_equal(before, after), "building the dataset moved the global RNG"
     for one, two in zip(first.negative_items_list, second.negative_items_list):
         assert torch.equal(one, two), f"{strategy} did not reproduce at a fixed seed"
+
+
+def test_the_exponent_flattens_the_distribution_at_zero():
+    """alpha is the dial between uniform and drawing in proportion to the counts.
+
+    Asserted on the weights rather than on a sample: at zero every item weighs
+    the same, which is uniform exactly, but the two strategies consume their
+    random stream differently so the items they happen to draw still differ.
+    """
+    weights = popularity_cumulative(skewed_train(), 60, 0.0)
+
+    steps = np.diff(np.concatenate([[0.0], weights]))
+    assert np.allclose(steps, steps[0]), "alpha=0 left some item likelier than another"
+
+
+def test_raising_the_exponent_draws_harder_negatives():
+    """If the dial does not move the draw, the keyword is decoration."""
+    train = skewed_train()
+
+    measured = [
+        mean_popularity(sampled("popularity", alpha=a), train)
+        for a in (0.0, 0.5, 1.0, 2.0)
+    ]
+
+    assert measured == sorted(measured), (
+        f"raising alpha did not draw harder negatives: {measured}"
+    )
+    assert measured[-1] > measured[0] * 2, (
+        f"the dial barely moved across its range: {measured}"
+    )
+
+
+def test_the_training_sampler_reads_the_same_exponent():
+    """Training and evaluation must mean the same thing by 'popularity'.
+
+    They draw through different code -- the training sampler rejects seen items
+    one at a time, the evaluation loader filters a block -- so the exponent is
+    the only thing keeping the two definitions of a hard negative together.
+    """
+    train = skewed_train()
+    counts = np.asarray((train > 0).sum(axis=0)).ravel()
+
+    drawn = {}
+    for alpha in (0.0, 0.75, 2.0):
+        sampler = NegativeSampler(
+            train, niid=60, strategy="popularity", alpha=alpha, seed=3
+        )
+        items = [sampler.sample(user) for user in range(40) for _ in range(8)]
+        drawn[alpha] = float(counts[items].mean())
+
+    assert drawn[0.0] < drawn[0.75] < drawn[2.0], (
+        f"the training sampler ignored the exponent: {drawn}"
+    )
+
+
+def test_the_training_sampler_never_returns_a_seen_item_whatever_the_exponent():
+    """Weighting the head must not start handing a user their own history."""
+    train = skewed_train()
+    sampler = NegativeSampler(train, niid=60, strategy="popularity", alpha=2.0, seed=3)
+
+    for user in range(40):
+        seen = set(train.indices[train.indptr[user] : train.indptr[user + 1]].tolist())
+        for _ in range(8):
+            assert sampler.sample(user) not in seen

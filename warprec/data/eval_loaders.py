@@ -125,6 +125,7 @@ class SampledEvaluationDataset(TorchDataset):
         num_negatives: int = 99,
         seed: int = 42,
         negative_sampling: str = "uniform",
+        neg_alpha: float = 0.75,
     ):
         super().__init__()
         self.num_users, self.num_items = train_interactions.shape
@@ -156,7 +157,7 @@ class SampledEvaluationDataset(TorchDataset):
         # algorithm, so the uniform draws are unchanged.
         rng = np.random.RandomState(seed)
         cumulative = (
-            popularity_cumulative(train_interactions, self.num_items)
+            popularity_cumulative(train_interactions, self.num_items, neg_alpha)
             if negative_sampling == "popularity"
             else None
         )
@@ -270,6 +271,7 @@ class SampledContextualEvaluationDataset(TorchDataset):
         num_negatives: int = 99,
         seed: int = 42,
         negative_sampling: str = "uniform",
+        neg_alpha: float = 0.75,
     ):
         # pylint: disable = too-many-nested-blocks
         self.num_negatives = num_negatives
@@ -293,7 +295,7 @@ class SampledContextualEvaluationDataset(TorchDataset):
         self.negatives_list: list[Tensor] = []
         rng = np.random.RandomState(seed)
         cumulative = (
-            popularity_cumulative(train_interactions, self.num_items)
+            popularity_cumulative(train_interactions, self.num_items, neg_alpha)
             if negative_sampling == "popularity"
             else None
         )

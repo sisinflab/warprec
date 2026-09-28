@@ -52,6 +52,9 @@ class Dataset:
             interaction matrix. One of 'max', 'mean', 'first', 'last' or 'sum'.
         negative_sampling (str): How negatives are drawn during training, 'uniform'
             or 'popularity'.
+        neg_alpha (float): The exponent the 'popularity' strategy
+            applies to the interaction counts. 0.75 is the usual choice; zero
+            makes every item equally likely and one draws in exact proportion.
         sequence_pooling (str): How the values of a multi-valued contextual field are
             pooled into the single vector the field contributes, 'mean', 'sum' or 'max'.
         context_separators (Optional[Dict[str, str]]): The separator of each contextual
@@ -119,6 +122,7 @@ class Dataset:
         rating_type: RatingType = RatingType.IMPLICIT,
         duplicates: str = "max",
         negative_sampling: str = "uniform",
+        neg_alpha: float = 0.75,
         sequence_pooling: str = "mean",
         context_separators: Optional[Dict[str, str]] = None,
         keep_unseen_items: bool = False,
@@ -389,6 +393,7 @@ class Dataset:
             rating_type=rating_type,
             duplicates=duplicates,
             negative_sampling=negative_sampling,
+            neg_alpha=neg_alpha,
             sequence_pooling=sequence_pooling,
             batch_size=batch_size,
         )
@@ -971,6 +976,7 @@ class Dataset:
         num_negatives: int = 99,
         seed: int = 42,
         negative_sampling: str = "uniform",
+        neg_alpha: float = 0.75,
         **kwargs: Any,
     ) -> DataLoader:
         """Retrieve the sampled evaluation DataLoader for the dataset.
@@ -980,6 +986,8 @@ class Dataset:
             seed (int): Random seed for negative sampling.
             negative_sampling (str): How the negatives are drawn, 'uniform' or
                 'popularity'.
+            neg_alpha (float): The exponent 'popularity' applies to
+                the interaction counts.
             **kwargs (Any): The keyword arguments to pass to DataLoader initialization.
 
         Returns:
@@ -987,7 +995,7 @@ class Dataset:
                 of interactions (pos_items, neg_items, user_indices)
         """
         key = (
-            f"sampled_{num_negatives}_{seed}_{negative_sampling}_"
+            f"sampled_{num_negatives}_{seed}_{negative_sampling}_{neg_alpha}_"
             f"{self._serialize_dataloader_kwargs(kwargs)}"
         )
 
@@ -1001,6 +1009,7 @@ class Dataset:
                 num_negatives=num_negatives,
                 seed=seed,
                 negative_sampling=negative_sampling,
+                neg_alpha=neg_alpha,
             )
             self._precomputed_dataloader[key] = DataLoader(
                 dataset,
@@ -1086,6 +1095,7 @@ class Dataset:
         num_negatives: int = 99,
         seed: int = 42,
         negative_sampling: str = "uniform",
+        neg_alpha: float = 0.75,
         **kwargs: Any,
     ) -> DataLoader:
         """Retrieve the sampled contextual evaluation DataLoader for the dataset.
@@ -1095,13 +1105,15 @@ class Dataset:
             seed (int): Random seed.
             negative_sampling (str): How the negatives are drawn, 'uniform' or
                 'popularity'.
+            neg_alpha (float): The exponent 'popularity' applies to
+                the interaction counts.
             **kwargs (Any): The keyword arguments to pass to DataLoader initialization.
 
         Returns:
             DataLoader: The sampled contextual loader.
         """
         key = (
-            f"sampled_contextual_{num_negatives}_{seed}_{negative_sampling}_"
+            f"sampled_contextual_{num_negatives}_{seed}_{negative_sampling}_{neg_alpha}_"
             f"{self._serialize_dataloader_kwargs(kwargs)}"
         )
 
@@ -1153,6 +1165,7 @@ class Dataset:
                 num_negatives=num_negatives,
                 seed=seed,
                 negative_sampling=negative_sampling,
+                neg_alpha=neg_alpha,
             )
             self._precomputed_dataloader[key] = DataLoader(
                 dataset,

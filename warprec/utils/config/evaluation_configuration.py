@@ -130,6 +130,8 @@ class EvaluationConfig(BaseModel):
             chance; 'popularity' draws in proportion to a dampened interaction
             count, which asks the model to separate a relevant item from popular
             distractors rather than from obscure ones. Defaults to 'uniform'.
+        neg_alpha (Optional[float]): The exponent 'popularity' applies
+            to the interaction counts. Defaults to 0.75. Ignored by 'uniform'.
         candidates (Optional[Literal["all", "cold", "warm"]]): Which items a run is
             allowed to rank. 'cold' keeps only the items with no training
             interaction and 'warm' only the rest, which is what makes a cold-start
@@ -158,6 +160,7 @@ class EvaluationConfig(BaseModel):
     strategy: Optional[str] = "full"  # or "sampled"
     num_negatives: Optional[int] = 99
     negative_sampling: Optional[NegativeSampling] = "uniform"
+    neg_alpha: Optional[float] = 0.75
     candidates: Optional[Literal["all", "cold", "warm"]] = "all"
     mask_seen: Optional[Literal["auto", "context", "pair", "none"]] = "auto"
     seed: Optional[int] = 42
@@ -223,6 +226,28 @@ class EvaluationConfig(BaseModel):
         if v not in ["full", "sampled"]:
             raise ValueError(
                 f"The strategy value should be either 'full' or 'sampled'. Value provided: {v}"
+            )
+        return v
+
+    @field_validator("neg_alpha")
+    @classmethod
+    def sampling_alpha_validator(cls, v: Optional[float]) -> Optional[float]:
+        """Reject an exponent that would invert the distribution.
+
+        Args:
+            v (Optional[float]): The configured value.
+
+        Returns:
+            Optional[float]: The value, unchanged.
+
+        Raises:
+            ValueError: If the exponent is negative.
+        """
+        if v is not None and v < 0:
+            raise ValueError(
+                f"neg_alpha must not be negative, got {v}. A negative "
+                "exponent makes the rarest items the most likely negatives, which is "
+                "not what 'popularity' sampling means."
             )
         return v
 
