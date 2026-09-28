@@ -67,6 +67,7 @@ class Interactions:
         self.rating_type = options.rating_type
         self.duplicates = options.duplicates
         self.negative_sampling = options.negative_sampling
+        self.neg_alpha = options.neg_alpha
 
         # Setup the training variables
         self._inter_dict: Optional[dict] = None
@@ -443,6 +444,7 @@ class Interactions:
             side_information=side_info_tensor,
             contexts=None,
             negative_sampling=self.negative_sampling,
+            neg_alpha=self.neg_alpha,
             seed=seed,
         )
 
@@ -481,6 +483,7 @@ class Interactions:
             sparse_matrix=self.get_sparse(),
             niid=self._og_niid,
             negative_sampling=self.negative_sampling,
+            neg_alpha=self.neg_alpha,
             seed=seed,
         )
 

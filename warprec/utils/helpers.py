@@ -95,6 +95,7 @@ def retrieve_evaluation_dataloader(
     num_negatives: int = 99,
     seed: int = 42,
     negative_sampling: str = "uniform",
+    neg_alpha: float = 0.75,
     **kwargs: Any,
 ) -> DataLoader:
     """Retrieve the appropriate evaluation dataloader based on the strategy and model type.
@@ -107,6 +108,8 @@ def retrieve_evaluation_dataloader(
         seed (int): Random seed for negative sampling.
         negative_sampling (str): How the evaluation negatives are drawn, 'uniform'
             or 'popularity'.
+        neg_alpha (float): The exponent 'popularity' applies to the
+            interaction counts.
         **kwargs (Any): Keyword arguments forwarded to the evaluation
             DataLoader constructor.
 
@@ -132,6 +135,7 @@ def retrieve_evaluation_dataloader(
                 num_negatives=num_negatives,
                 seed=seed,
                 negative_sampling=negative_sampling,
+                neg_alpha=neg_alpha,
                 **kwargs,
             )
         case ("full", True):
@@ -141,6 +145,7 @@ def retrieve_evaluation_dataloader(
                 num_negatives=num_negatives,
                 seed=seed,
                 negative_sampling=negative_sampling,
+                neg_alpha=neg_alpha,
                 **kwargs,
             )
         case _:

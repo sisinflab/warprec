@@ -102,6 +102,8 @@ class SignalOptions:
         rating_type (RatingType): Whether the feedback is implicit or explicit.
         duplicates (str): How repeated (user, item) rows are aggregated.
         negative_sampling (str): How negatives are drawn during training.
+        neg_alpha (float): The exponent the 'popularity' strategy
+            applies to the interaction counts.
         sequence_pooling (str): How a multi-valued field's values are pooled.
         batch_size (int): The batch size the structures are built for.
     """
@@ -109,6 +111,7 @@ class SignalOptions:
     rating_type: RatingType = RatingType.IMPLICIT
     duplicates: str = "max"
     negative_sampling: str = "uniform"
+    neg_alpha: float = 0.75
     sequence_pooling: str = "mean"
     batch_size: int = 1024
 

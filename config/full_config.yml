@@ -83,6 +83,7 @@ rerank:
     smoothing: 0.01
 training:
   negative_sampling: [uniform, popularity]
+  neg_alpha: 0.75
   sequence_pooling: [mean, sum, max]
 writer:
   dataset_name: MyDataset
@@ -239,6 +240,7 @@ evaluation:
   strategy: [full, sampled]
   num_negatives: 99
   negative_sampling: [uniform, popularity]
+  neg_alpha: 0.75
   candidates: [all, cold, warm]
   mask_seen: [auto, context, pair, none]
   seed: 42

@@ -45,7 +45,7 @@ class InteractionDataset(Dataset):
 
 
 def popularity_cumulative(
-    sparse_matrix: csr_matrix, niid: int, damping: float = 0.75
+    sparse_matrix: csr_matrix, niid: int, alpha: float = 0.75
 ) -> Optional[np.ndarray]:
     """The cumulative distribution that draws an item in proportion to its popularity.
 
@@ -55,15 +55,17 @@ def popularity_cumulative(
     Args:
         sparse_matrix (csr_matrix): The interactions the counts are taken from.
         niid (int): The number of items to sample from.
-        damping (float): The exponent applied to the interaction counts. The usual
-            choice, 0.75, keeps the head likely without letting it dominate.
+        alpha (float): The exponent applied to the interaction counts. The usual
+            choice, 0.75, keeps the head likely without letting it dominate. Zero
+            makes every item equally likely and one draws in exact proportion to
+            the counts.
 
     Returns:
         Optional[np.ndarray]: The cumulative weights, or None when no item has been
             interacted with at all and popularity carries no signal.
     """
     counts = np.asarray((sparse_matrix > 0).sum(axis=0)).ravel()[:niid]
-    weights = np.power(counts.astype(np.float64), damping)
+    weights = np.power(counts.astype(np.float64), alpha)
     total = weights.sum()
     if total <= 0:
         return None
@@ -84,7 +86,7 @@ class NegativeSampler:
             items the user has already interacted with.
         niid (int): The number of items to sample from.
         strategy (str): Either 'uniform' or 'popularity'.
-        damping (float): The exponent applied to the interaction counts under the
+        alpha (float): The exponent applied to the interaction counts under the
             'popularity' strategy. The usual choice, 0.75, keeps the head likely
             without letting it dominate.
         seed (int): The seed of the sampler's own generator.
@@ -95,7 +97,7 @@ class NegativeSampler:
         sparse_matrix: csr_matrix,
         niid: int,
         strategy: str = "uniform",
-        damping: float = 0.75,
+        alpha: float = 0.75,
         seed: int = 42,
     ):
         self.sparse_matrix = sparse_matrix
@@ -109,7 +111,7 @@ class NegativeSampler:
         self.rng = np.random.default_rng(seed)
 
         if strategy == "popularity":
-            self._cumulative = popularity_cumulative(sparse_matrix, niid, damping)
+            self._cumulative = popularity_cumulative(sparse_matrix, niid, alpha)
             # A catalogue nobody has touched carries no popularity signal, so the
             # only meaningful thing left to do is sample uniformly.
             if self._cumulative is None:
@@ -162,6 +164,8 @@ class PointWiseDataset(Dataset):
             of each interaction.
         negative_sampling (str): The strategy used to draw negatives, either
             'uniform' or 'popularity'.
+        neg_alpha (float): The exponent the 'popularity'
+            strategy applies to the interaction counts.
         seed (int): The seed of the sampler's generator, so that two runs with the
             same seed draw the same negatives.
     """
@@ -176,6 +180,7 @@ class PointWiseDataset(Dataset):
         side_information: Optional[Tensor] = None,
         contexts: Optional[Tensor] = None,
         negative_sampling: str = "uniform",
+        neg_alpha: float = 0.75,
         seed: int = 42,
     ):
         # Keep a copy of positive values
@@ -190,7 +195,7 @@ class PointWiseDataset(Dataset):
         self.side_information = side_information
         self.contexts = contexts
         self.sampler = NegativeSampler(
-            sparse_matrix, niid, negative_sampling, seed=seed
+            sparse_matrix, niid, negative_sampling, neg_alpha, seed=seed
         )
 
         self.num_positives = len(self.user_ids)
@@ -247,6 +252,8 @@ class ContrastiveDataset(Dataset):
         niid (int): Total number of items available.
         negative_sampling (str): The strategy used to draw negatives, either
             'uniform' or 'popularity'.
+        neg_alpha (float): The exponent the 'popularity'
+            strategy applies to the interaction counts.
         seed (int): The seed of the sampler's generator, so that two runs with the
             same seed draw the same negatives.
     """
@@ -258,6 +265,7 @@ class ContrastiveDataset(Dataset):
         sparse_matrix: csr_matrix,
         niid: int,
         negative_sampling: str = "uniform",
+        neg_alpha: float = 0.75,
         seed: int = 42,
     ):
         self.user_ids = user_ids
@@ -265,7 +273,7 @@ class ContrastiveDataset(Dataset):
         self.sparse_matrix = sparse_matrix
         self.niid = niid
         self.sampler = NegativeSampler(
-            sparse_matrix, niid, negative_sampling, seed=seed
+            sparse_matrix, niid, negative_sampling, neg_alpha, seed=seed
         )
 
     def __len__(self) -> int:

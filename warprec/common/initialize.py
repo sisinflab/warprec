@@ -430,6 +430,7 @@ def initialize_datasets(
         "rating_type": config.reader.rating_type,
         "duplicates": config.reader.duplicates,
         "negative_sampling": config.training.negative_sampling,
+        "neg_alpha": config.training.neg_alpha,
         "sequence_pooling": config.training.sequence_pooling,
         "context_separators": config.reader.dtypes.context_separators,
         "cold_start": cold_start,
