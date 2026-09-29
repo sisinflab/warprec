@@ -213,9 +213,11 @@ def top_k_breaking_ties(
         return values, indices
 
     rows = ambiguous.nonzero(as_tuple=True)[0]
+    # Drawn where the generator lives, which torch requires, then moved to the
+    # scores: the evaluator's generator is on the CPU even when the scores are not.
     order = torch.randperm(
-        predictions.size(1), generator=generator, device=predictions.device
-    )
+        predictions.size(1), generator=generator, device=generator.device
+    ).to(predictions.device)
     tied_values, shuffled = torch.topk(predictions[rows][:, order], k, dim=1)
 
     values, indices = values.clone(), indices.clone()
