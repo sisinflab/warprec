@@ -193,8 +193,10 @@ class FREEDOM(MultiModalRecommenderUtils, GraphRecommenderUtils, IterativeRecomm
         if keep <= 0:
             return self.adj
 
+        # The generator is a CPU one and torch requires the weights to share its
+        # device; the survivors only build a SciPy matrix, so they stay on the CPU.
         chosen = torch.multinomial(
-            self.edge_weights, keep, generator=self._edge_generator
+            self.edge_weights.cpu(), keep, generator=self._edge_generator
         )
 
         matrix = coo_matrix(
