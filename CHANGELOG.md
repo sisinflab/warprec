@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v1.15.2 (2026-09-29)
+
+### Bug Fixes
+
+- Ensure generator device compatibility
+  ([`5138ef0`](https://github.com/sisinflab/warprec/commit/5138ef029576ee25554a4a480d0c307a507eb9e6))
+
+
 ## v1.15.1 (2026-09-28)
 
 ### Bug Fixes
