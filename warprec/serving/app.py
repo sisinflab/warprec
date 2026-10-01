@@ -1,11 +1,16 @@
-from typing import Any, Dict
+import signal
+import threading
+from pathlib import Path
+from typing import Any, Dict, Union
 
 import ray
+import yaml
 from ray import serve
 from ray.serve import Application
 
 from warprec.serving.deployments import Gateway, ModelServer
 from warprec.utils.config.serving_configuration import ServingConfiguration
+from warprec.utils.logger import logger
 
 APP_NAME = "warprec"
 
@@ -45,17 +50,89 @@ def app_builder(args: Dict[str, Any]) -> Application:
     return build_application(ServingConfiguration.model_validate(args["config"]))
 
 
+def export_serve_config(config: ServingConfiguration, path: Union[str, Path]) -> None:
+    """Write the application as a Ray Serve config file, for serve deploy or KubeRay.
+
+    Paths become absolute so the file works from any directory, and the API key
+    is left out so that no secret ends up in a file meant to be shared.
+
+    Args:
+        config (ServingConfiguration): The validated configuration.
+        path (Union[str, Path]): Where to write the file.
+    """
+    if config.server.api_key:
+        logger.attention(
+            "The API key is not written to the exported file. Set WARPREC_API_KEY "
+            "in the environment of the cluster that runs it."
+        )
+    document = {
+        "proxy_location": "EveryNode",
+        "http_options": {"host": config.server.host, "port": config.server.port},
+        "applications": [
+            {
+                "name": APP_NAME,
+                "route_prefix": config.server.route_prefix,
+                "import_path": "warprec.serving.app:app_builder",
+                "args": {"config": config.portable().model_dump(mode="json")},
+            }
+        ],
+    }
+    Path(path).write_text(yaml.safe_dump(document, sort_keys=False), encoding="utf-8")
+    logger.positive(f"Ray Serve config written to {path}")
+
+
 def run(config: ServingConfiguration) -> None:
-    """Start Ray Serve with the configured models and block until interrupted.
+    """Start Ray Serve with the configured models and serve until told to stop.
+
+    Ctrl-C at a terminal and SIGTERM from a process manager or a container both
+    shut the application down cleanly, rather than leaving a traceback or
+    killing Ray mid-way. A signal during startup - a replica that cannot be
+    scheduled waits forever - interrupts it at once.
 
     Args:
         config (ServingConfiguration): The validated configuration.
     """
-    ray.init(address=config.server.ray_address, ignore_reinit_error=True)
-    serve.start(http_options={"host": config.server.host, "port": config.server.port})
-    serve.run(
-        build_application(config),
-        name=APP_NAME,
-        route_prefix=config.server.route_prefix,
-        blocking=True,
-    )
+    started = threading.Event()
+    stop = threading.Event()
+
+    def request_stop(signum: int, _frame: Any) -> None:
+        logger.msg(f"Received {signal.Signals(signum).name}, stopping.")
+        stop.set()
+        if not started.is_set():
+            # Still deploying: break out of Ray's wait instead of finishing it.
+            raise KeyboardInterrupt
+
+    def listen() -> None:
+        for signum in (signal.SIGINT, signal.SIGTERM):
+            signal.signal(signum, request_stop)
+
+    listen()
+    try:
+        ray.init(address=config.server.ray_address, ignore_reinit_error=True)
+        # Ray installs a SIGTERM handler of its own that aborts the process,
+        # so the clean one is put back once Ray is up.
+        listen()
+        serve.start(
+            http_options={"host": config.server.host, "port": config.server.port}
+        )
+        serve.run(
+            build_application(config),
+            name=APP_NAME,
+            route_prefix=config.server.route_prefix,
+        )
+        started.set()
+        names = ", ".join(endpoint.name for endpoint in config.endpoints)
+        logger.positive(
+            f"Serving {names} at http://{config.server.host}:{config.server.port}"
+            f"{config.server.route_prefix.rstrip('/')}/v1/models"
+        )
+        # Waiting in short steps keeps the main thread responsive to signals.
+        while not stop.wait(timeout=1.0):
+            pass
+    except KeyboardInterrupt:
+        logger.msg("Interrupted before every model was ready.")
+    finally:
+        if ray.is_initialized():
+            serve.shutdown()
+            ray.shutdown()
+        logger.positive("Serving stopped.")
