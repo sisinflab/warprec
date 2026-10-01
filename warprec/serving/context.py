@@ -165,5 +165,7 @@ class ContextSchema:
             indices.append(index)
 
         if kind == "seq":
-            return " ".join(str(index) for index in indices[: self.max_len])
+            # An empty field is the padding index, as the dataset encodes an
+            # empty cell; an empty string would not parse as a number.
+            return " ".join(str(index) for index in indices[: self.max_len]) or "0"
         return indices[0]

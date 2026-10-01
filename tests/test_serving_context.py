@@ -300,3 +300,37 @@ def test_an_old_context_checkpoint_is_refused_with_a_reason(
     torch.save(make_model("FM", dataset).get_state(), path)
     with pytest.raises(ValueError, match="context values"):
         ServableModel.from_checkpoint(path)
+
+
+def test_an_empty_multi_valued_field_is_padding_as_in_training():
+    """Training encodes an empty cell as the padding index; serving must too,
+    or the request breaks the whole batch it is scored with."""
+    from warprec.serving.context import ContextSchema
+
+    schema = ContextSchema(
+        labels=["tags"], types={"tags": "seq"}, maps={"tags": {"jazz": 1}}, max_len=1
+    )
+    encoded = schema.tensor(
+        [schema.encode({"tags": []}), schema.encode({"tags": ["jazz"]})], "cpu"
+    )
+    assert encoded.tolist() == [[0.0], [1.0]]
+
+
+def test_an_empty_multi_valued_field_does_not_break_its_batch(
+    tmp_path: Path, rich_dataset: Dataset
+):
+    servable = served(tmp_path, rich_dataset)
+    users, _ = rich_dataset.get_inverse_mappings()
+    queries = [
+        servable.resolve(
+            user_id=users[0],
+            k=3,
+            context={"daytime": "night", "temperature": 20, "tags": []},
+        ),
+        servable.resolve(
+            user_id=users[1],
+            k=3,
+            context={"daytime": "morning", "temperature": 10, "tags": ["jazz"]},
+        ),
+    ]
+    assert [len(answer) for answer in servable.recommend(queries)] == [3, 3]
