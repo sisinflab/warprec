@@ -50,12 +50,9 @@ runs:
       shell: bash
       run: poetry check --lock
 
-    # Every extra except 'mcp'. fastmcp pulls in cyclopts, which depends
-    # on docstring-parser, and that ships the same 'docstring_parser' module
-    # directory as the docstring_parser_fork pydoclint requires. Installing
-    # both makes pydoclint's import order-dependent and it crashes when the
-    # upstream package wins. 'serving' (Ray Serve alone) is installed so the
-    # serving application is tested; the MCP test skips without fastmcp.
+    # Every extra, so that the serving application and its MCP endpoint are
+    # tested. pydoclint runs from pre-commit in an environment of its own, so
+    # fastmcp's docstring-parser no longer collides with its fork.
     #
     # The install is retried because it fails for reasons that have nothing to
     # do with the project: PyPI's index intermittently reports no candidates for
@@ -67,7 +64,7 @@ runs:
       shell: bash
       run: |
         install() {
-          poetry sync --no-interaction --extras "dashboard remote-io bohb graph serving"
+          poetry sync --no-interaction --extras "dashboard remote-io bohb graph serving mcp"
         }
         for attempt in 1 2 3; do
           if install; then

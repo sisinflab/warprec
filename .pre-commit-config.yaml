@@ -8,13 +8,14 @@ repos:
       - id: ruff-format
         exclude: ^src/pipelines/
 
-  - repo: local
+  # pydoclint runs in an environment of its own rather than in the project's:
+  # it needs docstring_parser_fork, and fastmcp (the mcp extra) pulls in the
+  # upstream docstring-parser, which ships the same module directory and
+  # breaks pydoclint's imports when both are installed together.
+  - repo: https://github.com/jsh9/pydoclint
+    rev: 0.6.11
     hooks:
       - id: pydoclint
-        name: pydoclint
-        entry: poetry run pydoclint
-        language: system
-        types: [python]
         args: ["--style=google", "--check-return-types=True"]
         exclude: ^src/pipelines/
 
@@ -67,13 +68,9 @@ repos:
             # reviewed, in-place exemption.
             "--max-locals=40",
             "--extension-pkg-whitelist=pydantic",
-            # Optional dependencies that the linting environment does not
-            # install, so that linting never requires them to be present.
-            # PyTorch Geometric is optional by design; the serving stack
-            # (fastapi/fastmcp and their transitive starlette/uvicorn) is
-            # excluded because fastmcp pulls in cyclopts -> docstring-parser,
-            # which collides with the docstring_parser_fork that pydoclint
-            # needs: both ship the same 'docstring_parser' module directory.
+            # Optional dependencies, so that linting never requires them to
+            # be installed: PyTorch Geometric and the serving stack (fastapi,
+            # fastmcp and their transitive starlette/uvicorn) come from extras.
             # Attribute checks on these modules are off anyway (E1101).
             "--ignored-modules=torch_geometric,fastapi,fastmcp,starlette,uvicorn",
           ]

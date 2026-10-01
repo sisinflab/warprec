@@ -1608,23 +1608,6 @@ docs = ["pydoctor (>=25.4.0)"]
 test = ["pytest"]
 
 [[package]]
-name = "docstring-parser-fork"
-version = "0.0.16"
-description = "Parse Python docstrings in reST, Google and Numpydoc format"
-optional = false
-python-versions = ">=3.8"
-groups = ["dev"]
-files = [
-    {file = "docstring_parser_fork-0.0.16-py3-none-any.whl", hash = "sha256:c024c97af582d6acf85a14f0b332b3a2ab08626648d251c25e47191f33064386"},
-    {file = "docstring_parser_fork-0.0.16.tar.gz", hash = "sha256:9ecf861ceab8b87d1297a71001c15a1956ad02e87434ee6473643a5988094f7c"},
-]
-
-[package.extras]
-dev = ["docstring-parser[docs]", "docstring-parser[test]", "pre-commit (>=2.16.0) ; python_version >= \"3.9\""]
-docs = ["pydoctor (>=25.4.0)"]
-test = ["pytest"]
-
-[[package]]
 name = "email-validator"
 version = "2.3.0"
 description = "A robust email address syntax and deliverability validation library."
@@ -6294,25 +6277,6 @@ toml = ["tomli (>=2.0.1)"]
 yaml = ["pyyaml (>=6.0.1)"]
 
 [[package]]
-name = "pydoclint"
-version = "0.6.11"
-description = "A Python docstring linter that checks arguments, returns, yields, and raises sections"
-optional = false
-python-versions = ">=3.9"
-groups = ["dev"]
-files = [
-    {file = "pydoclint-0.6.11-py3-none-any.whl", hash = "sha256:07c003f09075525bd5680d8e72ce53809128c9a4903f282212cd454413d273e7"},
-    {file = "pydoclint-0.6.11.tar.gz", hash = "sha256:89da3d3fc82dedd0e0773e461b8eabc675dfb15060f4f37470c5edce15820ea1"},
-]
-
-[package.dependencies]
-click = ">=8.1.0"
-docstring_parser_fork = ">=0.0.12"
-
-[package.extras]
-flake8 = ["flake8 (>=4)"]
-
-[[package]]
 name = "pygments"
 version = "2.21.0"
 description = "Pygments is a syntax highlighting package written in Python."
@@ -9322,4 +9286,4 @@ serving = ["ray"]
 [metadata]
 lock-version = "2.1"
 python-versions = "^3.12"
-content-hash = "3cb6e66d758c7a4db9b54b68ac5e1cd45d8a2c31e56755f96517cda074d68b70"
+content-hash = "ebc7895f63e46e4d294317d666433d4fdf84154e61aabb77da6059adb84d3be0"

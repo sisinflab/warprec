@@ -29,8 +29,8 @@ remote-io = [
 serving = [
     "ray[serve]>=2.58.0,<3.0.0",
 ]
-# The MCP endpoint on top of serving. Kept apart from 'serving' so CI can test
-# the server without fastmcp, which cannot share an environment with pydoclint.
+# The MCP endpoint on top of serving, kept apart so that serving models over
+# HTTP does not pull in fastmcp and its dependencies.
 mcp = [
     "ray[serve]>=2.58.0,<3.0.0",
     "fastmcp>=3.1.0,<4.0.0",
@@ -92,7 +92,6 @@ pre-commit = "^4.1.0"
 pytest = "^8.3.4"
 pytest-cov = "^6.0.0"
 ruff = "^0.9.3"
-pydoclint = "^0.6.0"
 mypy = "^1.14.1"
 pylint = "^3.3.3"
 bandit = "^1.8.2"

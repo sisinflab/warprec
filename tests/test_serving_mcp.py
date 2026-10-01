@@ -1,7 +1,6 @@
 """An agent reaches the served models through MCP tools on the same server.
 
-Skipped unless the 'mcp' extra is installed; CI leaves it out because fastmcp
-and pydoclint cannot share an environment.
+Skipped unless the 'mcp' extra is installed.
 """
 
 import asyncio
