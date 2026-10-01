@@ -27,7 +27,7 @@ The `server` section is optional. Every key has a default.
 
 - **name**: The name the model is served under, used in its URL (`/v1/models/<name>/...`). Must be unique, start with a letter or digit and contain only letters, digits, `-` and `_`. `gateway` is reserved. Required.
 - **checkpoint**: The `.pth` file to serve. Relative paths resolve against the working directory. The file must exist. Required.
-- **device**: Where the model runs: `cpu`, `mps` or `cuda`. A numbered device such as `cuda:1` is refused: Ray shows each replica only the GPUs it assigned to it, always as `cuda:0`, so which GPU a replica gets is chosen with `deployment.ray_actor_options` (`num_gpus`, `accelerator_type`). Defaults to `cpu`.
+- **device**: Where the model runs: `cpu`, `mps` or `cuda`. A numbered device such as `cuda:1` is refused: Ray shows each replica only the GPUs it assigned to it, always as `cuda:0`, so which GPU a replica gets is chosen with `deployment.ray_actor_options` (`num_gpus`, `accelerator_type`). Defaults to `cpu`. Models that keep no tensors - the neighbourhood and EASE families, SLIM, RP3beta, SANSA, STAN, VSM and Random - score on the CPU wherever they are placed: with `mps` or `cuda` they are served on the CPU, with a warning, and reserve no GPU.
 - **default_k**: How many items a request gets when it does not set `k`. Must not exceed `max_k`. Defaults to `10`.
 - **max_k**: The largest `k` a request may ask for. Defaults to `100`.
 - **mask_seen**: Whether items the user interacted with in training are left out of their recommendations. Defaults to `true`.

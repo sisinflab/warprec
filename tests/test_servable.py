@@ -327,3 +327,18 @@ def test_a_user_with_no_training_history_is_treated_as_unknown(
         with pytest.raises(ServingError) as error:
             servable.resolve(user_id=users[0])
         assert error.value.status == 404
+
+
+@pytest.mark.parametrize(
+    "name, expected",
+    [("EASE", False), ("ItemKNN", False), ("BPR", True), ("LightGCN", True)],
+)
+def test_a_checkpoint_says_whether_its_model_can_use_a_gpu(
+    tmp_path: Path, dataset: Dataset, name: str, expected: bool
+):
+    """Closed-form models keep what they learned in numpy arrays and score on
+    the CPU wherever they are placed, so a GPU would sit idle."""
+    from warprec.serving.servable import scores_on_device
+
+    path = save_servable(tmp_path / f"{name}.pth", make_model(name, dataset), dataset)
+    assert scores_on_device(path) is expected

@@ -63,6 +63,27 @@ class Query:
     context: Optional[List[Any]] = None
 
 
+def scores_on_device(path: Union[str, Path]) -> bool:
+    """Whether the model in a checkpoint can do its scoring on a GPU.
+
+    Closed-form models - the neighbourhood and EASE families, SLIM and the like
+    - keep what they learned in numpy arrays rather than tensors, so they score
+    on the CPU wherever the model is placed. Their state dict is empty, which
+    is what tells them apart. Tensors are memory-mapped rather than read, so
+    the check stays cheap for large models.
+
+    Args:
+        path (Union[str, Path]): The .pth file.
+
+    Returns:
+        bool: True when the model holds parameters or buffers it scores with.
+    """
+    checkpoint = torch.load(  # nosec B614
+        path, map_location="cpu", weights_only=False, mmap=True
+    )
+    return len(checkpoint["state_dict"]) > 0
+
+
 def _builtin(label: Any) -> Label:
     """A mapping label as a JSON-friendly Python value.
 

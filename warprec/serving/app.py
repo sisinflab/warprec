@@ -9,6 +9,7 @@ from ray import serve
 from ray.serve import Application
 
 from warprec.serving.deployments import Gateway, ModelServer
+from warprec.serving.servable import scores_on_device
 from warprec.utils.config.serving_configuration import ServingConfiguration
 from warprec.utils.logger import logger
 
@@ -27,6 +28,18 @@ def build_application(config: ServingConfiguration) -> Application:
     # Replicas may run in another directory than this process - on a joined
     # cluster they run wherever it was started - so they get absolute paths.
     config = config.resolved()
+
+    # A model that keeps no tensors scores on the CPU wherever it is placed, so
+    # it is served there rather than holding a GPU it would never use.
+    for endpoint in config.endpoints:
+        if endpoint.device != "cpu" and not scores_on_device(endpoint.checkpoint):
+            logger.attention(
+                f"Endpoint '{endpoint.name}' serves a model that scores on the CPU "
+                f"(it keeps no tensors), so device '{endpoint.device}' is ignored "
+                "and no GPU is reserved for it."
+            )
+            endpoint.device = "cpu"
+
     # serve.deployment turns both classes into Deployments, which mypy cannot
     # follow through the decorator, hence the ignores on options() and bind().
     models = {

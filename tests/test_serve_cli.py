@@ -151,8 +151,10 @@ class Recorder:
 
     def __init__(self):
         self.bound = []
+        self.options_given = []
 
-    def options(self, **_options):
+    def options(self, **options):
+        self.options_given.append(options)
         return self
 
     def bind(self, *args):
@@ -211,3 +213,34 @@ def test_stopping_removes_only_its_own_application_on_a_shared_cluster(
 
     app.stop_serving(ray_address)
     assert calls == expected
+
+
+@pytest.mark.parametrize("name, gpu", [("EASE", False), ("BPR", True)])
+def test_a_model_that_cannot_use_a_gpu_does_not_reserve_one(
+    tmp_path: Path,
+    dataset: Dataset,
+    monkeypatch: pytest.MonkeyPatch,
+    name: str,
+    gpu: bool,
+):
+    """It is served on the CPU, with a warning, rather than holding a GPU idle."""
+    pytest.importorskip("ray.serve")
+    from warprec.serving import app
+    from warprec.utils.config.serving_configuration import ServingConfiguration
+
+    checkpoint = save_servable(
+        tmp_path / f"{name}.pth", make_model(name, dataset), dataset
+    )
+    servers = Recorder()
+    monkeypatch.setattr(app, "ModelServer", servers)
+    monkeypatch.setattr(app, "Gateway", Recorder())
+
+    config = ServingConfiguration.model_validate(
+        {"endpoints": [{"name": "m", "checkpoint": str(checkpoint), "device": "cuda"}]}
+    )
+    app.build_application(config)
+
+    ((endpoint,),) = servers.bound
+    (options,) = servers.options_given
+    assert endpoint["device"] == ("cuda" if gpu else "cpu")
+    assert ("num_gpus" in (options.get("ray_actor_options") or {})) is gpu
