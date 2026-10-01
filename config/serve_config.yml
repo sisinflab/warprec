@@ -28,6 +28,6 @@ endpoints:                 # at least one; names unique, letters/digits/-/_, not
       batch_wait_timeout_s: 0.005
     deployment:            # passed to Ray Serve as-is
       num_replicas: 1      # integer, or "auto"; not together with a fixed autoscaling_config
-      max_ongoing_requests: null
+      max_ongoing_requests: null  # null follows batching.max_batch_size, so batches can fill
       autoscaling_config: null   # e.g. {min_replicas: 1, max_replicas: 8, target_ongoing_requests: 16}
       ray_actor_options: null    # e.g. {num_cpus: 2, num_gpus: 0.25}; cuda defaults num_gpus to 1

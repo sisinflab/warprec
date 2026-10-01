@@ -86,7 +86,8 @@ class DeploymentSettings(BaseModel):
         num_replicas (Optional[Union[int, Literal["auto"]]]): A fixed replica
             count, or 'auto' for Ray's default autoscaling.
         max_ongoing_requests (Optional[int]): The most requests one replica
-            handles at once.
+            handles at once. Unset, it follows the endpoint's max_batch_size, so
+            that a batch can fill.
         autoscaling_config (Optional[Dict[str, Any]]): Ray Serve autoscaling
             settings, such as min_replicas, max_replicas and
             target_ongoing_requests.
@@ -255,10 +256,16 @@ class EndpointConfig(BaseModel):
         device at all, so an endpoint placed on cuda asks for one whole GPU
         unless its configuration already says how much it needs.
 
+        Ray Serve also lets a replica hold only a handful of requests at once
+        by default, which would cap every batch at that handful whatever
+        max_batch_size says, so a replica accepts a full batch unless told
+        otherwise.
+
         Returns:
             Dict[str, Any]: The keyword arguments for Deployment.options().
         """
         options = self.deployment.model_dump(exclude_none=True)
+        options.setdefault("max_ongoing_requests", self.batching.max_batch_size)
         if self.device.startswith("cuda"):
             actor = dict(options.get("ray_actor_options") or {})
             actor.setdefault("num_gpus", 1)

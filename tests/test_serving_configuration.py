@@ -113,7 +113,28 @@ def test_a_cuda_endpoint_asks_ray_for_a_gpu(checkpoint: Path):
 
 def test_a_cpu_endpoint_passes_only_what_was_set(checkpoint: Path):
     config = ServingConfiguration.model_validate(config_with(checkpoint))
-    assert config.endpoints[0].deployment_options() == {"num_replicas": 1}
+    assert config.endpoints[0].deployment_options() == {
+        "num_replicas": 1,
+        "max_ongoing_requests": 64,
+    }
+
+
+def test_a_replica_accepts_enough_requests_to_fill_a_batch(checkpoint: Path):
+    """Ray caps a replica at 5 in-flight requests by default, which would cap
+    every batch at 5 whatever max_batch_size says."""
+    batching = {"max_batch_size": 128}
+    options = (
+        ServingConfiguration.model_validate(config_with(checkpoint, batching=batching))
+        .endpoints[0]
+        .deployment_options()
+    )
+    assert options["max_ongoing_requests"] == 128
+
+    explicit = config_with(checkpoint, deployment={"max_ongoing_requests": 8})
+    options = (
+        ServingConfiguration.model_validate(explicit).endpoints[0].deployment_options()
+    )
+    assert options["max_ongoing_requests"] == 8, "an explicit setting is kept"
 
 
 def test_the_environment_overrides_the_api_key(

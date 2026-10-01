@@ -44,7 +44,7 @@ The `server` section is optional. Every key has a default.
     - **batch_wait_timeout_s**: How long, in seconds, the first request of a batch waits for others to join it. Defaults to `0.005`.
 - **deployment**: Ray Serve options for this endpoint, passed through unchanged.
     - **num_replicas**: A fixed number of replicas, or `auto` for Ray Serve's default autoscaling. Cannot be combined with a fixed `autoscaling_config`. Defaults to `1`.
-    - **max_ongoing_requests**: The most requests one replica handles at once. Defaults to Ray Serve's own default.
+    - **max_ongoing_requests**: The most requests one replica handles at once. Defaults to the endpoint's `batching.max_batch_size`: Ray Serve's own default is 5, which would cap every batch at 5 requests whatever `max_batch_size` says.
     - **autoscaling_config**: A Ray Serve autoscaling policy, for example `{min_replicas: 1, max_replicas: 8, target_ongoing_requests: 16}`. Defaults to `null`.
     - **ray_actor_options**: Resources per replica, for example `{num_cpus: 2, num_gpus: 0.25}`. Defaults to `null`.
 
