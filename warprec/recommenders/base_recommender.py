@@ -1343,9 +1343,13 @@ class SequentialRecommenderUtils(ABC):
             More recent transaction will have priority over older ones in case
             a sequence needs to be truncated. If a sequence is smaller than the
             max_seq_len, it will be padded.
+        needs_user (bool): Whether scoring reads the user index as well as the
+            sequence. A model that does cannot score a session whose user it
+            has never seen.
     """
 
     max_seq_len: int = 0
+    needs_user: bool = False
 
     def _gather_indexes(self, output: Tensor, gather_index: Tensor) -> Tensor:
         """Gathers the output from specific indexes for each batch.

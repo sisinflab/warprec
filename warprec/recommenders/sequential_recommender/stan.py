@@ -36,6 +36,8 @@ class STAN(Recommender, SequentialRecommenderUtils):
         lambda_3 (float): Eq. 7 decay.
         max_seq_len (int): Upper bound on current-session length (controls how much
             history the evaluator feeds to predict).
+        needs_user: True, because predict mixes a user embedding into the
+            sequence, so a session needs a known user.
     """
 
     # Model hyperparameters
@@ -44,6 +46,9 @@ class STAN(Recommender, SequentialRecommenderUtils):
     lambda_2: float
     lambda_3: float
     max_seq_len: int
+
+    # predict mixes a user embedding into the sequence representation.
+    needs_user = True
 
     @classmethod
     def estimate_space(
