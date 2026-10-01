@@ -1,5 +1,6 @@
 """warprec.serve starts the serving application or writes it out for a cluster."""
 
+import importlib.util
 import signal
 import socket
 import subprocess
@@ -129,3 +130,17 @@ def test_the_server_stops_cleanly_on_a_signal(
         if server.poll() is None:
             server.kill()
     assert "Serving stopped" in output.read_text()
+
+
+@pytest.mark.skipif(
+    importlib.util.find_spec("fastmcp") is not None,
+    reason="checks the message shown when fastmcp is missing",
+)
+def test_mcp_without_its_extra_is_refused_before_ray_starts(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
+    """Otherwise the gateway fails inside Ray and the deploy stalls without a word."""
+    monkeypatch.chdir(tmp_path)
+    write_config(tmp_path, mcp=True)
+    with pytest.raises(SystemExit, match=r"warprec\[mcp\]"):
+        main(["-c", "serve.yml"])

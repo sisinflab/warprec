@@ -1,4 +1,5 @@
 import argparse
+import importlib.util
 from pathlib import Path
 from typing import List, Optional
 
@@ -13,7 +14,8 @@ def main(argv: Optional[List[str]] = None) -> None:
 
     Raises:
         FileNotFoundError: If the configuration file does not exist.
-        SystemExit: If the serving extra is not installed.
+        SystemExit: If the serving extra, or the mcp extra when MCP is enabled,
+            is not installed.
     """
     parser = argparse.ArgumentParser(
         prog="warprec.serve",
@@ -49,6 +51,14 @@ def main(argv: Optional[List[str]] = None) -> None:
     if args.export:
         export_serve_config(config, args.export)
         return
+
+    # Checked here rather than left to the gateway: inside Ray the missing
+    # import only shows up as a deployment that never becomes ready.
+    if config.server.mcp and importlib.util.find_spec("fastmcp") is None:
+        raise SystemExit(
+            "server.mcp is enabled but fastmcp is not installed. Install it with: "
+            "pip install 'warprec[mcp]', or set server.mcp to false."
+        )
     run(config)
 
 
