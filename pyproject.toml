@@ -1,18 +1,67 @@
-[tool.poetry]
+[project]
 name = "warprec"
-version = "1.15.2"
 description = "Unifying Academic Rigor and Industrial Scale for Responsible, Reproducible, and Efficient Recommendation"
-authors = [
-    "MarcoWV <marco.avolio@wideverse.com>",
-    "potitoaghilar <potito.aghilar@wideverse.com>",
-    "SabeeenoGH <sabino.roccotelli@wideverse.com>",
-    "vitowalteranelli <vitowalter.anelli@poliba.it>",
-    "JTOVS <joseph.trotta@ovs.it>"
-]
 readme = "README.md"
+requires-python = ">=3.12,<4.0"
+authors = [
+    {name = "MarcoWV", email = "marco.avolio@wideverse.com"},
+    {name = "potitoaghilar", email = "potito.aghilar@wideverse.com"},
+    {name = "SabeeenoGH", email = "sabino.roccotelli@wideverse.com"},
+    {name = "vitowalteranelli", email = "vitowalter.anelli@poliba.it"},
+    {name = "JTOVS", email = "joseph.trotta@ovs.it"},
+]
+# The version stays under tool.poetry, where semantic-release bumps it, and the
+# dependencies stay there too, in Poetry's caret syntax.
+dynamic = ["version", "dependencies"]
 
-[tool.poetry.scripts]
+[project.optional-dependencies]
+dashboard = [
+    "wandb>=0.19.10,<0.20.0",
+    "codecarbon>=3.0.0,<4.0.0",
+    "mlflow>=2.22.0,<3.0.0",
+]
+remote-io = [
+    "azure-storage-blob>=12.26.0,<13.0.0",
+    "azure-identity>=1.25.1,<2.0.0",
+]
+# Ray Serve, which brings FastAPI and uvicorn with it. Its own extra rather
+# than part of the core install: it pulls in a web stack training never uses.
+serving = [
+    "ray[serve]>=2.58.0,<3.0.0",
+]
+# The MCP endpoint on top of serving. Kept apart from 'serving' so CI can test
+# the server without fastmcp, which cannot share an environment with pydoclint.
+mcp = [
+    "ray[serve]>=2.58.0,<3.0.0",
+    "fastmcp>=3.1.0,<4.0.0",
+]
+bohb = [
+    "hpbandster>=0.7.4,<0.8.0",
+    "configspace>=1.2.2,<2.0.0",
+]
+graph = [
+    "torch-geometric>=2.7.0,<3.0.0",
+]
+all = [
+    "wandb>=0.19.10,<0.20.0",
+    "codecarbon>=3.0.0,<4.0.0",
+    "mlflow>=2.22.0,<3.0.0",
+    "azure-storage-blob>=12.26.0,<13.0.0",
+    "azure-identity>=1.25.1,<2.0.0",
+    "ray[serve]>=2.58.0,<3.0.0",
+    "fastmcp>=3.1.0,<4.0.0",
+    "hpbandster>=0.7.4,<0.8.0",
+    "configspace>=1.2.2,<2.0.0",
+    "torch-geometric>=2.7.0,<3.0.0",
+]
+
+[project.scripts]
 warprec = "warprec.run:main"
+"warprec.run" = "warprec.run:main"
+"warprec.serve" = "warprec.serve:main"
+
+[tool.poetry]
+version = "1.15.2"
 
 [tool.poetry.dependencies]
 python = "^3.12"
@@ -23,7 +72,7 @@ pydantic = "^2.10.6"
 tabulate = "^0.9.0"
 scikit-learn = "^1.6.1"
 hyperopt = "^0.2.7"
-ray = {extras = ["data", "serve", "train", "tune"], version = "^2.54.0"}
+ray = {extras = ["data", "train", "tune"], version = "^2.54.0"}
 types-pyyaml = "^6.0.12.20241230"
 types-tabulate = "^0.9.0.20241207"
 loguru = "^0.7.3"
@@ -34,16 +83,6 @@ torchmetrics = "^1.8.2"
 optuna = "^4.5.0"
 polars = "^1.36"
 narwhals = "^2.15.0"
-wandb = {version = "^0.19.10", optional = true}
-codecarbon = {version = "^3.0.0", optional = true}
-mlflow = {version = "^2.22.0", optional = true}
-azure-storage-blob = {version = "^12.26.0", optional = true}
-azure-identity = {version = "^1.25.1", optional = true}
-fastapi = {version = "^0.135.1", optional = true}
-fastmcp = {version = "^3.1.0", optional = true}
-hpbandster = {version = "^0.7.4", optional = true}
-configspace = {version = "^1.2.2", optional = true}
-torch-geometric = {version = "^2.7.0", optional = true}
 lightning = "^2.6.1"
 coolname = "^5.0.0"
 
@@ -67,41 +106,6 @@ mkdocs-llmstxt = "^0.5.0"
 
 [tool.poetry.requires-plugins]
 poetry-plugin-export = ">=1.8"
-
-
-[tool.poetry.extras]
-dashboard = [
-    "wandb",
-    "codecarbon",
-    "mlflow",
-]
-remote-io = [
-    "azure-storage-blob",
-    "azure-identity",
-]
-serving = [
-    "fastapi",
-    "fastmcp",
-]
-bohb = [
-    "hpbandster",
-    "configspace",
-]
-graph = [
-    "torch-geometric",
-]
-all = [
-    "wandb",
-    "codecarbon",
-    "mlflow",
-    "azure-storage-blob",
-    "azure-identity",
-    "fastapi",
-    "fastmcp",
-    "hpbandster",
-    "configspace",
-    "torch-geometric",
-]
 
 
 [tool.semantic_release]
@@ -135,8 +139,13 @@ exclude_also = [
 
 [tool.coverage.run]
 source = ["warprec"]
-# The serving layer needs a live process to exercise and is covered separately.
-omit = ["*/serving/*"]
+# These run inside Ray replicas, which test_serving_app exercises over HTTP but
+# coverage cannot see. The logic they delegate to is covered in process.
+omit = [
+    "*/warprec/serving/api.py",
+    "*/warprec/serving/deployments.py",
+    "*/warprec/serving/mcp.py",
+]
 
 
 [tool.pytest.ini_options]
