@@ -37,7 +37,7 @@ WarpRec is built on **4 foundational pillars** — Scalability, Green AI, Agenti
 4. **Evaluation Engine** — Computes 45 GPU-accelerated metrics in a single pass with automated statistical significance testing, optional re-ranking, and inverse-propensity estimators that correct for exposure bias.
 5. **Writer** — Serializes results, checkpoints, and carbon reports to local or cloud storage.
 
-An **Application Layer** exposes trained models through a REST API (FastAPI) and an MCP server for agentic AI workflows.
+An **Application Layer** serves trained models on Ray Serve, as a batched REST API and, optionally, as MCP tools for agentic AI workflows.
 
 ## 📚 Table of Contents
 
@@ -50,6 +50,7 @@ An **Application Layer** exposes trained models through a REST API (FastAPI) and
   - [🏋️ Training a model](#️-training-a-model)
   - [✏️ Design a model](#️-design-a-model)
   - [🔍 Evaluate a model](#-evaluate-a-model)
+  - [🛰️ Serve a model](#️-serve-a-model)
   - [🧰 Makefile Commands](#-makefile-commands)
 - [🤝 Contributing](#-contributing)
 - [📜 License](#-license)
@@ -66,8 +67,8 @@ An **Application Layer** exposes trained models through a REST API (FastAPI) and
 - **Distributed Training & HPO**: Seamless vertical and horizontal scaling from single-GPU to multi-node Ray clusters. Hyperparameter optimization supports Grid, Random, Bayesian, HyperOpt, Optuna, and BoHB strategies, with ASHA pruning and model-level early stopping to maximize computational efficiency.
 - **Pausable & Resumable Runs**: Long experiments can be stopped with a signal (`Ctrl+C` or `SIGTERM`) and resumed later from the same command. Unfinished Ray Tune trials continue from their last checkpoint and models that already completed are skipped, so a preemption on a spot instance or a cluster reclaim costs minutes rather than the whole experiment.
 - **Green AI & Carbon Tracking**: WarpRec is the first recommendation framework with native [CodeCarbon](https://codecarbon.io/) integration, automatically quantifying energy consumption and CO₂ emissions for every experiment and persisting carbon footprint reports alongside standard results.
-- **Agentic AI via MCP**: WarpRec natively implements a [Model Context Protocol](https://modelcontextprotocol.io/) server (`serving/mcp/mcp_server.py`), exposing trained recommenders as callable tools within LLM and autonomous agent workflows — transforming the framework from a static predictor into an interactive, agent-ready component.
-- **REST API & Model Serving**: Trained models are instantly deployable as RESTful microservices via the built-in FastAPI server (`serving/restAPI/server.py`), decoupling the modeling core from serving infrastructure with zero additional engineering effort.
+- **Agentic AI via MCP**: Served models can also be exposed as [Model Context Protocol](https://modelcontextprotocol.io/) tools on the same server (`server.mcp: true`), so LLMs and autonomous agents call a trained recommender as a tool — transforming the framework from a static predictor into an interactive, agent-ready component.
+- **Model Serving on Ray Serve**: A model saved by the training pipeline is served with `python -m warprec.serve -c serve.yml` — a batched REST API with replicas, autoscaling and GPU placement set in configuration, and exportable to a Ray cluster or KubeRay. General, sequential, graph and context-aware models are all served from the checkpoint alone.
 - **Experiment Tracking**: Native integrations with `TensorBoard`, `Weights & Biases`, and `MLflow` for real-time monitoring of metrics, training dynamics, and multi-run management.
 - **Custom Pipelines & Callbacks**: Alongside the standard Training, Design, Evaluation, Swarm, and Estimate workflows, WarpRec exposes an event-driven Callback system for injecting custom logic at any stage — enabling complex experiments without modifying framework internals.
 
@@ -87,7 +88,8 @@ WarpRec provides extra dependencies for specific use cases:
 |---|---|
 | dashboard | Dashboard functionalities like MLflow and Weights & Biases. |
 | remote-io | Remote communication with cloud services like Azure. |
-| serving | Optional dependencies to serve your recommendation models. |
+| serving | Ray Serve, to serve trained models over HTTP with `warprec.serve`. |
+| mcp | Serving plus the MCP endpoint that exposes models to LLM agents. |
 | bohb | Dependencies required by the `bohb` search strategy and scheduler. |
 | graph | PyTorch Geometric, required by the graph-based recommenders. |
 | all | All of the above. |
@@ -199,6 +201,30 @@ To run only evaluation on a model, use the `eval` pipeline. Here's an example:
     ```
 
 This command starts the evaluation process using the specified configuration file.
+
+### 🛰️ Serve a model
+
+A model trained with `meta.save_model: true` can be served directly from its checkpoint:
+
+1. Install the serving extra:
+    ```bash
+    pip install "warprec[serving]"
+    ```
+2. Prepare a serving configuration (e.g. `config/serve_config.yml`) that points each endpoint at a saved `.pth` file.
+3. Start the server:
+    ```bash
+    # Running with pip
+    warprec.serve -c config/serve_config.yml
+    # Or with cloned repo
+    python -m warprec.serve -c config/serve_config.yml
+    ```
+4. Ask for recommendations:
+    ```bash
+    curl -X POST localhost:8000/v1/models/sasrec/recommend \
+         -H "Content-Type: application/json" -d '{"user_id": 1, "k": 10}'
+    ```
+
+See the [serving guide](https://warprec.readthedocs.io/en/latest/serving/) for the API, MCP, scaling and cluster deployment.
 
 ### 🧰 Makefile Commands
 

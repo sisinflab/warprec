@@ -14,7 +14,8 @@ WarpRec provides extra dependencies for specific use cases:
 |---|---|
 | dashboard | Dashboard functionalities like MLflow and Weights & Biases. |
 | remote-io | Remote communication with cloud services like Azure. |
-| serving | Optional dependencies to serve your recommendation models. |
+| serving | Ray Serve, to serve trained models over HTTP with `warprec.serve`. |
+| mcp | Serving plus the MCP endpoint that exposes models to LLM agents. |
 | bohb | Dependencies required by the `bohb` search strategy and scheduler. |
 | graph | PyTorch Geometric, required by the graph-based recommenders. |
 | all | All of the above. |

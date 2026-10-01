@@ -66,6 +66,8 @@ nav:
         - Novelty: evaluation/metrics/novelty.md
         - Rating: evaluation/metrics/rating.md
         - Debiased: evaluation/metrics/debiased.md
+  - Serving:
+    - Serving Models: serving/index.md
   - Cloud & Deployment:
     - Authentication: cloud/authentication.md
     - Cluster Management: cloud/cluster-management.md

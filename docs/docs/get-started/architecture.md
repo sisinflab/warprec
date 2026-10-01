@@ -22,7 +22,7 @@ WarpRec is the first Recommender Systems framework to enforce ecological account
 
 ### Agentic Readiness
 
-Anticipating the shift toward autonomous systems, WarpRec natively implements the [Model Context Protocol (MCP)](https://modelcontextprotocol.io/) server interface. This transforms the recommender from a static predictor into a queryable tool that LLMs and autonomous agents can invoke dynamically within their reasoning loops, bridging the gap between recommendation and conversational AI.
+Anticipating the shift toward autonomous systems, WarpRec serves trained models on Ray Serve and can expose them through the [Model Context Protocol (MCP)](https://modelcontextprotocol.io/) on the same server. This transforms the recommender from a static predictor into a queryable tool that LLMs and autonomous agents can invoke dynamically within their reasoning loops, bridging the gap between recommendation and conversational AI. See [Serving Models](../serving/index.md).
 
 ### Scientific Rigor
 
