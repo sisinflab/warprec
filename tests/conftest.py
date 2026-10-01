@@ -4,6 +4,7 @@ Every fixture here is generated in memory. The datasets live outside the
 repository, so a test that reads one would pass locally and fail in CI.
 """
 
+from pathlib import Path
 from typing import Any, Dict, List, Tuple
 
 import numpy as np
@@ -14,6 +15,7 @@ import torch
 import warprec.recommenders  # noqa: F401  (populates the registries make_model reads)
 from warprec.data.dataset import Dataset
 from warprec.recommenders.base_recommender import Recommender
+from warprec.serving.payload import build_serving_payload
 from warprec.utils.registry import model_registry, params_registry
 
 N_USERS = 40
@@ -352,3 +354,20 @@ def make_model(model_name: str, dataset: Dataset, seed: int = 0) -> Recommender:
         knowledge=dataset.knowledge,
         multimodal=dataset.multimodal,
     )
+
+
+def save_servable(path: Path, model: Recommender, dataset: Dataset) -> Path:
+    """Write a checkpoint the way the train pipeline does, serving payload included.
+
+    Args:
+        path (Path): Where to write it.
+        model (Recommender): The model to save.
+        dataset (Dataset): The dataset it was built on.
+
+    Returns:
+        Path: The path written.
+    """
+    state = model.get_state()
+    state["serving"] = build_serving_payload(model, dataset)
+    torch.save(state, path)
+    return path

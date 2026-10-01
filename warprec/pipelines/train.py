@@ -343,9 +343,9 @@ def train_pipeline(path: str):
                 }
                 context.writer.write_params(model_params)
 
-                # Model serialization
+                # Model serialization, with what serving needs from the data
                 if params.meta.save_model:
-                    context.writer.write_model(best_model)
+                    context.writer.write_model(best_model, dataset=main_dataset)
 
                 if config.general.time_report:
                     # Timing report for the current model

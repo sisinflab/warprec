@@ -25,6 +25,7 @@ from warprec.utils.config import (
     EvalConfiguration,
     EstimateConfiguration,
 )
+from warprec.serving.payload import build_serving_payload
 from warprec.utils.enums import WritingMethods
 from warprec.utils.logger import logger
 
@@ -382,18 +383,25 @@ class Writer(ABC):
                     f"Error writing per-user results for {model_name} (k={k}) to {path}: {e}"
                 )
 
-    def write_model(self, model: Recommender):
+    def write_model(self, model: Recommender, dataset: Optional[Dataset] = None):
         """Saves the model's state dictionary.
 
         Args:
             model (Recommender): The model to write.
+            dataset (Optional[Dataset]): The dataset the model was trained on.
+                When given, what serving needs from it - the items each user
+                has seen and, for a sequential model, their recent history - is
+                saved alongside, so that the file alone can be served.
         """
         path = self._path_join(
             self.experiment_serialized_models_path, model.name_param + ".pth"
         )
         try:
+            state = model.get_state()
+            if dataset is not None:
+                state["serving"] = build_serving_payload(model, dataset)
             buffer = BytesIO()
-            torch.save(model.get_state(), buffer)
+            torch.save(state, buffer)
             buffer.seek(0)
             self._write_bytes(path, buffer.read())
             logger.msg(f"Model state successfully written to {path}")
