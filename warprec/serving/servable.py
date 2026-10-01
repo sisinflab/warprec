@@ -299,6 +299,40 @@ class ServableModel:
             answers.append(self._top_k(scores, query))
         return answers
 
+    @torch.inference_mode()
+    def score(
+        self,
+        items: List[Label],
+        user_id: Optional[Label] = None,
+        history: Optional[List[Label]] = None,
+    ) -> List[Dict[str, Any]]:
+        """The model's score for each candidate, in the order they were sent.
+
+        Nothing is masked: a caller re-ranking its own candidates asked about
+        exactly these items.
+
+        Args:
+            items (List[Label]): The candidates, by id or name.
+            user_id (Optional[Label]): The user, by the dataset's own id.
+            history (Optional[List[Label]]): A session, for a sequential model.
+
+        Returns:
+            List[Dict[str, Any]]: One entry per candidate, in request order.
+
+        Raises:
+            ServingError: If there are no candidates, or the request cannot be answered.
+        """
+        if not items:
+            raise ServingError(422, "items must hold at least one candidate.")
+        candidates = [self._item_index(token) for token in items]
+        query = self.resolve(user_id=user_id, history=history, k=1)
+        if query.fallback:
+            row = self._popularity
+        else:
+            row = self._predict([query])[0]
+        values = row[torch.tensor(candidates, device=row.device)].tolist()  # type: ignore[index]
+        return [self._entry(index, value) for index, value in zip(candidates, values)]
+
     def _resolve_session(
         self, user: Optional[int], history: List[Label], k: int, excluded: List[int]
     ) -> Query:

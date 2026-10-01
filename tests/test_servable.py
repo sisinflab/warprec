@@ -16,6 +16,9 @@ from warprec.data.dataset import Dataset
 from warprec.recommenders.base_recommender import Recommender
 from warprec.serving.servable import ServableModel, ServingError, ServingPolicy
 
+from warprec.serving.catalogue import read_item_names
+from warprec.utils.config.serving_configuration import ItemMetadata
+
 from conftest import make_model, save_servable
 
 
@@ -238,3 +241,68 @@ def test_describe_reports_the_model(tmp_path: Path, dataset: Dataset):
     assert description["n_items"] == dataset.info()["n_items"]
     assert description["needs_user"] is False
     assert isinstance(description["params"], dict)
+
+
+def catalogue(tmp_path: Path, dataset: Dataset) -> dict:
+    _, items = labels(dataset)
+    path = tmp_path / "items.dat"
+    path.write_text(
+        "".join(f"{label}::Item {label}\n" for label in items.values()),
+        encoding="utf-8",
+    )
+    return read_item_names(ItemMetadata(path=str(path), sep="::", header=False))
+
+
+def test_names_are_read_by_position_without_a_header(tmp_path: Path, dataset: Dataset):
+    names = catalogue(tmp_path, dataset)
+    _, items = labels(dataset)
+    assert names[str(items[0])] == f"Item {items[0]}"
+
+
+def test_names_are_read_by_column_name_with_a_header(tmp_path: Path):
+    path = tmp_path / "items.csv"
+    path.write_text("title,movie_id\nHeat,7\n", encoding="utf-8")
+    metadata = ItemMetadata(path=str(path), id_column="movie_id", name_column="title")
+    assert read_item_names(metadata) == {"7": "Heat"}
+
+
+def test_answers_carry_names_and_accept_them(tmp_path: Path, dataset: Dataset):
+    path = save_servable(tmp_path / "m.pth", make_model("SASRec", dataset), dataset)
+    servable = ServableModel.from_checkpoint(
+        path, item_names=catalogue(tmp_path, dataset)
+    )
+    _, items = labels(dataset)
+    by_id = servable.recommend([servable.resolve(history=[items[1], items[2]], k=3)])
+    by_name = servable.recommend(
+        [servable.resolve(history=[f"Item {items[1]}", f"Item {items[2]}"], k=3)]
+    )
+    assert by_id == by_name
+    assert all(entry["name"] == f"Item {entry['item_id']}" for entry in by_id[0])
+
+
+def test_scores_come_back_in_request_order_unmasked(tmp_path: Path, dataset: Dataset):
+    servable = served(tmp_path, "BPR", dataset)
+    model = make_model("BPR", dataset)
+    model.eval()
+    users, items = labels(dataset)
+    wanted = [items[5], items[0], items[3]]
+    scored = servable.score(items=wanted, user_id=users[1])
+    with torch.inference_mode():
+        expected = model.predict(user_indices=torch.tensor([1]))[0]
+    assert [entry["item_id"] for entry in scored] == wanted
+    assert [entry["score"] for entry in scored] == pytest.approx(
+        [expected[i].item() for i in (5, 0, 3)]
+    )
+
+
+def test_scoring_an_unknown_item_is_refused(tmp_path: Path, dataset: Dataset):
+    users, _ = labels(dataset)
+    with pytest.raises(ServingError) as error:
+        served(tmp_path, "BPR", dataset).score(items=["nope"], user_id=users[0])
+    assert error.value.status == 422
+
+
+def test_scoring_needs_at_least_one_item(tmp_path: Path, dataset: Dataset):
+    users, _ = labels(dataset)
+    with pytest.raises(ServingError, match="items"):
+        served(tmp_path, "BPR", dataset).score(items=[], user_id=users[0])
