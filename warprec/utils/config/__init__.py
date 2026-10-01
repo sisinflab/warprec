@@ -45,6 +45,7 @@ from .config import (
     load_estimate_configuration,
     load_callback,
 )
+from .serving_configuration import ServingConfiguration, load_serving_configuration
 
 __all__ = [
     "recommender_model_config",
@@ -92,4 +93,6 @@ __all__ = [
     "load_eval_configuration",
     "load_estimate_configuration",
     "load_callback",
+    "ServingConfiguration",
+    "load_serving_configuration",
 ]

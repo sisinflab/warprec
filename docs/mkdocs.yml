@@ -35,6 +35,7 @@ nav:
       - Estimate: configuration/estimate.md
       - General: configuration/general.md
       - Run: configuration/run.md
+      - Serving: configuration/serving.md
   - Recommenders:
       - Module Overview: recommenders/index.md
       - Models Taxonomy: recommenders/taxonomy.md
