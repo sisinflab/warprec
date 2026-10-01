@@ -4,6 +4,7 @@ import numpy as np
 from scipy.sparse import csr_matrix
 
 from warprec.recommenders.base_recommender import (
+    ContextRecommenderUtils,
     Recommender,
     SequentialRecommenderUtils,
 )
@@ -29,8 +30,10 @@ def build_serving_payload(model: Recommender, dataset: "Dataset") -> Dict[str, A
         dataset (Dataset): The dataset it was trained on.
 
     Returns:
-        Dict[str, Any]: The binary training matrix under 'seen' and, for a
-            sequential model, the packed histories under 'histories'.
+        Dict[str, Any]: The binary training matrix under 'seen'; for a
+            sequential model, the packed histories under 'histories'; and, for
+            a context-aware model, the index of every known context value under
+            'context_maps'.
     """
     train = dataset.train_set.get_sparse().tocsr()
     # A stored zero is not an interaction, so it is dropped before the matrix
@@ -45,7 +48,13 @@ def build_serving_payload(model: Recommender, dataset: "Dataset") -> Dict[str, A
     histories: Optional[Dict[str, np.ndarray]] = None
     if isinstance(model, SequentialRecommenderUtils):
         histories = _pack_histories(dataset, model.max_seq_len)
-    return {"seen": seen, "histories": histories}
+    context_maps: Optional[Dict[str, Dict[Any, int]]] = None
+    if isinstance(model, ContextRecommenderUtils):
+        context_maps = {
+            label: dict(mapping)
+            for label, mapping in dataset.get_context_maps().items()
+        }
+    return {"seen": seen, "histories": histories, "context_maps": context_maps}
 
 
 def _pack_histories(dataset: "Dataset", max_seq_len: int) -> Dict[str, np.ndarray]:

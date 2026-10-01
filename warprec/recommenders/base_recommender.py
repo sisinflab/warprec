@@ -1017,9 +1017,18 @@ class ContextRecommenderUtils(nn.Module, ABC):
             item_features = interactions.get_side_tensor()
             self.register_buffer("item_features", item_features)
         else:
-            self.register_buffer(
-                "item_features", torch.zeros(self.n_items + 1, dtype=torch.long)
-            )
+            # Rebuilt from a checkpoint, without the interactions: the lookup is a
+            # placeholder the saved state fills in, so it must have the shape the
+            # saved one had - one column per item feature, or no lookup at all.
+            if self.feature_labels:
+                self.register_buffer(
+                    "item_features",
+                    torch.zeros(
+                        self.n_items + 1, len(self.feature_labels), dtype=torch.long
+                    ),
+                )
+            else:
+                self.register_buffer("item_features", None)
 
     def get_dataloader(
         self,

@@ -227,13 +227,6 @@ def test_popular_fallback_needs_the_seen_matrix(tmp_path: Path, dataset: Dataset
         )
 
 
-def test_context_aware_models_are_refused(tmp_path: Path, dataset: Dataset):
-    path = tmp_path / "fm.pth"
-    torch.save(make_model("FM", dataset).get_state(), path)
-    with pytest.raises(ValueError, match="context-aware"):
-        ServableModel.from_checkpoint(path)
-
-
 def test_describe_reports_the_model(tmp_path: Path, dataset: Dataset):
     description = served(tmp_path, "SASRec", dataset).describe()
     assert description["model"] == "SASRec"

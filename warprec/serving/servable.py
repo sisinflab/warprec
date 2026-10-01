@@ -2,7 +2,7 @@ import json
 import math
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Dict, List, Literal, Optional, Sequence, Union
+from typing import Any, Dict, List, Literal, Optional, Sequence, Union, cast
 
 import numpy as np
 import torch
@@ -15,6 +15,7 @@ from warprec.recommenders.base_recommender import (
     Recommender,
     SequentialRecommenderUtils,
 )
+from warprec.serving.context import ContextSchema
 from warprec.serving.errors import ServingError
 from warprec.utils.logger import logger
 from warprec.utils.registry import model_registry
@@ -50,6 +51,8 @@ class Query:
         history (Optional[List[int]]): The session's internal item indices, oldest first.
         exclude (List[int]): Internal item indices never to return.
         fallback (bool): Whether popularity answers because the user is unknown.
+        context (Optional[List[Any]]): The encoded context row, for a
+            context-aware model.
     """
 
     k: int
@@ -57,6 +60,7 @@ class Query:
     history: Optional[List[int]] = None
     exclude: List[int] = field(default_factory=list)
     fallback: bool = False
+    context: Optional[List[Any]] = None
 
 
 def _builtin(label: Any) -> Label:
@@ -89,10 +93,13 @@ class ServableModel:
         policy (ServingPolicy): How the endpoint answers.
         item_names (Optional[Dict[str, str]]): Item names by external id.
         warprec_version (Optional[str]): The WarpRec that wrote the checkpoint.
+        context_maps (Optional[Dict[str, Dict[Any, int]]]): The index of every
+            known context value, for a context-aware model.
 
     Raises:
         ValueError: If the policy asks for a popularity fallback the checkpoint
-            has no data for.
+            has no data for, or the model is context-aware and the checkpoint
+            lacks its context vocabulary.
     """
 
     def __init__(
@@ -103,6 +110,7 @@ class ServableModel:
         policy: ServingPolicy = ServingPolicy(),
         item_names: Optional[Dict[str, str]] = None,
         warprec_version: Optional[str] = None,
+        context_maps: Optional[Dict[str, Dict[Any, int]]] = None,
     ):
         if policy.unknown_user == "popular" and seen is None:
             raise ValueError(
@@ -145,6 +153,18 @@ class ServableModel:
             counts = np.asarray(seen.sum(axis=0), dtype=np.float32).ravel()
             self._popularity = torch.from_numpy(counts).to(model.device)
 
+        # A context-aware model needs the vocabulary its contexts were encoded
+        # with, which only checkpoints saved by this version carry.
+        self._context: Optional[ContextSchema] = None
+        if isinstance(model, ContextRecommenderUtils) and model.context_labels:
+            if context_maps is None:
+                raise ValueError(
+                    f"{model.name} is context-aware, but this checkpoint does not "
+                    "carry the context values it was trained on. Save the model "
+                    "again with this version of WarpRec."
+                )
+            self._context = ContextSchema.from_info(model.info, context_maps)
+
     @classmethod
     def from_checkpoint(
         cls,
@@ -166,18 +186,9 @@ class ServableModel:
 
         Returns:
             ServableModel: The model, ready to answer.
-
-        Raises:
-            ValueError: If the model is context-aware, which serving does not
-                support yet.
         """
         checkpoint = torch.load(path, map_location="cpu", weights_only=False)  # nosec B614
         model_class = model_registry.get_class(checkpoint["name"])
-        if issubclass(model_class, ContextRecommenderUtils):
-            raise ValueError(
-                f"{checkpoint['name']} is context-aware: every request would need a "
-                "context vector, which serving does not accept yet."
-            )
 
         model = model_class.from_checkpoint(checkpoint=checkpoint)
         model.to(device)
@@ -191,6 +202,7 @@ class ServableModel:
             policy=policy,
             item_names=item_names,
             warprec_version=checkpoint.get("warprec_version"),
+            context_maps=payload.get("context_maps"),
         )
 
     @property
@@ -213,6 +225,11 @@ class ServableModel:
         """Whether a session alone is not enough and the user must be known."""
         return self.is_sequential and getattr(self._model, "needs_user", False)
 
+    @property
+    def context_schema(self) -> Optional[ContextSchema]:
+        """The context fields of a context-aware model; None for any other."""
+        return self._context
+
     def describe(self) -> Dict[str, Any]:
         """What the endpoint serves, for clients to discover.
 
@@ -229,6 +246,7 @@ class ServableModel:
             # Round-tripped through JSON so that whatever types the
             # hyperparameters carry reach the client as plain values.
             "params": json.loads(json.dumps(self._model.get_params(), default=str)),
+            "context": self._context.describe() if self._context is not None else None,
         }
 
     def resolve(
@@ -237,8 +255,52 @@ class ServableModel:
         history: Optional[List[Label]] = None,
         k: Optional[int] = None,
         exclude: Optional[List[Label]] = None,
+        context: Optional[Union[Dict[str, Any], List[Any]]] = None,
     ) -> Query:
         """Check a request and translate it to the model's indices.
+
+        Args:
+            user_id (Optional[Label]): The user, by the dataset's own id.
+            history (Optional[List[Label]]): A session of item ids or names,
+                oldest first. Sequential models only.
+            k (Optional[int]): How many items to return.
+            exclude (Optional[List[Label]]): Items never to return.
+            context (Optional[Union[Dict[str, Any], List[Any]]]): The situation
+                of the request. Required by context-aware models, refused by others.
+
+        Returns:
+            Query: The request in internal indices.
+
+        Raises:
+            ServingError: If the request cannot be answered, with the reason.
+        """
+        if self._context is None:
+            if context is not None:
+                raise ServingError(
+                    422, f"{self._model.name} does not use context: leave it out."
+                )
+            encoded = None
+        else:
+            if context is None:
+                raise ServingError(
+                    422,
+                    f"{self._model.name} is context-aware: send a context with the "
+                    f"fields {self._context.labels}.",
+                )
+            encoded = self._context.encode(context)
+
+        query = self._resolve_target(user_id, history, k, exclude)
+        query.context = encoded
+        return query
+
+    def _resolve_target(
+        self,
+        user_id: Optional[Label] = None,
+        history: Optional[List[Label]] = None,
+        k: Optional[int] = None,
+        exclude: Optional[List[Label]] = None,
+    ) -> Query:
+        """Resolve the user, history, length and exclusions of a request.
 
         Args:
             user_id (Optional[Label]): The user, by the dataset's own id.
@@ -305,6 +367,7 @@ class ServableModel:
         items: List[Label],
         user_id: Optional[Label] = None,
         history: Optional[List[Label]] = None,
+        context: Optional[Union[Dict[str, Any], List[Any]]] = None,
     ) -> List[Dict[str, Any]]:
         """The model's score for each candidate, in the order they were sent.
 
@@ -315,6 +378,8 @@ class ServableModel:
             items (List[Label]): The candidates, by id or name.
             user_id (Optional[Label]): The user, by the dataset's own id.
             history (Optional[List[Label]]): A session, for a sequential model.
+            context (Optional[Union[Dict[str, Any], List[Any]]]): The situation
+                of the request, for a context-aware model.
 
         Returns:
             List[Dict[str, Any]]: One entry per candidate, in request order.
@@ -325,7 +390,7 @@ class ServableModel:
         if not items:
             raise ServingError(422, "items must hold at least one candidate.")
         candidates = [self._item_index(token) for token in items]
-        query = self.resolve(user_id=user_id, history=history, k=1)
+        query = self.resolve(user_id=user_id, history=history, k=1, context=context)
         if query.fallback:
             row = self._popularity
         else:
@@ -429,7 +494,7 @@ class ServableModel:
             # Every row is right-padded to the model's full width, not to the
             # longest row of the batch: attention models build their causal mask
             # for max_seq_len positions and cannot read a narrower batch.
-            longest = self._model.max_seq_len
+            longest = cast(SequentialRecommenderUtils, self._model).max_seq_len
             recent = [query.history[-longest:] for query in queries]
             sequences = torch.full(
                 (len(queries), longest), self.n_items, dtype=torch.long
@@ -439,6 +504,10 @@ class ServableModel:
             inputs["user_seq"] = sequences.to(device)
             inputs["seq_len"] = torch.tensor(
                 [len(items) for items in recent], dtype=torch.long, device=device
+            )
+        if self._context is not None:
+            inputs["contexts"] = self._context.tensor(
+                [query.context for query in queries], device
             )
         with torch.inference_mode():
             return self._model.predict(**inputs).float()

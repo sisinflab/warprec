@@ -1213,6 +1213,18 @@ class Dataset:
         """
         return self._context_dims
 
+    def get_context_maps(self) -> Dict[str, Dict[Any, int]]:
+        """Returns the index each known value of a context field was encoded to.
+
+        Serving needs it to encode the context a request describes exactly as
+        training encoded the rows the model learned from.
+
+        Returns:
+            Dict[str, Dict[Any, int]]: For each categorical or multi-valued field,
+                its values and their indices. Numeric fields have no entry.
+        """
+        return self._context_maps
+
     def get_mappings(self) -> Tuple[dict, dict]:
         """Returns the mapping used for this dataset.
 
