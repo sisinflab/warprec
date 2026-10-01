@@ -322,7 +322,7 @@ class ServableModel:
             )
         k = min(k, self.n_items)
         excluded = [self._item_index(token) for token in exclude or []]
-        user = None if user_id is None else self._users.get(str(user_id))
+        user = None if user_id is None else self._known_user(user_id)
 
         if history is not None:
             return self._resolve_session(user, history, k, excluded)
@@ -430,6 +430,25 @@ class ServableModel:
             )
         items = [self._item_index(token) for token in history]
         return Query(k=k, user=user, history=items, exclude=excluded)
+
+    def _known_user(self, user_id: Label) -> Optional[int]:
+        """The internal index of a user the model actually learned.
+
+        A cold-start protocol keeps the users it holds out in the mapping with
+        no training interactions, so their embedding never trained. With the
+        training matrix at hand, such a user counts as unknown.
+
+        Args:
+            user_id (Label): The user, by the dataset's own id.
+
+        Returns:
+            Optional[int]: The internal index, or None for an unknown user.
+        """
+        user = self._users.get(str(user_id))
+        if user is not None and self._seen is not None:
+            if self._seen.indptr[user] == self._seen.indptr[user + 1]:
+                return None
+        return user
 
     def _stored_history(self, user: int) -> Optional[List[int]]:
         """The training history of a known user, for a sequential model.

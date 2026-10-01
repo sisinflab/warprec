@@ -299,3 +299,31 @@ def test_scoring_needs_at_least_one_item(tmp_path: Path, dataset: Dataset):
     users, _ = labels(dataset)
     with pytest.raises(ServingError, match="items"):
         served(tmp_path, "BPR", dataset).score(items=[], user_id=users[0])
+
+
+@pytest.mark.parametrize(
+    "unknown_user, expected", [("popular", "fallback"), ("error", 404)]
+)
+def test_a_user_with_no_training_history_is_treated_as_unknown(
+    dataset: Dataset, unknown_user: str, expected
+):
+    """A cold-start protocol keeps held-out users in the mapping with no
+    training rows; their embedding never trained, so it must not answer."""
+    from scipy.sparse import csr_matrix
+
+    from warprec.serving.payload import build_serving_payload
+
+    model = make_model("BPR", dataset)
+    seen = build_serving_payload(model, dataset)["seen"].tolil()
+    seen.rows[0], seen.data[0] = [], []
+    servable = ServableModel(
+        model, seen=csr_matrix(seen), policy=ServingPolicy(unknown_user=unknown_user)
+    )
+    users, _ = labels(dataset)
+    if expected == "fallback":
+        assert servable.resolve(user_id=users[0]).fallback
+        assert not servable.resolve(user_id=users[1]).fallback
+    else:
+        with pytest.raises(ServingError) as error:
+            servable.resolve(user_id=users[0])
+        assert error.value.status == 404
