@@ -80,12 +80,22 @@ def build_api(
     async def describe_model(name: str) -> ModelInfo:
         return ModelInfo(name=name, **await handle(name).describe.remote())
 
-    @app.post("/v1/models/{name}/recommend", response_model=RecommendResponse)
+    @app.post(
+        "/v1/models/{name}/recommend",
+        response_model=RecommendResponse,
+        # An item's name is left out, not sent as null, without a catalogue.
+        response_model_exclude_none=True,
+    )
     async def recommend(name: str, body: RecommendRequest) -> RecommendResponse:
         result = await handle(name).recommend.remote(body.model_dump(exclude_none=True))
         return RecommendResponse(model=name, **_unwrap(result))
 
-    @app.post("/v1/models/{name}/score", response_model=ScoreResponse)
+    @app.post(
+        "/v1/models/{name}/score",
+        response_model=ScoreResponse,
+        # An item's name is left out, not sent as null, without a catalogue.
+        response_model_exclude_none=True,
+    )
     async def score(name: str, body: ScoreRequest) -> ScoreResponse:
         result = await handle(name).score.remote(body.model_dump(exclude_none=True))
         return ScoreResponse(model=name, **_unwrap(result))

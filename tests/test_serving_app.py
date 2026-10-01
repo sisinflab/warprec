@@ -117,6 +117,8 @@ def test_recommend_matches_the_model_in_process(
         timeout=10,
     ).json()
     assert body["model"] == "bpr" and body["fallback"] is False
+    # Without an item catalogue there is no name to give, so the field is absent.
+    assert all("name" not in entry for entry in body["items"])
     assert [e["item_id"] for e in body["items"]] == [e["item_id"] for e in expected]
 
 
