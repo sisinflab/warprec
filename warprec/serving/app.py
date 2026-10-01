@@ -70,7 +70,10 @@ def export_serve_config(config: ServingConfiguration, path: Union[str, Path]) ->
     """Write the application as a Ray Serve config file, for serve deploy or KubeRay.
 
     Paths become absolute so the file works from any directory, and the API key
-    is left out so that no secret ends up in a file meant to be shared.
+    is left out so that no secret ends up in a file meant to be shared. Unless
+    the configuration sets server.host explicitly, the proxy listens on every
+    interface: on a cluster it is reached from outside its machine or pod, where
+    the local default of 127.0.0.1 would leave the application unreachable.
 
     Args:
         config (ServingConfiguration): The validated configuration.
@@ -81,15 +84,18 @@ def export_serve_config(config: ServingConfiguration, path: Union[str, Path]) ->
             "The API key is not written to the exported file. Set WARPREC_API_KEY "
             "in the environment of the cluster that runs it."
         )
+    portable = config.portable()
+    if "host" not in config.server.model_fields_set:
+        portable.server.host = "0.0.0.0"  # nosec B104 - a cluster proxy must be reachable
     document = {
         "proxy_location": "EveryNode",
-        "http_options": {"host": config.server.host, "port": config.server.port},
+        "http_options": {"host": portable.server.host, "port": portable.server.port},
         "applications": [
             {
                 "name": APP_NAME,
                 "route_prefix": config.server.route_prefix,
                 "import_path": "warprec.serving.app:app_builder",
-                "args": {"config": config.portable().model_dump(mode="json")},
+                "args": {"config": portable.model_dump(mode="json")},
             }
         ],
     }

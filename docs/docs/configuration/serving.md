@@ -14,7 +14,7 @@ Unknown keys are rejected rather than ignored, so a typo fails at startup instea
 
 The `server` section is optional. Every key has a default.
 
-- **host**: The address the HTTP proxy binds to. Use `0.0.0.0` to accept connections from other machines. Defaults to `127.0.0.1`.
+- **host**: The address the HTTP proxy binds to. Use `0.0.0.0` to accept connections from other machines. Defaults to `127.0.0.1`; a configuration exported with `--export` for a cluster listens on `0.0.0.0` instead, unless `host` is set explicitly.
 - **port**: The port the HTTP proxy listens on, between 1 and 65535. Defaults to `8000`.
 - **route_prefix**: The path every route is mounted under. Must start with `/`. Defaults to `/`.
 - **api_key**: The value every request must carry in the `X-API-Key` header, except `GET /healthz`. The `WARPREC_API_KEY` environment variable overrides it. `null` disables authentication. Defaults to `null`.

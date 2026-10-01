@@ -244,3 +244,21 @@ def test_a_model_that_cannot_use_a_gpu_does_not_reserve_one(
     (options,) = servers.options_given
     assert endpoint["device"] == ("cuda" if gpu else "cpu")
     assert ("num_gpus" in (options.get("ray_actor_options") or {})) is gpu
+
+
+@pytest.mark.parametrize(
+    "server, expected", [({}, "0.0.0.0"), ({"host": "10.0.0.5"}, "10.0.0.5")]
+)
+def test_an_export_listens_on_every_interface_unless_told_otherwise(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, server, expected
+):
+    """A cluster's proxy is reached from outside its machine or pod, so the
+    local default 127.0.0.1 would leave the deployed application unreachable."""
+    pytest.importorskip("ray.serve")
+    monkeypatch.chdir(tmp_path)
+    write_config(tmp_path, **server)
+    main(["-c", "serve.yml", "--export", "serve_app.yaml"])
+
+    document = yaml.safe_load((tmp_path / "serve_app.yaml").read_text())
+    assert document["http_options"]["host"] == expected
+    assert document["applications"][0]["args"]["config"]["server"]["host"] == expected
