@@ -342,3 +342,27 @@ def test_a_checkpoint_says_whether_its_model_can_use_a_gpu(
 
     path = save_servable(tmp_path / f"{name}.pth", make_model(name, dataset), dataset)
     assert scores_on_device(path) is expected
+
+
+def test_a_batch_of_score_requests_answers_each_as_if_alone(
+    tmp_path: Path, dataset: Dataset
+):
+    """Scoring is batched like recommending: one forward pass for the batch,
+    then every request reads its own candidates, in its own order."""
+    servable = served(tmp_path, "SASRec", dataset, unknown_user="popular")
+    users, items = labels(dataset)
+    queries = [
+        servable.resolve_scoring(items=[items[3], items[1]], user_id=users[0]),
+        servable.resolve_scoring(items=[items[2]], user_id="nobody"),
+        servable.resolve_scoring(
+            items=[items[4], items[0], items[5]], history=[items[1], items[2]]
+        ),
+    ]
+    together = servable.score_batch(queries)
+    alone = [servable.score_batch([query])[0] for query in queries]
+    assert (
+        ids(together)
+        == ids(alone)
+        == [[items[3], items[1]], [items[2]], [items[4], items[0], items[5]]]
+    )
+    assert scores(together) == pytest.approx(scores(alone), rel=1e-5)

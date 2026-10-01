@@ -36,14 +36,15 @@ class ModelServer:
             ),
             item_names=names,
         )
-        # serve.batch wraps the method in an object carrying these setters,
+        # serve.batch wraps each method in an object carrying these setters,
         # which the decorator's type hints do not show.
-        self._recommend_batch.set_max_batch_size(  # type: ignore[attr-defined]
-            config.batching.max_batch_size
-        )
-        self._recommend_batch.set_batch_wait_timeout_s(  # type: ignore[attr-defined]
-            config.batching.batch_wait_timeout_s
-        )
+        for batched in (self._recommend_batch, self._score_batch):
+            batched.set_max_batch_size(  # type: ignore[attr-defined]
+                config.batching.max_batch_size
+            )
+            batched.set_batch_wait_timeout_s(  # type: ignore[attr-defined]
+                config.batching.batch_wait_timeout_s
+            )
 
     def describe(self) -> Dict[str, Any]:
         """What this endpoint serves.
@@ -70,7 +71,7 @@ class ModelServer:
         return {"items": items, "fallback": query.fallback}
 
     async def score(self, request: Dict[str, Any]) -> Dict[str, Any]:
-        """Score the candidates of one request.
+        """Score the candidates of one request, batched with its neighbours.
 
         Args:
             request (Dict[str, Any]): The fields of a ScoreRequest.
@@ -79,9 +80,10 @@ class ModelServer:
             Dict[str, Any]: The scores, or an error.
         """
         try:
-            return {"scores": self._model.score(**request)}
+            query = self._model.resolve_scoring(**request)
         except ServingError as error:
             return {"error": error.to_dict()}
+        return {"scores": await self._score_batch(query)}
 
     @serve.batch(max_batch_size=64, batch_wait_timeout_s=0.005)
     async def _recommend_batch(
@@ -96,6 +98,18 @@ class ModelServer:
             List[List[Dict[str, Any]]]: One answer per query, in order.
         """
         return self._model.recommend(queries)
+
+    @serve.batch(max_batch_size=64, batch_wait_timeout_s=0.005)
+    async def _score_batch(self, queries: List[Query]) -> List[List[Dict[str, Any]]]:
+        """Score the candidates of the queries that arrived together, in one pass.
+
+        Args:
+            queries (List[Query]): The scoring queries of the batch.
+
+        Returns:
+            List[List[Dict[str, Any]]]: One answer per query, in order.
+        """
+        return self._model.score_batch(queries)
 
 
 # The gateway only forwards requests, so it reserves no CPU: on a machine whose

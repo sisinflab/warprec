@@ -53,6 +53,8 @@ class Query:
         fallback (bool): Whether popularity answers because the user is unknown.
         context (Optional[List[Any]]): The encoded context row, for a
             context-aware model.
+        candidates (List[int]): Internal indices of the items to score, for a
+            scoring request.
     """
 
     k: int
@@ -61,6 +63,7 @@ class Query:
     exclude: List[int] = field(default_factory=list)
     fallback: bool = False
     context: Optional[List[Any]] = None
+    candidates: List[int] = field(default_factory=list)
 
 
 def scores_on_device(path: Union[str, Path]) -> bool:
@@ -382,7 +385,6 @@ class ServableModel:
             answers.append(self._top_k(scores, query))
         return answers
 
-    @torch.inference_mode()
     def score(
         self,
         items: List[Label],
@@ -404,6 +406,30 @@ class ServableModel:
 
         Returns:
             List[Dict[str, Any]]: One entry per candidate, in request order.
+        """
+        query = self.resolve_scoring(
+            items, user_id=user_id, history=history, context=context
+        )
+        return self.score_batch([query])[0]
+
+    def resolve_scoring(
+        self,
+        items: List[Label],
+        user_id: Optional[Label] = None,
+        history: Optional[List[Label]] = None,
+        context: Optional[Union[Dict[str, Any], List[Any]]] = None,
+    ) -> Query:
+        """Check a scoring request and translate it to the model's indices.
+
+        Args:
+            items (List[Label]): The candidates, by id or name.
+            user_id (Optional[Label]): The user, by the dataset's own id.
+            history (Optional[List[Label]]): A session, for a sequential model.
+            context (Optional[Union[Dict[str, Any], List[Any]]]): The situation
+                of the request, for a context-aware model.
+
+        Returns:
+            Query: The request in internal indices, its candidates included.
 
         Raises:
             ServingError: If there are no candidates, or the request cannot be answered.
@@ -412,12 +438,36 @@ class ServableModel:
             raise ServingError(422, "items must hold at least one candidate.")
         candidates = [self._item_index(token) for token in items]
         query = self.resolve(user_id=user_id, history=history, k=1, context=context)
-        if query.fallback:
-            row = self._popularity
-        else:
-            row = self._predict([query])[0]
-        values = row[torch.tensor(candidates, device=row.device)].tolist()  # type: ignore[index]
-        return [self._entry(index, value) for index, value in zip(candidates, values)]
+        query.candidates = candidates
+        return query
+
+    # Like recommend: one forward pass for the batch, edited in inference mode.
+    @torch.inference_mode()
+    def score_batch(self, queries: Sequence[Query]) -> List[List[Dict[str, Any]]]:
+        """Score the candidates of a batch of queries with one forward pass.
+
+        Args:
+            queries (Sequence[Query]): Queries returned by resolve_scoring().
+
+        Returns:
+            List[List[Dict[str, Any]]]: For each query, one entry per candidate,
+                in the order they were sent.
+        """
+        scored = [query for query in queries if not query.fallback]
+        rows = iter(self._predict(scored)) if scored else iter(())
+        answers = []
+        for query in queries:
+            row = self._popularity if query.fallback else next(rows)
+            values = row[  # type: ignore[index]
+                torch.tensor(query.candidates, device=row.device)  # type: ignore[union-attr]
+            ].tolist()
+            answers.append(
+                [
+                    self._entry(index, value)
+                    for index, value in zip(query.candidates, values)
+                ]
+            )
+        return answers
 
     def _resolve_session(
         self, user: Optional[int], history: List[Label], k: int, excluded: List[int]

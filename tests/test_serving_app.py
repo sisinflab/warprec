@@ -247,3 +247,52 @@ def test_concurrent_requests_each_get_their_own_answer(
     with ThreadPoolExecutor(max_workers=24) as pool:
         answers = list(pool.map(ask, requests_by_user))
     assert answers == expected
+
+
+def test_concurrent_score_requests_share_a_forward_pass(
+    checkpoints, dataset: Dataset, monkeypatch: pytest.MonkeyPatch
+):
+    """Scoring is batched like recommending, so a burst costs one forward pass."""
+    import asyncio
+
+    from types import SimpleNamespace
+
+    from warprec.serving.deployments import ModelServer
+
+    # serve.batch reads the replica's max_ongoing_requests, only to warn when
+    # it is too low; outside a deployment that context has to be supplied.
+    context = SimpleNamespace(
+        _deployment_config=SimpleNamespace(max_ongoing_requests=8)
+    )
+    monkeypatch.setattr(serve, "get_replica_context", lambda: context)
+
+    server = ModelServer.func_or_class(
+        {
+            "name": "bpr",
+            "checkpoint": str(checkpoints["bpr"]),
+            "batching": {"max_batch_size": 8, "batch_wait_timeout_s": 0.2},
+        }
+    )
+    sizes = []
+    score_batch = server._model.score_batch
+
+    def spy(queries):
+        sizes.append(len(queries))
+        return score_batch(queries)
+
+    monkeypatch.setattr(server._model, "score_batch", spy)
+    users, items = dataset.get_inverse_mappings()
+
+    async def burst():
+        return await asyncio.gather(
+            *[
+                server.score({"user_id": users[u], "items": [items[0], items[u]]})
+                for u in range(6)
+            ]
+        )
+
+    answers = asyncio.run(burst())
+    assert sizes == [6]
+    assert [[e["item_id"] for e in a["scores"]] for a in answers] == [
+        [items[0], items[u]] for u in range(6)
+    ]
