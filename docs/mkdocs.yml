@@ -71,6 +71,7 @@ nav:
   - Cloud & Deployment:
     - Authentication: cloud/authentication.md
     - Cluster Management: cloud/cluster-management.md
+    - Deploying Served Models: cloud/deployment.md
   - Guides:
     - Callbacks: guides/callbacks.md
     - Stash: guides/stash.md

@@ -172,22 +172,22 @@ Each endpoint is its own Ray Serve deployment, configured independently:
 - **deployment.ray_actor_options** sets the resources of each replica. With `device: cuda` a replica asks for one GPU; `num_gpus: 0.25` places four replicas on one GPU instead.
 - **server.ray_address: auto** joins the Ray cluster the machine belongs to, rather than starting a local one.
 
-## Deploying to a Cluster
+## Deploying
+
+`warprec.serve` runs the same way everywhere Ray runs:
+- one machine;
+- a Docker container;
+- a Kubernetes `Deployment`;
+- a Ray cluster on virtual machines;
+- a KubeRay `RayService`.
+
+For a cluster, `--export` writes the application as a standard Ray Serve config file:
 
 ```bash
 python -m warprec.serve -c serve.yml --export serve_app.yaml
-serve deploy serve_app.yaml
 ```
 
-`serve deploy` talks to the cluster through its dashboard agent, so the head node must run with the dashboard, which is Ray's default.
-
-`--export` writes a standard Ray Serve configuration file instead of starting the server:
-
-- Its application points at `warprec.serving.app:app_builder`, with the serving configuration inlined.
-- Paths become absolute, so the checkpoints must exist at the same paths on the cluster.
-- The API key is left out of the file; set `WARPREC_API_KEY` in the cluster's environment instead.
-
-The `applications` section of the file can also be pasted into a KubeRay `RayService`.
+[Deploying Served Models](../cloud/deployment.md) walks through every option, with the image, the manifests and the trade-offs.
 
 ## Security
 
