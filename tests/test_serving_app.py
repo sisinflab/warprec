@@ -249,50 +249,65 @@ def test_concurrent_requests_each_get_their_own_answer(
     assert answers == expected
 
 
-def test_concurrent_score_requests_share_a_forward_pass(
-    checkpoints, dataset: Dataset, monkeypatch: pytest.MonkeyPatch
-):
+# Driving the deployment class outside Ray Serve leaves a live batch queue on
+# the class itself, which then cannot be shipped to a replica. The probe runs in
+# a process of its own so that nothing leaks into the deployments other tests
+# start.
+SCORE_BATCH_PROBE = """
+import asyncio, json, sys
+from types import SimpleNamespace
+from ray import serve
+from warprec.serving.deployments import ModelServer
+
+checkpoint, users, items = sys.argv[1], json.loads(sys.argv[2]), json.loads(sys.argv[3])
+context = SimpleNamespace(_deployment_config=SimpleNamespace(max_ongoing_requests=8))
+serve.get_replica_context = lambda: context  # read by serve.batch only to warn
+server = ModelServer.func_or_class(
+    {"name": "bpr", "checkpoint": checkpoint,
+     "batching": {"max_batch_size": 8, "batch_wait_timeout_s": 0.2}}
+)
+sizes = []
+score_batch = server._model.score_batch
+def spy(queries):
+    sizes.append(len(queries))
+    return score_batch(queries)
+server._model.score_batch = spy
+
+async def burst():
+    return await asyncio.gather(*[
+        server.score({"user_id": users[u], "items": [items[0], items[u]]}) for u in range(6)
+    ])
+
+answers = asyncio.run(burst())
+print(json.dumps({"sizes": sizes,
+                  "ids": [[e["item_id"] for e in a["scores"]] for a in answers]}))
+"""
+
+
+def test_concurrent_score_requests_share_a_forward_pass(checkpoints, dataset: Dataset):
     """Scoring is batched like recommending, so a burst costs one forward pass."""
-    import asyncio
+    import json
+    import subprocess
+    import sys
 
-    from types import SimpleNamespace
-
-    from warprec.serving.deployments import ModelServer
-
-    # serve.batch reads the replica's max_ongoing_requests, only to warn when
-    # it is too low; outside a deployment that context has to be supplied.
-    context = SimpleNamespace(
-        _deployment_config=SimpleNamespace(max_ongoing_requests=8)
-    )
-    monkeypatch.setattr(serve, "get_replica_context", lambda: context)
-
-    server = ModelServer.func_or_class(
-        {
-            "name": "bpr",
-            "checkpoint": str(checkpoints["bpr"]),
-            "batching": {"max_batch_size": 8, "batch_wait_timeout_s": 0.2},
-        }
-    )
-    sizes = []
-    score_batch = server._model.score_batch
-
-    def spy(queries):
-        sizes.append(len(queries))
-        return score_batch(queries)
-
-    monkeypatch.setattr(server._model, "score_batch", spy)
     users, items = dataset.get_inverse_mappings()
-
-    async def burst():
-        return await asyncio.gather(
-            *[
-                server.score({"user_id": users[u], "items": [items[0], items[u]]})
-                for u in range(6)
-            ]
-        )
-
-    answers = asyncio.run(burst())
-    assert sizes == [6]
-    assert [[e["item_id"] for e in a["scores"]] for a in answers] == [
-        [items[0], items[u]] for u in range(6)
-    ]
+    user_labels = [int(users[u]) for u in range(6)]
+    item_labels = [int(items[i]) for i in range(6)]
+    done = subprocess.run(
+        [
+            sys.executable,
+            "-c",
+            SCORE_BATCH_PROBE,
+            str(checkpoints["bpr"]),
+            json.dumps(user_labels),
+            json.dumps(item_labels),
+        ],
+        capture_output=True,
+        text=True,
+        check=False,
+        timeout=300,
+    )
+    assert done.returncode == 0, done.stderr[-2000:]
+    result = json.loads(done.stdout.strip().splitlines()[-1])
+    assert result["sizes"] == [6]
+    assert result["ids"] == [[item_labels[0], item_labels[u]] for u in range(6)]
