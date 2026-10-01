@@ -9,9 +9,12 @@ from typing import Any, Dict, List, Tuple
 import numpy as np
 import pandas as pd
 import pytest
+import torch
 
+import warprec.recommenders  # noqa: F401  (populates the registries make_model reads)
 from warprec.data.dataset import Dataset
-from warprec.utils.registry import params_registry
+from warprec.recommenders.base_recommender import Recommender
+from warprec.utils.registry import model_registry, params_registry
 
 N_USERS = 40
 N_ITEMS = 25
@@ -325,3 +328,27 @@ def build_params(model_name: str) -> Dict[str, Any]:
         for name, field in schema.model_fields.items()
         if name not in SKIP_FIELDS
     }
+
+
+def make_model(model_name: str, dataset: Dataset, seed: int = 0) -> Recommender:
+    """Build a registered model on the shared dataset, with every input it may need.
+
+    Args:
+        model_name (str): The registry name of the model.
+        dataset (Dataset): The dataset to build it on.
+        seed (int): The torch seed, so that weights are reproducible.
+
+    Returns:
+        Recommender: The untrained model.
+    """
+    torch.manual_seed(seed)
+    return model_registry.get(
+        model_name,
+        params=build_params(model_name),
+        info=dataset.info(),
+        interactions=dataset.train_set,
+        sessions=dataset.train_session,
+        transactions=dataset.train_transactions,
+        knowledge=dataset.knowledge,
+        multimodal=dataset.multimodal,
+    )

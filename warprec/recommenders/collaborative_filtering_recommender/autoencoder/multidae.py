@@ -31,7 +31,6 @@ class Encoder(nn.Module):
     ):
         super().__init__()
 
-        self.l2_normalizer = lambda x: F.normalize(x, p=2, dim=1)
         self.dropout = nn.Dropout(dropout_rate)
 
         self.dense_proj = nn.Sequential(
@@ -43,7 +42,9 @@ class Encoder(nn.Module):
 
     def forward(self, inputs: Tensor) -> Tensor:
         """Forward pass of encoder with normalization and dropout."""
-        i_normalized = self.l2_normalizer(inputs)
+        # Normalised inline rather than through a stored lambda, which cannot
+        # be pickled and would keep the model out of a saved checkpoint.
+        i_normalized = F.normalize(inputs, p=2, dim=1)
         i_drop = self.dropout(i_normalized)
         x = self.dense_proj(i_drop)
         return self.dense_mean(x)
