@@ -16,6 +16,8 @@ pip install "warprec[serving]"   # the REST API
 pip install "warprec[mcp]"       # the REST API and the MCP endpoint for LLM agents
 ```
 
+Serving a model needs the same extras as training it: graph-based models such as LightGCN or NGCF also need `graph`, for example `pip install "warprec[serving,graph]"`. A missing one shows up as a `ModuleNotFoundError` in the replica's log, and the server stops with `Deploying application warprec failed`.
+
 ## From Training to Serving
 
 **1. Save the model.** Set `save_model` in the model's `meta` section of the training configuration:
@@ -176,6 +178,8 @@ Each endpoint is its own Ray Serve deployment, configured independently:
 python -m warprec.serve -c serve.yml --export serve_app.yaml
 serve deploy serve_app.yaml
 ```
+
+`serve deploy` talks to the cluster through its dashboard agent, so the head node must run with the dashboard, which is Ray's default.
 
 `--export` writes a standard Ray Serve configuration file instead of starting the server:
 
