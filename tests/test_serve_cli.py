@@ -144,3 +144,70 @@ def test_mcp_without_its_extra_is_refused_before_ray_starts(
     write_config(tmp_path, mcp=True)
     with pytest.raises(SystemExit, match=r"warprec\[mcp\]"):
         main(["-c", "serve.yml"])
+
+
+class Recorder:
+    """Stands in for a Ray deployment and records what it is bound with."""
+
+    def __init__(self):
+        self.bound = []
+
+    def options(self, **_options):
+        return self
+
+    def bind(self, *args):
+        self.bound.append(args)
+        return args
+
+
+def test_replicas_are_given_absolute_paths(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
+    """On a joined cluster a replica runs where the cluster started, not here."""
+    pytest.importorskip("ray.serve")
+    from warprec.serving import app
+    from warprec.utils.config.serving_configuration import ServingConfiguration
+
+    monkeypatch.chdir(tmp_path)
+    Path("model.pth").write_bytes(b"")
+    servers, gateway = Recorder(), Recorder()
+    monkeypatch.setattr(app, "ModelServer", servers)
+    monkeypatch.setattr(app, "Gateway", gateway)
+
+    config = ServingConfiguration.model_validate(
+        {
+            "server": {"api_key": "secret"},
+            "endpoints": [{"name": "bpr", "checkpoint": "model.pth"}],
+        }
+    )
+    app.build_application(config)
+
+    ((endpoint,),) = servers.bound
+    assert Path(endpoint["checkpoint"]).is_absolute()
+    assert gateway.bound[0][1]["api_key"] == "secret"
+
+
+@pytest.mark.parametrize(
+    "ray_address, expected",
+    [
+        (None, ["serve.shutdown", "ray.shutdown"]),
+        ("auto", ["serve.delete:warprec", "ray.shutdown"]),
+    ],
+)
+def test_stopping_removes_only_its_own_application_on_a_shared_cluster(
+    monkeypatch: pytest.MonkeyPatch, ray_address, expected
+):
+    """serve.shutdown would delete every team's applications on a joined cluster."""
+    pytest.importorskip("ray.serve")
+    from warprec.serving import app
+
+    calls = []
+    monkeypatch.setattr(app.ray, "is_initialized", lambda: True)
+    monkeypatch.setattr(app.ray, "shutdown", lambda: calls.append("ray.shutdown"))
+    monkeypatch.setattr(app.serve, "shutdown", lambda: calls.append("serve.shutdown"))
+    monkeypatch.setattr(
+        app.serve, "delete", lambda name: calls.append(f"serve.delete:{name}")
+    )
+
+    app.stop_serving(ray_address)
+    assert calls == expected

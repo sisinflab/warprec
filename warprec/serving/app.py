@@ -1,7 +1,7 @@
 import signal
 import threading
 from pathlib import Path
-from typing import Any, Dict, Union
+from typing import Any, Dict, Optional, Union
 
 import ray
 import yaml
@@ -24,6 +24,9 @@ def build_application(config: ServingConfiguration) -> Application:
     Returns:
         Application: A gateway bound to one model deployment per endpoint.
     """
+    # Replicas may run in another directory than this process - on a joined
+    # cluster they run wherever it was started - so they get absolute paths.
+    config = config.resolved()
     # serve.deployment turns both classes into Deployments, which mypy cannot
     # follow through the decorator, hence the ignores on options() and bind().
     models = {
@@ -132,7 +135,24 @@ def run(config: ServingConfiguration) -> None:
     except KeyboardInterrupt:
         logger.msg("Interrupted before every model was ready.")
     finally:
-        if ray.is_initialized():
-            serve.shutdown()
-            ray.shutdown()
+        stop_serving(config.server.ray_address)
         logger.positive("Serving stopped.")
+
+
+def stop_serving(ray_address: Optional[str]) -> None:
+    """Take the application down, and only it when the cluster is shared.
+
+    Started locally, Ray and Serve belong to this process and are shut down
+    whole. On a cluster joined with ray_address, Serve may be running other
+    applications, so only this one is deleted before disconnecting.
+
+    Args:
+        ray_address (Optional[str]): The cluster address the server joined, if any.
+    """
+    if not ray.is_initialized():
+        return
+    if ray_address is None:
+        serve.shutdown()
+    else:
+        serve.delete(APP_NAME)
+    ray.shutdown()
