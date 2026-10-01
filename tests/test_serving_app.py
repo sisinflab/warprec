@@ -50,7 +50,9 @@ def url(checkpoints):
     port = free_port()
     config = ServingConfiguration.model_validate(
         {
-            "server": {"port": port, "api_key": "secret"},
+            # Mounted under a prefix, so that every route here is also checked
+            # away from the root.
+            "server": {"port": port, "api_key": "secret", "route_prefix": "/api"},
             "endpoints": [
                 {
                     "name": "bpr",
@@ -68,10 +70,12 @@ def url(checkpoints):
     )
     mp = pytest.MonkeyPatch()
     mp.delenv(API_KEY_ENV, raising=False)
-    ray.init(num_cpus=4, include_dashboard=False, ignore_reinit_error=True)
+    # Exactly one CPU per model replica: the gateway only forwards requests
+    # and must not need one of its own, or a small machine never starts it.
+    ray.init(num_cpus=3, include_dashboard=False, ignore_reinit_error=True)
     serve.start(http_options={"host": "127.0.0.1", "port": port})
-    serve.run(build_application(config), name=APP_NAME, route_prefix="/")
-    yield f"http://127.0.0.1:{port}"
+    serve.run(build_application(config), name=APP_NAME, route_prefix="/api")
+    yield f"http://127.0.0.1:{port}/api"
     serve.shutdown()
     ray.shutdown()
     mp.undo()
@@ -83,6 +87,19 @@ def in_process(path: Path, **policy) -> ServableModel:
 
 def test_health_needs_no_key(url: str):
     assert requests.get(f"{url}/healthz", timeout=10).json() == {"status": "ok"}
+
+
+def test_only_the_health_route_itself_skips_the_key(url: str):
+    """A path that merely ends in /healthz is not the health check."""
+    response = requests.get(f"{url}/v1/models/healthz", timeout=10)
+    assert response.status_code == 401
+    assert "bpr" not in response.text, "no endpoint name leaks without the key"
+
+
+def test_the_gateway_reserves_no_cpu():
+    from warprec.serving.deployments import Gateway
+
+    assert Gateway.ray_actor_options["num_cpus"] == 0
 
 
 def test_everything_else_needs_the_key(url: str):

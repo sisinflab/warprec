@@ -49,7 +49,10 @@ def build_api(
 
         @app.middleware("http")
         async def require_api_key(request: Request, call_next):
-            if not request.url.path.endswith("/healthz"):
+            # Only the health route itself is public: matched exactly, with or
+            # without the route prefix the app is mounted under.
+            root = request.scope.get("root_path", "").rstrip("/")
+            if request.url.path not in ("/healthz", f"{root}/healthz"):
                 sent = request.headers.get("x-api-key", "")
                 if not hmac.compare_digest(sent.encode(), api_key.encode()):
                     return JSONResponse(

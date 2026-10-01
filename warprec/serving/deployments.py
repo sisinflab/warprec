@@ -98,7 +98,9 @@ class ModelServer:
         return self._model.recommend(queries)
 
 
-@serve.deployment(name="gateway")
+# The gateway only forwards requests, so it reserves no CPU: on a machine whose
+# CPUs all go to model replicas it would otherwise never be scheduled.
+@serve.deployment(name="gateway", ray_actor_options={"num_cpus": 0})
 @serve.ingress()
 class Gateway:
     """The HTTP entry point, routing each request to its model deployment.
