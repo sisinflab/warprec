@@ -29,7 +29,7 @@ class ServerSettings(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     host: str = "127.0.0.1"
-    port: int = Field(8000, ge=1, le=65535)
+    port: int = Field(default=8000, ge=1, le=65535)
     route_prefix: str = "/"
     api_key: Optional[str] = None
     mcp: bool = False
@@ -74,8 +74,8 @@ class BatchingSettings(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    max_batch_size: int = Field(64, ge=1)
-    batch_wait_timeout_s: float = Field(0.005, ge=0)
+    max_batch_size: int = Field(default=64, ge=1)
+    batch_wait_timeout_s: float = Field(default=0.005, ge=0)
 
 
 class DeploymentSettings(BaseModel):
@@ -98,7 +98,7 @@ class DeploymentSettings(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     num_replicas: Optional[Union[int, Literal["auto"]]] = None
-    max_ongoing_requests: Optional[int] = Field(None, ge=1)
+    max_ongoing_requests: Optional[int] = Field(default=None, ge=1)
     autoscaling_config: Optional[Dict[str, Any]] = None
     ray_actor_options: Optional[Dict[str, Any]] = None
 
@@ -186,9 +186,9 @@ class EndpointConfig(BaseModel):
 
     name: str = Field(pattern=r"^[A-Za-z0-9][A-Za-z0-9_-]*$")
     checkpoint: str
-    device: str = Field("cpu", pattern=r"^(cpu|mps|cuda(:\d+)?)$")
-    default_k: int = Field(10, ge=1)
-    max_k: int = Field(100, ge=1)
+    device: str = Field(default="cpu", pattern=r"^(cpu|mps|cuda(:\d+)?)$")
+    default_k: int = Field(default=10, ge=1)
+    max_k: int = Field(default=100, ge=1)
     mask_seen: bool = True
     unknown_user: Literal["error", "popular"] = "error"
     item_metadata: Optional[ItemMetadata] = None
