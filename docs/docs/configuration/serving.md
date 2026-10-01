@@ -27,7 +27,7 @@ The `server` section is optional. Every key has a default.
 
 - **name**: The name the model is served under, used in its URL (`/v1/models/<name>/...`). Must be unique, start with a letter or digit and contain only letters, digits, `-` and `_`. `gateway` is reserved. Required.
 - **checkpoint**: The `.pth` file to serve. Relative paths resolve against the working directory. The file must exist. Required.
-- **device**: Where the model runs: `cpu`, `mps`, `cuda` or `cuda:N`. Defaults to `cpu`.
+- **device**: Where the model runs: `cpu`, `mps` or `cuda`. A numbered device such as `cuda:1` is refused: Ray shows each replica only the GPUs it assigned to it, always as `cuda:0`, so which GPU a replica gets is chosen with `deployment.ray_actor_options` (`num_gpus`, `accelerator_type`). Defaults to `cpu`.
 - **default_k**: How many items a request gets when it does not set `k`. Must not exceed `max_k`. Defaults to `10`.
 - **max_k**: The largest `k` a request may ask for. Defaults to `100`.
 - **mask_seen**: Whether items the user interacted with in training are left out of their recommendations. Defaults to `true`.
@@ -49,7 +49,7 @@ The `server` section is optional. Every key has a default.
     - **ray_actor_options**: Resources per replica, for example `{num_cpus: 2, num_gpus: 0.25}`. Defaults to `null`.
 
 !!! important
-    Ray gives a replica no GPU unless it asks for one, and CUDA then sees no device at all. When `device` is `cuda` or `cuda:N` and `ray_actor_options` does not set `num_gpus`, WarpRec asks for one whole GPU per replica. Set a fraction, such as `num_gpus: 0.25`, to place several replicas on the same GPU.
+    Ray gives a replica no GPU unless it asks for one, and CUDA then sees no device at all. When `device` is `cuda` and `ray_actor_options` does not set `num_gpus`, WarpRec asks for one whole GPU per replica. Set a fraction, such as `num_gpus: 0.25`, to place several replicas on the same GPU.
 
 ## Example
 

@@ -11,7 +11,7 @@ server:
 endpoints:                 # at least one; names unique, letters/digits/-/_, not "gateway"
   - name: sasrec
     checkpoint: experiments/ml-1m/serialized/SASRec_example.pth   # written with meta.save_model: true
-    device: cpu            # cpu | mps | cuda | cuda:N
+    device: cpu            # cpu | mps | cuda (GPUs are chosen with ray_actor_options, not cuda:N)
     default_k: 10          # items returned when a request does not set k
     max_k: 100             # largest k a request may ask for
     mask_seen: true        # leave out items the user saw in training

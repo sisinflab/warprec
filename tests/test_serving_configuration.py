@@ -102,7 +102,7 @@ def test_a_cuda_endpoint_asks_ray_for_a_gpu(checkpoint: Path):
 
     shared = config_with(
         checkpoint,
-        device="cuda:0",
+        device="cuda",
         deployment={"ray_actor_options": {"num_gpus": 0.25}},
     )
     options = (
@@ -172,3 +172,28 @@ def test_the_portable_form_has_absolute_paths_and_no_secret(
     assert Path(portable.endpoints[0].checkpoint).is_absolute()
     assert Path(portable.endpoints[0].item_metadata.path).is_absolute()
     assert config.server.api_key == "secret", "the original is left untouched"
+
+
+def test_a_numbered_cuda_device_is_refused(checkpoint: Path):
+    """Ray gives each replica its own CUDA_VISIBLE_DEVICES, so inside it the
+    assigned GPU is always cuda:0 and cuda:1 means nothing it can reach."""
+    with pytest.raises(ValidationError, match="ray_actor_options"):
+        ServingConfiguration.model_validate(config_with(checkpoint, device="cuda:1"))
+
+
+def test_paths_resolve_without_dropping_the_key(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
+    """Replicas on a joined cluster run in another directory, so the paths
+    they open must be absolute; the key still has to reach the gateway."""
+    monkeypatch.chdir(tmp_path)
+    Path("model.pth").write_bytes(b"")
+    config = ServingConfiguration.model_validate(
+        {
+            "server": {"api_key": "secret"},
+            "endpoints": [{"name": "bpr", "checkpoint": "model.pth"}],
+        }
+    )
+    resolved = config.resolved()
+    assert Path(resolved.endpoints[0].checkpoint).is_absolute()
+    assert resolved.server.api_key == "secret"

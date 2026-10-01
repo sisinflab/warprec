@@ -171,7 +171,9 @@ class EndpointConfig(BaseModel):
         model_config: Configuration of the PyDantic model; unknown keys are rejected.
         name (str): The name the model is served under, used in its URL.
         checkpoint (str): The .pth file written with meta.save_model.
-        device (str): Where the model runs: cpu, mps, cuda or cuda:N.
+        device (Literal["cpu", "mps", "cuda"]): Where the model runs. Ray gives
+            every replica its own view of the GPUs, so which GPU a replica gets
+            is chosen through ray_actor_options, not a cuda:N index.
         default_k (int): How many items a request gets when it does not say.
         max_k (int): The most items a request may ask for.
         mask_seen (bool): Whether items a user saw in training are left out.
@@ -186,7 +188,7 @@ class EndpointConfig(BaseModel):
 
     name: str = Field(pattern=r"^[A-Za-z0-9][A-Za-z0-9_-]*$")
     checkpoint: str
-    device: str = Field(default="cpu", pattern=r"^(cpu|mps|cuda(:\d+)?)$")
+    device: Literal["cpu", "mps", "cuda"] = "cpu"
     default_k: int = Field(default=10, ge=1)
     max_k: int = Field(default=100, ge=1)
     mask_seen: bool = True
@@ -213,6 +215,32 @@ class EndpointConfig(BaseModel):
         """
         if value.lower() in RESERVED_NAMES:
             raise ValueError(f"'{value}' is a reserved name.")
+        return value
+
+    @field_validator("device", mode="before")
+    @classmethod
+    def check_device(cls, value: Any) -> Any:
+        """A numbered CUDA device cannot be honoured inside a Ray replica.
+
+        Ray sets CUDA_VISIBLE_DEVICES to the GPUs it assigned to the replica, so
+        the replica always sees its own GPU as cuda:0 and any other index
+        either fails or picks the wrong device.
+
+        Args:
+            value (Any): The configured device.
+
+        Returns:
+            Any: The device, unchanged.
+
+        Raises:
+            ValueError: If it names a CUDA device by number.
+        """
+        if isinstance(value, str) and value.startswith("cuda:"):
+            raise ValueError(
+                f"device '{value}' cannot be honoured: Ray shows each replica only "
+                "the GPUs it assigned, as cuda:0. Use device: cuda, and choose GPUs "
+                "with deployment.ray_actor_options (num_gpus, accelerator_type)."
+            )
         return value
 
     @field_validator("checkpoint")
@@ -309,8 +337,21 @@ class ServingConfiguration(BaseModel):
         Returns:
             ServingConfiguration: The copy.
         """
-        copy = self.model_copy(deep=True)
+        copy = self.resolved()
         copy.server.api_key = None
+        return copy
+
+    def resolved(self) -> "ServingConfiguration":
+        """A copy whose file paths are absolute.
+
+        Replicas do not necessarily run in the directory the configuration was
+        loaded from - on a cluster joined with ray_address they run wherever the
+        cluster was started - so relative paths are resolved here, once.
+
+        Returns:
+            ServingConfiguration: The copy.
+        """
+        copy = self.model_copy(deep=True)
         for endpoint in copy.endpoints:
             endpoint.checkpoint = str(Path(endpoint.checkpoint).resolve())
             if endpoint.item_metadata is not None:
