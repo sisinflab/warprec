@@ -24,6 +24,7 @@ def build_api(
     models: Dict[str, DeploymentHandle],
     api_key: Optional[str] = None,
     mcp: bool = False,
+    endpoints: Optional[List[Dict[str, Any]]] = None,
 ) -> FastAPI:
     """The HTTP interface of the serving application.
 
@@ -35,6 +36,8 @@ def build_api(
         models (Dict[str, DeploymentHandle]): The model deployments by endpoint name.
         api_key (Optional[str]): The key every request but /healthz must carry.
         mcp (bool): Whether to mount the MCP tools under /mcp.
+        endpoints (Optional[List[Dict[str, Any]]]): Each endpoint's name,
+            description and item noun, for the instructions MCP clients receive.
 
     Returns:
         FastAPI: The application.
@@ -44,7 +47,10 @@ def build_api(
         # Imported here: fastmcp is an optional extra of its own.
         from warprec.serving.mcp import build_mcp  # pylint: disable=import-outside-toplevel
 
-        mcp_app = build_mcp(models)
+        mcp_app = build_mcp(
+            models,
+            endpoints or [{"name": name, "item_noun": "item"} for name in models],
+        )
 
     app = FastAPI(
         title="WarpRec",

@@ -48,8 +48,16 @@ def build_application(config: ServingConfiguration) -> Application:
         ).bind(endpoint.model_dump(mode="json"))
         for endpoint in config.endpoints
     }
+    endpoints = [
+        {
+            "name": endpoint.name,
+            "description": endpoint.description,
+            "item_noun": endpoint.item_noun,
+        }
+        for endpoint in config.endpoints
+    ]
     return Gateway.bind(  # type: ignore[attr-defined]
-        models, config.server.model_dump(mode="json")
+        models, config.server.model_dump(mode="json"), endpoints
     )
 
 

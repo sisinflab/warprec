@@ -371,3 +371,26 @@ def save_servable(path: Path, model: Recommender, dataset: Dataset) -> Path:
     state["serving"] = build_serving_payload(model, dataset)
     torch.save(state, path)
     return path
+
+
+def write_catalogue(path: Path, dataset: Dataset) -> Path:
+    """Write an item file naming every item like a film, a few after real ones.
+
+    Args:
+        path (Path): Where to write it.
+        dataset (Dataset): The dataset whose items it names.
+
+    Returns:
+        Path: The path written, a '::'-separated file of id, name and genres.
+    """
+    _, items = dataset.get_inverse_mappings()
+    titles = {0: "Toy Story (1995)", 1: "Toy Story 2 (1999)", 2: "Heat (1995)"}
+    genres = ["Comedy", "Drama|Comedy", "Action|Crime"]
+    path.write_text(
+        "".join(
+            f"{label}::{titles.get(i, f'Item {label}')}::{genres[i % 3]}\n"
+            for i, label in items.items()
+        ),
+        encoding="utf-8",
+    )
+    return path

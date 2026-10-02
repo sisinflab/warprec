@@ -1,4 +1,4 @@
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 from fastapi import FastAPI
 from ray import serve
@@ -195,11 +195,19 @@ class Gateway:
     Args:
         models (Dict[str, DeploymentHandle]): The model deployments by name.
         server (Dict[str, Any]): The server settings, as plain data.
+        endpoints (Optional[List[Dict[str, Any]]]): Each endpoint's name,
+            description and item noun, for the instructions MCP clients receive.
     """
 
-    def __init__(self, models: Dict[str, DeploymentHandle], server: Dict[str, Any]):
+    def __init__(
+        self,
+        models: Dict[str, DeploymentHandle],
+        server: Dict[str, Any],
+        endpoints: Optional[List[Dict[str, Any]]] = None,
+    ):
         self._models = models
         self._server = ServerSettings.model_validate(server)
+        self._endpoints = endpoints
 
     def __serve_build_asgi_app__(self) -> FastAPI:
         """Called by Ray Serve after __init__, once the handles exist.
@@ -211,4 +219,5 @@ class Gateway:
             self._models,
             api_key=self._server.effective_api_key(),
             mcp=self._server.mcp,
+            endpoints=self._endpoints,
         )

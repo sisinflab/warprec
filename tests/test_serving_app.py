@@ -22,7 +22,7 @@ from warprec.serving.app import APP_NAME, build_application  # noqa: E402
 from warprec.serving.servable import ServableModel, ServingPolicy  # noqa: E402
 from warprec.utils.config.serving_configuration import API_KEY_ENV, ServingConfiguration  # noqa: E402
 
-from conftest import make_model, save_servable  # noqa: E402
+from conftest import make_model, save_servable, write_catalogue  # noqa: E402
 
 KEY = {"X-API-Key": "secret"}
 
@@ -47,21 +47,6 @@ def checkpoints(tmp_path_factory: pytest.TempPathFactory, dataset: Dataset):
         ),
         "catalogue": write_catalogue(root / "items.dat", dataset),
     }
-
-
-def write_catalogue(path: Path, dataset: Dataset) -> Path:
-    """Name every item like a film, a few after real ones, with genres."""
-    _, items = dataset.get_inverse_mappings()
-    titles = {0: "Toy Story (1995)", 1: "Toy Story 2 (1999)", 2: "Heat (1995)"}
-    genres = ["Comedy", "Drama|Comedy", "Action|Crime"]
-    path.write_text(
-        "".join(
-            f"{label}::{titles.get(i, f'Item {label}')}::{genres[i % 3]}\n"
-            for i, label in items.items()
-        ),
-        encoding="utf-8",
-    )
-    return path
 
 
 @pytest.fixture(scope="module")
