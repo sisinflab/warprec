@@ -71,9 +71,10 @@ def test_the_writer_still_works_without_the_dataset(tmp_path: Path, dataset: Dat
 
 def test_the_training_facts_travel_with_the_model(dataset: Dataset):
     """A served model can say what it was trained on and how well it scored."""
-    results = {
-        10: {"nDCG": torch.tensor(0.5), "Recall": 0.25, "PerUser": torch.ones(3)}
-    }
+    # The evaluator returns one value per user for most metrics; the results
+    # table reports their mean, ignoring users a metric cannot score.
+    per_user = torch.tensor([0.25, 0.75, float("nan")])
+    results = {10: {"nDCG": torch.tensor(0.5), "Recall": 0.25, "HitRate": per_user}}
     payload = build_serving_payload(
         make_model("BPR", dataset),
         dataset,
@@ -86,8 +87,12 @@ def test_the_training_facts_travel_with_the_model(dataset: Dataset):
     training = payload["training"]
     assert training["dataset"] == "movielens"
     assert training["evaluation"] == {"strategy": "sampled", "num_negatives": 99}
-    # Scalar results only, as plain numbers keyed metric@k.
-    assert training["metrics"] == {"nDCG@10": 0.5, "Recall@10": 0.25}
+    # Plain numbers keyed metric@k, as the results table shows them.
+    assert training["metrics"] == {
+        "nDCG@10": 0.5,
+        "Recall@10": 0.25,
+        "HitRate@10": 0.5,
+    }
     assert training["n_users"] == dataset.info()["n_users"]
     assert training["n_interactions"] == payload["seen"].nnz
     assert training["trained_at"].endswith("+00:00")

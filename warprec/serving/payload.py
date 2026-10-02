@@ -97,16 +97,14 @@ def _scalar_metrics(results: Dict[int, Dict[str, Any]]) -> Dict[str, float]:
         results (Dict[int, Dict[str, Any]]): The results by cutoff and metric.
 
     Returns:
-        Dict[str, float]: Every scalar result. Results that hold one value per
-            user or per item are left out.
+        Dict[str, float]: Every result. A metric computed per user is averaged
+            over the users it could score, as the results table reports it.
     """
     metrics: Dict[str, float] = {}
     for k, by_metric in results.items():
         for name, value in by_metric.items():
             if isinstance(value, torch.Tensor):
-                if value.numel() != 1:
-                    continue
-                value = value.item()
+                value = value.float().nanmean().item()
             if isinstance(value, (int, float, np.number)):
                 metrics[f"{name}@{k}"] = float(value)
     return metrics
