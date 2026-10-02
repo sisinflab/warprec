@@ -345,7 +345,18 @@ def train_pipeline(path: str):
 
                 # Model serialization, with what serving needs from the data
                 if params.meta.save_model:
-                    context.writer.write_model(best_model, dataset=main_dataset)
+                    evaluation = {"strategy": config.evaluation.strategy}
+                    if config.evaluation.strategy == "sampled":
+                        evaluation["num_negatives"] = config.evaluation.num_negatives
+                    context.writer.write_model(
+                        best_model,
+                        dataset=main_dataset,
+                        training={
+                            "dataset": config.writer.dataset_name,
+                            "evaluation": evaluation,
+                            "metrics": results,
+                        },
+                    )
 
                 if config.general.time_report:
                     # Timing report for the current model

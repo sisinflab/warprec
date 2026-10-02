@@ -67,3 +67,66 @@ def test_the_writer_still_works_without_the_dataset(tmp_path: Path, dataset: Dat
 
     (path,) = Path(writer.experiment_serialized_models_path).glob("*.pth")
     assert "serving" not in torch.load(path, map_location="cpu", weights_only=False)
+
+
+def test_the_training_facts_travel_with_the_model(dataset: Dataset):
+    """A served model can say what it was trained on and how well it scored."""
+    results = {
+        10: {"nDCG": torch.tensor(0.5), "Recall": 0.25, "PerUser": torch.ones(3)}
+    }
+    payload = build_serving_payload(
+        make_model("BPR", dataset),
+        dataset,
+        training={
+            "dataset": "movielens",
+            "evaluation": {"strategy": "sampled", "num_negatives": 99},
+            "metrics": results,
+        },
+    )
+    training = payload["training"]
+    assert training["dataset"] == "movielens"
+    assert training["evaluation"] == {"strategy": "sampled", "num_negatives": 99}
+    # Scalar results only, as plain numbers keyed metric@k.
+    assert training["metrics"] == {"nDCG@10": 0.5, "Recall@10": 0.25}
+    assert training["n_users"] == dataset.info()["n_users"]
+    assert training["n_interactions"] == payload["seen"].nnz
+    assert training["trained_at"].endswith("+00:00")
+
+
+def test_training_facts_are_present_even_without_results(dataset: Dataset):
+    training = build_serving_payload(make_model("BPR", dataset), dataset)["training"]
+    assert training["dataset"] is None and training["metrics"] == {}
+
+
+def test_context_values_are_counted_as_training_saw_them(
+    dataset: Dataset, interactions_frame
+):
+    """The counts behind 'what context can I give you?' match the training rows."""
+    stats = build_serving_payload(make_model("FM", dataset), dataset)["context_stats"]
+    train = interactions_frame.groupby("user_id", group_keys=False).apply(
+        lambda g: g.iloc[:-1]
+    )
+    assert stats["daytime"]["type"] == "token"
+    assert stats["daytime"]["counts"] == train["daytime"].value_counts().to_dict()
+    assert sum(stats["weather"]["counts"].values()) == len(train)
+
+
+def test_a_general_model_carries_no_context_stats(dataset: Dataset):
+    assert (
+        build_serving_payload(make_model("BPR", dataset), dataset)["context_stats"]
+        is None
+    )
+
+
+def test_the_writer_records_the_training_facts(tmp_path: Path, dataset: Dataset):
+    writer = LocalWriter(dataset_name="facts", local_path=str(tmp_path))
+    writer.write_model(
+        make_model("BPR", dataset),
+        dataset=dataset,
+        training={"dataset": "facts", "metrics": {10: {"nDCG": 0.4}}},
+    )
+    (path,) = Path(writer.experiment_serialized_models_path).glob("*.pth")
+    training = torch.load(path, map_location="cpu", weights_only=False)["serving"][
+        "training"
+    ]
+    assert training["dataset"] == "facts" and training["metrics"] == {"nDCG@10": 0.4}

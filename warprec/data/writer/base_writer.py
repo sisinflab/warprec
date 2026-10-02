@@ -383,7 +383,12 @@ class Writer(ABC):
                     f"Error writing per-user results for {model_name} (k={k}) to {path}: {e}"
                 )
 
-    def write_model(self, model: Recommender, dataset: Optional[Dataset] = None):
+    def write_model(
+        self,
+        model: Recommender,
+        dataset: Optional[Dataset] = None,
+        training: Optional[Dict[str, Any]] = None,
+    ):
         """Saves the model's state dictionary.
 
         Args:
@@ -392,6 +397,10 @@ class Writer(ABC):
                 When given, what serving needs from it - the items each user
                 has seen and, for a sequential model, their recent history - is
                 saved alongside, so that the file alone can be served.
+            training (Optional[Dict[str, Any]]): What the run knows about the
+                training - the dataset name, the evaluation strategy and the test
+                results - saved with the serving data so a server can describe
+                the model. Used only together with the dataset.
         """
         path = self._path_join(
             self.experiment_serialized_models_path, model.name_param + ".pth"
@@ -399,7 +408,7 @@ class Writer(ABC):
         try:
             state = model.get_state()
             if dataset is not None:
-                state["serving"] = build_serving_payload(model, dataset)
+                state["serving"] = build_serving_payload(model, dataset, training)
             buffer = BytesIO()
             torch.save(state, buffer)
             buffer.seek(0)

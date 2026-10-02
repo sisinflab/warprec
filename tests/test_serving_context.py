@@ -334,3 +334,22 @@ def test_an_empty_multi_valued_field_does_not_break_its_batch(
         ),
     ]
     assert [len(answer) for answer in servable.recommend(queries)] == [3, 3]
+
+
+def test_numeric_and_multi_valued_context_stats(
+    rich_dataset: Dataset, rich_frame: pd.DataFrame
+):
+    """A number is summarised by its range; a multi-valued field counts each value."""
+    stats = build_serving_payload(make_model("FM", rich_dataset), rich_dataset)[
+        "context_stats"
+    ]
+    train = rich_frame.groupby("user_id", group_keys=False).apply(lambda g: g.iloc[:-1])
+    assert stats["temperature"]["type"] == "float"
+    assert stats["temperature"]["min"] == pytest.approx(
+        train["temperature"].min(), abs=1e-4
+    )
+    assert stats["temperature"]["max"] == pytest.approx(
+        train["temperature"].max(), abs=1e-4
+    )
+    tags = train["tags"].str.split("|").explode().value_counts().to_dict()
+    assert stats["tags"] == {"type": "seq", "counts": tags}
