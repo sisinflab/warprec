@@ -345,7 +345,9 @@ def train_pipeline(path: str):
 
                 # Model serialization, with what serving needs from the data
                 if params.meta.save_model:
-                    evaluation = {"strategy": config.evaluation.strategy}
+                    evaluation: Dict[str, Any] = {
+                        "strategy": config.evaluation.strategy
+                    }
                     if config.evaluation.strategy == "sampled":
                         evaluation["num_negatives"] = config.evaluation.num_negatives
                     context.writer.write_model(
