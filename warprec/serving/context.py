@@ -1,5 +1,5 @@
-from dataclasses import dataclass
-from typing import Any, Dict, List, Union
+from dataclasses import dataclass, field
+from typing import Any, Dict, List, Optional, Union
 
 import numpy as np
 import torch
@@ -7,6 +7,9 @@ from torch import Tensor
 
 from warprec.data.entities.context import build_context_array
 from warprec.serving.errors import ServingError
+
+# Past this many values a field lists its most frequent ones and how many more.
+MAX_LISTED_VALUES = 100
 
 
 @dataclass(frozen=True)
@@ -24,22 +27,34 @@ class ContextSchema:
         maps (Dict[str, Dict[str, int]]): For each categorical or multi-valued
             field, the index of every value seen in training.
         max_len (int): The widest multi-valued field, or 1 when there is none.
+        stats (Dict[str, Dict[str, Any]]): How often each value occurred in
+            training, or a numeric field's range; empty for older checkpoints.
+        descriptions (Dict[str, str]): What each field means, as configured.
     """
 
     labels: List[str]
     types: Dict[str, str]
     maps: Dict[str, Dict[str, int]]
     max_len: int
+    stats: Dict[str, Dict[str, Any]] = field(default_factory=dict)
+    descriptions: Dict[str, str] = field(default_factory=dict)
 
     @classmethod
     def from_info(
-        cls, info: Dict[str, Any], maps: Dict[str, Dict[Any, int]]
+        cls,
+        info: Dict[str, Any],
+        maps: Dict[str, Dict[Any, int]],
+        stats: Optional[Dict[str, Dict[str, Any]]] = None,
+        descriptions: Optional[Dict[str, str]] = None,
     ) -> "ContextSchema":
         """Build the schema from a checkpoint's dataset information.
 
         Args:
             info (Dict[str, Any]): The dataset information saved with the model.
             maps (Dict[str, Dict[Any, int]]): The context vocabulary saved with it.
+            stats (Optional[Dict[str, Dict[str, Any]]]): The value counts and
+                ranges saved with it, when the checkpoint carries them.
+            descriptions (Optional[Dict[str, str]]): What each field means.
 
         Returns:
             ContextSchema: The schema.
@@ -57,24 +72,78 @@ class ContextSchema:
                 for label in labels
             },
             max_len=max(info.get("context_max_len", {}).values(), default=1),
+            stats=stats or {},
+            descriptions=descriptions or {},
         )
 
     def describe(self) -> Dict[str, Dict[str, Any]]:
         """The fields a request must describe and the values each accepts.
 
         Returns:
-            Dict[str, Dict[str, Any]]: Each field's kind and known values; None
-                for a numeric field, which takes any number.
+            Dict[str, Dict[str, Any]]: For each field its type; its accepted
+                values, the most frequent in training first with their counts
+                when known (None for a numeric field, which takes any number,
+                with its training range instead); and its description.
         """
-        return {
-            label: {
-                "type": self.types[label],
-                "values": None
-                if self.types[label] == "float"
-                else sorted(self.maps[label]),
-            }
-            for label in self.labels
+        described: Dict[str, Dict[str, Any]] = {}
+        for label in self.labels:
+            entry: Dict[str, Any] = {"type": self.types[label]}
+            stats = self.stats.get(label, {})
+            if self.types[label] == "float":
+                entry["values"] = None
+                if "mean" in stats:
+                    entry["range"] = {key: stats[key] for key in ("min", "max", "mean")}
+            else:
+                values = self._ordered_values(label)
+                entry["values"] = values[:MAX_LISTED_VALUES]
+                if len(values) > MAX_LISTED_VALUES:
+                    entry["more"] = len(values) - MAX_LISTED_VALUES
+                counts = {
+                    str(value): count
+                    for value, count in stats.get("counts", {}).items()
+                }
+                if counts:
+                    entry["counts"] = {
+                        value: counts.get(value, 0) for value in entry["values"]
+                    }
+            if label in self.descriptions:
+                entry["description"] = self.descriptions[label]
+            described[label] = entry
+        return described
+
+    def example(self) -> Dict[str, Any]:
+        """A context this model accepts: the most frequent value of each field.
+
+        Returns:
+            Dict[str, Any]: One value per field; the training mean for a
+                numeric field, and a one-value list for a multi-valued one.
+        """
+        example: Dict[str, Any] = {}
+        for label in self.labels:
+            kind = self.types[label]
+            if kind == "float":
+                example[label] = round(self.stats.get(label, {}).get("mean", 0.0), 2)
+                continue
+            first = self._ordered_values(label)[0]
+            example[label] = [first] if kind == "seq" else first
+        return example
+
+    def _ordered_values(self, label: str) -> List[str]:
+        """A field's known values, the most frequent in training first.
+
+        Args:
+            label (str): The field.
+
+        Returns:
+            List[str]: The values; alphabetical when there are no counts.
+        """
+        counts = {
+            str(value): count
+            for value, count in self.stats.get(label, {}).get("counts", {}).items()
         }
+        return sorted(
+            self.maps[label], key=lambda value: (-counts.get(value, 0), value)
+        )
 
     def encode(self, context: Union[Dict[str, Any], List[Any]]) -> List[Any]:
         """Check a request's context and encode it as one row of the model's input.

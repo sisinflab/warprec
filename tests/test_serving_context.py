@@ -20,7 +20,12 @@ import warprec.recommenders  # noqa: F401  (populates the registries)
 from warprec.data.dataset import Dataset
 from warprec.recommenders.base_recommender import ContextRecommenderUtils
 from warprec.serving.payload import build_serving_payload
-from warprec.serving.servable import ServableModel, ServingError, ServingPolicy
+from warprec.serving.servable import (
+    Presentation,
+    ServableModel,
+    ServingError,
+    ServingPolicy,
+)
 from warprec.utils.registry import model_registry
 
 from conftest import CONTEXT_LABELS, make_model, save_servable
@@ -283,14 +288,72 @@ def test_a_batch_of_different_contexts_answers_each_as_if_alone(
 
 
 def test_describe_lists_the_known_context_values(tmp_path: Path, rich_dataset: Dataset):
-    context = served(tmp_path, rich_dataset).describe()["context"]
-    assert context["daytime"] == {
-        "type": "token",
-        "values": ["evening", "morning", "night"],
-    }
-    assert context["temperature"] == {"type": "float", "values": None}
-    assert context["tags"]["type"] == "seq"
+    """Values come most frequent first, with how often training saw each."""
+    servable = served(tmp_path, rich_dataset)
+    context = servable.describe()["context"]
+    stats = build_serving_payload(make_model("FM", rich_dataset), rich_dataset)[
+        "context_stats"
+    ]
+    daytime = context["daytime"]
+    assert daytime["type"] == "token"
+    assert daytime["counts"] == stats["daytime"]["counts"]
+    assert daytime["values"] == sorted(
+        stats["daytime"]["counts"], key=lambda v: -stats["daytime"]["counts"][v]
+    )
     assert set(context["tags"]["values"]) == {"jazz", "live", "solo", "duo"}
+    temperature = context["temperature"]
+    assert temperature["values"] is None
+    assert (
+        temperature["range"]["min"]
+        <= temperature["range"]["mean"]
+        <= temperature["range"]["max"]
+    )
+
+
+def test_context_fields_carry_their_configured_description(
+    tmp_path: Path, rich_dataset: Dataset
+):
+    path = save_servable(
+        tmp_path / "fm.pth", make_model("FM", rich_dataset), rich_dataset
+    )
+    presentation = Presentation(context_descriptions={"daytime": "the time of day"})
+    servable = ServableModel.from_checkpoint(path, presentation=presentation)
+    assert servable.describe()["context"]["daytime"]["description"] == "the time of day"
+
+
+@pytest.mark.parametrize("which", ["dataset", "rich_dataset"])
+def test_the_example_context_is_accepted(tmp_path: Path, request, which: str):
+    """'What context can I give you?' comes with an answer that works as is."""
+    data = request.getfixturevalue(which)
+    servable = served(tmp_path, data)
+    described = servable.describe_context()
+    assert described["example"] == servable.describe()["example_context"]
+    users, _ = data.get_inverse_mappings()
+    (answer,) = servable.recommend(
+        [servable.resolve(user_id=users[0], context=described["example"])]
+    )
+    assert answer
+    (answer,) = servable.recommend(
+        [servable.resolve(**servable.describe()["example_request"])]
+    )
+    assert answer
+
+
+def test_without_training_counts_values_are_listed_alphabetically(
+    tmp_path: Path, rich_dataset: Dataset
+):
+    state = make_model("FM", rich_dataset).get_state()
+    state["serving"] = build_serving_payload(
+        make_model("FM", rich_dataset), rich_dataset
+    )
+    del state["serving"]["context_stats"]
+    torch.save(state, tmp_path / "old.pth")
+    daytime = ServableModel.from_checkpoint(tmp_path / "old.pth").describe()["context"][
+        "daytime"
+    ]
+    assert (
+        daytime["values"] == ["evening", "morning", "night"] and "counts" not in daytime
+    )
 
 
 def test_an_old_context_checkpoint_is_refused_with_a_reason(

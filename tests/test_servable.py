@@ -14,7 +14,12 @@ import torch
 
 from warprec.data.dataset import Dataset
 from warprec.recommenders.base_recommender import Recommender
-from warprec.serving.servable import ServableModel, ServingError, ServingPolicy
+from warprec.serving.servable import (
+    Presentation,
+    ServableModel,
+    ServingError,
+    ServingPolicy,
+)
 
 from warprec.serving.catalogue import Catalogue, read_catalogue
 from warprec.utils.config.serving_configuration import ItemMetadata
@@ -419,7 +424,9 @@ def test_a_user_with_no_training_history_is_treated_as_unknown(
     seen = build_serving_payload(model, dataset)["seen"].tolil()
     seen.rows[0], seen.data[0] = [], []
     servable = ServableModel(
-        model, seen=csr_matrix(seen), policy=ServingPolicy(unknown_user=unknown_user)
+        model,
+        payload={"seen": csr_matrix(seen)},
+        policy=ServingPolicy(unknown_user=unknown_user),
     )
     users, _ = labels(dataset)
     if expected == "fallback":
@@ -468,3 +475,64 @@ def test_a_batch_of_score_requests_answers_each_as_if_alone(
         == [[items[3], items[1]], [items[2]], [items[4], items[0], items[5]]]
     )
     assert scores(together) == pytest.approx(scores(alone), rel=1e-5)
+
+
+@pytest.mark.parametrize("name", ["BPR", "SASRec", "Caser", "EASE"])
+def test_the_example_request_of_a_card_is_accepted(
+    tmp_path: Path, dataset: Dataset, name: str
+):
+    """What the card tells a client to send must work when it is sent."""
+    servable = served(tmp_path, name, dataset)
+    card = servable.describe()
+    assert any("user_id" in sentence for sentence in card["how_to_ask"])
+    (answer,) = servable.recommend([servable.resolve(**card["example_request"])])
+    assert answer
+
+
+def test_a_card_speaks_of_the_items_as_configured(tmp_path: Path, dataset: Dataset):
+    path = save_servable(tmp_path / "m.pth", make_model("SASRec", dataset), dataset)
+    presentation = Presentation(
+        description="Films from a toy dataset", item_noun="movie"
+    )
+    card = ServableModel.from_checkpoint(path, presentation=presentation).describe()
+    assert card["description"] == "Films from a toy dataset"
+    assert card["item_noun"] == "movie"
+    assert any("movies" in sentence for sentence in card["how_to_ask"])
+
+
+def test_a_card_describes_the_catalogue_and_the_training(
+    tmp_path: Path, dataset: Dataset
+):
+    card = with_catalogue(tmp_path, dataset).describe()
+    assert card["catalogue"]["names"] is True
+    assert card["catalogue"]["n_items"] == dataset.info()["n_items"]
+    genres = card["catalogue"]["attributes"]["genres"]
+    assert set(genres["examples"]) <= {"Comedy", "Drama", "Action", "Crime"}
+    assert (
+        card["training"]["n_interactions"] == (dataset.train_set.get_sparse() != 0).nnz
+    )
+
+
+def test_a_card_without_catalogue_says_so(tmp_path: Path, dataset: Dataset):
+    card = served(tmp_path, "BPR", dataset).describe()
+    assert card["catalogue"] == {
+        "names": False,
+        "n_items": dataset.info()["n_items"],
+        "attributes": {},
+    }
+
+
+def test_the_example_user_is_one_the_model_learned_from(dataset: Dataset):
+    """A user held out of training would be refused, so the card never offers one."""
+    from scipy.sparse import csr_matrix
+
+    from warprec.serving.payload import build_serving_payload
+
+    model = make_model("BPR", dataset)
+    seen = build_serving_payload(model, dataset)["seen"].tolil()
+    seen.rows[0], seen.data[0] = [], []
+    servable = ServableModel(model, payload={"seen": csr_matrix(seen)})
+    users, _ = labels(dataset)
+    example = servable.describe()["example_request"]
+    assert example["user_id"] != users[0]
+    servable.recommend([servable.resolve(**example)])

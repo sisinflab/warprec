@@ -42,6 +42,21 @@ class ServingPolicy:
     unknown_user: Literal["error", "popular"] = "error"
 
 
+@dataclass(frozen=True)
+class Presentation:
+    """How an endpoint speaks about itself, as set in its configuration.
+
+    Attributes:
+        description (Optional[str]): What the endpoint serves, in words.
+        item_noun (str): What an item is called, such as 'movie'.
+        context_descriptions (Dict[str, str]): What each context field means.
+    """
+
+    description: Optional[str] = None
+    item_noun: str = "item"
+    context_descriptions: Dict[str, str] = field(default_factory=dict)
+
+
 @dataclass
 class Query:
     """A request resolved to the model's internal indices, ready to be batched.
@@ -111,15 +126,15 @@ class ServableModel:
 
     Args:
         model (Recommender): The restored model, already on its device.
-        seen (Optional[csr_matrix]): The binary training matrix, when the
-            checkpoint carries it.
-        histories (Optional[Dict[str, np.ndarray]]): The packed training
-            histories of a sequential model.
+        payload (Optional[Dict[str, Any]]): What the checkpoint carries for
+            serving: the training matrix ('seen'), the packed histories of a
+            sequential model ('histories'), the context vocabulary and its
+            counts ('context_maps', 'context_stats') and the training facts
+            ('training'). Older checkpoints carry less, or nothing.
         policy (ServingPolicy): How the endpoint answers.
         catalogue (Optional[Catalogue]): The names and attributes of the items.
+        presentation (Presentation): How the endpoint speaks about itself.
         warprec_version (Optional[str]): The WarpRec that wrote the checkpoint.
-        context_maps (Optional[Dict[str, Dict[Any, int]]]): The index of every
-            known context value, for a context-aware model.
 
     Raises:
         ValueError: If the policy asks for a popularity fallback the checkpoint
@@ -130,13 +145,14 @@ class ServableModel:
     def __init__(
         self,
         model: Recommender,
-        seen: Optional[csr_matrix] = None,
-        histories: Optional[Dict[str, np.ndarray]] = None,
+        payload: Optional[Dict[str, Any]] = None,
         policy: ServingPolicy = ServingPolicy(),
         catalogue: Optional[Catalogue] = None,
+        presentation: Presentation = Presentation(),
         warprec_version: Optional[str] = None,
-        context_maps: Optional[Dict[str, Dict[Any, int]]] = None,
     ):
+        payload = payload or {}
+        seen: Optional[csr_matrix] = payload.get("seen")
         if policy.unknown_user == "popular" and seen is None:
             raise ValueError(
                 "unknown_user: popular ranks by how often items were seen in "
@@ -151,8 +167,10 @@ class ServableModel:
 
         self._model = model
         self._seen = seen
-        self._histories = histories
+        self._histories: Optional[Dict[str, np.ndarray]] = payload.get("histories")
         self._policy = policy
+        self._presentation = presentation
+        self._training: Optional[Dict[str, Any]] = payload.get("training")
         self._warprec_version = warprec_version
 
         info = model.info
@@ -177,13 +195,18 @@ class ServableModel:
         # with, which only checkpoints saved by this version carry.
         self._context: Optional[ContextSchema] = None
         if isinstance(model, ContextRecommenderUtils) and model.context_labels:
-            if context_maps is None:
+            if payload.get("context_maps") is None:
                 raise ValueError(
                     f"{model.name} is context-aware, but this checkpoint does not "
                     "carry the context values it was trained on. Save the model "
                     "again with this version of WarpRec."
                 )
-            self._context = ContextSchema.from_info(model.info, context_maps)
+            self._context = ContextSchema.from_info(
+                model.info,
+                payload["context_maps"],
+                stats=payload.get("context_stats"),
+                descriptions=presentation.context_descriptions,
+            )
 
     @classmethod
     def from_checkpoint(
@@ -192,6 +215,7 @@ class ServableModel:
         device: str = "cpu",
         policy: ServingPolicy = ServingPolicy(),
         catalogue: Optional[Catalogue] = None,
+        presentation: Presentation = Presentation(),
     ) -> "ServableModel":
         """Load a checkpoint written by the train pipeline, ready to answer.
 
@@ -203,6 +227,7 @@ class ServableModel:
             device (str): The device to run the model on.
             policy (ServingPolicy): How the endpoint answers.
             catalogue (Optional[Catalogue]): The names and attributes of the items.
+            presentation (Presentation): How the endpoint speaks about itself.
 
         Returns:
             ServableModel: The model, ready to answer.
@@ -214,15 +239,13 @@ class ServableModel:
         model.to(device)
         model.eval()
 
-        payload = checkpoint.get("serving") or {}
         return cls(
             model,
-            seen=payload.get("seen"),
-            histories=payload.get("histories"),
+            payload=checkpoint.get("serving"),
             policy=policy,
             catalogue=catalogue,
+            presentation=presentation,
             warprec_version=checkpoint.get("warprec_version"),
-            context_maps=payload.get("context_maps"),
         )
 
     @property
@@ -251,23 +274,158 @@ class ServableModel:
         return self._context
 
     def describe(self) -> Dict[str, Any]:
-        """What the endpoint serves, for clients to discover.
+        """The model card: what the endpoint serves and how to ask it.
+
+        It is what a client or an agent needs before a first request: the kind
+        of model, what a request must contain with an example that works as
+        is, the items it knows, what it was trained on and how well it scored,
+        and the context it accepts.
 
         Returns:
-            Dict[str, Any]: The model name, kind, sizes and hyperparameters.
+            Dict[str, Any]: The card.
         """
+        context = self.describe_context() if self._context is not None else None
         return {
             "model": self._model.name,
             "kind": "sequential" if self.is_sequential else "general",
+            "description": self._presentation.description,
+            "item_noun": self._presentation.item_noun,
             "n_users": self.n_users,
             "n_items": self.n_items,
             "needs_user": self.needs_user,
+            "how_to_ask": self._how_to_ask(),
+            "example_request": self._example_request(),
+            "catalogue": self._catalogue_card(),
+            "training": self._training,
+            "context": context["fields"] if context else None,
+            "example_context": context["example"] if context else None,
             "warprec_version": self._warprec_version,
             # Round-tripped through JSON so that whatever types the
             # hyperparameters carry reach the client as plain values.
             "params": json.loads(json.dumps(self._model.get_params(), default=str)),
-            "context": self._context.describe() if self._context is not None else None,
         }
+
+    def describe_context(self) -> Dict[str, Any]:
+        """The context a context-aware model accepts, with an example.
+
+        Returns:
+            Dict[str, Any]: Each field's type, accepted values (most frequent
+                in training first, with their counts when known), range for a
+                numeric field and description; and an example context.
+
+        Raises:
+            ServingError: If the model does not use context.
+        """
+        if self._context is None:
+            raise ServingError(
+                422, f"{self._model.name} does not use context: there is none to give."
+            )
+        return {"fields": self._context.describe(), "example": self._context.example()}
+
+    def _how_to_ask(self) -> List[str]:
+        """What a request must and may contain, in sentences.
+
+        Returns:
+            List[str]: The instructions.
+        """
+        nouns = f"{self._presentation.item_noun}s"
+        by = "id or exact name" if self._catalogue is not None else "id"
+        sentences = [f"Send user_id: one of the {self.n_users} users seen in training."]
+        if self._policy.unknown_user == "popular":
+            sentences.append(f"An unknown user gets the most popular {nouns}.")
+        else:
+            sentences.append("An unknown user is refused.")
+        if self.is_sequential:
+            together = " together with the user_id" if self.needs_user else ""
+            sentences.append(
+                f"Or send history{together}: the {nouns} of a session, oldest "
+                f"first, by {by}."
+            )
+        if self._context is not None:
+            sentences.append(
+                "Every request needs context: a value for each of "
+                f"{', '.join(self._context.labels)} (see 'context' for the "
+                "accepted values)."
+            )
+        sentences.append(
+            f"Optional: k, how many {nouns} to return (1 to {self._policy.max_k}, "
+            f"default {self._policy.default_k}), and exclude, {nouns} to leave out."
+        )
+        return sentences
+
+    def _example_request(self) -> Dict[str, Any]:
+        """A request this endpoint answers, to start from.
+
+        Returns:
+            Dict[str, Any]: The request fields.
+        """
+        request: Dict[str, Any] = {"k": min(5, self._policy.max_k)}
+        if self.is_sequential and not self.needs_user:
+            # A session of the best-known items reads naturally as an example.
+            popular = self._most_interacted(3)
+            request["history"] = [
+                (
+                    self._catalogue.names.get(str(self._labels[index]))
+                    if self._catalogue
+                    else None
+                )
+                or self._labels[index]
+                for index in popular
+            ]
+        else:
+            request["user_id"] = self._example_user()
+        if self._context is not None:
+            request["context"] = self._context.example()
+        return request
+
+    def _example_user(self) -> Label:
+        """A user the model learned from, for the example request.
+
+        Returns:
+            Label: The id of the first user with training interactions, or of
+                the first user when the checkpoint does not record them.
+        """
+        mapping = self._model.info["user_mapping"]
+        if self._seen is not None:
+            active = np.flatnonzero(np.diff(self._seen.indptr))
+            if active.size:
+                first = int(active[0])
+                for label, index in mapping.items():
+                    if index == first:
+                        return _builtin(label)
+        return _builtin(next(iter(mapping)))
+
+    def _catalogue_card(self) -> Dict[str, Any]:
+        """What the endpoint knows about its items.
+
+        Returns:
+            Dict[str, Any]: Whether items have names, how many there are, and
+                for each attribute its most common values.
+        """
+        if self._catalogue is None:
+            return {"names": False, "n_items": self.n_items, "attributes": {}}
+        attributes = {}
+        for attribute in self._catalogue.attribute_names():
+            counts = self._catalogue.attribute_values(attribute)
+            attributes[attribute] = {
+                "examples": [value for value, _ in counts.most_common(10)],
+                "n_values": len(counts),
+            }
+        return {"names": True, "n_items": self.n_items, "attributes": attributes}
+
+    def _most_interacted(self, k: int) -> List[int]:
+        """The internal indices of the items with the most training interactions.
+
+        Args:
+            k (int): How many.
+
+        Returns:
+            List[int]: The indices, most interacted first; the first items when
+                the checkpoint does not record interactions.
+        """
+        if self._popularity is None:
+            return list(range(min(k, self.n_items)))
+        return torch.topk(self._popularity, min(k, self.n_items)).indices.tolist()
 
     def resolve(
         self,
