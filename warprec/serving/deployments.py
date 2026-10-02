@@ -6,7 +6,13 @@ from ray.serve.handle import DeploymentHandle
 
 from warprec.serving.api import build_api
 from warprec.serving.catalogue import read_catalogue
-from warprec.serving.servable import Query, ServableModel, ServingError, ServingPolicy
+from warprec.serving.servable import (
+    Presentation,
+    Query,
+    ServableModel,
+    ServingError,
+    ServingPolicy,
+)
 from warprec.utils.config.serving_configuration import EndpointConfig, ServerSettings
 
 
@@ -37,6 +43,11 @@ class ModelServer:
                 unknown_user=config.unknown_user,
             ),
             catalogue=catalogue,
+            presentation=Presentation(
+                description=config.description,
+                item_noun=config.item_noun,
+                context_descriptions=config.context_descriptions,
+            ),
         )
         # serve.batch wraps each method in an object carrying these setters,
         # which the decorator's type hints do not show.
@@ -55,6 +66,66 @@ class ModelServer:
             Dict[str, Any]: The model description.
         """
         return self._model.describe()
+
+    def describe_context(self) -> Dict[str, Any]:
+        """The context this endpoint accepts.
+
+        Returns:
+            Dict[str, Any]: The fields and an example, or an error.
+        """
+        return self._answer(self._model.describe_context)
+
+    def search_items(self, request: Dict[str, Any]) -> Dict[str, Any]:
+        """Search the items by name.
+
+        Args:
+            request (Dict[str, Any]): 'query' and optionally 'limit'.
+
+        Returns:
+            Dict[str, Any]: The matches and suggestions, or an error.
+        """
+        return self._answer(self._model.search_items, **request)
+
+    def get_items(self, request: Dict[str, Any]) -> Dict[str, Any]:
+        """Look items up by id or name.
+
+        Args:
+            request (Dict[str, Any]): 'items'.
+
+        Returns:
+            Dict[str, Any]: The items found and not found, or an error.
+        """
+        return self._answer(self._model.get_items, **request)
+
+    def popular(self, request: Dict[str, Any]) -> Dict[str, Any]:
+        """The most popular items.
+
+        Args:
+            request (Dict[str, Any]): The fields of a PopularRequest.
+
+        Returns:
+            Dict[str, Any]: The items, or an error.
+        """
+        try:
+            return {"items": self._model.popular_items(**request)}
+        except ServingError as error:
+            return {"error": error.to_dict()}
+
+    @staticmethod
+    def _answer(method: Any, **request: Any) -> Dict[str, Any]:
+        """Call a method of the model, returning a refusal as a value.
+
+        Args:
+            method (Any): The method.
+            **request (Any): Its arguments.
+
+        Returns:
+            Dict[str, Any]: What it returned, or the error it raised.
+        """
+        try:
+            return method(**request)
+        except ServingError as error:
+            return {"error": error.to_dict()}
 
     async def recommend(self, request: Dict[str, Any]) -> Dict[str, Any]:
         """Recommend for one request, batched with its concurrent neighbours.

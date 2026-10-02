@@ -6,11 +6,17 @@ from fastapi.responses import JSONResponse
 from ray.serve.handle import DeploymentHandle
 
 from warprec.serving.schemas import (
+    ContextDescription,
+    LookupRequest,
+    LookupResponse,
     ModelInfo,
+    PopularRequest,
+    PopularResponse,
     RecommendRequest,
     RecommendResponse,
     ScoreRequest,
     ScoreResponse,
+    SearchResponse,
 )
 
 
@@ -102,6 +108,38 @@ def build_api(
     async def score(name: str, body: ScoreRequest) -> ScoreResponse:
         result = await handle(name).score.remote(body.model_dump(exclude_none=True))
         return ScoreResponse(model=name, **_unwrap(result))
+
+    @app.get("/v1/models/{name}/context", response_model=ContextDescription)
+    async def describe_context(name: str) -> ContextDescription:
+        result = await handle(name).describe_context.remote()
+        return ContextDescription(model=name, **_unwrap(result))
+
+    @app.get(
+        "/v1/models/{name}/items",
+        response_model=SearchResponse,
+        response_model_exclude_none=True,
+    )
+    async def search_items(name: str, q: str, limit: int = 10) -> SearchResponse:
+        result = await handle(name).search_items.remote({"query": q, "limit": limit})
+        return SearchResponse(model=name, **_unwrap(result))
+
+    @app.post(
+        "/v1/models/{name}/items/lookup",
+        response_model=LookupResponse,
+        response_model_exclude_none=True,
+    )
+    async def lookup_items(name: str, body: LookupRequest) -> LookupResponse:
+        result = await handle(name).get_items.remote(body.model_dump())
+        return LookupResponse(model=name, **_unwrap(result))
+
+    @app.post(
+        "/v1/models/{name}/popular",
+        response_model=PopularResponse,
+        response_model_exclude_none=True,
+    )
+    async def popular_items(name: str, body: PopularRequest) -> PopularResponse:
+        result = await handle(name).popular.remote(body.model_dump(exclude_none=True))
+        return PopularResponse(model=name, **_unwrap(result))
 
     if mcp_app is not None:
         app.mount("/mcp", mcp_app)

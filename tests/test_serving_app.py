@@ -42,7 +42,26 @@ def checkpoints(tmp_path_factory: pytest.TempPathFactory, dataset: Dataset):
             root / "sasrec.pth", make_model("SASRec", dataset), dataset
         ),
         "fm": save_servable(root / "fm.pth", make_model("FM", dataset), dataset),
+        "movies": save_servable(
+            root / "movies.pth", make_model("BPR", dataset), dataset
+        ),
+        "catalogue": write_catalogue(root / "items.dat", dataset),
     }
+
+
+def write_catalogue(path: Path, dataset: Dataset) -> Path:
+    """Name every item like a film, a few after real ones, with genres."""
+    _, items = dataset.get_inverse_mappings()
+    titles = {0: "Toy Story (1995)", 1: "Toy Story 2 (1999)", 2: "Heat (1995)"}
+    genres = ["Comedy", "Drama|Comedy", "Action|Crime"]
+    path.write_text(
+        "".join(
+            f"{label}::{titles.get(i, f'Item {label}')}::{genres[i % 3]}\n"
+            for i, label in items.items()
+        ),
+        encoding="utf-8",
+    )
+    return path
 
 
 @pytest.fixture(scope="module")
@@ -64,7 +83,23 @@ def url(checkpoints):
                     "checkpoint": str(checkpoints["sasrec"]),
                     "batching": {"max_batch_size": 8, "batch_wait_timeout_s": 0.05},
                 },
-                {"name": "fm", "checkpoint": str(checkpoints["fm"])},
+                {
+                    "name": "fm",
+                    "checkpoint": str(checkpoints["fm"]),
+                    "context_descriptions": {"daytime": "the time of day"},
+                },
+                {
+                    "name": "movies",
+                    "checkpoint": str(checkpoints["movies"]),
+                    "description": "Films from the test dataset",
+                    "item_noun": "movie",
+                    "item_metadata": {
+                        "path": str(checkpoints["catalogue"]),
+                        "sep": "::",
+                        "header": False,
+                        "columns": {"genres": {"column": 2, "separator": "|"}},
+                    },
+                },
             ],
         }
     )
@@ -72,7 +107,7 @@ def url(checkpoints):
     mp.delenv(API_KEY_ENV, raising=False)
     # Exactly one CPU per model replica: the gateway only forwards requests
     # and must not need one of its own, or a small machine never starts it.
-    ray.init(num_cpus=3, include_dashboard=False, ignore_reinit_error=True)
+    ray.init(num_cpus=4, include_dashboard=False, ignore_reinit_error=True)
     serve.start(http_options={"host": "127.0.0.1", "port": port})
     serve.run(build_application(config), name=APP_NAME, route_prefix="/api")
     yield f"http://127.0.0.1:{port}/api"
@@ -114,6 +149,7 @@ def test_models_are_listed(url: str):
         ("bpr", "general"),
         ("sasrec", "sequential"),
         ("fm", "general"),
+        ("movies", "general"),
     }
     (fm,) = [m for m in models if m["name"] == "fm"]
     assert set(fm["context"]) == {"daytime", "weather"}
@@ -311,3 +347,90 @@ def test_concurrent_score_requests_share_a_forward_pass(checkpoints, dataset: Da
     result = json.loads(done.stdout.strip().splitlines()[-1])
     assert result["sizes"] == [6]
     assert result["ids"] == [[item_labels[0], item_labels[u]] for u in range(6)]
+
+
+def get(url: str, path: str, **params):
+    return requests.get(f"{url}{path}", params=params, headers=KEY, timeout=10)
+
+
+def post(url: str, path: str, body: dict):
+    return requests.post(f"{url}{path}", json=body, headers=KEY, timeout=10)
+
+
+def test_the_card_tells_a_client_what_it_needs(url: str):
+    card = get(url, "/v1/models/movies").json()
+    assert card["description"] == "Films from the test dataset"
+    assert card["item_noun"] == "movie"
+    assert (
+        card["catalogue"]["names"] is True
+        and "genres" in card["catalogue"]["attributes"]
+    )
+    assert card["training"]["n_interactions"] > 0
+    example = post(url, "/v1/models/movies/recommend", card["example_request"])
+    assert example.status_code == 200 and example.json()["items"]
+
+
+def test_the_context_route_answers_what_context_to_give(url: str):
+    described = get(url, "/v1/models/fm/context").json()
+    assert described["fields"]["daytime"]["description"] == "the time of day"
+    users = get(url, "/v1/models/fm").json()["example_request"]["user_id"]
+    answer = post(
+        url,
+        "/v1/models/fm/recommend",
+        {"user_id": users, "context": described["example"]},
+    )
+    assert answer.status_code == 200
+    assert get(url, "/v1/models/bpr/context").status_code == 422
+
+
+def test_items_are_searched_and_looked_up(url: str):
+    found = get(url, "/v1/models/movies/items", q="toy story").json()
+    assert {m["name"] for m in found["matches"]} == {
+        "Toy Story (1995)",
+        "Toy Story 2 (1999)",
+    }
+    assert all(m["interactions"] >= 0 for m in found["matches"])
+    assert (
+        get(url, "/v1/models/movies/items", q="Kung Fu Panda").json()["matches"] == []
+    )
+    looked = post(
+        url,
+        "/v1/models/movies/items/lookup",
+        {"items": ["heat (1995)", "Toy Stroy (1995)"]},
+    ).json()
+    assert [i["name"] for i in looked["items"]] == ["Heat (1995)"]
+    assert "Toy Story (1995)" in looked["unknown"][0]["suggestions"]
+    assert get(url, "/v1/models/bpr/items", q="toy").status_code == 422
+
+
+def test_popular_items_can_be_filtered(url: str):
+    popular = post(
+        url, "/v1/models/movies/popular", {"k": 3, "filter": {"genres": "Comedy"}}
+    ).json()
+    assert len(popular["items"]) == 3
+    assert all(
+        "Comedy" in i["attributes"]["genres"] and i["interactions"] >= 0
+        for i in popular["items"]
+    )
+
+
+def test_recommendations_filter_and_explain(url: str, dataset: Dataset):
+    users, _ = dataset.get_inverse_mappings()
+    body = post(
+        url,
+        "/v1/models/movies/recommend",
+        {
+            "user_id": users[0],
+            "k": 3,
+            "filter": {"genres": ["Action"]},
+            "explain": True,
+        },
+    ).json()
+    assert all("Action" in i["attributes"]["genres"] for i in body["items"])
+    assert all("because" in i for i in body["items"])
+    bad = post(
+        url,
+        "/v1/models/movies/recommend",
+        {"user_id": users[0], "filter": {"genres": "Actoin"}},
+    )
+    assert bad.status_code == 422 and "Action" in bad.json()["detail"]
