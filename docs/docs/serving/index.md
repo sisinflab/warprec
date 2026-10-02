@@ -71,11 +71,15 @@ Every route but `/healthz` requires the `X-API-Key` header when an API key is co
 | Method | Path | Purpose |
 |---|---|---|
 | GET | `/healthz` | Liveness check. |
-| GET | `/v1/models` | The served models and what each accepts. |
-| GET | `/v1/models/{name}` | One served model. |
+| GET | `/v1/models` | The cards of all served models. |
+| GET | `/v1/models/{name}` | One model's card: how to ask it, what it knows, how it was trained. |
+| GET | `/v1/models/{name}/context` | The context a context-aware model accepts, with an example. |
+| GET | `/v1/models/{name}/items?q=` | Items whose name contains `q`, with their attributes. |
+| POST | `/v1/models/{name}/items/lookup` | Items by id or name. |
+| POST | `/v1/models/{name}/popular` | The items with the most training interactions. |
 | POST | `/v1/models/{name}/recommend` | Top-k recommendations. |
 | POST | `/v1/models/{name}/score` | Scores of given candidate items, for re-ranking. |
-| * | `/mcp` | MCP tools, when `server.mcp` is `true`. |
+| * | `/mcp` | MCP tools, resources and prompts, when `server.mcp` is `true`. |
 
 **List the models.**
 
@@ -126,6 +130,79 @@ curl -X POST localhost:8000/v1/models/sasrec/score -H "X-API-Key: change-me" \
 
 Errors carry a `detail` message and a status: `404` for an unknown model or user, `422` for a request the model cannot answer, `401` for a missing or wrong API key.
 
+## What a Model Says About Itself
+
+Every endpoint describes itself, so a client or an agent needs nothing but the server to use it.
+
+**The model card,** `GET /v1/models/{name}`, holds:
+
+- `how_to_ask`: what a request must and may contain, in sentences.
+- `example_request`: a request the endpoint answers, to start from.
+- `catalogue`: whether items have names, and the attributes they carry with their most common values.
+- `training`: what the model was trained on and how it scored.
+    - dataset, date, and numbers of users, items and interactions;
+    - evaluation strategy and test metrics, such as `nDCG@10`.
+- `context` and `example_context`: for a context-aware model.
+- The configured `description` and `item_noun`, the model class, its hyperparameters and the WarpRec version.
+
+```bash
+curl -s -H "X-API-Key: change-me" localhost:8000/v1/models/sasrec | python3 -m json.tool
+```
+
+**The catalogue.** With [`item_metadata`](../configuration/serving.md), items have names and attributes, such as genres. These are returned with every item.
+
+- Names are matched ignoring case.
+- A name that is not in the catalogue gets a 422 suggesting the closest ones ("did you mean 'Toy Story (1995)'?").
+- Search answers whether a model knows an item:
+
+```bash
+curl -s -H "X-API-Key: change-me" "localhost:8000/v1/models/sasrec/items?q=toy%20story"
+curl -s -H "X-API-Key: change-me" "localhost:8000/v1/models/sasrec/items?q=Kung%20Fu%20Panda"   # no matches: not in its training data
+curl -s -X POST localhost:8000/v1/models/sasrec/items/lookup -H "X-API-Key: change-me" \
+     -H "Content-Type: application/json" -d '{"items": ["heat (1995)", 260]}'
+```
+
+**The context.** `GET /v1/models/{name}/context` answers "what context can I give you?", with three things per field:
+
+- its accepted values, most frequent in training first, with their counts;
+- the training range, for a numeric field;
+- the configured description.
+
+It also gives an example context that the model accepts.
+
+```bash
+curl -s -H "X-API-Key: change-me" localhost:8000/v1/models/fm/context | python3 -m json.tool
+```
+
+Checkpoints saved before WarpRec recorded training facts still serve. Their card has `training: null`, and their context values come without counts.
+
+## Popular Items, Filters and Explanations
+
+**Popular items.** `POST /v1/models/{name}/popular` lists the items with the most training interactions. It is the same for everyone, and suits a first visit:
+
+```bash
+curl -s -X POST localhost:8000/v1/models/sasrec/popular -H "X-API-Key: change-me" \
+     -H "Content-Type: application/json" -d '{"k": 5, "filter": {"genres": "Comedy"}}'
+```
+
+**Filters.** `recommend` and `popular` accept `filter`, such as `{"genres": "Comedy"}`.
+
+- Only items with those attributes are returned, ranked as the model ranks them.
+- Values are compared ignoring case.
+- A list matches any of its values, for example `{"genres": ["Action", "Crime"]}`.
+- Several attributes must all match.
+- An unknown attribute or value gets a 422 that lists or suggests the accepted ones.
+
+**Explanations.** `explain: true` on `recommend` adds `because` to each item: the request's own items (the user's training items, or the session) that training users most often consumed together with it, with the count.
+
+```json
+{"item_id": 2858, "name": "American Beauty (1999)", "score": 4.02,
+ "because": [{"item_id": 1196, "name": "Star Wars: Episode V - The Empire Strikes Back (1980)", "co_occurrences": 1714}]}
+```
+
+!!! warning
+    `because` is evidence from the training data, not the model's reasoning: WarpRec models do not expose why they rank an item. Present it as "people who liked X also liked this", not as the reason the model chose it.
+
 ## How Requests Are Answered
 
 - **Ids.** Requests and responses use the dataset's own user and item ids. They are matched as strings, so `1` and `"1"` are the same user.
@@ -152,12 +229,30 @@ curl -X POST localhost:8000/v1/models/fm/recommend -H "X-API-Key: change-me" \
 
 ## MCP
 
-With `server.mcp: true` and the `mcp` extra installed, the same server exposes two [Model Context Protocol](https://modelcontextprotocol.io/) tools under `/mcp`:
+With `server.mcp: true` and the `mcp` extra installed, the same server speaks the [Model Context Protocol](https://modelcontextprotocol.io/) under `/mcp`. The API key protects it as well.
 
-- `list_models` tells an agent which models exist and what each accepts.
-- `recommend` asks one of them, by user, session or context.
+**Instructions.** On connecting, a client receives instructions it passes to its model before any tool is called. They state what the server does, list each endpoint with its configured `description`, and say which tool answers which question.
 
-The API key protects `/mcp` as well. A client configuration looks like this:
+**Tools:**
+
+| Tool | Answers |
+|---|---|
+| `list_models` | Which models are there, what each serves and needs? |
+| `describe_model` | How do I ask this model? What does it know, and how was it trained? |
+| `describe_context` | What context can I provide, and which values are accepted? |
+| `search_items` | Is this model trained on "Kung Fu Panda"? Which "Toy Story" films does it know? |
+| `get_items` | What are these items, and what attributes do they have? |
+| `popular_items` | What is popular, possibly among comedies only? |
+| `recommend` | What should this user, or this session, try next, possibly filtered and explained? |
+| `score_items` | Which of these candidates would the user like most? |
+
+**Resources:** `warprec://models` (the list) and `warprec://models/{name}` (a model card), for clients that browse resources instead of calling tools.
+
+**Prompts:**
+- `recommend_for_me` guides a conversation that ends in explained, personal recommendations.
+- `explore_catalogue` guides an exploration of what a model knows.
+
+A client configuration looks like this:
 
 ```json
 {"mcpServers": {"warprec": {"url": "http://localhost:8000/mcp/", "headers": {"X-API-Key": "change-me"}}}}
