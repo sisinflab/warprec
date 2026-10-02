@@ -16,6 +16,9 @@ endpoints:                 # at least one; names unique, letters/digits/-/_, not
     max_k: 100             # largest k a request may ask for
     mask_seen: true        # leave out items the user saw in training
     unknown_user: error    # error (404) | popular (most interacted items)
+    description: null      # what this endpoint serves, shown to clients and agents
+    item_noun: item        # what an item is called, e.g. movie, app
+    context_descriptions: {}   # context-aware models: {field: what it means}
     item_metadata:         # optional: item names for responses and MCP
       path: data/ml-1m/movies.dat
       sep: "::"
@@ -23,6 +26,8 @@ endpoints:                 # at least one; names unique, letters/digits/-/_, not
       id_column: 0         # position, or column name when header is true
       name_column: 1
       encoding: latin-1
+      columns:             # extra attributes, returned with every item and usable in filters
+        genres: {column: 2, separator: "|"}   # or just a position/name for a single value
     batching:
       max_batch_size: 64
       batch_wait_timeout_s: 0.005

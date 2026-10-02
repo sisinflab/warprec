@@ -39,6 +39,10 @@ The `server` section is optional. Every key has a default.
     - **id_column**: The column of item ids, by position (an integer) or, with a header, by name. Defaults to `0`.
     - **name_column**: The column of item names, by position or name. Defaults to `1`.
     - **encoding**: The file encoding, for example `latin-1` for MovieLens. Defaults to `utf-8`.
+    - **columns**: Extra attributes of each item, by the name they are served under. Each is a `column` (position, or name when the file has a header) with an optional `separator` that splits a cell into a list of values, such as `genres: {column: 2, separator: "|"}`. A bare position or name is short for a column without separator. The attributes come back with every item, and requests can filter on them. `name` and `item_id` are reserved. Defaults to none.
+- **description**: What the endpoint serves, in words, such as "Movies, trained on MovieLens 1M". Shown in the model card and in the instructions MCP clients receive. Defaults to `null`.
+- **item_noun**: What an item is called, such as `movie` or `app`, used when the server describes the endpoint. Defaults to `item`.
+- **context_descriptions**: For a context-aware model, what each context field means, such as `{daytime: "the time of day the app is used"}`. Shown next to the field's known values. Defaults to none.
 - **batching**: How concurrent requests to this endpoint are grouped into one forward pass.
     - **max_batch_size**: The most requests scored together. Defaults to `64`.
     - **batch_wait_timeout_s**: How long, in seconds, the first request of a batch waits for others to join it. Defaults to `0.005`.

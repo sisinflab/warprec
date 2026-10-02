@@ -197,3 +197,62 @@ def test_paths_resolve_without_dropping_the_key(
     resolved = config.resolved()
     assert Path(resolved.endpoints[0].checkpoint).is_absolute()
     assert resolved.server.api_key == "secret"
+
+
+def test_an_endpoint_can_describe_itself(checkpoint: Path):
+    config = ServingConfiguration.model_validate(
+        config_with(
+            checkpoint,
+            description="Movies, trained on MovieLens 1M",
+            item_noun="movie",
+            context_descriptions={"daytime": "the time of day"},
+        )
+    )
+    endpoint = config.endpoints[0]
+    assert endpoint.description == "Movies, trained on MovieLens 1M"
+    assert endpoint.item_noun == "movie"
+    assert endpoint.context_descriptions == {"daytime": "the time of day"}
+
+
+def test_the_defaults_say_nothing_extra(checkpoint: Path):
+    endpoint = ServingConfiguration.model_validate(config_with(checkpoint)).endpoints[0]
+    assert (
+        endpoint.description,
+        endpoint.item_noun,
+        endpoint.context_descriptions,
+    ) == (None, "item", {})
+
+
+def test_item_metadata_columns_take_a_short_or_a_full_form(
+    tmp_path: Path, checkpoint: Path
+):
+    items = tmp_path / "items.dat"
+    items.write_text("1::Heat::Action|Crime\n")
+    metadata = {
+        "path": str(items),
+        "sep": "::",
+        "header": False,
+        "columns": {"genres": {"column": 2, "separator": "|"}, "raw": 2},
+    }
+    columns = (
+        ServingConfiguration.model_validate(
+            config_with(checkpoint, item_metadata=metadata)
+        )
+        .endpoints[0]
+        .item_metadata.columns
+    )
+    assert (columns["genres"].column, columns["genres"].separator) == (2, "|")
+    assert (columns["raw"].column, columns["raw"].separator) == (2, None)
+
+
+@pytest.mark.parametrize("reserved", ["name", "item_id"])
+def test_item_metadata_columns_cannot_shadow_the_entry_fields(
+    tmp_path: Path, checkpoint: Path, reserved: str
+):
+    items = tmp_path / "items.csv"
+    items.write_text("id,name\n1,a\n")
+    metadata = {"path": str(items), "columns": {reserved: 1}}
+    with pytest.raises(ValidationError, match="reserved"):
+        ServingConfiguration.model_validate(
+            config_with(checkpoint, item_metadata=metadata)
+        )

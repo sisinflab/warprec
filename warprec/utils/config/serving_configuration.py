@@ -123,6 +123,26 @@ class DeploymentSettings(BaseModel):
         return self
 
 
+# Every served item already carries these keys, so an attribute cannot use them.
+RESERVED_ATTRIBUTES = {"name", "item_id"}
+
+
+class ItemColumn(BaseModel):
+    """An extra item attribute read from the item metadata file.
+
+    Attributes:
+        model_config: Configuration of the PyDantic model; unknown keys are rejected.
+        column (Union[int, str]): The column, by position or, with a header, by name.
+        separator (Optional[str]): Splits a cell into a list of values, such as
+            the genres of a film. None keeps the cell as one value.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    column: Union[int, str]
+    separator: Optional[str] = None
+
+
 class ItemMetadata(BaseModel):
     """A file that names the items, so responses and MCP tools can use titles.
 
@@ -134,6 +154,9 @@ class ItemMetadata(BaseModel):
         id_column (Union[int, str]): The column of item ids, by position or name.
         name_column (Union[int, str]): The column of item names, by position or name.
         encoding (str): The file encoding.
+        columns (Dict[str, ItemColumn]): Extra attributes of each item, by the
+            name they are served under. A bare position or column name is
+            short for a column without a separator.
     """
 
     model_config = ConfigDict(extra="forbid")
@@ -144,6 +167,33 @@ class ItemMetadata(BaseModel):
     id_column: Union[int, str] = 0
     name_column: Union[int, str] = 1
     encoding: str = "utf-8"
+    columns: Dict[str, ItemColumn] = Field(default_factory=dict)
+
+    @field_validator("columns", mode="before")
+    @classmethod
+    def expand_columns(cls, value: Any) -> Any:
+        """Accept a bare position or column name as a column without separator.
+
+        Args:
+            value (Any): The configured columns.
+
+        Returns:
+            Any: The columns, each as a mapping.
+
+        Raises:
+            ValueError: If an attribute uses a name every item already carries.
+        """
+        if not isinstance(value, dict):
+            return value
+        reserved = sorted(RESERVED_ATTRIBUTES & set(value))
+        if reserved:
+            raise ValueError(
+                f"Attribute names {reserved} are reserved: every item already has them."
+            )
+        return {
+            name: spec if isinstance(spec, (dict, ItemColumn)) else {"column": spec}
+            for name, spec in value.items()
+        }
 
     @field_validator("path")
     @classmethod
@@ -180,6 +230,12 @@ class EndpointConfig(BaseModel):
         unknown_user (Literal["error", "popular"]): What a user unseen in
             training gets: a 404, or the most popular items.
         item_metadata (Optional[ItemMetadata]): Item names, when available.
+        description (Optional[str]): What the endpoint serves, in words, shown
+            to clients and agents.
+        item_noun (str): What an item is called, such as 'movie', used when
+            the server describes itself.
+        context_descriptions (Dict[str, str]): What each context field means,
+            for a context-aware model.
         batching (BatchingSettings): How requests are grouped.
         deployment (DeploymentSettings): Ray Serve replica and resource options.
     """
@@ -194,6 +250,9 @@ class EndpointConfig(BaseModel):
     mask_seen: bool = True
     unknown_user: Literal["error", "popular"] = "error"
     item_metadata: Optional[ItemMetadata] = None
+    description: Optional[str] = None
+    item_noun: str = "item"
+    context_descriptions: Dict[str, str] = Field(default_factory=dict)
     batching: BatchingSettings = Field(default_factory=BatchingSettings)
     deployment: DeploymentSettings = Field(
         default_factory=lambda: DeploymentSettings(num_replicas=1)
