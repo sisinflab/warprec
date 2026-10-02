@@ -6,6 +6,8 @@ with the model itself.
 """
 
 import math
+
+import numpy as np
 from pathlib import Path
 from typing import List
 
@@ -536,3 +538,141 @@ def test_the_example_user_is_one_the_model_learned_from(dataset: Dataset):
     example = servable.describe()["example_request"]
     assert example["user_id"] != users[0]
     servable.recommend([servable.resolve(**example)])
+
+
+def genre_index(dataset: Dataset):
+    """Internal item index -> its genres, as the test catalogue assigns them."""
+    _, items = labels(dataset)
+    return {index: GENRES[index % 3].split("|") for index in items}
+
+
+def test_a_filter_keeps_only_matching_items(tmp_path: Path, dataset: Dataset):
+    """'Only comedies' ranks exactly as the model would among comedies alone."""
+    servable = with_catalogue(tmp_path, dataset, "BPR")
+    model = make_model("BPR", dataset)
+    model.eval()
+    users, items = labels(dataset)
+    comedies = [i for i, genres in genre_index(dataset).items() if "Comedy" in genres]
+    (answer,) = servable.recommend(
+        [servable.resolve(user_id=users[0], k=5, filter={"genres": "comedy"})]
+    )
+    with torch.inference_mode():
+        scores = model.predict(user_indices=torch.tensor([0]))[0]
+    scores = scores.clone()
+    scores[dataset.train_set.get_sparse()[0].indices] = -math.inf
+    blocked = torch.ones_like(scores, dtype=torch.bool)
+    blocked[comedies] = False
+    scores[blocked] = -math.inf
+    expected = [
+        items[i]
+        for i in torch.topk(scores, 5).indices.tolist()
+        if math.isfinite(scores[i])
+    ]
+    assert [entry["item_id"] for entry in answer] == expected
+    assert all("Comedy" in entry["attributes"]["genres"] for entry in answer)
+
+
+def test_a_filter_value_list_matches_any_of_them(tmp_path: Path, dataset: Dataset):
+    servable = with_catalogue(tmp_path, dataset, "BPR", max_k=1000)
+    users, _ = labels(dataset)
+    (answer,) = servable.recommend(
+        [
+            servable.resolve(
+                user_id=users[0], k=1000, filter={"genres": ["Action", "Drama"]}
+            )
+        ]
+    )
+    assert answer and all(
+        {"Action", "Drama"} & set(e["attributes"]["genres"]) for e in answer
+    )
+
+
+@pytest.mark.parametrize(
+    "filter_, message",
+    [({"mood": "happy"}, "genres"), ({"genres": "Comdy"}, "Did you mean.*Comedy")],
+)
+def test_a_bad_filter_says_what_it_accepts(
+    tmp_path: Path, dataset: Dataset, filter_, message
+):
+    servable = with_catalogue(tmp_path, dataset, "BPR")
+    users, _ = labels(dataset)
+    with pytest.raises(ServingError, match=message) as error:
+        servable.resolve(user_id=users[0], filter=filter_)
+    assert error.value.status == 422
+
+
+def test_a_filter_needs_a_catalogue(tmp_path: Path, dataset: Dataset):
+    users, _ = labels(dataset)
+    with pytest.raises(ServingError, match="catalogue"):
+        served(tmp_path, "BPR", dataset).resolve(
+            user_id=users[0], filter={"genres": "Comedy"}
+        )
+
+
+def test_popular_items_follow_the_training_interactions(
+    tmp_path: Path, dataset: Dataset
+):
+    servable = with_catalogue(tmp_path, dataset, "BPR")
+    _, items = labels(dataset)
+    counts = torch.tensor(
+        np.asarray((dataset.train_set.get_sparse() != 0).sum(axis=0)).ravel()
+    ).float()
+    expected = [items[i] for i in torch.topk(counts, 4).indices.tolist()]
+    answer = servable.popular_items(k=4)
+    assert [entry["item_id"] for entry in answer] == expected
+    assert [entry["interactions"] for entry in answer] == sorted(
+        (entry["interactions"] for entry in answer), reverse=True
+    )
+    comedies = servable.popular_items(
+        k=4, filter={"genres": "Comedy"}, exclude=[expected[0]]
+    )
+    assert all("Comedy" in e["attributes"]["genres"] for e in comedies)
+    assert expected[0] not in [e["item_id"] for e in comedies]
+
+
+def test_popular_items_need_the_training_interactions(tmp_path: Path, dataset: Dataset):
+    torch.save(make_model("BPR", dataset).get_state(), tmp_path / "old.pth")
+    with pytest.raises(ServingError, match="interactions"):
+        ServableModel.from_checkpoint(tmp_path / "old.pth").popular_items()
+
+
+def test_explanations_are_training_co_occurrences(tmp_path: Path, dataset: Dataset):
+    """'Because' names the user's own items most often consumed with each one."""
+    servable = served(tmp_path, "BPR", dataset)
+    users, items = labels(dataset)
+    seen = (dataset.train_set.get_sparse() != 0).astype(np.int64).tocsc()
+    history = set(dataset.train_set.get_sparse()[0].indices.tolist())
+    index = {str(label): i for i, label in items.items()}
+    (answer,) = servable.recommend(
+        [servable.resolve(user_id=users[0], k=3, explain=True)]
+    )
+    for entry in answer:
+        target = index[str(entry["item_id"])]
+        counts = {h: int(seen[:, h].multiply(seen[:, target]).sum()) for h in history}
+        best = sorted((c for c in counts.values() if c > 0), reverse=True)[:2]
+        assert [e["co_occurrences"] for e in entry["because"]] == best
+        assert all(index[str(e["item_id"])] in history for e in entry["because"])
+
+
+def test_a_session_is_explained_from_its_own_items(tmp_path: Path, dataset: Dataset):
+    servable = served(tmp_path, "SASRec", dataset)
+    _, items = labels(dataset)
+    session = [items[1], items[2], items[3]]
+    (answer,) = servable.recommend(
+        [servable.resolve(history=session, k=3, explain=True)]
+    )
+    assert all(e["item_id"] in session for entry in answer for e in entry["because"])
+
+
+def test_no_explanation_unless_asked(tmp_path: Path, dataset: Dataset):
+    users, _ = labels(dataset)
+    servable = served(tmp_path, "BPR", dataset)
+    (answer,) = servable.recommend([servable.resolve(user_id=users[0], k=3)])
+    assert all("because" not in entry for entry in answer)
+
+
+def test_the_card_mentions_filters_and_explanations(tmp_path: Path, dataset: Dataset):
+    sentences = " ".join(
+        with_catalogue(tmp_path, dataset, "BPR").describe()["how_to_ask"]
+    )
+    assert "filter" in sentences and "genres" in sentences and "explain" in sentences

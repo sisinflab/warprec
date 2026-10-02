@@ -1,3 +1,4 @@
+import difflib
 import json
 import math
 from dataclasses import dataclass, field
@@ -71,6 +72,10 @@ class Query:
             context-aware model.
         candidates (List[int]): Internal indices of the items to score, for a
             scoring request.
+        allowed (Optional[np.ndarray]): Internal indices of the only items a
+            filtered request may return; None when it is not filtered.
+        explain (bool): Whether each item comes with the training evidence
+            linking it to the request's own items.
     """
 
     k: int
@@ -80,6 +85,8 @@ class Query:
     fallback: bool = False
     context: Optional[List[Any]] = None
     candidates: List[int] = field(default_factory=list)
+    allowed: Optional[np.ndarray] = None
+    explain: bool = False
 
 
 def scores_on_device(path: Union[str, Path]) -> bool:
@@ -351,6 +358,18 @@ class ServableModel:
             f"Optional: k, how many {nouns} to return (1 to {self._policy.max_k}, "
             f"default {self._policy.default_k}), and exclude, {nouns} to leave out."
         )
+        attributes = self._catalogue.attribute_names() if self._catalogue else []
+        if attributes:
+            sentences.append(
+                f"Optional: filter, to keep only {nouns} with given attributes "
+                f"({', '.join(attributes)}), such as "
+                f'{{"{attributes[0]}": "<value>"}}; a list matches any of its values.'
+            )
+        sentences.append(
+            f"Optional: explain: true adds to each {self._presentation.item_noun} "
+            f"the {nouns} of the request that training users most often consumed "
+            "with it - evidence from the data, not the model's reasoning."
+        )
         return sentences
 
     def _example_request(self) -> Dict[str, Any]:
@@ -434,6 +453,8 @@ class ServableModel:
         k: Optional[int] = None,
         exclude: Optional[List[Label]] = None,
         context: Optional[Union[Dict[str, Any], List[Any]]] = None,
+        filter: Optional[Dict[str, Any]] = None,  # pylint: disable=redefined-builtin
+        explain: bool = False,
     ) -> Query:
         """Check a request and translate it to the model's indices.
 
@@ -445,6 +466,10 @@ class ServableModel:
             exclude (Optional[List[Label]]): Items never to return.
             context (Optional[Union[Dict[str, Any], List[Any]]]): The situation
                 of the request. Required by context-aware models, refused by others.
+            filter (Optional[Dict[str, Any]]): Item attributes the answer must
+                have, such as {"genres": "Comedy"}; a list matches any of its values.
+            explain (bool): Whether each item comes with the training evidence
+                linking it to the request's own items.
 
         Returns:
             Query: The request in internal indices.
@@ -469,6 +494,8 @@ class ServableModel:
 
         query = self._resolve_target(user_id, history, k, exclude)
         query.context = encoded
+        query.allowed = self._allowed_items(filter) if filter else None
+        query.explain = explain
         return query
 
     def _resolve_target(
@@ -493,12 +520,7 @@ class ServableModel:
         Raises:
             ServingError: If the request cannot be answered, with the reason.
         """
-        k = self._policy.default_k if k is None else k
-        if not 1 <= k <= self._policy.max_k:
-            raise ServingError(
-                422, f"k must be between 1 and {self._policy.max_k}, got {k}."
-            )
-        k = min(k, self.n_items)
+        k = self._checked_k(k)
         excluded = [self._item_index(token) for token in exclude or []]
         user = None if user_id is None else self._known_user(user_id)
 
@@ -536,8 +558,48 @@ class ServableModel:
                 scores = self._popularity.clone()  # type: ignore[union-attr]
             else:
                 scores = next(rows)
-            answers.append(self._top_k(scores, query))
+            answer = self._top_k(scores, query)
+            if query.explain:
+                self._explain(query, answer)
+            answers.append(answer)
         return answers
+
+    @torch.inference_mode()
+    def popular_items(
+        self,
+        k: Optional[int] = None,
+        filter: Optional[Dict[str, Any]] = None,  # pylint: disable=redefined-builtin
+        exclude: Optional[List[Label]] = None,
+    ) -> List[Dict[str, Any]]:
+        """The items with the most training interactions, for anyone.
+
+        Args:
+            k (Optional[int]): How many items to return.
+            filter (Optional[Dict[str, Any]]): Item attributes the answer must have.
+            exclude (Optional[List[Label]]): Items never to return.
+
+        Returns:
+            List[Dict[str, Any]]: The items, most interacted first, each with
+                its number of training interactions.
+
+        Raises:
+            ServingError: If the checkpoint does not record training
+                interactions, or the request is invalid.
+        """
+        if self._popularity is None:
+            raise ServingError(
+                422,
+                "This checkpoint does not record training interactions, so there "
+                "is no popularity to rank by. Save the model again with this "
+                "version of WarpRec.",
+            )
+        query = Query(k=self._checked_k(k))
+        query.exclude = [self._item_index(token) for token in exclude or []]
+        query.allowed = self._allowed_items(filter) if filter else None
+        answer = self._top_k(self._popularity.clone(), query, mask_seen=False)
+        for entry in answer:
+            entry["interactions"] = int(entry["score"])
+        return answer
 
     def score(
         self,
@@ -853,26 +915,140 @@ class ServableModel:
         with torch.inference_mode():
             return self._model.predict(**inputs).float()
 
-    def _top_k(self, scores: Tensor, query: Query) -> List[Dict[str, Any]]:
+    def _top_k(
+        self, scores: Tensor, query: Query, mask_seen: bool = True
+    ) -> List[Dict[str, Any]]:
         """The best items of one row of scores, hidden ones left out.
 
         Args:
             scores (Tensor): The row of scores, modified in place.
             query (Query): The query it answers.
+            mask_seen (bool): Whether the items the request has already seen
+                are hidden, as the endpoint's policy says; off for popularity,
+                which is the same for everyone.
 
         Returns:
             List[Dict[str, Any]]: The items, best first. Fewer than k when
                 masking leaves fewer items to rank.
         """
-        hidden = self._hidden_items(query)
+        hidden = self._hidden_items(query) if mask_seen else list(query.exclude)
         if hidden:
             scores[torch.tensor(hidden, device=scores.device)] = -math.inf
+        if query.allowed is not None:
+            blocked = torch.ones_like(scores, dtype=torch.bool)
+            blocked[torch.as_tensor(query.allowed, device=scores.device)] = False
+            scores[blocked] = -math.inf
         values, indices = torch.topk(scores, query.k)
         keep = torch.isfinite(values)
         return [
             self._entry(index, score)
             for index, score in zip(indices[keep].tolist(), values[keep].tolist())
         ]
+
+    def _allowed_items(self, filter: Dict[str, Any]) -> np.ndarray:  # pylint: disable=redefined-builtin
+        """The items whose attributes match a filter.
+
+        Values are compared without regard to case. A list of values matches
+        an item that has any of them, and an attribute holding a list matches
+        when any of its values does; several attributes must all match.
+
+        Args:
+            filter (Dict[str, Any]): Attribute values, such as {"genres": "Comedy"}.
+
+        Returns:
+            np.ndarray: The internal indices of the matching items.
+
+        Raises:
+            ServingError: If there is no catalogue, or an attribute or a value
+                is unknown.
+        """
+        catalogue = self._require_catalogue()
+        known = catalogue.attribute_names()
+        allowed: Optional[set] = None
+        for attribute, wanted in filter.items():
+            if attribute not in known:
+                raise ServingError(
+                    422,
+                    f"Unknown attribute '{attribute}'. Items can be filtered on: "
+                    f"{known or 'nothing (no attributes are configured)'}.",
+                )
+            values = {str(value) for value in catalogue.attribute_values(attribute)}
+            folded = {value.casefold(): value for value in values}
+            requested = wanted if isinstance(wanted, list) else [wanted]
+            for value in requested:
+                if str(value).casefold() not in folded:
+                    close = difflib.get_close_matches(str(value), list(values), n=3)
+                    hint = (
+                        f" Did you mean {', '.join(map(repr, close))}?" if close else ""
+                    )
+                    raise ServingError(422, f"No item has {attribute} '{value}'.{hint}")
+            targets = {str(value).casefold() for value in requested}
+            matching = set()
+            for item, attributes in catalogue.attributes.items():
+                value = attributes.get(attribute)
+                cells = value if isinstance(value, list) else [value]
+                if item in self._items and targets & {str(c).casefold() for c in cells}:
+                    matching.add(self._items[item])
+            allowed = matching if allowed is None else allowed & matching
+        return np.array(sorted(allowed or set()), dtype=np.int64)
+
+    def _explain(self, query: Query, answer: List[Dict[str, Any]]) -> None:
+        """Add to each item the request's own items most often consumed with it.
+
+        This is evidence from the training data - how many users interacted
+        with both items - not the model's reasoning, which it does not expose.
+
+        Args:
+            query (Query): The query the answer is for.
+            answer (List[Dict[str, Any]]): The items, completed in place.
+        """
+        own = set(query.history or [])
+        if query.user is not None and self._seen is not None:
+            start, end = (
+                self._seen.indptr[query.user],
+                self._seen.indptr[query.user + 1],
+            )
+            own.update(self._seen.indices[start:end].tolist())
+        if not answer or not own or self._seen is None:
+            for entry in answer:
+                entry["because"] = []
+            return
+        own_items = sorted(own)
+        targets = [self._items[str(entry["item_id"])] for entry in answer]
+        columns = self._seen.tocsc()
+        together = (columns[:, own_items].T @ columns[:, targets]).toarray()
+        for position, entry in enumerate(answer):
+            counts = together[:, position]
+            best = [
+                row for row in np.argsort(-counts, kind="stable")[:2] if counts[row] > 0
+            ]
+            entry["because"] = [
+                {
+                    "item_id": self._labels[own_items[row]],
+                    **self._described(own_items[row]),
+                    "co_occurrences": int(counts[row]),
+                }
+                for row in best
+            ]
+
+    def _checked_k(self, k: Optional[int]) -> int:
+        """A requested list length, checked against the endpoint's limits.
+
+        Args:
+            k (Optional[int]): The requested length; None for the default.
+
+        Returns:
+            int: The length to return, at most the number of items.
+
+        Raises:
+            ServingError: If it is out of range.
+        """
+        k = self._policy.default_k if k is None else k
+        if not 1 <= k <= self._policy.max_k:
+            raise ServingError(
+                422, f"k must be between 1 and {self._policy.max_k}, got {k}."
+            )
+        return min(k, self.n_items)
 
     def _hidden_items(self, query: Query) -> List[int]:
         """The items a query must not get back.
