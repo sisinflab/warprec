@@ -16,7 +16,7 @@ from warprec.data.dataset import Dataset
 from warprec.recommenders.base_recommender import Recommender
 from warprec.serving.servable import ServableModel, ServingError, ServingPolicy
 
-from warprec.serving.catalogue import read_item_names
+from warprec.serving.catalogue import Catalogue, read_catalogue
 from warprec.utils.config.serving_configuration import ItemMetadata
 
 from conftest import make_model, save_servable
@@ -236,41 +236,143 @@ def test_describe_reports_the_model(tmp_path: Path, dataset: Dataset):
     assert isinstance(description["params"], dict)
 
 
-def catalogue(tmp_path: Path, dataset: Dataset) -> dict:
+TITLES = {0: "Toy Story (1995)", 1: "Toy Story 2 (1999)", 2: "Heat (1995)"}
+GENRES = ["Comedy", "Drama|Comedy", "Action|Crime"]
+
+
+def catalogue(tmp_path: Path, dataset: Dataset) -> Catalogue:
+    """A catalogue naming every item, a few like real films, with their genres."""
     _, items = labels(dataset)
     path = tmp_path / "items.dat"
     path.write_text(
-        "".join(f"{label}::Item {label}\n" for label in items.values()),
+        "".join(
+            f"{label}::{TITLES.get(index, f'Item {label}')}::{GENRES[index % 3]}\n"
+            for index, label in items.items()
+        ),
         encoding="utf-8",
     )
-    return read_item_names(ItemMetadata(path=str(path), sep="::", header=False))
+    metadata = ItemMetadata(
+        path=str(path),
+        sep="::",
+        header=False,
+        columns={"genres": {"column": 2, "separator": "|"}},
+    )
+    return read_catalogue(metadata)
 
 
-def test_names_are_read_by_position_without_a_header(tmp_path: Path, dataset: Dataset):
-    names = catalogue(tmp_path, dataset)
+def with_catalogue(
+    tmp_path: Path, dataset: Dataset, name: str = "SASRec", **policy
+) -> ServableModel:
+    path = save_servable(tmp_path / f"{name}.pth", make_model(name, dataset), dataset)
+    return ServableModel.from_checkpoint(
+        path, policy=ServingPolicy(**policy), catalogue=catalogue(tmp_path, dataset)
+    )
+
+
+def test_names_and_attributes_are_read_by_position(tmp_path: Path, dataset: Dataset):
+    read = catalogue(tmp_path, dataset)
     _, items = labels(dataset)
-    assert names[str(items[0])] == f"Item {items[0]}"
+    assert read.names[str(items[3])] == f"Item {items[3]}"
+    assert read.attributes[str(items[1])] == {"genres": ["Drama", "Comedy"]}
 
 
 def test_names_are_read_by_column_name_with_a_header(tmp_path: Path):
     path = tmp_path / "items.csv"
-    path.write_text("title,movie_id\nHeat,7\n", encoding="utf-8")
-    metadata = ItemMetadata(path=str(path), id_column="movie_id", name_column="title")
-    assert read_item_names(metadata) == {"7": "Heat"}
-
-
-def test_answers_carry_names_and_accept_them(tmp_path: Path, dataset: Dataset):
-    path = save_servable(tmp_path / "m.pth", make_model("SASRec", dataset), dataset)
-    servable = ServableModel.from_checkpoint(
-        path, item_names=catalogue(tmp_path, dataset)
+    path.write_text("title,movie_id,year\nHeat,7,1995\n", encoding="utf-8")
+    metadata = ItemMetadata(
+        path=str(path),
+        id_column="movie_id",
+        name_column="title",
+        columns={"year": "year"},
     )
+    read = read_catalogue(metadata)
+    assert read.names == {"7": "Heat"}
+    assert read.attributes == {"7": {"year": "1995"}}
+
+
+def test_answers_carry_names_and_attributes_and_accept_names(
+    tmp_path: Path, dataset: Dataset
+):
+    servable = with_catalogue(tmp_path, dataset)
     _, items = labels(dataset)
     by_id = servable.recommend([servable.resolve(history=[items[1], items[2]], k=3)])
     by_name = servable.recommend(
-        [servable.resolve(history=[f"Item {items[1]}", f"Item {items[2]}"], k=3)]
+        [servable.resolve(history=[TITLES[1], TITLES[2]], k=3)]
     )
     assert by_id == by_name
-    assert all(entry["name"] == f"Item {entry['item_id']}" for entry in by_id[0])
+    read = catalogue(tmp_path, dataset)
+    for entry in by_id[0]:
+        assert entry["name"] == read.names[str(entry["item_id"])]
+        assert entry["attributes"] == read.attributes[str(entry["item_id"])]
+
+
+def test_names_are_matched_whatever_their_case(tmp_path: Path, dataset: Dataset):
+    servable = with_catalogue(tmp_path, dataset)
+    _, items = labels(dataset)
+    exact = servable.resolve(history=[items[0]], k=3)
+    folded = servable.resolve(history=["TOY STORY (1995)"], k=3)
+    assert exact.history == folded.history
+
+
+def test_an_unknown_name_suggests_the_closest(tmp_path: Path, dataset: Dataset):
+    servable = with_catalogue(tmp_path, dataset)
+    with pytest.raises(
+        ServingError, match=r"Did you mean.*Toy Story \(1995\)"
+    ) as error:
+        servable.resolve(history=["Toy Stroy (1995)"])
+    assert error.value.status == 422
+
+
+def test_search_finds_items_by_part_of_their_name(tmp_path: Path, dataset: Dataset):
+    servable = with_catalogue(tmp_path, dataset)
+    found = servable.search_items("toy story")
+    assert {entry["name"] for entry in found["matches"]} == {TITLES[0], TITLES[1]}
+    seen = dataset.train_set.get_sparse()
+    _, items = labels(dataset)
+    index = {str(label): i for i, label in items.items()}
+    for entry in found["matches"]:
+        assert (
+            entry["interactions"] == (seen[:, index[str(entry["item_id"])]] != 0).sum()
+        )
+        assert "genres" in entry["attributes"]
+
+
+def test_search_ranks_an_exact_name_first(tmp_path: Path, dataset: Dataset):
+    found = with_catalogue(tmp_path, dataset).search_items("toy story (1995)")
+    assert found["matches"][0]["name"] == TITLES[0]
+
+
+def test_search_respects_its_limit(tmp_path: Path, dataset: Dataset):
+    assert (
+        len(with_catalogue(tmp_path, dataset).search_items("item", limit=4)["matches"])
+        == 4
+    )
+
+
+def test_search_says_when_an_item_is_unknown(tmp_path: Path, dataset: Dataset):
+    """'Are you trained on Kung Fu Panda?' gets a no, not a guess."""
+    servable = with_catalogue(tmp_path, dataset)
+    assert servable.search_items("Kung Fu Panda")["matches"] == []
+    near = servable.search_items("Toy Stroy (1995)")
+    assert near["matches"] == []
+    assert TITLES[0] in [entry["name"] for entry in near["suggestions"]]
+
+
+def test_search_needs_a_catalogue(tmp_path: Path, dataset: Dataset):
+    with pytest.raises(ServingError, match="catalogue") as error:
+        served(tmp_path, "BPR", dataset).search_items("toy")
+    assert error.value.status == 422
+
+
+def test_items_are_looked_up_by_id_or_name(tmp_path: Path, dataset: Dataset):
+    servable = with_catalogue(tmp_path, dataset)
+    _, items = labels(dataset)
+    found = servable.get_items([items[0], "heat (1995)", "Toy Stroy (1995)"])
+    assert [entry["name"] for entry in found["items"]] == [TITLES[0], TITLES[2]]
+    (unknown,) = found["unknown"]
+    assert (
+        unknown["query"] == "Toy Stroy (1995)" and TITLES[0] in unknown["suggestions"]
+    )
 
 
 def test_scores_come_back_in_request_order_unmasked(tmp_path: Path, dataset: Dataset):

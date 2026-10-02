@@ -15,6 +15,7 @@ from warprec.recommenders.base_recommender import (
     Recommender,
     SequentialRecommenderUtils,
 )
+from warprec.serving.catalogue import Catalogue
 from warprec.serving.context import ContextSchema
 from warprec.serving.errors import ServingError
 from warprec.utils.logger import logger
@@ -115,7 +116,7 @@ class ServableModel:
         histories (Optional[Dict[str, np.ndarray]]): The packed training
             histories of a sequential model.
         policy (ServingPolicy): How the endpoint answers.
-        item_names (Optional[Dict[str, str]]): Item names by external id.
+        catalogue (Optional[Catalogue]): The names and attributes of the items.
         warprec_version (Optional[str]): The WarpRec that wrote the checkpoint.
         context_maps (Optional[Dict[str, Dict[Any, int]]]): The index of every
             known context value, for a context-aware model.
@@ -132,7 +133,7 @@ class ServableModel:
         seen: Optional[csr_matrix] = None,
         histories: Optional[Dict[str, np.ndarray]] = None,
         policy: ServingPolicy = ServingPolicy(),
-        item_names: Optional[Dict[str, str]] = None,
+        catalogue: Optional[Catalogue] = None,
         warprec_version: Optional[str] = None,
         context_maps: Optional[Dict[str, Dict[Any, int]]] = None,
     ):
@@ -165,12 +166,7 @@ class ServableModel:
         for label, index in info["item_mapping"].items():
             self._labels[index] = _builtin(label)
 
-        self._names = item_names or {}
-        self._by_name = {
-            name: self._items[label]
-            for label, name in self._names.items()
-            if label in self._items
-        }
+        self._catalogue = catalogue
 
         self._popularity: Optional[Tensor] = None
         if seen is not None:
@@ -195,7 +191,7 @@ class ServableModel:
         path: Union[str, Path],
         device: str = "cpu",
         policy: ServingPolicy = ServingPolicy(),
-        item_names: Optional[Dict[str, str]] = None,
+        catalogue: Optional[Catalogue] = None,
     ) -> "ServableModel":
         """Load a checkpoint written by the train pipeline, ready to answer.
 
@@ -206,7 +202,7 @@ class ServableModel:
             path (Union[str, Path]): The .pth file.
             device (str): The device to run the model on.
             policy (ServingPolicy): How the endpoint answers.
-            item_names (Optional[Dict[str, str]]): Item names by external id.
+            catalogue (Optional[Catalogue]): The names and attributes of the items.
 
         Returns:
             ServableModel: The model, ready to answer.
@@ -224,7 +220,7 @@ class ServableModel:
             seen=payload.get("seen"),
             histories=payload.get("histories"),
             policy=policy,
-            item_names=item_names,
+            catalogue=catalogue,
             warprec_version=checkpoint.get("warprec_version"),
             context_maps=payload.get("context_maps"),
         )
@@ -469,6 +465,96 @@ class ServableModel:
             )
         return answers
 
+    def search_items(self, query: str, limit: int = 10) -> Dict[str, Any]:
+        """Find the items whose name contains some text.
+
+        Answers "do you know this item?": an item that is not in the catalogue
+        comes back as no match, with the closest names as suggestions.
+
+        Args:
+            query (str): Part of a name, matched without regard to case.
+            limit (int): The most matches to return.
+
+        Returns:
+            Dict[str, Any]: The query, the matching items and, when nothing
+                matched, the items with the closest names.
+
+        Raises:
+            ServingError: If the endpoint has no catalogue to search, or the
+                limit is out of range.
+        """
+        catalogue = self._require_catalogue()
+        if not 1 <= limit <= self._policy.max_k:
+            raise ServingError(
+                422, f"limit must be between 1 and {self._policy.max_k}, got {limit}."
+            )
+        matches = [
+            self._items[item] for item in catalogue.search(query) if item in self._items
+        ]
+        # Past an exact match, the more interactions an item had, the likelier
+        # it is the one meant.
+        exact = matches[:1] if catalogue.find(query) is not None else []
+        rest = sorted(
+            (index for index in matches if index not in exact),
+            key=self._interactions,
+            reverse=True,
+        )
+        found = [self._catalogue_entry(index) for index in (exact + rest)[:limit]]
+        suggestions = []
+        if not found:
+            for name in catalogue.suggest(query):
+                item = catalogue.find(name)
+                if item in self._items:
+                    suggestions.append(self._catalogue_entry(self._items[item]))
+        return {"query": query, "matches": found, "suggestions": suggestions}
+
+    def get_items(self, items: List[Label]) -> Dict[str, Any]:
+        """Look items up by id or name.
+
+        Args:
+            items (List[Label]): The ids or names.
+
+        Returns:
+            Dict[str, Any]: The items found, in request order, and for each one
+                not found, what was asked and the closest names.
+        """
+        found, unknown = [], []
+        for token in items:
+            try:
+                found.append(self._catalogue_entry(self._item_index(token)))
+            except ServingError:
+                close = self._catalogue.suggest(str(token)) if self._catalogue else []
+                unknown.append({"query": token, "suggestions": close})
+        return {"items": found, "unknown": unknown}
+
+    def _require_catalogue(self) -> Catalogue:
+        """The endpoint's catalogue, for operations that need item names.
+
+        Returns:
+            Catalogue: The catalogue.
+
+        Raises:
+            ServingError: If the endpoint has none.
+        """
+        if self._catalogue is None:
+            raise ServingError(
+                422,
+                "This endpoint has no item catalogue: items are known by id only. "
+                "Configure item_metadata to search them by name.",
+            )
+        return self._catalogue
+
+    def _interactions(self, index: int) -> int:
+        """How many training interactions an item had.
+
+        Args:
+            index (int): The internal item index.
+
+        Returns:
+            int: The count; 0 when the checkpoint does not carry it.
+        """
+        return 0 if self._popularity is None else int(self._popularity[index].item())
+
     def _resolve_session(
         self, user: Optional[int], history: List[Label], k: int, excluded: List[int]
     ) -> Query:
@@ -558,10 +644,17 @@ class ServableModel:
             ServingError: If the item is unknown.
         """
         index = self._items.get(str(token))
+        if index is None and self._catalogue is not None:
+            index = self._items.get(self._catalogue.find(str(token)) or "")
         if index is None:
-            index = self._by_name.get(str(token))
-        if index is None:
-            raise ServingError(422, f"Item '{token}' is not in the model's catalogue.")
+            message = f"Item '{token}' is not in the model's catalogue."
+            if self._catalogue is not None:
+                close = self._catalogue.suggest(str(token))
+                if close:
+                    message += (
+                        f" Did you mean {', '.join(repr(name) for name in close)}?"
+                    )
+            raise ServingError(422, message)
         return index
 
     def _predict(self, queries: Sequence[Query]) -> Tensor:
@@ -652,10 +745,45 @@ class ServableModel:
             score (float): Its score.
 
         Returns:
-            Dict[str, Any]: The external id, the score and, with a catalogue, the name.
+            Dict[str, Any]: The external id, the score and, with a catalogue,
+                the name and attributes.
         """
-        label = self._labels[index]
-        entry: Dict[str, Any] = {"item_id": label, "score": score}
-        if self._names:
-            entry["name"] = self._names.get(str(label))
+        entry: Dict[str, Any] = {"item_id": self._labels[index], "score": score}
+        entry.update(self._described(index))
+        return entry
+
+    def _described(self, index: int) -> Dict[str, Any]:
+        """What the catalogue says about an item.
+
+        Args:
+            index (int): The internal item index.
+
+        Returns:
+            Dict[str, Any]: The name and the attributes, or nothing without a
+                catalogue.
+        """
+        if self._catalogue is None:
+            return {}
+        label = str(self._labels[index])
+        described: Dict[str, Any] = {"name": self._catalogue.names.get(label)}
+        attributes = self._catalogue.attributes.get(label)
+        if attributes:
+            described["attributes"] = attributes
+        return described
+
+    def _catalogue_entry(self, index: int) -> Dict[str, Any]:
+        """An item as search and lookup return it.
+
+        Args:
+            index (int): The internal item index.
+
+        Returns:
+            Dict[str, Any]: The external id, what the catalogue says about it,
+                and how many training interactions it had.
+        """
+        entry: Dict[str, Any] = {"item_id": self._labels[index]}
+        entry.update(self._described(index))
+        entry["interactions"] = (
+            self._interactions(index) if self._popularity is not None else None
+        )
         return entry

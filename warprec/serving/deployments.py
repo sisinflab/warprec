@@ -5,7 +5,7 @@ from ray import serve
 from ray.serve.handle import DeploymentHandle
 
 from warprec.serving.api import build_api
-from warprec.serving.catalogue import read_item_names
+from warprec.serving.catalogue import read_catalogue
 from warprec.serving.servable import Query, ServableModel, ServingError, ServingPolicy
 from warprec.utils.config.serving_configuration import EndpointConfig, ServerSettings
 
@@ -24,7 +24,9 @@ class ModelServer:
 
     def __init__(self, endpoint: Dict[str, Any]):
         config = EndpointConfig.model_validate(endpoint)
-        names = read_item_names(config.item_metadata) if config.item_metadata else None
+        catalogue = (
+            read_catalogue(config.item_metadata) if config.item_metadata else None
+        )
         self._model = ServableModel.from_checkpoint(
             config.checkpoint,
             device=config.device,
@@ -34,7 +36,7 @@ class ModelServer:
                 mask_seen=config.mask_seen,
                 unknown_user=config.unknown_user,
             ),
-            item_names=names,
+            catalogue=catalogue,
         )
         # serve.batch wraps each method in an object carrying these setters,
         # which the decorator's type hints do not show.
