@@ -276,6 +276,11 @@ BY_NAME: Dict[str, Any] = {
     "temperature": 0.2,
     "cl_weight": 0.1,
     "kg_weight": 0.01,
+    # Every feature of the small graph is kept, and KGFlex selects both orders
+    # with one of them limited, which is the combination Elliot crashed on.
+    "min_feature_items": 1,
+    "first_order_limit": -1,
+    "second_order_limit": 2,
     "ind_weight": 0.01,
     "steps": 4,
     "time_size": 8,

@@ -417,7 +417,7 @@ def build_knowledge_model(model_name: str, dataset: Dataset, **overrides: Any) -
     )
 
 
-@pytest.mark.parametrize("model_name", ["KGCN", "KGIN", "RippleNet"])
+@pytest.mark.parametrize("model_name", ["KGCN", "KGIN", "RippleNet", "KaHFM"])
 def test_every_knowledge_model_refuses_a_dataset_without_a_graph(
     model_name: str, dataset: Dataset
 ):
@@ -505,3 +505,55 @@ def test_kgin_offers_both_ways_of_measuring_overlap(dataset: Dataset):
 
         assert torch.isfinite(value)
         assert float(value) >= 0.0
+
+
+def test_kahfm_starts_every_item_at_the_tfidf_of_its_features(dataset: Dataset):
+    """A factor is a feature, and an item starts as much about it as its TF-IDF."""
+    model = build_knowledge_model("KaHFM", dataset)
+    features, labels = dataset.knowledge.item_features(order=1, min_items=1)
+
+    dense = features.to_dense()
+    described = int((dense.sum(dim=1) > 0).sum())
+    expected = dense * torch.log(described / dense.sum(dim=0))
+    expected = expected / expected.norm(dim=1, keepdim=True).clamp(min=1e-12)
+
+    assert model.feature_labels == labels
+    assert torch.allclose(model.item_factors.weight[:-1], expected, atol=1e-6)
+    assert torch.equal(model.item_factors.weight[-1], torch.zeros(len(labels)))
+
+
+def test_kahfm_starts_every_user_at_the_mean_of_their_items(dataset: Dataset):
+    """The paper's profile, not Elliot's last-item-wins one."""
+    model = build_knowledge_model("KaHFM", dataset)
+    history = dataset.train_set.get_sparse().tocsr()
+
+    for user in range(5):
+        items = torch.as_tensor(history[user].indices, dtype=torch.long)
+        expected = model.item_factors.weight[items].mean(dim=0)
+        assert torch.allclose(model.user_factors.weight[user], expected, atol=1e-6)
+
+
+def test_kahfm_refuses_a_graph_with_no_feature_common_enough(dataset: Dataset):
+    """Without a single feature there is no factor to learn."""
+    with pytest.raises(ValueError, match="min_feature_items"):
+        build_knowledge_model("KaHFM", dataset, min_feature_items=10_000)
+
+
+def test_kahfm_contrasts_each_positive_with_its_own_negative(dataset: Dataset):
+    """BPR is pairwise: a positive is not compared with other users' negatives."""
+    model = build_knowledge_model("KaHFM", dataset)
+    user = torch.tensor([0, 1])
+    positive = torch.tensor([0, 1])
+    negative = torch.tensor([2, 3])
+
+    expected = torch.nn.functional.softplus(
+        model(user, negative) - model(user, positive)
+    ).mean()
+    observed = model.rec_loss(model(user, positive), model(user, negative))
+    assert torch.allclose(observed, expected)
+
+
+def test_kahfm_is_named_by_its_hyperparameters_only(dataset: Dataset):
+    """A run is named after get_params; the feature labels must not leak into it."""
+    model = build_knowledge_model("KaHFM", dataset)
+    assert "feature_labels" not in model.get_params()
