@@ -12,6 +12,7 @@ than scoring from nothing, and that its attention is a distribution that moves.
 from typing import Any, Tuple
 
 import narwhals as nw
+import numpy as np
 import pandas as pd
 import pytest
 import torch
@@ -19,6 +20,7 @@ import torch
 import warprec.recommenders  # noqa: F401  (populates the registries)
 from warprec.data.dataset import Dataset
 from warprec.data.entities import KnowledgeGraph
+from warprec.recommenders.knowledge_aware_recommender import KGFlex
 from warprec.utils.registry import model_registry
 
 from conftest import build_params
@@ -417,7 +419,7 @@ def build_knowledge_model(model_name: str, dataset: Dataset, **overrides: Any) -
     )
 
 
-@pytest.mark.parametrize("model_name", ["KGCN", "KGIN", "RippleNet", "KaHFM"])
+@pytest.mark.parametrize("model_name", ["KGCN", "KGIN", "RippleNet", "KaHFM", "KGFlex"])
 def test_every_knowledge_model_refuses_a_dataset_without_a_graph(
     model_name: str, dataset: Dataset
 ):
@@ -557,3 +559,98 @@ def test_kahfm_is_named_by_its_hyperparameters_only(dataset: Dataset):
     """A run is named after get_params; the feature labels must not leak into it."""
     model = build_knowledge_model("KaHFM", dataset)
     assert "feature_labels" not in model.get_params()
+
+
+def test_information_gain_is_a_bit_for_a_perfect_split_and_nothing_for_none():
+    """Balanced classes start at one bit of uncertainty."""
+    gains = KGFlex.information_gain(
+        np.array([4.0, 2.0, 3.0]), np.array([0.0, 2.0, 1.0]), np.array([4.0, 4.0, 4.0])
+    )
+
+    assert gains[0] == pytest.approx(1.0)
+    assert gains[1] == pytest.approx(0.0)
+    assert 0.0 < gains[2] < 1.0
+
+
+def test_kgflex_keeps_no_more_features_per_user_than_it_is_allowed(dataset: Dataset):
+    """A limit of one first-order feature and no second-order ones."""
+    model = build_knowledge_model(
+        "KGFlex", dataset, first_order_limit=1, second_order_limit=0
+    )
+    per_user = model.user_offsets[1:] - model.user_offsets[:-1]
+
+    assert int(per_user.max()) == 1
+    assert all(len(model.feature_labels[f]) == 2 for f in model.pair_feature.tolist())
+    assert bool((model.pair_weight > 0).all())
+
+
+def test_kgflex_accepts_a_first_order_limit_beside_every_second_order_feature(
+    dataset: Dataset,
+):
+    """The combination Elliot raised on."""
+    model = build_knowledge_model(
+        "KGFlex", dataset, first_order_limit=1, second_order_limit=-1
+    )
+
+    assert any(len(label) == 3 for label in model.feature_labels)
+
+
+def test_kgflex_selects_the_same_features_from_the_same_seed(dataset: Dataset):
+    """The negatives the gain is measured against are drawn from the seed."""
+    first = build_knowledge_model("KGFlex", dataset)
+    second = build_knowledge_model("KGFlex", dataset)
+
+    assert torch.equal(first.pair_feature, second.pair_feature)
+    assert torch.equal(first.pair_weight, second.pair_weight)
+
+
+def test_kgflex_scores_an_item_by_the_features_it_shares_with_the_user(
+    dataset: Dataset,
+):
+    """x_ui = sum over shared f of k_uf (p_uf . g_f + b_f), on both paths."""
+    model = build_knowledge_model("KGFlex", dataset)
+    model.eval()
+
+    per_user = model.user_offsets[1:] - model.user_offsets[:-1]
+    user = int(per_user.argmax())
+    items = torch.arange(dataset.info()["n_items"])
+    carried = set(zip(model.item_rows.tolist(), model.item_columns.tolist()))
+
+    expected = torch.zeros(len(items))
+    start, end = model.user_offsets[user : user + 2].tolist()
+    with torch.no_grad():
+        for pair in range(start, end):
+            feature = int(model.pair_feature[pair])
+            value = model.pair_weight[pair] * (
+                model.user_feature_embedding.weight[pair]
+                @ model.feature_embedding.weight[feature]
+                + model.feature_bias.weight[feature, 0]
+            )
+            for item in items.tolist():
+                if (item, feature) in carried:
+                    expected[item] += value
+
+        full = model.predict(torch.tensor([user]))[0]
+        pairwise = model(torch.full_like(items, user), items)
+
+    assert expected.abs().sum() > 0
+    assert torch.allclose(full, expected, atol=1e-6)
+    assert torch.allclose(pairwise, expected, atol=1e-6)
+
+
+def test_kgflex_refuses_a_graph_with_no_feature_common_enough(dataset: Dataset):
+    """Without a feature there is nothing any user could be expert about."""
+    with pytest.raises(ValueError, match="min_feature_items"):
+        build_knowledge_model("KGFlex", dataset, min_feature_items=10_000)
+
+
+def test_kgflex_contrasts_each_positive_with_its_own_negative(dataset: Dataset):
+    """BPR is pairwise: a positive is not compared with other users' negatives."""
+    model = build_knowledge_model("KGFlex", dataset)
+    batch = (torch.tensor([0, 1]), torch.tensor([0, 1]), torch.tensor([2, 3]))
+    user, positive, negative = batch
+
+    expected = torch.nn.functional.softplus(
+        model(user, negative) - model(user, positive)
+    ).mean()
+    assert torch.allclose(model.training_step(batch, 0), expected)
