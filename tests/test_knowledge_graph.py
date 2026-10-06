@@ -10,6 +10,7 @@ than scoring from nothing, and that its attention is a distribution that moves.
 """
 
 from typing import Any, Tuple
+from unittest.mock import patch
 
 import narwhals as nw
 import numpy as np
@@ -654,3 +655,14 @@ def test_kgflex_contrasts_each_positive_with_its_own_negative(dataset: Dataset):
         model(user, negative) - model(user, positive)
     ).mean()
     assert torch.allclose(model.training_step(batch, 0), expected)
+
+
+def test_kgflex_builds_no_feature_table_it_was_told_to_keep_nothing_from(
+    dataset: Dataset,
+):
+    """Walking two facts from every item is the expensive part of a large graph."""
+    graph = dataset.knowledge
+    with patch.object(graph, "item_features", wraps=graph.item_features) as spy:
+        build_knowledge_model("KGFlex", dataset, second_order_limit=0)
+
+    assert [call.kwargs["order"] for call in spy.call_args_list] == [1]

@@ -111,12 +111,8 @@ class KGFlex(KnowledgeRecommenderUtils, IterativeRecommender):
                 "interacted with, so it needs the interactions at construction."
             )
 
-        first, first_labels = self._graph.item_features(
-            order=1, min_items=self.min_feature_items
-        )
-        second, second_labels = self._graph.item_features(
-            order=2, min_items=self.min_feature_items
-        )
+        first, first_labels = self._features(1, self.first_order_limit)
+        second, second_labels = self._features(2, self.second_order_limit)
         first_items, second_items = self._to_scipy(first), self._to_scipy(second)
 
         history = interactions.get_sparse().tocsr().astype(np.float32)
@@ -187,6 +183,30 @@ class KGFlex(KnowledgeRecommenderUtils, IterativeRecommender):
             f"Users without an informative feature: {silent}/{self.n_users}",
             "KGFlex",
         )
+
+    def _features(self, order: int, limit: int) -> Tuple[Tensor, List[Tuple[Any, ...]]]:
+        """The item features of one order, or none when no user may keep any.
+
+        Walking two facts from every item is the expensive part of a large
+        graph, so it is not done for features that would all be discarded.
+
+        Args:
+            order (int): 1 for first-order features, 2 for second-order ones.
+            limit (int): How many features of this order each user keeps.
+
+        Returns:
+            Tuple[Tensor, List[Tuple[Any, ...]]]: The sparse {item x feature}
+                matrix and the feature labels.
+        """
+        if limit == 0:
+            empty = torch.sparse_coo_tensor(
+                torch.zeros((2, 0), dtype=torch.long),
+                torch.zeros(0),
+                (self.n_items, 0),
+            )
+            return empty.coalesce(), []
+
+        return self._graph.item_features(order=order, min_items=self.min_feature_items)
 
     @staticmethod
     def _to_scipy(features: Tensor) -> csr_matrix:
