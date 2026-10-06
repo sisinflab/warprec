@@ -2,6 +2,155 @@
 
 <!-- version list -->
 
+## v2.0.0 (2026-10-06)
+
+### Bug Fixes
+
+- Graph models no longer repeat PyTorch Geometric's internal warnings in every process
+  ([`296a2f9`](https://github.com/sisinflab/warprec/commit/296a2f920986f287bc65f66c8252417391365e99))
+
+### Build System
+
+- Building from source requires poetry-core 2, which reads the project table
+  ([`517fbd8`](https://github.com/sisinflab/warprec/commit/517fbd8f3ba662e8c63d2098f159f5eb726ca80f))
+
+### Chores
+
+- The serving configuration passes the package-wide type check
+  ([`b33f86b`](https://github.com/sisinflab/warprec/commit/b33f86b9f994ddac504cff328144cc7ab464e4a0))
+
+- The training facts the pipeline saves pass the package-wide type check
+  ([`dcc092d`](https://github.com/sisinflab/warprec/commit/dcc092d6fb25f5234bb52b7e6619a33d8a652934))
+
+### Continuous Integration
+
+- Pydoclint runs in an environment of its own, so the mcp extra is installed and tested
+  ([`1a35cb6`](https://github.com/sisinflab/warprec/commit/1a35cb605fae6d847c4214d60341e2ab5dc21034))
+
+### Documentation
+
+- Served models can be deployed on one machine, Docker, Kubernetes, Ray clusters and KubeRay
+  ([`edc6586`](https://github.com/sisinflab/warprec/commit/edc65869793ed2d25314082398d7b70c31d6ef19))
+
+- Serving trained models is documented end to end
+  ([`8d4da39`](https://github.com/sisinflab/warprec/commit/8d4da39242b9d02cf2cdcb7a9cd15705e56dc4c8))
+
+- The serving guide covers model cards, the catalogue, context, filters, explanations and the MCP
+  surface
+  ([`98524b4`](https://github.com/sisinflab/warprec/commit/98524b40c62a59f7412dfd46a3d4cd1b15b83d13))
+
+- The serving guide lists the extras graph models need and the dashboard serve deploy uses
+  ([`dfbaa64`](https://github.com/sisinflab/warprec/commit/dfbaa644f451271d449e3f4f420f73df01a8478f))
+
+### Features
+
+- A saved checkpoint restores every model without the training data
+  ([`a43fdfd`](https://github.com/sisinflab/warprec/commit/a43fdfdf21501c7ded12bc6fb3a6a88be90d521a))
+
+- A saved model answers batched recommendation requests
+  ([`632e300`](https://github.com/sisinflab/warprec/commit/632e300fbf6cf0122f5e462f52ed4fb1400b2500))
+
+- A saved model carries the seen items and histories serving needs
+  ([`33f3e2a`](https://github.com/sisinflab/warprec/commit/33f3e2a691f98a6b64b87d9687791dbf10591f21))
+
+- A saved model records its test metrics as the averages the results table reports
+  ([`063aa90`](https://github.com/sisinflab/warprec/commit/063aa9071655572dc38ca1285f97f7aee12d1fa7))
+
+- A saved model records what it was trained on, how it scored and the context it saw
+  ([`bacffcc`](https://github.com/sisinflab/warprec/commit/bacffcc0dcde07a2a96323da507e3519f426f145))
+
+- A serving endpoint can describe itself, name its items and the attributes they carry
+  ([`154fe8e`](https://github.com/sisinflab/warprec/commit/154fe8ea0606cbbb7ca109429700c7293262e4c8))
+
+- An empty multi-valued context is served as padding, as in training
+  ([`d6f33b3`](https://github.com/sisinflab/warprec/commit/d6f33b30f996e6512f1552442d11d05458408716))
+
+- An exported serving application listens on every interface unless a host is set
+  ([`cbe2998`](https://github.com/sisinflab/warprec/commit/cbe2998e1f17f47fd25310017da77addb4f8f903))
+
+- Concurrent score requests to a served model share one forward pass
+  ([`56dd579`](https://github.com/sisinflab/warprec/commit/56dd579c51e01c1926669dd28b0259fd4bfe45a8))
+
+- Context-aware models are served with the context each request describes
+  ([`bc00ca5`](https://github.com/sisinflab/warprec/commit/bc00ca50ed206cf5770cd5b3d78fe7e3fe84adf9))
+
+- Each served model has a card that says how to ask it, what it knows and how it was trained
+  ([`b7e89ac`](https://github.com/sisinflab/warprec/commit/b7e89acbe4352173fbf8db3de2f1cdcbfcfb1bef))
+
+- Each serving replica accepts enough concurrent requests to fill a batch
+  ([`75bb246`](https://github.com/sisinflab/warprec/commit/75bb246f1b9043f3ffaade2f0c8e592c31681205))
+
+- MCP clients are told what the server does and get tools, resources and prompts for every model
+  ([`564ebac`](https://github.com/sisinflab/warprec/commit/564ebac0e646b604c1c608bc0ef32849ac263c66))
+
+- Models that score on the CPU are served there instead of reserving a GPU
+  ([`b32bc98`](https://github.com/sisinflab/warprec/commit/b32bc98b66503828e2fd43ad3763796770876958))
+
+- Saved models are served over HTTP with Ray Serve, now an optional extra
+  ([`b43ae94`](https://github.com/sisinflab/warprec/commit/b43ae941bf3b59eb54a88ec522923cab22f3af80))
+
+- Sequential models declare whether they need a known user to score a session
+  ([`6862a6d`](https://github.com/sisinflab/warprec/commit/6862a6dddafccc5aa787c58867937ef9a97b8368))
+
+- Served items can be searched and looked up by name, with suggestions for near misses
+  ([`8113521`](https://github.com/sisinflab/warprec/commit/81135211bdadbcc703ccdc1815ce92edc80267c8))
+
+- Served items carry a name only when an item catalogue is configured
+  ([`292885d`](https://github.com/sisinflab/warprec/commit/292885d6ce5b02bb608e970a16c5723a2670e5ae))
+
+- Served models are exposed to agents over MCP
+  ([`93950ec`](https://github.com/sisinflab/warprec/commit/93950ec9eb6545bcf6f0f990a36a2e8e9874bb36))
+
+- Served models filter by item attributes, list popular items and explain with training evidence
+  ([`ce78dc9`](https://github.com/sisinflab/warprec/commit/ce78dc9749fec996a7f1382e41b785cf47aaeca3))
+
+- Served models score candidates and resolve item names
+  ([`ce093a1`](https://github.com/sisinflab/warprec/commit/ce093a1687f96b2c76cb76946934464b8f1ce6d3))
+
+- Stopping the warprec.serve command on a shared Ray cluster removes only its own application
+  ([`45b1353`](https://github.com/sisinflab/warprec/commit/45b1353e849de3d8bc16ae2af879d652201b3528))
+
+- The REST API serves model cards, context, item search, lookups, popular items, filters and
+  explanations
+  ([`25eb295`](https://github.com/sisinflab/warprec/commit/25eb295d9f991a44e5d2a341a580bfdb4c9c30a9))
+
+- The serving configuration is validated and documented
+  ([`d2b31bf`](https://github.com/sisinflab/warprec/commit/d2b31bffa8d6fd2f2688d9438718eea9c81927a0))
+
+- The serving configuration refuses numbered CUDA devices and gives replicas absolute paths
+  ([`11d9124`](https://github.com/sisinflab/warprec/commit/11d9124a61a0415e9994c8f9815e45f1ba5f32ba))
+
+- The serving gateway reserves no CPU and only the health route skips the API key
+  ([`36f91f2`](https://github.com/sisinflab/warprec/commit/36f91f2ec5bdf867f77ebc1f5680a3062ec87a69))
+
+- The warprec.serve command refuses MCP up front when fastmcp is missing
+  ([`7a32b34`](https://github.com/sisinflab/warprec/commit/7a32b34cf0b04c0afa822ab1fb7525cd3c80f42a))
+
+- The warprec.serve command starts the serving application or exports it for a cluster
+  ([`0ef0a8d`](https://github.com/sisinflab/warprec/commit/0ef0a8dba7dd23b0d66cedc2fe6480e28f4aa037))
+
+- Users without a training history are served as unknown users
+  ([`e6fdc23`](https://github.com/sisinflab/warprec/commit/e6fdc23e58d79b661d30ecd8d9cab5bc9b776996))
+
+### Refactoring
+
+- The standalone REST and MCP servers are removed in favour of warprec.serve
+  ([`acb71d4`](https://github.com/sisinflab/warprec/commit/acb71d43a564619225d677c809b378a500707c4f))
+
+### Testing
+
+- The score batching probe runs in its own process instead of leaking a queue into the deployment
+  ([`5f34c9b`](https://github.com/sisinflab/warprec/commit/5f34c9b50dc09e17013a655c36a509b6c6b3f699))
+
+### Breaking Changes
+
+- Ray Serve is no longer installed with warprec. Install the serving extra, pip install
+  "warprec[serving]", to serve models, or "warprec[mcp]" for the MCP endpoint.
+
+- The serving/ directory, its serving_config.yml and the /api/warprec/v1 routes are gone. Serve
+  models with python -m warprec.serve -c serve.yml and the /v1/models routes.
+
+
 ## v1.15.2 (2026-09-29)
 
 ### Bug Fixes
