@@ -1,6 +1,6 @@
 # Models Taxonomy
 
-WarpRec ships with **86 built-in algorithms** spanning 8 model families. All models can run locally or at cluster scale via Ray.
+WarpRec ships with **88 built-in algorithms** spanning 8 model families. All models can run locally or at cluster scale via Ray.
 
 | Family | Model | Description |
 |---|---|---|
@@ -65,6 +65,8 @@ WarpRec ships with **86 built-in algorithms** spanning 8 model families. All mod
 | | [KGCN](knowledge.md#kgcn) | A sampled entity neighbourhood, weighted per user by relation. |
 | | [KGIN](knowledge.md#kgin) | Propagation split across learned, mutually independent user intents. |
 | **Knowledge-Aware / Memory** | [RippleNet](knowledge.md#ripplenet) | Preferences spread outward from a user's history across the graph. |
+| **Knowledge-Aware / Feature** | [KaHFM](knowledge.md#kahfm) | One interpretable factor per graph feature, started at its TF-IDF. |
+| | [KGFlex](knowledge.md#kgflex) | Per-user embeddings of the features each user is expert about. |
 | **Multimodal / Embedding** | [VBPR](multimodal.md#vbpr) | BPR extended with a learned projection of the item features. |
 | **Multimodal / Graph** | [FREEDOM](multimodal.md#freedom) | A frozen item-item feature graph beside a denoised user-item graph. |
 | | [LATTICE](multimodal.md#lattice) | An item-item graph learned from the projected features. |

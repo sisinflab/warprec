@@ -214,7 +214,7 @@ Entities and relations are mapped into an index space of their own, in the same 
 
 !!! note "Items the graph is silent about"
 
-    An item that is not aligned to any entity, or is aligned to an entity that appears in no triple, keeps all of its interactions and simply carries no facts. Such an item is scored from the collaborative half of the model alone; it is never dropped from the catalogue.
+    An item that is not aligned to any entity, or is aligned to an entity that appears in no triple, keeps all of its interactions and simply carries no facts. Such an item is scored from the collaborative half of the model alone, and for the feature-based models it simply has no feature; it is never dropped from the catalogue.
 
 !!! tip "Alignments beyond the catalogue"
 
