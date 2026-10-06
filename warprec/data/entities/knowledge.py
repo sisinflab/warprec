@@ -1,4 +1,4 @@
-from typing import Any, Dict, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 import numpy as np
 import torch
@@ -61,6 +61,8 @@ class KnowledgeGraph:
         relations = sorted(set(raw_relations.tolist()))
         self._entity_index = {entity: i for i, entity in enumerate(entities)}
         self._relation_index = {relation: i for i, relation in enumerate(relations)}
+        self._entity_names = entities
+        self._relation_names = relations
 
         self.n_entities = len(self._entity_index)
         self.n_relations = len(self._relation_index)
@@ -71,6 +73,10 @@ class KnowledgeGraph:
 
         self._item_entity = self._align(links, item_mapping, item_label, entity_label)
         self._neighbour_index: Optional[Tuple[Tensor, Tensor, Tensor]] = None
+        self._outgoing_index: Optional[Tuple[Tensor, Tensor]] = None
+        self._item_features: Dict[
+            Tuple[int, int], Tuple[Tensor, List[Tuple[Any, ...]]]
+        ] = {}
 
         aligned = int((self._item_entity >= 0).sum())
         logger.stat_msg(
@@ -244,6 +250,167 @@ class KnowledgeGraph:
         )
 
         return sampled_entities, sampled_relations
+
+    def _outgoing(self) -> Tuple[Tensor, Tensor]:
+        """The facts leaving each entity, in the direction they were written.
+
+        ``neighbour_index`` reads a fact from both ends, which is what a model
+        propagating over the graph wants. A feature is a statement about an
+        item, so it is read only from the end the fact was written about.
+
+        Returns:
+            Tuple[Tensor, Tensor]: The offsets, and the facts ordered by head:
+                the facts leaving entity ``e`` are
+                ``facts[offsets[e]:offsets[e + 1]]``.
+        """
+        if self._outgoing_index is None:
+            facts = torch.argsort(self._heads, stable=True)
+            counts = torch.bincount(self._heads, minlength=self.n_entities)
+
+            offsets = torch.zeros(self.n_entities + 1, dtype=torch.long)
+            offsets[1:] = torch.cumsum(counts, dim=0)
+
+            self._outgoing_index = (offsets, facts)
+
+        return self._outgoing_index
+
+    def _follow(self, owners: Tensor, entities: Tensor) -> Tuple[Tensor, Tensor]:
+        """Follow every fact leaving the given entities.
+
+        Args:
+            owners (Tensor): Whom each entity is followed on behalf of.
+            entities (Tensor): The entity to leave from, one per owner.
+
+        Returns:
+            Tuple[Tensor, Tensor]: The owner of each fact reached, and the fact.
+        """
+        offsets, facts = self._outgoing()
+        start = offsets[entities]
+        degree = offsets[entities + 1] - start
+
+        # Each owner reaches a run of consecutive facts; the step counts along
+        # that run and restarts at zero for every owner.
+        run_start = torch.cumsum(degree, dim=0) - degree
+        step = torch.arange(int(degree.sum())) - torch.repeat_interleave(
+            run_start, degree
+        )
+
+        reached = facts[torch.repeat_interleave(start, degree) + step]
+        return torch.repeat_interleave(owners, degree), reached
+
+    def item_features(
+        self, order: int, min_items: int = 1
+    ) -> Tuple[Tensor, List[Tuple[Any, ...]]]:
+        """The facts about each item, flattened into binary features.
+
+        A first-order feature is a ``(relation, tail)`` pair leaving the item's
+        entity: *directed by Kubrick*. A second-order feature walks one fact
+        further, ``(relation, relation, tail)``: *directed by someone born in
+        the UK*. This is how the feature-based models read a graph: as an
+        attribute table built from it, not as a structure to propagate over.
+
+        A feature only a handful of items carry says little and costs a column,
+        so it is kept only when at least ``min_items`` items of the catalogue
+        carry it. The table is built once per request and kept, because every
+        trial builds a model and every model asks for the same one.
+
+        Args:
+            order (int): 1 for first-order features, 2 for second-order ones.
+            min_items (int): How many items must carry a feature for it to be kept.
+
+        Returns:
+            Tuple[Tensor, List[Tuple[Any, ...]]]: The sparse binary
+                {item x feature} matrix, and each column's feature written with
+                the identifiers the graph was read with.
+
+        Raises:
+            ValueError: If the order is not 1 or 2, or min_items is below 1.
+        """
+        if order not in (1, 2):
+            raise ValueError(f"An item feature is one or two facts long, not {order}.")
+        if min_items < 1:
+            raise ValueError(f"min_items must be at least 1, received {min_items}.")
+
+        key = (order, min_items)
+        if key not in self._item_features:
+            self._item_features[key] = self._build_item_features(order, min_items)
+
+        return self._item_features[key]
+
+    def _build_item_features(
+        self, order: int, min_items: int
+    ) -> Tuple[Tensor, List[Tuple[Any, ...]]]:
+        """Walk the graph from every item and count what it reaches.
+
+        Args:
+            order (int): 1 for first-order features, 2 for second-order ones.
+            min_items (int): How many items must carry a feature for it to be kept.
+
+        Returns:
+            Tuple[Tensor, List[Tuple[Any, ...]]]: The matrix and the labels.
+        """
+        n_items = len(self._item_entity)
+        items = torch.nonzero(self._item_entity >= 0).flatten()
+
+        owners, facts = self._follow(items, self._item_entity[items])
+        relations, tails = self._relations[facts], self._tails[facts]
+
+        # A feature is encoded as one integer, so that it can be deduplicated
+        # and counted with tensor operations rather than a dictionary.
+        if order == 1:
+            codes = relations * self.n_entities + tails
+        else:
+            path, further = self._follow(torch.arange(len(owners)), tails)
+            owners = owners[path]
+            codes = (
+                relations[path] * self.n_relations + self._relations[further]
+            ) * self.n_entities + self._tails[further]
+
+        if owners.numel() == 0:
+            empty = torch.sparse_coo_tensor(
+                torch.zeros((2, 0), dtype=torch.long), torch.zeros(0), (n_items, 0)
+            )
+            return empty.coalesce(), []
+
+        # An item reaching the same feature along two paths carries it once.
+        owners, codes = torch.unique(torch.stack([owners, codes]), dim=1)
+        vocabulary, column, support = torch.unique(
+            codes, return_inverse=True, return_counts=True
+        )
+
+        kept = support >= min_items
+        renumbered = torch.cumsum(kept.long(), dim=0) - 1
+        carried = kept[column]
+
+        matrix = torch.sparse_coo_tensor(
+            torch.stack([owners[carried], renumbered[column[carried]]]),
+            torch.ones(int(carried.sum())),
+            (n_items, int(kept.sum())),
+        ).coalesce()
+        labels = [self._describe(code, order) for code in vocabulary[kept].tolist()]
+
+        return matrix, labels
+
+    def _describe(self, code: int, order: int) -> Tuple[Any, ...]:
+        """Write an encoded feature back with the graph's own identifiers.
+
+        Args:
+            code (int): The feature, as encoded while it was counted.
+            order (int): How many facts long the feature is.
+
+        Returns:
+            Tuple[Any, ...]: The relations and the tail the feature names.
+        """
+        rest, tail = divmod(code, self.n_entities)
+        if order == 1:
+            return (self._relation_names[rest], self._entity_names[tail])
+
+        first, second = divmod(rest, self.n_relations)
+        return (
+            self._relation_names[first],
+            self._relation_names[second],
+            self._entity_names[tail],
+        )
 
     def adjacency(
         self,

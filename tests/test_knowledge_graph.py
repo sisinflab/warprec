@@ -255,6 +255,51 @@ def test_the_sampling_is_reproducible(graph: KnowledgeGraph):
     assert not torch.equal(first, other)
 
 
+def test_a_first_order_feature_is_a_fact_leaving_the_item(graph: KnowledgeGraph):
+    """An item carries the (relation, tail) of every fact written about it."""
+    matrix, labels = graph.item_features(order=1)
+
+    assert labels == [
+        ("directed_by", "d_kubrick"),
+        ("directed_by", "d_wilder"),
+        ("genre", "drama"),
+    ]
+    # m4 is aligned to an entity no triple mentions and m5 is not aligned.
+    expected = torch.tensor(
+        [[1, 0, 1], [0, 0, 1], [0, 1, 0], [0, 0, 0], [0, 0, 0]], dtype=torch.float
+    )
+    assert torch.equal(matrix.to_dense(), expected)
+
+
+def test_a_second_order_feature_walks_one_fact_further(graph: KnowledgeGraph):
+    """m1 is directed by someone born in the UK; nothing else reaches that far."""
+    matrix, labels = graph.item_features(order=2)
+
+    assert labels == [("directed_by", "born_in", "uk")]
+    assert matrix.to_dense().flatten().tolist() == [1.0, 0.0, 0.0, 0.0, 0.0]
+
+
+def test_a_feature_too_few_items_carry_is_dropped(graph: KnowledgeGraph):
+    """Only drama is shared by two films."""
+    matrix, labels = graph.item_features(order=1, min_items=2)
+
+    assert labels == [("genre", "drama")]
+    assert matrix.to_dense().flatten().tolist() == [1.0, 1.0, 0.0, 0.0, 0.0]
+
+
+def test_the_item_features_are_built_once(graph: KnowledgeGraph):
+    """Every trial builds a model, and each one asks for the same table."""
+    assert graph.item_features(order=1) is graph.item_features(order=1)
+
+
+def test_an_item_feature_is_one_or_two_facts_long(graph: KnowledgeGraph):
+    """A third order or a non-positive support is a configuration mistake."""
+    with pytest.raises(ValueError):
+        graph.item_features(order=3)
+    with pytest.raises(ValueError):
+        graph.item_features(order=1, min_items=0)
+
+
 def test_a_knowledge_model_refuses_a_dataset_without_a_graph(dataset: Dataset):
     """Scoring from a graph that is not there would quietly become collaborative."""
     for name in ("CKE", "KGAT"):
