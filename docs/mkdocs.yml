@@ -35,6 +35,7 @@ nav:
       - Estimate: configuration/estimate.md
       - General: configuration/general.md
       - Run: configuration/run.md
+      - Serving: configuration/serving.md
   - Recommenders:
       - Module Overview: recommenders/index.md
       - Models Taxonomy: recommenders/taxonomy.md
@@ -65,9 +66,12 @@ nav:
         - Novelty: evaluation/metrics/novelty.md
         - Rating: evaluation/metrics/rating.md
         - Debiased: evaluation/metrics/debiased.md
+  - Serving:
+    - Serving Models: serving/index.md
   - Cloud & Deployment:
     - Authentication: cloud/authentication.md
     - Cluster Management: cloud/cluster-management.md
+    - Deploying Served Models: cloud/deployment.md
   - Guides:
     - Callbacks: guides/callbacks.md
     - Stash: guides/stash.md

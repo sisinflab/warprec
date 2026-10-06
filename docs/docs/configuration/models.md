@@ -14,7 +14,7 @@ This section is divided into several nested sections to provide detailed control
 
 The **meta** section allows controlling aspects of the model that do not directly interfere with training:
 
-- **save_model**: Whether to save the model in the experiment directory. Defaults to `False`.
+- **save_model**: Whether to save the model in the experiment directory. The saved file also carries the items each user has seen, their recent history for sequential models and the context vocabulary for context-aware ones, so it can be served directly (see [Serving Models](../serving/index.md)). Defaults to `False`.
 - **save_recs**: Whether to save generated recommendations. Defaults to `False`.
 - **load_from**: Path to pre-trained model weights to load. Defaults to `None`.
 

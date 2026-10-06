@@ -1,0 +1,240 @@
+from dataclasses import dataclass, field
+from typing import Any, Dict, List, Optional, Union
+
+import numpy as np
+import torch
+from torch import Tensor
+
+from warprec.data.entities.context import build_context_array
+from warprec.serving.errors import ServingError
+
+# Past this many values a field lists its most frequent ones and how many more.
+MAX_LISTED_VALUES = 100
+
+
+@dataclass(frozen=True)
+class ContextSchema:
+    """The context fields a model was trained on and the values each accepts.
+
+    It turns the raw context of a request into the array the model reads, the
+    way the dataset turned the context of every training row into it: a
+    category becomes its index, a number stays a number, and a multi-valued
+    field becomes the indices of its values, padded to the widest field.
+
+    Attributes:
+        labels (List[str]): The fields, in the order the model reads them.
+        types (Dict[str, str]): Each field's kind: 'token', 'float' or 'seq'.
+        maps (Dict[str, Dict[str, int]]): For each categorical or multi-valued
+            field, the index of every value seen in training.
+        max_len (int): The widest multi-valued field, or 1 when there is none.
+        stats (Dict[str, Dict[str, Any]]): How often each value occurred in
+            training, or a numeric field's range; empty for older checkpoints.
+        descriptions (Dict[str, str]): What each field means, as configured.
+    """
+
+    labels: List[str]
+    types: Dict[str, str]
+    maps: Dict[str, Dict[str, int]]
+    max_len: int
+    stats: Dict[str, Dict[str, Any]] = field(default_factory=dict)
+    descriptions: Dict[str, str] = field(default_factory=dict)
+
+    @classmethod
+    def from_info(
+        cls,
+        info: Dict[str, Any],
+        maps: Dict[str, Dict[Any, int]],
+        stats: Optional[Dict[str, Dict[str, Any]]] = None,
+        descriptions: Optional[Dict[str, str]] = None,
+    ) -> "ContextSchema":
+        """Build the schema from a checkpoint's dataset information.
+
+        Args:
+            info (Dict[str, Any]): The dataset information saved with the model.
+            maps (Dict[str, Dict[Any, int]]): The context vocabulary saved with it.
+            stats (Optional[Dict[str, Dict[str, Any]]]): The value counts and
+                ranges saved with it, when the checkpoint carries them.
+            descriptions (Optional[Dict[str, str]]): What each field means.
+
+        Returns:
+            ContextSchema: The schema.
+        """
+        labels = list(info.get("context_dims", {}))
+        types = info.get("context_types", {})
+        return cls(
+            labels=labels,
+            types={label: types.get(label, "token") for label in labels},
+            # Values are matched as strings, whatever type the dataset read them as.
+            maps={
+                label: {
+                    str(value): index for value, index in maps.get(label, {}).items()
+                }
+                for label in labels
+            },
+            max_len=max(info.get("context_max_len", {}).values(), default=1),
+            stats=stats or {},
+            descriptions=descriptions or {},
+        )
+
+    def describe(self) -> Dict[str, Dict[str, Any]]:
+        """The fields a request must describe and the values each accepts.
+
+        Returns:
+            Dict[str, Dict[str, Any]]: For each field its type; its accepted
+                values, the most frequent in training first with their counts
+                when known (None for a numeric field, which takes any number,
+                with its training range instead); and its description.
+        """
+        described: Dict[str, Dict[str, Any]] = {}
+        for label in self.labels:
+            entry: Dict[str, Any] = {"type": self.types[label]}
+            stats = self.stats.get(label, {})
+            if self.types[label] == "float":
+                entry["values"] = None
+                if "mean" in stats:
+                    entry["range"] = {key: stats[key] for key in ("min", "max", "mean")}
+            else:
+                values = self._ordered_values(label)
+                entry["values"] = values[:MAX_LISTED_VALUES]
+                if len(values) > MAX_LISTED_VALUES:
+                    entry["more"] = len(values) - MAX_LISTED_VALUES
+                counts = {
+                    str(value): count
+                    for value, count in stats.get("counts", {}).items()
+                }
+                if counts:
+                    entry["counts"] = {
+                        value: counts.get(value, 0) for value in entry["values"]
+                    }
+            if label in self.descriptions:
+                entry["description"] = self.descriptions[label]
+            described[label] = entry
+        return described
+
+    def example(self) -> Dict[str, Any]:
+        """A context this model accepts: the most frequent value of each field.
+
+        Returns:
+            Dict[str, Any]: One value per field; the training mean for a
+                numeric field, and a one-value list for a multi-valued one.
+        """
+        example: Dict[str, Any] = {}
+        for label in self.labels:
+            kind = self.types[label]
+            if kind == "float":
+                example[label] = round(self.stats.get(label, {}).get("mean", 0.0), 2)
+                continue
+            first = self._ordered_values(label)[0]
+            example[label] = [first] if kind == "seq" else first
+        return example
+
+    def _ordered_values(self, label: str) -> List[str]:
+        """A field's known values, the most frequent in training first.
+
+        Args:
+            label (str): The field.
+
+        Returns:
+            List[str]: The values; alphabetical when there are no counts.
+        """
+        counts = {
+            str(value): count
+            for value, count in self.stats.get(label, {}).get("counts", {}).items()
+        }
+        return sorted(
+            self.maps[label], key=lambda value: (-counts.get(value, 0), value)
+        )
+
+    def encode(self, context: Union[Dict[str, Any], List[Any]]) -> List[Any]:
+        """Check a request's context and encode it as one row of the model's input.
+
+        Args:
+            context (Union[Dict[str, Any], List[Any]]): The value of every field,
+                by name or as a list in the order of the labels.
+
+        Returns:
+            List[Any]: The encoded row, one entry per field.
+
+        Raises:
+            ServingError: If a field is missing, unexpected or holds a value the
+                model was not trained on.
+        """
+        if isinstance(context, list):
+            if len(context) != len(self.labels):
+                raise ServingError(
+                    422,
+                    f"A context list holds one value per field, in the order "
+                    f"{self.labels}; got {len(context)} values.",
+                )
+            context = dict(zip(self.labels, context))
+
+        missing = [label for label in self.labels if label not in context]
+        unexpected = [label for label in context if label not in self.labels]
+        if missing or unexpected:
+            raise ServingError(
+                422,
+                f"The context must describe exactly the fields {self.labels}: "
+                f"missing {missing}, unexpected {unexpected}.",
+            )
+        return [self._encode_field(label, context[label]) for label in self.labels]
+
+    def tensor(self, rows: List[List[Any]], device: Union[str, torch.device]) -> Tensor:
+        """Stack encoded rows into the tensor the model's predict takes.
+
+        Args:
+            rows (List[List[Any]]): Rows returned by encode().
+            device (Union[str, torch.device]): The model's device.
+
+        Returns:
+            Tensor: [rows, fields], or [rows, fields, max_len] with a multi-valued field.
+        """
+        array = build_context_array(
+            np.array(rows, dtype=object),
+            [self.types[label] for label in self.labels],
+            self.max_len,
+        )
+        return torch.from_numpy(array).to(device)
+
+    def _encode_field(self, label: str, value: Any) -> Any:
+        """Encode one field's value as the dataset encoded it in training.
+
+        Args:
+            label (str): The field.
+            value (Any): Its raw value; a list for a multi-valued field.
+
+        Returns:
+            Any: The value for a numeric field, the index for a categorical one,
+                and the space-joined indices for a multi-valued one.
+
+        Raises:
+            ServingError: If the value does not fit the field.
+        """
+        kind = self.types[label]
+        if kind == "float":
+            try:
+                return float(value)
+            except (TypeError, ValueError):
+                raise ServingError(
+                    422, f"Context '{label}' is numeric, got '{value}'."
+                ) from None
+
+        values = value if isinstance(value, list) else [value]
+        if kind != "seq" and len(values) != 1:
+            raise ServingError(422, f"Context '{label}' takes one value, got {values}.")
+
+        indices = []
+        for item in values:
+            index = self.maps[label].get(str(item))
+            if index is None:
+                raise ServingError(
+                    422,
+                    f"'{item}' is not a known value of context '{label}'. "
+                    f"Known values: {sorted(self.maps[label])}.",
+                )
+            indices.append(index)
+
+        if kind == "seq":
+            # An empty field is the padding index, as the dataset encodes an
+            # empty cell; an empty string would not parse as a number.
+            return " ".join(str(index) for index in indices[: self.max_len]) or "0"
+        return indices[0]

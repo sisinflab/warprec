@@ -55,7 +55,6 @@ class VAEncoder(nn.Module):
         dropout_rate: float = 0,
     ):
         super().__init__()
-        self.l2_normalizer = lambda x: F.normalize(x, p=2, dim=1)
         self.dropout = nn.Dropout(dropout_rate)
 
         self.dense_proj = nn.Sequential(
@@ -77,7 +76,9 @@ class VAEncoder(nn.Module):
                 - Tensor: The log variance of the inputs.
                 - Tensor: The sampled latent vector of the inputs.
         """
-        i_normalized = self.l2_normalizer(inputs)
+        # Normalised inline rather than through a stored lambda, which cannot
+        # be pickled and would keep the model out of a saved checkpoint.
+        i_normalized = F.normalize(inputs, p=2, dim=1)
         i_drop = self.dropout(i_normalized)
         x = self.dense_proj(i_drop)
         z_mean = self.dense_mean(x)

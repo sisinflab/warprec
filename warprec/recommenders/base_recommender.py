@@ -3,6 +3,7 @@ import random
 import json
 import inspect
 import hashlib
+from importlib.metadata import PackageNotFoundError, version
 from typing import Any, Optional, List, Dict, Tuple, no_type_check
 from abc import ABC, abstractmethod
 
@@ -26,6 +27,24 @@ from warprec.utils.registry import lr_scheduler_registry, optimizer_registry
 
 # Memory budget for a single dense similarity block, in bytes
 SIMILARITY_BLOCK_BYTES = 64 * 1024**2
+
+
+# The layout of the dictionary get_state() returns. Version 2 records the
+# writing WarpRec and keeps interaction-built iterative models whole.
+CHECKPOINT_FORMAT = 2
+
+
+def _installed_version() -> Optional[str]:
+    """The installed WarpRec version, recorded in every checkpoint it writes.
+
+    Returns:
+        Optional[str]: The version, or None when running from a source tree that
+            was never installed.
+    """
+    try:
+        return version("warprec")
+    except PackageNotFoundError:
+        return None
 
 
 class Recommender(nn.Module, ABC):
@@ -155,7 +174,16 @@ class Recommender(nn.Module, ABC):
             "info": self.info,
             "state_dict": self.state_dict(),
             "artifacts": self._learned_artifacts(),
+            "format_version": CHECKPOINT_FORMAT,
+            "warprec_version": _installed_version(),
         }
+
+        # An iteratively trained model whose constructor derives a graph or a
+        # matrix from the interactions cannot be rebuilt from its parameters,
+        # and a serving process has no interactions to hand it. The fitted
+        # module is kept whole so that the checkpoint alone is enough.
+        if isinstance(self, IterativeRecommender) and self._fits_on_interactions():
+            state["module"] = self
         return state
 
     def _learned_artifacts(self) -> Dict[str, Any]:
@@ -304,12 +332,16 @@ class Recommender(nn.Module, ABC):
                 return cls._from_artifacts(checkpoint, artifacts, strict=strict)
 
             # An iteratively trained model keeps its result in parameters, but
-            # its constructor still derives the graph or the matrix shapes from
-            # the interactions, so those have to be supplied.
+            # its constructor derives the graph or the matrix shapes from the
+            # interactions. It is saved whole, so it comes back without them.
+            module = checkpoint.get("module")
+            if isinstance(module, cls):
+                return module
+
             raise ValueError(
                 f"{cls.__name__} derives its structure from the training "
                 "interactions, so they must be passed to from_checkpoint() "
-                "alongside the checkpoint."
+                "alongside a checkpoint saved before the whole module was kept."
             )
 
         # Common initialization params + additional parameters
@@ -985,9 +1017,18 @@ class ContextRecommenderUtils(nn.Module, ABC):
             item_features = interactions.get_side_tensor()
             self.register_buffer("item_features", item_features)
         else:
-            self.register_buffer(
-                "item_features", torch.zeros(self.n_items + 1, dtype=torch.long)
-            )
+            # Rebuilt from a checkpoint, without the interactions: the lookup is a
+            # placeholder the saved state fills in, so it must have the shape the
+            # saved one had - one column per item feature, or no lookup at all.
+            if self.feature_labels:
+                self.register_buffer(
+                    "item_features",
+                    torch.zeros(
+                        self.n_items + 1, len(self.feature_labels), dtype=torch.long
+                    ),
+                )
+            else:
+                self.register_buffer("item_features", None)
 
     def get_dataloader(
         self,
@@ -1311,9 +1352,13 @@ class SequentialRecommenderUtils(ABC):
             More recent transaction will have priority over older ones in case
             a sequence needs to be truncated. If a sequence is smaller than the
             max_seq_len, it will be padded.
+        needs_user (bool): Whether scoring reads the user index as well as the
+            sequence. A model that does cannot score a session whose user it
+            has never seen.
     """
 
     max_seq_len: int = 0
+    needs_user: bool = False
 
     def _gather_indexes(self, output: Tensor, gather_index: Tensor) -> Tensor:
         """Gathers the output from specific indexes for each batch.

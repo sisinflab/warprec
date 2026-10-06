@@ -1,10 +1,29 @@
+import warnings
 from typing import Any, Optional, Tuple
 
 import torch
 import numpy as np
 from torch import nn, Tensor
 from scipy.sparse import coo_matrix
-from torch_geometric import EdgeIndex
+
+# Importing PyG runs torch.jit.script on its own pooling layers, which PyTorch
+# now deprecates. Nothing here uses TorchScript, so the notice is silenced for
+# this import only rather than repeated in every process that loads a model.
+with warnings.catch_warnings():
+    warnings.filterwarnings(
+        "ignore", message=r"`torch\.jit\.script` is deprecated", category=FutureWarning
+    )
+    from torch_geometric import EdgeIndex
+
+# EdgeIndex multiplies through a sparse CSR tensor, which is what makes it fast,
+# and PyTorch flags the CSR layout as beta when the first one is built. A plain
+# sparse-dense product is well within what that layout supports, so the notice
+# carries no information here. The filter matches that message only.
+warnings.filterwarnings(
+    "ignore",
+    message=r"Sparse CSR tensor support is in beta state",
+    category=UserWarning,
+)
 
 
 class SparseAdjacency:
@@ -62,7 +81,13 @@ class SparseAdjacency:
         Returns:
             Tensor: The product.
         """
-        return self._edge_index.matmul(other, input_value=self._value, reduce=reduce)
+        # The indices come from this class, sorted and in range, so the sparse
+        # tensor PyG builds from them needs no validation; opting out explicitly
+        # is how PyTorch asks to be told, instead of warning that it was assumed.
+        with torch.sparse.check_sparse_tensor_invariants(enable=False):
+            return self._edge_index.matmul(
+                other, input_value=self._value, reduce=reduce
+            )
 
     def t(self) -> "SparseAdjacency":
         """Returns the transpose.

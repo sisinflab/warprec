@@ -40,6 +40,8 @@ class FOSSIL(IterativeRecommender, SequentialRecommenderUtils):
         learning_rate (float): The learning rate value.
         neg_samples (int): The number of negative samples.
         max_seq_len (int): The maximum length of sequences.
+        needs_user: True, because predict mixes a user embedding into the
+            sequence, so a session needs a known user.
     """
 
     # Dataloader definition
@@ -55,6 +57,9 @@ class FOSSIL(IterativeRecommender, SequentialRecommenderUtils):
     learning_rate: float
     neg_samples: int
     max_seq_len: int
+
+    # predict mixes a user embedding into the sequence representation.
+    needs_user = True
 
     def __init__(
         self,

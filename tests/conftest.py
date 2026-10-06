@@ -4,14 +4,19 @@ Every fixture here is generated in memory. The datasets live outside the
 repository, so a test that reads one would pass locally and fail in CI.
 """
 
+from pathlib import Path
 from typing import Any, Dict, List, Tuple
 
 import numpy as np
 import pandas as pd
 import pytest
+import torch
 
+import warprec.recommenders  # noqa: F401  (populates the registries make_model reads)
 from warprec.data.dataset import Dataset
-from warprec.utils.registry import params_registry
+from warprec.recommenders.base_recommender import Recommender
+from warprec.serving.payload import build_serving_payload
+from warprec.utils.registry import model_registry, params_registry
 
 N_USERS = 40
 N_ITEMS = 25
@@ -325,3 +330,67 @@ def build_params(model_name: str) -> Dict[str, Any]:
         for name, field in schema.model_fields.items()
         if name not in SKIP_FIELDS
     }
+
+
+def make_model(model_name: str, dataset: Dataset, seed: int = 0) -> Recommender:
+    """Build a registered model on the shared dataset, with every input it may need.
+
+    Args:
+        model_name (str): The registry name of the model.
+        dataset (Dataset): The dataset to build it on.
+        seed (int): The torch seed, so that weights are reproducible.
+
+    Returns:
+        Recommender: The untrained model.
+    """
+    torch.manual_seed(seed)
+    return model_registry.get(
+        model_name,
+        params=build_params(model_name),
+        info=dataset.info(),
+        interactions=dataset.train_set,
+        sessions=dataset.train_session,
+        transactions=dataset.train_transactions,
+        knowledge=dataset.knowledge,
+        multimodal=dataset.multimodal,
+    )
+
+
+def save_servable(path: Path, model: Recommender, dataset: Dataset) -> Path:
+    """Write a checkpoint the way the train pipeline does, serving payload included.
+
+    Args:
+        path (Path): Where to write it.
+        model (Recommender): The model to save.
+        dataset (Dataset): The dataset it was built on.
+
+    Returns:
+        Path: The path written.
+    """
+    state = model.get_state()
+    state["serving"] = build_serving_payload(model, dataset)
+    torch.save(state, path)
+    return path
+
+
+def write_catalogue(path: Path, dataset: Dataset) -> Path:
+    """Write an item file naming every item like a film, a few after real ones.
+
+    Args:
+        path (Path): Where to write it.
+        dataset (Dataset): The dataset whose items it names.
+
+    Returns:
+        Path: The path written, a '::'-separated file of id, name and genres.
+    """
+    _, items = dataset.get_inverse_mappings()
+    titles = {0: "Toy Story (1995)", 1: "Toy Story 2 (1999)", 2: "Heat (1995)"}
+    genres = ["Comedy", "Drama|Comedy", "Action|Crime"]
+    path.write_text(
+        "".join(
+            f"{label}::{titles.get(i, f'Item {label}')}::{genres[i % 3]}\n"
+            for i, label in items.items()
+        ),
+        encoding="utf-8",
+    )
+    return path
