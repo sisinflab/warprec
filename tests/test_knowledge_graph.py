@@ -657,6 +657,42 @@ def test_kgflex_contrasts_each_positive_with_its_own_negative(dataset: Dataset):
     assert torch.allclose(model.training_step(batch, 0), expected)
 
 
+def test_kgflex_comes_back_from_a_checkpoint_trained_with_another_seed(
+    dataset: Dataset,
+):
+    """The selection is drawn from the seed, and a reload must not redraw it.
+
+    The pipelines rebuild a model from its checkpoint without the seed it was
+    trained with, so a KGFlex that redrew its features would come back with
+    other shapes, or with its weights on the wrong pairs.
+    """
+    model = model_registry.get(
+        "KGFlex",
+        params=build_params("KGFlex"),
+        info=dataset.info(),
+        interactions=dataset.train_set,
+        sessions=dataset.train_session,
+        transactions=dataset.train_transactions,
+        knowledge=dataset.knowledge,
+        seed=7,
+    )
+    restored = KGFlex.from_checkpoint(
+        checkpoint=model.get_state(),
+        interactions=dataset.train_set,
+        sessions=dataset.train_session,
+        transactions=dataset.train_transactions,
+        knowledge=dataset.knowledge,
+    )
+
+    model.eval()
+    restored.eval()
+    users = torch.arange(4)
+    with torch.no_grad():
+        assert torch.equal(restored.predict(users), model.predict(users))
+    assert restored.feature_labels == model.feature_labels
+    assert restored.n_features == model.n_features
+
+
 def test_kgflex_builds_no_feature_table_it_was_told_to_keep_nothing_from(
     dataset: Dataset,
 ):

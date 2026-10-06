@@ -1,5 +1,5 @@
 # pylint: disable = R0801, E1102
-from typing import Any, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 import numpy as np
 import torch
@@ -207,6 +207,83 @@ class KGFlex(KnowledgeRecommenderUtils, IterativeRecommender):
             return empty.coalesce(), []
 
         return self._graph.item_features(order=order, min_items=self.min_feature_items)
+
+    def get_extra_state(self) -> Dict[str, Any]:
+        """What a checkpoint carries besides tensors: the name of each feature.
+
+        Returns:
+            Dict[str, Any]: The feature labels, in embedding order.
+        """
+        return {"feature_labels": self.feature_labels}
+
+    def set_extra_state(self, state: Any):
+        """Restore the feature names a checkpoint was trained with.
+
+        Args:
+            state (Any): What get_extra_state returned.
+        """
+        self.feature_labels = list(state["feature_labels"])
+
+    def _load_from_state_dict(
+        self,
+        state_dict: Dict[str, Any],
+        prefix: str,
+        local_metadata: Dict[str, Any],
+        strict: bool,
+        missing_keys: List[str],
+        unexpected_keys: List[str],
+        error_msgs: List[str],
+    ):
+        """Take the features a checkpoint was trained on, not the ones drawn here.
+
+        The selection depends on the seed the model was built with, and the
+        pipelines rebuild a model from its checkpoint without it. The shapes
+        are therefore taken from the checkpoint before its values are copied
+        in, so the weights land on the pairs they were trained for.
+
+        Args:
+            state_dict (Dict[str, Any]): The state being loaded.
+            prefix (str): The prefix of this module's keys.
+            local_metadata (Dict[str, Any]): The metadata of this module.
+            strict (bool): Whether every key must match.
+            missing_keys (List[str]): Collects the keys the state lacks.
+            unexpected_keys (List[str]): Collects the keys the model lacks.
+            error_msgs (List[str]): Collects the loading errors.
+        """
+        # pylint: disable = too-many-arguments, too-many-positional-arguments
+        for name in (
+            "user_offsets",
+            "pair_feature",
+            "pair_weight",
+            "item_rows",
+            "item_columns",
+            "item_keys",
+        ):
+            saved = state_dict.get(prefix + name)
+            if saved is not None:
+                current = getattr(self, name)
+                setattr(self, name, torch.empty_like(saved, device=current.device))
+
+        for name in ("user_feature_embedding", "feature_embedding", "feature_bias"):
+            saved = state_dict.get(f"{prefix}{name}.weight")
+            current = getattr(self, name).weight
+            if saved is not None and saved.shape != current.shape:
+                rows, width = saved.shape
+                setattr(self, name, nn.Embedding(rows, width, device=current.device))
+
+        saved = state_dict.get(prefix + "feature_embedding.weight")
+        if saved is not None:
+            self.n_features = int(saved.size(0))
+
+        super()._load_from_state_dict(
+            state_dict,
+            prefix,
+            local_metadata,
+            strict,
+            missing_keys,
+            unexpected_keys,
+            error_msgs,
+        )
 
     @staticmethod
     def _to_scipy(features: Tensor) -> csr_matrix:
