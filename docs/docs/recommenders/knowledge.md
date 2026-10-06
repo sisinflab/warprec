@@ -237,6 +237,6 @@ models:
 
     A user holds one embedding per feature they kept, so the model has `users × features kept per user × embedding_size` personal parameters. With both limits at `-1` on a large graph that is far more than a matrix factorization of the same width; the limits are the knob.
 
-!!! note "Users without a feature"
+!!! note "Sparse graphs"
 
-    A user for whom no feature is informative scores every item zero. How many such users there are is logged when the model is built.
+    An item is scored only through the features it shares with the user, and there is no collaborative term to fall back on: an item that shares none scores zero, and a user for whom no feature is informative scores every item zero. How many such users there are is logged when the model is built. On a graph with only a few facts per item, most of the catalogue is out of a user's reach and the model ranks far below a collaborative one; it is meant for graphs that describe items richly. The personal embeddings are not regularized, as in the paper, so [`early_stopping`](../configuration/models.md) is worth configuring.
