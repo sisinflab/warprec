@@ -111,3 +111,35 @@ def test_cluster_files_are_read_and_mapped(tmp_path: Path):
         assert user_cluster[index] == user_cluster[user_map[raw % 2]]
     for raw, index in item_map.items():
         assert item_cluster[index] == item_cluster[item_map[raw % 3]]
+
+
+def test_pre_split_folds_are_loaded_as_train_and_validation_pairs(tmp_path: Path):
+    """Each fold directory becomes its own dataset, aligned on its own train set."""
+    split = tmp_path / "split"
+    folds = 3
+    frame = transactions(2)
+    test = frame.groupby("user_id").tail(1)
+    train = frame.drop(test.index)
+    split.mkdir()
+    train.to_csv(split / "train.tsv", sep="\t", index=False)
+    test.to_csv(split / "test.tsv", sep="\t", index=False)
+    fold_of = train.groupby("user_id").cumcount() % folds
+    for fold in range(folds):
+        directory = split / str(fold + 1)
+        directory.mkdir()
+        train[fold_of != fold].to_csv(directory / "train.tsv", sep="\t", index=False)
+        train[fold_of == fold].to_csv(
+            directory / "validation.tsv", sep="\t", index=False
+        )
+
+    main, validation, fold_datasets = build(
+        tmp_path,
+        {"loading_strategy": "split", "split": {"local_path": str(split)}},
+    )
+
+    assert validation is None
+    assert len(fold_datasets) == folds
+    assert main.train_set.get_sparse().nnz == len(train)
+    for fold, dataset in enumerate(fold_datasets):
+        assert dataset.train_set.get_sparse().nnz == int((fold_of != fold).sum())
+        assert dataset.eval_set.get_sparse().nnz > 0
