@@ -149,3 +149,38 @@ def test_cross_validation_returns_the_requested_folds(transactions: pd.DataFrame
     for i, left in enumerate(validations):
         for right in validations[i + 1 :]:
             assert left & right == set(), "two folds share a transaction"
+
+
+@pytest.mark.parametrize(
+    "validation",
+    [
+        SplitSpec(strategy="temporal_leave_k_out", k=1),
+        SplitSpec(strategy="k_fold_cross_validation", folds=3),
+    ],
+)
+def test_a_validation_set_only_asks_about_what_its_train_set_knows(
+    transactions: pd.DataFrame, validation: SplitSpec
+):
+    """A validation item no training row mentions cannot be scored, so it goes.
+
+    One user's second-to-last interaction is the only one with its item. Leaving
+    the last interaction out for testing puts that one in a validation set whose
+    train set has never seen the item.
+    """
+    rare = transactions[transactions.user_id == 0].tail(2).head(1).copy()
+    rare["item_id"] = 999
+    data = pd.concat([transactions.drop(rare.index), rare]).sort_values("timestamp")
+
+    train, validations, _ = Splitter().split_transaction(
+        data,
+        labels=ColumnLabels(),
+        test=SplitSpec(strategy="temporal_leave_k_out", k=1),
+        validation=validation,
+    )
+
+    folds = validations if isinstance(validations, list) else [(train, validations)]
+    for fold_train, fold_validation in folds:
+        train_frame = fold_train.to_native()
+        validation_frame = fold_validation.to_native()
+        assert set(validation_frame.item_id) <= set(train_frame.item_id)
+        assert set(validation_frame.user_id) <= set(train_frame.user_id)

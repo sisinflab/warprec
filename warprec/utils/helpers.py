@@ -1,4 +1,5 @@
 import importlib
+import sys
 import os
 from typing import Any, Optional, Dict, List, Tuple, TYPE_CHECKING
 from pathlib import Path
@@ -7,7 +8,6 @@ from torch.utils.data import DataLoader
 
 from warprec.utils.config.model_configuration import RecomModel
 from warprec.utils.registry import params_registry
-from warprec.utils.logger import logger
 
 if TYPE_CHECKING:
     from warprec.data.dataset import Dataset
@@ -17,22 +17,38 @@ if TYPE_CHECKING:
 def load_custom_modules(custom_modules: str | List[str] | None):
     """Load custom modules dynamically.
 
+    A module is imported under its own name, the file or directory name without
+    the extension, with its parent directory made importable. That is also the
+    name Ray gives the copy it ships to every worker through the runtime
+    environment's py_modules, so the driver and the workers agree on it.
+
     Args:
         custom_modules (str | List[str] | None): List of custom module paths to import.
             Each path can either point to a Python file (ending with .py)
             or a directory containing an __init__.py file.
+
+    Raises:
+        ImportError: If a module cannot be imported. A run that carried on
+            without it would only fail later, on a name it does not know.
     """
     if isinstance(custom_modules, str):
         custom_modules = [custom_modules]
 
-    # Import custom models dynamically
-    if custom_modules is not None and len(custom_modules) > 0:
-        for model_path in custom_modules:
-            model_path = model_path.removesuffix(".py")
-            try:
-                importlib.import_module(model_path)
-            except ImportError as e:
-                logger.negative(f"Failed to import custom model {model_path}: {e}")
+    for module_path in custom_modules or []:
+        path = Path(module_path)
+        # On a Ray worker the path may not exist, the module having been shipped
+        # rather than copied there, but it is already importable by name.
+        if path.exists():
+            parent = str(path.resolve().parent)
+            if parent not in sys.path:
+                sys.path.insert(0, parent)
+        name = path.name.removesuffix(".py")
+        try:
+            importlib.import_module(name)
+        except ImportError as e:
+            raise ImportError(
+                f"Failed to import the custom module '{name}' from '{module_path}': {e}"
+            ) from e
 
 
 def is_python_module(path: str | Path) -> bool:

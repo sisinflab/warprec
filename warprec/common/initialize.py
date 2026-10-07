@@ -234,10 +234,15 @@ def initialize_datasets(
             test_data = _align_set_on_train(train_data, test_data, "Test")
             if val_data is not None:
                 if isinstance(val_data, list):
-                    for idx, (val_train, val_set) in enumerate(val_data):
-                        val_data[idx] = _align_set_on_train(
-                            train_data, val_set, "Validation"
+                    # A fold is trained on its own train set, so that is the
+                    # one its validation set has to be aligned with.
+                    val_data = [
+                        (
+                            val_train,
+                            _align_set_on_train(val_train, val_set, "Validation"),
                         )
+                        for val_train, val_set in val_data
+                    ]
                 else:
                     val_data = _align_set_on_train(train_data, val_data, "Validation")
         else:
@@ -337,7 +342,7 @@ def initialize_datasets(
                 specific_config["id_type"],
                 common_cluster_type,
             ]
-            dtype_map = zip(column_names, dtypes_list)
+            dtype_map = dict(zip(column_names, dtypes_list))
 
             # Read data using the custom reader
             file_format = specific_config["file_format"]
