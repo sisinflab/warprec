@@ -337,7 +337,7 @@ def initialize_datasets(
                 specific_config["id_type"],
                 common_cluster_type,
             ]
-            dtype_map = zip(column_names, dtypes_list)
+            dtype_map = dict(zip(column_names, dtypes_list))
 
             # Read data using the custom reader
             file_format = specific_config["file_format"]
