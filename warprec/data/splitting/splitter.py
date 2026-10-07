@@ -99,30 +99,35 @@ class Splitter:
             # CASE 1: Only train and test set
             return (original_train_set, None, test_set)
 
+        # Each validation set is aligned with the train set it validates.
+        validation_folds = [
+            (
+                train,
+                self.filter_sets(
+                    train,
+                    val_set,
+                    labels.user_id,
+                    labels.item_id,
+                    "Validation",
+                    cold_dimension=cold,
+                ),
+            )
+            for train, val_set in validation_folds
+        ]
+
         if len(validation_folds) == 1:
-            # CASE 2: Train/Validation/Test
+            # CASE 2: Train/Validation/Test. The main model trains on the train
+            # set the validation split left, so the test set is aligned with it.
             train_set, validation_set = validation_folds[0]
             test_set = self.filter_sets(
                 train_set,
                 test_set,
                 labels.user_id,
                 labels.item_id,
-                "Validation",
+                "Test",
                 cold_dimension=cold,
             )
             return (train_set, validation_set, test_set)
-
-        # Filter out each validation set based on
-        # corresponding train set
-        for train, val_set in validation_folds:
-            val_set = self.filter_sets(
-                train,
-                val_set,
-                labels.user_id,
-                labels.item_id,
-                "Validation",
-                cold_dimension=cold,
-            )
 
         # CASE 3: N folds of train and validation + the test set
         return (original_train_set, validation_folds, test_set)
