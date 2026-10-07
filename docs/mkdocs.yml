@@ -72,11 +72,11 @@ nav:
     - Authentication: cloud/authentication.md
     - Cluster Management: cloud/cluster-management.md
     - Deploying Served Models: cloud/deployment.md
-  - Guides:
-    - Callbacks: guides/callbacks.md
-    - Stash: guides/stash.md
-    - Models: guides/models.md
-    - Metrics: guides/metrics.md
+  - Extending WarpRec:
+    - Custom Models: extending/models.md
+    - Custom Metrics: extending/metrics.md
+    - Callbacks: extending/callbacks.md
+    - Stash: extending/stash.md
   - API Reference:
     - Overview: api-reference/index.md
     - Data:
@@ -193,8 +193,8 @@ plugins:
           - evaluation/metrics/*.md
         Cloud & Deployment:
           - cloud/*.md
-        Implementation Guides:
-          - guides/*.md
+        Extending WarpRec:
+          - extending/*.md
         API Reference:
           - api-reference/data/*.md
           - api-reference/recommenders/*.md

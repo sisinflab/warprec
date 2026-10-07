@@ -80,8 +80,45 @@ The following table summarizes the available Metric Blocks:
 |---|---|
 | `BINARY_RELEVANCE` | Relevance encoded as a binary tensor `[0, 1]`, where 1 indicates that the item is relevant and 0 otherwise. Dim: `[batch_size, num_items]`. |
 | `DISCOUNTED_RELEVANCE` | Relevance values adjusted by a discounting factor (e.g., logarithmic), typically used in ranking metrics such as nDCG. Dim: `[batch_size, num_items]`. |
-| `VALID_USERS` | The number (or mask) of users that have at least one relevant item in the evaluation set. This block ensures that metrics are computed only on meaningful user subsets. Returns the number of valid users in the batch. |
+| `VALID_USERS` | A mask of the users in the batch that have at least one relevant item in the evaluation set: 1 for such a user, 0 otherwise. User-averaged metrics use it so that a user with nothing to retrieve does not count. Dim: `[batch_size]`. |
 | `TOP_K_INDICES` | The indices of the top-$k$ predictions returned by the model for each user. Dim: `[batch_size, top_k]`. |
 | `TOP_K_VALUES` | The actual prediction scores of the top-$k$ items for each user, aligned with `TOP_K_INDICES`. Dim: `[batch_size, top_k]`. |
 | `TOP_K_BINARY_RELEVANCE` | The binary relevance (`[0, 1]`) of the top-$k$ predicted items, used in precision, recall, and hit-rate computations. Dim: `[batch_size, top_k]`. |
 | `TOP_K_DISCOUNTED_RELEVANCE` | The discounted relevance values of the top-$k$ predicted items, used in ranking-aware metrics such as nDCG. Dim: `[batch_size, top_k]`. |
+
+!!! warning
+
+    Declare every block your metric reads. The evaluator computes only the blocks some metric in the run asked for, so a metric that reads a block without declaring it works next to one that does, and fails when it is evaluated alone.
+
+## Registering and Configuring a Metric
+
+A metric becomes available by name once its class is registered and its module is imported. The name is what the configuration uses, case-insensitively:
+
+```python
+from warprec.utils.registry import metric_registry
+
+
+@metric_registry.register("RBP")
+class RBP(UserAverageTopKMetric):
+    ...
+```
+
+Point `general.custom_modules` at the file (or package) that holds it. WarpRec imports it before the configuration is validated, so the metric can be named in either list of the `evaluation` section:
+
+```yaml
+general:
+    custom_modules: [user_code/my_metrics.py]
+evaluation:
+    top_k: [10, 20]
+    metrics: [nDCG, RBP]
+    complex_metrics:
+        - name: RBP
+          params:
+              persistence: 0.5
+```
+
+Every metric is constructed with the cutoff `k` and the keyword arguments the evaluator shares with all metrics (the number of users and items, the training matrix, the side information and cluster lookups, the propensities and the dataset's stash), so its constructor must accept `**kwargs`. The `params` of a `complex_metrics` entry arrive as extra keyword arguments. When one metric is configured with several sets of parameters, override its `name` property so that each appears under its own name in the results.
+
+!!! tip
+
+    [Guide 15 · Custom models and metrics](../guides/custom-models-and-metrics.md) builds a complete metric (rank-biased precision with a `persistence` parameter), uses it in both lists, and checks its values by hand.

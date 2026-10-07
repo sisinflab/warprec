@@ -252,29 +252,30 @@ def forward(self, user: Tensor, item: Tensor):
     return torch.mul(user_e, item_e).sum(dim=1)
 ```
 
-**3. `train_step`**: Implements a single training step using a batch of data. This method computes the loss and returns it for backpropagation.
+**3. `training_step`**: Implements a single training step using a batch of data. Iterative models are PyTorch Lightning modules, so this is Lightning's `training_step(batch, batch_idx)`: it computes the loss and returns it.
 
 ```python
-def train_step(self, batch: Any, *args, **kwargs):
+def training_step(self, batch: Any, batch_idx: int):
     user, pos_item, neg_item = batch
 
     pos_item_score = self.forward(user, pos_item)
     neg_item_score = self.forward(user, neg_item)
     loss = self.bpr_loss(pos_item_score, neg_item_score)
+    self.log("loss", loss, on_step=False, on_epoch=True, prog_bar=True)
 
     return loss
 ```
 
 !!! warning
 
-    The `train_step` method must return a scalar loss tensor. WarpRec handles the backpropagation and optimizer step automatically. If the returned loss is not a Tensor, an error will be raised.
+    The `training_step` method must return a scalar loss tensor. WarpRec handles the backpropagation and optimizer step automatically. Logging it with `self.log` is optional; a logged value appears on Lightning's progress bar and in every epoch's report to Ray Tune, next to the validation metrics.
 
 ### Step 3: Implement Prediction Methods
 
 Recommendation models must implement a prediction method to generate scores for user-item pairs. You must implement the `predict` method to define how predictions are made. Normal behavior is to compute a full prediction over the batch of users if item_indices is None, or compute predictions only for the provided item indices:
 
 ```python
-def predict(self, user_indices: Tensor, *args, item_indices: Optional[Tensor], **kwargs):
+def predict(self, user_indices: Tensor, *args, item_indices: Optional[Tensor] = None, **kwargs):
     user_embeddings = self.user_embedding(user_indices)
     if item_indices is None:
         # Case 'full': prediction on all items
@@ -287,6 +288,8 @@ def predict(self, user_indices: Tensor, *args, item_indices: Optional[Tensor], *
     predictions = torch.einsum(einsum_string, user_embeddings, item_embeddings)
     return predictions
 ```
+
+`item_indices` must default to `None`: under full evaluation the evaluator does not pass it at all. Under sampled evaluation it holds each user's candidates, and shorter candidate lists are padded with the index `n_items`. The padded embedding row above makes those columns score zero; a model without one must keep the index in range (for example with `item_indices.clamp(max=self.n_items - 1)`), since the evaluator discards the padded scores anyway.
 
 !!! important
 
@@ -335,13 +338,14 @@ class MyBPR(IterativeRecommender):
             **kwargs,
         )
 
-    def train_step(self, batch: Any, *args, **kwargs):
+    def training_step(self, batch: Any, batch_idx: int):
         user, pos_item, neg_item = batch
 
         # Compute BPR loss
         pos_item_score = self.forward(user, pos_item)
         neg_item_score = self.forward(user, neg_item)
         loss = self.bpr_loss(pos_item_score, neg_item_score)
+        self.log("loss", loss, on_step=False, on_epoch=True, prog_bar=True)
 
         return loss
 
@@ -351,7 +355,7 @@ class MyBPR(IterativeRecommender):
 
         return torch.mul(user_e, item_e).sum(dim=1)
 
-    def predict(self, user_indices: Tensor, *args, item_indices: Optional[Tensor], **kwargs):
+    def predict(self, user_indices: Tensor, *args, item_indices: Optional[Tensor] = None, **kwargs):
         user_embeddings = self.user_embedding(user_indices)
         if item_indices is None:
             # Case 'full': prediction on all items
@@ -364,3 +368,37 @@ class MyBPR(IterativeRecommender):
         predictions = torch.einsum(einsum_string, user_embeddings, item_embeddings)
         return predictions
 ```
+
+
+---
+
+## Validating Hyperparameters
+
+Only the attributes annotated on the model class itself are read from `params`. Without anything else, WarpRec accepts any value for them, and the training pipeline logs that the model "is registered in the model registry, but not in parameter registry". To validate them, and to let each one take a search space (see [Models configuration](../configuration/models.md)), register a parameter class **named exactly like the model**:
+
+```python
+from pydantic import field_validator
+
+from warprec.utils.config.common import validate_greater_than_zero
+from warprec.utils.config.model_configuration import FLOAT_FIELD, INT_FIELD, RecomModel
+from warprec.utils.registry import params_registry
+
+
+@params_registry.register("MyBPR")
+class MyBPR(RecomModel):
+    embedding_size: INT_FIELD
+    batch_size: INT_FIELD
+    epochs: INT_FIELD
+    learning_rate: FLOAT_FIELD
+
+    @field_validator("embedding_size", "batch_size", "epochs", "learning_rate")
+    @classmethod
+    def check_positive(cls, v, info):
+        return validate_greater_than_zero(cls, v, info.field_name)
+```
+
+WarpRec finds the class through its own name, so it cannot be called `MyBPRParams`; keep it in a module of its own to avoid clashing with the model class.
+
+!!! tip
+
+    [Guide 15 · Custom models and metrics](../guides/custom-models-and-metrics.md) runs all of this end to end: a closed-form and an iterative model, a parameter class and a custom metric, loaded through `custom_modules`, checked against the built-in models they reproduce.

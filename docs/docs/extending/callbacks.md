@@ -28,7 +28,7 @@ In this example, we track the `nDCG@5` metric across iterations during the train
 The callback must inherit from `WarpRecCallback`.
 
 ```python
-from warprec.utils.callbacks import WarpRecCallback
+from warprec.utils.callback import WarpRecCallback
 
 class ComputeNDCGOverIterations(WarpRecCallback):
 
@@ -39,13 +39,13 @@ class ComputeNDCGOverIterations(WarpRecCallback):
 
 This constructor initializes the callback by retrieving the plot save path from `kwargs` and preparing a container for metric scores.
 
-Next, track metric values during training. Recall that `WarpRecCallback` inherits the **Ray Tune lifecycle hooks**, including `on_trial_save`.
+Next, track metric values during training. Recall that `WarpRecCallback` inherits the **Ray Tune lifecycle hooks**. `on_trial_result` is called on the driver with every report a trial makes, one per evaluated epoch, and `result` holds the metrics under their `<metric>@<k>` names. (`on_trial_save` is not a substitute: a WarpRec training run never calls it.)
 
 ```python
     ...
 
-    def on_trial_save(self, iteration, trials, trial, **info):
-        ndcg_score = trial.last_result.get("nDCG@5", 0.0)
+    def on_trial_result(self, iteration, trials, trial, result, **info):
+        ndcg_score = result.get("nDCG@5", 0.0)
         self._ndcg_scores.append(ndcg_score)
 ```
 
@@ -124,7 +124,7 @@ Callbacks can also **inject code or data** into the main training pipeline. Alth
 For instance, to attach custom data to a dataset during experiment initialization, implement it in the `on_dataset_creation` hook:
 
 ```python
-from warprec.callbacks import WarpRecCallback
+from warprec.utils.callback import WarpRecCallback
 
 class CustomDataToStash(WarpRecCallback):
 
@@ -146,3 +146,7 @@ This ensures **all datasets** involved in the experiment are enriched with a `st
 !!! important
 
     Due to WarpRec's **distributed execution**, loading data at *model runtime* may cause errors or undefined behavior. Using the stash ensures proper **serialization and reproducibility**.
+
+!!! tip
+
+    [Guide 16 · Callbacks and custom pipelines](../guides/callbacks-and-custom-pipelines.md) implements every hook, shows in which process each one runs under the design and the train pipeline, fills the stash for a custom metric, and records the trial reports with `on_trial_result`.
