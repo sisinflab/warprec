@@ -2,6 +2,39 @@
 
 <!-- version list -->
 
+## v2.1.0 (2026-10-07)
+
+### Bug Fixes
+
+- BPR contrasts each positive with its own negative instead of every negative in the batch
+  ([`a85bb12`](https://github.com/sisinflab/warprec/commit/a85bb126312a3321376040062c8ff645b8a1d0ce))
+
+### Documentation
+
+- Documented the KaHFM and KGFlex knowledge models
+  ([`bd4e9ce`](https://github.com/sisinflab/warprec/commit/bd4e9ce4736ebfdd7094c92f4f439d528a55b56f))
+
+- KGFlex says how it behaves on a sparse knowledge graph
+  ([`1449d79`](https://github.com/sisinflab/warprec/commit/1449d7996fa80dfeeec1925772525f3aab627405))
+
+### Features
+
+- A knowledge graph can describe its items as first- and second-order features
+  ([`acf8067`](https://github.com/sisinflab/warprec/commit/acf80671ba491b85d0240ddb2979e04b70dc8c5e))
+
+- Added the KaHFM knowledge model, whose factors are the features of the graph
+  ([`419d4be`](https://github.com/sisinflab/warprec/commit/419d4bea5b0ab84d05b5bc5e0b2d857bf86446c4))
+
+- Added the KGFlex knowledge model, which factorizes the features each user is expert about
+  ([`0ae377f`](https://github.com/sisinflab/warprec/commit/0ae377fd95d3a511e52f4a1a3ac91d95e63b9a56))
+
+- KGFlex comes back from a checkpoint with the features it was trained on
+  ([`3d7ab4f`](https://github.com/sisinflab/warprec/commit/3d7ab4f4de7e98d3a9a6d90b6c5b2c6310b7c847))
+
+- KGFlex does not walk the graph for features no user may keep
+  ([`cd06151`](https://github.com/sisinflab/warprec/commit/cd06151e2c71d4572262d2f1056ee74b4d4e0e8f))
+
+
 ## v2.0.0 (2026-10-06)
 
 ### Bug Fixes
