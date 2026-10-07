@@ -1,9 +1,10 @@
 import time
 from dataclasses import dataclass
-from typing import List, Optional, Tuple
+from typing import Any, List, Optional, Tuple
 
 import ray
 
+import warprec
 from warprec.common import (
     RunState,
     RunStateStore,
@@ -67,10 +68,10 @@ def initialise_ray(config: TrainConfiguration) -> None:
     Raises:
         ConnectionError: If unable to connect to the Ray cluster.
     """
-    py_modules = (
-        [] if config.general.custom_modules is None else config.general.custom_modules
-    )
-    py_modules.extend(["warprec"])  # type: ignore[union-attr]
+    # WarpRec is shipped as the package that is imported here, wherever it is
+    # installed, rather than as a path that exists only when WarpRec is run
+    # from its own repository. The configured list is copied, not extended.
+    py_modules: List[Any] = [*(config.general.custom_modules or []), warprec]
 
     try:
         ray.init(
