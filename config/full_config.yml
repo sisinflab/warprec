@@ -264,7 +264,7 @@ general:
   ray_verbose: [0, 1, 2, 3]
   ray_address: auto
   time_report: [True, False]
-  custom_models: [path/to/python/module, path/to/python/script.py]
+  custom_modules: [path/to/python/module, path/to/python/script.py]
   callback:
     callback_path: path/to/python/script.py
     callback_name: MyCustomCallback
