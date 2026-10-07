@@ -8,8 +8,11 @@ and before anything in the configuration asks for the names it registers.
 import uuid
 from pathlib import Path
 
+import pandas as pd
 import pytest
+import yaml
 
+from warprec.utils.config.config import load_design_configuration
 from warprec.utils.helpers import load_custom_modules
 from warprec.utils.registry import metric_registry
 
@@ -79,3 +82,40 @@ def test_a_module_that_fails_to_import_stops_the_run(tmp_path: Path):
 
     with pytest.raises(ImportError, match=broken.stem):
         load_custom_modules([str(broken)])
+
+
+def test_a_custom_metric_can_be_configured_with_parameters(tmp_path: Path):
+    """complex_metrics checks its names, so the module must already be loaded."""
+    path, name = write_metric_module(tmp_path / "user_code")
+    data = tmp_path / "data.tsv"
+    pd.DataFrame(
+        {"user_id": [1, 1, 2, 2], "item_id": [1, 2, 1, 3], "timestamp": [1, 2, 3, 4]}
+    ).to_csv(data, sep="\t", index=False)
+    config = tmp_path / "config.yml"
+    config.write_text(
+        yaml.safe_dump(
+            {
+                "reader": {
+                    "loading_strategy": "dataset",
+                    "data_type": "transaction",
+                    "reading_method": "local",
+                    "local_path": str(data),
+                    "rating_type": "implicit",
+                },
+                "splitter": {
+                    "test_splitting": {"strategy": "temporal_holdout", "ratio": 0.5}
+                },
+                "models": {"Pop": {}},
+                "evaluation": {
+                    "top_k": [2],
+                    "metrics": ["nDCG"],
+                    "complex_metrics": [{"name": name, "params": {}}],
+                },
+                "general": {"custom_modules": [str(path)]},
+            }
+        )
+    )
+
+    loaded = load_design_configuration(str(config))
+
+    assert loaded.evaluation.complex_metrics[0].name == name

@@ -6,7 +6,11 @@ from typing import Dict, Any, List
 
 import yaml
 from pydantic import BaseModel, model_validator, Field
-from warprec.utils.helpers import load_custom_modules, validation_metric
+from warprec.utils.helpers import (
+    is_python_module,
+    load_custom_modules,
+    validation_metric,
+)
 from warprec.data.filtering import Filter
 from warprec.utils.config import (
     GeneralConfig,
@@ -48,6 +52,33 @@ class WarpRecConfiguration(BaseModel):
     general: GeneralConfig = Field(default_factory=GeneralConfig)
     training: TrainingConfig = Field(default_factory=TrainingConfig)
     rerank: RerankConfig = Field(default_factory=RerankConfig)
+
+    @model_validator(mode="before")
+    @classmethod
+    def load_custom_modules_first(cls, data: Any) -> Any:
+        """Import the user's modules before any section is validated.
+
+        Sections check the names they are given against the registries, so a
+        model, metric or filter a custom module registers has to be there
+        before them. A path that is not a module is left to the 'general'
+        section, which rejects it with a message saying so.
+
+        Args:
+            data (Any): The raw configuration.
+
+        Returns:
+            Any: The raw configuration, unchanged.
+        """
+        if not isinstance(data, dict):
+            return data
+        general = data.get("general") or {}
+        modules = general.get("custom_modules") if isinstance(general, dict) else None
+        if isinstance(modules, str):
+            modules = [modules]
+        load_custom_modules(
+            [m for m in modules or [] if isinstance(m, str) and is_python_module(m)]
+        )
+        return data
 
     @model_validator(mode="after")
     def migrate_reader_training_options(self) -> "WarpRecConfiguration":
@@ -115,9 +146,6 @@ class WarpRecConfiguration(BaseModel):
                 raise ValueError(
                     "Both storage_account_name and container_name must be provided in Azure configuration."
                 )
-
-        # Load custom modules if specified
-        load_custom_modules(self.general.custom_modules)
 
         # Check if the filters have been set correctly
         if self.filtering is not None:
