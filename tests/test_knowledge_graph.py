@@ -10,8 +10,10 @@ than scoring from nothing, and that its attention is a distribution that moves.
 """
 
 from typing import Any, Tuple
+from unittest.mock import patch
 
 import narwhals as nw
+import numpy as np
 import pandas as pd
 import pytest
 import torch
@@ -19,6 +21,7 @@ import torch
 import warprec.recommenders  # noqa: F401  (populates the registries)
 from warprec.data.dataset import Dataset
 from warprec.data.entities import KnowledgeGraph
+from warprec.recommenders.knowledge_aware_recommender import KGFlex
 from warprec.utils.registry import model_registry
 
 from conftest import build_params
@@ -255,6 +258,51 @@ def test_the_sampling_is_reproducible(graph: KnowledgeGraph):
     assert not torch.equal(first, other)
 
 
+def test_a_first_order_feature_is_a_fact_leaving_the_item(graph: KnowledgeGraph):
+    """An item carries the (relation, tail) of every fact written about it."""
+    matrix, labels = graph.item_features(order=1)
+
+    assert labels == [
+        ("directed_by", "d_kubrick"),
+        ("directed_by", "d_wilder"),
+        ("genre", "drama"),
+    ]
+    # m4 is aligned to an entity no triple mentions and m5 is not aligned.
+    expected = torch.tensor(
+        [[1, 0, 1], [0, 0, 1], [0, 1, 0], [0, 0, 0], [0, 0, 0]], dtype=torch.float
+    )
+    assert torch.equal(matrix.to_dense(), expected)
+
+
+def test_a_second_order_feature_walks_one_fact_further(graph: KnowledgeGraph):
+    """m1 is directed by someone born in the UK; nothing else reaches that far."""
+    matrix, labels = graph.item_features(order=2)
+
+    assert labels == [("directed_by", "born_in", "uk")]
+    assert matrix.to_dense().flatten().tolist() == [1.0, 0.0, 0.0, 0.0, 0.0]
+
+
+def test_a_feature_too_few_items_carry_is_dropped(graph: KnowledgeGraph):
+    """Only drama is shared by two films."""
+    matrix, labels = graph.item_features(order=1, min_items=2)
+
+    assert labels == [("genre", "drama")]
+    assert matrix.to_dense().flatten().tolist() == [1.0, 1.0, 0.0, 0.0, 0.0]
+
+
+def test_the_item_features_are_built_once(graph: KnowledgeGraph):
+    """Every trial builds a model, and each one asks for the same table."""
+    assert graph.item_features(order=1) is graph.item_features(order=1)
+
+
+def test_an_item_feature_is_one_or_two_facts_long(graph: KnowledgeGraph):
+    """A third order or a non-positive support is a configuration mistake."""
+    with pytest.raises(ValueError):
+        graph.item_features(order=3)
+    with pytest.raises(ValueError):
+        graph.item_features(order=1, min_items=0)
+
+
 def test_a_knowledge_model_refuses_a_dataset_without_a_graph(dataset: Dataset):
     """Scoring from a graph that is not there would quietly become collaborative."""
     for name in ("CKE", "KGAT"):
@@ -372,7 +420,7 @@ def build_knowledge_model(model_name: str, dataset: Dataset, **overrides: Any) -
     )
 
 
-@pytest.mark.parametrize("model_name", ["KGCN", "KGIN", "RippleNet"])
+@pytest.mark.parametrize("model_name", ["KGCN", "KGIN", "RippleNet", "KaHFM", "KGFlex"])
 def test_every_knowledge_model_refuses_a_dataset_without_a_graph(
     model_name: str, dataset: Dataset
 ):
@@ -460,3 +508,197 @@ def test_kgin_offers_both_ways_of_measuring_overlap(dataset: Dataset):
 
         assert torch.isfinite(value)
         assert float(value) >= 0.0
+
+
+def test_kahfm_starts_every_item_at_the_tfidf_of_its_features(dataset: Dataset):
+    """A factor is a feature, and an item starts as much about it as its TF-IDF."""
+    model = build_knowledge_model("KaHFM", dataset)
+    features, labels = dataset.knowledge.item_features(order=1, min_items=1)
+
+    dense = features.to_dense()
+    described = int((dense.sum(dim=1) > 0).sum())
+    expected = dense * torch.log(described / dense.sum(dim=0))
+    expected = expected / expected.norm(dim=1, keepdim=True).clamp(min=1e-12)
+
+    assert model.feature_labels == labels
+    assert torch.allclose(model.item_factors.weight[:-1], expected, atol=1e-6)
+    assert torch.equal(model.item_factors.weight[-1], torch.zeros(len(labels)))
+
+
+def test_kahfm_starts_every_user_at_the_mean_of_their_items(dataset: Dataset):
+    """The paper's profile, not Elliot's last-item-wins one."""
+    model = build_knowledge_model("KaHFM", dataset)
+    history = dataset.train_set.get_sparse().tocsr()
+
+    for user in range(5):
+        items = torch.as_tensor(history[user].indices, dtype=torch.long)
+        expected = model.item_factors.weight[items].mean(dim=0)
+        assert torch.allclose(model.user_factors.weight[user], expected, atol=1e-6)
+
+
+def test_kahfm_refuses_a_graph_with_no_feature_common_enough(dataset: Dataset):
+    """Without a single feature there is no factor to learn."""
+    with pytest.raises(ValueError, match="min_feature_items"):
+        build_knowledge_model("KaHFM", dataset, min_feature_items=10_000)
+
+
+def test_kahfm_contrasts_each_positive_with_its_own_negative(dataset: Dataset):
+    """BPR is pairwise: a positive is not compared with other users' negatives."""
+    model = build_knowledge_model("KaHFM", dataset)
+    user = torch.tensor([0, 1])
+    positive = torch.tensor([0, 1])
+    negative = torch.tensor([2, 3])
+
+    expected = torch.nn.functional.softplus(
+        model(user, negative) - model(user, positive)
+    ).mean()
+    observed = model.rec_loss(model(user, positive), model(user, negative))
+    assert torch.allclose(observed, expected)
+
+
+def test_kahfm_is_named_by_its_hyperparameters_only(dataset: Dataset):
+    """A run is named after get_params; the feature labels must not leak into it."""
+    model = build_knowledge_model("KaHFM", dataset)
+    assert "feature_labels" not in model.get_params()
+
+
+def test_information_gain_is_a_bit_for_a_perfect_split_and_nothing_for_none():
+    """Balanced classes start at one bit of uncertainty."""
+    gains = KGFlex.information_gain(
+        np.array([4.0, 2.0, 3.0]), np.array([0.0, 2.0, 1.0]), np.array([4.0, 4.0, 4.0])
+    )
+
+    assert gains[0] == pytest.approx(1.0)
+    assert gains[1] == pytest.approx(0.0)
+    assert 0.0 < gains[2] < 1.0
+
+
+def test_kgflex_keeps_no_more_features_per_user_than_it_is_allowed(dataset: Dataset):
+    """A limit of one first-order feature and no second-order ones."""
+    model = build_knowledge_model(
+        "KGFlex", dataset, first_order_limit=1, second_order_limit=0
+    )
+    per_user = model.user_offsets[1:] - model.user_offsets[:-1]
+
+    assert int(per_user.max()) == 1
+    assert all(len(model.feature_labels[f]) == 2 for f in model.pair_feature.tolist())
+    assert bool((model.pair_weight > 0).all())
+
+
+def test_kgflex_accepts_a_first_order_limit_beside_every_second_order_feature(
+    dataset: Dataset,
+):
+    """The combination Elliot raised on."""
+    model = build_knowledge_model(
+        "KGFlex", dataset, first_order_limit=1, second_order_limit=-1
+    )
+
+    assert any(len(label) == 3 for label in model.feature_labels)
+
+
+def test_kgflex_selects_the_same_features_from_the_same_seed(dataset: Dataset):
+    """The negatives the gain is measured against are drawn from the seed."""
+    first = build_knowledge_model("KGFlex", dataset)
+    second = build_knowledge_model("KGFlex", dataset)
+
+    assert torch.equal(first.pair_feature, second.pair_feature)
+    assert torch.equal(first.pair_weight, second.pair_weight)
+
+
+def test_kgflex_scores_an_item_by_the_features_it_shares_with_the_user(
+    dataset: Dataset,
+):
+    """x_ui = sum over shared f of k_uf (p_uf . g_f + b_f), on both paths."""
+    model = build_knowledge_model("KGFlex", dataset)
+    model.eval()
+
+    per_user = model.user_offsets[1:] - model.user_offsets[:-1]
+    user = int(per_user.argmax())
+    items = torch.arange(dataset.info()["n_items"])
+    carried = set(zip(model.item_rows.tolist(), model.item_columns.tolist()))
+
+    expected = torch.zeros(len(items))
+    start, end = model.user_offsets[user : user + 2].tolist()
+    with torch.no_grad():
+        for pair in range(start, end):
+            feature = int(model.pair_feature[pair])
+            value = model.pair_weight[pair] * (
+                model.user_feature_embedding.weight[pair]
+                @ model.feature_embedding.weight[feature]
+                + model.feature_bias.weight[feature, 0]
+            )
+            for item in items.tolist():
+                if (item, feature) in carried:
+                    expected[item] += value
+
+        full = model.predict(torch.tensor([user]))[0]
+        pairwise = model(torch.full_like(items, user), items)
+
+    assert expected.abs().sum() > 0
+    assert torch.allclose(full, expected, atol=1e-6)
+    assert torch.allclose(pairwise, expected, atol=1e-6)
+
+
+def test_kgflex_refuses_a_graph_with_no_feature_common_enough(dataset: Dataset):
+    """Without a feature there is nothing any user could be expert about."""
+    with pytest.raises(ValueError, match="min_feature_items"):
+        build_knowledge_model("KGFlex", dataset, min_feature_items=10_000)
+
+
+def test_kgflex_contrasts_each_positive_with_its_own_negative(dataset: Dataset):
+    """BPR is pairwise: a positive is not compared with other users' negatives."""
+    model = build_knowledge_model("KGFlex", dataset)
+    batch = (torch.tensor([0, 1]), torch.tensor([0, 1]), torch.tensor([2, 3]))
+    user, positive, negative = batch
+
+    expected = torch.nn.functional.softplus(
+        model(user, negative) - model(user, positive)
+    ).mean()
+    assert torch.allclose(model.training_step(batch, 0), expected)
+
+
+def test_kgflex_comes_back_from_a_checkpoint_trained_with_another_seed(
+    dataset: Dataset,
+):
+    """The selection is drawn from the seed, and a reload must not redraw it.
+
+    The pipelines rebuild a model from its checkpoint without the seed it was
+    trained with, so a KGFlex that redrew its features would come back with
+    other shapes, or with its weights on the wrong pairs.
+    """
+    model = model_registry.get(
+        "KGFlex",
+        params=build_params("KGFlex"),
+        info=dataset.info(),
+        interactions=dataset.train_set,
+        sessions=dataset.train_session,
+        transactions=dataset.train_transactions,
+        knowledge=dataset.knowledge,
+        seed=7,
+    )
+    restored = KGFlex.from_checkpoint(
+        checkpoint=model.get_state(),
+        interactions=dataset.train_set,
+        sessions=dataset.train_session,
+        transactions=dataset.train_transactions,
+        knowledge=dataset.knowledge,
+    )
+
+    model.eval()
+    restored.eval()
+    users = torch.arange(4)
+    with torch.no_grad():
+        assert torch.equal(restored.predict(users), model.predict(users))
+    assert restored.feature_labels == model.feature_labels
+    assert restored.n_features == model.n_features
+
+
+def test_kgflex_builds_no_feature_table_it_was_told_to_keep_nothing_from(
+    dataset: Dataset,
+):
+    """Walking two facts from every item is the expensive part of a large graph."""
+    graph = dataset.knowledge
+    with patch.object(graph, "item_features", wraps=graph.item_features) as spy:
+        build_knowledge_model("KGFlex", dataset, second_order_limit=0)
+
+    assert [call.kwargs["order"] for call in spy.call_args_list] == [1]

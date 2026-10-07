@@ -22,9 +22,12 @@ class BPRLoss(nn.Module):
         Returns:
             Tensor: The computed BPR loss.
         """
-        # Compute the distance of positive
-        # and negative scores
-        distance = pos_score.unsqueeze(1) - neg_score
+        # One negative per row is that row's own; a column of them is each
+        # contrasted with the row's positive.
+        if neg_score.dim() == pos_score.dim():
+            distance = pos_score - neg_score
+        else:
+            distance = pos_score.unsqueeze(1) - neg_score
 
         # Compute the softplus function of the negative distance
         loss = F.softplus(-distance)  # pylint: disable=not-callable

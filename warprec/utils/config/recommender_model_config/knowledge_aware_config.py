@@ -1,4 +1,4 @@
-from typing import ClassVar
+from typing import Any, ClassVar
 
 from pydantic import field_validator
 
@@ -17,6 +17,30 @@ from warprec.utils.config.model_configuration import (
     RecomModel,
 )
 from warprec.utils.registry import params_registry
+
+
+def validate_feature_limit(cls: type, value: Any, field: str) -> list:
+    """Validate a KGFlex feature limit: -1 keeps every feature, 0 none.
+
+    Args:
+        cls (type): Class type of original Pydantic BaseModel.
+        value (Any): A value or a list of values to be validated.
+        field (str): The name of the field to be validated.
+
+    Returns:
+        list: A list of validated values.
+
+    Raises:
+        ValueError: If any value is below -1.
+    """
+    values = value if isinstance(value, list) else [value]
+    for v in values:
+        if isinstance(v, int) and v < -1:
+            raise ValueError(
+                f"Values of {field} for {cls.__name__} model must be >= -1, where "
+                f"-1 keeps every feature. Values received as input: {values}"
+            )
+    return values
 
 
 @params_registry.register("CKE")
@@ -413,3 +437,135 @@ class KGIN(RecomModel):
     def check_independence(cls, v: list):
         """Validate independence."""
         return validate_str_list(cls, v, ["distance", "cosine"], "independence")
+
+
+@params_registry.register("KaHFM")
+class KaHFM(RecomModel):
+    """Definition of the model KaHFM.
+
+    Attributes:
+        need_knowledge (ClassVar[bool]): The model scores from a knowledge graph.
+        min_feature_items (INT_FIELD): How many items must carry a feature for it
+            to become a factor.
+        reg_weight (FLOAT_FIELD): List of values for reg_weight.
+        bias_reg_weight (FLOAT_FIELD): List of values for bias_reg_weight.
+        batch_size (INT_FIELD): List of values for batch_size.
+        epochs (INT_FIELD): List of values for epochs.
+        learning_rate (FLOAT_FIELD): List of values for learning rate.
+    """
+
+    need_knowledge: ClassVar[bool] = True
+
+    min_feature_items: INT_FIELD
+    reg_weight: FLOAT_FIELD
+    bias_reg_weight: FLOAT_FIELD
+    batch_size: INT_FIELD
+    epochs: INT_FIELD
+    learning_rate: FLOAT_FIELD
+
+    @field_validator("min_feature_items")
+    @classmethod
+    def check_min_feature_items(cls, v: list):
+        """Validate min_feature_items."""
+        return validate_greater_than_zero(cls, v, "min_feature_items")
+
+    @field_validator("reg_weight")
+    @classmethod
+    def check_reg_weight(cls, v: list):
+        """Validate reg_weight."""
+        return validate_greater_equal_than_zero(cls, v, "reg_weight")
+
+    @field_validator("bias_reg_weight")
+    @classmethod
+    def check_bias_reg_weight(cls, v: list):
+        """Validate bias_reg_weight."""
+        return validate_greater_equal_than_zero(cls, v, "bias_reg_weight")
+
+    @field_validator("batch_size")
+    @classmethod
+    def check_batch_size(cls, v: list):
+        """Validate batch_size."""
+        return validate_greater_than_zero(cls, v, "batch_size")
+
+    @field_validator("epochs")
+    @classmethod
+    def check_epochs(cls, v: list):
+        """Validate epochs."""
+        return validate_greater_than_zero(cls, v, "epochs")
+
+    @field_validator("learning_rate")
+    @classmethod
+    def check_learning_rate(cls, v: list):
+        """Validate learning_rate."""
+        return validate_greater_than_zero(cls, v, "learning_rate")
+
+
+@params_registry.register("KGFlex")
+class KGFlex(RecomModel):
+    """Definition of the model KGFlex.
+
+    Attributes:
+        need_knowledge (ClassVar[bool]): The model scores from a knowledge graph.
+        embedding_size (INT_FIELD): List of values for embedding_size.
+        first_order_limit (INT_FIELD): How many first-order features each user
+            keeps; -1 keeps all of them.
+        second_order_limit (INT_FIELD): How many second-order features each user
+            keeps; -1 keeps all of them.
+        min_feature_items (INT_FIELD): How many items must carry a feature for it
+            to be considered.
+        batch_size (INT_FIELD): List of values for batch_size.
+        epochs (INT_FIELD): List of values for epochs.
+        learning_rate (FLOAT_FIELD): List of values for learning rate.
+    """
+
+    need_knowledge: ClassVar[bool] = True
+
+    embedding_size: INT_FIELD
+    first_order_limit: INT_FIELD
+    second_order_limit: INT_FIELD
+    min_feature_items: INT_FIELD
+    batch_size: INT_FIELD
+    epochs: INT_FIELD
+    learning_rate: FLOAT_FIELD
+
+    @field_validator("embedding_size")
+    @classmethod
+    def check_embedding_size(cls, v: list):
+        """Validate embedding_size."""
+        return validate_greater_than_zero(cls, v, "embedding_size")
+
+    @field_validator("first_order_limit")
+    @classmethod
+    def check_first_order_limit(cls, v: list):
+        """Validate first_order_limit."""
+        return validate_feature_limit(cls, v, "first_order_limit")
+
+    @field_validator("second_order_limit")
+    @classmethod
+    def check_second_order_limit(cls, v: list):
+        """Validate second_order_limit."""
+        return validate_feature_limit(cls, v, "second_order_limit")
+
+    @field_validator("min_feature_items")
+    @classmethod
+    def check_min_feature_items(cls, v: list):
+        """Validate min_feature_items."""
+        return validate_greater_than_zero(cls, v, "min_feature_items")
+
+    @field_validator("batch_size")
+    @classmethod
+    def check_batch_size(cls, v: list):
+        """Validate batch_size."""
+        return validate_greater_than_zero(cls, v, "batch_size")
+
+    @field_validator("epochs")
+    @classmethod
+    def check_epochs(cls, v: list):
+        """Validate epochs."""
+        return validate_greater_than_zero(cls, v, "epochs")
+
+    @field_validator("learning_rate")
+    @classmethod
+    def check_learning_rate(cls, v: list):
+        """Validate learning_rate."""
+        return validate_greater_than_zero(cls, v, "learning_rate")

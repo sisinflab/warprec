@@ -12,11 +12,11 @@ In the following sections, you will find the list of available knowledge-aware m
 
 Every model on this page requires `reader.knowledge` to be configured. It names two files: the `(head, relation, tail)` triples, and the `(item, entity)` alignment that says which entity each catalogue item stands for. Configuring one of these models without a graph terminates the experiment during configuration validation.
 
-An item the graph is silent about — one that is not aligned, or is aligned to an entity no triple mentions — is kept in the catalogue and scored from the collaborative half of the model alone.
+An item the graph is silent about — one that is not aligned, or is aligned to an entity no triple mentions — is kept in the catalogue and scored from the collaborative half of the model alone. For the feature-based models such an item has no feature: KaHFM scores it by its bias alone and KGFlex scores it zero.
 
 ## Training
 
-A few behaviours are shared by every model on this page:
+A few behaviours are shared by the embedding, propagation and memory models on this page; the [feature-based](#feature-based) ones are described in their own section:
 
 - **Two objectives are optimised together.** A recommendation loss over sampled `(user, positive, negative)` triples, and a knowledge loss over facts drawn from the graph. Both are stepped in the same pass, so a single `epochs` and `learning_rate` govern the whole model.
 - **Facts are learned translationally.** A relation projects entities into a space of its own, where a true fact is contrasted against the same fact with a uniformly corrupted tail.
@@ -32,6 +32,8 @@ A few behaviours are shared by every model on this page:
 | | [KGCN](#kgcn) | Knowledge Graph Convolutional Network; a sampled neighbourhood weighted per user. |
 | | [KGIN](#kgin) | Knowledge Graph Intent Network; propagation split across learned user intents. |
 | Memory-Based | [RippleNet](#ripplenet) | Preferences spread outward from a user's history across the graph. |
+| Feature-Based | [KaHFM](#kahfm) | Knowledge-aware Hybrid Factorization Machines; one interpretable factor per graph feature, started at its TF-IDF. |
+| | [KGFlex](#kgflex) | Sparse feature factorization over the features each user is expert about, chosen by information gain. |
 
 ## Embedding-Based
 
@@ -177,3 +179,64 @@ models:
 !!! note "Scoring cost"
 
     Like KGCN, the representation depends on the pair rather than on the item alone, so full-catalogue ranking walks every pair.
+
+## Feature-Based
+
+Feature-Based knowledge models neither embed the graph nor propagate over it. They read it as an attribute table: a **first-order feature** is a `(relation, tail)` pair leaving an item's entity, such as *directed by Kubrick*, and a **second-order feature** walks one fact further, `(relation, relation, tail)`, such as *directed by someone born in the UK*. Facts are read in the direction they were written, from the item outwards. A feature is kept only when at least `min_feature_items` items of the catalogue carry it.
+
+Both models were developed at SisInfLab and first implemented in [Elliot](https://github.com/sisinflab/elliot). The WarpRec versions follow the papers where Elliot's code departs from them, as noted below.
+
+### KaHFM
+
+KaHFM (Knowledge-aware Hybrid Factorization Machines): A factorization model whose factors are not latent. There is one factor per first-order feature, so a user's factor is how much they care about *directed by Kubrick* and an item's is how much it is about it. An item starts at the TF-IDF of its features, normalised to unit length, and a user at the mean of the items in their training history; BPR then refines both, together with an item bias, and every factor stays tied to the feature it started from. Elliot's three variants (KaHFM, KaHFMBatch, KaHFMEmbeddings) differ only in how they are optimised; this one is trained in mini-batches with the configured optimizer. Elliot's user profile keeps only the last item carrying each feature; WarpRec uses the mean the paper defines. **This model requires a knowledge graph to function properly.**
+
+For further details, please refer to the [ISWC 2019 paper](https://doi.org/10.1007/978-3-030-30793-6_3) and its [TKDE extension](https://doi.org/10.1109/TKDE.2020.3010215).
+
+```yaml
+models:
+  KaHFM:
+    min_feature_items: 10
+    reg_weight: 0.0025
+    bias_reg_weight: 0.0
+    batch_size: 1024
+    epochs: 100
+    learning_rate: 0.001
+```
+
+- **min_feature_items**: How many items must carry a feature for it to become a factor. The width of the model is the number of features kept, so there is no `embedding_size`.
+- **reg_weight**: The L2 regularization weight of the user and item factors.
+- **bias_reg_weight**: The L2 regularization weight of the item biases.
+
+!!! note "Reading the factors"
+
+    The model keeps the feature each factor stands for in `feature_labels`, in the identifiers the graph was read with, so a user's largest factors name the features their recommendations lean on.
+
+### KGFlex
+
+KGFlex: A user is described by the few features their choices depend on. Before training, each user's items are set against as many items they did not take, drawn at random, and every feature is weighed by its **information gain** at telling the two apart. Only features with a positive gain are kept, up to `first_order_limit` first-order and `second_order_limit` second-order ones per user, and the gain becomes the fixed weight `k_uf` of that feature for that user. Each kept feature has a global embedding `g_f` and bias `b_f`, and each user a personal embedding `p_uf` for every feature they kept; an item is scored as `Σ k_uf (p_uf · g_f + b_f)` over the features it shares with the user, trained with BPR. Elliot's prediction paired a user's embeddings with the wrong features, it skipped samples whose negative shared no feature with the user, and it rejected a first-order limit without a second-order one; none of that is reproduced. **This model requires a knowledge graph to function properly.**
+
+For further details, please refer to the [paper](https://arxiv.org/abs/2107.14290).
+
+```yaml
+models:
+  KGFlex:
+    embedding_size: 10
+    first_order_limit: 100
+    second_order_limit: 100
+    min_feature_items: 10
+    batch_size: 1024
+    epochs: 50
+    learning_rate: 0.005
+```
+
+- **first_order_limit**: How many first-order features each user keeps, by information gain. `-1` keeps every informative one, `0` none.
+- **second_order_limit**: The same, for second-order features.
+- **min_feature_items**: How many items must carry a feature for it to be considered.
+
+!!! warning "Memory"
+
+    A user holds one embedding per feature they kept, so the model has `users × features kept per user × embedding_size` personal parameters. With both limits at `-1` on a large graph that is far more than a matrix factorization of the same width; the limits are the knob.
+
+!!! note "Sparse graphs"
+
+    An item is scored only through the features it shares with the user, and there is no collaborative term to fall back on: an item that shares none scores zero, and a user for whom no feature is informative scores every item zero. How many such users there are is logged when the model is built. On a graph with only a few facts per item, most of the catalogue is out of a user's reach and the model ranks far below a collaborative one; it is meant for graphs that describe items richly. The personal embeddings are not regularized, as in the paper, so [`early_stopping`](../configuration/models.md) is worth configuring.
