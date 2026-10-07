@@ -2,6 +2,15 @@
 
 <!-- version list -->
 
+## v2.1.2 (2026-10-07)
+
+### Bug Fixes
+
+- The train and swarm pipelines start from any directory, not only from inside the WarpRec
+  repository
+  ([`8b04558`](https://github.com/sisinflab/warprec/commit/8b045580068794d3ad8692f62293842933644c0f))
+
+
 ## v2.1.1 (2026-10-07)
 
 ### Bug Fixes
