@@ -2,6 +2,29 @@
 
 <!-- version list -->
 
+## v2.1.1 (2026-10-07)
+
+### Bug Fixes
+
+- Custom metrics can be configured with parameters under complex_metrics
+  ([`42e7cb5`](https://github.com/sisinflab/warprec/commit/42e7cb56350947ac20fe436e9b9719c81a87db64))
+
+- Custom modules given as a path are imported, on the driver and on every Ray worker
+  ([`d875e80`](https://github.com/sisinflab/warprec/commit/d875e806cdd80aa2acc146d2db507289e546a980))
+
+- Every validation set is aligned with the train set it validates
+  ([`1d97b11`](https://github.com/sisinflab/warprec/commit/1d97b114695bcf076029fe803fef81b0f62e44cf))
+
+- Pre-split cross-validation folds can be loaded, each aligned with its own train set
+  ([`ac3059d`](https://github.com/sisinflab/warprec/commit/ac3059d3be0824fe570d59a6e1f35ff31e632252))
+
+- Sequential histories stay with their users when the last users have no training interactions
+  ([`4203ef6`](https://github.com/sisinflab/warprec/commit/4203ef6013460b6d6d23b02023ff046115b37ac9))
+
+- User and item cluster files can be read
+  ([`45d9edc`](https://github.com/sisinflab/warprec/commit/45d9edc5bee5b7ba112f33240026ba8932b025e5))
+
+
 ## v2.1.0 (2026-10-07)
 
 ### Bug Fixes
