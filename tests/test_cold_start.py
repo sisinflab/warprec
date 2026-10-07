@@ -268,3 +268,38 @@ def test_a_batch_of_users_without_history_still_has_a_sequence(
     assert sequences.shape[0] == len(cold)
     assert sequences.shape[1] >= 1, "a cold batch was given no position to read"
     assert bool((lengths == 0).all()), "a held-out user kept a training history"
+
+
+def test_every_user_keeps_their_own_history_when_the_last_users_are_held_out(
+    interactions: pd.DataFrame,
+):
+    """The users at the end of the index space have no training rows here.
+
+    A protocol that holds users out can leave the highest indices empty, and the
+    history of the last user who did train must neither vanish nor be handed to
+    a held-out user, who would then be scored on someone else's past.
+    """
+    held_out = {N_USERS - 2, N_USERS - 1}
+    train = interactions[~interactions.user_id.isin(held_out)]
+    test = interactions[interactions.user_id.isin(held_out)]
+    dataset = Dataset(
+        train_data=train,
+        eval_data=test,
+        rating_type="implicit",
+        timestamp_label="timestamp",
+        cold_start="user",
+        batch_size=16,
+    )
+
+    user_map, item_map = dataset.get_mappings()
+    users = sorted(user_map)
+    sequences, lengths = dataset.train_session.get_user_history_sequences(
+        [user_map[user] for user in users], N_ITEMS
+    )
+
+    for row, user in enumerate(users):
+        expected = [
+            item_map[item]
+            for item in train[train.user_id == user].sort_values("timestamp").item_id
+        ]
+        assert sequences[row, : lengths[row]].tolist() == expected, user

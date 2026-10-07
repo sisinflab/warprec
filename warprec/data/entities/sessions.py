@@ -129,23 +129,14 @@ class Sessions:
         self._flat_users = df.select(self.user_label).to_numpy().flatten()
         self._flat_items = df.select(self.item_label).to_numpy().flatten()
 
-        # Calculate Offsets
-        # unique_users are sorted because df is sorted by user
-        unique_users, start_indices = np.unique(self._flat_users, return_index=True)
-
+        # Calculate Offsets. The tape is sorted by user, so a user's rows start
+        # where the counts of every lower index end. Counting rather than
+        # locating starts gives a user with no rows an empty range wherever it
+        # falls, the end of the index space included, which a cold-start
+        # protocol produces whenever it holds out the highest indices.
+        counts = np.bincount(self._flat_users, minlength=self._nuid)
         self._user_offsets = np.zeros(self._nuid + 1, dtype=np.int64)
-
-        # Set starts
-        self._user_offsets[unique_users] = start_indices
-        # Set ends (start of next user)
-        self._user_offsets[unique_users + 1] = np.roll(start_indices, -1)
-        self._user_offsets[-1] = len(self._flat_items)
-
-        # Fill gaps for users with no interactions (propagate previous offset)
-        # This ensures user_offsets[u] == user_offsets[u+1] for empty users
-        for i in range(1, len(self._user_offsets)):
-            if self._user_offsets[i] == 0 and self._user_offsets[i - 1] > 0:
-                self._user_offsets[i] = self._user_offsets[i - 1]
+        np.cumsum(counts, out=self._user_offsets[1:])
 
     def get_user_history_sequences(
         self, user_ids: List[int], max_seq_len: int
