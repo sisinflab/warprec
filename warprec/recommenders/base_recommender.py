@@ -775,6 +775,14 @@ class IterativeRecommender(Recommender, L.LightningModule):
             "interval": "epoch",
             "frequency": 1,
         }
+
+        # A plateau scheduler steps on the epoch's training loss: unlike the
+        # validation metric it exists in every run, the retraining after
+        # cross-validation included, and on every epoch however often the
+        # model is evaluated
+        if isinstance(scheduler, torch.optim.lr_scheduler.ReduceLROnPlateau):
+            lr_scheduler_config["monitor"] = TRAIN_LOSS
+
         return {"optimizer": optimizer, "lr_scheduler": lr_scheduler_config}
 
     def _init_weights(self, module: nn.Module):

@@ -136,6 +136,8 @@ models:
 
 For further details about the scheduling algorithms and their parameters, you can check the original [PyTorch Guide](https://docs.pytorch.org/docs/stable/optim.html#how-to-adjust-learning-rate).
 
+**ReduceLROnPlateau** steps on the mean training loss of each epoch (`train_loss`), not on the validation metric. The loss exists in every run and on every epoch: in a sweep trial whatever `eval_every_n` is, and in the retraining after cross-validation, which has no validation data. The learning-rate schedule the retrained model follows is then the one the trials followed. Since a lower loss is better, its `mode` must stay `min` (the default); `max` is refused.
+
 ### Optimizer Section
 
 Within WarpRec standard pipelines, you customize the optimizer used during training to fit your need. To do so, you can pass the following parameters under the optimizer configuration block:
