@@ -231,8 +231,9 @@ def remote_model_retraining(
             persistent_workers=persistent_workers,
         )
 
+        # The epochs cross-validation settled on, not the search's upper bound
         l_trainer = L.Trainer(
-            max_epochs=best_model.epochs,
+            max_epochs=iterations,
             devices="auto",
             accelerator=device,
             **lightning_runtime(params.optimization, device),
