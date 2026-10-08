@@ -5,7 +5,7 @@ from datetime import datetime
 from enum import Enum
 from importlib.metadata import PackageNotFoundError, version
 from io import BytesIO
-from typing import Any, Dict, Optional, TYPE_CHECKING
+from typing import Any, Dict, Optional, Tuple, TYPE_CHECKING
 
 import numpy as np
 import torch
@@ -298,6 +298,44 @@ def model_fingerprint(model_name: str, model_params: Dict[str, Any]) -> str:
         str: The fingerprint.
     """
     return _digest({"model": model_name, "params": _strip_excluded(model_params)})
+
+
+def reconcile_model_state(
+    state: RunState, model_name: str, model_params: Dict[str, Any]
+) -> Tuple[ModelState, bool]:
+    """Checks a model's recorded progress against its current configuration.
+
+    This runs before any decision based on the recorded status, so that a model
+    whose configuration changed is optimised again even when the manifest says
+    it completed or failed. Its recorded state is replaced by a pending one and
+    the current fingerprint is recorded.
+
+    Args:
+        state (RunState): The state of the run.
+        model_name (str): The name of the model.
+        model_params (Dict[str, Any]): The model's current parameter block.
+
+    Returns:
+        Tuple[ModelState, bool]: The model's state, and whether the progress
+            Ray Tune saved for it may be restored. Only progress recorded by
+            this run, under the same model configuration, may be restored;
+            anything else on disk belongs to a run whose state was discarded.
+    """
+    model_state = state.model_state(model_name)
+    current = model_fingerprint(model_name, model_params)
+
+    if model_state.fingerprint and model_state.fingerprint != current:
+        logger.attention(
+            f"The configuration of {model_name} changed since the last run. "
+            "Its saved state will be discarded and the model will be "
+            "optimized from scratch."
+        )
+        model_state = ModelState()
+        state.models[model_name] = model_state
+
+    resumable = model_state.fingerprint == current
+    model_state.fingerprint = current
+    return model_state, resumable
 
 
 def run_fingerprint(config: "TrainConfiguration") -> str:

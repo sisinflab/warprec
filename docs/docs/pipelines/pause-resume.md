@@ -22,6 +22,8 @@ A resumed trial keeps its `result.json` and `progress.csv`: the results reported
 
 The manifest tracks, for every model, one of five states: `pending`, `interrupted`, `hpo_completed`, `completed` or `failed`. On resume, `completed` models are skipped entirely, `hpo_completed` models skip the sweep and rebuild their best model from its checkpoint, and `interrupted` models continue their sweep.
 
+The manifest decides for both layers. A Ray Tune experiment is restored only for a model the manifest records under its current configuration. When the manifest's state is discarded instead — see [What Invalidates a Resume](../configuration/run.md#what-invalidates-a-resume) — the experiment is moved aside to `<run_name>__<model_name>.discarded-<timestamp>` and the model starts a new sweep, so an old split or an old search space can never leak into the new run.
+
 The manifest also pins the timestamp embedded in the run's output file names, so a resumed run keeps merging into the same `Overall_Results_*.tsv`, `Overall_Params_*.json` and `Time_Report_*.tsv` as the run that created them, instead of starting a second set.
 
 ## Pausing a Run

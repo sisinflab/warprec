@@ -7,7 +7,7 @@ from warprec.common import (
     ModelState,
     ModelStatus,
     log_evaluation,
-    model_fingerprint,
+    reconcile_model_state,
 )
 from warprec.data import Dataset
 from warprec.pipelines.common import (
@@ -140,7 +140,11 @@ def train_pipeline(path: str):
     with PauseController(enabled=config.run.pause_on_signal) as pause:
         try:
             for model_name in models:
-                model_state = context.state.model_state(model_name)
+                # Compared before the status is read, so that a model whose
+                # configuration changed is optimized again whatever its status
+                model_state, resumable = reconcile_model_state(
+                    context.state, model_name, config.models[model_name]
+                )
 
                 if model_state.status == ModelStatus.COMPLETED:
                     logger.msg(f"Skipping {model_name}: already completed in this run.")
@@ -171,23 +175,6 @@ def train_pipeline(path: str):
 
                 params = model_param_from_dict(model_name, config.models[model_name])
 
-                # A model whose configuration changed cannot reuse its saved context.state
-                current_fingerprint = model_fingerprint(
-                    model_name, config.models[model_name]
-                )
-                if (
-                    model_state.fingerprint
-                    and model_state.fingerprint != current_fingerprint
-                ):
-                    logger.attention(
-                        f"The configuration of {model_name} changed since the last run. "
-                        "Its saved context.state will be discarded and the model will be "
-                        "optimized from scratch."
-                    )
-                    model_state = ModelState()
-                    context.state.models[model_name] = model_state
-                model_state.fingerprint = current_fingerprint
-
                 trainer = Trainer(
                     storage_path=storage_path,
                     custom_callback=context.callback,
@@ -195,8 +182,13 @@ def train_pipeline(path: str):
                     dashboard_config=config.dashboard,
                     run_name=context.run_name,
                     errored_trials=config.run.errored_trials,
+                    resumable=resumable,
                 )
                 model_state.tune_experiment_name = trainer.experiment_name(model_name)
+
+                # Recorded before the sweep starts, so that a run killed during
+                # it can still continue the sweep under the same configuration
+                context.state_store.save(context.state)
 
                 outcome = resolve_model_outcome(
                     model_name,

@@ -4,10 +4,9 @@ from typing import Dict, Any, Optional, List, Tuple
 import ray
 
 from warprec.common import (
-    ModelState,
     ModelStatus,
     log_evaluation,
-    model_fingerprint,
+    reconcile_model_state,
 )
 from warprec.data.writer import WriterFactory
 from warprec.data import Dataset
@@ -28,7 +27,6 @@ from warprec.utils.config import (
     TrainConfiguration,
 )
 from warprec.utils.pause import PauseController
-from warprec.utils.enums import ErroredTrialPolicy
 from warprec.utils.helpers import model_param_from_dict
 from warprec.utils.logger import logger
 
@@ -79,8 +77,13 @@ def swarm_pipeline(path: str):
 
     # Only launch the models that are not already finished
     pending_models = []
+    resumable_models = set()
     for model_name in models:
-        model_state = context.state.model_state(model_name)
+        # Compared before the status is read, so that a model whose
+        # configuration changed is optimized again whatever its status
+        model_state, resumable = reconcile_model_state(
+            context.state, model_name, config.models[model_name]
+        )
 
         if model_state.status == ModelStatus.COMPLETED:
             logger.msg(f"Skipping {model_name}: already completed in this run.")
@@ -99,15 +102,8 @@ def swarm_pipeline(path: str):
             logger.msg(f"Skipping {model_name}: it failed in a previous run.")
             continue
 
-        current_fingerprint = model_fingerprint(model_name, config.models[model_name])
-        if model_state.fingerprint and model_state.fingerprint != current_fingerprint:
-            logger.attention(
-                f"The configuration of {model_name} changed since the last run. "
-                "Its saved context.state will be discarded and the model will be "
-                "optimized from scratch."
-            )
-            context.state.models[model_name] = ModelState()
-        context.state.model_state(model_name).fingerprint = current_fingerprint
+        if resumable:
+            resumable_models.add(model_name)
         pending_models.append(model_name)
 
     context.state_store.save(context.state)
@@ -123,8 +119,8 @@ def swarm_pipeline(path: str):
             callback=context.callback,
             data_preparation_time=data_preparation_time,
             run_name=context.run_name,
-            errored_trials=config.run.errored_trials,
             writer_timestamp=context.state.writer_timestamp,
+            resumable=model_name in resumable_models,
         )  # type: ignore[call-arg]
         futures.append(future)
 
@@ -242,8 +238,8 @@ def remote_model_pipeline(
     callback: WarpRecCallback,
     data_preparation_time: float,
     run_name: Optional[str] = None,
-    errored_trials: ErroredTrialPolicy = ErroredTrialPolicy.SKIP,
     writer_timestamp: Optional[str] = None,
+    resumable: bool = False,
 ) -> Tuple[str, Optional[Recommender], Dict, Dict, Dict, Dict]:
     """Orchestrates the entire lifecycle of a single model in parallel.
 
@@ -260,10 +256,10 @@ def remote_model_pipeline(
         data_preparation_time (float): Time taken for data prep (for reporting).
         run_name (Optional[str]): The identifier of the run, used to give the Ray
             Tune experiment a deterministic name so that it can be restored.
-        errored_trials (ErroredTrialPolicy): How to treat trials that errored
-            before a pause when restoring the experiment.
         writer_timestamp (Optional[str]): The timestamp pinned into the output
             file names of this run.
+        resumable (bool): Whether the run state allows restoring the Ray Tune
+            experiment this model left behind.
 
     Returns:
         Tuple[str, Optional[Recommender], Dict, Dict, Dict, Dict]: A tuple containing:
@@ -289,7 +285,8 @@ def remote_model_pipeline(
         custom_modules=config.general.custom_modules,
         dashboard_config=config.dashboard,
         run_name=run_name,
-        errored_trials=errored_trials,
+        errored_trials=config.run.errored_trials,
+        resumable=resumable,
     )
 
     # Run the HPO
