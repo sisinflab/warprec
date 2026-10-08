@@ -423,6 +423,9 @@ class Trainer:
             "chunk_size": opt_config.chunk_size,
             "custom_modules": self._custom_modules,
             "early_stopping_config": params.early_stopping,
+            # The trial rebuilds its configuration from the sampled
+            # hyperparameters alone, so precision and clipping travel here
+            "optimization": opt_config,
             "num_workers": opt_config.num_workers,
             "cpu_per_worker": (
                 scaling_config_dict.get("resources_per_worker") or {}
