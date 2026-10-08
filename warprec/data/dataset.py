@@ -1083,6 +1083,7 @@ class Dataset:
                 user_id_label=user_label,
                 item_id_label=item_label,
                 context_labels=context_labels,
+                context=self._context_spec,
             )
             self._precomputed_dataloader[key] = DataLoader(
                 dataset, batch_size=self.batch_size, shuffle=False, **kwargs
@@ -1166,6 +1167,7 @@ class Dataset:
                 seed=seed,
                 negative_sampling=negative_sampling,
                 neg_alpha=neg_alpha,
+                context=self._context_spec,
             )
             self._precomputed_dataloader[key] = DataLoader(
                 dataset,

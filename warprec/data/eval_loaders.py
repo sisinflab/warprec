@@ -10,9 +10,11 @@ from torch.utils.data import Dataset as TorchDataset
 from torch.nn.utils.rnn import pad_sequence
 from scipy.sparse import csr_matrix
 
+from warprec.data.entities.context import build_context_array
 from warprec.data.entities.train_structures.interaction_structures import (
     popularity_cumulative,
 )
+from warprec.data.schema import ContextSpec
 
 
 def draw_candidates(
@@ -121,6 +123,37 @@ def draw_negatives(
     return chosen[:num_negatives]
 
 
+def read_contexts(
+    eval_data: DataFrame[Any],
+    context_labels: List[str],
+    context: Optional[ContextSpec] = None,
+) -> Tensor:
+    """Read the encoded context columns the way training reads them.
+
+    A categorical field stores an index and a numeric field a value, and a
+    multi-valued field stores its indices as one string, such as '5 14'. The
+    array is built by the same function the training records use, so that an
+    evaluation context has the shape and the padding of a training one.
+
+    Args:
+        eval_data (DataFrame[Any]): The evaluation rows, contexts encoded.
+        context_labels (List[str]): The context columns, in order.
+        context (Optional[ContextSpec]): How each field is encoded and the widest
+            multi-valued field; None when every field holds a single number.
+
+    Returns:
+        Tensor: The contexts, [rows, fields], or [rows, fields, values] with a
+            multi-valued field.
+    """
+    context = context or ContextSpec()
+    types = [context.field_types.get(label, "token") for label in context_labels]
+    return torch.from_numpy(
+        build_context_array(
+            eval_data.select(context_labels).to_numpy(), types, context.max_len
+        )
+    )
+
+
 class EvaluationDataset(TorchDataset):
     """
     Yields: (user_idx, item_indices, values)
@@ -169,6 +202,7 @@ class ContextualEvaluationDataset(TorchDataset):
         user_id_label: str,
         item_id_label: str,
         context_labels: List[str],
+        context: Optional[ContextSpec] = None,
     ):
         # Pre-convert DataFrames to torch tensor to reduce overhead
         self.user_indices = torch.from_numpy(
@@ -177,11 +211,7 @@ class ContextualEvaluationDataset(TorchDataset):
         self.item_indices = torch.from_numpy(
             eval_data.select(item_id_label).to_numpy().flatten().astype(np.int64)
         )
-        # Categorical fields store an index and numeric fields a value, so the
-        # evaluation contexts are read the same way the training ones are.
-        self.context_features = torch.from_numpy(
-            eval_data.select(context_labels).to_numpy().astype(np.float32)
-        )
+        self.context_features = read_contexts(eval_data, context_labels, context)
 
     def __len__(self) -> int:
         return len(self.user_indices)
@@ -329,7 +359,11 @@ class SampledContextualEvaluationDataset(TorchDataset):
         seed: int = 42,
         negative_sampling: str = "uniform",
         neg_alpha: float = 0.75,
+        context: Optional[ContextSpec] = None,
     ):
+        # pylint: disable = too-many-arguments, too-many-positional-arguments
+        # The evaluation rows, the sampling protocol and the context encoding
+        # are decided in different places and only meet here.
         self.num_negatives = num_negatives
         self.num_items = num_items
 
@@ -340,11 +374,7 @@ class SampledContextualEvaluationDataset(TorchDataset):
         self.pos_item_indices = torch.from_numpy(
             eval_data.select(item_id_label).to_numpy().flatten().astype(np.int64)
         )
-        # Categorical fields store an index and numeric fields a value, so the
-        # evaluation contexts are read the same way the training ones are.
-        self.context_features = torch.from_numpy(
-            eval_data.select(context_labels).to_numpy().astype(np.float32)
-        )
+        self.context_features = read_contexts(eval_data, context_labels, context)
 
         n_train_users = train_interactions.shape[0]
 
