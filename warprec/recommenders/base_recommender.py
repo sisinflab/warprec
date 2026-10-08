@@ -29,6 +29,10 @@ from warprec.utils.registry import lr_scheduler_registry, optimizer_registry
 SIMILARITY_BLOCK_BYTES = 64 * 1024**2
 
 
+# The name every iterative model logs its mean training loss of the epoch under
+TRAIN_LOSS = "train_loss"
+
+
 # The layout of the dictionary get_state() returns. Version 2 records the
 # writing WarpRec and keeps interaction-built iterative models whole.
 CHECKPOINT_FORMAT = 2
@@ -860,6 +864,31 @@ class IterativeRecommender(Recommender, L.LightningModule):
         Returns:
             Tensor: The computed loss for the batch.
         """
+
+    def on_train_batch_end(self, outputs: Any, batch: Any, batch_idx: int) -> None:
+        """PyTorch Lightning hook that collects the training loss of every model.
+
+        The loss each training step returns is logged under TRAIN_LOSS as the
+        unweighted mean over the batches of the epoch, so that early stopping
+        and ReduceLROnPlateau can watch it whether or not the model logs its
+        own loss.
+
+        Args:
+            outputs (Any): What the training step returned, as Lightning hands
+                it over: the loss, or a dictionary holding it under 'loss'.
+            batch (Any): The batch of data from the DataLoader.
+            batch_idx (int): The current batch index.
+        """
+        loss = outputs.get("loss") if isinstance(outputs, dict) else outputs
+        if isinstance(loss, Tensor):
+            self.log(
+                TRAIN_LOSS,
+                loss.detach(),
+                on_step=False,
+                on_epoch=True,
+                batch_size=1,
+                sync_dist=True,
+            )
 
     def validation_step(self, batch: Any, batch_idx: int) -> Any:
         """PyTorch Lightning needs this method to be implemented

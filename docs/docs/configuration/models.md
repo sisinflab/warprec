@@ -213,9 +213,11 @@ The **properties** subsection provides additional parameters to the optimization
 
 The **early_stopping** section optionally adds stopping criteria for each trial:
 
-- **monitor**: Metric to monitor, e.g., `score` (validation metric) or `loss`.
-- **patience**: Consecutive evaluations without improvement before stopping. Required if early stopping is enabled.
-- **grace_period**: Minimum number of evaluations before early stopping can trigger.
+- **monitor**: What to watch: `score` (the default) or `loss`.
+    - `score` watches the validation metric each time the model is evaluated (every `eval_every_n` epochs), in the direction set by `properties.mode`.
+    - `loss` watches the mean training loss of every epoch, whether or not that epoch is evaluated. Lower is always better, whatever `properties.mode` says. Every iterative model reports this loss, as `train_loss`, without having to log it itself.
+- **patience**: Consecutive checks without improvement before stopping: evaluations under `score`, epochs under `loss`. Required if early stopping is enabled.
+- **grace_period**: The epoch from which early stopping starts counting.
 - **min_delta**: Minimum change to consider as an improvement.
 
 !!! Example "ASHA Scheduler for Efficient Trial Pruning"
