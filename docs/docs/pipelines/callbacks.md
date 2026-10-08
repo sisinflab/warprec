@@ -15,4 +15,4 @@ To integrate a custom callback into the main pipeline, follow these two steps:
 1. **Implement the Callback:** Create a script containing a class that extends the base `WarpRecCallback`.
 2. **Register the Callback:** Add the callback definition to your configuration file. For more details on configuration, see the [General Configuration](../configuration/general.md) guide.
 
-For a detailed implementation tutorial, see the [Callbacks Guide](../guides/callbacks.md).
+For a detailed implementation tutorial, see the [Callbacks Guide](../extending/callbacks.md).

@@ -1,0 +1,16 @@
+# Read a ready-made train/test split: split/train.tsv and split/test.tsv.
+reader:
+  loading_strategy: split
+  data_type: transaction
+  reading_method: local
+  rating_type: explicit
+  split:
+    local_path: ../runs/01-reading-data/split-u1
+    ext: .tsv
+    sep: "\t"
+    header: true
+models:
+  Pop: {}
+evaluation:
+  top_k: [10]
+  metrics: [nDCG]

@@ -45,7 +45,7 @@ WarpRec is not only a framework for building and evaluating recommender systems,
 - **44 GPU-accelerated metrics** across accuracy, rating, coverage, novelty, diversity, bias, fairness, debiased and multi-objective families
 - **21 filtering and splitting strategies** for rigorous, leak-free experimental protocols, including item and user cold-start
 - **Comprehensive HPO engine** with Grid Search, Bayesian optimization (HyperOpt, Optuna), and bandit-based strategies (BOHB)
-- **Integrated dashboarding** via Weights & Biases, MLflow, and TensorBoard
+- **Integrated dashboarding** via Weights & Biases, MLflow and CodeCarbon
 - **Event-driven callback system** for injecting custom logic at any pipeline stage
 
 For a detailed walkthrough of the architecture, see [Architecture](architecture.md).

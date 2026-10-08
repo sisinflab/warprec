@@ -1,0 +1,8 @@
+# Rank each user's test items against 99 drawn negatives instead of the catalogue.
+evaluation:
+  top_k: [10, 20]
+  metrics: [nDCG, Recall, Precision, HitRate]
+  strategy: sampled
+  num_negatives: 99
+  negative_sampling: popularity   # or uniform (the default)
+  neg_alpha: 0.75                 # read by popularity only

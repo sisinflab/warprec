@@ -1,0 +1,32 @@
+# Every contextual field the guide derives, declared in the reader.
+reader:
+  loading_strategy: dataset
+  data_type: transaction
+  reading_method: local
+  local_path: ../runs/05-context/ratings-context.tsv
+  rating_type: explicit
+  # How repeated (user, item) rows collapse into the interaction matrix.
+  duplicates: max
+  labels:
+    context_labels: [daypart, weekend, tenure, previous_genres]
+  dtypes:
+    context_types:
+      daypart: str
+      weekend: str
+      tenure: float32 # a measurement, not a category
+      previous_genres: str
+    context_separators:
+      previous_genres: "|" # several values in one cell
+splitter:
+  test_splitting:
+    strategy: temporal_leave_k_out
+    k: 1
+training:
+  # How the values of a multi-valued field are combined: mean, sum or max.
+  sequence_pooling: mean
+# This file is read for its data sections only; guide 9 covers models.
+models:
+  Pop: {}
+evaluation:
+  top_k: [10]
+  metrics: [nDCG]

@@ -1,0 +1,34 @@
+# The same step as a train-pipeline run (guide 10): save_split writes the split,
+# meta.save_model writes serialized/<name>.pth, meta.save_recs writes recs/.
+reader:
+  loading_strategy: dataset
+  data_type: transaction
+  reading_method: local
+  local_path: ../data/ml-100k/ratings.tsv
+  rating_type: implicit
+splitter:
+  test_splitting:
+    strategy: temporal_holdout
+    ratio: 0.1
+writer:
+  dataset_name: ml-100k
+  writing_method: local
+  local_experiment_path: ../runs/14-evaluating-existing-models/trained
+  save_split: true
+models:
+  BPR:
+    embedding_size: 32
+    reg_weight: 0.0001
+    batch_size: 1024
+    epochs: 10
+    learning_rate: 0.005
+    meta: {save_model: true, save_recs: true}
+  EASE:
+    l2: 200.0
+    meta: {save_model: true, save_recs: true}
+evaluation:
+  top_k: [10]
+  metrics: [nDCG, Recall]
+general:
+  ray_address: local
+  ray_verbose: 0

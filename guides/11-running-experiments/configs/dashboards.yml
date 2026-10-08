@@ -1,0 +1,54 @@
+# One BPR configuration trained for three epochs, with CodeCarbon writing the
+# energy each trial used to a CSV and MLflow logging every epoch's report to a
+# local file store. No run.name: WarpRec derives one.
+reader:
+  loading_strategy: dataset
+  data_type: transaction
+  reading_method: local
+  local_path: ../data/ml-100k/ratings.tsv
+  rating_type: implicit
+splitter:
+  test_splitting:
+    strategy: temporal_holdout
+    ratio: 0.1
+  validation_splitting:
+    strategy: temporal_holdout
+    ratio: 0.1
+writer:
+  dataset_name: dashboards
+  writing_method: local
+  local_experiment_path: ../runs/11-running-experiments/
+models:
+  BPR:
+    optimization:
+      num_workers: 0
+      properties:
+        seed: 42
+    embedding_size: 32
+    learning_rate: 0.005
+    reg_weight: 0.0001
+    batch_size: 1024
+    epochs: 3
+evaluation:
+  top_k: [10]
+  metrics: [nDCG, Recall]
+  validation_metric: nDCG@10
+dashboard:
+  codecarbon:
+    enabled: true
+    save_to_file: true
+    tracking_mode: machine
+  mlflow:
+    enabled: true
+    tracking_uri: ../runs/11-running-experiments/mlruns
+    registry_uri: ../runs/11-running-experiments/mlruns
+    experiment_name: warprec-guide-11
+  # Weights & Biases needs an account; with an API key it is enabled the same way:
+  # wandb:
+  #   enabled: true
+  #   project: warprec-guides
+  #   api_key_file: ~/.wandb_key
+general:
+  device: cpu
+  ray_address: local
+  ray_verbose: 0

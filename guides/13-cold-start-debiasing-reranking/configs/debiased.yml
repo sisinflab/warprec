@@ -1,0 +1,32 @@
+# Each user's latest 20% as the test set, scored with the naive metrics and
+# their inverse-propensity counterparts.
+reader:
+  loading_strategy: dataset
+  data_type: transaction
+  reading_method: local
+  local_path: ../data/ml-100k/ratings.tsv
+  rating_type: implicit
+  side:
+    local_path: ../runs/13-cold-start-debiasing-reranking/item-genres.tsv
+splitter:
+  test_splitting:
+    strategy: temporal_holdout
+    ratio: 0.2
+models:
+  Pop: {}
+  EASE:
+    l2: 200.0
+  ItemKNN:
+    k: 50
+    similarity: cosine
+  VSM:
+    similarity: cosine
+    user_profile: tfidf
+    item_profile: binary
+evaluation:
+  top_k: [10]
+  metrics: [Recall, nDCG, IPSRecall, SNIPSRecall, IPSDCG, SNIPSDCG, ARP]
+  propensity:
+    estimator: popularity  # uniform (default) applies no correction
+    power: 0.5             # p_i = (n_i / max n) ** power; 0 turns the correction off
+    clip: 0.1              # the smallest propensity an item may carry

@@ -1,0 +1,5 @@
+# Leave training items in the ranking (full strategy only).
+evaluation:
+  top_k: [10, 20]
+  metrics: [nDCG, Recall, Precision, HitRate]
+  mask_seen: none   # auto (default), pair, context or none

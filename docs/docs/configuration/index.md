@@ -116,7 +116,7 @@ evaluation:
     batch_size: 1024
     metrics: [nDCG, Precision, Recall, HitRate]
 general:
-    custom_models: [my_custom_model.py]
+    custom_modules: [my_custom_model.py]
 ```
 
 Run the design pipeline with:

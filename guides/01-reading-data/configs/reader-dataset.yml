@@ -1,0 +1,20 @@
+# Read one file and split it. Paths are relative to the guide's folder.
+reader:
+  loading_strategy: dataset
+  data_type: transaction
+  reading_method: local
+  local_path: ../data/ml-100k/ratings.tsv
+  sep: "\t"
+  header: true
+  rating_type: explicit
+splitter:
+  test_splitting:
+    strategy: temporal_holdout
+    ratio: 0.1
+# Every configuration names at least one model and how to evaluate it.
+# Guides 9 and 12 cover these two sections.
+models:
+  Pop: {}
+evaluation:
+  top_k: [10]
+  metrics: [nDCG]

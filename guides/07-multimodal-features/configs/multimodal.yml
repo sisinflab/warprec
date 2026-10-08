@@ -1,0 +1,28 @@
+# Three modalities, one per file layout. Paths are relative to the guide's folder.
+reader:
+  loading_strategy: dataset
+  data_type: transaction
+  reading_method: local
+  local_path: ../data/ml-100k/ratings.tsv
+  rating_type: implicit
+  multimodal:
+    text:                     # a .npy matrix and the item of each of its rows
+      local_path: ../runs/07-multimodal-features/text.npy
+      item_path: ../runs/07-multimodal-features/text_items.tsv
+    genres:                   # a TSV whose first column is the item
+      local_path: ../runs/07-multimodal-features/genres.tsv
+      file_format: tabular
+      header: true
+    partial:                  # a parquet file covering ~90% of the films
+      local_path: ../runs/07-multimodal-features/text_partial.parquet
+      file_format: parquet
+      normalize: l2
+splitter:
+  test_splitting:
+    strategy: temporal_holdout
+    ratio: 0.1
+models:
+  Pop: {}
+evaluation:
+  top_k: [10]
+  metrics: [nDCG]

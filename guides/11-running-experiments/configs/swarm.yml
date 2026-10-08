@@ -1,0 +1,53 @@
+# The swarm pipeline takes the same configuration as the train pipeline. Two
+# single-configuration models, tuned at the same time instead of one after the
+# other. Both ask for their model to be saved, EASE also for its
+# recommendations, and a Wilcoxon test compares the two.
+run:
+  name: ml100k-swarm
+reader:
+  loading_strategy: dataset
+  data_type: transaction
+  reading_method: local
+  local_path: ../data/ml-100k/ratings.tsv
+  rating_type: implicit
+splitter:
+  test_splitting:
+    strategy: temporal_holdout
+    ratio: 0.1
+  validation_splitting:
+    strategy: temporal_holdout
+    ratio: 0.1
+writer:
+  dataset_name: swarm
+  writing_method: local
+  local_experiment_path: ../runs/11-running-experiments/
+models:
+  EASE:
+    meta:
+      save_model: true
+      save_recs: true
+    optimization:
+      num_workers: 0
+    l2: 100.0
+  BPR:
+    meta:
+      save_model: true
+    optimization:
+      num_workers: 0
+      properties:
+        seed: 42
+    embedding_size: 16
+    learning_rate: 0.005
+    reg_weight: 0.0001
+    batch_size: 1024
+    epochs: 2
+evaluation:
+  top_k: [10]
+  metrics: [nDCG, Recall]
+  validation_metric: nDCG@10
+  stat_significance:
+    wilcoxon_test: true
+general:
+  device: cpu
+  ray_address: local
+  ray_verbose: 0

@@ -12,7 +12,7 @@ In the following sections, you will find the list of available knowledge-aware m
 
 Every model on this page requires `reader.knowledge` to be configured. It names two files: the `(head, relation, tail)` triples, and the `(item, entity)` alignment that says which entity each catalogue item stands for. Configuring one of these models without a graph terminates the experiment during configuration validation.
 
-An item the graph is silent about — one that is not aligned, or is aligned to an entity no triple mentions — is kept in the catalogue and scored from the collaborative half of the model alone. For the feature-based models such an item has no feature: KaHFM scores it by its bias alone and KGFlex scores it zero.
+An item the graph is silent about — one that is not aligned, or is aligned to an entity no triple mentions — is kept in the catalogue and scored from the collaborative half of the model alone. For the feature-based models such an item has no feature: in KaHFM its factor row starts at zero, so before training only its bias scores it, and BPR then trains the row like any other; KGFlex scores it zero.
 
 ## Training
 

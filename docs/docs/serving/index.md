@@ -104,7 +104,7 @@ curl -X POST localhost:8000/v1/models/sasrec/recommend -H "X-API-Key: change-me"
 {"model": "sasrec", "fallback": false,
  "items": [{"item_id": 2858, "score": 7.91, "name": "American Beauty (1999)"},
            {"item_id": 1196, "score": 7.64, "name": "Star Wars: Episode V - The Empire Strikes Back (1980)"},
-           {"item_id": 260, "score": 7.55, "name": "Star Wars: Episode IV - A New Hope (1977)"}]}
+           {"item_id": 1210, "score": 7.48, "name": "Star Wars: Episode VI - Return of the Jedi (1983)"}]}
 ```
 
 **Recommend for a session.** A sequential model also answers from a history of items, oldest first, without a known user. With an item catalogue, items may be given by their exact name.
@@ -193,11 +193,12 @@ curl -s -X POST localhost:8000/v1/models/sasrec/popular -H "X-API-Key: change-me
 - Several attributes must all match.
 - An unknown attribute or value gets a 422 that lists or suggests the accepted ones.
 
-**Explanations.** `explain: true` on `recommend` adds `because` to each item: the request's own items (the user's training items, or the session) that training users most often consumed together with it, with the count.
+**Explanations.** `explain: true` on `recommend` adds `because` to each item: up to two of the request's own items (the user's training items, or the session) that training users most often consumed together with it, each with `co_occurrences`, the number of training users who consumed both. For user 1 above, the first item becomes:
 
 ```json
-{"item_id": 2858, "name": "American Beauty (1999)", "score": 4.02,
- "because": [{"item_id": 1196, "name": "Star Wars: Episode V - The Empire Strikes Back (1980)", "co_occurrences": 1714}]}
+{"item_id": 2858, "score": 7.91, "name": "American Beauty (1999)",
+ "because": [{"item_id": 608, "name": "Fargo (1996)", "co_occurrences": 1840},
+             {"item_id": 2762, "name": "Sixth Sense, The (1999)", "co_occurrences": 1787}]}
 ```
 
 !!! warning

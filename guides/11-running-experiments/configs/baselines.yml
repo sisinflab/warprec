@@ -1,0 +1,46 @@
+# Two models, each with a small grid: EASE (closed form, three trials) and BPR
+# (iterative, four trials of twelve epochs). The run is named, so that it can be
+# paused and resumed. Paths are relative to the guide's folder.
+run:
+  name: ml100k-baselines
+  resume: auto
+reader:
+  loading_strategy: dataset
+  data_type: transaction
+  reading_method: local
+  local_path: ../data/ml-100k/ratings.tsv
+  rating_type: implicit
+splitter:
+  test_splitting:
+    strategy: temporal_holdout
+    ratio: 0.1
+  validation_splitting:
+    strategy: temporal_holdout
+    ratio: 0.1
+writer:
+  dataset_name: baselines
+  writing_method: local
+  local_experiment_path: ../runs/11-running-experiments/
+models:
+  EASE:
+    optimization:
+      num_workers: 0
+    l2: [grid, 50.0, 100.0, 200.0]
+  BPR:
+    optimization:
+      num_workers: 0
+      properties:
+        seed: 42
+    embedding_size: [grid, 16, 32]
+    learning_rate: [grid, 0.001, 0.005]
+    reg_weight: 0.0001
+    batch_size: 1024
+    epochs: 12
+evaluation:
+  top_k: [10]
+  metrics: [nDCG, Recall]
+  validation_metric: nDCG@10
+general:
+  device: cpu
+  ray_address: local
+  ray_verbose: 0

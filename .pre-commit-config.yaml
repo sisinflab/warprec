@@ -23,7 +23,7 @@ repos:
     hooks:
       - id: mypy
         name: mypy
-        entry: poetry run mypy warprec callbacks sample_pipelines
+        entry: poetry run mypy warprec
         language: system
         types: [python]
         pass_filenames: false
@@ -38,7 +38,7 @@ repos:
     hooks:
       - id: pylint
         name: pylint
-        entry: poetry run pylint warprec callbacks sample_pipelines
+        entry: poetry run pylint warprec
         language: system
         types: [python]
         pass_filenames: false

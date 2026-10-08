@@ -1,0 +1,24 @@
+# Item side information: one row per item, the item ID first, every other
+# column a feature. Paths are relative to the guide's folder.
+reader:
+  loading_strategy: dataset
+  data_type: transaction
+  reading_method: local
+  local_path: ../data/ml-100k/ratings.tsv
+  rating_type: implicit
+  side:
+    local_path: ../runs/04-side-information-and-clusters/items-side.tsv
+    sep: "\t"
+    header: true
+splitter:
+  test_splitting:
+    strategy: temporal_holdout
+    ratio: 0.1
+models:
+  VSM:
+    similarity: cosine
+    user_profile: binary
+    item_profile: binary
+evaluation:
+  top_k: [10]
+  metrics: [nDCG]

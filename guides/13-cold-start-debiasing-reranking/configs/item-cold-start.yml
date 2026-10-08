@@ -1,0 +1,32 @@
+# Item cold start: every interaction of 10% of the films is held out, and the
+# ranking is restricted to those films. Genres are the side information the
+# content model scores cold films from.
+reader:
+  loading_strategy: dataset
+  data_type: transaction
+  reading_method: local
+  local_path: ../data/ml-100k/ratings.tsv
+  rating_type: implicit
+  side:
+    local_path: ../runs/13-cold-start-debiasing-reranking/item-genres.tsv
+splitter:
+  test_splitting:
+    strategy: item_cold_start
+    ratio: 0.1      # a fraction of the items, not of the rows
+    seed: 42
+models:
+  Random: {}
+  Pop: {}
+  ItemKNN:
+    k: 50
+    similarity: cosine
+  EASE:
+    l2: 200.0
+  VSM:
+    similarity: cosine
+    user_profile: tfidf
+    item_profile: binary
+evaluation:
+  top_k: [10]
+  metrics: [nDCG, Recall, HitRate]
+  candidates: cold  # all (default), cold or warm

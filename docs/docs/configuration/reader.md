@@ -112,7 +112,7 @@ WarpRec can ingest a **knowledge graph** describing the items, which the knowled
 - **link_azure_blob_name**: Name of the Azure Blob containing the alignment.
 - **sep**: Column separator used by both files. Defaults to `'\t'`.
 - **header**: Whether the first row of each file is a header. Defaults to `False`, which is how the published graphs are distributed.
-- **file_format**: The format of both files. Supported values are `tabular` and `parquet`.
+- **file_format**: The format of both files. Only `tabular` is supported; any other value stops the run when the data is read.
 - **column_names**: The names of the three columns of the triples file, in order. Defaults to `[head, relation, tail]`.
 - **link_column_names**: The names of the two columns of the alignment file, in order. Defaults to `[item_id, entity_id]`.
 
@@ -130,7 +130,7 @@ reader:
 Both files are required: the triples alone do not say which item any entity stands for. The format of each is described in [Reading a Knowledge Graph](../data-management/reader.md#reading-a-knowledge-graph).
 
 !!! important
-    Configuring a knowledge-aware model without `reader.knowledge` terminates the experiment during configuration validation, in the same way a content-based model without `reader.side` does.
+    Configuring a knowledge-aware model without `reader.knowledge` terminates the experiment, in the same way a content-based model without `reader.side` does: the training and swarm pipelines stop during configuration validation, the design, evaluation and estimate pipelines when the model is built.
 
 ## Multimodal Feature Reading
 
@@ -167,7 +167,7 @@ Each entry accepts:
     A dense array carries no identifiers of its own, so nothing in the file says which item any row belongs to. A matrix offset by even one row against the catalogue trains without complaint and scores nonsense, which is why the row order must be named rather than assumed. A `tabular` or `parquet` file carries the identifiers in its first column and needs no separate file.
 
 !!! important
-    Configuring a multimodal model without `reader.multimodal` terminates the experiment during configuration validation, as does asking a model for a modality this section does not define.
+    Configuring a multimodal model without `reader.multimodal` terminates the experiment, as does asking a model for a modality this section does not define: the training and swarm pipelines stop during configuration validation, the design, evaluation and estimate pipelines when the model is built.
 
 ## Clustering Information Reading
 

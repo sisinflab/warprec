@@ -1,0 +1,31 @@
+# A training configuration (guide 10) whose model asks for a modality
+# the reader does not configure.
+reader:
+  loading_strategy: dataset
+  data_type: transaction
+  reading_method: local
+  local_path: ../data/ml-100k/ratings.tsv
+  rating_type: implicit
+  multimodal:
+    text:
+      local_path: ../runs/07-multimodal-features/text.npy
+      item_path: ../runs/07-multimodal-features/text_items.tsv
+writer:
+  dataset_name: ml-100k
+  writing_method: local
+  local_experiment_path: ../runs/07-multimodal-features/experiments
+splitter:
+  test_splitting:
+    strategy: temporal_holdout
+    ratio: 0.1
+models:
+  VBPR:
+    embedding_size: 64
+    modalities: [visual]
+    reg_weight: 0.0001
+    batch_size: 1024
+    epochs: 5
+    learning_rate: 0.001
+evaluation:
+  top_k: [10]
+  metrics: [nDCG]

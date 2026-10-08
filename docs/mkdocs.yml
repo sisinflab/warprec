@@ -9,6 +9,29 @@ nav:
     - Installation: get-started/installation.md
     - Quick Start: get-started/quick-start.md
     - Architecture: get-started/architecture.md
+  - Guides:
+    - Overview: guides/index.md
+    - Data:
+      - 1 · Reading Data: guides/reading-data.md
+      - 2 · Filtering: guides/filtering.md
+      - 3 · Splitting: guides/splitting.md
+      - 4 · Side Information and Clusters: guides/side-information-and-clusters.md
+      - 5 · Context: guides/context.md
+      - 6 · Knowledge Graphs: guides/knowledge-graphs.md
+      - 7 · Multimodal Features: guides/multimodal-features.md
+      - 8 · Dataloaders: guides/dataloaders.md
+    - Models and Training:
+      - 9 · Model Families: guides/model-families.md
+      - 10 · Hyperparameter Search: guides/hyperparameter-search.md
+      - 11 · Running Experiments: guides/running-experiments.md
+    - Evaluation:
+      - 12 · Evaluation: guides/evaluation.md
+      - 13 · Cold Start, Debiasing and Re-Ranking: guides/cold-start-debiasing-reranking.md
+      - 14 · Evaluating Existing Models: guides/evaluating-existing-models.md
+    - Extending and Deploying:
+      - 15 · Custom Models and Metrics: guides/custom-models-and-metrics.md
+      - 16 · Callbacks and Custom Pipelines: guides/callbacks-and-custom-pipelines.md
+      - 17 · Serving: guides/serving.md
   - Pipelines:
     - Standardized Workflows: pipelines/index.md
     - Training: pipelines/training.md
@@ -72,11 +95,11 @@ nav:
     - Authentication: cloud/authentication.md
     - Cluster Management: cloud/cluster-management.md
     - Deploying Served Models: cloud/deployment.md
-  - Guides:
-    - Callbacks: guides/callbacks.md
-    - Stash: guides/stash.md
-    - Models: guides/models.md
-    - Metrics: guides/metrics.md
+  - Extending WarpRec:
+    - Custom Models: extending/models.md
+    - Custom Metrics: extending/metrics.md
+    - Callbacks: extending/callbacks.md
+    - Stash: extending/stash.md
   - API Reference:
     - Overview: api-reference/index.md
     - Data:
@@ -193,8 +216,10 @@ plugins:
           - evaluation/metrics/*.md
         Cloud & Deployment:
           - cloud/*.md
-        Implementation Guides:
+        Guides:
           - guides/*.md
+        Extending WarpRec:
+          - extending/*.md
         API Reference:
           - api-reference/data/*.md
           - api-reference/recommenders/*.md

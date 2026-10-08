@@ -1,0 +1,49 @@
+# The same callback and metric under the train pipeline, on a private local Ray.
+# A validation split is added: the trials are scored on it.
+general:
+  device: cpu
+  ray_address: local
+  ray_verbose: 0
+  custom_modules:
+    - user_code/my_metrics.py
+  callback:
+    callback_path: user_code/my_callback.py
+    callback_name: GuideCallback
+    kwargs:
+      items_path: ../data/ml-100k/items.tsv
+      output_dir: ../runs/16-callbacks-and-custom-pipelines/train
+      metric: nDCG@10
+reader:
+  loading_strategy: dataset
+  data_type: transaction
+  reading_method: local
+  local_path: ../data/ml-100k/ratings.tsv
+  rating_type: implicit
+splitter:
+  test_splitting:
+    strategy: temporal_holdout
+    ratio: 0.2
+  validation_splitting:
+    strategy: temporal_holdout
+    ratio: 0.1
+writer:
+  dataset_name: ml-100k
+  writing_method: local
+  local_experiment_path: ../runs/16-callbacks-and-custom-pipelines/train
+models:
+  EASE:
+    l2: [50.0, 200.0, 500.0]
+    optimization:
+      num_workers: 0
+  BPR:
+    embedding_size: [16, 64]
+    reg_weight: 0.0001
+    batch_size: 1024
+    epochs: 4
+    learning_rate: 0.005
+    optimization:
+      num_workers: 0
+evaluation:
+  top_k: [10]
+  metrics: [nDCG, Recall, NewReleaseShare]
+  validation_metric: nDCG@10

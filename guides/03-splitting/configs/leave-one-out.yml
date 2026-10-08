@@ -1,0 +1,17 @@
+# Hold out one random interaction per user as the test set.
+reader:
+  loading_strategy: dataset
+  data_type: transaction
+  reading_method: local
+  local_path: ../data/ml-100k/ratings.tsv
+  rating_type: explicit
+splitter:
+  test_splitting:
+    strategy: random_leave_k_out
+    k: 1
+    seed: 42
+models:
+  Pop: {}
+evaluation:
+  top_k: [10]
+  metrics: [nDCG]

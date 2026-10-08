@@ -1,0 +1,33 @@
+# Evaluate the saved EASE again and write its top-20 list for every user.
+reader:
+  loading_strategy: split
+  data_type: transaction
+  reading_method: local
+  rating_type: implicit
+  split:
+    local_path: ../runs/14-evaluating-existing-models/trained/ml-100k/split
+    ext: .tsv
+    sep: "\t"
+    header: true
+writer:
+  dataset_name: ml-100k
+  writing_method: local
+  local_experiment_path: ../runs/14-evaluating-existing-models/eval-recs
+  recommendation:
+    k: 20             # items per user (default 50)
+    sep: "\t"
+    ext: .tsv
+    header: true      # user_id, item_id, rating: what ProxyRecommender reads
+models:
+  EASE:
+    l2: 200.0
+    meta:
+      load_from: ../runs/14-evaluating-existing-models/trained/ml-100k/serialized/EASE_WiseFoxOfForce.pth
+      save_recs: true
+    optimization: {num_workers: 0}
+evaluation:
+  top_k: [10, 20]
+  metrics: [nDCG, Recall]
+  mask_seen: auto     # also decides which items the written lists may contain
+general:
+  device: cpu
