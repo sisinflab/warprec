@@ -557,7 +557,9 @@ class Writer(ABC):
         new_df = pd.DataFrame(time_report)
         new_df["Inference Time (ms)"] = (new_df.pop("Inference Time") * 1000).round(6)
         for col in new_df.select_dtypes(include=["float"]).columns:
-            if "Usage (MB)" in col:
+            # A column whose name gives its unit holds a number in that unit;
+            # only the unlabelled durations are written as h:mm:ss.
+            if col.endswith(("(MB)", "(ms)", "(s)")):
                 new_df[col] = new_df[col].round(6)
             else:
                 new_df[col] = new_df[col].apply(
