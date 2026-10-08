@@ -1403,6 +1403,28 @@ class SequentialRecommenderUtils(ABC):
         mask[:, 0] &= ~mask.all(dim=1)
         return mask
 
+    def _pad_to_max_seq_len(self, item_seq: Tensor, padding_token: int) -> Tensor:
+        """Pads a batch of item sequences on the right to the full window.
+
+        Training always hands a model sequences max_seq_len wide, but the
+        evaluator pads a batch only as wide as its longest history, which is a
+        single column for a batch of users without any. A model that reads the
+        window as a whole, through a convolution as tall as the window or a
+        transform over every position, has to see the width it was trained on
+        to score a user the same whichever users share the batch.
+
+        Args:
+            item_seq (Tensor): The padded item sequences, [batch_size, seq_len].
+            padding_token (int): The item identifier reserved for padding.
+
+        Returns:
+            Tensor: The sequences, [batch_size, max(seq_len, max_seq_len)].
+        """
+        missing = self.max_seq_len - item_seq.size(1)
+        if missing <= 0:
+            return item_seq
+        return nn.functional.pad(item_seq, (0, missing), value=padding_token)
+
     def _generate_square_subsequent_mask(self, seq_len: int) -> Tensor:
         """Generate a square mask for the sequence.
 

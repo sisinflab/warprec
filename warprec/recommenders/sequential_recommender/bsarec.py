@@ -337,6 +337,10 @@ class BSARec(IterativeRecommender, SequentialRecommenderUtils):
             Tensor: The embedding of the predicted item (last session state)
                     [batch_size, embedding_size].
         """
+        # The frequency layer transforms over every position, padding included,
+        # so its output depends on the width; the batch is brought back to the
+        # window training used, whatever its longest history.
+        item_seq = self._pad_to_max_seq_len(item_seq, self.n_items)
         seq_len = item_seq.size(1)
 
         # Padding mask to ignore padding tokens

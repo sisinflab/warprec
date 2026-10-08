@@ -326,6 +326,10 @@ class LightSANs(IterativeRecommender, SequentialRecommenderUtils):
         Returns:
             Tensor: The embedding of the predicted item (last session state).
         """
+        # Position attention reaches padding positions too, so the output
+        # depends on the width; the batch is brought back to the window
+        # training used, whatever its longest history.
+        item_seq = self._pad_to_max_seq_len(item_seq, self.n_items)
         seq_len = item_seq.size(1)
 
         # Padding mask (True where padding exists)
