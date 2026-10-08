@@ -50,7 +50,11 @@ evaluation:
     metrics: [nDCG, Precision, Recall, HitRate, MAP, MRR]
 ```
 
-The `meta.load_from` key specifies the path to the saved checkpoint. The model is instantiated with the given hyperparameters, and then the saved weights are loaded via `torch.load()` and `model.load_state_dict()`.
+The `meta.load_from` key specifies the path to the saved checkpoint (written by the Training Pipeline with `meta.save_model`). An iterative model is instantiated with the given hyperparameters and the saved weights are loaded into it. A closed-form model (EASE, ItemKNN, ...) is restored from what the checkpoint saved, without refitting, so the hyperparameters listed for it are not used.
+
+!!! important
+    - A `load_from` path that does not exist stops the pipeline before any data is read.
+    - The checkpoint must come from the data, filtering and splitting it is evaluated on: its user and item ids are checked against the dataset's, and the pipeline stops if they map to different indices, because the model would otherwise score the wrong items. A model trained with a `validation_splitting` was fitted without the validation set, so keep that block in the evaluation configuration too.
 
 ### Mode 2: External Recommendation Files
 

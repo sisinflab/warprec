@@ -1,9 +1,11 @@
+import os
 import time
 from typing import Dict, Any
 
 import torch
 
 from warprec.common import initialize_datasets, log_evaluation
+from warprec.data import Dataset
 from warprec.data.reader import ReaderFactory
 from warprec.data.writer import WriterFactory
 from warprec.utils.callback import WarpRecCallback
@@ -19,8 +21,141 @@ from warprec.utils.helpers import (
 )
 from warprec.utils.logger import logger
 from warprec.utils.registry import model_registry
-from warprec.recommenders.base_recommender import IterativeRecommender
+from warprec.recommenders.base_recommender import IterativeRecommender, Recommender
 from warprec.evaluation.statistical_significance import compute_paired_statistical_test
+
+
+def _check_checkpoint_paths(models: Dict[str, Any]) -> None:
+    """Refuse a configuration whose checkpoints are not there.
+
+    Args:
+        models (Dict[str, Any]): The configured models and their parameters.
+
+    Raises:
+        FileNotFoundError: If a model's meta.load_from names a file that does
+            not exist.
+    """
+    for model_name, model_params in models.items():
+        load_from = model_param_from_dict(model_name, model_params).meta.load_from
+        if load_from is not None and not os.path.isfile(load_from):
+            raise FileNotFoundError(
+                f"The checkpoint of {model_name} (meta.load_from) does not "
+                f"exist: {load_from}"
+            )
+
+
+def _check_checkpoint_matches(
+    checkpoint: Dict[str, Any], model_class: type, dataset: Dataset, path: str
+) -> None:
+    """Refuse a checkpoint that would score the wrong model or the wrong ids.
+
+    A model scores indices, not ids. A checkpoint trained on a dataset whose
+    ids map to other indices - another split, another filtering, other data -
+    has the same dimensions as this one often enough, and would then rank the
+    wrong items for the wrong users without any error.
+
+    Args:
+        checkpoint (Dict[str, Any]): The loaded checkpoint.
+        model_class (type): The class of the configured model.
+        dataset (Dataset): The dataset the model is evaluated on.
+        path (str): Where the checkpoint was read from.
+
+    Raises:
+        ValueError: If the checkpoint is of another model, or its user or item
+            ids do not map to the same indices as the dataset's.
+    """
+    saved_name = checkpoint.get("name")
+    if saved_name != model_class.__name__:
+        raise ValueError(
+            f"The checkpoint {path} holds a {saved_name} model, not a "
+            f"{model_class.__name__}."
+        )
+
+    saved_info = checkpoint.get("info") or {}
+    info = dataset.info()
+    for kind in ("user", "item"):
+        saved = saved_info.get(f"{kind}_mapping")
+        if saved is None:
+            logger.attention(
+                f"The checkpoint {path} does not record its {kind} ids, so "
+                "they cannot be checked against the dataset."
+            )
+            continue
+        current = info[f"{kind}_mapping"]
+        if dict(saved) == dict(current):
+            continue
+        moved = sum(1 for label, idx in current.items() if saved.get(label) != idx)
+        raise ValueError(
+            f"The checkpoint {path} was trained on other {kind} ids than this "
+            f"dataset: {len(saved)} {kind}s in the checkpoint, {len(current)} in "
+            f"the dataset, {moved} of the dataset's {kind}s missing from the "
+            "checkpoint or at another index. Evaluate it on the data, filtering "
+            "and splitting it was trained with, validation_splitting included: "
+            "a model trained with a validation split was fitted without it."
+        )
+
+
+def _load_or_build_model(
+    model_name: str,
+    model_params: Dict[str, Any],
+    dataset: Dataset,
+    block_size: int,
+    chunk_size: int,
+) -> Recommender:
+    """The model to evaluate: restored from its checkpoint when one is given.
+
+    A closed-form model keeps what it learned in plain attributes, which the
+    checkpoint carries, so it is restored from them rather than refitted. An
+    iterative model is built from the configuration and given the saved weights.
+
+    Args:
+        model_name (str): The name of the model.
+        model_params (Dict[str, Any]): Its configured parameters.
+        dataset (Dataset): The dataset the model is evaluated on.
+        block_size (int): The block size of the model.
+        chunk_size (int): The chunk size of the model.
+
+    Returns:
+        Recommender: The model, ready to be evaluated.
+    """
+    params = model_param_from_dict(model_name, model_params)
+    load_from = params.meta.load_from
+    model_class = model_registry.get_class(model_name)
+
+    checkpoint = None
+    if load_from is not None:
+        checkpoint = torch.load(load_from, weights_only=False, map_location="cpu")
+        _check_checkpoint_matches(checkpoint, model_class, dataset, load_from)
+
+        if not issubclass(model_class, IterativeRecommender):
+            model = model_class.from_checkpoint(checkpoint=checkpoint)
+            logger.positive(f"Restored {model_name} from {load_from}.")
+            return model
+
+    model = model_registry.get(
+        name=model_name,
+        params=model_params,
+        interactions=dataset.train_set,
+        transactions=dataset.train_transactions,
+        knowledge=dataset.knowledge,
+        multimodal=dataset.multimodal,
+        sessions=dataset.train_session,
+        seed=42,
+        info=dataset.info(),
+        **dataset.get_stash(),
+        block_size=block_size,
+        chunk_size=chunk_size,
+    )
+
+    if isinstance(model, IterativeRecommender):
+        if checkpoint is not None:
+            model.load_state_dict(checkpoint["state_dict"])
+            logger.positive(f"Loaded the weights of {model_name} from {load_from}.")
+        else:
+            logger.negative(
+                "No checkpoint path found. Model will be evaluated using default weights."
+            )
+    return model
 
 
 def eval_pipeline(path: str):
@@ -37,6 +172,9 @@ def eval_pipeline(path: str):
 
     # Configuration loading
     config = load_eval_configuration(path)
+
+    # A missing checkpoint is found before any data is read
+    _check_checkpoint_paths(config.models)
 
     # Load custom callback if specified
     callback: WarpRecCallback = load_callback(
@@ -102,33 +240,13 @@ def eval_pipeline(path: str):
             reuse_loader=False,
         )
 
-        model = model_registry.get(
-            name=model_name,
-            params=model_params,
-            interactions=main_dataset.train_set,
-            transactions=main_dataset.train_transactions,
-            knowledge=main_dataset.knowledge,
-            multimodal=main_dataset.multimodal,
-            sessions=main_dataset.train_session,
-            seed=42,
-            info=main_dataset.info(),
-            **main_dataset.get_stash(),
+        model = _load_or_build_model(
+            model_name=model_name,
+            model_params=model_params,
+            dataset=main_dataset,
             block_size=block_size,
             chunk_size=chunk_size,
         )
-
-        if isinstance(model, IterativeRecommender):
-            if params.meta.load_from is not None:
-                # Load model weights
-                checkpoint = torch.load(
-                    params.meta.load_from, weights_only=False, map_location="cpu"
-                )
-                model.load_state_dict(checkpoint["state_dict"])
-                logger.positive("Successfully loaded model previous checkpoint.")
-            else:
-                logger.negative(
-                    "No checkpoint path found. Model will be evaluated using default weights."
-                )
 
         # Callback on training complete
         callback.on_training_complete(model=model)

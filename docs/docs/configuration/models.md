@@ -16,7 +16,7 @@ The **meta** section allows controlling aspects of the model that do not directl
 
 - **save_model**: Whether to save the model in the experiment directory. The saved file also carries the items each user has seen, their recent history for sequential models and the context vocabulary for context-aware ones, so it can be served directly (see [Serving Models](../serving/index.md)). Defaults to `False`.
 - **save_recs**: Whether to save generated recommendations. Defaults to `False`.
-- **load_from**: Path to pre-trained model weights to load. Defaults to `None`.
+- **load_from**: Path to a checkpoint saved with `save_model`, used by the Evaluation Pipeline. The file must exist and come from the same data and split. Defaults to `None`.
 
 ## Optimization Configuration
 
