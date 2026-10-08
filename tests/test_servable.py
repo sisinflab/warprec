@@ -654,6 +654,37 @@ def test_explanations_are_training_co_occurrences(tmp_path: Path, dataset: Datas
         assert all(index[str(e["item_id"])] in history for e in entry["because"])
 
 
+@pytest.mark.parametrize("together", [300, 386])
+def test_explanations_count_beyond_a_byte(dataset: Dataset, together: int):
+    """The seen matrix is stored one byte per cell; co-occurrences above 127
+    must still be counted, never wrapped (386 used to become -126 and vanish)."""
+    from scipy.sparse import csr_matrix, vstack
+
+    from warprec.serving.payload import build_serving_payload
+
+    model = make_model("BPR", dataset)
+    stored = build_serving_payload(model, dataset)["seen"]
+    n_items = stored.shape[1]
+    # User 0 saw item 0 only; every other row saw every item, so item 0 was
+    # consumed with each candidate by exactly `together` users.
+    first = np.zeros((1, n_items), dtype=np.int8)
+    first[0, 0] = 1
+    others = np.ones((together, n_items), dtype=np.int8)
+    seen = vstack([csr_matrix(first), csr_matrix(others)]).tocsr().astype(stored.dtype)
+    servable = ServableModel(model, payload={"seen": seen})
+    users, items = labels(dataset)
+    (answer,) = servable.recommend(
+        [servable.resolve(user_id=users[0], k=3, explain=True)]
+    )
+    assert answer
+    for entry in answer:
+        assert [(str(e["item_id"]), e["co_occurrences"]) for e in entry["because"]] == [
+            (str(items[0]), together)
+        ]
+    (most_popular,) = servable.popular_items(k=1)
+    assert most_popular["interactions"] == together + 1
+
+
 def test_a_session_is_explained_from_its_own_items(tmp_path: Path, dataset: Dataset):
     servable = served(tmp_path, "SASRec", dataset)
     _, items = labels(dataset)
