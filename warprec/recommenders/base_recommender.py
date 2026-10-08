@@ -1177,10 +1177,12 @@ class ContextRecommenderUtils(nn.Module, ABC):
             reg_params.append(self.merged_feature_bias(global_indices))
 
         if contexts is not None and self.merged_context_embedding is not None:
-            flat_contexts = contexts[:, :, 0] if contexts.dim() == 3 else contexts
-            global_indices = flat_contexts.long() + self.context_offsets
-            reg_params.append(self.merged_context_embedding(global_indices))
-            reg_params.append(self.merged_context_bias(global_indices))
+            # Every row the forward pass read: each value of a multi-valued
+            # field, and the single row of a numeric one.
+            indices, _, occupied = self._context_slots(contexts)
+            rows = indices[occupied]
+            reg_params.append(self.merged_context_embedding(rows))
+            reg_params.append(self.merged_context_bias(rows))
 
         return reg_params
 
@@ -1211,76 +1213,90 @@ class ContextRecommenderUtils(nn.Module, ABC):
         A categorical field looks its value up in the merged table. A numeric field
         owns a single row of that table and scales it by the value it carries, which
         is what lets a measurement keep its ordering instead of being spread over an
-        invented vocabulary. Either way a field contributes exactly one vector, so
-        the number of fields a model sees never changes.
+        invented vocabulary. A multi-valued field pools the rows of its values.
+        Either way a field contributes exactly one vector, so the number of fields
+        a model sees never changes.
 
         Args:
-            contexts (Tensor): The context row, indices and values together.
+            contexts (Tensor): The context row, indices and values together,
+                [batch, fields], or [batch, fields, values] with a multi-valued
+                field.
 
         Returns:
-            Optional[Tensor]: The per-field embeddings, or None without contexts.
+            Optional[Tensor]: The per-field embeddings, [batch, fields,
+                embedding], or None without contexts.
         """
         if not self.context_dims or self.merged_context_embedding is None:
             return None
 
-        # A multi-valued field arrives as its padded values on a third dimension.
-        if contexts.dim() == 3:
-            return self._pool_context_values(contexts)
+        indices, scale, occupied = self._context_slots(contexts)
+        embeddings = self.merged_context_embedding(indices) * scale.unsqueeze(-1)
+        return self._pool_context_slots(embeddings, occupied)
 
-        offsets = self.context_offsets
-        indices = contexts.long() + offsets
-        if not any(self.context_is_float):
-            return self.merged_context_embedding(indices)
+    def _context_slots(self, contexts: Tensor) -> Tuple[Tensor, Tensor, Tensor]:
+        """Where every context value sits in the merged tables, and its weight.
 
-        # A numeric field always sits at its own offset; only the scaling differs.
-        numeric = torch.tensor(self.context_is_float, device=contexts.device)
-        indices = torch.where(numeric, offsets.expand_as(indices), indices)
-        embeddings = self.merged_context_embedding(indices)
-        scale = torch.where(numeric, contexts, torch.ones_like(contexts))
-        return embeddings * scale.unsqueeze(-1)
-
-    def _pool_context_values(self, contexts: Tensor) -> Tensor:
-        """Combine the values of every context field into one vector per field.
-
-        A multi-valued field is pooled over the values it carries. The default,
-        the mean, is the embedding equivalent of the normalised multi-hot block the
-        factorisation-machine literature defines these models over, so a field's
-        contribution does not grow with the number of values it happens to hold.
+        A categorical value is an index into its field's block of the tables. A
+        numeric field owns a single row, at its offset, and the value it carries
+        is the weight of that row; reading the value as an index would point past
+        the field, or into another one. A multi-valued field arrives as its values
+        on a third dimension, padded with index 0.
 
         Args:
-            contexts (Tensor): The context values, [batch, fields, values].
+            contexts (Tensor): The context row, [batch, fields] or [batch, fields,
+                values].
 
         Returns:
-            Tensor: One embedding per field, [batch, fields, embedding].
+            Tuple[Tensor, Tensor, Tensor]: The row of every value, its weight and
+                whether it holds a value rather than padding, all [batch, fields,
+                values]. The first value of a field always counts, as an unknown
+                category does.
         """
-        offsets = self.context_offsets.unsqueeze(-1)
+        if contexts.dim() == 2:
+            contexts = contexts.unsqueeze(-1)
+        offsets = self.context_offsets.view(1, -1, 1)
         numeric = torch.tensor(self.context_is_float, device=contexts.device)
         numeric = numeric.view(1, -1, 1)
 
         indices = torch.where(
             numeric, offsets.expand_as(contexts), contexts.long() + offsets
         )
-        embeddings = self.merged_context_embedding(indices)
-
-        # Padding carries index 0, and a numeric field lives entirely in its first slot.
-        occupied = (contexts != 0) | numeric
-        occupied[:, :, 0] |= True
+        # Padding carries index 0, and a numeric field lives entirely in its
+        # first slot, whatever its value.
+        occupied = (contexts != 0) & ~numeric
+        occupied[:, :, 0] = True
         scale = torch.where(numeric, contexts, occupied.to(contexts.dtype))
-        embeddings = embeddings * scale.unsqueeze(-1)
+        return indices, scale, occupied
 
+    def _pool_context_slots(self, values: Tensor, occupied: Tensor) -> Tensor:
+        """Combine the values of every context field into one per field.
+
+        A multi-valued field is pooled over the values it carries. The default,
+        the mean, is the embedding equivalent of the normalised multi-hot block the
+        factorisation-machine literature defines these models over, so a field's
+        contribution does not grow with the number of values it happens to hold.
+        A single-valued field has one value, which every pooling returns as is.
+
+        Args:
+            values (Tensor): The weighted rows, [batch, fields, values, ...].
+            occupied (Tensor): Which values are not padding, [batch, fields, values].
+
+        Returns:
+            Tensor: One entry per field, [batch, fields, ...].
+        """
+        mask = occupied.view(*occupied.shape, *([1] * (values.dim() - 3)))
         if self.context_pooling == "sum":
-            return embeddings.sum(dim=2)
+            return values.sum(dim=2)
         if self.context_pooling == "max":
-            return (
-                embeddings.masked_fill(~occupied.unsqueeze(-1), float("-inf"))
-                .max(dim=2)
-                .values
-            )
-        counts = occupied.sum(dim=2, keepdim=True).clamp(min=1).to(embeddings.dtype)
-        return embeddings.sum(dim=2) / counts
+            return values.masked_fill(~mask, float("-inf")).max(dim=2).values
+        counts = mask.sum(dim=2).clamp(min=1).to(values.dtype)
+        return values.sum(dim=2) / counts
 
     def _get_context_bias(self, contexts: Tensor) -> Tensor:
         """Sum the first-order term contributed by the context fields.
+
+        Each field's bias is pooled over its values the way its embedding is,
+        so the linear term stays consistent with the interaction term.
 
         Args:
             contexts (Tensor): The context row, indices and values together.
@@ -1288,21 +1304,9 @@ class ContextRecommenderUtils(nn.Module, ABC):
         Returns:
             Tensor: The summed context bias, one value per row.
         """
-        if contexts.dim() == 3:
-            # Mirror the pooling used for the embeddings, on the first slot only,
-            # so the linear term stays consistent with the interaction term.
-            contexts = contexts[:, :, 0]
-
-        offsets = self.context_offsets
-        indices = contexts.long() + offsets
-        if not any(self.context_is_float):
-            return self.merged_context_bias(indices).sum(dim=1).squeeze(-1)
-
-        numeric = torch.tensor(self.context_is_float, device=contexts.device)
-        indices = torch.where(numeric, offsets.expand_as(indices), indices)
-        biases = self.merged_context_bias(indices).squeeze(-1)
-        scale = torch.where(numeric, contexts, torch.ones_like(contexts))
-        return (biases * scale).sum(dim=1)
+        indices, scale, occupied = self._context_slots(contexts)
+        biases = self.merged_context_bias(indices).squeeze(-1) * scale
+        return self._pool_context_slots(biases, occupied).sum(dim=1)
 
     def _catalogue_item_side(
         self,

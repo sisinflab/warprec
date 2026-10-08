@@ -132,13 +132,16 @@ def test_the_evaluation_contexts_are_encoded_as_training_encodes_them(
     assert contexts[:, tags].max() < multi_valued_dataset.info()["context_dims"]["tags"]
 
 
-@pytest.mark.parametrize("strategy", ["full", "sampled"])
-@pytest.mark.parametrize("model_name", CONTEXT_MODELS)
-def test_a_multi_valued_field_is_evaluated(
-    multi_valued_dataset: Dataset, model_name: str, strategy: str
-):
-    data = multi_valued_dataset
-    model = make_model(model_name, data)
+def assert_evaluates(
+    model: ContextRecommenderUtils, data: Dataset, strategy: str
+) -> None:
+    """Evaluate a model on the contextual loader and check every result is a number.
+
+    Args:
+        model (ContextRecommenderUtils): The context-aware model.
+        data (Dataset): The dataset it was built on.
+        strategy (str): 'full' or 'sampled'.
+    """
     evaluator = Evaluator(
         ["nDCG", "HitRate"], [5], train_set=data.train_set.get_sparse()
     )
@@ -153,4 +156,91 @@ def test_a_multi_valued_field_is_evaluated(
     for name in ("nDCG", "HitRate"):
         value = results[name]
         value = value.float().nanmean().item() if torch.is_tensor(value) else value
-        assert math.isfinite(value), f"{model_name} {strategy}: {name} is {value}"
+        assert math.isfinite(value), f"{model.name} {strategy}: {name} is {value}"
+
+
+@pytest.mark.parametrize("strategy", ["full", "sampled"])
+@pytest.mark.parametrize("model_name", CONTEXT_MODELS)
+def test_a_multi_valued_field_is_evaluated(
+    multi_valued_dataset: Dataset, model_name: str, strategy: str
+):
+    assert_evaluates(
+        make_model(model_name, multi_valued_dataset), multi_valued_dataset, strategy
+    )
+
+
+@pytest.mark.parametrize("which", ["numeric_dataset", "multi_valued_dataset"])
+@pytest.mark.parametrize("model_name", CONTEXT_MODELS)
+def test_numeric_and_multi_valued_fields_train_and_evaluate(
+    model_name: str, which: str, request
+):
+    """A numeric value of one or more used to be taken as an index by the
+    regularisation, past the single row its field owns: IndexError."""
+    data = request.getfixturevalue(which)
+    model = make_model(model_name, data)
+    loader = model.get_dataloader(
+        interactions=data.train_set, sessions=data.train_session
+    )
+    model.on_train_epoch_start()
+    for step, batch in enumerate(loader):
+        loss = model.training_step(batch, step)
+        assert torch.isfinite(loss).all(), f"{model_name}: non-finite loss"
+    for strategy in ("full", "sampled"):
+        assert_evaluates(model, data, strategy)
+
+
+def pooled(rows: torch.Tensor, pooling: str) -> torch.Tensor:
+    if pooling == "sum":
+        return rows.sum(dim=0)
+    if pooling == "max":
+        return rows.max(dim=0).values
+    return rows.mean(dim=0)
+
+
+@pytest.mark.parametrize("pooling", ["mean", "sum", "max"])
+def test_every_value_of_a_field_reaches_the_bias_and_the_regularisation(
+    multi_valued_dataset: Dataset, pooling: str
+):
+    """The bias of a multi-valued field pools all its values, as the embedding
+    does, and a numeric field always reads its own row, scaled by its value."""
+    torch.manual_seed(0)
+    model = make_model("FM", multi_valued_dataset)
+    model.context_pooling = pooling
+    labels = model.context_labels
+    daytime, temperature, tags = (
+        labels.index("daytime"),
+        labels.index("temperature"),
+        labels.index("tags"),
+    )
+    offsets = model.context_offsets.tolist()
+    width = multi_valued_dataset.train_transactions.get_arrays()[3].shape[2]
+
+    contexts = torch.zeros(1, len(labels), width)
+    contexts[0, daytime, 0] = 2
+    contexts[0, temperature, 0] = 21.5
+    contexts[0, tags, :2] = torch.tensor([1.0, 3.0])
+
+    bias = model.merged_context_bias.weight.detach().squeeze(-1)
+    table = model.merged_context_embedding.weight.detach()
+    tag_rows = [offsets[tags] + 1, offsets[tags] + 3]
+
+    expected_bias = (
+        bias[offsets[daytime] + 2]
+        + 21.5 * bias[offsets[temperature]]
+        + pooled(bias[tag_rows], pooling)
+    )
+    with torch.no_grad():
+        assert torch.allclose(model._get_context_bias(contexts)[0], expected_bias)
+
+        embeddings = model._get_context_embeddings(contexts)[0]
+        assert torch.allclose(
+            embeddings[temperature], 21.5 * table[offsets[temperature]]
+        )
+        assert torch.allclose(embeddings[tags], pooled(table[tag_rows], pooling))
+
+        regularised = model.get_reg_params(
+            torch.tensor([0]), torch.tensor([0]), None, contexts
+        )[-2:]
+    used = [offsets[daytime] + 2, offsets[temperature]] + tag_rows
+    assert torch.allclose(regularised[0].pow(2).sum(), table[used].pow(2).sum())
+    assert torch.allclose(regularised[1].pow(2).sum(), bias[used].pow(2).sum())
