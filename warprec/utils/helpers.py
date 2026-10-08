@@ -215,11 +215,16 @@ def resolve_available_cpus(cpu_per_trial: Optional[float] = None) -> int:
     Returns:
         int: The number of CPUs this process may use, at least 1.
     """
+    granted = 0
     try:  # inside a Ray task: ask what was granted
         import ray  # pylint: disable = import-outside-toplevel
 
-        assigned = ray.get_runtime_context().get_assigned_resources()
-        granted = int(assigned.get("CPU", 0))
+        # get_runtime_context() starts a local Ray instance when Ray is not up,
+        # which is how a driver-only pipeline ended up launching Ray. Inside a
+        # task or actor Ray is always initialised, so only ask then.
+        if ray.is_initialized():
+            assigned = ray.get_runtime_context().get_assigned_resources()
+            granted = int(assigned.get("CPU", 0))
     except Exception:  # pylint: disable = broad-except
         # Ray is unavailable, or this process is not running inside a task:
         # fall through to the configured budget.
