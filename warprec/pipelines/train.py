@@ -14,6 +14,7 @@ from warprec.pipelines.common import (
     bootstrap_pipeline,
     prepare_datasets,
     report_statistical_significance,
+    write_model_outputs,
 )
 from warprec.pipelines.remotes import (
     remote_model_retraining,
@@ -289,22 +290,16 @@ def train_pipeline(path: str):
                     results=results,
                 )
 
-                # Write results of current model
-                context.writer.write_results(
-                    results,
+                # Results, parameters and the model itself
+                write_model_outputs(
+                    context,
                     model_name,
-                    **config.writer.results.model_dump(),
+                    params,
+                    best_model,
+                    results,
+                    best_iter,
+                    main_dataset,
                 )
-
-                # Check if per-user results are needed
-                if config.evaluation.save_per_user:
-                    i_umap, _ = main_dataset.get_inverse_mappings()
-                    context.writer.write_results_per_user(
-                        results,
-                        model_name,
-                        i_umap,
-                        **config.writer.results.model_dump(),
-                    )
 
                 # Recommendation writing
                 if params.meta.save_recs:
@@ -324,32 +319,6 @@ def train_pipeline(path: str):
                             config=config,
                             device=device,
                         )  # type: ignore[call-arg]
-                    )
-
-                # Save params
-                model_params = {
-                    model_name: {
-                        "Best Params": best_model.get_params(),
-                        "Best Training Iteration": best_iter,
-                    }
-                }
-                context.writer.write_params(model_params)
-
-                # Model serialization, with what serving needs from the data
-                if params.meta.save_model:
-                    evaluation: Dict[str, Any] = {
-                        "strategy": config.evaluation.strategy
-                    }
-                    if config.evaluation.strategy == "sampled":
-                        evaluation["num_negatives"] = config.evaluation.num_negatives
-                    context.writer.write_model(
-                        best_model,
-                        dataset=main_dataset,
-                        training={
-                            "dataset": config.writer.dataset_name,
-                            "evaluation": evaluation,
-                            "metrics": results,
-                        },
                     )
 
                 if config.general.time_report:

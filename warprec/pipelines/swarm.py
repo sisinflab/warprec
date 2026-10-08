@@ -14,6 +14,7 @@ from warprec.pipelines.common import (
     bootstrap_pipeline,
     prepare_datasets,
     report_statistical_significance,
+    write_model_outputs,
 )
 from warprec.pipelines.remotes import (
     remote_evaluation_and_timing,
@@ -198,8 +199,23 @@ def swarm_pipeline(path: str):
         # Log the results
         log_evaluation(results, "Test", config.evaluation.max_metric_per_row)
 
+        # The same files a train run writes for a model
+        write_model_outputs(
+            context,
+            model_name,
+            model_param_from_dict(model_name, config.models[model_name]),
+            best_model,
+            results,
+            model_params[model_name]["Best Training Iteration"],
+            main_dataset,
+        )
+
+        if config.general.time_report:
+            model_timing_report.append(timing_report)
+
         # Collect for statistical significance
         if requires_stat_significance:
+            model_results[model_name] = results
             context.state_store.save_eval_results(model_name, results)
 
         model_state = context.state.model_state(model_name)

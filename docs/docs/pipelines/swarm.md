@@ -13,6 +13,10 @@ The Swarm Pipeline represents an alternative execution strategy to the standard 
 - Aiming to maximize utilization of all available cluster resources
 - Minimizing end-to-end training time is a primary objective
 
+## Output Artifacts
+
+The Swarm Pipeline writes the same [output artifacts](training.md#output-artifacts) as the train pipeline: overall and per-user results, recommendations, serialized models when `meta.save_model` is set, best hyperparameters and the time report. The statistical significance tests compare every model the run evaluated, including those completed by an earlier, paused run.
+
 ## Pausing and Resuming
 
 The Swarm Pipeline supports [pause and resume](pause-resume.md) through the same [run](../configuration/run.md) section as the training pipeline, but with a **weaker guarantee**.
