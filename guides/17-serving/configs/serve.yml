@@ -1,0 +1,39 @@
+# Three models on one server. Paths are relative to the directory the server
+# is started from (this guide's folder).
+server:                   # host: 127.0.0.1 by default; an export listens on 0.0.0.0
+  port: 8117
+  api_key: guide-17        # every request but /healthz sends X-API-Key: guide-17
+  mcp: true                # MCP tools under /mcp (needs warprec[mcp])
+
+endpoints:
+  - name: ease
+    checkpoint: ../runs/17-serving/ml-100k/serialized/EASE_WiseFoxOfForce.pth
+    description: Films from MovieLens-100K, for users seen in training
+    item_noun: movie
+    unknown_user: popular  # a user not in training gets the most popular films
+    item_metadata: &movies
+      path: ../data/ml-100k/items.tsv
+      sep: "\t"
+      header: true
+      id_column: item_id
+      name_column: title
+      columns:
+        genres: {column: genres, separator: "|"}
+    batching:
+      max_batch_size: 32
+      batch_wait_timeout_s: 0.005
+
+  - name: sasrec
+    checkpoint: ../runs/17-serving/ml-100k/serialized/SASRec_FlamingoOfInevitableEngineering.pth
+    description: Films from MovieLens-100K, next film from a sequence of films
+    item_noun: movie
+    item_metadata: *movies
+
+  - name: fm
+    checkpoint: ../runs/17-serving/ml-100k-context/serialized/FM_BlazingSpiritedBeluga.pth
+    description: Films from MovieLens-100K, ranked for the time of day and week
+    item_noun: movie
+    item_metadata: *movies
+    context_descriptions:
+      daypart: the part of the day, in US Central time
+      weekend: whether it is a weekday or the weekend

@@ -1,0 +1,39 @@
+# Only the artists the graph covers, a knowledge model next to BPR.
+reader:
+  loading_strategy: dataset
+  data_type: transaction
+  reading_method: local
+  local_path: ../runs/06-knowledge-graphs/user_artists_covered.tsv
+  rating_type: implicit
+  labels:
+    user_id_label: userID
+    item_id_label: artistID
+  knowledge:
+    local_path: ../data/kgcn-music/kg.txt
+    link_path: ../data/kgcn-music/item_index2entity_id.txt
+splitter:
+  test_splitting:
+    strategy: random_holdout
+    ratio: 0.2
+    seed: 42
+models:
+  BPR:
+    embedding_size: 64
+    reg_weight: 0.001
+    batch_size: 1024
+    epochs: 20
+    learning_rate: 0.005
+    optimization:
+      num_workers: 0
+  KaHFM:
+    min_feature_items: 2
+    reg_weight: 0.001
+    bias_reg_weight: 0.0
+    batch_size: 1024
+    epochs: 20
+    learning_rate: 0.005
+    optimization:
+      num_workers: 0
+evaluation:
+  top_k: [10, 20]
+  metrics: [nDCG, Recall, Precision]

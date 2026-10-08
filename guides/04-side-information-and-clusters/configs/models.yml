@@ -1,0 +1,34 @@
+# Side information and clusters together, and two pairs of models: each
+# side-information model next to its collaborative counterpart.
+reader:
+  loading_strategy: dataset
+  data_type: transaction
+  reading_method: local
+  local_path: ../data/ml-100k/ratings.tsv
+  rating_type: implicit
+  dtypes:
+    cluster_type: str
+  side:
+    local_path: ../runs/04-side-information-and-clusters/items-side.tsv
+  clustering:
+    user_local_path: ../runs/04-side-information-and-clusters/user-gender.tsv
+    item_local_path: ../runs/04-side-information-and-clusters/item-first-genre.tsv
+splitter:
+  test_splitting:
+    strategy: temporal_holdout
+    ratio: 0.1
+models:
+  ItemKNN:
+    k: 50
+    similarity: cosine
+  AttributeItemKNN:
+    k: 50
+    similarity: cosine
+  EASE:
+    l2: 200.0
+  CEASE:
+    l2: 200.0
+    alpha: 1.0
+evaluation:
+  top_k: [10]
+  metrics: [nDCG, SRecall, UserMADRanking]

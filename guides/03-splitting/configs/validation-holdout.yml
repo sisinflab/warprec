@@ -1,0 +1,19 @@
+# Test: each user's latest 10%. Validation: the latest 10% of what is left.
+reader:
+  loading_strategy: dataset
+  data_type: transaction
+  reading_method: local
+  local_path: ../data/ml-100k/ratings.tsv
+  rating_type: explicit
+splitter:
+  test_splitting:
+    strategy: temporal_holdout
+    ratio: 0.1
+  validation_splitting:
+    strategy: temporal_holdout
+    ratio: 0.1
+models:
+  Pop: {}
+evaluation:
+  top_k: [10]
+  metrics: [nDCG]

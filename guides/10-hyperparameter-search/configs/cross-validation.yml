@@ -1,0 +1,42 @@
+# BPR tuned by 3-fold cross-validation: the training part of the temporal test
+# split is cut into three folds, every learning rate is trained and scored on
+# each fold, and the one with the best mean is retrained on the whole training
+# part, for the epochs the folds settled on, and tested.
+reader:
+  loading_strategy: dataset
+  data_type: transaction
+  reading_method: local
+  local_path: ../data/ml-100k/ratings.tsv
+  rating_type: implicit
+splitter:
+  test_splitting:
+    strategy: temporal_holdout
+    ratio: 0.1
+  validation_splitting:
+    strategy: k_fold_cross_validation
+    folds: 3
+writer:
+  dataset_name: cross-validation
+  writing_method: local
+  local_experiment_path: ../runs/10-hyperparameter-search/
+models:
+  BPR:
+    meta:
+      save_model: true
+    optimization:
+      num_workers: 0
+      properties:
+        desired_training_it: median
+    learning_rate: [0.002, 0.02]
+    embedding_size: 16
+    reg_weight: 0.0001
+    batch_size: 1024
+    epochs: 8
+evaluation:
+  top_k: [10, 20]
+  metrics: [nDCG, Recall]
+  validation_metric: nDCG@10
+general:
+  device: cpu
+  ray_address: local
+  ray_verbose: 0

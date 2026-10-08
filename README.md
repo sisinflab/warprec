@@ -52,6 +52,7 @@ An **Application Layer** serves trained models on Ray Serve, as a batched REST A
   - [🔍 Evaluate a model](#-evaluate-a-model)
   - [🛰️ Serve a model](#️-serve-a-model)
   - [🧰 Makefile Commands](#-makefile-commands)
+- [📓 Guides](#-guides)
 - [🤝 Contributing](#-contributing)
 - [📜 License](#-license)
 - [📖 Citation](#-citation)
@@ -238,6 +239,10 @@ The project includes a Makefile to simplify common operations:
     ```bash
     make test
     ```
+
+## 📓 Guides
+
+The [`guides/`](guides/) folder holds 17 Jupyter notebooks, committed with their outputs, that go through WarpRec one piece at a time on public datasets: reading, filtering and splitting data, side information, contexts, knowledge graphs and multimodal features, every dataloader, the model families, hyperparameter search, every metric family, cold start and debiased evaluation, custom models and metrics, callbacks, and serving. Each step runs through the Python API and through the configuration that does the same, so the notebooks double as worked examples of both. See [`guides/README.md`](guides/README.md) or the [Guides](https://warprec.readthedocs.io/en/latest/guides/) section of the documentation.
 
 ## 🤝 Contributing
 We welcome contributions from the community! Whether you're fixing bugs, improving documentation, or proposing new features, your input is highly valued.

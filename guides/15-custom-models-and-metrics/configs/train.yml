@@ -1,0 +1,44 @@
+# The same models for the train pipeline (guide 10). Not run in this guide:
+# it is loaded to show how the hyperparameters are validated. On Ray, every
+# entry of custom_modules is shipped to the workers and imported there under
+# the same name.
+general:
+  device: cpu
+  ray_address: local
+  ray_verbose: 0
+  custom_modules:
+    - user_code/my_models.py
+    - user_code/my_params.py
+    - user_code/my_metrics.py
+reader:
+  loading_strategy: dataset
+  data_type: transaction
+  reading_method: local
+  local_path: ../data/ml-100k/ratings.tsv
+  rating_type: implicit
+splitter:
+  test_splitting:
+    strategy: temporal_holdout
+    ratio: 0.2
+  validation_splitting:
+    strategy: temporal_holdout
+    ratio: 0.1
+models:
+  MyEASE:              # no parameter class: loaded, not validated
+    l2: [100.0, 200.0]
+  MyBPR:               # validated by user_code/my_params.py
+    embedding_size: [32, 64]
+    batch_size: 1024
+    epochs: 10
+    learning_rate: 0.005
+writer:
+  dataset_name: ml-100k
+  writing_method: local
+  local_experiment_path: ../runs/15-custom-models-and-metrics/train
+evaluation:
+  top_k: [10]
+  metrics: [nDCG, Precision, RBP]
+  complex_metrics:
+    - name: RBP
+      params:
+        persistence: 0.5

@@ -1,0 +1,29 @@
+# MovieLens-100K with genres as side information and two cluster files, split
+# on each user's latest 20%. Paths are relative to the guide's folder.
+reader:
+  loading_strategy: dataset
+  data_type: transaction
+  reading_method: local
+  local_path: ../data/ml-100k/ratings.tsv
+  rating_type: implicit
+  dtypes:
+    cluster_type: str
+  side:
+    local_path: ../runs/12-evaluation/item-genres.tsv
+  clustering:
+    user_local_path: ../runs/12-evaluation/user-gender.tsv
+    item_local_path: ../runs/12-evaluation/item-first-genre.tsv
+splitter:
+  test_splitting:
+    strategy: temporal_holdout
+    ratio: 0.2
+models:
+  Pop: {}
+  ItemKNN:
+    k: 50
+    similarity: cosine
+  EASE:
+    l2: 200.0
+evaluation:
+  top_k: [10, 20]
+  metrics: [nDCG, Recall, Precision, HitRate]

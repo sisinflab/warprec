@@ -1,0 +1,23 @@
+# Keep ratings of 4 and 5 as positives, then the 10-core of what is left.
+reader:
+  loading_strategy: dataset
+  data_type: transaction
+  reading_method: local
+  local_path: ../data/ml-100k/ratings.tsv
+  sep: "\t"
+  header: true
+  rating_type: implicit
+filtering:
+  MinRating:
+    min_rating: 4
+  IterativeKCore:
+    min_interactions: 10
+splitter:
+  test_splitting:
+    strategy: temporal_holdout
+    ratio: 0.1
+models:
+  Pop: {}
+evaluation:
+  top_k: [10]
+  metrics: [nDCG]

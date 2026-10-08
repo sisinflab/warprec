@@ -1,0 +1,41 @@
+# The design pipeline with the guide's callback and its stash-reading metric.
+# Paths are relative to the guide's folder.
+general:
+  device: cpu
+  # The metric is imported like any custom module; the callback is not listed
+  # here, it has a section of its own.
+  custom_modules:
+    - user_code/my_metrics.py
+  callback:
+    callback_path: user_code/my_callback.py
+    callback_name: GuideCallback
+    # Passed to the constructor as GuideCallback(*args, **kwargs), unvalidated.
+    kwargs:
+      items_path: ../data/ml-100k/items.tsv
+      output_dir: ../runs/16-callbacks-and-custom-pipelines/design
+reader:
+  loading_strategy: dataset
+  data_type: transaction
+  reading_method: local
+  local_path: ../data/ml-100k/ratings.tsv
+  rating_type: implicit
+splitter:
+  test_splitting:
+    strategy: temporal_holdout
+    ratio: 0.2
+models:
+  EASE:
+    l2: 200.0
+    optimization:
+      num_workers: 0
+  BPR:
+    embedding_size: 64
+    reg_weight: 0.0001
+    batch_size: 1024
+    epochs: 5
+    learning_rate: 0.005
+    optimization:
+      num_workers: 0
+evaluation:
+  top_k: [10]
+  metrics: [nDCG, Recall, NewReleaseShare]

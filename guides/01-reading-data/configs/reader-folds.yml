@@ -1,0 +1,14 @@
+# A ready-made split with validation folds: train.tsv and test.tsv, plus
+# 1/, 2/, 3/ each holding the train.tsv and validation.tsv of one fold.
+reader:
+  loading_strategy: split
+  data_type: transaction
+  reading_method: local
+  rating_type: explicit
+  split:
+    local_path: ../runs/01-reading-data/split-ua-folds
+models:
+  Pop: {}
+evaluation:
+  top_k: [10]
+  metrics: [nDCG]

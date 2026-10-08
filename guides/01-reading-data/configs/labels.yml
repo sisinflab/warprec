@@ -1,0 +1,21 @@
+# The same file with other column names, mapped onto WarpRec's.
+reader:
+  loading_strategy: dataset
+  data_type: transaction
+  reading_method: local
+  local_path: ../runs/01-reading-data/renamed.tsv
+  rating_type: explicit
+  labels:
+    user_id_label: userId
+    item_id_label: movieId
+    rating_label: stars
+    timestamp_label: when
+splitter:
+  test_splitting:
+    strategy: temporal_holdout
+    ratio: 0.1
+models:
+  Pop: {}
+evaluation:
+  top_k: [10]
+  metrics: [nDCG]

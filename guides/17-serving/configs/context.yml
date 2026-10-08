@@ -1,0 +1,35 @@
+# A context-aware model (FM) over two categorical contexts derived from the
+# timestamps, as guide 5 builds them. Trained and saved through the Python API.
+reader:
+  loading_strategy: dataset
+  data_type: transaction
+  reading_method: local
+  local_path: ../runs/17-serving/ratings-context.tsv
+  rating_type: implicit
+  labels:
+    context_labels: [daypart, weekend]
+  dtypes:
+    context_types:
+      daypart: str
+      weekend: str
+splitter:
+  test_splitting:
+    strategy: temporal_leave_k_out
+    k: 1
+models:
+  FM:
+    embedding_size: 32
+    reg_weight: 0.0001
+    batch_size: 2048
+    epochs: 3
+    learning_rate: 0.001
+    neg_samples: 1
+    optimization:
+      device: cpu
+      num_workers: 0
+evaluation:
+  top_k: [10]
+  metrics: [nDCG, HitRate]
+  mask_seen: pair
+general:
+  device: cpu

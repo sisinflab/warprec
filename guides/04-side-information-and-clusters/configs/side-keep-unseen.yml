@@ -1,0 +1,23 @@
+# The same side information, keeping the items that have attributes but no
+# training interaction.
+reader:
+  loading_strategy: dataset
+  data_type: transaction
+  reading_method: local
+  local_path: ../data/ml-100k/ratings.tsv
+  rating_type: implicit
+  side:
+    local_path: ../runs/04-side-information-and-clusters/items-side.tsv
+    keep_unseen_items: true
+splitter:
+  test_splitting:
+    strategy: temporal_holdout
+    ratio: 0.1
+models:
+  VSM:
+    similarity: cosine
+    user_profile: binary
+    item_profile: binary
+evaluation:
+  top_k: [10]
+  metrics: [nDCG]

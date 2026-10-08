@@ -1,0 +1,21 @@
+# User cold start: every interaction of 10% of the users is held out. The
+# items stay warm, so there is no candidate restriction to make.
+reader:
+  loading_strategy: dataset
+  data_type: transaction
+  reading_method: local
+  local_path: ../data/ml-100k/ratings.tsv
+  rating_type: implicit
+splitter:
+  test_splitting:
+    strategy: user_cold_start
+    ratio: 0.1
+    seed: 42
+models:
+  Random: {}
+  Pop: {}
+  EASE:
+    l2: 200.0
+evaluation:
+  top_k: [10]
+  metrics: [nDCG, Recall, HitRate]

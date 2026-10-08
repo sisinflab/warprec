@@ -1,0 +1,22 @@
+# One metric or two from every family. Metrics that need parameters go under
+# complex_metrics; the others under metrics.
+evaluation:
+  top_k: [10]
+  metrics:
+    [nDCG, Recall, Precision, HitRate, MAP, MRR, AUC, GAUC,  # accuracy
+     ItemCoverage, UserCoverage,                              # coverage
+     EPC, EFD,                                                # novelty
+     Gini, ShannonEntropy, SRecall,                           # diversity (SRecall: side info)
+     ARP, APLT, PopREO,                                       # popularity bias
+     UserMADRanking, BiasDisparityBS, BiasDisparityBR, BiasDisparityBD]  # fairness: clusters
+  complex_metrics:
+    - name: F1                        # F-beta of any two metrics
+      params: {metric_1: nDCG, metric_2: MAP, beta: 0.5}
+    - name: EPC                       # graded instead of binary relevance
+      params: {relevance: discounted}
+    - name: APLT                      # long tail = items outside the top 50% of interactions
+      params: {pop_ratio: 0.5}
+    - name: EucDistance
+      params: {metric_names: [nDCG, EPC], utopia_points: [1.0, 1.0]}
+    - name: Hypervolume
+      params: {metric_names: [nDCG, EPC], nadir_points: [0.0, 0.0], higher_is_better: [true, true]}

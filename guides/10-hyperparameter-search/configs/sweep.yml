@@ -1,0 +1,65 @@
+# Two searches in one run on MovieLens-100K: each user's latest 10% is the test
+# set, the latest 10% of what is left is the validation set every trial is
+# scored on. Paths are relative to the guide's folder.
+reader:
+  loading_strategy: dataset
+  data_type: transaction
+  reading_method: local
+  local_path: ../data/ml-100k/ratings.tsv
+  rating_type: implicit
+splitter:
+  test_splitting:
+    strategy: temporal_holdout
+    ratio: 0.1
+  validation_splitting:
+    strategy: temporal_holdout
+    ratio: 0.1
+writer:
+  dataset_name: sweep
+  writing_method: local
+  local_experiment_path: ../runs/10-hyperparameter-search/
+models:
+  # Closed form: one trial per l2 value, grid search (the default strategy).
+  EASE:
+    meta:
+      save_model: true
+      save_recs: true
+    optimization:
+      num_workers: 0
+    l2: [10.0, 100.0, 500.0]
+  # Iterative: six configurations proposed by Optuna, pruned by ASHA and by
+  # early stopping on the training loss. Sizes and epochs are kept tiny so the
+  # guide runs on a laptop; precision and clipping are what a GPU run would use.
+  BPR:
+    optimization:
+      strategy: optuna
+      num_samples: 6
+      max_concurrent_trials: 1
+      scheduler: asha
+      properties:
+        seed: 42
+        n_startup_trials: 3
+        max_t: 8
+        grace_period: 2
+        reduction_factor: 2
+      num_workers: 0
+      precision: bf16-mixed
+      gradient_clip: 1.0
+    early_stopping:
+      monitor: loss
+      patience: 1
+      grace_period: 2
+      min_delta: 0.02
+    embedding_size: [choice, 16, 32]
+    learning_rate: [loguniform, 0.0005, 0.02]
+    reg_weight: [uniform, 0.0, 0.001]
+    batch_size: 1024
+    epochs: 8
+evaluation:
+  top_k: [10, 20]
+  metrics: [nDCG, Recall]
+  validation_metric: nDCG@10
+general:
+  device: cpu
+  ray_address: local
+  ray_verbose: 0

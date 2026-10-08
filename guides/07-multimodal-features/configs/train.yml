@@ -1,0 +1,39 @@
+# BPR and VBPR with the same width and schedule; VBPR also reads two modalities.
+reader:
+  loading_strategy: dataset
+  data_type: transaction
+  reading_method: local
+  local_path: ../data/ml-100k/ratings.tsv
+  rating_type: implicit
+  multimodal:
+    text:
+      local_path: ../runs/07-multimodal-features/text.npy
+      item_path: ../runs/07-multimodal-features/text_items.tsv
+    genres:
+      local_path: ../runs/07-multimodal-features/genres.tsv
+      file_format: tabular
+      header: true
+splitter:
+  test_splitting:
+    strategy: temporal_holdout
+    ratio: 0.1
+models:
+  BPR:
+    embedding_size: 64
+    reg_weight: 0.0001
+    batch_size: 1024
+    epochs: 10
+    learning_rate: 0.001
+    optimization:
+      num_workers: 0          # load batches in this process; no worker start-up
+  VBPR:
+    embedding_size: 64        # modalities left out: reads text and genres
+    reg_weight: 0.0001
+    batch_size: 1024
+    epochs: 10
+    learning_rate: 0.001
+    optimization:
+      num_workers: 0
+evaluation:
+  top_k: [10, 20]
+  metrics: [nDCG, Recall, ItemCoverage]

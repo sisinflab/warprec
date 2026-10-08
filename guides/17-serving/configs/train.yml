@@ -1,0 +1,49 @@
+# Two models to serve, trained and saved by the train pipeline: EASE (general,
+# closed form) and SASRec (sequential). Each user's last interaction is the
+# test set, the one before it the validation set. meta.save_model writes each
+# best model to <local_experiment_path>/<dataset_name>/serialized/.
+reader:
+  loading_strategy: dataset
+  data_type: transaction
+  reading_method: local
+  local_path: ../data/ml-100k/ratings.tsv
+  rating_type: implicit
+splitter:
+  test_splitting:
+    strategy: temporal_leave_k_out
+    k: 1
+  validation_splitting:
+    strategy: temporal_leave_k_out
+    k: 1
+writer:
+  dataset_name: ml-100k
+  writing_method: local
+  local_experiment_path: ../runs/17-serving/
+models:
+  EASE:
+    meta: {save_model: true}
+    l2: 200.0
+  SASRec:
+    meta: {save_model: true}
+    optimization: {num_workers: 0}
+    embedding_size: 32
+    n_layers: 1
+    n_heads: 1
+    inner_size: 64
+    dropout_prob: 0.2
+    attn_dropout_prob: 0.2
+    reg_weight: 0.0
+    weight_decay: 0.0
+    batch_size: 1024
+    epochs: 4
+    learning_rate: 0.002
+    neg_samples: 1
+    max_seq_len: 20
+evaluation:
+  top_k: [10]
+  metrics: [nDCG, HitRate]
+  validation_metric: nDCG@10
+general:
+  device: cpu
+  ray_address: local
+  ray_verbose: 0

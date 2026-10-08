@@ -1,0 +1,26 @@
+# User and item clusters: one file each, an ID column and a cluster column.
+# The cluster column's name and type are shared by both files.
+reader:
+  loading_strategy: dataset
+  data_type: transaction
+  reading_method: local
+  local_path: ../data/ml-100k/ratings.tsv
+  rating_type: implicit
+  labels:
+    cluster_label: cluster
+  dtypes:
+    cluster_type: str
+  clustering:
+    user_local_path: ../runs/04-side-information-and-clusters/user-gender.tsv
+    item_local_path: ../runs/04-side-information-and-clusters/item-first-genre.tsv
+    user_sep: "\t"
+    item_sep: "\t"
+splitter:
+  test_splitting:
+    strategy: temporal_holdout
+    ratio: 0.1
+models:
+  Pop: {}
+evaluation:
+  top_k: [10]
+  metrics: [nDCG]

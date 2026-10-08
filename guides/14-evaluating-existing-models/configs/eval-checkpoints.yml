@@ -1,0 +1,40 @@
+# Evaluate the saved models on more metrics and cut-offs, without training.
+# The split written in section 1 is read back, so the test set is the same.
+reader:
+  loading_strategy: split
+  data_type: transaction
+  reading_method: local
+  rating_type: implicit
+  split:
+    local_path: ../runs/14-evaluating-existing-models/trained/ml-100k/split
+    ext: .tsv
+    sep: "\t"
+    header: true
+writer:
+  dataset_name: ml-100k
+  writing_method: local
+  local_experiment_path: ../runs/14-evaluating-existing-models/eval-checkpoints
+# BPR is built from these hyperparameters and given the saved weights, so they
+# must be those it was trained with. EASE is restored whole from its file.
+# num_workers: 0 builds the evaluation batches in this process, which on a
+# dataset this small is much faster than starting worker processes.
+models:
+  BPR:
+    embedding_size: 32
+    reg_weight: 0.0001
+    batch_size: 1024
+    epochs: 10
+    learning_rate: 0.005
+    meta:
+      load_from: ../runs/14-evaluating-existing-models/trained/ml-100k/serialized/BPR_NippyValiantNewt.pth
+    optimization: {num_workers: 0}
+  EASE:
+    l2: 10.0          # not used: the checkpoint's l2 (200.0) comes with it
+    meta:
+      load_from: ../runs/14-evaluating-existing-models/trained/ml-100k/serialized/EASE_WiseFoxOfForce.pth
+    optimization: {num_workers: 0}
+evaluation:
+  top_k: [10, 20, 50]
+  metrics: [nDCG, Recall, MAP, ItemCoverage]
+general:
+  device: cpu

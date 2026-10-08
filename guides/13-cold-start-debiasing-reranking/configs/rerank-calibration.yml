@@ -1,0 +1,7 @@
+# Only the rerank section differs from rerank-mmr.yml.
+rerank:
+  name: Calibration
+  pool: 100
+  params:
+    weight: 0.5      # 0 keeps the model's order, 1 ignores its scores
+    smoothing: 0.01  # pulls the list's genre mix towards the user's before the KL

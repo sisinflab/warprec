@@ -1,0 +1,37 @@
+# The whole experiment: data, models, and an evaluation section that also asks
+# for per-user files and significance tests between every pair of models.
+reader:
+  loading_strategy: dataset
+  data_type: transaction
+  reading_method: local
+  local_path: ../data/ml-100k/ratings.tsv
+  rating_type: implicit
+splitter:
+  test_splitting:
+    strategy: temporal_holdout
+    ratio: 0.2
+models:
+  Pop: {}
+  ItemKNN:
+    k: 50
+    similarity: cosine
+  EASE:
+    l2: 200.0
+writer:
+  dataset_name: ml-100k
+  writing_method: local
+  local_experiment_path: ../runs/12-evaluation/experiment
+evaluation:
+  top_k: [10, 20]
+  metrics: [nDCG, Recall, HitRate, ItemCoverage]
+  validation_metric: nDCG@10        # what HPO selects on (guide 10)
+  full_evaluation_on_report: false  # true: every metric on every report
+  save_per_user: true
+  stat_significance:
+    wilcoxon_test: true
+    paired_t_test: true
+    corrections:
+      bonferroni: true
+      holm_bonferroni: true
+      fdr: true
+      alpha: 0.05
