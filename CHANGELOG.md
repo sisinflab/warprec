@@ -2,6 +2,79 @@
 
 <!-- version list -->
 
+## v2.1.3 (2026-10-08)
+
+### Bug Fixes
+
+- A run whose saved state is discarded sets the old Ray Tune experiment aside instead of restoring
+  it, and a changed model is optimized again even if it had completed
+  ([`bbd01a7`](https://github.com/sisinflab/warprec/commit/bbd01a76579e9e598deab70bf85dc526e65e5237))
+
+- A server with no ray_address starts a Ray instance of its own instead of joining, and on stopping
+  shutting down, one already running
+  ([`fc4f465`](https://github.com/sisinflab/warprec/commit/fc4f465aca11a56930e7656fdd1268319c032651))
+
+- Context-aware models evaluate, full and sampled, with a multi-valued context field
+  ([`9511afb`](https://github.com/sisinflab/warprec/commit/9511afb7c900abd438361ba1254486fc24e9e422))
+
+- Context-aware models train with numeric context fields, and pool every value of a multi-valued
+  field into its bias
+  ([`ea43ce1`](https://github.com/sisinflab/warprec/commit/ea43ce10dd9546d6ddac81644548bb4c4432e99e))
+
+- Early stopping with monitor: loss stops a trial when the epoch's mean training loss stops falling
+  ([`51ad56f`](https://github.com/sisinflab/warprec/commit/51ad56f733d72e04a2d87bcc18d651a2cfd10124))
+
+- Explanations count co-occurrences above 127 correctly
+  ([`fa72810`](https://github.com/sisinflab/warprec/commit/fa72810e651221430070cbcac102ff6a4f86860d))
+
+- ReduceLROnPlateau trains instead of failing at the first step, stepping on the epoch's mean
+  training loss
+  ([`e237582`](https://github.com/sisinflab/warprec/commit/e237582f0f4b53e74069292a4f03df21156a182d))
+
+- Reusing an evaluator gives every evaluation the same tie break and sampled permutation, so a
+  result no longer depends on what was evaluated before
+  ([`93c8773`](https://github.com/sisinflab/warprec/commit/93c877381d59ca783c8aade4ede13cc5cb3083cd))
+
+- Sampled evaluation draws its negatives uniformly, or by popularity, instead of favouring low item
+  indices
+  ([`40fd552`](https://github.com/sisinflab/warprec/commit/40fd552becea77f2dc8aec87ad82d2bea537375d))
+
+- Sequential models score batches whose histories are shorter than max_seq_len or empty, as under
+  user cold start
+  ([`4868227`](https://github.com/sisinflab/warprec/commit/4868227f1c53d8039147e7709db96ee7fcd40f02))
+
+- The design, eval and estimate pipelines no longer start a local Ray instance to size their
+  DataLoader
+  ([`2b897d5`](https://github.com/sisinflab/warprec/commit/2b897d548193f4c53c5145b466210a176600ffc1))
+
+- The estimate pipeline times full evaluation of iterative models and masks seen items as the
+  evaluator does
+  ([`5c57642`](https://github.com/sisinflab/warprec/commit/5c576429cac1ac785afeb558b24584910da9f1a2))
+
+- The eval pipeline restores closed-form models from meta.load_from instead of refitting them, and
+  stops on a missing checkpoint or one trained on other ids
+  ([`2daa42b`](https://github.com/sisinflab/warprec/commit/2daa42b57adb4e42593842166cfa9325db0ba518))
+
+- The MLflow dashboard logs metrics as <metric>/<k>, which MLflow accepts, instead of failing on the
+  first report
+  ([`1063ed8`](https://github.com/sisinflab/warprec/commit/1063ed88a950927982cd048b8c6b5b16eaaf9f05))
+
+- The model retrained after cross-validation trains for the epochs desired_training_it settled on,
+  not for the full epochs
+  ([`b22fe75`](https://github.com/sisinflab/warprec/commit/b22fe75c2b83b13235e10e6a819c5a55229882b2))
+
+- The swarm pipeline writes the same results, parameters, saved models and time report as the train
+  pipeline, and compares every model it evaluated
+  ([`5a991d9`](https://github.com/sisinflab/warprec/commit/5a991d9c854093ba81ccb413d5d817caabf972c0))
+
+- The time report gives inference time in milliseconds and average trial time in seconds, as their
+  column names say
+  ([`7aa76fd`](https://github.com/sisinflab/warprec/commit/7aa76fde56fbe5715352aeafbad78f4c75ce35d9))
+
+- Train-pipeline trials train with the configured precision and gradient clipping
+  ([`151c70b`](https://github.com/sisinflab/warprec/commit/151c70b2e410f9cde024e26fc2c17f4fdfd9e7f6))
+
+
 ## v2.1.2 (2026-10-07)
 
 ### Bug Fixes
