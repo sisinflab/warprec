@@ -51,9 +51,9 @@ from warprec.utils.registry import (
 
 # Optional imports handling
 try:
-    from ray.air.integrations.mlflow import MLflowLoggerCallback
     from warprec.recommenders.trainer.dashboard_callbacks import (
         CodeCarbonCallback,
+        WarpRecMLflowLoggerCallback,
         WarpRecWandbLoggerCallback,
     )
 
@@ -953,7 +953,7 @@ class Trainer:
             )
         if dashboard.mlflow.enabled:
             callbacks.append(
-                MLflowLoggerCallback(
+                WarpRecMLflowLoggerCallback(
                     tracking_uri=dashboard.mlflow.tracking_uri,
                     registry_uri=dashboard.mlflow.registry_uri,
                     experiment_name=dashboard.mlflow.experiment_name,

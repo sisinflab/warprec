@@ -4,6 +4,7 @@ from typing import Dict
 
 from codecarbon import EmissionsTracker
 from ray import tune
+from ray.air.integrations.mlflow import MLflowLoggerCallback
 from ray.air.integrations.wandb import WandbLoggerCallback
 
 
@@ -22,6 +23,34 @@ class WarpRecWandbLoggerCallback(WandbLoggerCallback):
             for trial in list(self._trial_logging_actors):
                 self._signal_logging_actor_stop(trial=trial)
         super().on_experiment_end(trials, **info)
+
+
+def mlflow_metric_name(name: str) -> str:
+    """The name MLflow receives for a WarpRec metric.
+
+    WarpRec names a metric ``<metric>@<k>``, and MLflow refuses names holding an
+    ``@``, so the cutoff is separated by a slash instead (``nDCG@10`` is sent as
+    ``nDCG/10``), which MLflow also uses to group related metrics.
+
+    Args:
+        name (str): The metric name as WarpRec reports it.
+
+    Returns:
+        str: The name to log the metric under in MLflow.
+    """
+    return name.replace("@", "/")
+
+
+class WarpRecMLflowLoggerCallback(MLflowLoggerCallback):
+    """Ray's MLflow callback, with metric names MLflow accepts.
+
+    Only what is sent to MLflow is renamed: the report Ray Tune and the other
+    callbacks see keeps WarpRec's ``<metric>@<k>`` names.
+    """
+
+    def log_trial_result(self, iteration, trial, result):
+        renamed = {mlflow_metric_name(key): value for key, value in result.items()}
+        super().log_trial_result(iteration, trial, renamed)
 
 
 class CodeCarbonCallback(tune.Callback):
