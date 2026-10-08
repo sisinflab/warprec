@@ -338,3 +338,180 @@ def test_the_training_sampler_never_returns_a_seen_item_whatever_the_exponent():
         seen = set(train.indices[train.indptr[user] : train.indptr[user + 1]].tolist())
         for _ in range(8):
             assert sampler.sample(user) not in seen
+
+
+def spread_out(
+    strategy: str, contextual: bool, num_items: int = 1000
+) -> List[torch.Tensor]:
+    """Draw negatives over a large catalogue for users who have seen nothing.
+
+    Every item is equally likely under 'uniform', and under 'popularity' at
+    alpha 0, so the negatives must spread evenly over the item indices.
+
+    Args:
+        strategy (str): Either 'uniform' or 'popularity'.
+        contextual (bool): Whether to build the contextual variant.
+        num_items (int): The catalogue size.
+
+    Returns:
+        List[torch.Tensor]: The negatives drawn for each user.
+    """
+    num_users = 200
+    # One training interaction per item keeps every popularity weight equal,
+    # and it belongs to a user who is not evaluated.
+    train = csr_matrix(
+        (np.ones(num_items), ([num_users] * num_items, list(range(num_items)))),
+        shape=(num_users + 1, num_items),
+    )
+    positives = [num_items - 1] * num_users
+    if contextual:
+        rows = nw.from_native(
+            pd.DataFrame(
+                {
+                    "user_id": list(range(num_users)),
+                    "item_id": positives,
+                    "daytime": [1.0] * num_users,
+                    "weather": [1.0] * num_users,
+                }
+            ),
+            eager_only=True,
+        )
+        contextual_dataset = SampledContextualEvaluationDataset(
+            train_interactions=train,
+            eval_data=rows,
+            user_id_label="user_id",
+            item_id_label="item_id",
+            context_labels=CONTEXTS,
+            num_items=num_items,
+            num_negatives=99,
+            seed=42,
+            negative_sampling=strategy,
+            neg_alpha=0.0,
+        )
+        return contextual_dataset.negatives_list
+    evaluation = csr_matrix(
+        (np.ones(num_users), (list(range(num_users)), positives)),
+        shape=(num_users + 1, num_items),
+    )
+    dataset = SampledEvaluationDataset(
+        train_interactions=train,
+        eval_interactions=evaluation,
+        num_negatives=99,
+        seed=42,
+        negative_sampling=strategy,
+        neg_alpha=0.0,
+    )
+    return dataset.negative_items_list
+
+
+@pytest.mark.parametrize("contextual", [False, True])
+@pytest.mark.parametrize("strategy", ["uniform", "popularity"])
+def test_the_negatives_spread_over_the_whole_catalogue(strategy: str, contextual: bool):
+    """A uniform draw must not lean towards low item indices.
+
+    The loaders used to draw twice the candidates, sort them and keep the
+    first ones, so the negatives came from the lower half of the catalogue.
+    """
+    negatives = spread_out(strategy, contextual)
+    for drawn in negatives:
+        assert drawn.numel() == 99
+        assert len(set(drawn.tolist())) == 99
+        assert 999 not in drawn.tolist()
+    every = torch.cat(negatives).double()
+    # 19,800 draws of an index uniform over 0..998: the mean is 499 with a
+    # standard error near 2, and the sorted prefix put it near 250.
+    assert abs(every.mean().item() - 499.0) < 10
+    assert (every >= 500).double().mean().item() > 0.48
+
+
+@pytest.mark.parametrize("contextual", [False, True])
+def test_a_popularity_draw_follows_the_weights(contextual: bool):
+    """Popularity sampling without replacement, checked against numpy's own.
+
+    Drawing one item after another in proportion to its weight, skipping
+    repeats and seen items, is what numpy's choice does without replacement;
+    the share of the head among the negatives has to agree with it.
+    """
+    num_items, num_users, num_negatives = 300, 200, 20
+    # Item i was held by 1 + i % 7 users who are not evaluated.
+    rows, cols = [], []
+    for item in range(num_items):
+        for holder in range(1 + item % 7):
+            rows.append(num_users + holder)
+            cols.append(item)
+    train = csr_matrix(
+        (np.ones(len(rows)), (rows, cols)), shape=(num_users + 7, num_items)
+    )
+    positive = num_items - 1
+    if contextual:
+        frame_rows = nw.from_native(
+            pd.DataFrame(
+                {
+                    "user_id": list(range(num_users)),
+                    "item_id": [positive] * num_users,
+                    "daytime": [1.0] * num_users,
+                    "weather": [1.0] * num_users,
+                }
+            ),
+            eager_only=True,
+        )
+        drawn = SampledContextualEvaluationDataset(
+            train_interactions=train,
+            eval_data=frame_rows,
+            user_id_label="user_id",
+            item_id_label="item_id",
+            context_labels=CONTEXTS,
+            num_items=num_items,
+            num_negatives=num_negatives,
+            seed=3,
+            negative_sampling="popularity",
+            neg_alpha=1.0,
+        ).negatives_list
+    else:
+        evaluation = csr_matrix(
+            (np.ones(num_users), (list(range(num_users)), [positive] * num_users)),
+            shape=(num_users + 7, num_items),
+        )
+        drawn = SampledEvaluationDataset(
+            train_interactions=train,
+            eval_interactions=evaluation,
+            num_negatives=num_negatives,
+            seed=3,
+            negative_sampling="popularity",
+            neg_alpha=1.0,
+        ).negative_items_list
+    weights = np.array([1 + item % 7 for item in range(num_items)], dtype=float)
+    weights[positive] = 0.0
+    rng = np.random.default_rng(0)
+    reference = np.concatenate(
+        [
+            rng.choice(
+                num_items, num_negatives, replace=False, p=weights / weights.sum()
+            )
+            for _ in range(2000)
+        ]
+    )
+    got = torch.cat(drawn).numpy()
+    assert positive not in got
+    assert all(len(set(row.tolist())) == num_negatives for row in drawn)
+    # The mean weight of a drawn item: about 4.6 for the exact draw, while the
+    # sorted prefix of a with-replacement draw ignored the weights almost
+    # entirely (about 4.0, the catalogue mean).
+    assert abs(weights[got].mean() - weights[reference].mean()) < 0.1
+    assert abs(got.mean() - reference.mean()) < 8
+
+
+def test_a_popularity_draw_short_of_weighted_items_is_refused():
+    """Items no one trained on have no weight, so popularity never draws them.
+
+    Every user still has 50 unseen items here, but only about 44 of them carry
+    a weight; asking for 50 used to draw for ever.
+    """
+    evaluation = csr_matrix((np.ones(40), (list(range(40)), [50] * 40)), shape=(40, 60))
+    with pytest.raises(ValueError, match="popularity sampling can draw"):
+        SampledEvaluationDataset(
+            train_interactions=skewed_train(),
+            eval_interactions=evaluation,
+            num_negatives=50,
+            negative_sampling="popularity",
+        )

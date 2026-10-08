@@ -138,7 +138,11 @@ def run(config: ServingConfiguration) -> None:
 
     listen()
     try:
-        ray.init(address=config.server.ray_address, ignore_reinit_error=True)
+        # Without an address the server starts a Ray instance of its own:
+        # ray.init(address=None) would join one already running on the
+        # machine, and stopping would then shut Serve down for every
+        # application on it. Only a cluster named in ray_address is shared.
+        ray.init(address=config.server.ray_address or "local", ignore_reinit_error=True)
         # Ray installs a SIGTERM handler of its own that aborts the process,
         # so the clean one is put back once Ray is up.
         listen()

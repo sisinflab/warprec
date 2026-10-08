@@ -42,7 +42,9 @@ Changing any of the following invalidates the **whole run**, because it changes 
 - the `evaluation` section
 - the set of model names
 
-Changing a **single model's** parameters or search space invalidates only that model. Every other model keeps its saved state, and the changed model is optimized from scratch.
+Changing a **single model's** parameters or search space invalidates only that model. Every other model keeps its saved state, and the changed model is optimized from scratch, even when it had already completed or failed.
+
+Whenever a model's saved state is discarded — `resume: never`, an invalidated run, or a changed model — the Ray Tune experiment it left behind is never restored. It is moved aside to `<run_name>__<model_name>.discarded-<timestamp>`, next to where it was, and the model starts a new sweep. Nothing is deleted, so an old sweep can still be inspected or removed by hand.
 
 The following do **not** invalidate a resume, so a paused run can be resumed on a cluster of a different size or shape:
 

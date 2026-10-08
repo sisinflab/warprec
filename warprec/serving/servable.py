@@ -195,7 +195,8 @@ class ServableModel:
 
         self._popularity: Optional[Tensor] = None
         if seen is not None:
-            counts = np.asarray(seen.sum(axis=0), dtype=np.float32).ravel()
+            counts = np.asarray(seen.sum(axis=0, dtype=np.int64), dtype=np.float32)
+            counts = counts.ravel()
             self._popularity = torch.from_numpy(counts).to(model.device)
 
         # A context-aware model needs the vocabulary its contexts were encoded
@@ -1015,8 +1016,13 @@ class ServableModel:
             return
         own_items = sorted(own)
         targets = [self._items[str(entry["item_id"])] for entry in answer]
+        # The matrix is stored one byte per cell, so the product is taken in a
+        # wide type: a count above 127 would otherwise wrap around.
         columns = self._seen.tocsc()
-        together = (columns[:, own_items].T @ columns[:, targets]).toarray()
+        together = (
+            columns[:, own_items].astype(np.int64).T
+            @ columns[:, targets].astype(np.int64)
+        ).toarray()
         for position, entry in enumerate(answer):
             counts = together[:, position]
             best = [

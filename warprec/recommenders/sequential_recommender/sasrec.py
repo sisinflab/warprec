@@ -201,10 +201,12 @@ class SASRec(IterativeRecommender, SequentialRecommenderUtils):
         seq_emb = self.layernorm(item_emb + pos_emb)
         seq_emb = self.emb_dropout(seq_emb)
 
-        # Pass through Transformer Encoder
+        # Pass through Transformer Encoder. The evaluator pads a batch only as
+        # wide as its longest history, one column for users without any, so
+        # the mask is cut to the batch rather than assumed max_seq_len wide.
         transformer_output = self.transformer_encoder(
             src=seq_emb,
-            mask=self.causal_mask,
+            mask=self.causal_mask[:seq_len, :seq_len],  # type: ignore[index]
             src_key_padding_mask=padding_mask,
         )  # [batch_size, max_seq_len, embedding_size]
 

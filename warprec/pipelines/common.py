@@ -1,6 +1,6 @@
 import time
 from dataclasses import dataclass
-from typing import Any, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 import ray
 
@@ -18,8 +18,10 @@ from warprec.data.reader import ReaderFactory
 from warprec.data.reader.base_reader import Reader
 from warprec.data.writer import WriterFactory
 from warprec.data.writer.base_writer import Writer
+from warprec.recommenders.base_recommender import Recommender
 from warprec.utils.callback import WarpRecCallback
 from warprec.utils.config import (
+    RecomModel,
     TrainConfiguration,
     load_callback,
     load_train_configuration,
@@ -259,6 +261,67 @@ def prepare_datasets(
                 raise ValueError(f"File format '{file_format}'not supported.")
 
     return main_dataset, val_dataset, fold_dataset
+
+
+def write_model_outputs(
+    context: PipelineContext,
+    model_name: str,
+    params: RecomModel,
+    model: Recommender,
+    results: Dict[Any, Any],
+    best_iter: int,
+    dataset: Dataset,
+) -> None:
+    """Write what a run keeps of one evaluated model.
+
+    The train and swarm pipelines both call this once a model is evaluated, so
+    that either of them leaves the same files behind: the overall and, when
+    asked for, per-user results, the best parameters and, when 'meta.save_model'
+    is set, the model itself with what serving needs from the data.
+
+    Args:
+        context (PipelineContext): The context produced by the bootstrap.
+        model_name (str): The name of the model.
+        params (RecomModel): The parameters of the model.
+        model (Recommender): The best model found.
+        results (Dict[Any, Any]): The evaluation results of the model.
+        best_iter (int): The best training iteration.
+        dataset (Dataset): The main dataset the model was evaluated on.
+    """
+    config = context.config
+    writer = context.writer
+
+    writer.write_results(results, model_name, **config.writer.results.model_dump())
+
+    if config.evaluation.save_per_user:
+        i_umap, _ = dataset.get_inverse_mappings()
+        writer.write_results_per_user(
+            results, model_name, i_umap, **config.writer.results.model_dump()
+        )
+
+    writer.write_params(
+        {
+            model_name: {
+                "Best Params": model.get_params(),
+                "Best Training Iteration": best_iter,
+            }
+        }
+    )
+
+    # Model serialization, with what serving needs from the data
+    if params.meta.save_model:
+        evaluation: Dict[str, Any] = {"strategy": config.evaluation.strategy}
+        if config.evaluation.strategy == "sampled":
+            evaluation["num_negatives"] = config.evaluation.num_negatives
+        writer.write_model(
+            model,
+            dataset=dataset,
+            training={
+                "dataset": config.writer.dataset_name,
+                "evaluation": evaluation,
+                "metrics": results,
+            },
+        )
 
 
 def report_statistical_significance(

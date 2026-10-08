@@ -11,6 +11,12 @@ import torch
 
 from warprec.common import initialize_datasets
 from warprec.data import Dataset
+from warprec.data.ranking import (
+    mask_seen_in_context,
+    mask_seen_pairs,
+    resolve_mask_policy,
+    restrict_to_candidates,
+)
 from warprec.evaluation import build_evaluator
 from warprec.recommenders.reranking import build_reranker
 from warprec.data.reader import ReaderFactory
@@ -309,7 +315,7 @@ def _estimate_eval_loop(
     measured_batches: int,
     tracker: EstimateStageTracker,
 ) -> Dict[str, Any]:
-    # pylint: disable=too-many-statements
+    # pylint: disable=too-many-statements, too-many-branches
     evaluator.reset_metrics()
     evaluator.metrics_to(device)
     model.eval()
@@ -319,6 +325,15 @@ def _estimate_eval_loop(
     train_sparse = dataset.train_set.get_sparse()
     padding_idx = train_sparse.shape[1]
     max_batches = warmup_batches + measured_batches
+
+    # The batches are run here rather than through Evaluator.evaluate so that
+    # each one can be timed, so the same masking policy has to be resolved.
+    transactions = dataset.train_transactions
+    policy = resolve_mask_policy(evaluator.mask_seen, transactions)
+    context_index: Optional[dict] = None
+    context_ids: Optional[dict] = None
+    if policy == "context" and transactions is not None:
+        context_index, context_ids = transactions.get_context_index()
 
     for batch_idx, batch in enumerate(dataloader):
         if batch_idx >= max_batches:
@@ -375,10 +390,34 @@ def _estimate_eval_loop(
                         (len(user_indices), evaluator.num_items), device=device
                     )
                     eval_batch.scatter_(1, target_item.unsqueeze(1), 1.0)
+                elif "gt_rows" in batch_data:
+                    # The full loader yields the ground truth sparse, as
+                    # (users, rows, cols, values): densify it on the device.
+                    eval_batch = torch.zeros(
+                        (len(user_indices), evaluator.num_items), device=device
+                    )
+                    eval_batch[batch_data["gt_rows"], batch_data["gt_cols"]] = (
+                        batch_data["gt_vals"]
+                    )
                 else:
                     eval_batch = batch_data["ground_truth"]
 
-                predictions[train_batch.nonzero()] = -torch.inf
+                if evaluator.candidate_mask is not None:
+                    restrict_to_candidates(predictions, evaluator.candidate_mask)
+
+                if policy == "none":
+                    pass
+                elif context_index is not None and context is not None:
+                    mask_seen_in_context(
+                        predictions,
+                        user_indices,
+                        context.cpu().numpy(),
+                        context_index,
+                        context_ids,
+                        batch_data.get("target_item"),
+                    )
+                else:
+                    mask_seen_pairs(predictions, train_batch)
             else:
                 predictions[candidates == padding_idx] = -torch.inf
 

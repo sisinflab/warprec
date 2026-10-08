@@ -262,3 +262,34 @@ def test_an_export_listens_on_every_interface_unless_told_otherwise(
     document = yaml.safe_load((tmp_path / "serve_app.yaml").read_text())
     assert document["http_options"]["host"] == expected
     assert document["applications"][0]["args"]["config"]["server"]["host"] == expected
+
+
+@pytest.mark.parametrize("ray_address, expected", [(None, "local"), ("auto", "auto")])
+def test_without_an_address_the_server_starts_a_private_ray(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, ray_address, expected
+):
+    """Left unset, the server must not join a Ray instance already on the machine.
+
+    Joining one would make stopping the server shut down Serve for every
+    application on it; only a cluster named in ray_address is shared.
+    """
+    pytest.importorskip("ray.serve")
+    from warprec.serving import app
+    from warprec.utils.config.serving_configuration import (
+        load_serving_configuration,
+    )
+
+    monkeypatch.chdir(tmp_path)
+    config = load_serving_configuration(
+        str(write_config(tmp_path, ray_address=ray_address))
+    )
+    seen = {}
+
+    def init(**kwargs):
+        seen.update(kwargs)
+        raise RuntimeError("stop here")
+
+    monkeypatch.setattr(app.ray, "init", init)
+    with pytest.raises(RuntimeError, match="stop here"):
+        app.run(config)
+    assert seen["address"] == expected

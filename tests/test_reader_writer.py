@@ -311,3 +311,30 @@ def test_a_collaborative_model_still_writes(tmp_path: Path, dataset: Dataset):
     written = write_with(tmp_path, dataset, "pair")
 
     assert len(written) > 0
+
+
+def test_the_time_report_gives_each_column_in_the_unit_its_name_says(tmp_path: Path):
+    """A column labelled (ms) or (s) holds a number in that unit; the rest durations."""
+    writer = LocalWriter(dataset_name="timing", local_path=str(tmp_path))
+    writer.write_time_report(
+        [
+            {
+                "Model Name": "EASE",
+                "Trainable Params (Best Model)": 0,
+                "Total Params (Best Model)": 0,
+                "Data Preparation Time": 3.5,
+                "Average Trial Time (s)": 12.25,
+                "Inference Time": 0.0131,
+                "Total Time": 75.0,
+            }
+        ]
+    )
+    report = pd.read_csv(
+        next(Path(writer.experiment_evaluation_path).glob("Time_Report_*.tsv")),
+        sep="\t",
+    ).iloc[0]
+
+    assert float(report["Inference Time (ms)"]) == pytest.approx(13.1)
+    assert float(report["Average Trial Time (s)"]) == pytest.approx(12.25)
+    assert report["Total Time"] == "0:01:15"
+    assert report["Data Preparation Time"] == "0:00:03.500000"

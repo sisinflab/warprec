@@ -16,7 +16,7 @@ The **meta** section allows controlling aspects of the model that do not directl
 
 - **save_model**: Whether to save the model in the experiment directory. The saved file also carries the items each user has seen, their recent history for sequential models and the context vocabulary for context-aware ones, so it can be served directly (see [Serving Models](../serving/index.md)). Defaults to `False`.
 - **save_recs**: Whether to save generated recommendations. Defaults to `False`.
-- **load_from**: Path to pre-trained model weights to load. Defaults to `None`.
+- **load_from**: Path to a checkpoint saved with `save_model`, used by the Evaluation Pipeline. The file must exist and come from the same data and split. Defaults to `None`.
 
 ## Optimization Configuration
 
@@ -136,6 +136,8 @@ models:
 
 For further details about the scheduling algorithms and their parameters, you can check the original [PyTorch Guide](https://docs.pytorch.org/docs/stable/optim.html#how-to-adjust-learning-rate).
 
+**ReduceLROnPlateau** steps on the mean training loss of each epoch (`train_loss`), not on the validation metric. The loss exists in every run and on every epoch: in a sweep trial whatever `eval_every_n` is, and in the retraining after cross-validation, which has no validation data. The learning-rate schedule the retrained model follows is then the one the trials followed. Since a lower loss is better, its `mode` must stay `min` (the default); `max` is refused.
+
 ### Optimizer Section
 
 Within WarpRec standard pipelines, you customize the optimizer used during training to fit your need. To do so, you can pass the following parameters under the optimizer configuration block:
@@ -213,9 +215,11 @@ The **properties** subsection provides additional parameters to the optimization
 
 The **early_stopping** section optionally adds stopping criteria for each trial:
 
-- **monitor**: Metric to monitor, e.g., `score` (validation metric) or `loss`.
-- **patience**: Consecutive evaluations without improvement before stopping. Required if early stopping is enabled.
-- **grace_period**: Minimum number of evaluations before early stopping can trigger.
+- **monitor**: What to watch: `score` (the default) or `loss`.
+    - `score` watches the validation metric each time the model is evaluated (every `eval_every_n` epochs), in the direction set by `properties.mode`.
+    - `loss` watches the mean training loss of every epoch, whether or not that epoch is evaluated. Lower is always better, whatever `properties.mode` says. Every iterative model reports this loss, as `train_loss`, without having to log it itself.
+- **patience**: Consecutive checks without improvement before stopping: evaluations under `score`, epochs under `loss`. Required if early stopping is enabled.
+- **grace_period**: The epoch from which early stopping starts counting.
 - **min_delta**: Minimum change to consider as an improvement.
 
 !!! Example "ASHA Scheduler for Efficient Trial Pruning"

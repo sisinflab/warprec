@@ -7,11 +7,13 @@ import logging
 import math
 import uuid
 from dataclasses import dataclass, field
+from datetime import datetime
 from typing import List, Optional, Dict, Union, Any
 from pathlib import Path
 
 import torch
 import numpy as np
+import pyarrow.fs
 import ray
 from ray import tune
 from ray.tune import Tuner, TuneConfig
@@ -20,6 +22,7 @@ from ray.tune.search.basic_variant import BasicVariantGenerator
 from ray.tune.integration.ray_train import TuneReportCallback
 from ray.train.torch import TorchTrainer
 from ray.train import ScalingConfig
+from ray.train._internal.storage import get_fs_and_path
 
 from warprec.recommenders.base_recommender import Recommender, IterativeRecommender
 from warprec.data import Dataset
@@ -48,9 +51,9 @@ from warprec.utils.registry import (
 
 # Optional imports handling
 try:
-    from ray.air.integrations.mlflow import MLflowLoggerCallback
     from warprec.recommenders.trainer.dashboard_callbacks import (
         CodeCarbonCallback,
+        WarpRecMLflowLoggerCallback,
         WarpRecWandbLoggerCallback,
     )
 
@@ -114,6 +117,11 @@ class Trainer:
             name and the run cannot be resumed.
         errored_trials (ErroredTrialPolicy): How to treat trials that errored
             before a pause when restoring a run. Defaults to skipping them.
+        resumable (bool): Whether the run state records this model's Ray Tune
+            experiment as one to continue. When False, an experiment left
+            under the same name by an earlier run is moved aside rather than
+            restored, so that it cannot leak an old split or configuration
+            into this one. Defaults to False.
     """
 
     def __init__(
@@ -124,12 +132,14 @@ class Trainer:
         dashboard_config: Optional[DashboardConfig] = None,
         run_name: Optional[str] = None,
         errored_trials: ErroredTrialPolicy = ErroredTrialPolicy.SKIP,
+        resumable: bool = False,
     ):
         self._stg_path = storage_path
         self._custom_modules = custom_modules or []
         self._callbacks = self._setup_callbacks(custom_callback, dashboard_config)
         self._run_name = run_name
         self._errored_trials = errored_trials
+        self._resumable = resumable
 
     def experiment_name(self, model_name: str) -> Optional[str]:
         """Builds the deterministic Ray Tune experiment name for a model.
@@ -423,6 +433,9 @@ class Trainer:
             "chunk_size": opt_config.chunk_size,
             "custom_modules": self._custom_modules,
             "early_stopping_config": params.early_stopping,
+            # The trial rebuilds its configuration from the sampled
+            # hyperparameters alone, so precision and clipping travel here
+            "optimization": opt_config,
             "num_workers": opt_config.num_workers,
             "cpu_per_worker": (
                 scaling_config_dict.get("resources_per_worker") or {}
@@ -432,9 +445,10 @@ class Trainer:
         num_folds = len(dataset) if isinstance(dataset, list) else 0
         param_space = self._parse_params(params, num_folds)
         experiment_name = self.experiment_name(model_name)
+        restore = self._claim_experiment(experiment_name)
         logged_epochs = (
             read_logged_epochs(os.path.join(self._stg_path, experiment_name))
-            if experiment_name
+            if restore and experiment_name
             else {}
         )
         session_id = uuid.uuid4().hex
@@ -532,8 +546,50 @@ class Trainer:
             param_space=param_space,
             tune_config=tune_config,
             run_config=run_config,
-            experiment_name=self.experiment_name(model_name),
+            experiment_name=experiment_name,
+            restore=restore,
         )
+
+    def _claim_experiment(self, experiment_name: Optional[str]) -> bool:
+        """Decides whether to restore the Ray Tune experiment of a model.
+
+        Only an experiment the run state records as resumable is restored. Any
+        other experiment found under the same name was left by a run whose
+        state has been discarded, so it is moved aside to
+        '<name>.discarded-<timestamp>' rather than deleted, and the model
+        starts afresh.
+
+        Args:
+            experiment_name (Optional[str]): The deterministic experiment name,
+                or None when the run is not resumable.
+
+        Returns:
+            bool: True when the existing experiment should be restored.
+        """
+        if experiment_name is None:
+            return False
+
+        experiment_path = os.path.join(self._stg_path, experiment_name)
+        if self._resumable and Tuner.can_restore(experiment_path):
+            return True
+
+        # Resolved the way Ray Tune resolves it, so remote storage works too
+        fs, fs_path = get_fs_and_path(experiment_path)
+        if fs.get_file_info(fs_path).type == pyarrow.fs.FileType.NotFound:
+            return False
+
+        stamp = datetime.now().strftime("%Y%m%d-%H%M%S")
+        aside, suffix = f"{fs_path}.discarded-{stamp}", 1
+        while fs.get_file_info(aside).type != pyarrow.fs.FileType.NotFound:
+            aside = f"{fs_path}.discarded-{stamp}-{suffix}"
+            suffix += 1
+        fs.move(fs_path, aside)
+        logger.attention(
+            f"The Ray Tune experiment at {experiment_path} belongs to run state "
+            f"that was discarded. It was moved to {aside} and the model will be "
+            "optimized from scratch."
+        )
+        return False
 
     def _build_or_restore_tuner(
         self,
@@ -542,6 +598,7 @@ class Trainer:
         tune_config: TuneConfig,
         run_config: Any,
         experiment_name: Optional[str],
+        restore: bool = False,
     ) -> Tuner:
         """Builds a new Tuner, or restores the one left behind by a paused run.
 
@@ -555,21 +612,14 @@ class Trainer:
             run_config (Any): The Ray Tune run configuration.
             experiment_name (Optional[str]): The deterministic experiment name,
                 or None when the run is not resumable.
+            restore (bool): Whether to restore the experiment, as decided by
+                '_claim_experiment'.
 
         Returns:
             Tuner: A fresh Tuner, or one restored from a previous run.
         """
-        if experiment_name is None:
-            return Tuner(
-                trainable,
-                param_space=param_space,
-                tune_config=tune_config,
-                run_config=run_config,
-            )
-
-        experiment_path = os.path.join(self._stg_path, experiment_name)
-
-        if Tuner.can_restore(experiment_path):
+        if restore and experiment_name is not None:
+            experiment_path = os.path.join(self._stg_path, experiment_name)
             logger.positive(
                 f"Found a resumable Ray Tune experiment at {experiment_path}. "
                 "Unfinished trials will continue from their last checkpoint."
@@ -903,7 +953,7 @@ class Trainer:
             )
         if dashboard.mlflow.enabled:
             callbacks.append(
-                MLflowLoggerCallback(
+                WarpRecMLflowLoggerCallback(
                     tracking_uri=dashboard.mlflow.tracking_uri,
                     registry_uri=dashboard.mlflow.registry_uri,
                     experiment_name=dashboard.mlflow.experiment_name,

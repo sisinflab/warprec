@@ -29,6 +29,10 @@ from warprec.utils.registry import lr_scheduler_registry, optimizer_registry
 SIMILARITY_BLOCK_BYTES = 64 * 1024**2
 
 
+# The name every iterative model logs its mean training loss of the epoch under
+TRAIN_LOSS = "train_loss"
+
+
 # The layout of the dictionary get_state() returns. Version 2 records the
 # writing WarpRec and keeps interaction-built iterative models whole.
 CHECKPOINT_FORMAT = 2
@@ -771,6 +775,14 @@ class IterativeRecommender(Recommender, L.LightningModule):
             "interval": "epoch",
             "frequency": 1,
         }
+
+        # A plateau scheduler steps on the epoch's training loss: unlike the
+        # validation metric it exists in every run, the retraining after
+        # cross-validation included, and on every epoch however often the
+        # model is evaluated
+        if isinstance(scheduler, torch.optim.lr_scheduler.ReduceLROnPlateau):
+            lr_scheduler_config["monitor"] = TRAIN_LOSS
+
         return {"optimizer": optimizer, "lr_scheduler": lr_scheduler_config}
 
     def _init_weights(self, module: nn.Module):
@@ -860,6 +872,31 @@ class IterativeRecommender(Recommender, L.LightningModule):
         Returns:
             Tensor: The computed loss for the batch.
         """
+
+    def on_train_batch_end(self, outputs: Any, batch: Any, batch_idx: int) -> None:
+        """PyTorch Lightning hook that collects the training loss of every model.
+
+        The loss each training step returns is logged under TRAIN_LOSS as the
+        unweighted mean over the batches of the epoch, so that early stopping
+        and ReduceLROnPlateau can watch it whether or not the model logs its
+        own loss.
+
+        Args:
+            outputs (Any): What the training step returned, as Lightning hands
+                it over: the loss, or a dictionary holding it under 'loss'.
+            batch (Any): The batch of data from the DataLoader.
+            batch_idx (int): The current batch index.
+        """
+        loss = outputs.get("loss") if isinstance(outputs, dict) else outputs
+        if isinstance(loss, Tensor):
+            self.log(
+                TRAIN_LOSS,
+                loss.detach(),
+                on_step=False,
+                on_epoch=True,
+                batch_size=1,
+                sync_dist=True,
+            )
 
     def validation_step(self, batch: Any, batch_idx: int) -> Any:
         """PyTorch Lightning needs this method to be implemented
@@ -1140,10 +1177,12 @@ class ContextRecommenderUtils(nn.Module, ABC):
             reg_params.append(self.merged_feature_bias(global_indices))
 
         if contexts is not None and self.merged_context_embedding is not None:
-            flat_contexts = contexts[:, :, 0] if contexts.dim() == 3 else contexts
-            global_indices = flat_contexts.long() + self.context_offsets
-            reg_params.append(self.merged_context_embedding(global_indices))
-            reg_params.append(self.merged_context_bias(global_indices))
+            # Every row the forward pass read: each value of a multi-valued
+            # field, and the single row of a numeric one.
+            indices, _, occupied = self._context_slots(contexts)
+            rows = indices[occupied]
+            reg_params.append(self.merged_context_embedding(rows))
+            reg_params.append(self.merged_context_bias(rows))
 
         return reg_params
 
@@ -1174,76 +1213,90 @@ class ContextRecommenderUtils(nn.Module, ABC):
         A categorical field looks its value up in the merged table. A numeric field
         owns a single row of that table and scales it by the value it carries, which
         is what lets a measurement keep its ordering instead of being spread over an
-        invented vocabulary. Either way a field contributes exactly one vector, so
-        the number of fields a model sees never changes.
+        invented vocabulary. A multi-valued field pools the rows of its values.
+        Either way a field contributes exactly one vector, so the number of fields
+        a model sees never changes.
 
         Args:
-            contexts (Tensor): The context row, indices and values together.
+            contexts (Tensor): The context row, indices and values together,
+                [batch, fields], or [batch, fields, values] with a multi-valued
+                field.
 
         Returns:
-            Optional[Tensor]: The per-field embeddings, or None without contexts.
+            Optional[Tensor]: The per-field embeddings, [batch, fields,
+                embedding], or None without contexts.
         """
         if not self.context_dims or self.merged_context_embedding is None:
             return None
 
-        # A multi-valued field arrives as its padded values on a third dimension.
-        if contexts.dim() == 3:
-            return self._pool_context_values(contexts)
+        indices, scale, occupied = self._context_slots(contexts)
+        embeddings = self.merged_context_embedding(indices) * scale.unsqueeze(-1)
+        return self._pool_context_slots(embeddings, occupied)
 
-        offsets = self.context_offsets
-        indices = contexts.long() + offsets
-        if not any(self.context_is_float):
-            return self.merged_context_embedding(indices)
+    def _context_slots(self, contexts: Tensor) -> Tuple[Tensor, Tensor, Tensor]:
+        """Where every context value sits in the merged tables, and its weight.
 
-        # A numeric field always sits at its own offset; only the scaling differs.
-        numeric = torch.tensor(self.context_is_float, device=contexts.device)
-        indices = torch.where(numeric, offsets.expand_as(indices), indices)
-        embeddings = self.merged_context_embedding(indices)
-        scale = torch.where(numeric, contexts, torch.ones_like(contexts))
-        return embeddings * scale.unsqueeze(-1)
-
-    def _pool_context_values(self, contexts: Tensor) -> Tensor:
-        """Combine the values of every context field into one vector per field.
-
-        A multi-valued field is pooled over the values it carries. The default,
-        the mean, is the embedding equivalent of the normalised multi-hot block the
-        factorisation-machine literature defines these models over, so a field's
-        contribution does not grow with the number of values it happens to hold.
+        A categorical value is an index into its field's block of the tables. A
+        numeric field owns a single row, at its offset, and the value it carries
+        is the weight of that row; reading the value as an index would point past
+        the field, or into another one. A multi-valued field arrives as its values
+        on a third dimension, padded with index 0.
 
         Args:
-            contexts (Tensor): The context values, [batch, fields, values].
+            contexts (Tensor): The context row, [batch, fields] or [batch, fields,
+                values].
 
         Returns:
-            Tensor: One embedding per field, [batch, fields, embedding].
+            Tuple[Tensor, Tensor, Tensor]: The row of every value, its weight and
+                whether it holds a value rather than padding, all [batch, fields,
+                values]. The first value of a field always counts, as an unknown
+                category does.
         """
-        offsets = self.context_offsets.unsqueeze(-1)
+        if contexts.dim() == 2:
+            contexts = contexts.unsqueeze(-1)
+        offsets = self.context_offsets.view(1, -1, 1)
         numeric = torch.tensor(self.context_is_float, device=contexts.device)
         numeric = numeric.view(1, -1, 1)
 
         indices = torch.where(
             numeric, offsets.expand_as(contexts), contexts.long() + offsets
         )
-        embeddings = self.merged_context_embedding(indices)
-
-        # Padding carries index 0, and a numeric field lives entirely in its first slot.
-        occupied = (contexts != 0) | numeric
-        occupied[:, :, 0] |= True
+        # Padding carries index 0, and a numeric field lives entirely in its
+        # first slot, whatever its value.
+        occupied = (contexts != 0) & ~numeric
+        occupied[:, :, 0] = True
         scale = torch.where(numeric, contexts, occupied.to(contexts.dtype))
-        embeddings = embeddings * scale.unsqueeze(-1)
+        return indices, scale, occupied
 
+    def _pool_context_slots(self, values: Tensor, occupied: Tensor) -> Tensor:
+        """Combine the values of every context field into one per field.
+
+        A multi-valued field is pooled over the values it carries. The default,
+        the mean, is the embedding equivalent of the normalised multi-hot block the
+        factorisation-machine literature defines these models over, so a field's
+        contribution does not grow with the number of values it happens to hold.
+        A single-valued field has one value, which every pooling returns as is.
+
+        Args:
+            values (Tensor): The weighted rows, [batch, fields, values, ...].
+            occupied (Tensor): Which values are not padding, [batch, fields, values].
+
+        Returns:
+            Tensor: One entry per field, [batch, fields, ...].
+        """
+        mask = occupied.view(*occupied.shape, *([1] * (values.dim() - 3)))
         if self.context_pooling == "sum":
-            return embeddings.sum(dim=2)
+            return values.sum(dim=2)
         if self.context_pooling == "max":
-            return (
-                embeddings.masked_fill(~occupied.unsqueeze(-1), float("-inf"))
-                .max(dim=2)
-                .values
-            )
-        counts = occupied.sum(dim=2, keepdim=True).clamp(min=1).to(embeddings.dtype)
-        return embeddings.sum(dim=2) / counts
+            return values.masked_fill(~mask, float("-inf")).max(dim=2).values
+        counts = mask.sum(dim=2).clamp(min=1).to(values.dtype)
+        return values.sum(dim=2) / counts
 
     def _get_context_bias(self, contexts: Tensor) -> Tensor:
         """Sum the first-order term contributed by the context fields.
+
+        Each field's bias is pooled over its values the way its embedding is,
+        so the linear term stays consistent with the interaction term.
 
         Args:
             contexts (Tensor): The context row, indices and values together.
@@ -1251,21 +1304,9 @@ class ContextRecommenderUtils(nn.Module, ABC):
         Returns:
             Tensor: The summed context bias, one value per row.
         """
-        if contexts.dim() == 3:
-            # Mirror the pooling used for the embeddings, on the first slot only,
-            # so the linear term stays consistent with the interaction term.
-            contexts = contexts[:, :, 0]
-
-        offsets = self.context_offsets
-        indices = contexts.long() + offsets
-        if not any(self.context_is_float):
-            return self.merged_context_bias(indices).sum(dim=1).squeeze(-1)
-
-        numeric = torch.tensor(self.context_is_float, device=contexts.device)
-        indices = torch.where(numeric, offsets.expand_as(indices), indices)
-        biases = self.merged_context_bias(indices).squeeze(-1)
-        scale = torch.where(numeric, contexts, torch.ones_like(contexts))
-        return (biases * scale).sum(dim=1)
+        indices, scale, occupied = self._context_slots(contexts)
+        biases = self.merged_context_bias(indices).squeeze(-1) * scale
+        return self._pool_context_slots(biases, occupied).sum(dim=1)
 
     def _catalogue_item_side(
         self,
@@ -1402,6 +1443,28 @@ class SequentialRecommenderUtils(ABC):
         # model holds for an empty history to rank from.
         mask[:, 0] &= ~mask.all(dim=1)
         return mask
+
+    def _pad_to_max_seq_len(self, item_seq: Tensor, padding_token: int) -> Tensor:
+        """Pads a batch of item sequences on the right to the full window.
+
+        Training always hands a model sequences max_seq_len wide, but the
+        evaluator pads a batch only as wide as its longest history, which is a
+        single column for a batch of users without any. A model that reads the
+        window as a whole, through a convolution as tall as the window or a
+        transform over every position, has to see the width it was trained on
+        to score a user the same whichever users share the batch.
+
+        Args:
+            item_seq (Tensor): The padded item sequences, [batch_size, seq_len].
+            padding_token (int): The item identifier reserved for padding.
+
+        Returns:
+            Tensor: The sequences, [batch_size, max(seq_len, max_seq_len)].
+        """
+        missing = self.max_seq_len - item_seq.size(1)
+        if missing <= 0:
+            return item_seq
+        return nn.functional.pad(item_seq, (0, missing), value=padding_token)
 
     def _generate_square_subsequent_mask(self, seq_len: int) -> Tensor:
         """Generate a square mask for the sequence.

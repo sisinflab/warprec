@@ -194,6 +194,10 @@ class Caser(IterativeRecommender, SequentialRecommenderUtils):
         Returns:
             Tensor: The final sequence output embedding [batch_size, embedding_size].
         """
+        # The vertical filter is max_seq_len tall, so a batch padded only as
+        # wide as its longest history is brought back to the full window.
+        item_seq = self._pad_to_max_seq_len(item_seq, self.n_items)
+
         # --- Embedding Look-up ---
         # Unsqueeze to get a 4-D input for convolution layers:
         # (batch_size, 1, max_seq_len, embedding_size)

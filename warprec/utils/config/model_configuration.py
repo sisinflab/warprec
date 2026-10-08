@@ -166,6 +166,25 @@ class LRSchedulerConfig(BaseModel):
             )
         return v
 
+    @model_validator(mode="after")
+    def check_plateau_mode(self) -> "LRSchedulerConfig":
+        """Validate that ReduceLROnPlateau minimises what it watches.
+
+        Returns:
+            LRSchedulerConfig: The validated configuration.
+
+        Raises:
+            ValueError: If ReduceLROnPlateau is asked to maximise.
+        """
+        if (self.name or "").upper() == "REDUCELRONPLATEAU" and (
+            (self.params or {}).get("mode", "min") != "min"
+        ):
+            raise ValueError(
+                "ReduceLROnPlateau steps on the training loss, which falls as the "
+                "model improves, so its mode must be 'min'."
+            )
+        return self
+
 
 class OptimizerConfig(BaseModel):
     """Definition of the optimizer configuration.

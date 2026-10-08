@@ -85,6 +85,7 @@ class Evaluator:
         self.required_blocks: Dict[int, Set[MetricBlock]] = {}
 
         # Set the seed for random permutation in sampled evaluation
+        self.seed = seed
         self.g = torch.Generator().manual_seed(seed)
 
         # Ties are broken from a stream of their own, so that turning the tie
@@ -209,6 +210,13 @@ class Evaluator:
         self.reset_metrics()
         self.metrics_to(device)
         model.eval()
+
+        # Both random streams start again from the seed, so that a result
+        # depends on the model alone: the pipelines evaluate every model and
+        # every epoch with one evaluator, and a stream carried over from the
+        # previous call would rank tied scores differently each time.
+        self.g.manual_seed(self.seed)
+        self.tie_g.manual_seed(self.seed)
 
         # Retrieve train interactions for masking (needed in full strategy)
         train_sparse = dataset.train_set.get_sparse()

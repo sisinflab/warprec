@@ -10,9 +10,11 @@ from torch.utils.data import Dataset as TorchDataset
 from torch.nn.utils.rnn import pad_sequence
 from scipy.sparse import csr_matrix
 
+from warprec.data.entities.context import build_context_array
 from warprec.data.entities.train_structures.interaction_structures import (
     popularity_cumulative,
 )
+from warprec.data.schema import ContextSpec
 
 
 def draw_candidates(
@@ -38,6 +40,118 @@ def draw_candidates(
         return rng.randint(0, num_items, size=size)
     drawn = np.searchsorted(cumulative, rng.random_sample(size))
     return np.minimum(drawn, num_items - 1)
+
+
+def drawable_items(cumulative: Optional[np.ndarray]) -> Optional[np.ndarray]:
+    """Which items a popularity draw can return at all.
+
+    Args:
+        cumulative (Optional[np.ndarray]): The cumulative popularity weights, or
+            None for a uniform draw.
+
+    Returns:
+        Optional[np.ndarray]: A mask of the items with a weight, or None when
+            every item can be drawn.
+    """
+    if cumulative is None:
+        return None
+    return np.diff(cumulative, prepend=0.0) > 0
+
+
+def draw_negatives(
+    rng: np.random.RandomState,
+    cumulative: Optional[np.ndarray],
+    drawable: Optional[np.ndarray],
+    num_items: int,
+    seen: np.ndarray,
+    num_negatives: int,
+    user: int,
+) -> np.ndarray:
+    """Draw distinct items a user has not seen, in the configured distribution.
+
+    Candidates are drawn one after another and a repeat or a seen item is
+    rejected, so the result is a draw without replacement from the user's unseen
+    items: uniform over them, or in proportion to their popularity. The order of
+    the draws is kept. Sorting the candidates and keeping the first ones, as
+    the loaders used to, favoured the items with the lowest indices.
+
+    Args:
+        rng (np.random.RandomState): The stream the draws come from.
+        cumulative (Optional[np.ndarray]): The cumulative popularity weights, or
+            None to draw every item with equal probability.
+        drawable (Optional[np.ndarray]): The items the popularity draw can
+            return, from drawable_items; None for a uniform draw.
+        num_items (int): The size of the catalogue.
+        seen (np.ndarray): The items the user may not be offered.
+        num_negatives (int): How many items to draw.
+        user (int): The user drawn for, named in the error.
+
+    Returns:
+        np.ndarray: Exactly num_negatives distinct unseen items, in draw order.
+
+    Raises:
+        ValueError: If the user has fewer items left to draw than num_negatives.
+    """
+    seen = np.unique(np.asarray(seen, dtype=np.int64))
+    if drawable is None:
+        available = num_items - len(seen)
+        reason = ""
+    else:
+        # An item no one interacted with has no weight and is never drawn.
+        available = int(drawable.sum() - drawable[seen].sum())
+        reason = " that popularity sampling can draw"
+    # Every user must yield the same number of candidates, or the evaluator
+    # cannot line the batch up, and drawing for a user who cannot supply them
+    # would never return.
+    if available < num_negatives:
+        raise ValueError(
+            f"Sampled evaluation asks for {num_negatives} negatives per user, but "
+            f"user {user} has only {available} of the {num_items} items left "
+            f"unseen{reason}. Lower 'evaluation.num_negatives' or evaluate on the "
+            "full catalogue."
+        )
+
+    chosen = np.empty(0, dtype=np.int64)
+    while len(chosen) < num_negatives:
+        # Twice as many as needed, so that one round is usually enough.
+        candidates = draw_candidates(rng, cumulative, num_items, 2 * num_negatives)
+        candidates = candidates[np.isin(candidates, seen, invert=True)]
+        merged = np.concatenate([chosen, candidates.astype(np.int64)])
+        # Each item where it was first drawn, in the order of the draws.
+        _, first = np.unique(merged, return_index=True)
+        chosen = merged[np.sort(first)]
+    return chosen[:num_negatives]
+
+
+def read_contexts(
+    eval_data: DataFrame[Any],
+    context_labels: List[str],
+    context: Optional[ContextSpec] = None,
+) -> Tensor:
+    """Read the encoded context columns the way training reads them.
+
+    A categorical field stores an index and a numeric field a value, and a
+    multi-valued field stores its indices as one string, such as '5 14'. The
+    array is built by the same function the training records use, so that an
+    evaluation context has the shape and the padding of a training one.
+
+    Args:
+        eval_data (DataFrame[Any]): The evaluation rows, contexts encoded.
+        context_labels (List[str]): The context columns, in order.
+        context (Optional[ContextSpec]): How each field is encoded and the widest
+            multi-valued field; None when every field holds a single number.
+
+    Returns:
+        Tensor: The contexts, [rows, fields], or [rows, fields, values] with a
+            multi-valued field.
+    """
+    context = context or ContextSpec()
+    types = [context.field_types.get(label, "token") for label in context_labels]
+    return torch.from_numpy(
+        build_context_array(
+            eval_data.select(context_labels).to_numpy(), types, context.max_len
+        )
+    )
 
 
 class EvaluationDataset(TorchDataset):
@@ -88,6 +202,7 @@ class ContextualEvaluationDataset(TorchDataset):
         user_id_label: str,
         item_id_label: str,
         context_labels: List[str],
+        context: Optional[ContextSpec] = None,
     ):
         # Pre-convert DataFrames to torch tensor to reduce overhead
         self.user_indices = torch.from_numpy(
@@ -96,11 +211,7 @@ class ContextualEvaluationDataset(TorchDataset):
         self.item_indices = torch.from_numpy(
             eval_data.select(item_id_label).to_numpy().flatten().astype(np.int64)
         )
-        # Categorical fields store an index and numeric fields a value, so the
-        # evaluation contexts are read the same way the training ones are.
-        self.context_features = torch.from_numpy(
-            eval_data.select(context_labels).to_numpy().astype(np.float32)
-        )
+        self.context_features = read_contexts(eval_data, context_labels, context)
 
     def __len__(self) -> int:
         return len(self.user_indices)
@@ -161,6 +272,7 @@ class SampledEvaluationDataset(TorchDataset):
             if negative_sampling == "popularity"
             else None
         )
+        drawable = drawable_items(cumulative)
 
         for u in self.users_with_eval:
             # Store positives
@@ -178,43 +290,18 @@ class SampledEvaluationDataset(TorchDataset):
                 self.negative_items_list.append(torch.tensor([], dtype=torch.long))
                 continue
 
-            # Sample one time 2x the number of negatives
-            # NOTE: In most cases this will skip the while loop
-            num_to_generate = num_negatives * 2
-            candidates = draw_candidates(
-                rng, cumulative, self.num_items, num_to_generate
-            )
-
-            # Fast filtering using numpy boolean masking
-            mask = np.isin(candidates, seen_items, invert=True)
-            valid_negatives = candidates[mask]
-
-            # Remove duplicates in candidates if necessary
-            valid_negatives = np.unique(valid_negatives)
-
-            # Every user must yield the same number of candidates, or the
-            # evaluator cannot line the batch up. A user with fewer unseen items
-            # than were asked for cannot, and the loop below would otherwise
-            # draw for them forever.
-            if self.num_items - n_seen < num_negatives:
-                raise ValueError(
-                    f"Sampled evaluation asks for {num_negatives} negatives per "
-                    f"user, but user {u} has only {self.num_items - n_seen} of "
-                    f"the {self.num_items} items left unseen. Lower "
-                    "'evaluation.num_negatives' or evaluate on the full catalogue."
-                )
-
-            if len(valid_negatives) < num_negatives:
-                final_negs = list(valid_negatives)
-                while len(final_negs) < num_negatives:
-                    cand = int(draw_candidates(rng, cumulative, self.num_items, 1)[0])
-                    if cand not in seen_items and cand not in final_negs:
-                        final_negs.append(cand)
-                valid_negatives = np.array(final_negs)
-
-            # Take exactly num_negatives
             self.negative_items_list.append(
-                torch.tensor(valid_negatives[:num_negatives], dtype=torch.long)
+                torch.from_numpy(
+                    draw_negatives(
+                        rng,
+                        cumulative,
+                        drawable,
+                        self.num_items,
+                        seen_items,
+                        num_negatives,
+                        u,
+                    )
+                )
             )
 
     def __len__(self) -> int:
@@ -272,8 +359,11 @@ class SampledContextualEvaluationDataset(TorchDataset):
         seed: int = 42,
         negative_sampling: str = "uniform",
         neg_alpha: float = 0.75,
+        context: Optional[ContextSpec] = None,
     ):
-        # pylint: disable = too-many-nested-blocks
+        # pylint: disable = too-many-arguments, too-many-positional-arguments
+        # The evaluation rows, the sampling protocol and the context encoding
+        # are decided in different places and only meet here.
         self.num_negatives = num_negatives
         self.num_items = num_items
 
@@ -284,11 +374,7 @@ class SampledContextualEvaluationDataset(TorchDataset):
         self.pos_item_indices = torch.from_numpy(
             eval_data.select(item_id_label).to_numpy().flatten().astype(np.int64)
         )
-        # Categorical fields store an index and numeric fields a value, so the
-        # evaluation contexts are read the same way the training ones are.
-        self.context_features = torch.from_numpy(
-            eval_data.select(context_labels).to_numpy().astype(np.float32)
-        )
+        self.context_features = read_contexts(eval_data, context_labels, context)
 
         n_train_users = train_interactions.shape[0]
 
@@ -299,6 +385,7 @@ class SampledContextualEvaluationDataset(TorchDataset):
             if negative_sampling == "popularity"
             else None
         )
+        drawable = drawable_items(cumulative)
 
         for idx, user_idx_tensor in enumerate(self.user_indices):
             u = int(user_idx_tensor.item())
@@ -315,43 +402,18 @@ class SampledContextualEvaluationDataset(TorchDataset):
             # Compute seen items
             seen_items = np.append(train_items, target_item)
 
-            # Generate 2x candidates to avoid loops in most cases
-            num_to_generate = self.num_negatives * 2
-            candidates = draw_candidates(
-                rng, cumulative, self.num_items, num_to_generate
-            )
-
-            # Filter out seen items using optimized numpy boolean masking
-            mask = np.isin(candidates, seen_items, invert=True)
-            valid_negatives = candidates[mask]
-
-            # Remove duplicates
-            valid_negatives = np.unique(valid_negatives)
-
-            # As above: a user without enough unseen items cannot supply the
-            # candidates, and drawing until they can would never return.
-            if self.num_items - len(np.unique(seen_items)) < self.num_negatives:
-                raise ValueError(
-                    f"Sampled evaluation asks for {self.num_negatives} negatives "
-                    f"per user, but user {u} has only "
-                    f"{self.num_items - len(np.unique(seen_items))} of the "
-                    f"{self.num_items} items left unseen. Lower "
-                    "'evaluation.num_negatives' or evaluate on the full catalogue."
-                )
-
-            if len(valid_negatives) < self.num_negatives:
-                final_negs = list(valid_negatives)
-                while len(final_negs) < self.num_negatives:
-                    cand = int(draw_candidates(rng, cumulative, self.num_items, 1)[0])
-                    if cand not in final_negs:
-                        if cand != target_item:
-                            if cand not in train_items:
-                                final_negs.append(cand)  # type: ignore[arg-type]
-                valid_negatives = np.array(final_negs)
-
-            # Take exactly num_negatives
             self.negatives_list.append(
-                torch.tensor(valid_negatives[: self.num_negatives], dtype=torch.long)
+                torch.from_numpy(
+                    draw_negatives(
+                        rng,
+                        cumulative,
+                        drawable,
+                        self.num_items,
+                        seen_items,
+                        self.num_negatives,
+                        u,
+                    )
+                )
             )
 
     def __len__(self) -> int:

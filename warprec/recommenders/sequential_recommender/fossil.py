@@ -142,6 +142,10 @@ class FOSSIL(IterativeRecommender, SequentialRecommenderUtils):
         )  # (batch_size, 2 * sequence_length, embedding_dim)
 
         # Iterate 'order_len' times to gather specific items from the padded sequence
+        # The offset is the width of the zeros prepended above, which is the
+        # width of this batch rather than max_seq_len: the evaluator pads a
+        # batch only as wide as its longest history.
+        width = seq_item_embedding.size(1)
         embedding_list = []
         for i in range(self.order_len):
             # Calculate the index for gathering. This index is relative to the padded sequence.
@@ -149,7 +153,7 @@ class FOSSIL(IterativeRecommender, SequentialRecommenderUtils):
             # within the context of the `item_embedding_zeros` tensor.
             embedding = self._gather_indexes(
                 item_embedding_zeros,
-                self.max_seq_len + seq_item_len - self.order_len + i,
+                width + seq_item_len - self.order_len + i,
             )  # (batch_size, embedding_dim)
             embedding_list.append(embedding.unsqueeze(1))
 

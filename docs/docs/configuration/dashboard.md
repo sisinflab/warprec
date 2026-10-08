@@ -44,6 +44,9 @@ WarpRec supports **MLFlow** via Ray for experiment tracking and artifact logging
 - **tracking_token**: Token for authentication with the MLFlow server.
 - **save_artifacts**: Whether to save artifacts to the MLFlow server. Defaults to `False`.
 
+!!! note
+    MLFlow does not accept `@` in a metric name, so metrics appear in MLFlow as `<metric>/<k>` (for example `nDCG@10` is logged as `nDCG/10`). Everywhere else, WarpRec keeps the `<metric>@<k>` names.
+
 ## CodeCarbon (codecarbon)
 
 WarpRec supports **CodeCarbon** via Ray to monitor energy consumption and carbon footprint.

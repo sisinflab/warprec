@@ -11,6 +11,10 @@ from typing import Dict, Tuple
 import numpy as np
 import torch
 
+from conftest import make_model
+from warprec.data.dataset import Dataset
+from warprec.evaluation import Evaluator
+
 from warprec.data.ranking import (
     mask_seen_in_context,
     restrict_to_candidates,
@@ -155,3 +159,32 @@ def test_without_a_generator_the_ordering_is_the_deterministic_one():
 
     # And it is stable: without a generator there is nothing to vary.
     assert torch.equal(indices, top_k_breaking_ties(predictions, 3)[1])
+
+
+def test_reusing_an_evaluator_gives_the_same_results_every_time(dataset: Dataset):
+    """An evaluation must not depend on the evaluations that came before it.
+
+    The pipelines evaluate every model, and every epoch, with one evaluator. A
+    model that ties many scores is ranked through the tie break, and sampled
+    evaluation permutes the candidates, so both random streams have to start
+    from the seed on every call for a result to depend on the model alone.
+    """
+    model = make_model("Pop", dataset)
+    for strategy, loader in [
+        ("full", dataset.get_evaluation_dataloader()),
+        ("sampled", dataset.get_sampled_evaluation_dataloader(num_negatives=5)),
+    ]:
+        reused = Evaluator(
+            ["nDCG", "Recall"], [5], train_set=dataset.train_set.get_sparse()
+        )
+        runs = []
+        for _ in range(3):
+            reused.evaluate(model, loader, strategy, dataset)
+            runs.append(reused.compute_results()[5]["nDCG"].clone())
+        fresh = Evaluator(
+            ["nDCG", "Recall"], [5], train_set=dataset.train_set.get_sparse()
+        )
+        fresh.evaluate(model, loader, strategy, dataset)
+        expected = fresh.compute_results()[5]["nDCG"]
+        for run in runs:
+            assert torch.equal(run.nan_to_num(-1), expected.nan_to_num(-1)), strategy

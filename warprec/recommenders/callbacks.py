@@ -9,6 +9,7 @@ from torch import Tensor
 
 from warprec.data.dataset import Dataset
 from warprec.evaluation.evaluator import Evaluator
+from warprec.recommenders.base_recommender import TRAIN_LOSS
 from warprec.utils.config.model_configuration import EarlyStopping
 from warprec.utils.logger import logger
 
@@ -80,7 +81,7 @@ class WarpRecLightningIntegrationCallback(L.Callback):
             self.patience = self.early_stopping_config.patience
             self.min_delta = self.early_stopping_config.min_delta
             self.grace_period = self.early_stopping_config.grace_period
-            self.es_best_score = None
+            self.es_best_score: Optional[float] = None
             self.wait = 0
 
     def state_dict(self) -> Dict[str, Any]:
@@ -148,6 +149,17 @@ class WarpRecLightningIntegrationCallback(L.Callback):
         self.last_report = {k: v.item() for k, v in trainer.callback_metrics.items()}
         self.last_report.update(epoch=trainer.current_epoch, step=trainer.global_step)
 
+        # Early stopping on the loss: every epoch has one, evaluated or not
+        train_loss = trainer.callback_metrics.get(TRAIN_LOSS)
+        if (
+            self.early_stopping_config
+            and self.early_stopping_config.monitor == "loss"
+            and train_loss is not None
+        ):
+            self._early_stopping_step(
+                trainer, float(train_loss), lower_is_better=True, label="Loss"
+            )
+
         super().on_train_epoch_end(trainer, pl_module)
 
     def on_validation_epoch_end(self, trainer, pl_module):
@@ -208,35 +220,18 @@ class WarpRecLightningIntegrationCallback(L.Callback):
 
             metric_report[f"best_{self.validation_score}"] = self.absolute_best_score
 
-        # Early stopping logic
-        if self.early_stopping_config and self.validation_score in metric_report:
-            current_score = metric_report[self.validation_score]
-            epoch = trainer.current_epoch
-
-            if epoch >= self.grace_period:
-                if self.es_best_score is None:
-                    self.es_best_score = current_score
-                else:
-                    improved = (
-                        (current_score < self.es_best_score - self.min_delta)
-                        if self.mode == "min"
-                        else (current_score > self.es_best_score + self.min_delta)
-                    )
-
-                    if improved:
-                        self.es_best_score = current_score
-                        self.wait = 0
-                    else:
-                        self.wait += 1
-
-                    if self.wait >= self.patience:
-                        if trainer.is_global_zero:
-                            logger.attention(
-                                f"Early stopping triggered at epoch {epoch} "
-                                f"(Score: {current_score:.4f}, Best: {self.es_best_score:.4f})."
-                            )
-                        # This trigger will stop Lightning Trainer
-                        trainer.should_stop = True
+        # Early stopping on the validation metric
+        if (
+            self.early_stopping_config
+            and self.early_stopping_config.monitor != "loss"
+            and self.validation_score in metric_report
+        ):
+            self._early_stopping_step(
+                trainer,
+                metric_report[self.validation_score],
+                lower_is_better=self.mode == "min",
+                label="Score",
+            )
 
         # Log the remaining metrics to Lightning
         # NOTE: We don't need synching here as we already did it before, and
@@ -245,3 +240,42 @@ class WarpRecLightningIntegrationCallback(L.Callback):
             if key in synced_keys:
                 continue
             pl_module.log(key, val, prog_bar=True, on_epoch=True, sync_dist=False)
+
+    def _early_stopping_step(
+        self, trainer: L.Trainer, current: float, lower_is_better: bool, label: str
+    ) -> None:
+        """Count one more epoch towards early stopping, and stop when it is due.
+
+        Args:
+            trainer (L.Trainer): The trainer to stop.
+            current (float): The value of the monitored quantity this epoch.
+            lower_is_better (bool): Whether a decrease is an improvement.
+            label (str): What the value is, for the log line.
+        """
+        epoch = trainer.current_epoch
+        if epoch < self.grace_period:
+            return
+
+        if self.es_best_score is None:
+            self.es_best_score = current
+            return
+
+        improved = (
+            current < self.es_best_score - self.min_delta
+            if lower_is_better
+            else current > self.es_best_score + self.min_delta
+        )
+        if improved:
+            self.es_best_score = current
+            self.wait = 0
+        else:
+            self.wait += 1
+
+        if self.wait >= self.patience:
+            if trainer.is_global_zero:
+                logger.attention(
+                    f"Early stopping triggered at epoch {epoch} "
+                    f"({label}: {current:.4f}, Best: {self.es_best_score:.4f})."
+                )
+            # This trigger will stop Lightning Trainer
+            trainer.should_stop = True

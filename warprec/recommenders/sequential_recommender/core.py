@@ -181,7 +181,10 @@ class CORE(IterativeRecommender, SequentialRecommenderUtils):
     def ave_net(self, item_seq: Tensor, item_emb: Tensor) -> Tensor:
         """Simple average pooling encoder."""
         mask = (item_seq != self.n_items).to(torch.float)
-        alpha = mask / mask.sum(dim=-1, keepdim=True)
+        # A user with no history has nothing to average, and dividing by its
+        # length of zero would score them NaN. Every weight stays zero instead,
+        # the empty session the Transformer encoder also gives them.
+        alpha = mask / mask.sum(dim=-1, keepdim=True).clamp(min=1)
         return alpha.unsqueeze(-1)
 
     def forward(self, item_seq: Tensor) -> Tensor:

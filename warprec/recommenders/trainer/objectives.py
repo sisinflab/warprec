@@ -80,6 +80,7 @@ def objective_function(config: dict) -> None:  # pylint: disable = too-many-loca
     chunk_size = config.get("chunk_size", 4096)
     custom_modules = config.get("custom_modules", [])
     early_stopping_config = config.get("early_stopping_config", None)
+    optimization = config.get("optimization", None)
 
     # Validation metric in the correct format
     validation_score = f"{validation_metric_name}@{validation_top_k}"
@@ -208,7 +209,9 @@ def objective_function(config: dict) -> None:  # pylint: disable = too-many-loca
                 max_epochs=epochs,
                 devices="auto",
                 accelerator=l_device,
-                **lightning_runtime(model_params.optimization, l_device),
+                **lightning_runtime(
+                    optimization or model_params.optimization, l_device
+                ),
                 strategy=pl_strategy,  # Ray handles DDP communication
                 plugins=pl_plugins,  # Ray handles environment variables
                 num_sanity_val_steps=0,
