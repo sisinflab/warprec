@@ -45,8 +45,8 @@ evaluation:
     complex_metrics:
         - name: F1
           params:
-              metric_name_1: nDCG
-              metric_name_2: MAP
+              metric_1: nDCG
+              metric_2: MAP
               beta: 0.5
 ```
 
@@ -170,8 +170,10 @@ evaluation:
 **Normalized Discounted Cumulative Gain (nDCG@K).** Evaluates the **ranking quality** of recommendations, giving higher scores to relevant items appearing at higher ranks.
 
 $$
-\text{DCG@}K = \sum_{i=1}^{K} \frac{2^{r_i} - 1}{\log_2(i + 1)}, \quad \text{nDCG@}K = \frac{\text{DCG@}K}{\text{IDCG@}K}
+\text{DCG@}K = \sum_{i=1}^{K} \frac{g_i}{\log_2(i + 1)}, \quad g_i = \begin{cases} 2^{r_i + 1} - 1 & r_i > 0 \\ 0 & \text{otherwise} \end{cases}, \quad \text{nDCG@}K = \frac{\text{DCG@}K}{\text{IDCG@}K}
 $$
+
+where $r_i$ is the test relevance of the item at rank $i$ (its rating, or 1 under implicit feedback).
 
 For further details, please refer to this [link](https://en.wikipedia.org/wiki/Discounted_cumulative_gain).
 

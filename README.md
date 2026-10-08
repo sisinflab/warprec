@@ -70,7 +70,7 @@ An **Application Layer** serves trained models on Ray Serve, as a batched REST A
 - **Green AI & Carbon Tracking**: WarpRec is the first recommendation framework with native [CodeCarbon](https://codecarbon.io/) integration, automatically quantifying energy consumption and CO₂ emissions for every experiment and persisting carbon footprint reports alongside standard results.
 - **Agentic AI via MCP**: Served models can also be exposed as [Model Context Protocol](https://modelcontextprotocol.io/) tools on the same server (`server.mcp: true`), so LLMs and autonomous agents call a trained recommender as a tool — transforming the framework from a static predictor into an interactive, agent-ready component.
 - **Model Serving on Ray Serve**: A model saved by the training pipeline is served with `python -m warprec.serve -c serve.yml` — a batched REST API with replicas, autoscaling and GPU placement set in configuration, and exportable to a Ray cluster or KubeRay. General, sequential, graph and context-aware models are all served from the checkpoint alone.
-- **Experiment Tracking**: Native integrations with `TensorBoard`, `Weights & Biases`, and `MLflow` for real-time monitoring of metrics, training dynamics, and multi-run management.
+- **Experiment Tracking**: Native integrations with `Weights & Biases` and `MLflow` for real-time monitoring of metrics, training dynamics and multi-run management, and `CodeCarbon` for the energy and emissions of every trial.
 - **Custom Pipelines & Callbacks**: Alongside the standard Training, Design, Evaluation, Swarm, and Estimate workflows, WarpRec exposes an event-driven Callback system for injecting custom logic at any stage — enabling complex experiments without modifying framework internals.
 
 ## ⚙️ Installation

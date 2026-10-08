@@ -1,7 +1,6 @@
 # Dashboard Configuration
 
 The **Dashboard Configuration** module allows you to select which dashboards are activated during model training.
-By default, the **TensorBoard dashboard** is always enabled and cannot be disabled.
 
 WarpRec integrates with multiple dashboards through **Ray**, enabling flexible monitoring and logging of experiments.
 
@@ -14,8 +13,7 @@ The following nested sections can be used to configure dashboards:
 - **codecarbon**: Configuration for **CodeCarbon**.
 
 !!! important
-    - Default state for all optional dashboards is **disabled**.
-    - TensorBoard is **always active** and can be accessed locally.
+    - Every dashboard is **disabled** by default.
     - Ensure all required credentials and API keys are valid; otherwise, dashboard logging may fail.
 
 ## Weights & Biases (wandb)

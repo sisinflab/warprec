@@ -49,7 +49,7 @@ Next, track metric values during training. Recall that `WarpRecCallback` inherit
         self._ndcg_scores.append(ndcg_score)
 ```
 
-In this scenario, only `nDCG@5` is monitored. For tracking multiple metrics simultaneously, the `full_evaluation_on_report` feature can be used.
+In this scenario, only `nDCG@5` is monitored, which assumes `evaluation.validation_metric: nDCG@5` (the default is `nDCG@10`): each report carries the validation metric alone, unless `full_evaluation_on_report` asks for every configured metric.
 
 Finally, generate and save the plot in the `on_training_complete` hook, which is invoked after model training concludes.
 

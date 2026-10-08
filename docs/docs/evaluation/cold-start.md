@@ -42,8 +42,10 @@ evaluation:
 
 - **all** ranks the whole catalogue. The default.
 - **cold** keeps only the items with no training interaction.
-- **warm** keeps only the rest, which is useful for measuring what the protocol cost
-  the models that were never meant to handle cold items.
+- **warm** keeps only the rest. Under `item_cold_start` every test item is cold, so
+  `warm` leaves nothing relevant to retrieve. Under any other split, test items without
+  training interactions are aligned away and `warm` equals `all`, except that it also
+  leaves out the interaction-free items `reader.side.keep_unseen_items` brought in.
 
 `candidates` is item-side only. Under `user_cold_start` every item is warm, and the
 restriction to cold users happens by itself because the evaluation set contains only

@@ -1,7 +1,8 @@
 # Filtering Configuration
 
 The **Filtering Configuration** module defines the preprocessing strategies applied to the dataset
-*before* the splitting phase.
+*before* the splitting phase. Filtering runs only with `reader.loading_strategy: dataset`; data read
+already split (`loading_strategy: split`) is not filtered, and the section is ignored there.
 Filtering is a fundamental step when the dataset contains redundant or low-quality interactions,
 or when its size exceeds the available computational resources.
 
@@ -25,8 +26,9 @@ filtering:
 
 !!! important
     - Strategies are executed **top to bottom** in the exact order they are listed.
-    - Some strategies (e.g., `MinRating` and `UserAverage`) are **incompatible** with implicit feedback datasets.
-    - Incorrect strategy names or invalid parameter keys will cause WarpRec to raise an error.
+    - A strategy can appear only once: if a name is repeated, the YAML loader silently keeps its last parameters, at the position of its first occurrence.
+    - An unknown strategy name, or a missing or invalid required parameter, raises when the configuration is loaded. A key the strategy does not take is ignored.
+    - The rating-based strategies also work with `rating_type: implicit`: the rating column is still read, and the 1s are stored only when the dataset is built, after filtering.
 
 ## Supported Filtering Strategies
 
@@ -35,8 +37,8 @@ WarpRec currently supports the following filtering strategies:
 | Strategy | Category | Description |
 |----------|----------|-------------|
 | `MinRating` | Rating-based | Remove interactions below a rating threshold. |
-| `UserAverage` | Rating-based | Remove interactions below each user's average rating. |
-| `ItemAverage` | Rating-based | Remove interactions below each item's average rating. |
+| `UserAverage` | Rating-based | Keep interactions rated above the user's average rating. |
+| `ItemAverage` | Rating-based | Keep interactions rated above the item's average rating. |
 | `UserMin` | Frequency-based | Remove users with fewer than N interactions. |
 | `UserMax` | Frequency-based | Remove users with more than N interactions. |
 | `ItemMin` | Frequency-based | Remove items with fewer than N interactions. |
@@ -51,7 +53,6 @@ WarpRec currently supports the following filtering strategies:
 **1. MinRating**
 
 Removes all interactions where the rating value is strictly below the specified threshold.
-Not compatible with implicit feedback datasets.
 
 ```yaml
 filtering:
@@ -61,8 +62,8 @@ filtering:
 
 **2. UserAverage**
 
-Removes all interactions for which the rating is below the corresponding user's average rating.
-Not applicable to implicit feedback scenarios.
+Keeps only the interactions rated strictly above the corresponding user's average rating,
+so a rating equal to the mean is removed as well.
 
 ```yaml
 filtering:
@@ -71,8 +72,8 @@ filtering:
 
 **3. ItemAverage**
 
-Removes all interactions for which the rating is below the corresponding item's average rating.
-Not applicable to implicit feedback scenarios.
+Keeps only the interactions rated strictly above the corresponding item's average rating,
+so a rating equal to the mean is removed as well.
 
 ```yaml
 filtering:

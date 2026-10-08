@@ -42,7 +42,7 @@ splitter:
 **2. Temporal Leave-K-Out**
 
 Orders interactions by **timestamp** and leaves exactly **K** interactions per user for the test set.
-Users with fewer than K interactions remain entirely in the training set.
+Users with K or fewer interactions are dropped from both training and test.
 
 ```yaml
 splitter:
@@ -65,7 +65,7 @@ splitter:
 **4. Random Leave-K-Out**
 
 Randomly selects **K** interactions per user to include in the test set.
-Users with fewer than K interactions remain entirely in the training set.
+Users with K or fewer interactions are dropped from both training and test.
 
 ```yaml
 splitter:
@@ -94,6 +94,7 @@ splitter:
 
 Partitions the dataset into **K folds**, using K-1 folds for training and the remaining fold for validation.
 The process is repeated K times to exhaust all possible fold combinations.
+Each user's rows are dealt to the folds round-robin in file order, so the assignment is deterministic and `seed` is not read.
 
 ```yaml
 splitter:

@@ -4,7 +4,7 @@ The **Context Recommenders** module of WarpRec contains models designed to incor
 
 !!! important
 
-    Context-Aware recommenders assume a Leave-One-Out strategy has been used to create the test/validation set. In any other case the framework will not raise an error but it will yield incorrect results.
+    Context-aware models are evaluated once per **test row**, not once per user: the catalogue (or the sampled candidates) is ranked for that user in that row's context, and the row's item is the one relevant answer, the user's other test items counting as non-relevant. A user with several test rows contributes the mean over their rows, so the protocol does not depend on Leave-One-Out.
 
 !!! info "API Reference"
 
@@ -17,7 +17,7 @@ In the following sections, you will find the list of available context-aware mod
 A few behaviours are shared by every model on this page:
 
 - **Training examples are interaction rows.** Each row of the training split becomes a positive example carrying its own context, so the same (user, item) pair appearing in several contexts contributes several examples.
-- **This requires `reader.context` to be configured.** The rows come from it. The interaction matrix cannot stand in: it holds one cell per (user, item) pair, so it can neither carry that pair in several situations nor say which situation a cell belongs to. A model asked to train on contexts without it is refused rather than given rows whose contexts describe other interactions.
+- **This requires contextual columns, named in `reader.labels.context_labels`** (with `reader.dtypes.context_types` and `context_separators` as needed). The rows come from them. The interaction matrix cannot stand in: it holds one cell per (user, item) pair, so it can neither carry that pair in several situations nor say which situation a cell belongs to. A model asked to train on contexts without it is refused rather than given rows whose contexts describe other interactions.
 - **Labels are binary.** Positives are labelled 1 and sampled negatives 0, whatever `rating_type` says, because these models optimise a binary objective. An explicit rating therefore acts as a filter on which interactions exist, not as a target value.
 - **Contextual fields may be categorical, numeric or multi-valued.** Each contributes one vector: a category is looked up, a measurement scales a single embedding by its value, and a multi-valued field is pooled over its values. See [How a Contextual Column Is Interpreted](../data-management/reader.md#how-a-contextual-column-is-interpreted).
 - **Negatives reuse the positive's context.** A negative sample is a different item in the *same* situation, which is what makes the context discriminative. How those items are drawn is set by `training.negative_sampling`.
