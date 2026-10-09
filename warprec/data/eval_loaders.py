@@ -226,7 +226,11 @@ class ContextualEvaluationDataset(TorchDataset):
 
 class SampledEvaluationDataset(TorchDataset):
     """
-    Yields: (user_idx, pos_item, neg_items_vector)
+    Yields: (user_idx, pos_items_vector, neg_items_vector, pos_values_vector)
+
+    The values are what the evaluation matrix holds for each positive, the
+    rating on explicit data and 1 on implicit data, so a sampled evaluation is
+    graded exactly as a full one is.
     """
 
     def __init__(
@@ -261,6 +265,7 @@ class SampledEvaluationDataset(TorchDataset):
         ]
 
         self.positive_items_list = []
+        self.positive_values_list = []
         self.negative_items_list = []
 
         # The sampler owns its stream: seeding the global one made the draws
@@ -275,11 +280,13 @@ class SampledEvaluationDataset(TorchDataset):
         drawable = drawable_items(cumulative)
 
         for u in self.users_with_eval:
-            # Store positives
-            eval_pos = eval_interactions.indices[
-                eval_interactions.indptr[u] : eval_interactions.indptr[u + 1]
-            ]
+            # Store positives, with the relevance full evaluation gives them
+            start, end = eval_interactions.indptr[u], eval_interactions.indptr[u + 1]
+            eval_pos = eval_interactions.indices[start:end]
             self.positive_items_list.append(torch.tensor(eval_pos, dtype=torch.long))
+            self.positive_values_list.append(
+                torch.from_numpy(eval_interactions.data[start:end].astype(np.float32))
+            )
 
             # Compute seen items
             seen_items = self.all_positives[u]
@@ -307,26 +314,28 @@ class SampledEvaluationDataset(TorchDataset):
     def __len__(self) -> int:
         return len(self.users_with_eval)
 
-    def __getitem__(self, idx: int) -> Tuple[int, Tensor, Tensor]:
+    def __getitem__(self, idx: int) -> Tuple[int, Tensor, Tensor, Tensor]:
         user_idx = self.users_with_eval[idx]
         return (
             user_idx,
             self.positive_items_list[idx],
             self.negative_items_list[idx],
+            self.positive_values_list[idx],
         )
 
     def collate_fn(
-        self, batch: List[Tuple[int, Tensor, Tensor]]
-    ) -> Tuple[Tensor, Tensor, Tensor]:
+        self, batch: List[Tuple[int, Tensor, Tensor, Tensor]]
+    ) -> Tuple[Tensor, Tensor, Tensor, Tensor]:
         """Collate the sampled evaluation rows into padded batches.
 
         Args:
-            batch (List[Tuple[int, Tensor, Tensor]]): The rows to collate.
+            batch (List[Tuple[int, Tensor, Tensor, Tensor]]): The rows to collate.
 
         Returns:
-            Tuple[Tensor, Tensor, Tensor]: The users, positives and negatives.
+            Tuple[Tensor, Tensor, Tensor, Tensor]: The users, positives, negatives
+                and the values of the positives (0 where a positive is padding).
         """
-        user_indices, positive_tensors, negative_tensors = zip(*batch)
+        user_indices, positive_tensors, negative_tensors, value_tensors = zip(*batch)
         user_indices_tensor = torch.tensor(list(user_indices), dtype=torch.long)
 
         positives_padded = pad_sequence(
@@ -339,12 +348,21 @@ class SampledEvaluationDataset(TorchDataset):
             batch_first=True,
             padding_value=self.num_items,
         )
-        return user_indices_tensor, positives_padded, negatives_padded
+        values_padded = pad_sequence(
+            value_tensors,  # type: ignore[arg-type]
+            batch_first=True,
+            padding_value=0.0,
+        )
+        return user_indices_tensor, positives_padded, negatives_padded, values_padded
 
 
 class SampledContextualEvaluationDataset(TorchDataset):
     """
     Yields: (user_idx, pos_item, neg_items_vector, context_vector)
+
+    Batches carry the value of each positive before the contexts, like the
+    non-contextual sampled loader. It is 1: the contextual full evaluation
+    scores its target item as 1 too, and the two strategies grade alike.
     """
 
     def __init__(
@@ -429,15 +447,15 @@ class SampledContextualEvaluationDataset(TorchDataset):
 
     def collate_fn(
         self, batch: List[Tuple[Tensor, Tensor, Tensor, Tensor]]
-    ) -> Tuple[Tensor, Tensor, Tensor, Tensor]:
+    ) -> Tuple[Tensor, Tensor, Tensor, Tensor, Tensor]:
         """Collate the sampled contextual evaluation rows into batches.
 
         Args:
             batch (List[Tuple[Tensor, Tensor, Tensor, Tensor]]): The rows to collate.
 
         Returns:
-            Tuple[Tensor, Tensor, Tensor, Tensor]: The users, positives, negatives
-                and contexts.
+            Tuple[Tensor, Tensor, Tensor, Tensor, Tensor]: The users, positives,
+                negatives, the values of the positives and the contexts.
         """
         user_indices, pos_items, neg_items, context_features = zip(*batch)
 
@@ -450,6 +468,7 @@ class SampledContextualEvaluationDataset(TorchDataset):
             tensor_user_indices,
             tensor_pos_items,
             tensor_neg_items,
+            torch.ones(tensor_pos_items.shape, dtype=torch.float32),
             tensor_context_features,
         )
 
