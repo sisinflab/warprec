@@ -81,7 +81,8 @@ class LightSANsLayer(nn.Module):
             x (Tensor): Item embeddings [batch_size, seq_len, hidden_size]
             pos_emb (Tensor): Position embeddings [seq_len, hidden_size] (Shared across batch)
             padding_mask (Optional[Tensor]): [batch_size, seq_len] (True where padding)
-            causal_mask (Optional[Tensor]): [seq_len, seq_len]
+            causal_mask (Optional[Tensor]): [seq_len, seq_len] (True where a
+                position must not attend, i.e. on the future positions)
 
         Returns:
             Tensor: Output of the forward pass.
@@ -136,9 +137,10 @@ class LightSANsLayer(nn.Module):
         attn_pos_scores = torch.matmul(pos_q, pos_k.transpose(-1, -2))
         attn_pos_scores = attn_pos_scores / (self.head_dim**0.5)
 
-        # Apply Causal Mask to Position Attention
+        # Apply Causal Mask to Position Attention: the mask is True on the
+        # future positions, so each position attends to itself and the past
         if causal_mask is not None:
-            attn_pos_scores = attn_pos_scores.masked_fill(causal_mask == 0, -1e9)
+            attn_pos_scores = attn_pos_scores.masked_fill(causal_mask, -1e9)
 
         attn_pos_probs = F.softmax(attn_pos_scores, dim=-1)
         attn_pos_probs = self.attn_dropout(attn_pos_probs)
