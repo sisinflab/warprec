@@ -1,12 +1,12 @@
 # pylint: disable = too-many-branches, too-many-statements
-from typing import Tuple, Optional, List, Any, Dict
+from typing import Callable, Tuple, Optional, List, Any, Dict
 
 import math
 
 import numpy as np
 import torch
 from torch import Tensor
-from torch.utils.data import DataLoader
+from torch.utils.data import DataLoader, Dataset as TorchDataset
 from scipy.sparse import csr_matrix, coo_matrix
 
 import narwhals as nw
@@ -177,6 +177,7 @@ class Dataset:
 
         # Initialize the dataset dataloader
         self._precomputed_dataloader: Dict[str, Any] = {}
+        self._evaluation_samples: Dict[str, TorchDataset] = {}
 
         # If side information data has been provided, we filter the main dataset
         if mat_side_data is not None:
@@ -956,20 +957,14 @@ class Dataset:
             DataLoader: DataLoader that yields batches of interactions
                 (eval_batch, user_indices).
         """
-        key = f"full_{self._serialize_dataloader_kwargs(kwargs)}"
-        if key not in self._precomputed_dataloader:
+
+        def build() -> EvaluationDataset:
             eval_sparse = self.eval_set.get_sparse()
+            return EvaluationDataset(eval_interactions=eval_sparse)
 
-            dataset = EvaluationDataset(eval_interactions=eval_sparse)
-            self._precomputed_dataloader[key] = DataLoader(
-                dataset,
-                batch_size=self.batch_size,
-                shuffle=False,
-                collate_fn=sparse_eval_collate,
-                **kwargs,
-            )
-
-        return self._precomputed_dataloader[key]
+        return self._evaluation_loader(
+            "full", build, kwargs, collate_fn=sparse_eval_collate
+        )
 
     def get_sampled_evaluation_dataloader(
         self,
@@ -994,16 +989,12 @@ class Dataset:
             DataLoader: DataLoader that yields batches
                 of interactions (pos_items, neg_items, user_indices)
         """
-        key = (
-            f"sampled_{num_negatives}_{seed}_{negative_sampling}_{neg_alpha}_"
-            f"{self._serialize_dataloader_kwargs(kwargs)}"
-        )
 
-        if key not in self._precomputed_dataloader:
+        def build() -> SampledEvaluationDataset:
             train_sparse = self.train_set.get_sparse()
             eval_sparse = self.eval_set.get_sparse()
 
-            dataset = SampledEvaluationDataset(
+            return SampledEvaluationDataset(
                 train_interactions=train_sparse,
                 eval_interactions=eval_sparse,
                 num_negatives=num_negatives,
@@ -1011,15 +1002,12 @@ class Dataset:
                 negative_sampling=negative_sampling,
                 neg_alpha=neg_alpha,
             )
-            self._precomputed_dataloader[key] = DataLoader(
-                dataset,
-                batch_size=self.batch_size,
-                shuffle=False,
-                collate_fn=dataset.collate_fn,
-                **kwargs,
-            )
 
-        return self._precomputed_dataloader[key]
+        return self._evaluation_loader(
+            f"sampled_{num_negatives}_{seed}_{negative_sampling}_{neg_alpha}",
+            build,
+            kwargs,
+        )
 
     def get_contextual_evaluation_dataloader(self, **kwargs: Any) -> DataLoader:
         """Retrieve the full contextual evaluation DataLoader for the dataset.
@@ -1033,8 +1021,8 @@ class Dataset:
         Returns:
             DataLoader: The contextual data loader.
         """
-        key = f"full_contextual_{self._serialize_dataloader_kwargs(kwargs)}"
-        if key not in self._precomputed_dataloader:
+
+        def build() -> ContextualEvaluationDataset:
             eval_data = self.eval_set.get_df()
 
             # Retrieve labels to pre-compute eval data
@@ -1078,18 +1066,15 @@ class Dataset:
             # but if we need to drop other nulls:
             # eval_data = eval_data.drop_nulls(subset=[user_label, item_label])
 
-            dataset = ContextualEvaluationDataset(
+            return ContextualEvaluationDataset(
                 eval_data=eval_data,
                 user_id_label=user_label,
                 item_id_label=item_label,
                 context_labels=context_labels,
                 context=self._context_spec,
             )
-            self._precomputed_dataloader[key] = DataLoader(
-                dataset, batch_size=self.batch_size, shuffle=False, **kwargs
-            )
 
-        return self._precomputed_dataloader[key]
+        return self._evaluation_loader("full_contextual", build, kwargs)
 
     def get_sampled_contextual_evaluation_dataloader(
         self,
@@ -1113,12 +1098,8 @@ class Dataset:
         Returns:
             DataLoader: The sampled contextual loader.
         """
-        key = (
-            f"sampled_contextual_{num_negatives}_{seed}_{negative_sampling}_{neg_alpha}_"
-            f"{self._serialize_dataloader_kwargs(kwargs)}"
-        )
 
-        if key not in self._precomputed_dataloader:
+        def build() -> SampledContextualEvaluationDataset:
             train_sparse = self.train_set.get_sparse()
             eval_data = self.eval_set.get_df()
 
@@ -1156,7 +1137,7 @@ class Dataset:
                 nw.col(f"{item_label}_idx").alias(item_label),
             ).drop(f"{user_label}_idx", f"{item_label}_idx")
 
-            dataset = SampledContextualEvaluationDataset(
+            return SampledContextualEvaluationDataset(
                 train_interactions=train_sparse,
                 eval_data=eval_data,
                 user_id_label=user_label,
@@ -1169,15 +1150,55 @@ class Dataset:
                 neg_alpha=neg_alpha,
                 context=self._context_spec,
             )
-            self._precomputed_dataloader[key] = DataLoader(
+
+        return self._evaluation_loader(
+            f"sampled_contextual_{num_negatives}_{seed}_{negative_sampling}_{neg_alpha}",
+            build,
+            kwargs,
+        )
+
+    def _evaluation_loader(
+        self,
+        key: str,
+        build: Callable[[], TorchDataset],
+        kwargs: Dict[str, Any],
+        collate_fn: Optional[Callable] = None,
+    ) -> DataLoader:
+        """Wrap an evaluation sample in a DataLoader, building each only once.
+
+        The sample and the loader are cached apart. The sample is what costs:
+        the sampled strategies draw every user's negatives when it is built. A
+        loader only wraps it, and its worker settings differ between the train
+        pipeline's preparation, which has none, and each trial, which sizes
+        them from its own CPUs. Were both cached under one key, a trial would
+        never find the sample prepared for it and would draw it again.
+
+        Args:
+            key (str): What identifies the sample: the strategy and every
+                parameter the draw depends on, the seed included.
+            build (Callable[[], TorchDataset]): Builds the sample on a miss.
+            kwargs (Dict[str, Any]): The keyword arguments to pass to
+                DataLoader initialization.
+            collate_fn (Optional[Callable]): How a batch is assembled, when the
+                sample does not say so itself.
+
+        Returns:
+            DataLoader: The loader over the cached sample.
+        """
+        loader_key = f"{key}_{self._serialize_dataloader_kwargs(kwargs)}"
+        if loader_key not in self._precomputed_dataloader:
+            if key not in self._evaluation_samples:
+                self._evaluation_samples[key] = build()
+            dataset = self._evaluation_samples[key]
+            self._precomputed_dataloader[loader_key] = DataLoader(
                 dataset,
                 batch_size=self.batch_size,
                 shuffle=False,
-                collate_fn=dataset.collate_fn,
+                collate_fn=collate_fn or getattr(dataset, "collate_fn", None),
                 **kwargs,
             )
 
-        return self._precomputed_dataloader[key]
+        return self._precomputed_dataloader[loader_key]
 
     @staticmethod
     def _serialize_dataloader_kwargs(kwargs: dict[str, Any]) -> str:
