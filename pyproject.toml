@@ -61,7 +61,7 @@ warprec = "warprec.run:main"
 "warprec.serve" = "warprec.serve:main"
 
 [tool.poetry]
-version = "2.1.3"
+version = "2.1.4"
 
 [tool.poetry.dependencies]
 python = "^3.12"

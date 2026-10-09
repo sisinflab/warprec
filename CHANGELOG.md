@@ -2,6 +2,33 @@
 
 <!-- version list -->
 
+## v2.1.4 (2026-10-09)
+
+### Bug Fixes
+
+- Significance tables follow Holm's step-down and Benjamini-Hochberg's step-up procedures, say
+  Significant or Not significant, and flag the tests that ignore the pairing
+  ([`cf8e624`](https://github.com/sisinflab/warprec/commit/cf8e624e83a009bcedd65e4e7c87bd1f04a43965))
+
+### Documentation
+
+- Configuration examples name the custom_modules key and the quick start counts 88 models
+  ([`1ce2c05`](https://github.com/sisinflab/warprec/commit/1ce2c0536174e647225683a65cbae6936c062db7))
+
+- Seventeen notebook guides walk through WarpRec on public datasets, replacing the sample scripts
+  ([`472db8a`](https://github.com/sisinflab/warprec/commit/472db8aff23174c9321f8b063e8435e9a44d1280))
+
+- The guides read significance tables as Significant or Not significant, and describe Holm's and
+  Benjamini-Hochberg's procedures
+  ([`49e78ad`](https://github.com/sisinflab/warprec/commit/49e78adaf9eef554239c16cf73fb587d927ec987))
+
+- The how-tos for custom models, metrics, callbacks and recommendation files show code that runs
+  ([`3fbb4a5`](https://github.com/sisinflab/warprec/commit/3fbb4a549f35f0fbec9abf1fa65906e4e9187f8e))
+
+- The reference pages describe what the code does where they had said otherwise
+  ([`479d103`](https://github.com/sisinflab/warprec/commit/479d103cec5a3bb692e2007e0a92d8363ec6e808))
+
+
 ## v2.1.3 (2026-10-08)
 
 ### Bug Fixes
