@@ -43,3 +43,4 @@ evaluation:
   strategy: sampled
   num_negatives: 99
   negative_sampling: uniform
+  seed: 42
