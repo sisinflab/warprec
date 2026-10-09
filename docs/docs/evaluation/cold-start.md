@@ -70,6 +70,8 @@ candidates.
     on their own, from `evaluation.seed`, so such a model's score is an average over
     many independent draws of the pool rather than one draw shared by a batch: it
     lands near the random floor, and it moves little from one seed to the next.
+    The draw is keyed on the user and the item, so the recommendations a run writes
+    break ties the same way and are the lists it evaluated.
 
 The models to expect a signal from under this protocol are the ones that score from
 item attributes rather than from interactions. See

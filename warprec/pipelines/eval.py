@@ -310,6 +310,7 @@ def eval_pipeline(path: str):
             writer.write_recs(
                 reranker=reranker,
                 mask_seen=config.evaluation.mask_seen,
+                seed=config.evaluation.seed,
                 model=model,
                 dataset=main_dataset,
                 **config.writer.recommendation.model_dump(),

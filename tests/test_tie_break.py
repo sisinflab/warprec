@@ -148,3 +148,39 @@ def test_a_tied_pool_is_drawn_from_whole_and_only_from_itself():
     assert set(indices.flatten().tolist()) == set(pool.tolist())
     assert bool((values == 0.0).all())
     assert len({tuple(row) for row in indices.tolist()}) > 1_900
+
+
+def test_a_users_draw_does_not_depend_on_their_batch():
+    """A user is ranked alike whoever shares the batch, so lists can be compared.
+
+    The evaluator and the writer walk the users in different batches; only a
+    draw keyed on the user and the item gives both the same list.
+    """
+    scores = torch.zeros(60, 80)
+    scores[:, 70:] = 1.0  # some ties above the cutoff too
+    users = torch.arange(100, 160)
+
+    whole = top_k_breaking_ties(scores, 12, torch.Generator().manual_seed(4), users)
+    first = top_k_breaking_ties(
+        scores[:25], 12, torch.Generator().manual_seed(4), users[:25]
+    )
+    shuffled = torch.randperm(35, generator=torch.Generator().manual_seed(0)) + 25
+    rest = top_k_breaking_ties(
+        scores[shuffled], 12, torch.Generator().manual_seed(4), users[shuffled]
+    )
+
+    torch.testing.assert_close(whole[1][:25], first[1], rtol=0, atol=0)
+    torch.testing.assert_close(whole[1][shuffled], rest[1], rtol=0, atol=0)
+
+
+def test_tied_items_come_first_for_about_half_the_users():
+    """For any two tied items, either one leads for about half of the users."""
+    scores = torch.zeros(20_000, 30)
+    _, indices = top_k_breaking_ties(
+        scores, 30, torch.Generator().manual_seed(5), torch.arange(20_000)
+    )
+    position = torch.argsort(indices, dim=1)  # where each item landed, per user
+
+    for a, b in [(0, 1), (3, 17), (28, 29)]:
+        share = float((position[:, a] < position[:, b]).float().mean())
+        assert abs(share - 0.5) < 0.02, (a, b, share)

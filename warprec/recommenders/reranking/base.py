@@ -106,7 +106,9 @@ class Reranker(ABC):
         depth = min(max(k, self.pool), predictions.size(1))
         # The pool is cut where the ranking without a re-ranker would cut it, so
         # equal scores at its edge are drawn per user rather than taken by id.
-        relevance, candidates = top_k_breaking_ties(predictions, depth, generator)
+        relevance, candidates = top_k_breaking_ties(
+            predictions, depth, generator, user_indices
+        )
 
         pooled = min(self.pool, depth)
         cut = min(k, pooled)

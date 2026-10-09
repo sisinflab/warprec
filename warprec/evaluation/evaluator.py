@@ -449,7 +449,7 @@ class Evaluator:
                 )
             else:
                 top_k_values_full, top_k_indices_full = top_k_breaking_ties(
-                    predictions, max_k, self.tie_g
+                    predictions, max_k, self.tie_g, user_indices
                 )
 
             for k in self.k_values:

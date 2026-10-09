@@ -85,6 +85,7 @@ def remote_generate_recs(
     writer.write_recs(
         reranker=build_reranker(config.rerank, dataset),
         mask_seen=config.evaluation.mask_seen,
+        seed=config.evaluation.seed,
         model=model,
         dataset=dataset,
         **config.writer.recommendation.model_dump(),
