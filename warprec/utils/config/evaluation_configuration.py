@@ -142,7 +142,9 @@ class EvaluationConfig(BaseModel):
             seen in the same context when the dataset has contextual columns and
             every seen item otherwise, 'context' and 'pair' force either behaviour,
             'none' excludes nothing. Defaults to 'auto'.
-        seed (Optional[int]): Random seed for reproducibility. Used in negative sampling.
+        seed (int): The seed of the evaluation: it draws the sampled negatives and
+            breaks ties in every ranking, the written ones included. An integer
+            from 0 to 2**32 - 1.
         stat_significance (Optional[StatSignificance]): Statistical significance configuration.
         full_evaluation_on_report (Optional[bool]): Wether or not to compute all metric
             for each report produced.
@@ -163,7 +165,7 @@ class EvaluationConfig(BaseModel):
     neg_alpha: Optional[float] = 0.75
     candidates: Optional[Literal["all", "cold", "warm"]] = "all"
     mask_seen: Optional[Literal["auto", "context", "pair", "none"]] = "auto"
-    seed: Optional[int] = 42
+    seed: int = 42
     stat_significance: Optional[StatSignificance] = Field(
         default_factory=StatSignificance
     )
@@ -248,6 +250,36 @@ class EvaluationConfig(BaseModel):
                 f"neg_alpha must not be negative, got {v}. A negative "
                 "exponent makes the rarest items the most likely negatives, which is "
                 "not what 'popularity' sampling means."
+            )
+        return v
+
+    @field_validator("seed", mode="before")
+    @classmethod
+    def seed_validator(cls, v: Any) -> Any:
+        """Refuse a seed the evaluation cannot be drawn from.
+
+        Nothing gives a missing seed a meaning: it used to reach the evaluator's
+        generator and fail there, mid-run. numpy, which draws the sampled
+        negatives, takes seeds from 0 to 2**32 - 1 only.
+
+        Args:
+            v (Any): The configured value.
+
+        Returns:
+            Any: The value, unchanged.
+
+        Raises:
+            ValueError: If the seed is null or out of range.
+        """
+        if v is None:
+            raise ValueError(
+                "evaluation.seed cannot be null: the evaluation draws its sampled "
+                "negatives and its tie break from it. Leave the key out to use the "
+                "default, 42, or give an integer from 0 to 2**32 - 1."
+            )
+        if isinstance(v, int) and not 0 <= v < 2**32:
+            raise ValueError(
+                f"evaluation.seed must be an integer from 0 to 2**32 - 1, got {v}."
             )
         return v
 

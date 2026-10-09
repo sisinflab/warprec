@@ -15,6 +15,7 @@ from typing import Any, Dict, List
 import pandas as pd
 import pytest
 import torch
+from pydantic import ValidationError
 import yaml
 
 import warprec.recommenders  # noqa: F401  (populates the registries)
@@ -26,6 +27,7 @@ from warprec.pipelines import design, estimate, eval as eval_module
 from warprec.pipelines.remotes import ml
 from warprec.recommenders.trainer import objectives
 from warprec.utils import helpers
+from warprec.utils.config import load_design_configuration
 from warprec.utils.config.evaluation_configuration import EvaluationConfig
 from warprec.utils.helpers import (
     build_evaluation_dataloader_kwargs,
@@ -283,3 +285,33 @@ def test_the_trials_reuse_the_precomputed_sample(
 
     assert len(prepared) == 1
     assert loader.dataset is prepared[0]
+
+
+@pytest.mark.parametrize("seed", [None, -1, 2**32])
+def test_a_seed_the_evaluation_cannot_use_is_refused(seed: Any):
+    """null, negative or too large: refused when read, not deep in a run.
+
+    None crashed the evaluator's generator and numpy's RandomState, which draws
+    the sampled negatives, takes only 0 to 2**32 - 1.
+    """
+    with pytest.raises(ValidationError, match="evaluation.seed"):
+        EvaluationConfig(top_k=[5], metrics=["nDCG"], seed=seed)
+
+
+def test_a_null_seed_is_refused_when_the_configuration_is_loaded(
+    tmp_path: Path, interactions_frame: pd.DataFrame
+):
+    """'seed: null' in a configuration file stops the run at load time."""
+    path = _write_config(tmp_path, interactions_frame)
+    config = yaml.safe_load(Path(path).read_text())
+    config["evaluation"]["seed"] = None
+    Path(path).write_text(yaml.safe_dump(config))
+
+    with pytest.raises(ValidationError, match="evaluation.seed"):
+        load_design_configuration(path)
+
+
+@pytest.mark.parametrize("seed", [0, 7, 2**32 - 1])
+def test_every_seed_in_range_is_accepted(seed: int):
+    """The whole range numpy and torch both take is valid."""
+    assert EvaluationConfig(top_k=[5], metrics=["nDCG"], seed=seed).seed == seed
