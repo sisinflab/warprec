@@ -12,11 +12,23 @@ from scipy.stats import wilcoxon, ttest_rel, kruskal, mannwhitneyu
 from warprec.utils.registry import stat_significance_registry
 from warprec.utils.logger import logger
 
+# What a significance column says about the difference between two models
+SIGNIFICANT = "Significant"
+NOT_SIGNIFICANT = "Not significant"
+
 
 class StatisticalTest(ABC):
     """Abstract base class for statistical tests.
     This class defines the interface for statistical tests to be implemented.
+
+    Attributes:
+        PAIRED (bool): Whether the test uses the pairing of the two samples. Two
+            models are scored on the same users, so a paired test compares each
+            user with themself; an unpaired one treats the two sets of per-user
+            scores as independent samples, and asks a weaker question.
     """
+
+    PAIRED: bool = True
 
     @abstractmethod
     def compute(self, X: np.ndarray, Y: Optional[np.ndarray]) -> Tuple[float, float]:
@@ -81,8 +93,12 @@ class PairedTTest(StatisticalTest):
 @stat_significance_registry.register("kruskal_test")
 class KruskalTest(StatisticalTest):
     """Kruskal-Wallis H test implementation.
-    This class implements the Kruskal-Wallis H test for independent samples.
+    This class implements the Kruskal-Wallis H test for independent samples. It
+    ignores that two models are scored on the same users; the Wilcoxon
+    signed-rank test is its paired counterpart.
     """
+
+    PAIRED = False
 
     def compute(
         self, X: np.ndarray, Y: Optional[np.ndarray] = None
@@ -103,8 +119,12 @@ class KruskalTest(StatisticalTest):
 @stat_significance_registry.register("whitney_u_test")
 class WhitneyUTest(StatisticalTest):
     """Mann-Whitney U test implementation.
-    This class implements the Mann-Whitney U test for independent samples.
+    This class implements the Mann-Whitney U test for independent samples. It
+    ignores that two models are scored on the same users; the Wilcoxon
+    signed-rank test is its paired counterpart.
     """
+
+    PAIRED = False
 
     def compute(
         self, X: np.ndarray, Y: Optional[np.ndarray] = None
@@ -139,8 +159,8 @@ def apply_bonferroni_correction(
 
     return results.with_columns(
         nw.when(nw.col("p-value") < corrected_alpha)
-        .then(nw.lit("Accepted"))
-        .otherwise(nw.lit("Rejected"))
+        .then(nw.lit(SIGNIFICANT))
+        .otherwise(nw.lit(NOT_SIGNIFICANT))
         .alias(f"Significance (Bonferroni α={corrected_alpha:.2e})")
     )
 
@@ -150,6 +170,8 @@ def apply_holm_bonferroni_correction(
 ) -> DataFrame[Any]:
     """Apply Holm-Bonferroni correction to p-values in the results DataFrame.
 
+    The table is returned sorted by p-value.
+
     Args:
         results (DataFrame[Any]): The DataFrame containing p-values.
         alpha (float): The significance level for the correction.
@@ -157,26 +179,15 @@ def apply_holm_bonferroni_correction(
     Returns:
         DataFrame[Any]: The DataFrame with corrected significance values.
     """
+    # Holm's step-down procedure: with the p-values sorted, the i-th smallest
+    # of m is tested against alpha / (m - i + 1), and testing stops at the first
+    # that fails. Every hypothesis from there on is kept, whatever its p-value.
     results = results.sort("p-value")
-
-    # Create a rank column (1-based)
-    # We use 'ordinal' rank to get a simple 1..N sequence matching the sort
-    results = results.with_columns(
-        nw.col("p-value").rank(method="ordinal").alias("Holm-Bonferroni Rank")
-    )
-
-    # Apply logic
-    results = results.with_columns(
-        nw.when(
-            nw.col("p-value")
-            < (alpha / (nw.len() - nw.col("Holm-Bonferroni Rank") + 1))
-        )
-        .then(nw.lit("Accepted"))
-        .otherwise(nw.lit("Rejected"))
-        .alias("Significance (Holm-Bonferroni)")
-    )
-
-    return results.drop("Holm-Bonferroni Rank")
+    p_values = results["p-value"].to_numpy()
+    m = len(p_values)
+    passes = p_values < alpha / (m - np.arange(m))
+    rejected = np.logical_and.accumulate(passes) if m else passes
+    return _with_verdicts(results, rejected, "Significance (Holm-Bonferroni)")
 
 
 def apply_fdr_correction(
@@ -184,6 +195,8 @@ def apply_fdr_correction(
 ) -> DataFrame[Any]:
     """Apply False Discovery Rate (FDR) correction to p-values in the results DataFrame.
 
+    The Benjamini-Hochberg procedure. The table is returned sorted by p-value.
+
     Args:
         results (DataFrame[Any]): The DataFrame containing p-values.
         alpha (float): The significance level for the correction.
@@ -191,26 +204,51 @@ def apply_fdr_correction(
     Returns:
         DataFrame[Any]: The DataFrame with corrected significance values.
     """
+    # Benjamini-Hochberg's step-up procedure: with the p-values sorted, find the
+    # largest rank k whose p-value is below k * alpha / m, and reject every
+    # hypothesis up to it, including those that missed their own threshold.
     results = results.sort("p-value")
+    p_values = results["p-value"].to_numpy()
+    m = len(p_values)
+    passing = np.flatnonzero(p_values < alpha * np.arange(1, m + 1) / m)
+    rejected = np.arange(m) <= passing[-1] if passing.size else np.zeros(m, bool)
+    return _with_verdicts(results, rejected, "Significance (FDR)")
 
-    results = results.with_columns(
-        nw.col("p-value").rank(method="ordinal").alias("FDR Rank")
+
+def _with_verdicts(
+    results: DataFrame[Any], rejected: np.ndarray, column: str
+) -> DataFrame[Any]:
+    """Add one verdict per row of a table already in the order of the decisions.
+
+    Args:
+        results (DataFrame[Any]): The table, sorted as the decisions are.
+        rejected (np.ndarray): Whether each row's null hypothesis is rejected.
+        column (str): The name of the verdict column.
+
+    Returns:
+        DataFrame[Any]: The table with the verdict column added.
+    """
+    verdicts = np.where(rejected, SIGNIFICANT, NOT_SIGNIFICANT).tolist()
+    return results.with_columns(
+        nw.new_series(
+            column, verdicts, nw.String, backend=nw.get_native_namespace(results)
+        )
     )
 
-    # Calculate Threshold
-    # Threshold = (Rank / Total) * Alpha
-    results = results.with_columns(
-        (alpha * nw.col("FDR Rank") / nw.len()).alias("FDR Threshold")
-    )
 
-    results = results.with_columns(
-        nw.when(nw.col("p-value") < nw.col("FDR Threshold"))
-        .then(nw.lit("Accepted"))
-        .otherwise(nw.lit("Rejected"))
-        .alias("Significance (FDR)")
-    )
+def _note_unpaired(test_name: str, stat_test: StatisticalTest) -> None:
+    """Say so when a test ignores that both models are scored on the same users.
 
-    return results.drop(["FDR Rank", "FDR Threshold"])
+    Args:
+        test_name (str): The registered name of the test.
+        stat_test (StatisticalTest): The test about to be run.
+    """
+    if not stat_test.PAIRED:
+        logger.attention(
+            f"{test_name} treats the two models' per-user scores as independent "
+            "samples, although both are scored on the same users. The Wilcoxon "
+            "signed-rank test and the paired t-test use that pairing."
+        )
 
 
 def compute_paired_statistical_test(
@@ -249,6 +287,7 @@ def compute_paired_statistical_test(
     rows = []
     model_names = list(results.keys())
     stat_test: StatisticalTest = stat_significance_registry.get(test_name)
+    _note_unpaired(test_name, stat_test)
     cutoff_values: Set[int] = set()
 
     # Gather all cutoff values
@@ -293,7 +332,7 @@ def compute_paired_statistical_test(
                             continue
 
                         stat, p = stat_test.compute(array_a, array_b)
-                        accepted = "Accepted" if p < alpha else "Rejected"
+                        verdict = SIGNIFICANT if p < alpha else NOT_SIGNIFICANT
 
                         rows.append(
                             {
@@ -303,7 +342,7 @@ def compute_paired_statistical_test(
                                 "Cutoff": cutoff,
                                 "Statistic": stat,
                                 "p-value": p,
-                                f"Significance (α={alpha})": accepted,
+                                f"Significance (α={alpha})": verdict,
                             }
                         )
                 except (KeyError, ValueError, AttributeError) as e:
