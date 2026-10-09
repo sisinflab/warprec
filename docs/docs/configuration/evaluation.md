@@ -51,8 +51,8 @@ The **stat_significance** nested section allows users to configure statistical t
 
 - **paired_t_test**: Enable the Paired t-test. Defaults to `False`.
 - **wilcoxon_test**: Enable the Wilcoxon signed-rank test. Defaults to `False`.
-- **kruskal_test**: Enable the Kruskal-Wallis H-test. Defaults to `False`.
-- **whitney_u_test**: Enable the Mann-Whitney U test. Defaults to `False`.
+- **kruskal_test**: Enable the Kruskal-Wallis H-test, which treats the two models' per-user values as independent samples. Defaults to `False`.
+- **whitney_u_test**: Enable the Mann-Whitney U test, which treats the two models' per-user values as independent samples. Defaults to `False`.
 - **corrections**: Nested section defining corrections for multiple hypothesis testing.
 
 ## Corrections
