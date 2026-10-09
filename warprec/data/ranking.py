@@ -172,38 +172,34 @@ def top_k_breaking_ties(
     Under a cold-start protocol that is the difference between a model that has
     learned nothing scoring at the random floor and appearing to beat it.
 
-    Shuffling the columns before the selection and mapping the indices back makes
-    tied items equally likely while leaving any genuine ordering untouched.
+    Every user's ties are drawn on their own: each item of an ambiguous row gets a
+    random key, and the row is ranked by its score first and by that key among
+    equal scores. So a model that ties a whole population gives each user an
+    independent uniform draw of it, in a uniformly random order, and its score is
+    an average over the users rather than the luck of one draw shared by a batch.
+    A higher score still always ranks above a lower one.
 
-    Only the rows whose ranking is genuinely ambiguous are shuffled, so a run whose
-    scores are distinct pays nothing beyond looking one position past the cutoff.
-    On real model scores that is almost every row.
-
-    The shuffle itself is drawn once per call rather than once per row, which is
-    what keeps it affordable on a large catalogue. So a model that ties everything
-    returns the same list to every user in the batch rather than an independently
-    drawn one each time. That understates such a model rather than flattering it,
-    which is the safe direction, but it does mean the resulting score is not the
-    random baseline: measure that by evaluating an unpersonalized random model.
+    Only the rows whose ranking is genuinely ambiguous get keys, and a row with no
+    ties comes back exactly as ``torch.topk`` returns it. Finding them costs one
+    position past the cutoff; on real model scores almost no row is ambiguous.
 
     Args:
         predictions (Tensor): The score matrix.
         k (int): The cutoff.
         generator (Optional[torch.Generator]): The generator that makes the
-            shuffle reproducible. Without one the ordering falls back to the
-            deterministic behaviour.
+            draw reproducible. Without one the ordering falls back to the
+            deterministic behaviour of ``torch.topk``.
 
     Returns:
-        Tuple[Tensor, Tensor]: The top-k values and the item indices they belong to.
+        Tuple[Tensor, Tensor]: The top-k values, in descending order, and the
+            item indices they belong to.
     """
     if generator is None:
         return torch.topk(predictions, k, dim=1)
 
-    # Shuffling means copying the score matrix, which is the dominant cost of the
-    # selection on a large catalogue, and only the rows whose ranking is actually
-    # ambiguous need it. One extra position past the cutoff is enough to find
-    # them: a row with no two equal scores among them has both its membership and
-    # its order already settled, and most rows of a real evaluation do.
+    # One extra position past the cutoff is enough to find the rows that need a
+    # draw: a row with no two equal scores among them has both its membership
+    # and its order already settled.
     probe = min(k + 1, predictions.size(1))
     values, indices = torch.topk(predictions, probe, dim=1)
 
@@ -213,14 +209,47 @@ def top_k_breaking_ties(
         return values, indices
 
     rows = ambiguous.nonzero(as_tuple=True)[0]
-    # Drawn where the generator lives, which torch requires, then moved to the
-    # scores: the evaluator's generator is on the CPU even when the scores are not.
-    order = torch.randperm(
-        predictions.size(1), generator=generator, device=generator.device
-    ).to(predictions.device)
-    tied_values, shuffled = torch.topk(predictions[rows][:, order], k, dim=1)
+    scores = predictions if rows.numel() == predictions.size(0) else predictions[rows]
+
+    # The k-th score splits each row in three: the items above it are in the
+    # list whatever the draw, the items below it are out, and the items equal to
+    # it compete for the places left.
+    kth = values[rows, k - 1 :]
+
+    # Drawing the keys is the dominant cost, so they are drawn only for the
+    # items that can still make some list. When the ties sit on a known
+    # population, such as the cold items of a cold-start run, that is a small
+    # fraction of the catalogue. When it is most of it, narrowing would only
+    # add a copy of the scores.
+    columns = (scores >= kth).any(dim=0).nonzero(as_tuple=True)[0]
+    narrowed = columns.numel() <= scores.size(1) // 2
+    if narrowed:
+        scores = scores[:, columns]
+
+    # Keying the items above the k-th score over every random key, and the ones
+    # below it under, lets one top-k make the choice for every row at once, with
+    # a fresh key per user and item. Drawn where the generator lives, which
+    # torch requires, then moved to the scores: the evaluator's generator is on
+    # the CPU even when the scores are not.
+    keys = torch.rand(scores.shape, generator=generator, device=generator.device).to(
+        predictions.device
+    )
+    keys.masked_fill_(scores < kth, -1.0)
+    keys[scores > kth] += 2.0
+    _, chosen = torch.topk(keys, k, dim=1)
+    del keys
+
+    # The draw settled which items are in, and in key order. Sorting them by
+    # score, stably, puts a higher score first and leaves equal scores in the
+    # order their keys drew.
+    tied_values, order = torch.sort(
+        scores.gather(1, chosen), dim=1, descending=True, stable=True
+    )
+    chosen = chosen.gather(1, order)
+    if narrowed:
+        chosen = columns[chosen]
 
     values, indices = values.clone(), indices.clone()
     values[rows] = tied_values
-    indices[rows] = order[shuffled]
+    indices[rows] = chosen
     return values, indices

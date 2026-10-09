@@ -4,6 +4,8 @@ from typing import Any, Optional, Tuple
 import torch
 from torch import Tensor
 
+from warprec.data.ranking import top_k_breaking_ties
+
 
 class Reranker(ABC):
     """Reorders the head of a ranking before anything else looks at it.
@@ -78,7 +80,11 @@ class Reranker(ABC):
         return (finite - lowest) / (highest - lowest).clamp(min=1e-12)
 
     def __call__(
-        self, predictions: Tensor, k: int, user_indices: Optional[Tensor] = None
+        self,
+        predictions: Tensor,
+        k: int,
+        user_indices: Optional[Tensor] = None,
+        generator: Optional[torch.Generator] = None,
     ) -> Tuple[Tensor, Tensor]:
         """Reorder the head of each row.
 
@@ -87,6 +93,9 @@ class Reranker(ABC):
             k (int): The cutoff.
             user_indices (Optional[Tensor]): The users of this batch, needed by the
                 objectives that read a user's history.
+            generator (Optional[torch.Generator]): The generator that breaks ties
+                when the pool is taken, as the ranking without a re-ranker breaks
+                them. Without one, equal scores are taken in item order.
 
         Returns:
             Tuple[Tensor, Tensor]: The scores and the item indices they belong to,
@@ -95,7 +104,9 @@ class Reranker(ABC):
         # Deep enough to fill the cutoff even when it runs past the pool, so that
         # asking for more than was reconsidered never returns a shorter list.
         depth = min(max(k, self.pool), predictions.size(1))
-        relevance, candidates = torch.topk(predictions, depth, dim=1)
+        # The pool is cut where the ranking without a re-ranker would cut it, so
+        # equal scores at its edge are drawn per user rather than taken by id.
+        relevance, candidates = top_k_breaking_ties(predictions, depth, generator)
 
         pooled = min(self.pool, depth)
         cut = min(k, pooled)

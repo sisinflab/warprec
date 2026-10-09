@@ -445,7 +445,7 @@ class Evaluator:
             max_k = max(self.k_values)
             if self.reranker is not None:
                 top_k_values_full, top_k_indices_full = self.reranker(
-                    predictions, max_k, user_indices
+                    predictions, max_k, user_indices, self.tie_g
                 )
             else:
                 top_k_values_full, top_k_indices_full = top_k_breaking_ties(

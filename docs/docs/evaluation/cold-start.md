@@ -66,8 +66,10 @@ candidates.
     sounds: a purely collaborative model scores every cold item alike, because each is
     an all-zero column, so its ranking is decided entirely by the tie break. Deciding
     it by position would hand those models the lowest item ids, and in most catalogues
-    those are the oldest and best-known entries. The shuffle is drawn once per batch,
-    so it removes that bias without standing in for a random baseline of its own.
+    those are the oldest and best-known entries. The tie break is drawn for each user
+    on their own, from `evaluation.seed`, so such a model's score is an average over
+    many independent draws of the pool rather than one draw shared by a batch: it
+    lands near the random floor, and it moves little from one seed to the next.
 
 The models to expect a signal from under this protocol are the ones that score from
 item attributes rather than from interactions. See
