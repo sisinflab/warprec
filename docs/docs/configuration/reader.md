@@ -30,7 +30,7 @@ The following keywords are available to configure the reader:
 
 - **header**: Boolean flag to indicate whether the first row of the file is a header. Defaults to `True`.
 
-- **duplicates**: How repeated `(user_id, item_id)` rows are aggregated when the interaction matrix is built: `max`, `mean`, `first`, `last` or `sum`. Defaults to `max`. With implicit feedback every policy except `sum` yields a binary matrix, while `sum` yields interaction counts.
+- **duplicates**: How repeated `(user_id, item_id)` rows are aggregated when the interaction matrix is built: `max`, `mean`, `first`, `last` or `sum`. Defaults to `max`. `first` and `last` keep the rating of the earliest or latest of the repeated rows in file order, whichever backend reads the data. With implicit feedback every policy except `sum` yields a binary matrix, while `sum` yields interaction counts.
 
 !!! warning "Moved"
     `negative_sampling` and `sequence_pooling` were released here in 1.7 and now live

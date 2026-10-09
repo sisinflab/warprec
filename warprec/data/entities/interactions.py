@@ -16,6 +16,7 @@ from warprec.data.entities.train_structures import (
 )
 from warprec.data.entities.common import (
     ITEM_INDEX,
+    ROW_INDEX,
     USER_INDEX,
     map_to_index_space,
     seeded_dataloader,
@@ -242,14 +243,15 @@ class Interactions:
             )
 
         # Sorted so that the arrays are in a reproducible order and line up
-        # with one another however the frame arrived.
+        # with one another however the frame arrived. Repeated pairs stay in
+        # file order, which the 'first' and 'last' duplicate policies rely on.
         mapped_df = map_to_index_space(
             self._inter_df,
             self.user_label,
             self.item_label,
             self._umap,
             self._imap,
-        ).sort([USER_INDEX, ITEM_INDEX])
+        ).sort([USER_INDEX, ITEM_INDEX, ROW_INDEX])
 
         self._flat_users = mapped_df.select(USER_INDEX).to_numpy().flatten()
         self._flat_items = mapped_df.select(ITEM_INDEX).to_numpy().flatten()
@@ -308,7 +310,7 @@ class Interactions:
             self.item_label,
             self._umap,
             self._imap,
-        ).sort([USER_INDEX, ITEM_INDEX])
+        ).sort([USER_INDEX, ITEM_INDEX, ROW_INDEX])
 
         users = mapped_df.select(USER_INDEX).to_numpy().flatten()
         items = mapped_df.select(ITEM_INDEX).to_numpy().flatten()
