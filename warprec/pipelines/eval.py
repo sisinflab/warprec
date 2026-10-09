@@ -140,7 +140,7 @@ def _load_or_build_model(
         knowledge=dataset.knowledge,
         multimodal=dataset.multimodal,
         sessions=dataset.train_session,
-        seed=42,
+        seed=params.optimization.properties.seed,
         info=dataset.info(),
         **dataset.get_stash(),
         block_size=block_size,

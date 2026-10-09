@@ -20,12 +20,13 @@ import warprec.recommenders  # noqa: F401  (populates the registries)
 from warprec.data.dataset import Dataset
 from warprec.pipelines.design import design_pipeline
 from warprec.pipelines.estimate import estimate_pipeline
+from warprec.pipelines.eval import eval_pipeline
 from warprec.pipelines.remotes.ml import remote_model_retraining
 from warprec.recommenders.collaborative_filtering_recommender.latent_factor.bpr import (
     BPR,
 )
 from warprec.recommenders.trainer import objectives
-from warprec.utils.registry import params_registry
+from warprec.utils.registry import model_registry, params_registry
 
 from conftest import make_model
 from test_trial_optimization import RecordingTrainer, _bundle
@@ -219,3 +220,43 @@ def test_the_estimate_pipeline_trains_on_the_configured_seed(
     )
 
     assert seeds_seen == [SEED]
+
+
+def test_the_eval_pipeline_builds_models_with_the_configured_seed(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, interactions_frame: pd.DataFrame
+):
+    """A model the eval pipeline builds carries its configured seed, not 42.
+
+    It matters for whatever the model draws when it is built or asked to
+    score, such as the Random baseline's ranking.
+    """
+    built: List[Any] = []
+    original = model_registry.get
+
+    def recording(*args: Any, **kwargs: Any) -> Any:
+        model = original(*args, **kwargs)
+        built.append(model.seed)
+        return model
+
+    monkeypatch.setattr(model_registry, "get", recording)
+
+    path = _write_config(
+        tmp_path,
+        interactions_frame,
+        writer={
+            "dataset_name": "seed",
+            "writing_method": "local",
+            "local_experiment_path": str(tmp_path),
+        },
+    )
+    config = yaml.safe_load(Path(path).read_text())
+    optimization = {"properties": {"seed": SEED}, "num_workers": 0}
+    config["models"] = {
+        "Random": {"optimization": optimization},
+        "EASE": {"l2": 10.0, "optimization": optimization},
+    }
+    Path(path).write_text(yaml.safe_dump(config))
+
+    eval_pipeline(path)
+
+    assert built == [SEED, SEED]
