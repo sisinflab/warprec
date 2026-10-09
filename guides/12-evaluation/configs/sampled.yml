@@ -6,3 +6,4 @@ evaluation:
   num_negatives: 99
   negative_sampling: popularity   # or uniform (the default)
   neg_alpha: 0.75                 # read by popularity only
+  seed: 42                        # the negatives' draw and the tie-breaking

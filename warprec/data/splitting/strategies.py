@@ -359,8 +359,10 @@ class RandomHoldoutSplit(SplittingStrategy):
 
         # Random sampling
         n_rows = data_prep.select(nw.col(data_prep.columns[0])).shape[0]
-        np.random.seed(seed)
-        random_vals = np.random.rand(n_rows)
+        # A generator of its own, so that the user's np.random stream is left
+        # where it was. RandomState with the same seed draws exactly what the
+        # seeded global stream used to, so every split is unchanged.
+        random_vals = np.random.RandomState(seed).rand(n_rows)
 
         # Assign the random values
         rand_series = nw.new_series(
@@ -425,8 +427,10 @@ class RandomLeaveKOutSplit(SplittingStrategy):
 
         # Random sampling
         n_rows = data_prep.select(nw.col(data_prep.columns[0])).shape[0]
-        np.random.seed(seed)
-        random_vals = np.random.rand(n_rows)
+        # A generator of its own, so that the user's np.random stream is left
+        # where it was. RandomState with the same seed draws exactly what the
+        # seeded global stream used to, so every split is unchanged.
+        random_vals = np.random.RandomState(seed).rand(n_rows)
 
         # Assign the random values
         rand_series = nw.new_series(

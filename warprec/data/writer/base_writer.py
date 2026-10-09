@@ -13,7 +13,11 @@ from narwhals.dataframe import DataFrame
 from torch import Tensor
 from tqdm import tqdm
 
-from warprec.data.ranking import mask_seen_pairs, resolve_recommendation_mask
+from warprec.data.ranking import (
+    mask_seen_pairs,
+    resolve_recommendation_mask,
+    top_k_breaking_ties,
+)
 from warprec.data import Dataset
 from warprec.recommenders.base_recommender import (
     ContextRecommenderUtils,
@@ -195,6 +199,7 @@ class Writer(ABC):
         k: int,
         reranker: Optional[Any] = None,
         mask_seen: str = "pair",
+        seed: int = 42,
     ) -> Generator[list[tuple], None, None]:
         """A generator that yields batches of recommendation rows.
         Each batch corresponds to the recommendations for a batch of users.
@@ -208,11 +213,15 @@ class Writer(ABC):
             mask_seen (str): Which already-seen items are excluded, following the
                 same setting the evaluation uses so that the list written out is
                 filtered by the rule the run reported under.
+            seed (int): The seed ties are broken from, the evaluation's, so
+                that a model scoring items alike writes the lists it was
+                evaluated on.
 
         Yields:
             list[tuple]: A list of (user_label, item_label, score) tuples.
         """
         policy = resolve_recommendation_mask(mask_seen, dataset.train_transactions)
+        tie_break = torch.Generator().manual_seed(seed)
 
         train_sparse = dataset.train_set.get_sparse()
         umap_i, imap_i = dataset.get_inverse_mappings()
@@ -241,10 +250,16 @@ class Writer(ABC):
                 )
                 if policy != "none":
                     mask_seen_pairs(predictions, train_batch)
+                # Ties are broken as the evaluator breaks them, from the same
+                # seed and per user, so the list written is the list evaluated.
                 if reranker is not None:
-                    top_k_scores, top_k_items = reranker(predictions, k, user_indices)
+                    top_k_scores, top_k_items = reranker(
+                        predictions, k, user_indices, tie_break
+                    )
                 else:
-                    top_k_scores, top_k_items = torch.topk(predictions, k, dim=1)
+                    top_k_scores, top_k_items = top_k_breaking_ties(
+                        predictions, k, tie_break, user_indices
+                    )
 
             batch_users = user_indices.unsqueeze(1).expand(-1, k).flatten()
             user_labels = [umap_i[idx.item()] for idx in batch_users]
