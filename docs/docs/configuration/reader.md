@@ -97,7 +97,7 @@ This can be configured using the `side` nested section:
 
 - **column_names**: The names of the columns, required when the file has no header row. The first name must be the item ID column.
 
-- **keep_unseen_items**: Whether items that carry attributes but no interaction stay in the catalogue. Defaults to `False`, which drops them. Set it to `True` for cold-start experiments: such an item becomes an all-zero column of the interaction matrix, so a content-based or hybrid model can still recommend it from its attributes while the collaborative models score it last.
+- **keep_unseen_items**: Whether items that carry attributes but no interaction stay in the catalogue. Defaults to `False`, which drops them. Set it to `True` for cold-start experiments: such an item becomes an all-zero column of the interaction matrix, so a content-based or hybrid model can still recommend it from its attributes while the collaborative models score it last. The context-aware models, which embed the item attributes, read them for these items too.
 
 !!! tip
     Side information can improve model performance, especially in **cold-start scenarios**. Not every model uses side information, check the [Recommenders Documentation](../recommenders/index.md) for further details on each model.
