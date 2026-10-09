@@ -229,6 +229,7 @@ def remote_model_retraining(
             num_workers=num_workers,
             pin_memory=pin_memory,
             persistent_workers=persistent_workers,
+            seed=best_model.seed,
         )
 
         # The epochs cross-validation settled on, not the search's upper bound

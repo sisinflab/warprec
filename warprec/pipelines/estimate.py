@@ -590,6 +590,7 @@ def _run_estimate_setup(  # pylint: disable = too-many-locals
             num_workers=num_workers,
             pin_memory=pin_memory,
             persistent_workers=persistent_workers,
+            seed=model.seed,
         )
         total_train_batches = len(train_dataloader)
         train_limit = min(

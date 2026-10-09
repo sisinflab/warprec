@@ -179,6 +179,7 @@ def objective_function(config: dict) -> None:  # pylint: disable = too-many-loca
                 num_workers=num_workers,
                 pin_memory=pin_memory,
                 persistent_workers=persistent_workers,
+                seed=model.seed,
             )
             eval_dataloader = retrieve_evaluation_dataloader(
                 dataset=dataset,

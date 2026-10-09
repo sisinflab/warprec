@@ -139,6 +139,7 @@ def design_pipeline(path: str):
                 num_workers=num_workers,
                 pin_memory=pin_memory,
                 persistent_workers=persistent_workers,
+                seed=model.seed,
             )
 
             # Standard training loop
