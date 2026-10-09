@@ -64,9 +64,10 @@ candidates.
 
     Ties are broken at random rather than by item id, which matters here more than it
     sounds: a purely collaborative model scores every cold item alike, because each is
-    an all-zero column, so its ranking is decided entirely by the tie break. Deciding
-    it by position would hand those models the lowest item ids, and in most catalogues
-    those are the oldest and best-known entries. The tie break is drawn for each user
+    an all-zero column, so its ranking is decided entirely by the tie break. Left to
+    `torch.topk`, which makes no promise about the order of equal scores, the choice
+    would follow the item indices and give every user the same items, often the lowest
+    ids, which in most catalogues are the oldest and best-known entries. The tie break is drawn for each user
     on their own, from `evaluation.seed`, so such a model's score is an average over
     many independent draws of the pool rather than one draw shared by a batch: it
     lands near the random floor, and it moves little from one seed to the next.
