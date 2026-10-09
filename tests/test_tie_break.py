@@ -132,7 +132,9 @@ def test_the_reranker_pool_breaks_ties_like_the_ranking():
     _, indices = reranker(tied, 5, generator=torch.Generator().manual_seed(9))
     _, positional = reranker(tied, 5)
 
-    assert bool((positional < 10).all()), "without a generator the pool is positional"
+    # torch.topk gives no guarantee about the order of equal scores, only that
+    # it is the same for the same input: every user gets one and the same pool.
+    assert len({tuple(row) for row in positional.tolist()}) == 1
     assert int(indices.max()) >= 10, "the pool stayed at the lowest ids"
     assert len({tuple(row) for row in indices.tolist()}) > 45
 
