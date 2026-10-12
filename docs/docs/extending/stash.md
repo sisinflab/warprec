@@ -60,3 +60,16 @@ class CustomModel(Recommender):
         super().__init__(params, info, *args, seed=seed, **kwargs)
         self.item_images = kwargs.get("item_images")
 ```
+
+## Reserved Names
+
+The stash is passed as keyword arguments to every model and, through the evaluator, to every metric, next to the arguments WarpRec gives them itself. An entry named like one of those would replace it (a `num_items` entry used to replace the catalogue size of every metric) or make every model fail, so these names are refused:
+
+- given to models: `name`, `params`, `info`, `interactions`, `transactions`, `knowledge`, `multimodal`, `sessions`, `seed`, `block_size`, `chunk_size`, `checkpoint`, `strict`;
+- given to metrics: `k`, `num_users`, `num_items`, `item_interactions`, `item_indices`, `train_matrix`, `feature_lookup`, `user_cluster`, `item_cluster`, `propensity`.
+
+`add_to_stash` raises a `ValueError` naming the key as soon as one is added. An entry written into the dictionary `get_stash()` returns is checked where the stash is passed on, when a model or the evaluator is built.
+
+!!! note
+
+    Every metric receives the whole stash, so an entry named like a metric's own parameter (for example `relevance` for EPC and EFD) sets that parameter for every metric that has it. Give stash entries names specific to your data, such as `item_images`.

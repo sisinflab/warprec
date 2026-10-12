@@ -7,6 +7,7 @@ from torch.utils.data import DataLoader
 from scipy.sparse import csr_matrix
 
 from warprec.data import Dataset
+from warprec.data.stash import METRIC_ARGUMENTS, check_stash
 from warprec.data.ranking import (
     cold_item_candidates,
     mask_seen_in_context,
@@ -131,8 +132,13 @@ class Evaluator:
             "user_cluster": user_cluster,
             "item_cluster": item_cluster,
             "propensity": propensity,
-            **additional_data,
         }
+        # The additional data (the dataset's stash) is passed next to these and
+        # to the cutoff, so a key of theirs would replace one of WarpRec's.
+        check_stash(
+            additional_data, {"k", *self.common_params, *METRIC_ARGUMENTS}, "metric"
+        )
+        self.common_params.update(additional_data)
         self._init_metrics(metric_list, complex_metrics)
 
     def _init_metrics(

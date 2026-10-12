@@ -20,6 +20,7 @@ from warprec.data.entities import (
     Sessions,
     Transactions,
 )
+from warprec.data.stash import METRIC_ARGUMENTS, MODEL_ARGUMENTS, check_stash
 from warprec.data.schema import ColumnLabels, ContextSpec, SideData, SignalOptions
 from warprec.data.eval_loaders import (
     EvaluationDataset,
@@ -1366,10 +1367,14 @@ class Dataset:
     def add_to_stash(self, key: str, value: Any):
         """Add a custom structure to the stash.
 
+        The stash is passed to every model and every metric next to the
+        arguments WarpRec gives them, so those names cannot be used.
+
         Args:
             key (str): The key of the custom structure.
             value (Any): The value of the custom structure.
         """
+        check_stash({key: value}, MODEL_ARGUMENTS | METRIC_ARGUMENTS, "model or metric")
         self._stash[key] = value
 
     def update_mappings(self, user_mapping: dict, item_mapping: dict):

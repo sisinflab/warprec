@@ -17,8 +17,10 @@ from torch import Tensor
 
 import warprec.evaluation  # noqa: F401  (populates the metric registry)
 from warprec.data.dataset import Dataset
+from warprec.data.stash import METRIC_ARGUMENTS
 from warprec.evaluation import Evaluator
 from warprec.evaluation.metrics.base_metric import TopKMetric, UserAverageTopKMetric
+from warprec.pipelines.eval import _load_or_build_model
 from warprec.recommenders.base_recommender import Recommender
 from warprec.recommenders.trainer.trainer import Trainer
 from warprec.utils.config.model_configuration import INT_FIELD, RecomModel
@@ -358,3 +360,63 @@ def test_the_same_module_may_be_loaded_again_or_from_a_copy(tmp_path: Path):
     load_custom_modules([str(path), str(copy)])
 
     assert sys.modules[name].VALUE == 1
+
+
+def test_a_stash_key_named_like_a_metric_argument_is_refused(ranking_dataset: Dataset):
+    """'num_items' in the stash used to replace the catalogue size of every metric."""
+    for key in ("num_items", "k"):
+        with pytest.raises(ValueError, match=f"'{key}'"):
+            Evaluator(
+                ["Recall"],
+                [5],
+                train_set=ranking_dataset.train_set.get_sparse(),
+                additional_data={key: 3},
+            )
+
+
+def test_a_stash_key_named_like_a_model_argument_is_refused(ranking_dataset: Dataset):
+    """A stash written to directly is checked where models are built."""
+    stash = ranking_dataset.get_stash()
+    stash["seed"] = 3
+    try:
+        with pytest.raises(ValueError, match="'seed'"):
+            _load_or_build_model("EASE", {"l2": 10.0}, ranking_dataset, 50, 4096)
+    finally:
+        del stash["seed"]
+
+
+@pytest.mark.parametrize("key", ["seed", "params", "info", "num_items", "k"])
+def test_add_to_stash_refuses_a_reserved_name(key: str, ranking_dataset: Dataset):
+    """The name is refused where it is added, before anything is built."""
+    with pytest.raises(ValueError, match=f"'{key}'"):
+        ranking_dataset.add_to_stash(key, 1)
+    assert key not in ranking_dataset.get_stash()
+
+
+def test_a_stash_entry_of_its_own_reaches_models_and_metrics(
+    ranking_dataset: Dataset,
+):
+    """Every other name still works."""
+    ranking_dataset.add_to_stash("item_year", torch.zeros(40))
+    try:
+        Evaluator(
+            ["Recall"],
+            [5],
+            train_set=ranking_dataset.train_set.get_sparse(),
+            additional_data=ranking_dataset.get_stash(),
+        )
+        model = _load_or_build_model("EASE", {"l2": 10.0}, ranking_dataset, 50, 4096)
+        assert model is not None
+    finally:
+        del ranking_dataset.get_stash()["item_year"]
+
+
+def test_the_reserved_metric_names_are_those_the_evaluator_passes(
+    ranking_dataset: Dataset,
+):
+    """add_to_stash refuses what the evaluator would refuse, no more, no less."""
+    evaluator = Evaluator(
+        ["Recall"], [5], train_set=ranking_dataset.train_set.get_sparse()
+    )
+
+    assert set(evaluator.common_params) | {"k"} == METRIC_ARGUMENTS

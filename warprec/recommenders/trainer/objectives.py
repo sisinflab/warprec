@@ -14,6 +14,7 @@ from ray.train.lightning import (
 )
 from torch import Tensor
 
+from warprec.data.stash import MODEL_ARGUMENTS, check_stash
 from warprec.evaluation import build_evaluator
 from warprec.recommenders.callbacks import (
     WarpRecLightningIntegrationCallback,
@@ -141,7 +142,7 @@ def objective_function(config: dict) -> None:  # pylint: disable = too-many-loca
             sessions=dataset.train_session,
             seed=seed,
             info=dataset.info(),
-            **dataset.get_stash(),
+            **check_stash(dataset.get_stash(), MODEL_ARGUMENTS, "model"),
             block_size=block_size,
             chunk_size=chunk_size,
         )

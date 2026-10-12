@@ -24,6 +24,7 @@ from ray.train.torch import TorchTrainer
 from ray.train import ScalingConfig
 from ray.train._internal.storage import get_fs_and_path
 
+from warprec.data.stash import MODEL_ARGUMENTS, check_stash
 from warprec.recommenders.base_recommender import Recommender, IterativeRecommender
 from warprec.data import Dataset
 from warprec.recommenders.trainer.logger_callbacks import (
@@ -769,7 +770,7 @@ class Trainer:
                 knowledge=dataset.knowledge,
                 multimodal=dataset.multimodal,
                 sessions=dataset.train_session,
-                **dataset.get_stash(),
+                **check_stash(dataset.get_stash(), MODEL_ARGUMENTS, "model"),
             )
         else:
             model = model_class(
@@ -780,7 +781,7 @@ class Trainer:
                 multimodal=dataset.multimodal,
                 sessions=dataset.train_session,
                 info=dataset.info(),
-                **dataset.get_stash(),
+                **check_stash(dataset.get_stash(), MODEL_ARGUMENTS, "model"),
             )
 
         return model

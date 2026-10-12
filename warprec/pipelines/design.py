@@ -2,6 +2,7 @@ import time
 
 import lightning as L
 
+from warprec.data.stash import MODEL_ARGUMENTS, check_stash
 from warprec.common import initialize_datasets, log_evaluation
 from warprec.data.reader import ReaderFactory
 from warprec.recommenders.base_recommender import IterativeRecommender
@@ -90,7 +91,7 @@ def design_pipeline(path: str):
             sessions=main_dataset.train_session,
             seed=seed,
             info=main_dataset.info(),
-            **main_dataset.get_stash(),
+            **check_stash(main_dataset.get_stash(), MODEL_ARGUMENTS, "model"),
             block_size=block_size,
             chunk_size=chunk_size,
         )
