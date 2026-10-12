@@ -378,7 +378,7 @@ class MyBPR(IterativeRecommender):
 
 ## Validating Hyperparameters
 
-Only the attributes annotated on the model class itself are read from `params`. Without anything else, WarpRec accepts any value for them, and the training pipeline logs that the model "is registered in the model registry, but not in parameter registry". To validate them, and to let each one take a search space (see [Models configuration](../configuration/models.md)), register a parameter class **under the model's name**:
+Only the attributes annotated on the model class itself are read from `params` (or, for a class that annotates none, those of the nearest model class it derives from; `Recommender`'s own never count). They are the model's hyperparameters: `get_params()` returns them and the model's `name_param`, which names its checkpoints and result rows, is derived from them. A class constant is not a hyperparameter: annotate it as a `ClassVar`, or name it in capitals, and it is left out of both. Without anything else, WarpRec accepts any value for them, and the training pipeline logs that the model "is registered in the model registry, but not in parameter registry". To validate them, and to let each one take a search space (see [Models configuration](../configuration/models.md)), register a parameter class **under the model's name**:
 
 ```python
 from pydantic import field_validator

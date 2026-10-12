@@ -7,7 +7,7 @@ wrong thing, or failed far from its cause, now either works or says what to do.
 import sys
 import uuid
 from pathlib import Path
-from typing import Any, Dict, Optional, Set
+from typing import Any, ClassVar, Dict, Optional, Set
 
 import numpy as np
 import pandas as pd
@@ -474,3 +474,62 @@ def test_a_value_of_another_shape_is_refused(ranking_dataset: Dataset):
 
     with pytest.raises(ValueError, match="'Constant'.*one value per user"):
         evaluate_alone(name, ranking_dataset)
+
+
+@pytest.mark.parametrize("model_name", ["Pop", "Random"])
+def test_a_model_without_hyperparameters_reports_none(
+    model_name: str, ranking_dataset: Dataset
+):
+    """Pop and Random used to report the base class's DATALOADER_TYPE as one."""
+    model = model_registry.get(
+        model_name,
+        params={},
+        info=ranking_dataset.info(),
+        interactions=ranking_dataset.train_set,
+    )
+
+    assert not model.get_params()
+
+
+def test_class_constants_are_not_hyperparameters():
+    """A ClassVar or a name in capitals is a constant of the class."""
+
+    class WithConstants(Recommender):
+        """A model with one hyperparameter and two constants."""
+
+        LOADER: str = "pairs"
+        flag: ClassVar[bool] = True
+        alpha: float
+
+        def predict(self, *args: Any, **kwargs: Any):
+            """Unused.
+
+            Args:
+                *args (Any): Unused.
+                **kwargs (Any): Unused.
+
+            Raises:
+                NotImplementedError: Always.
+            """
+            raise NotImplementedError
+
+    model = WithConstants(
+        {"alpha": 0.5, "LOADER": "x", "flag": False}, {"n_users": 2, "n_items": 2}
+    )
+
+    assert model.get_params() == {"alpha": 0.5}
+    assert WithConstants.LOADER == "pairs" and WithConstants.flag is True
+
+
+def test_a_subclass_of_a_model_keeps_its_hyperparameters(ranking_dataset: Dataset):
+    """A model that only overrides behaviour reads its parent's hyperparameters."""
+    ease = model_registry.get_class("EASE")
+
+    class MyEASE(ease):  # type: ignore[valid-type,misc]
+        """EASE, unchanged."""
+
+    model = MyEASE(
+        {"l2": 10.0}, ranking_dataset.info(), interactions=ranking_dataset.train_set
+    )
+
+    assert model.get_params() == {"l2": 10.0}

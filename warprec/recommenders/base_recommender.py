@@ -4,7 +4,16 @@ import json
 import inspect
 import hashlib
 from importlib.metadata import PackageNotFoundError, version
-from typing import Any, Optional, List, Dict, Tuple, no_type_check
+from typing import (
+    Any,
+    ClassVar,
+    Dict,
+    List,
+    Optional,
+    Tuple,
+    get_origin,
+    no_type_check,
+)
 from abc import ABC, abstractmethod
 
 import torch
@@ -49,6 +58,20 @@ def _installed_version() -> Optional[str]:
         return version("warprec")
     except PackageNotFoundError:
         return None
+
+
+def _is_class_var(hint: Any) -> bool:
+    """Whether an annotation declares a class variable rather than an attribute.
+
+    Args:
+        hint (Any): The annotation, a type or, under postponed evaluation, a string.
+
+    Returns:
+        bool: True for ClassVar or ClassVar[...].
+    """
+    if isinstance(hint, str):
+        return hint.split("[", 1)[0].strip() in ("ClassVar", "typing.ClassVar")
+    return hint is ClassVar or get_origin(hint) is ClassVar
 
 
 class Recommender(nn.Module, ABC):
@@ -122,9 +145,34 @@ class Recommender(nn.Module, ABC):
         Args:
             params (dict): The dictionary with the model params.
         """
-        for ann, _ in self.__class__.__annotations__.items():
+        for ann in self.hyperparameter_names():
             if ann in params:
                 setattr(self, ann, params[ann])
+
+    @classmethod
+    def hyperparameter_names(cls) -> List[str]:
+        """The names of the model's hyperparameters, read from its annotations.
+
+        They are the annotations of the model class itself or, when it has none,
+        of the nearest class it derives from that has some, as Python resolves a
+        class's annotations, but never of Recommender: a model without
+        hyperparameters has none. A class constant is not a hyperparameter,
+        whether annotated as a ClassVar or named in capitals.
+
+        Returns:
+            List[str]: The hyperparameter names, in declaration order.
+        """
+        for klass in cls.__mro__:
+            if klass is Recommender:
+                break
+            annotations = klass.__dict__.get("__annotations__")
+            if annotations:
+                return [
+                    name
+                    for name, hint in annotations.items()
+                    if not name.isupper() and not _is_class_var(hint)
+                ]
+        return []
 
     def get_params(self) -> dict:
         """Get the model parameters as a dictionary.
@@ -139,7 +187,7 @@ class Recommender(nn.Module, ABC):
             dict: The dictionary containing the model parameters.
         """
         params = {}
-        for ann, _ in self.__class__.__annotations__.items():
+        for ann in self.hyperparameter_names():
             value = getattr(self, ann, None)
             if isinstance(value, Tensor):
                 continue
