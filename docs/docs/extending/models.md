@@ -376,7 +376,7 @@ class MyBPR(IterativeRecommender):
 
 ## Validating Hyperparameters
 
-Only the attributes annotated on the model class itself are read from `params`. Without anything else, WarpRec accepts any value for them, and the training pipeline logs that the model "is registered in the model registry, but not in parameter registry". To validate them, and to let each one take a search space (see [Models configuration](../configuration/models.md)), register a parameter class **named exactly like the model**:
+Only the attributes annotated on the model class itself are read from `params`. Without anything else, WarpRec accepts any value for them, and the training pipeline logs that the model "is registered in the model registry, but not in parameter registry". To validate them, and to let each one take a search space (see [Models configuration](../configuration/models.md)), register a parameter class **under the model's name**:
 
 ```python
 from pydantic import field_validator
@@ -387,7 +387,7 @@ from warprec.utils.registry import params_registry
 
 
 @params_registry.register("MyBPR")
-class MyBPR(RecomModel):
+class MyBPRParams(RecomModel):
     embedding_size: INT_FIELD
     batch_size: INT_FIELD
     epochs: INT_FIELD
@@ -399,7 +399,7 @@ class MyBPR(RecomModel):
         return validate_greater_than_zero(cls, v, info.field_name)
 ```
 
-WarpRec finds the class through its own name, so it cannot be called `MyBPRParams`; keep it in a module of its own to avoid clashing with the model class.
+WarpRec finds the class through the name it is registered under, so the class itself can be called anything. A parameter class that shares the model's class name needs a module of its own, or one class would replace the other.
 
 !!! tip
 

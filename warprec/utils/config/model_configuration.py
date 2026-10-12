@@ -558,7 +558,7 @@ class RecomModel(BaseModel, ABC):
     @model_validator(mode="after")
     def model_validation(self):
         """RecomModel model validation."""
-        _name = self.__class__.__name__
+        _name = self._model_name()
 
         # If validation has not been registered, return the model not
         # validated
@@ -632,6 +632,23 @@ class RecomModel(BaseModel, ABC):
 
         self.__dict__.update(updated_values)
         return self
+
+    @classmethod
+    def _model_name(cls) -> str:
+        """The name of the model this parameter class describes.
+
+        The class is registered under the model's name, which need not be its
+        own: a class MyBPRParams may describe the model MyBPR. A class named
+        like its model keeps its own spelling.
+
+        Returns:
+            str: The model's name, or the class name when the class is not
+                registered.
+        """
+        registered = params_registry.registered_name(cls)
+        if registered is None or registered == cls.__name__.upper():
+            return cls.__name__
+        return registered
 
     def validate_model(self, name: str):
         """Checks if the model exist in the registry.

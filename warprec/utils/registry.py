@@ -101,6 +101,32 @@ class BasicRegistry(Generic[T]):
             )
         return cls
 
+    def registered_name(self, cls: type) -> Optional[str]:
+        """Get the name a class was registered under.
+
+        A class is registered under the name given to the decorator, which need
+        not be its own, so it is looked up by identity. A copy of the class made
+        by importing its module again is recognised by its module and qualified
+        name.
+
+        Args:
+            cls (type): The class to look up.
+
+        Returns:
+            Optional[str]: The upper-case registry key, or None when the class
+                is not registered.
+        """
+        for key, registered in self._registry.items():
+            if registered is cls:
+                return key
+        for key, registered in self._registry.items():
+            if (registered.__module__, registered.__qualname__) == (
+                cls.__module__,
+                cls.__qualname__,
+            ):
+                return key
+        return None
+
     def list_registered(self) -> List[str]:
         """List all registered names.
 

@@ -9,8 +9,8 @@ from warprec.utils.config.model_configuration import (
 from warprec.utils.registry import params_registry
 
 
-# WarpRec looks a parameter class up by its own class name, so it must be
-# named exactly like the model it validates. Hence a module of its own.
+# WarpRec finds a parameter class by the name it is registered under, so any
+# class name works. Sharing the model's, as here, needs a module of its own.
 @params_registry.register("MyBPR")
 class MyBPR(RecomModel):
     """The hyperparameters of the MyBPR model.
