@@ -101,17 +101,18 @@ class PopRSP(TopKMetric):
 
     def compute(self):
         """Computes the final metric value."""
-        # Handle division by zero
+        # A group with nothing on offer has no rate, and with one rate missing
+        # there is nothing to compare: the metric is undefined there.
         if self.avail_short == 0 or self.avail_long == 0:
-            return {self.name: torch.tensor(0.0)}
+            return {self.name: float("nan")}
 
         pr_short = self.short_recs / self.avail_short
         pr_long = self.long_recs / self.avail_long
         pr = torch.stack([pr_short, pr_long])
 
-        # Handle the case where mean is zero
+        # Nothing recommended in either group leaves std over mean as 0/0.
         if torch.mean(pr) == 0:
-            return {self.name: torch.tensor(0.0)}
+            return {self.name: float("nan")}
 
         pop_rsp = torch.std(pr, unbiased=False) / torch.mean(pr)
         return {self.name: pop_rsp.item()}

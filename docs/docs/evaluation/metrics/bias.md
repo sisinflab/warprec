@@ -94,6 +94,8 @@ $$
 
 where $p_g$ is the ratio of recommended items from group $g$ to the number of relevant items from that group.
 
+The metric is undefined, and reported as `NaN`, when either group has no relevant item in the test set or no relevant item of either group is recommended.
+
 For further details, please refer to this [paper](https://dl.acm.org/doi/abs/10.1145/3397271.3401177).
 
 ```yaml
@@ -122,6 +124,8 @@ $$
 $$
 
 where $p_g$ is the ratio of recommended items from group $g$ to the total number of items in that group in the catalog.
+
+The metric is undefined, and reported as `NaN`, when either group has no item on offer to the users or nothing is recommended.
 
 For further details, please refer to this [paper](https://dl.acm.org/doi/abs/10.1145/3397271.3401177).
 

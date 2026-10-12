@@ -114,9 +114,6 @@ class REO(TopKMetric):
         # We assume cluster 0 is padding/unknown and usually ignore it if it has no items
         valid_mask = self.cluster_total_items > 0
 
-        if not valid_mask.any():
-            return {self.name: torch.tensor(0.0).item()}
-
         # Calculate probabilities for ALL clusters (keep 0 for invalid ones to maintain index alignment)
         # Avoid division by zero
         safe_denom = self.cluster_total_items.clone()
@@ -128,13 +125,6 @@ class REO(TopKMetric):
         # Calculate global stats based ONLY on valid clusters
         valid_probs = probs[valid_mask]
 
-        if valid_probs.numel() <= 1:
-            std_prob = torch.tensor(0.0)
-            mean_prob = torch.tensor(1.0)  # Avoid div/0
-        else:
-            std_prob = torch.std(valid_probs, unbiased=False)
-            mean_prob = torch.mean(valid_probs)
-
         results = {}
 
         # Populate per-cluster probability
@@ -145,10 +135,13 @@ class REO(TopKMetric):
             else:
                 results[key] = float("nan")
 
-        # Aggregate Score
-        if mean_prob == 0:
-            results[self.name] = 0.0
+        # Aggregate Score. A cluster with no relevant item has no rate; with
+        # fewer than two rates there is nothing to compare, and with no hit in
+        # any cluster std over mean is 0/0: the metric is undefined there.
+        if valid_probs.numel() < 2 or torch.mean(valid_probs) == 0:
+            results[self.name] = float("nan")
         else:
-            results[self.name] = (std_prob / mean_prob).item()
+            std_prob = torch.std(valid_probs, unbiased=False)
+            results[self.name] = (std_prob / torch.mean(valid_probs)).item()
 
         return results
