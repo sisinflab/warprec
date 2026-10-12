@@ -73,8 +73,8 @@ This is achieved through the `split` nested configuration block. To enable this 
 1. Set `loading_strategy` to `split`.
 2. Provide the following options:
 
-- **local_path**: Directory containing all split files. All splits must be located in the same directory.
-- **azure_blob_prefix**: Prefix path in the Azure Blob Storage where split files are located.
+- **local_path**: Directory containing all split files. All splits must be located in the same directory. Mandatory when `reading_method` is `local`.
+- **azure_blob_prefix**: Prefix path in the Azure Blob Storage where split files are located. Mandatory when `reading_method` is `azure_blob`.
 - **ext**: Extension of the split files. Defaults to `.tsv`.
 - **sep**: Column separator used by the split files. Defaults to `'\t'`.
 - **header**: Whether to treat the first row of the split files as headers. Defaults to `True`.

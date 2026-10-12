@@ -393,28 +393,44 @@ class ReaderConfig(BaseModel):
     @model_validator(mode="after")
     def check_data(self):
         """This method checks if the required information have been passed to the configuration."""
+        # Each reading method reads its own key: a local reader a path, an Azure
+        # reader a blob name, or under the split strategy a blob prefix.
+        azure = self.reading_method == ReadingMethods.AZURE_BLOB
+        dataset_key, dataset_value = (
+            ("azure_blob_name", self.azure_blob_name)
+            if azure
+            else ("local_path", self.local_path)
+        )
+        split_key, split_value = (
+            ("azure_blob_prefix", self.split.azure_blob_prefix)
+            if azure
+            else ("local_path", self.split.local_path)
+        )
+
         # ValueError checks
-        if self.loading_strategy == "split" and not self.split.local_path:
+        if self.loading_strategy == "split" and not split_value:
             raise ValueError(
-                "You have chosen split loading strategy but the split_dir "
-                "field has not been filled."
+                "You have chosen split loading strategy but the "
+                f"'reader.split.{split_key}' field has not been filled."
             )
-        if self.loading_strategy == "dataset" and not self.local_path:
+        if self.loading_strategy == "dataset" and not dataset_value:
             raise ValueError(
-                "You have chosen dataset loading strategy but the local_path "
-                "field has not been filled."
+                "You have chosen dataset loading strategy but the "
+                f"'reader.{dataset_key}' field has not been filled."
             )
 
         # Attention checks
-        if self.loading_strategy == "split" and self.local_path:
+        if self.loading_strategy == "split" and dataset_value:
             logger.attention(
-                "You have chosen split loading strategy but the local_path field "
-                "has been filled. Check your configuration file for possible errors."
+                f"You have chosen split loading strategy but the '{dataset_key}' "
+                "field has been filled. Check your configuration file for possible "
+                "errors."
             )
-        if self.loading_strategy == "dataset" and self.split.local_path:
+        if self.loading_strategy == "dataset" and split_value:
             logger.attention(
-                "You have chosen dataset loading strategy but the split_dir field "
-                "has been filled. Check your configuration file for possible errors."
+                f"You have chosen dataset loading strategy but the "
+                f"'split.{split_key}' field has been filled. Check your "
+                "configuration file for possible errors."
             )
 
         return self
