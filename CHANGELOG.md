@@ -2,6 +2,34 @@
 
 <!-- version list -->
 
+## v2.1.6 (2026-10-12)
+
+### Bug Fixes
+
+- Context-aware models read each item's own attributes when the catalogue keeps unseen or held-out
+  items
+  ([`85a7896`](https://github.com/sisinflab/warprec/commit/85a7896eb624fa9cb8db97628ad0d2d74747716c))
+
+- GSASRec's sliding windows keep every item of a history in which items repeat
+  ([`45b7498`](https://github.com/sisinflab/warprec/commit/45b7498f2cd787535f1abab62a9f6cc4379ac1ff))
+
+- LightSANs' position attention looks at each item and its past instead of the future
+  ([`d813c3c`](https://github.com/sisinflab/warprec/commit/d813c3c187659dcfbc704aca5f10995756976004))
+
+- Sampled evaluation grades positives by their rating on explicit data, as full evaluation does
+  ([`c2fe8cc`](https://github.com/sisinflab/warprec/commit/c2fe8ccc100016d6a0e10973842d1269568cb08c))
+
+- The first and last duplicate policies keep the earliest and latest row in file order on the polars
+  backend too
+  ([`d399da8`](https://github.com/sisinflab/warprec/commit/d399da833777a782df65a4644b7837f10a28bc4d))
+
+### Documentation
+
+- The guides read sampled batches with each positive's rating, and seed their loaders as the
+  pipelines do
+  ([`cb62c63`](https://github.com/sisinflab/warprec/commit/cb62c634e8e9475edb5bbd892406ec13bd0dc840))
+
+
 ## v2.1.5 (2026-10-12)
 
 ### Bug Fixes
