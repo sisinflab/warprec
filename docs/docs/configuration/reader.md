@@ -185,6 +185,8 @@ This is configured under the `clustering` nested section:
 - **user_file_format**: The format of the user clustering file. Supported values are `tabular` and `parquet`.
 - **item_file_format**: The format of the item clustering file. Supported values are `tabular` and `parquet`.
 
+Either file may be given without the other: the side that has none is treated as a single cluster. A `clustering` section that names neither file is refused when the configuration is loaded.
+
 ## Labels
 
 WarpRec expects datasets to follow a strict column schema:

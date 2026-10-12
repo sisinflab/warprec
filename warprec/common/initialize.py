@@ -396,21 +396,23 @@ def initialize_datasets(
             "header": config.reader.clustering.item_header,
         }
 
-        # Read user clustering data
-        user_cluster = _read_cluster_data_clean(
-            specific_config=user_config,
-            common_cluster_label=common_cluster_label,
-            common_cluster_type=common_cluster_type,
-            reader=reader,
-        )
+        # Either file may come alone: only the side that names one is read, and
+        # the dataset leaves the other without clusters.
+        if user_config["local_path"] or user_config["blob_name"]:
+            user_cluster = _read_cluster_data_clean(
+                specific_config=user_config,
+                common_cluster_label=common_cluster_label,
+                common_cluster_type=common_cluster_type,
+                reader=reader,
+            )
 
-        # Read item clustering data
-        item_cluster = _read_cluster_data_clean(
-            specific_config=item_config,
-            common_cluster_label=common_cluster_label,
-            common_cluster_type=common_cluster_type,
-            reader=reader,
-        )
+        if item_config["local_path"] or item_config["blob_name"]:
+            item_cluster = _read_cluster_data_clean(
+                specific_config=item_config,
+                common_cluster_label=common_cluster_label,
+                common_cluster_type=common_cluster_type,
+                reader=reader,
+            )
 
     # Dataset common information
     common_params: Dict[str, Any] = {

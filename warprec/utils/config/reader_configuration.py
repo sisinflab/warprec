@@ -245,6 +245,34 @@ class ClusteringInformationReading(BaseModel):
         """Validates the separator."""
         return check_separator(v)
 
+    @model_validator(mode="after")
+    def check_a_file_is_named(self) -> "ClusteringInformationReading":
+        """Validate that the section names at least one cluster file.
+
+        Either file may come alone, and the side without one is read as a
+        single cluster, but a section naming neither would read nothing.
+
+        Returns:
+            ClusteringInformationReading: The validated configuration.
+
+        Raises:
+            ValueError: If neither the user nor the item file is named.
+        """
+        if not any(
+            (
+                self.user_local_path,
+                self.item_local_path,
+                self.user_azure_blob_name,
+                self.item_azure_blob_name,
+            )
+        ):
+            raise ValueError(
+                "'reader.clustering' names no cluster file. Set 'user_local_path', "
+                "'item_local_path' (or their Azure counterparts), or remove the "
+                "section."
+            )
+        return self
+
 
 AllowedDtype = Literal[
     "int16", "int32", "int64", "float32", "float64", "str", "datetime"
