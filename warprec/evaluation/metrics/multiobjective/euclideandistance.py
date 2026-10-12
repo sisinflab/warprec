@@ -74,24 +74,48 @@ class EucDistance(TopKMetric):
 
         self._REQUIRED_COMPONENTS = required_blocks
 
-    def update(self, preds: Tensor, user_indices: Tensor, **kwargs: Any):
-        """Updates the metric state with the new batch of predictions."""
-        for metric in self.sub_metrics:
-            metric.update(preds, user_indices, **kwargs)
+    def update(self, preds: Tensor, **kwargs: Any):
+        """Updates the metric state with the new batch of predictions.
 
-    def compute(self):
-        """Computes the Euclidean distance for each user towards the Utopia Point."""
-        sum_squared_diff = torch.zeros(self.num_users, device=self.utopia_tensor.device)
+        The user indices travel in the keyword arguments, as the evaluator passes
+        them: a user-averaged sub-metric reads them by name, a global one ignores
+        them.
+
+        Args:
+            preds (Tensor): The prediction tensor.
+            **kwargs (Any): The keyword arguments the evaluator gives every metric.
+        """
+        for metric in self.sub_metrics:
+            metric.update(preds, **kwargs)
+
+    def compute(self) -> dict:
+        """Computes the Euclidean distance for each user towards the Utopia Point.
+
+        A global sub-metric gives one score that every user shares, so the distance
+        is per user when any sub-metric is user-averaged and a single float, as
+        other global metrics give, when none is.
+
+        Returns:
+            dict: The distance under the metric's name.
+
+        Raises:
+            ValueError: If a sub-metric gives no single value under its name.
+        """
+        sum_squared_diff = torch.zeros((), device=self.utopia_tensor.device)
 
         for i, metric in enumerate(self.sub_metrics):
             # Compute the sub-metric score
             res = metric.compute()
 
-            # Extract the specific score tensor for the current metric
-            score = res.get(
-                metric.name,
-                torch.zeros(self.num_users, device=self.utopia_tensor.device),
-            )
+            # A metric reporting several values (one per cluster pair, say) has
+            # no single score to combine; a zero in its place would pass silently
+            if metric.name not in res:
+                raise ValueError(
+                    f"EucDistance cannot combine {metric.name}: it reports "
+                    f"{', '.join(res)} rather than one value under its name. "
+                    "Pick sub-metrics that give a single score."
+                )
+            score = res[metric.name]
 
             utopia = self.utopia_tensor[i]
 
@@ -99,11 +123,13 @@ class EucDistance(TopKMetric):
             # NOTE: Optimization direction is technically handled by the Utopia Point value itself
             # (e.g., Utopia is 1.0 for Precision, 0.0 for Error), but we keep the logic consistent.
             diff = score - utopia
-            sum_squared_diff += torch.pow(diff, 2)
+            sum_squared_diff = sum_squared_diff + torch.pow(diff, 2)
 
         # Final Euclidean distance: sqrt(sum(diff^2))
         euc_dist = torch.sqrt(sum_squared_diff)
 
+        if euc_dist.dim() == 0:
+            return {self.name: euc_dist.item()}
         return {self.name: euc_dist}
 
     @property

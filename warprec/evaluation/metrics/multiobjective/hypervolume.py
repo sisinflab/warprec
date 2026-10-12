@@ -80,16 +80,34 @@ class Hypervolume(TopKMetric):
 
         self._REQUIRED_COMPONENTS = required_blocks
 
-    def update(self, preds: Tensor, user_indices: Tensor, **kwargs: Any):
-        """Updates the metric state with the new batch of predictions."""
-        for metric in self.sub_metrics:
-            metric.update(preds, user_indices, **kwargs)
+    def update(self, preds: Tensor, **kwargs: Any):
+        """Updates the metric state with the new batch of predictions.
 
-    def compute(self):
+        The user indices travel in the keyword arguments, as the evaluator passes
+        them: a user-averaged sub-metric reads them by name, a global one ignores
+        them.
+
+        Args:
+            preds (Tensor): The prediction tensor.
+            **kwargs (Any): The keyword arguments the evaluator gives every metric.
+        """
+        for metric in self.sub_metrics:
+            metric.update(preds, **kwargs)
+
+    def compute(self) -> dict:
         """Computes the Hypervolume for each user.
 
         HV is calculated as the product of positive distances from the nadir point
-        across all defined objectives.
+        across all defined objectives. A global sub-metric gives one score that
+        every user shares, so the volume is per user when any sub-metric is
+        user-averaged and a single float, as other global metrics give, when none
+        is.
+
+        Returns:
+            dict: The volume under the metric's name.
+
+        Raises:
+            ValueError: If a sub-metric gives no single value under its name.
         """
         hv_per_user = None
 
@@ -97,11 +115,15 @@ class Hypervolume(TopKMetric):
             # Compute the sub-metric score
             res = metric.compute()
 
-            # Extract the specific score tensor for the current metric
-            score = res.get(
-                metric.name,
-                torch.zeros(self.num_users, device=self.nadir_tensor.device),
-            )
+            # A metric reporting several values (one per cluster pair, say) has
+            # no single score to combine; a zero in its place would pass silently
+            if metric.name not in res:
+                raise ValueError(
+                    f"Hypervolume cannot combine {metric.name}: it reports "
+                    f"{', '.join(res)} rather than one value under its name. "
+                    "Pick sub-metrics that give a single score."
+                )
+            score = res[metric.name]
             nadir = self.nadir_tensor[i]
 
             # Calculate the distance from the nadir based on the optimization direction
@@ -121,6 +143,8 @@ class Hypervolume(TopKMetric):
             else:
                 hv_per_user = hv_per_user * dist
 
+        if isinstance(hv_per_user, Tensor) and hv_per_user.dim() == 0:
+            return {self.name: hv_per_user.item()}
         return {self.name: hv_per_user}
 
     @property
