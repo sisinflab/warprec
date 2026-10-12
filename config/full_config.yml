@@ -141,11 +141,13 @@ splitter:
     ratio: 0.1
     k: 10
     timestamp: [123456789, best]
+    seed: 42
   validation_splitting:
     strategy: [temporal_holdout, temporal_leave_k_out, random_holdout, random_leave_k_out, timestamp_slicing, k_fold_cross_validation, item_cold_start, user_cold_start]
     ratio: 0.1
     k: 10
     timestamp: [123456789, best]
+    seed: 42
     folds: 10
 dashboard:
   wandb:

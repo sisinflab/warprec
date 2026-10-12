@@ -15,6 +15,7 @@ WarpRec provides multiple splitting strategies that can be tailored to your expe
     - Temporal strategies require that **timestamps** are present in the dataset loaded by the reader.
     - **Test set** is required for train and design pipelines; **validation set** is optional.
     - Each strategy requires the parameter it reads (`ratio`, `k`, `timestamp` or `folds`, as listed below); a strategy missing it is refused when the configuration is loaded, and so is a `SplitSpec` built from Python.
+    - **seed** seeds the random strategies (`random_holdout`, `random_leave_k_out` and the cold-start ones), separately for `test_splitting` and `validation_splitting`. An integer from `0` to `2**32 - 1`; `null` is refused when the configuration is loaded. Defaults to `42`.
 
 ## Supported Splitting Strategies
 

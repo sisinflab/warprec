@@ -1,6 +1,7 @@
-from typing import Optional, Union
+from typing import Any, Optional, Union
 
 from pydantic import BaseModel, model_validator, field_validator, Field
+from warprec.utils.config.common import check_seed
 from warprec.utils.enums import SplittingStrategies
 from warprec.utils.logger import logger
 
@@ -13,17 +14,31 @@ class SplitStrategy(BaseModel):
         ratio (Optional[float]): The ratio value to pass to the splitting strategy.
         k (Optional[int]): The k value to pass to the splitting strategy.
         folds (Optional[int]): The folds value to pass to the splitting strategy.
+        seed (int): The seed to be used during the splitting process. An integer
+            from 0 to 2**32 - 1; null is refused.
         timestamp (Optional[Union[int, str]]): The timestamp to be used for the test set.
             Either and integer or 'best'.
-        seed (Optional[int]): The seed to be used during the splitting process.
     """
 
     strategy: Optional[SplittingStrategies] = None
     ratio: Optional[float] = None
     k: Optional[int] = None
     folds: Optional[int] = None
+    seed: int = 42
     timestamp: Optional[Union[int, str]] = None
-    seed: Optional[int] = 42
+
+    @field_validator("seed", mode="before")
+    @classmethod
+    def check_seed(cls, v: Any) -> Any:
+        """Refuse a seed the random strategies cannot be seeded with.
+
+        Args:
+            v (Any): The configured value.
+
+        Returns:
+            Any: The value, unchanged.
+        """
+        return check_seed(v, "The splitting seed", "the random strategies draw")
 
     @field_validator("timestamp")
     @classmethod

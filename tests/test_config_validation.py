@@ -13,6 +13,7 @@ import pytest
 from pydantic import ValidationError
 
 from warprec.utils.config import config as config_module
+from warprec.utils.config.model_configuration import Properties
 from warprec.utils.config.splitter_configuration import SplittingConfig
 from warprec.utils.config.config import (
     DesignConfiguration,
@@ -325,3 +326,33 @@ def test_a_cold_start_validation_split_matching_the_test_split_is_accepted():
         test_splitting={"strategy": "item_cold_start", "ratio": 0.1},
         validation_splitting={"strategy": "item_cold_start", "ratio": 0.1},
     )
+
+
+@pytest.mark.parametrize("seed", [None, -1, 2**32])
+def test_a_model_seed_must_be_an_integer_in_range(seed: Any):
+    """A null or out-of-range optimization seed fails at load, naming the key."""
+    with pytest.raises(ValidationError, match="optimization.properties.seed"):
+        Properties(seed=seed)
+
+
+@pytest.mark.parametrize("split", ["test_splitting", "validation_splitting"])
+@pytest.mark.parametrize("seed", [None, -1, 2**32])
+def test_a_splitting_seed_must_be_an_integer_in_range(split: str, seed: Any):
+    """A null or out-of-range splitting seed fails at load, naming the key."""
+    sections = {
+        "test_splitting": {"strategy": "random_holdout", "ratio": 0.1},
+        "validation_splitting": {"strategy": "random_holdout", "ratio": 0.1},
+    }
+    sections[split]["seed"] = seed
+
+    with pytest.raises(ValidationError, match=rf"{split}\.seed"):
+        SplittingConfig(**sections)
+
+
+def test_seeds_at_the_edges_of_the_range_are_accepted():
+    """0 and 2**32 - 1 are the seeds numpy takes, so both are accepted."""
+    for seed in (0, 2**32 - 1):
+        Properties(seed=seed)
+        SplittingConfig(
+            test_splitting={"strategy": "random_holdout", "ratio": 0.1, "seed": seed}
+        )
