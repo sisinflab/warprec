@@ -1,3 +1,4 @@
+import difflib
 from typing import List, Literal, Optional, Dict, Any
 
 from pydantic import BaseModel, field_validator, Field
@@ -90,6 +91,41 @@ class PropensityConfig(BaseModel):
         return v
 
 
+def check_metric_name(name: str, key: str) -> None:
+    """Check a configured metric name against the metric registry.
+
+    The registry ignores case, so the check does too. Custom modules are imported
+    before any section is validated, so the metrics they register are known here.
+
+    Args:
+        name (str): The configured metric name.
+        key (str): The configuration key the name was given under.
+
+    Raises:
+        ValueError: If no metric is registered under that name.
+    """
+    registered = metric_registry.list_registered()
+    if name.upper() in registered:
+        return
+    # Suggest the spelling of the class when it matches its registered name
+    spelled = {}
+    for upper in registered:
+        cls_name = metric_registry.get_class(upper).__name__
+        spelled[upper] = cls_name if cls_name.upper() == upper else upper
+    close = difflib.get_close_matches(name.upper(), registered, n=3, cutoff=0.75)
+    hint = (
+        f" Did you mean {', '.join(repr(spelled[c]) for c in close)}?"
+        if close
+        else " Check the spelling against the registered metrics:"
+        f" {', '.join(sorted(spelled.values(), key=str.upper))}."
+    )
+    raise ValueError(
+        f"{key} names the metric '{name}', which is not a registered metric.{hint} "
+        "A metric of your own must be registered in a module listed under "
+        "general.custom_modules."
+    )
+
+
 class ComplexMetricConfig(BaseModel):
     """Definition of a metric that carries its own parameters.
 
@@ -105,8 +141,7 @@ class ComplexMetricConfig(BaseModel):
     @classmethod
     def validate_name(cls, v: str):
         """Validate the metric name against the registry."""
-        if v.upper() not in metric_registry.list_registered():
-            raise ValueError(f"Metric {v} not found in registry.")
+        check_metric_name(v, "evaluation.complex_metrics")
         return v
 
 
@@ -196,6 +231,8 @@ class EvaluationConfig(BaseModel):
                 f"Duplicated metrics found inside evaluation. "
                 f"{len_before - len_after} metrics removed."
             )
+        for name in v:
+            check_metric_name(name, "evaluation.metrics")
         return v
 
     @field_validator("validation_metric")
