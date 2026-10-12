@@ -303,3 +303,49 @@ def test_a_metric_with_nothing_counted_reports_the_same_types(
         for metric in evaluator.metrics[3]:
             for key, value in metric.compute().items():
                 assert_result_contract(key, value, roomy_dataset.info()["n_users"])
+
+
+class _DoubleScoreRecommender(_RandomScoreRecommender):
+    """The same scores in float64, as a closed-form model such as EASE gives them."""
+
+    def predict(
+        self,
+        user_indices: torch.Tensor,
+        *args: Any,
+        item_indices: Optional[torch.Tensor] = None,
+        **kwargs: Any,
+    ) -> torch.Tensor:
+        """Score the requested users in double precision.
+
+        Args:
+            user_indices (torch.Tensor): The batch of user indices.
+            *args (Any): Unused.
+            item_indices (Optional[torch.Tensor]): The candidates to score.
+            **kwargs (Any): Unused.
+
+        Returns:
+            torch.Tensor: The float64 score matrix.
+        """
+        return super().predict(user_indices, item_indices=item_indices).double()
+
+
+@pytest.mark.parametrize("strategy", ["full", "sampled"])
+@pytest.mark.parametrize("metric_name", METRICS)
+def test_a_registered_metric_accepts_float64_scores(
+    metric_name: str, strategy: str, roomy_dataset: Dataset
+):
+    """ItemMADRating and UserMADRating could not accumulate float64 scores."""
+    evaluator = build_full_evaluator(metric_name, roomy_dataset)
+    evaluator.evaluate(
+        model=_DoubleScoreRecommender({}, roomy_dataset.info()),
+        dataloader=(
+            roomy_dataset.get_evaluation_dataloader()
+            if strategy == "full"
+            else roomy_dataset.get_sampled_evaluation_dataloader(num_negatives=5)
+        ),
+        strategy=strategy,
+        dataset=roomy_dataset,
+    )
+
+    for key, value in evaluator.compute_results()[3].items():
+        assert_result_contract(key, value, roomy_dataset.info()["n_users"])

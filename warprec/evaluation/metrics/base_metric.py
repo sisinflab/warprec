@@ -535,9 +535,12 @@ class UserAverageTopKMetric(TopKMetric):
             users > 0, batch_scores, torch.tensor(0.0, device=preds.device)
         )
 
-        # Accumulate per user
-        self.scores.index_add_(0, user_indices, batch_scores)
-        self.user_interactions.index_add_(0, user_indices, users)
+        # Accumulate per user, in the accumulators' precision: a score read
+        # from the predictions is float64 when the model scores in float64.
+        self.scores.index_add_(0, user_indices, batch_scores.to(self.scores.dtype))
+        self.user_interactions.index_add_(
+            0, user_indices, users.to(self.user_interactions.dtype)
+        )
 
     def compute(self):
         """Computes the final metric value."""

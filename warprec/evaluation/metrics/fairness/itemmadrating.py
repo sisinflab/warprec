@@ -78,7 +78,10 @@ class ItemMADRating(TopKMetric):
         # Filter only Relevant items (True Positives)
         # We select elements from global_indices and top_k_values where relevance_mask is True
         relevant_indices = torch.masked_select(top_k_indices, rel_mask)
-        relevant_scores = torch.masked_select(top_k_values, rel_mask)
+        # In the accumulators' precision: float64 when the model scores in float64.
+        relevant_scores = torch.masked_select(top_k_values, rel_mask).to(
+            self.item_gains.dtype
+        )
 
         if relevant_indices.numel() > 0:
             # Accumulate counts (1 for every relevant appearance)
