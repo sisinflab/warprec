@@ -28,6 +28,8 @@ class MyModel(Recommender):
   # Rest of the model implementation...
 ```
 
+Names are compared ignoring case, and a name is taken once: registering a different class under a name already registered, such as `ease` for a model of your own, raises an error naming both classes, so a built-in is never replaced without a word. Registering the same class again (same module and class name, as when a notebook cell runs twice or a Ray worker imports the module) is allowed. The same rule holds for every registry: metrics, parameter classes, filters and the rest.
+
 ### Add the Model to your Configuration
 
 In case you are using configuration files to execute your experiment, you need an extra step to ensure that WarpRec recognizes your model. To use your custom model in a WarpRec pipeline, add it to your configuration file under the `general` section. You have two options:

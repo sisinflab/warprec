@@ -4,7 +4,9 @@ Each test pins down a trap a user fell into: something that silently did the
 wrong thing, or failed far from its cause, now either works or says what to do.
 """
 
+import sys
 import uuid
+from pathlib import Path
 from typing import Any, Dict, Optional
 
 import numpy as np
@@ -21,6 +23,7 @@ from warprec.recommenders.base_recommender import Recommender
 from warprec.recommenders.trainer.trainer import Trainer
 from warprec.utils.config.model_configuration import INT_FIELD, RecomModel
 from warprec.utils.enums import RatingType, SearchSpace
+from warprec.utils.helpers import load_custom_modules
 from warprec.utils.registry import metric_registry, model_registry, params_registry
 
 
@@ -250,3 +253,108 @@ def test_a_metric_updated_without_its_blocks_computes_them():
     expected = torch.tensor([0.5, 1.0])
     torch.testing.assert_close(absent.compute()["Recall"], expected)
     torch.testing.assert_close(none.compute()["Recall"], expected)
+
+
+def test_a_different_class_cannot_take_a_built_in_name():
+    """Registering a custom model as 'ease' used to replace EASE without a word."""
+    builtin = model_registry.get_class("EASE")
+
+    with pytest.raises(ValueError) as error:
+
+        @model_registry.register("ease")
+        class MyEASE(Recommender):  # pylint: disable=unused-variable
+            """A model that tries to take EASE's name."""
+
+    message = str(error.value)
+    assert "MyEASE" in message and __name__ in message
+    assert builtin.__qualname__ in message and builtin.__module__ in message
+    assert model_registry.get_class("EASE") is builtin
+
+
+def test_every_registry_refuses_a_taken_name():
+    """The rule is the registry's, so it holds for metrics and parameters too."""
+    for registry, base in (
+        (metric_registry, TopKMetric),
+        (params_registry, RecomModel),
+    ):
+        name = unique_name("Taken")
+        first = type("First", (base,), {})
+        registry.register(name)(first)
+
+        with pytest.raises(ValueError, match="already registered"):
+            registry.register(name)(type("Second", (base,), {}))
+        assert registry.get_class(name) is first
+
+
+def test_the_same_class_may_be_registered_again():
+    """A notebook cell run twice or a Ray worker re-imports the module."""
+    name = unique_name("Again")
+
+    def define() -> type:
+        """Define the class afresh, as re-running its module does.
+
+        Returns:
+            type: A new class object with the same module and qualified name.
+        """
+
+        class Again(Recommender):
+            """A model whose module is imported twice."""
+
+        return Again
+
+    first, second = define(), define()
+    model_registry.register(name)(first)
+    model_registry.register(name)(second)
+
+    assert model_registry.get_class(name) is second
+
+
+def write_module(directory: Path, name: str, body: str) -> Path:
+    """Write a module file.
+
+    Args:
+        directory (Path): Where to write it.
+        name (str): The module name.
+        body (str): The source.
+
+    Returns:
+        Path: The module's path.
+    """
+    directory.mkdir(parents=True, exist_ok=True)
+    path = directory / f"{name}.py"
+    path.write_text(body)
+    return path
+
+
+def test_a_second_module_with_a_taken_name_is_refused(tmp_path: Path):
+    """Two files called alike used to load the first and drop the second silently."""
+    name = unique_name("models_").lower()
+    first = write_module(tmp_path / "one", name, "VALUE = 1\n")
+    second = write_module(tmp_path / "two", name, "VALUE = 2\n")
+    load_custom_modules([str(first)])
+
+    with pytest.raises(ImportError) as error:
+        load_custom_modules([str(second)])
+
+    message = str(error.value)
+    assert str(first.resolve()) in message and str(second) in message
+
+
+def test_a_module_named_like_an_imported_one_is_refused(tmp_path: Path):
+    """A file called json.py would silently be the standard library's json."""
+    path = write_module(tmp_path / "user_code", "json", "VALUE = 1\n")
+
+    with pytest.raises(ImportError, match="json"):
+        load_custom_modules([str(path)])
+
+
+def test_the_same_module_may_be_loaded_again_or_from_a_copy(tmp_path: Path):
+    """Each pipeline loads the modules again, and Ray ships a copy to its workers."""
+    name = unique_name("metrics_").lower()
+    path = write_module(tmp_path / "one", name, "VALUE = 1\n")
+    copy = write_module(tmp_path / "ray_copy", name, "VALUE = 1\n")
+
+    load_custom_modules([str(path)])
+    load_custom_modules([str(path), str(copy)])
+
+    assert sys.modules[name].VALUE == 1

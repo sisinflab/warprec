@@ -22,6 +22,18 @@ if TYPE_CHECKING:
 T = TypeVar("T")
 
 
+def _qualified(cls: type) -> str:
+    """The module and qualified name of a class, which identify it across imports.
+
+    Args:
+        cls (type): The class.
+
+    Returns:
+        str: The dotted name, e.g. 'warprec.recommenders.EASE'.
+    """
+    return f"{cls.__module__}.{cls.__qualname__}"
+
+
 class BasicRegistry(Generic[T]):
     """Basic registry with functionality to store information.
 
@@ -51,9 +63,22 @@ class BasicRegistry(Generic[T]):
 
             Returns:
                 Type[T]: Any type of class.
+
+            Raises:
+                ValueError: If a different class is registered under the name.
             """
             nonlocal name
             key = (name or cls.__name__).upper()
+            existing = self._registry.get(key)
+            # The same class registered again, because its module was imported
+            # again (a notebook cell run twice, a Ray worker), replaces itself.
+            if existing is not None and _qualified(existing) != _qualified(cls):
+                raise ValueError(
+                    f"Cannot register {_qualified(cls)} as '{name or cls.__name__}' "
+                    f"in the {self.registry_name} registry: the name is already "
+                    f"registered to {_qualified(existing)} (names are compared "
+                    "ignoring case). Register the class under another name."
+                )
             self._registry[key] = cls
             return cls
 
@@ -120,10 +145,7 @@ class BasicRegistry(Generic[T]):
             if registered is cls:
                 return key
         for key, registered in self._registry.items():
-            if (registered.__module__, registered.__qualname__) == (
-                cls.__module__,
-                cls.__qualname__,
-            ):
+            if _qualified(registered) == _qualified(cls):
                 return key
         return None
 

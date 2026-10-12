@@ -107,6 +107,8 @@ class RBP(UserAverageTopKMetric):
     ...
 ```
 
+A name already registered to a different class, built-in or not, is refused with an error naming both classes; names are compared ignoring case.
+
 Point `general.custom_modules` at the file (or package) that holds it. WarpRec imports it before the configuration is validated, so the metric can be named in either list of the `evaluation` section:
 
 ```yaml

@@ -1,6 +1,7 @@
 import importlib
 import sys
 import os
+from types import ModuleType
 from typing import Any, Optional, Dict, List, Tuple, TYPE_CHECKING
 from pathlib import Path
 
@@ -29,7 +30,9 @@ def load_custom_modules(custom_modules: str | List[str] | None):
 
     Raises:
         ImportError: If a module cannot be imported. A run that carried on
-            without it would only fail later, on a name it does not know.
+            without it would only fail later, on a name it does not know. Also
+            if its name is already taken by another module, another custom
+            module or one of Python's, which would be used in its place.
     """
     if isinstance(custom_modules, str):
         custom_modules = [custom_modules]
@@ -44,11 +47,42 @@ def load_custom_modules(custom_modules: str | List[str] | None):
                 sys.path.insert(0, parent)
         name = path.name.removesuffix(".py")
         try:
-            importlib.import_module(name)
+            module = importlib.import_module(name)
         except ImportError as e:
             raise ImportError(
                 f"Failed to import the custom module '{name}' from '{module_path}': {e}"
             ) from e
+        if path.exists() and not _is_module_at(module, path):
+            raise ImportError(
+                f"The custom module '{module_path}' is imported as '{name}', a name "
+                f"already taken by '{getattr(module, '__file__', None) or module}', "
+                "which would be used in its place. Rename one of the two."
+            )
+
+
+def _is_module_at(module: ModuleType, path: Path) -> bool:
+    """Whether an imported module is the one at a path.
+
+    A module is identified by its name, so a second file of that name is never
+    imported: the first one answers for it. A copy of the file, such as the one
+    Ray ships to its workers, holds the same source and is the same module.
+
+    Args:
+        module (ModuleType): The module imported under the path's name.
+        path (Path): The file, or the package directory, the user gave.
+
+    Returns:
+        bool: True if the module was loaded from the path or from a copy of it.
+    """
+    expected = path / "__init__.py" if path.is_dir() else path
+    loaded = getattr(module, "__file__", None)
+    if loaded is None or not Path(loaded).exists():
+        return False
+    loaded_path = Path(loaded).resolve()
+    return (
+        loaded_path == expected.resolve()
+        or loaded_path.read_bytes() == expected.read_bytes()
+    )
 
 
 def is_python_module(path: str | Path) -> bool:
