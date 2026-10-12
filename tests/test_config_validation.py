@@ -13,6 +13,7 @@ import pytest
 from pydantic import ValidationError
 
 from warprec.utils.config import config as config_module
+from warprec.utils.config.splitter_configuration import SplittingConfig
 from warprec.utils.config.config import (
     DesignConfiguration,
     EstimateConfiguration,
@@ -290,3 +291,37 @@ def test_filtering_a_dataset_is_not_warned_about(
     )
 
     assert not any("'filtering'" in m for m in messages)
+
+
+@pytest.mark.parametrize("strategy", ["item_cold_start", "user_cold_start"])
+def test_a_cold_start_split_requires_its_ratio(strategy: str):
+    """The cold-start strategies read a ratio, so the configuration requires one."""
+    with pytest.raises(ValidationError, match="'ratio'"):
+        SplittingConfig(test_splitting={"strategy": strategy})
+
+
+@pytest.mark.parametrize(
+    "test, validation",
+    [
+        ("random_holdout", "item_cold_start"),
+        ("temporal_holdout", "user_cold_start"),
+        ("user_cold_start", "item_cold_start"),
+    ],
+)
+def test_a_cold_start_validation_split_that_would_be_emptied_is_refused(
+    test: str, validation: str
+):
+    """A validation split holding out what the test split keeps is refused at load."""
+    with pytest.raises(ValidationError, match="validation_splitting"):
+        SplittingConfig(
+            test_splitting={"strategy": test, "ratio": 0.1},
+            validation_splitting={"strategy": validation, "ratio": 0.1},
+        )
+
+
+def test_a_cold_start_validation_split_matching_the_test_split_is_accepted():
+    """Validating on held-out items when the test holds out items too is a protocol."""
+    SplittingConfig(
+        test_splitting={"strategy": "item_cold_start", "ratio": 0.1},
+        validation_splitting={"strategy": "item_cold_start", "ratio": 0.1},
+    )

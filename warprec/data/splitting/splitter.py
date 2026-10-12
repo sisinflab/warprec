@@ -48,11 +48,21 @@ class Splitter:
             SplitResult:
                 The train set, the validation set (a single frame, a list of
                 folds, or None) and the test set.
+
+        Raises:
+            ValueError: If no test split is given, or the validation split holds
+                out a side of the catalogue the test split does not.
         """
+        if test is None or test.strategy is None:
+            raise ValueError(
+                "split_transaction needs the test split: pass "
+                "test=SplitSpec(strategy=..., ...), e.g. "
+                "test=SplitSpec(strategy='temporal_holdout', ratio=0.2)."
+            )
         data = nw.from_native(data, pass_through=True)
         labels = labels or ColumnLabels()
-        test = test or SplitSpec()
         cold = self.cold_dimension(test)
+        self.check_validation_cold_start(test, validation)
 
         # Test set
         split_process_start_time = time.time()
@@ -163,6 +173,40 @@ class Splitter:
             seed=spec.seed,
         )
         return split
+
+    @classmethod
+    def check_validation_cold_start(
+        cls, test: SplitSpec, validation: Optional[SplitSpec]
+    ) -> None:
+        """Refuse a cold-start validation split the test split would empty.
+
+        Evaluation sets keep only the entities training saw, except on the side
+        the test split holds out. A validation split holding out the other side,
+        or holding out anything when the test split does not, is therefore
+        emptied once aligned with its train set.
+
+        Args:
+            test (SplitSpec): The criterion the test split follows.
+            validation (Optional[SplitSpec]): The criterion the validation split
+                follows, if any.
+
+        Raises:
+            ValueError: If the validation split holds out a side the test split
+                does not.
+        """
+        if validation is None or validation.strategy is None:
+            return
+        held_out = cls.cold_dimension(validation)
+        if held_out is None or held_out == cls.cold_dimension(test):
+            return
+        raise ValueError(
+            f"The validation split uses {validation.resolved_strategy().value}, which "
+            f"holds {held_out}s out of training, but the test split "
+            f"({test.resolved_strategy().value}) does not, so every validation "
+            f"{held_out} would be dropped and the validation set left empty. Use "
+            f"{validation.resolved_strategy().value} for the test split too, or a "
+            "holdout or leave-k-out strategy for the validation split."
+        )
 
     @staticmethod
     def cold_dimension(spec: SplitSpec) -> Optional[str]:

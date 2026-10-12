@@ -14,6 +14,7 @@ WarpRec provides multiple splitting strategies that can be tailored to your expe
 !!! important
     - Temporal strategies require that **timestamps** are present in the dataset loaded by the reader.
     - **Test set** is required for train and design pipelines; **validation set** is optional.
+    - Each strategy requires the parameter it reads (`ratio`, `k`, `timestamp` or `folds`, as listed below); a strategy missing it is refused when the configuration is loaded, and so is a `SplitSpec` built from Python.
 
 ## Supported Splitting Strategies
 
@@ -123,6 +124,14 @@ splitter:
 
     Pair it with `evaluation.candidates: cold` and read the result against the random
     floor WarpRec logs. See [Cold-Start Protocols](../evaluation/cold-start.md).
+
+!!! note
+    `ratio` is required: a cold-start strategy without it is refused when the
+    configuration is loaded. As `validation_splitting`, a cold-start strategy is
+    accepted only when `test_splitting` holds out the same side (`item_cold_start`
+    for both, or `user_cold_start` for both). Otherwise the entities it holds out
+    are dropped when the validation set is aligned with its train set, which would
+    leave the validation set empty, so the configuration is refused at load.
 
 ## Example Splitter Configuration
 

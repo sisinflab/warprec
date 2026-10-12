@@ -51,6 +51,29 @@ class SplitSpec:
     timestamp: Optional[Union[int, str]] = None
     seed: int = 42
 
+    def __post_init__(self) -> None:
+        """Validate that the strategy is given the parameters it reads.
+
+        Raises:
+            ValueError: If the strategy is unknown or a parameter it requires is
+                missing.
+        """
+        strategy = self.resolved_strategy()
+        if strategy is None:
+            return
+        missing = [
+            name
+            for name in strategy.required_parameters()
+            if getattr(self, name) is None
+        ]
+        if missing:
+            raise ValueError(
+                f"The {strategy.value} splitting strategy reads "
+                f"{', '.join(repr(name) for name in missing)}, which this SplitSpec "
+                f"does not set. Pass it, e.g. SplitSpec(strategy='{strategy.value}', "
+                f"{missing[0]}=...)."
+            )
+
     def resolved_strategy(self) -> Optional[SplittingStrategies]:
         """The strategy as an enum member, however it was written.
 

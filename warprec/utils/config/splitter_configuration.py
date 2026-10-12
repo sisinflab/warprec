@@ -45,49 +45,13 @@ class SplitStrategy(BaseModel):
             Warning: If a field that will not be used during the experiment has been filled.
         """
         # ValueError checks
-        if (
-            self.strategy
-            in (
-                SplittingStrategies.TEMPORAL_HOLDOUT,
-                SplittingStrategies.RANDOM_HOLDOUT,
-            )
-            and self.ratio is None
-        ):
-            raise ValueError(
-                f"You have chosen {self.strategy.value} splitting but "
-                "the ratio field has not been filled."
-            )
-
-        if (
-            self.strategy
-            in (
-                SplittingStrategies.TEMPORAL_LEAVE_K_OUT,
-                SplittingStrategies.RANDOM_LEAVE_K_OUT,
-            )
-            and self.k is None
-        ):
-            raise ValueError(
-                f"You have chosen {self.strategy.value} splitting but "
-                "the k field has not been filled."
-            )
-
-        if (
-            self.strategy == SplittingStrategies.TIMESTAMP_SLICING
-            and self.timestamp is None
-        ):
-            raise ValueError(
-                "You have chosen fixed timestamp splitting but "
-                "the timestamp field has not been filled."
-            )
-
-        if (
-            self.strategy == SplittingStrategies.K_FOLD_CROSS_VALIDATION
-            and self.folds is None
-        ):
-            raise ValueError(
-                "You have chosen k-fold-cross-validation splitting but "
-                "the fold field has not been filled."
-            )
+        if self.strategy is not None:
+            for name in self.strategy.required_parameters():
+                if getattr(self, name) is None:
+                    raise ValueError(
+                        f"You have chosen {self.strategy.value} splitting but "
+                        f"the '{name}' field has not been filled."
+                    )
 
         # Attention checks
         if (
@@ -200,5 +164,20 @@ class SplittingConfig(BaseModel):
                 "The test set cannot be created with k-fold-cross-validation. "
                 "Choose another strategy"
             )
+
+        # The splitter refuses a cold-start validation split the test split
+        # would empty; the same check runs here so it fails at load.
+        from warprec.data.schema import SplitSpec  # pylint: disable=import-outside-toplevel
+        from warprec.data.splitting import Splitter  # pylint: disable=import-outside-toplevel
+
+        try:
+            Splitter.check_validation_cold_start(
+                SplitSpec(**self.test_splitting.model_dump()),
+                SplitSpec(**self.validation_splitting.model_dump()),
+            )
+        except ValueError as error:
+            raise ValueError(
+                f"'splitter.validation_splitting' is refused. {error}"
+            ) from error
 
         return self

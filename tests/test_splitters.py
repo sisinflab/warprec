@@ -209,3 +209,48 @@ def test_a_random_split_leaves_numpys_global_stream_alone(
     after = np.random.random(5)
 
     np.testing.assert_array_equal(after, expected)
+
+
+@pytest.mark.parametrize(
+    "strategy, parameter",
+    [
+        ("temporal_holdout", "ratio"),
+        ("random_holdout", "ratio"),
+        ("temporal_leave_k_out", "k"),
+        ("random_leave_k_out", "k"),
+        ("timestamp_slicing", "timestamp"),
+        ("k_fold_cross_validation", "folds"),
+        ("item_cold_start", "ratio"),
+        ("user_cold_start", "ratio"),
+    ],
+)
+def test_a_split_spec_missing_its_parameter_is_refused(strategy: str, parameter: str):
+    """A strategy built without the parameter it reads fails when it is built."""
+    with pytest.raises(ValueError, match=f"'{parameter}'"):
+        SplitSpec(strategy=strategy)
+
+
+def test_splitting_without_a_test_split_is_refused(transactions: pd.DataFrame):
+    """The test split is the one split every run has, so leaving it out says so."""
+    with pytest.raises(ValueError, match="test="):
+        Splitter().split_transaction(transactions)
+
+
+@pytest.mark.parametrize(
+    "test, validation",
+    [
+        ("random_holdout", "item_cold_start"),
+        ("random_holdout", "user_cold_start"),
+        ("item_cold_start", "user_cold_start"),
+    ],
+)
+def test_a_cold_start_validation_the_test_split_would_empty_is_refused(
+    transactions: pd.DataFrame, test: str, validation: str
+):
+    """A validation split holding out what training must see is refused, not emptied."""
+    with pytest.raises(ValueError, match=validation):
+        Splitter().split_transaction(
+            transactions,
+            test=SplitSpec(strategy=test, ratio=0.2, seed=1),
+            validation=SplitSpec(strategy=validation, ratio=0.2, seed=2),
+        )
