@@ -105,7 +105,7 @@ item_id,genre,director
 
 !!! tip "Several rows per item"
 
-    A file may carry more than one row for the same item, as is natural for a tag list. The item-by-feature matrix (content-based and hybrid models, the feature-based metrics) merges every row into that item, so there a long layout works as well as a wide one. The per-attribute lookup read by the context-aware models needs exactly **one row per item**.
+    A file may carry more than one row for the same item, as is natural for a tag list. The item-by-feature matrix (content-based and hybrid models, the feature-based metrics) merges every row into that item, so there a long layout works as well as a wide one. The per-attribute lookup read by the context-aware models needs exactly **one row per item**: a context-aware model given a file that repeats an item refuses to be built, naming how many items repeat. For them, aggregate each item's rows into one, for instance one column per attribute.
 
 !!! note "Items without attributes"
 

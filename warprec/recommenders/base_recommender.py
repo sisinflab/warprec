@@ -941,6 +941,10 @@ class ContextRecommenderUtils(nn.Module, ABC):
         **kwargs (Any): Arbitrary keyword arguments. ``transactions`` carries the
             row-oriented training records, passed through by the pipelines.
 
+    Raises:
+        ValueError: If the side information gives an item more than one row,
+            which the per-item feature lookup cannot hold.
+
     Attributes:
         n_users (int): Number of users.
         n_items (int): Number of items.
@@ -1051,6 +1055,18 @@ class ContextRecommenderUtils(nn.Module, ABC):
 
         # Fixed feature lookup Tensor
         if interactions is not None:
+            repeated = interactions.get_side_repeated_items()
+            if self.feature_labels and repeated:
+                raise ValueError(
+                    f"{type(self).__name__} embeds the side information through a "
+                    "lookup holding one row per item, but the side information "
+                    f"gives several rows to {len(repeated)} items (e.g. "
+                    f"{repeated[:5]}). Give the context-aware models one row per "
+                    "item, aggregating the repeated rows into it (e.g. one column "
+                    "per attribute), or leave reader.side out for them. The "
+                    "content-based and hybrid models read several rows per item "
+                    "as they are."
+                )
             item_features = interactions.get_side_tensor()
             self.register_buffer("item_features", item_features)
         else:

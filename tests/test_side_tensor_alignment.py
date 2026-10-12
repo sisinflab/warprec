@@ -144,3 +144,63 @@ def test_context_models_train_on_a_widened_catalogue(model_name: str):
         scores = model.predict(torch.arange(dataset.info()["n_users"]))
     assert scores.shape == (dataset.info()["n_users"], dataset.info()["n_items"])
     assert torch.isfinite(scores).all()
+
+
+# Items 2 and 5 carry two genres each, one row per genre: the long layout.
+LONG_SIDE = pd.DataFrame(
+    {
+        "item_id": [2, 2, 3, 5, 5, 7, 8, 9, 10],
+        "genre": ["g1", "g2", "g3", "g1", "g4", "g2", "g3", "g4", "g1"],
+    }
+)
+
+
+def _build_long() -> Dataset:
+    """A dataset whose side table repeats items.
+
+    Returns:
+        Dataset: The dataset under test.
+    """
+    return Dataset(
+        train_data=TRAIN,
+        eval_data=EVAL,
+        side_data=LONG_SIDE,
+        timestamp_label="timestamp",
+        batch_size=4,
+    )
+
+
+def test_the_feature_matrix_reads_a_side_table_that_repeats_items():
+    """The item-by-feature matrix merges every row of an item into that item."""
+    dataset = _build_long()
+    n_items = dataset.info()["n_items"]
+    _, item_map = dataset.get_mappings()
+
+    matrix = dataset.get_feature_matrix()
+
+    assert matrix.shape[0] == n_items + 1
+    assert int(matrix[item_map[2]].sum()) == 2
+    assert int(matrix[item_map[5]].sum()) == 2
+
+
+@pytest.mark.parametrize(
+    "model_name",
+    ["AFM", "DCN", "DCNv2", "DeepFM", "FM", "NFM", "WideAndDeep", "xDeepFM"],
+)
+def test_context_models_refuse_a_side_table_that_repeats_items(model_name: str):
+    """A per-item lookup cannot hold two rows for one item, so the model says so.
+
+    Args:
+        model_name (str): The context-aware model under test.
+    """
+    dataset = _build_long()
+
+    with pytest.raises(ValueError, match="one row per item"):
+        model_registry.get(
+            model_name,
+            params=build_params(model_name),
+            info=dataset.info(),
+            interactions=dataset.train_set,
+            sessions=dataset.train_session,
+            transactions=dataset.train_transactions,
+        )
