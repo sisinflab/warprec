@@ -1,4 +1,5 @@
 # pylint: disable = too-few-public-methods
+import inspect
 from typing import List, Any
 from abc import ABC
 
@@ -22,8 +23,16 @@ class Filter(ABC):
         item_id_label (str): Column name for item IDs.
         rating_label (str): Column name for ratings.
         timestamp_label (str): Column name for timestamps.
-        **kwargs (Any): Additional keyword arguments.
+        **kwargs (Any): The other column labels the configuration hands every
+            filter. Any other key is refused.
+
+    Raises:
+        ValueError: If a keyword is neither a parameter of the filter nor a
+            column label.
     """
+
+    # The labels a configuration passes to every filter besides the four above.
+    _OTHER_LABELS = frozenset({"cluster_label", "context_labels"})
 
     def __init__(
         self,
@@ -33,6 +42,25 @@ class Filter(ABC):
         timestamp_label: str = "timestamp",
         **kwargs: Any,
     ):
+        # A misspelled parameter would otherwise land here and be ignored,
+        # leaving the filter to run with its default, or not at all.
+        unknown = sorted(set(kwargs) - self._OTHER_LABELS)
+        if unknown:
+            accepted = [
+                name
+                for name, param in inspect.signature(
+                    type(self).__init__
+                ).parameters.items()
+                if name != "self"
+                and param.kind
+                not in (inspect.Parameter.VAR_KEYWORD, inspect.Parameter.VAR_POSITIONAL)
+            ]
+            raise ValueError(
+                f"The filter {type(self).__name__} does not take "
+                f"{', '.join(repr(key) for key in unknown)}. The parameters it "
+                f"takes are {accepted or 'none'}."
+            )
+
         self.user_label = user_id_label
         self.item_label = item_id_label
         self.rating_label = rating_label
