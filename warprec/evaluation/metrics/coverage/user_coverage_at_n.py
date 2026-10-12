@@ -44,4 +44,4 @@ class UserCoverageAtN(TopKMetric):
         self.users += satisfied_users
 
     def compute(self):
-        return {self.name: int(self.users.item())}
+        return {self.name: float(self.users.item())}

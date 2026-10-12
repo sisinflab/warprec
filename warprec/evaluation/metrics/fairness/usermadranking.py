@@ -75,7 +75,7 @@ class UserMADRanking(UserAverageTopKMetric):
         mask = self.user_interactions > 0
 
         if not mask.any():
-            return {self.name: torch.tensor(0.0)}
+            return {self.name: 0.0}
 
         user_vals = torch.zeros_like(self.scores)
         user_vals[mask] = self.scores[mask] / self.user_interactions[mask]
@@ -95,7 +95,7 @@ class UserMADRanking(UserAverageTopKMetric):
         valid_clusters = count_cluster > 0
 
         if not valid_clusters.any():
-            return {self.name: torch.tensor(0.0)}
+            return {self.name: 0.0}
 
         mean_cluster = sum_cluster[valid_clusters] / count_cluster[valid_clusters]
 

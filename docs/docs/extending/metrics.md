@@ -45,6 +45,15 @@ For the **UserAverageTopKMetric** interface, we don't need to worry about accumu
 
     The number of users is not always fixed. We often only consider users who have **at least one relevant item** in the ground truth for evaluation. This ensures the denominator reflects only *valid* evaluation cases.
 
+### What `compute` Returns
+
+`compute()` returns a dictionary from the names the metric reports under to their values, and every value takes one of two shapes:
+
+- a **per-user tensor**, one entry per user index (`num_users` long), for a metric averaged over users. Users the metric does not apply to hold NaN. The number a run logs and writes is its `nanmean`, the per-user files hold the whole vector, and the significance tests compare two models user by user on it. `UserAverageTopKMetric` and `RatingMetric` return this shape for you.
+- a **Python float**, for a global value: a coverage count, a diversity index, a fairness score over clusters. It is written as it is and is left out of the significance tests.
+
+`Evaluator.compute_results()` holds every metric to this: a 0-d tensor, an integer or a NumPy number is turned into a float, and any other value (a tensor of another shape, a list) raises an error naming the metric.
+
 ---
 
 ## Metric Blocks

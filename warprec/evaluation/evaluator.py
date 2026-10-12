@@ -1,6 +1,7 @@
 import time
 from typing import List, Dict, Optional, Set, Any, Tuple
 
+import numpy as np
 import torch
 from torch import Tensor
 from torch.utils.data import DataLoader
@@ -548,6 +549,11 @@ class Evaluator:
     def compute_results(self) -> Dict[int, Dict[str, float | Tensor]]:
         """The method to retrieve computed results in dictionary format.
 
+        Every value is either a tensor with one entry per user index, for a
+        metric averaged over users (NaN for a user it does not apply to), or a
+        Python float, for a global value. A 0-d tensor or another number a
+        metric returns is turned into a float.
+
         Returns:
             Dict[int, Dict[str, float | Tensor]]: The dictionary containing the results.
         """
@@ -556,8 +562,37 @@ class Evaluator:
             results[k] = {}
             for metric in metric_instances:
                 metric_result = metric.compute()
-                results[k].update(metric_result)
+                for name, value in metric_result.items():
+                    results[k][name] = self._as_result(name, value)
         return results
+
+    def _as_result(self, name: str, value: Any) -> float | Tensor:
+        """Bring a metric's value to one of the two shapes results have.
+
+        Args:
+            name (str): The key the metric reports the value under.
+            value (Any): The value.
+
+        Returns:
+            float | Tensor: A tensor with one value per user, or a float.
+
+        Raises:
+            ValueError: If the value is neither a number nor a per-user tensor.
+        """
+        num_users = self.common_params["num_users"]
+        if isinstance(value, Tensor):
+            if value.dim() == 0:
+                return float(value.item())
+            if value.dim() == 1 and value.numel() == num_users:
+                return value
+        elif isinstance(value, (int, float, np.number)) and not isinstance(value, bool):
+            return float(value)
+        shape = tuple(value.shape) if isinstance(value, Tensor) else None
+        raise ValueError(
+            f"The metric result '{name}' is a {type(value).__name__}"
+            f"{f' of shape {shape}' if shape is not None else ''}. A metric "
+            f"reports a tensor with one value per user ({num_users}) or a number."
+        )
 
     def _retrieve_sequences_for_user(
         self, dataset: Dataset, user_indices: List[int], max_seq_len: int

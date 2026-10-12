@@ -65,7 +65,7 @@ class ShannonEntropy(TopKMetric):
     def compute(self):
         # Avoid division by zero
         if self.total_recs == 0:
-            return {self.name: torch.tensor(0.0)}
+            return {self.name: 0.0}
 
         # Calculate probability distribution
         probs = self.item_counts / self.total_recs

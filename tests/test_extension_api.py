@@ -7,7 +7,7 @@ wrong thing, or failed far from its cause, now either works or says what to do.
 import sys
 import uuid
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, Set
 
 import numpy as np
 import pandas as pd
@@ -24,7 +24,7 @@ from warprec.pipelines.eval import _load_or_build_model
 from warprec.recommenders.base_recommender import Recommender
 from warprec.recommenders.trainer.trainer import Trainer
 from warprec.utils.config.model_configuration import INT_FIELD, RecomModel
-from warprec.utils.enums import RatingType, SearchSpace
+from warprec.utils.enums import MetricBlock, RatingType, SearchSpace
 from warprec.utils.helpers import load_custom_modules
 from warprec.utils.registry import metric_registry, model_registry, params_registry
 
@@ -420,3 +420,57 @@ def test_the_reserved_metric_names_are_those_the_evaluator_passes(
     )
 
     assert set(evaluator.common_params) | {"k"} == METRIC_ARGUMENTS
+
+
+def register_constant_metric(value: Any) -> str:
+    """Register a metric whose result is the given value, whatever it ranks.
+
+    Args:
+        value (Any): What compute() returns under the metric's name.
+
+    Returns:
+        str: The name the metric is registered under.
+    """
+    name = unique_name("Constant")
+
+    @metric_registry.register(name)
+    class Constant(TopKMetric):
+        """A metric reporting a fixed value."""
+
+        _REQUIRED_COMPONENTS: Set[MetricBlock] = set()
+
+        def update(self, preds: Tensor, **kwargs: Any):
+            """Count nothing.
+
+            Args:
+                preds (Tensor): Unused.
+                **kwargs (Any): Unused.
+            """
+
+        def compute(self) -> Dict[str, Any]:
+            """The fixed value.
+
+            Returns:
+                Dict[str, Any]: The value under the metric's name.
+            """
+            return {"Constant": value}
+
+    return name
+
+
+@pytest.mark.parametrize(
+    "value", [torch.tensor(2.5), np.float32(2.5), 2.5], ids=["0-d", "numpy", "float"]
+)
+def test_a_global_value_is_reported_as_a_float(value: Any, ranking_dataset: Dataset):
+    """A 0-d tensor used to pass for a per-user one, and break the writer."""
+    result = evaluate_alone(register_constant_metric(value), ranking_dataset)
+
+    assert type(result["Constant"]) is float and result["Constant"] == 2.5
+
+
+def test_a_value_of_another_shape_is_refused(ranking_dataset: Dataset):
+    """A tensor that is not one value per user cannot be averaged or written."""
+    name = register_constant_metric(torch.zeros(2, 2))
+
+    with pytest.raises(ValueError, match="'Constant'.*one value per user"):
+        evaluate_alone(name, ranking_dataset)

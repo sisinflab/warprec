@@ -54,5 +54,5 @@ class ItemCoverage(TopKMetric):
         self.item_counts += batch_counts.to(self.item_counts)
 
     def compute(self):
-        item_coverage = (self.item_counts > 0).sum().item()
+        item_coverage = float((self.item_counts > 0).sum().item())
         return {self.name: item_coverage}
