@@ -8,6 +8,7 @@ from torch.utils.data import DataLoader, Dataset
 
 USER_INDEX = "__uidx__"
 ITEM_INDEX = "__iidx__"
+ROW_INDEX = "__row__"
 
 
 def seed_worker(worker_id: int) -> None:
@@ -84,6 +85,11 @@ def map_to_index_space(
     entities each used to carry their own copy of it, and a copy is a chance for
     the two to disagree about which rows exist.
 
+    A join does not promise to keep the rows in their input order (polars does
+    not), so each row also carries its position in the input, ``ROW_INDEX``.
+    Sorting on it after the indices keeps repeated (user, item) rows in file
+    order, which is what the 'first' and 'last' duplicate policies mean.
+
     Args:
         data (DataFrame[Any]): The raw interactions.
         user_label (str): The name of the user column.
@@ -94,7 +100,7 @@ def map_to_index_space(
             indices. Left out, every column of the input is kept.
 
     Returns:
-        DataFrame[Any]: The frame with the index columns attached.
+        DataFrame[Any]: The frame with the index and row position columns attached.
     """
     namespace = nw.get_native_namespace(data)
     umap_df = nw.from_dict(
@@ -112,10 +118,14 @@ def map_to_index_space(
         native_namespace=namespace,
     )
 
-    mapped = data.join(umap_df, on=user_label, how="inner").join(
-        imap_df, on=item_label, how="inner"
+    mapped = (
+        data.with_row_index(ROW_INDEX)
+        .join(umap_df, on=user_label, how="inner")
+        .join(imap_df, on=item_label, how="inner")
     )
 
     if keep is None:
         return mapped
-    return mapped.select([nw.col(c) for c in (*keep, USER_INDEX, ITEM_INDEX)])
+    return mapped.select(
+        [nw.col(c) for c in (*keep, USER_INDEX, ITEM_INDEX, ROW_INDEX)]
+    )

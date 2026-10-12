@@ -11,6 +11,7 @@ from warprec.data.entities.context import build_context_array, context_key
 from warprec.data.schema import ColumnLabels, ContextSpec, SignalOptions
 from warprec.data.entities.common import (
     ITEM_INDEX,
+    ROW_INDEX,
     USER_INDEX,
     map_to_index_space,
     seeded_dataloader,
@@ -85,7 +86,7 @@ class Transactions:
         # attached to the interaction they describe.
         mapped = map_to_index_space(
             data, self.user_label, self.item_label, user_mapping, item_mapping
-        ).sort([USER_INDEX, ITEM_INDEX])
+        ).sort([USER_INDEX, ITEM_INDEX, ROW_INDEX])
 
         self._users = mapped.select(USER_INDEX).to_numpy().flatten().astype(np.int64)
         self._items = mapped.select(ITEM_INDEX).to_numpy().flatten().astype(np.int64)

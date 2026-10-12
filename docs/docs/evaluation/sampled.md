@@ -54,6 +54,8 @@ $$
 
 In this setting, $-\infty$ is used for **padding**. Since WarpRec requires rectangular tensors, the number of positive labels must be padded to match across users.
 
+The targets above are implicit feedback. On explicit data each positive keeps its rating, exactly as in full evaluation, so a graded metric such as nDCG is graded under `sampled` too. The contextual sampled evaluation scores its target item as 1, as the contextual full evaluation does.
+
 The final evaluation results will differ from those obtained with full evaluation, but the main advantages of sampled evaluation are **reduced computational cost and lower memory usage**.
 
 !!! note

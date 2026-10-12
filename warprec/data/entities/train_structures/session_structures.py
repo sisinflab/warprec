@@ -201,12 +201,18 @@ class SlidingWindowDataset(Dataset):
     Dataset for Sequence-to-Sequence training.
 
     Sampled Output: (InputSequence, NegativeSamplesMatrix)
+
+    A window is cut from ``flat_items`` and ends at its user's end in that same
+    array, ``window_ends``. The interaction matrix cannot give that end: it
+    holds one cell per (user, item) pair, so a user who repeats an item has
+    fewer cells than rows.
     """
 
     def __init__(
         self,
         flat_items: np.ndarray,
         window_starts: np.ndarray,
+        window_ends: np.ndarray,
         window_users: np.ndarray,
         sparse_matrix: csr_matrix,
         max_seq_len: int,
@@ -214,11 +220,15 @@ class SlidingWindowDataset(Dataset):
         niid: int,
         seed: int = 42,
     ):
+        # pylint: disable = too-many-arguments, too-many-positional-arguments
+        # These arguments are the flat session arrays and the sampling
+        # parameters, as for ClozeDataset; they form no group that recurs.
         # The dataset owns its stream, so a seed fixes the negatives it draws
         # rather than leaving them to whatever state the global one is in.
         self.rng = np.random.default_rng(seed)
         self.flat_items = flat_items
         self.window_starts = window_starts
+        self.window_ends = window_ends
         self.window_users = window_users
         self.sparse_matrix = sparse_matrix
         self.max_seq_len = max_seq_len
@@ -233,9 +243,8 @@ class SlidingWindowDataset(Dataset):
         start_idx = self.window_starts[idx]
         user_idx = self.window_users[idx]
 
-        # Clip end to user boundary
-        user_end_limit = self.sparse_matrix.indptr[user_idx + 1]
-        end_idx = min(start_idx + self.max_seq_len, user_end_limit)
+        # Clip end to the user's boundary in the flat array
+        end_idx = min(start_idx + self.max_seq_len, self.window_ends[idx])
 
         seq_array = self.flat_items[start_idx:end_idx]
         real_len = len(seq_array)

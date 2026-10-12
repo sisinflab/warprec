@@ -262,24 +262,9 @@ class Evaluator:
 
             # C. Item Indices (used in sampled evaluation)
             if strategy == "sampled":
-                positives = batch_data["positives"]
-                negatives = batch_data["negatives"]
-                candidates = torch.cat([positives, negatives], dim=1)
-
-                # Initialize the GT tensor
-                eval_batch = torch.zeros_like(candidates)
-                num_pos_cols = positives.shape[1]
-
-                # Construct the GT based on the positives
-                eval_batch[:, :num_pos_cols] = 1.0
-                mask_padding = positives == padding_idx
-                eval_batch[:, :num_pos_cols][mask_padding] = 0.0
-
-                # Random permutation to avoid bias towards position
-                perm = torch.randperm(candidates.shape[1], generator=self.g)
-                candidates = candidates[:, perm]
-                eval_batch = eval_batch[:, perm]
-
+                candidates, eval_batch = self._sampled_candidates(
+                    batch_data, padding_idx
+                )
                 predict_kwargs["item_indices"] = candidates
 
             # Model prediction
@@ -348,6 +333,41 @@ class Evaluator:
         if verbose:
             self._log_results(eval_start_time, model.name)
 
+    def _sampled_candidates(
+        self, batch_data: Dict[str, Any], padding_idx: int
+    ) -> Tuple[Tensor, Tensor]:
+        """Build the candidates of a sampled batch and their ground truth.
+
+        The positives carry the value the evaluation matrix holds for them, the
+        rating on explicit data, so the relevance is graded exactly as in full
+        evaluation. A loader that yields no values grades every positive as 1.
+
+        Args:
+            batch_data (Dict[str, Any]): The parsed batch.
+            padding_idx (int): The item index that pads the positives.
+
+        Returns:
+            Tuple[Tensor, Tensor]: The candidates, positives and negatives in a
+                seeded random order, and the relevance of each.
+        """
+        positives = batch_data["positives"]
+        negatives = batch_data["negatives"]
+        candidates = torch.cat([positives, negatives], dim=1)
+        num_pos_cols = positives.shape[1]
+
+        # The ground truth: the positives' values, and 0 for every negative
+        eval_batch = torch.zeros(
+            candidates.shape, dtype=torch.float32, device=candidates.device
+        )
+        values = batch_data.get("values")
+        eval_batch[:, :num_pos_cols] = 1.0 if values is None else values.float()
+        mask_padding = positives == padding_idx
+        eval_batch[:, :num_pos_cols][mask_padding] = 0.0
+
+        # Random permutation to avoid bias towards position
+        perm = torch.randperm(candidates.shape[1], generator=self.g)
+        return candidates[:, perm], eval_batch[:, perm]
+
     def _parse_batch(self, batch: Tuple, strategy: str, device: str) -> Dict[str, Any]:
         """Parses the batch tuple based on strategy and dimensions.
 
@@ -388,15 +408,22 @@ class Evaluator:
 
         elif strategy == "sampled":
             if len(batch) == 3:
-                # Standard Sampled: (users, positives, negatives)
+                # Without values: (users, positives, negatives)
                 data["positives"] = batch[1]
                 data["negatives"] = batch[2]
 
             elif len(batch) == 4:
-                # Contextual Sampled: (users, positives, negatives, context)
+                # Standard Sampled: (users, positives, negatives, values)
                 data["positives"] = batch[1]
                 data["negatives"] = batch[2]
-                data["context"] = batch[3]
+                data["values"] = batch[3]
+
+            elif len(batch) == 5:
+                # Contextual Sampled: (users, positives, negatives, values, context)
+                data["positives"] = batch[1]
+                data["negatives"] = batch[2]
+                data["values"] = batch[3]
+                data["context"] = batch[4]
             else:
                 raise ValueError(
                     f"Unexpected batch size {len(batch)} for Sampled strategy"

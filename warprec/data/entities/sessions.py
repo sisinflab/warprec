@@ -317,6 +317,7 @@ class Sessions:
         dataset = SlidingWindowDataset(
             flat_items=self._flat_items,
             window_starts=window_starts_flat.astype(np.int64),
+            window_ends=self._user_offsets[window_user_ids + 1].astype(np.int64),
             window_users=window_user_ids.astype(np.int64),
             sparse_matrix=self._inter_sparse,
             max_seq_len=max_seq_len,

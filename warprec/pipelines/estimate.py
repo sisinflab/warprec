@@ -365,19 +365,9 @@ def _estimate_eval_loop(
             predict_kwargs["contexts"] = context
 
         if strategy == "sampled":
-            positives = batch_data["positives"]
-            negatives = batch_data["negatives"]
-            candidates = torch.cat([positives, negatives], dim=1)
-
-            eval_batch = torch.zeros_like(candidates)
-            num_pos_cols = positives.shape[1]
-            eval_batch[:, :num_pos_cols] = 1.0
-            mask_padding = positives == padding_idx
-            eval_batch[:, :num_pos_cols][mask_padding] = 0.0
-
-            perm = torch.randperm(candidates.shape[1], generator=evaluator.g)
-            candidates = candidates[:, perm]
-            eval_batch = eval_batch[:, perm]
+            candidates, eval_batch = evaluator._sampled_candidates(  # pylint: disable=protected-access
+                batch_data, padding_idx
+            )
             predict_kwargs["item_indices"] = candidates
 
         with torch.inference_mode():

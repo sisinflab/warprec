@@ -16,6 +16,7 @@ from warprec.data.entities.train_structures import (
 )
 from warprec.data.entities.common import (
     ITEM_INDEX,
+    ROW_INDEX,
     USER_INDEX,
     map_to_index_space,
     seeded_dataloader,
@@ -98,16 +99,13 @@ class Interactions:
         self._umap = user_mapping
         self._imap = item_mapping
 
-        # Filter side information (if present)
+        # Align side information (if present) with the catalogue
         if self._inter_side is not None:
-            valid_items = self._inter_df.select(self.item_label).unique()
-            # We use inner join on unique items to filter
-            self._inter_side = self._inter_side.join(
-                valid_items, on=self.item_label, how="inner"
-            )
-
-            # Order side information to be in the same order of the dataset (by item index)
-            # Create mapping DF for items
+            # The lookup is indexed by item index, so it holds one row per item of
+            # the catalogue in index order, whichever items this split happens to
+            # contain: a catalogue that keeps unseen items, or held-out cold
+            # items, is wider than the items of any split. An item without
+            # attributes gets 0, the index every feature reserves for unknown.
             imap_df = nw.from_dict(
                 {
                     self.item_label: list(item_mapping.keys()),
@@ -115,10 +113,8 @@ class Interactions:
                 },
                 native_namespace=nw.get_native_namespace(self._inter_side),
             )
-
-            # Join to get the order, sort, and drop temp column
             self._inter_side = (
-                self._inter_side.join(imap_df, on=self.item_label, how="left")
+                imap_df.join(self._inter_side, on=self.item_label, how="left")
                 .sort("__order__")
                 .drop("__order__")
             )
@@ -127,14 +123,17 @@ class Interactions:
             feature_cols = [c for c in self._inter_side.columns if c != self.item_label]
 
             # Create the lookup tensor for side information
-            # Extract values to numpy
-            side_values = self._inter_side.select(feature_cols).to_numpy()
+            side_values = (
+                self._inter_side.select(feature_cols)
+                .with_columns(nw.all().fill_null(0))
+                .to_numpy()
+            )
             side_tensor = torch.tensor(side_values, dtype=torch.long)
 
             # Create the padding row (zeros)
             padding_row = torch.zeros((1, side_tensor.shape[1]), dtype=torch.long)
 
-            # Concatenate padding row at the beginning (assuming index 0 is padding/unknown)
+            # The padding row goes last, at index n_items, like every item lookup
             self._inter_side_tensor = torch.cat([side_tensor, padding_row], dim=0)
 
             # Store the feature labels
@@ -244,14 +243,15 @@ class Interactions:
             )
 
         # Sorted so that the arrays are in a reproducible order and line up
-        # with one another however the frame arrived.
+        # with one another however the frame arrived. Repeated pairs stay in
+        # file order, which the 'first' and 'last' duplicate policies rely on.
         mapped_df = map_to_index_space(
             self._inter_df,
             self.user_label,
             self.item_label,
             self._umap,
             self._imap,
-        ).sort([USER_INDEX, ITEM_INDEX])
+        ).sort([USER_INDEX, ITEM_INDEX, ROW_INDEX])
 
         self._flat_users = mapped_df.select(USER_INDEX).to_numpy().flatten()
         self._flat_items = mapped_df.select(ITEM_INDEX).to_numpy().flatten()
@@ -310,7 +310,7 @@ class Interactions:
             self.item_label,
             self._umap,
             self._imap,
-        ).sort([USER_INDEX, ITEM_INDEX])
+        ).sort([USER_INDEX, ITEM_INDEX, ROW_INDEX])
 
         users = mapped_df.select(USER_INDEX).to_numpy().flatten()
         items = mapped_df.select(ITEM_INDEX).to_numpy().flatten()

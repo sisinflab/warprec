@@ -30,7 +30,7 @@ The following keywords are available to configure the reader:
 
 - **header**: Boolean flag to indicate whether the first row of the file is a header. Defaults to `True`.
 
-- **duplicates**: How repeated `(user_id, item_id)` rows are aggregated when the interaction matrix is built: `max`, `mean`, `first`, `last` or `sum`. Defaults to `max`. With implicit feedback every policy except `sum` yields a binary matrix, while `sum` yields interaction counts.
+- **duplicates**: How repeated `(user_id, item_id)` rows are aggregated when the interaction matrix is built: `max`, `mean`, `first`, `last` or `sum`. Defaults to `max`. `first` and `last` keep the rating of the earliest or latest of the repeated rows in file order, whichever backend reads the data. With implicit feedback every policy except `sum` yields a binary matrix, while `sum` yields interaction counts.
 
 !!! warning "Moved"
     `negative_sampling` and `sequence_pooling` were released here in 1.7 and now live
@@ -97,7 +97,7 @@ This can be configured using the `side` nested section:
 
 - **column_names**: The names of the columns, required when the file has no header row. The first name must be the item ID column.
 
-- **keep_unseen_items**: Whether items that carry attributes but no interaction stay in the catalogue. Defaults to `False`, which drops them. Set it to `True` for cold-start experiments: such an item becomes an all-zero column of the interaction matrix, so a content-based or hybrid model can still recommend it from its attributes while the collaborative models score it last.
+- **keep_unseen_items**: Whether items that carry attributes but no interaction stay in the catalogue. Defaults to `False`, which drops them. Set it to `True` for cold-start experiments: such an item becomes an all-zero column of the interaction matrix, so a content-based or hybrid model can still recommend it from its attributes while the collaborative models score it last. The context-aware models, which embed the item attributes, read them for these items too.
 
 !!! tip
     Side information can improve model performance, especially in **cold-start scenarios**. Not every model uses side information, check the [Recommenders Documentation](../recommenders/index.md) for further details on each model.
