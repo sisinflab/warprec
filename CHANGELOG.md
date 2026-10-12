@@ -2,6 +2,71 @@
 
 <!-- version list -->
 
+## v2.1.7 (2026-10-12)
+
+### Bug Fixes
+
+- A clustering section reads a user or an item cluster file on its own, and one naming neither is
+  refused at load
+  ([`64c07b1`](https://github.com/sisinflab/warprec/commit/64c07b1fb4330910b62cec2807d088eef72081cb))
+
+- A cold-start split requires its ratio, a cold-start validation split the test split would empty is
+  refused, and a SplitSpec or split without its required parameters fails with a clear message
+  ([`a862619`](https://github.com/sisinflab/warprec/commit/a8626193c0008dbe009fae578656592f81ff04bf))
+
+- A context-aware model refuses side information that gives an item several rows, saying to give one
+  row per item
+  ([`597625d`](https://github.com/sisinflab/warprec/commit/597625dd777010041c39f9136a7253d6ab219caa))
+
+- A design configuration giving a hyperparameter several values or a range is refused at load,
+  naming the key
+  ([`3abe673`](https://github.com/sisinflab/warprec/commit/3abe6738982b9525f735706c478317a2fb1c75d7))
+
+- A filter given a key it does not take is refused at load, naming the key and listing the
+  parameters it takes
+  ([`e38d9e2`](https://github.com/sisinflab/warprec/commit/e38d9e292e7441f8e2913afdac69e022a9f99be1))
+
+- A hyperparameter the model does not take is refused at load, naming it and listing the ones the
+  model takes
+  ([`a34b77a`](https://github.com/sisinflab/warprec/commit/a34b77a1f722f59c9afd6f49b71093149963a9e2))
+
+- A null or out-of-range model or splitting seed is refused at load, as the evaluation seed already
+  is
+  ([`90af7e5`](https://github.com/sisinflab/warprec/commit/90af7e52033e43a06f55514c517b76741775f1bb))
+
+- An unknown name in evaluation.metrics stops the run when the configuration loads and suggests the
+  registered metric meant
+  ([`eecf070`](https://github.com/sisinflab/warprec/commit/eecf070621196aca53c8ca7be4a6a8df33c21f7b))
+
+- Azure Blob reading works for the dataset, the splits and every side input, and requires the blob
+  name rather than a local path
+  ([`91cf36a`](https://github.com/sisinflab/warprec/commit/91cf36a0becd946d14c6246e71bcf8ab1673f7fc))
+
+- EucDistance and Hypervolume combine global sub-metrics such as ItemCoverage instead of failing on
+  the first batch
+  ([`c2e3100`](https://github.com/sisinflab/warprec/commit/c2e3100fea8ec33f322ee799693d85c163b9a503))
+
+- EucDistance and Hypervolume reset their sub-metrics between evaluations and move them to the
+  evaluation device
+  ([`076df08`](https://github.com/sisinflab/warprec/commit/076df089f66ef2401d800f7e418e9620568c01c3))
+
+- Loading a configuration that filters data read already split warns that the filters are ignored
+  ([`2c99ce4`](https://github.com/sisinflab/warprec/commit/2c99ce4a4fd1162ddf93087a71fd172e8bc02390))
+
+- PopREO, PopRSP, REO and RSP report NaN where they are undefined, and an empty popularity group no
+  longer breaks the evaluation
+  ([`bbd343d`](https://github.com/sisinflab/warprec/commit/bbd343d1e147da13c1cfc0751de0f914d3ca4c1d))
+
+- The design, evaluation and estimate pipelines check at load that every model is registered and has
+  the side information, context, knowledge graph and modalities it reads
+  ([`6eabe5d`](https://github.com/sisinflab/warprec/commit/6eabe5d2a72e33283d694e751b072ff3aaa24e33))
+
+### Documentation
+
+- The guides show configurations refused at load and composite metrics reported per evaluation
+  ([`effe3da`](https://github.com/sisinflab/warprec/commit/effe3da14bf21895a0a51b283ff473f12965f505))
+
+
 ## v2.1.6 (2026-10-12)
 
 ### Bug Fixes
