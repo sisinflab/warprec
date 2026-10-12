@@ -11,7 +11,6 @@ from warprec.recommenders.knowledge_aware_recommender.knowledge_utils import (
     KnowledgeRecommenderUtils,
 )
 from warprec.recommenders.losses import BPRLoss, EmbLoss
-from warprec.utils.enums import DataLoaderType
 from warprec.utils.registry import model_registry
 
 
@@ -39,7 +38,6 @@ class KGIN(KnowledgeRecommenderUtils, IterativeRecommender):
         **kwargs (Any): Arbitrary keyword arguments.
 
     Attributes:
-        DATALOADER_TYPE: The type of dataloader used.
         embedding_size (int): The width of the embeddings.
         n_factors (int): How many intents to keep.
         n_hops (int): How many hops to propagate.
@@ -58,8 +56,6 @@ class KGIN(KnowledgeRecommenderUtils, IterativeRecommender):
     Raises:
         ValueError: If the training interactions were not provided.
     """
-
-    DATALOADER_TYPE = DataLoaderType.POS_NEG_LOADER
 
     embedding_size: int
     n_factors: int

@@ -14,7 +14,6 @@ from warprec.recommenders.losses import EmbLoss
 from warprec.recommenders.collaborative_filtering_recommender.graph_based import (
     GraphRecommenderUtils,
 )
-from warprec.utils.enums import DataLoaderType
 from warprec.utils.registry import model_registry
 from warprec.recommenders.collaborative_filtering_recommender.graph_based.graph_utils import (
     SparseAdjacency,
@@ -90,7 +89,6 @@ class GCMC(IterativeRecommender, GraphRecommenderUtils):
         **kwargs (Any): Arbitrary keyword arguments.
 
     Attributes:
-        DATALOADER_TYPE: The type of dataloader used.
         embedding_size (int): The embedding size of user and item.
         reg_weight (float): The L2 regularization weight.
         weight_decay (float): The value of weight decay used in the optimizer.
@@ -101,9 +99,6 @@ class GCMC(IterativeRecommender, GraphRecommenderUtils):
     Raises:
         ValueError: If the dataset does not have explicit rating.
     """
-
-    # Dataloader definition for explicit feedback
-    DATALOADER_TYPE = DataLoaderType.ITEM_RATING_LOADER
 
     # Model hyperparameters
     embedding_size: int

@@ -10,7 +10,6 @@ from warprec.recommenders.base_recommender import (
 )
 from warprec.recommenders.layers import MLP
 from warprec.recommenders.losses import EmbLoss
-from warprec.utils.enums import DataLoaderType
 from warprec.data.entities import Interactions
 from warprec.utils.registry import model_registry
 
@@ -29,7 +28,6 @@ class DCNv2(ContextRecommenderUtils, IterativeRecommender):
         **kwargs (Any): Arbitrary keyword arguments.
 
     Attributes:
-        DATALOADER_TYPE: The type of dataloader used.
         embedding_size (int): The size of the latent vectors.
         mlp_hidden_size (List[int]): The MLP hidden layer size list.
         cross_layer_num (int): The number of cross layers.
@@ -48,8 +46,6 @@ class DCNv2(ContextRecommenderUtils, IterativeRecommender):
     Raises:
         ValueError: If model_structure parameter is not supported.
     """
-
-    DATALOADER_TYPE = DataLoaderType.ITEM_RATING_LOADER_WITH_CONTEXT
 
     embedding_size: int
     mlp_hidden_size: List[int]

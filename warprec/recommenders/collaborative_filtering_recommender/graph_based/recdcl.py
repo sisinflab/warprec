@@ -10,7 +10,6 @@ from warprec.recommenders.base_recommender import IterativeRecommender
 from warprec.recommenders.collaborative_filtering_recommender.graph_based import (
     GraphRecommenderUtils,
 )
-from warprec.utils.enums import DataLoaderType
 from warprec.utils.registry import model_registry
 
 
@@ -87,8 +86,6 @@ class RecDCL(GraphRecommenderUtils, IterativeRecommender):
         **kwargs (Any): Arbitrary keyword arguments.
 
     Attributes:
-        DATALOADER_TYPE: POS_LOADER – yields (user, pos_item) pairs.
-            RecDCL does not require negative sampling (Section 4.2 / Table 1).
         embedding_size (int): Dimensionality of user/item embedding vectors (F).
             Best results at large F (2048); see Section D.7 / Figure 4.
         n_layers (int): Number of LightGCN propagation layers. Default: 2.
@@ -107,9 +104,6 @@ class RecDCL(GraphRecommenderUtils, IterativeRecommender):
         epochs (int): Number of training epochs.
         learning_rate (float): Adam learning rate. Default: 0.001 (Appendix D.3).
     """
-
-    # Dataloader definition
-    DATALOADER_TYPE = DataLoaderType.POS_DATALOADER
 
     # Model hyperparameters
     embedding_size: int

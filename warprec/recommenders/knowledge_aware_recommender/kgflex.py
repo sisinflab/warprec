@@ -12,7 +12,6 @@ from warprec.recommenders.knowledge_aware_recommender.knowledge_utils import (
     KnowledgeRecommenderUtils,
 )
 from warprec.recommenders.losses import BPRLoss
-from warprec.utils.enums import DataLoaderType
 from warprec.utils.logger import logger
 from warprec.utils.registry import model_registry
 
@@ -53,7 +52,6 @@ class KGFlex(KnowledgeRecommenderUtils, IterativeRecommender):
         **kwargs (Any): Arbitrary keyword arguments.
 
     Attributes:
-        DATALOADER_TYPE: The type of dataloader used.
         embedding_size (int): The width of the feature embeddings.
         first_order_limit (int): How many first-order features each user keeps.
         second_order_limit (int): How many second-order features each user keeps.
@@ -73,8 +71,6 @@ class KGFlex(KnowledgeRecommenderUtils, IterativeRecommender):
         ValueError: If the interactions were not provided, or no feature
             informs any user.
     """
-
-    DATALOADER_TYPE = DataLoaderType.POS_NEG_LOADER
 
     embedding_size: int
     first_order_limit: int

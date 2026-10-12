@@ -10,7 +10,6 @@ from warprec.recommenders.multimodal_recommender.multimodal_utils import (
     MultiModalRecommenderUtils,
 )
 from warprec.recommenders.losses import BPRLoss, EmbLoss
-from warprec.utils.enums import DataLoaderType
 from warprec.utils.registry import model_registry
 
 
@@ -38,7 +37,6 @@ class VBPR(MultiModalRecommenderUtils, IterativeRecommender):
         **kwargs (Any): Arbitrary keyword arguments.
 
     Attributes:
-        DATALOADER_TYPE: The type of dataloader used.
         embedding_size (int): The width of both the collaborative and the
             projected feature factors.
         modalities (Optional[List[str]]): The modalities to read. Defaults to
@@ -48,8 +46,6 @@ class VBPR(MultiModalRecommenderUtils, IterativeRecommender):
         epochs (int): The number of epochs.
         learning_rate (float): The learning rate value.
     """
-
-    DATALOADER_TYPE = DataLoaderType.POS_NEG_LOADER
 
     embedding_size: int
     modalities: Optional[List[str]]

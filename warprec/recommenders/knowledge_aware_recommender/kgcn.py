@@ -10,7 +10,6 @@ from warprec.recommenders.knowledge_aware_recommender.knowledge_utils import (
     KnowledgeRecommenderUtils,
 )
 from warprec.recommenders.losses import BPRLoss, EmbLoss
-from warprec.utils.enums import DataLoaderType
 from warprec.utils.registry import model_registry
 
 
@@ -38,7 +37,6 @@ class KGCN(KnowledgeRecommenderUtils, IterativeRecommender):
         **kwargs (Any): Arbitrary keyword arguments.
 
     Attributes:
-        DATALOADER_TYPE: The type of dataloader used.
         embedding_size (int): The width of the entity and relation embeddings.
         neighbour_size (int): How many neighbours each entity is given.
         n_iter (int): How many hops out from an item to read.
@@ -50,8 +48,6 @@ class KGCN(KnowledgeRecommenderUtils, IterativeRecommender):
         neighbour_entities (Tensor): The sampled neighbours of every entity.
         neighbour_relations (Tensor): How each of those neighbours was reached.
     """
-
-    DATALOADER_TYPE = DataLoaderType.POS_NEG_LOADER
 
     embedding_size: int
     neighbour_size: int

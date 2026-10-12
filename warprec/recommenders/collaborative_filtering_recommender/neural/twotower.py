@@ -7,7 +7,6 @@ from torch import nn, Tensor
 from warprec.data.entities import Interactions, Sessions
 from warprec.recommenders.base_recommender import IterativeRecommender
 from warprec.recommenders.losses import EmbLoss
-from warprec.utils.enums import DataLoaderType
 from warprec.utils.registry import model_registry
 
 
@@ -78,7 +77,6 @@ class TwoTower(IterativeRecommender):
         **kwargs (Any): Arbitrary keyword arguments.
 
     Attributes:
-        DATALOADER_TYPE: The type of dataloader used.
         embedding_size (int): The width of the user and item embeddings.
         tower_hidden_size (List[int]): The width of each tower layer, the last of
             which is the retrieval space.
@@ -100,9 +98,6 @@ class TwoTower(IterativeRecommender):
     Raises:
         ValueError: If the item attributes are asked for but none were provided.
     """
-
-    # Dataloader definition
-    DATALOADER_TYPE = DataLoaderType.POS_DATALOADER
 
     # Model hyperparameters
     embedding_size: int

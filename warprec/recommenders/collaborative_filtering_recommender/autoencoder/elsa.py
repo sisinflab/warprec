@@ -7,7 +7,6 @@ import torch.nn.functional as F
 
 from warprec.data.entities import Interactions, Sessions
 from warprec.recommenders.base_recommender import IterativeRecommender
-from warprec.utils.enums import DataLoaderType
 from warprec.utils.registry import model_registry
 
 
@@ -25,14 +24,11 @@ class ELSA(IterativeRecommender):
         **kwargs (Any): Keyword argument for PyTorch nn.Module.
 
     Attributes:
-        DATALOADER_TYPE: The type of dataloader used.
         n_dims (int): The number of dimensions for the latent space.
         batch_size (int): The batch size used for training.
         epochs (int): The number of epochs.
         learning_rate (float): The learning rate value.
     """
-
-    DATALOADER_TYPE = DataLoaderType.INTERACTION_LOADER
 
     n_dims: int
     batch_size: int

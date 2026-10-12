@@ -11,7 +11,6 @@ from warprec.recommenders.base_recommender import (
 )
 from warprec.recommenders.losses import BPRLoss, EmbLoss
 from warprec.data.entities import Interactions, Sessions
-from warprec.utils.enums import DataLoaderType
 from warprec.utils.registry import model_registry
 
 
@@ -29,7 +28,6 @@ class Caser(IterativeRecommender, SequentialRecommenderUtils):
         **kwargs (Any): Arbitrary keyword arguments.
 
     Attributes:
-        DATALOADER_TYPE: The type of dataloader used.
         embedding_size (int): The dimension of the item and user embeddings.
         n_h (int): The number of horizontal filters.
         n_v (int): The number of vertical filters.
@@ -44,9 +42,6 @@ class Caser(IterativeRecommender, SequentialRecommenderUtils):
         needs_user: True, because predict mixes a user embedding into the
             sequence, so a session needs a known user.
     """
-
-    # Dataloader definition
-    DATALOADER_TYPE = DataLoaderType.SEQUENTIAL_LOADER_WITH_USER_ID
 
     # Model hyperparameters
     embedding_size: int

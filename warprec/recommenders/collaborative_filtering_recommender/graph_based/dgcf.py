@@ -11,7 +11,6 @@ from warprec.recommenders.collaborative_filtering_recommender.graph_based import
     GraphRecommenderUtils,
 )
 from warprec.recommenders.losses import BPRLoss, EmbLoss
-from warprec.utils.enums import DataLoaderType
 from warprec.utils.registry import model_registry
 
 
@@ -29,7 +28,6 @@ class DGCF(IterativeRecommender, GraphRecommenderUtils):
         **kwargs (Any): Arbitrary keyword arguments.
 
     Attributes:
-        DATALOADER_TYPE: The type of dataloader used.
         embedding_size (int): The embedding size of user and item.
         n_layers (int): The number of graph convolution layers.
         n_factors (int): The number of factors.
@@ -43,8 +41,6 @@ class DGCF(IterativeRecommender, GraphRecommenderUtils):
     Raises:
         ValueError: If embedding size is not divisible by n_factors.
     """
-
-    DATALOADER_TYPE = DataLoaderType.POS_NEG_LOADER
 
     # Model hyperparameters
     embedding_size: int

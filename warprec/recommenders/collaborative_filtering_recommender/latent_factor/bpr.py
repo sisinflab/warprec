@@ -7,7 +7,6 @@ from torch import nn, Tensor
 from warprec.data.entities import Interactions, Sessions
 from warprec.recommenders.base_recommender import IterativeRecommender
 from warprec.recommenders.losses import BPRLoss, EmbLoss
-from warprec.utils.enums import DataLoaderType
 from warprec.utils.registry import model_registry
 
 
@@ -24,16 +23,12 @@ class BPR(IterativeRecommender):
         **kwargs (Any): Arbitrary keyword arguments.
 
     Attributes:
-        DATALOADER_TYPE: The type of dataloader used.
         embedding_size (int): The embedding size of user and item.
         reg_weight (float): The L2 regularization weight.
         batch_size (int): The batch size used for training.
         epochs (int): The number of epochs.
         learning_rate (float): The learning rate value.
     """
-
-    # Dataloader definition
-    DATALOADER_TYPE = DataLoaderType.POS_NEG_LOADER
 
     # Model hyperparameters
     embedding_size: int

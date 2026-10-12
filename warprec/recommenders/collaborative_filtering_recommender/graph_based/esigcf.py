@@ -11,7 +11,6 @@ from warprec.recommenders.collaborative_filtering_recommender.graph_based import
     GraphRecommenderUtils,
 )
 from warprec.recommenders.losses import BPRLoss, EmbLoss, InfoNCELoss
-from warprec.utils.enums import DataLoaderType
 from warprec.utils.registry import model_registry
 
 
@@ -29,7 +28,6 @@ class ESIGCF(IterativeRecommender, GraphRecommenderUtils):
         **kwargs (Any): Arbitrary keyword arguments.
 
     Attributes:
-        DATALOADER_TYPE: The type of dataloader used.
         embedding_size (int): The embedding size of items.
         n_layers (int): The number of propagation layers.
         ssl_lambda (float): Weight for SSL Intent Loss (User-Positive).
@@ -40,9 +38,6 @@ class ESIGCF(IterativeRecommender, GraphRecommenderUtils):
         epochs (int): The number of epochs.
         learning_rate (float): The learning rate value.
     """
-
-    # Dataloader definition
-    DATALOADER_TYPE = DataLoaderType.POS_NEG_LOADER
 
     # Model hyperparameters
     embedding_size: int

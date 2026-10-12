@@ -11,7 +11,6 @@ from warprec.recommenders.base_recommender import (
 )
 from warprec.recommenders.losses import BPRLoss, EmbLoss
 from warprec.data.entities import Interactions, Sessions
-from warprec.utils.enums import DataLoaderType
 from warprec.utils.registry import model_registry
 
 
@@ -146,7 +145,6 @@ class LinRec(IterativeRecommender, SequentialRecommenderUtils):
         **kwargs (Any): Arbitrary keyword arguments.
 
     Attributes:
-        DATALOADER_TYPE: The type of dataloader used.
         embedding_size (int): Item embedding dimensions.
         n_layers (int): The number of transformer encoder layers.
         n_heads (int): The number of attention heads in the transformer.
@@ -160,8 +158,6 @@ class LinRec(IterativeRecommender, SequentialRecommenderUtils):
         neg_samples (int): The number of negative samples.
         max_seq_len (int): The maximum length of sequences.
     """
-
-    DATALOADER_TYPE = DataLoaderType.SEQUENTIAL_LOADER
 
     embedding_size: int
     n_layers: int

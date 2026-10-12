@@ -11,7 +11,6 @@ from warprec.recommenders.knowledge_aware_recommender.knowledge_utils import (
     KnowledgeRecommenderUtils,
 )
 from warprec.recommenders.losses import BPRLoss, EmbLoss
-from warprec.utils.enums import DataLoaderType
 from warprec.utils.registry import model_registry
 
 
@@ -80,7 +79,6 @@ class KGAT(KnowledgeRecommenderUtils, IterativeRecommender):
         **kwargs (Any): Arbitrary keyword arguments.
 
     Attributes:
-        DATALOADER_TYPE: The type of dataloader used.
         embedding_size (int): The width of the node embeddings.
         kg_embedding_size (int): The width of the space a relation projects into.
         layers (List[int]): The width of each propagation hop.
@@ -98,8 +96,6 @@ class KGAT(KnowledgeRecommenderUtils, IterativeRecommender):
     Raises:
         ValueError: If the training interactions were not provided.
     """
-
-    DATALOADER_TYPE = DataLoaderType.POS_NEG_LOADER
 
     embedding_size: int
     kg_embedding_size: int

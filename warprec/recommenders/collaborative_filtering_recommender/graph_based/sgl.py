@@ -10,7 +10,6 @@ from warprec.recommenders.collaborative_filtering_recommender.graph_based import
     GraphRecommenderUtils,
 )
 from warprec.recommenders.losses import BPRLoss, EmbLoss, InfoNCELoss
-from warprec.utils.enums import DataLoaderType
 from warprec.utils.registry import model_registry
 from warprec.recommenders.collaborative_filtering_recommender.graph_based.graph_utils import (
     SparseAdjacency,
@@ -31,7 +30,6 @@ class SGL(IterativeRecommender, GraphRecommenderUtils):
         **kwargs (Any): Arbitrary keyword arguments.
 
     Attributes:
-        DATALOADER_TYPE: The type of dataloader used.
         embedding_size (int): The embedding size of user and item.
         n_layers (int): The number of graph convolution layers.
         ssl_tau (float): The temperature parameter for SSL loss.
@@ -46,8 +44,6 @@ class SGL(IterativeRecommender, GraphRecommenderUtils):
     Raises:
         ValueError: If aug_type is not one of the supported types.
     """
-
-    DATALOADER_TYPE = DataLoaderType.POS_NEG_LOADER
 
     # Hyperparameters
     embedding_size: int

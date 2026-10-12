@@ -14,7 +14,6 @@ from warprec.recommenders.multimodal_recommender.multimodal_utils import (
     MultiModalRecommenderUtils,
 )
 from warprec.recommenders.losses import BPRLoss, EmbLoss
-from warprec.utils.enums import DataLoaderType
 from warprec.utils.registry import model_registry
 
 
@@ -43,7 +42,6 @@ class LATTICE(MultiModalRecommenderUtils, GraphRecommenderUtils, IterativeRecomm
         **kwargs (Any): Arbitrary keyword arguments.
 
     Attributes:
-        DATALOADER_TYPE: The type of dataloader used.
         embedding_size (int): The width of the collaborative embeddings.
         feature_size (int): The width the features are projected to.
         knn_k (int): How many neighbours each item keeps.
@@ -61,8 +59,6 @@ class LATTICE(MultiModalRecommenderUtils, GraphRecommenderUtils, IterativeRecomm
     Raises:
         ValueError: If the training interactions were not provided.
     """
-
-    DATALOADER_TYPE = DataLoaderType.POS_NEG_LOADER
 
     embedding_size: int
     feature_size: int

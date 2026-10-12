@@ -14,7 +14,6 @@ from warprec.recommenders.multimodal_recommender.multimodal_utils import (
     MultiModalRecommenderUtils,
 )
 from warprec.recommenders.losses import EmbLoss
-from warprec.utils.enums import DataLoaderType
 from warprec.utils.registry import model_registry
 
 
@@ -41,7 +40,6 @@ class BM3(MultiModalRecommenderUtils, GraphRecommenderUtils, IterativeRecommende
         **kwargs (Any): Arbitrary keyword arguments.
 
     Attributes:
-        DATALOADER_TYPE: The type of dataloader used.
         embedding_size (int): The width of the embeddings.
         n_layers (int): How many hops to run over the user-item graph.
         dropout (float): The dropout that makes the target view differ.
@@ -56,8 +54,6 @@ class BM3(MultiModalRecommenderUtils, GraphRecommenderUtils, IterativeRecommende
     Raises:
         ValueError: If the training interactions were not provided.
     """
-
-    DATALOADER_TYPE = DataLoaderType.POS_DATALOADER
 
     embedding_size: int
     n_layers: int

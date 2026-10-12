@@ -14,7 +14,6 @@ from warprec.recommenders.collaborative_filtering_recommender.graph_based import
     GraphRecommenderUtils,
 )
 from warprec.recommenders.losses import BPRLoss, EmbLoss
-from warprec.utils.enums import DataLoaderType
 from warprec.utils.registry import model_registry
 from warprec.recommenders.collaborative_filtering_recommender.graph_based.graph_utils import (
     SparseAdjacency,
@@ -36,7 +35,6 @@ class LightGCNpp(IterativeRecommender, GraphRecommenderUtils):
         **kwargs (Any): Arbitrary keyword arguments.
 
     Attributes:
-        DATALOADER_TYPE: The type of dataloader used.
         embedding_size (int): The embedding size of user and item.
         n_layers (int): The number of graph convolution layers.
         alpha (float): The exponent for the target node degree in the normalization coefficient.
@@ -48,9 +46,6 @@ class LightGCNpp(IterativeRecommender, GraphRecommenderUtils):
         epochs (int): The number of epochs.
         learning_rate (float): The learning rate value.
     """
-
-    # Dataloader definition
-    DATALOADER_TYPE = DataLoaderType.POS_NEG_LOADER
 
     # Model hyperparameters
     embedding_size: int

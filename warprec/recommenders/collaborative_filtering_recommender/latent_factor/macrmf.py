@@ -8,7 +8,6 @@ from torch import nn, Tensor
 from warprec.data.entities import Interactions, Sessions
 from warprec.recommenders.base_recommender import IterativeRecommender
 from warprec.recommenders.losses import EmbLoss
-from warprec.utils.enums import DataLoaderType
 from warprec.utils.registry import model_registry
 
 
@@ -37,7 +36,6 @@ class MACRMF(IterativeRecommender):
         **kwargs (Any): Arbitrary keyword arguments.
 
     Attributes:
-        DATALOADER_TYPE: Pointwise (user, item, rating) loader with negative sampling.
         embedding_size (int): Dimension of user and item embeddings.
         alpha (float): Weight for item-module auxiliary loss L_I (Eq. 8).
         beta (float): Weight for user-module auxiliary loss L_U (Eq. 8).
@@ -48,9 +46,6 @@ class MACRMF(IterativeRecommender):
         epochs (int): Number of training epochs.
         learning_rate (float): Adam learning rate.
     """
-
-    # Dataloader definition
-    DATALOADER_TYPE = DataLoaderType.ITEM_RATING_LOADER
 
     # Model hyperparameters
     embedding_size: int

@@ -7,7 +7,6 @@ from torch import nn, Tensor
 from warprec.data.entities import Interactions, Sessions
 from warprec.recommenders.base_recommender import IterativeRecommender
 from warprec.recommenders.losses import EmbLoss
-from warprec.utils.enums import DataLoaderType
 from warprec.utils.registry import model_registry
 
 
@@ -25,7 +24,6 @@ class FISM(IterativeRecommender):
         **kwargs (Any): Arbitrary keyword arguments.
 
     Attributes:
-        DATALOADER_TYPE: The type of dataloader used.
         embedding_size (int): The number of factors for item feature embeddings.
         alpha (float): The alpha parameter, a value between 0 and 1,
             used in the similarity calculation.
@@ -36,9 +34,6 @@ class FISM(IterativeRecommender):
         epochs (int): The number of training epochs.
         learning_rate (float): The learning rate for the optimizer.
     """
-
-    # Dataloader definition
-    DATALOADER_TYPE = DataLoaderType.HISTORY
 
     # Model specific parameters
     embedding_size: int

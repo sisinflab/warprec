@@ -11,7 +11,6 @@ from warprec.recommenders.multimodal_recommender.multimodal_utils import (
     MultiModalRecommenderUtils,
 )
 from warprec.recommenders.losses import BPRLoss
-from warprec.utils.enums import DataLoaderType
 from warprec.utils.registry import model_registry
 
 
@@ -102,7 +101,6 @@ class MMGCN(MultiModalRecommenderUtils, IterativeRecommender):
         **kwargs (Any): Arbitrary keyword arguments.
 
     Attributes:
-        DATALOADER_TYPE: The type of dataloader used.
         embedding_size (int): The width of the representations.
         feature_size (int): The width each modality is projected to.
         n_layers (int): How many hops each modality graph runs.
@@ -117,8 +115,6 @@ class MMGCN(MultiModalRecommenderUtils, IterativeRecommender):
     Raises:
         ValueError: If the training interactions were not provided.
     """
-
-    DATALOADER_TYPE = DataLoaderType.POS_NEG_LOADER
 
     embedding_size: int
     feature_size: int

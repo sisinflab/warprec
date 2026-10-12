@@ -14,7 +14,6 @@ from warprec.recommenders.multimodal_recommender.multimodal_utils import (
     MultiModalRecommenderUtils,
 )
 from warprec.recommenders.losses import BPRLoss, EmbLoss
-from warprec.utils.enums import DataLoaderType
 from warprec.utils.registry import model_registry
 
 
@@ -45,7 +44,6 @@ class MGCN(MultiModalRecommenderUtils, GraphRecommenderUtils, IterativeRecommend
         **kwargs (Any): Arbitrary keyword arguments.
 
     Attributes:
-        DATALOADER_TYPE: The type of dataloader used.
         embedding_size (int): The width of the embeddings.
         knn_k (int): How many neighbours each item keeps in the feature graph.
         n_layers (int): How many hops to run over the item-item graph.
@@ -64,8 +62,6 @@ class MGCN(MultiModalRecommenderUtils, GraphRecommenderUtils, IterativeRecommend
     Raises:
         ValueError: If the training interactions were not provided.
     """
-
-    DATALOADER_TYPE = DataLoaderType.POS_NEG_LOADER
 
     embedding_size: int
     knn_k: int

@@ -10,7 +10,6 @@ from warprec.recommenders.base_recommender import (
 )
 from warprec.recommenders.losses import EmbLoss
 from warprec.data.entities import Interactions, Sessions
-from warprec.utils.enums import DataLoaderType
 from warprec.utils.registry import model_registry
 
 
@@ -30,7 +29,6 @@ class gSASRec(IterativeRecommender, SequentialRecommenderUtils):
         **kwargs (Any): Arbitrary keyword arguments.
 
     Attributes:
-        DATALOADER_TYPE: The type of dataloader used.
         embedding_size (int): The dimension of the item embeddings (hidden_size).
         n_layers (int): The number of transformer encoder layers.
         n_heads (int): The number of attention heads in the transformer.
@@ -47,9 +45,6 @@ class gSASRec(IterativeRecommender, SequentialRecommenderUtils):
         max_seq_len (int): The maximum length of sequences.
         reuse_item_embeddings (bool): Whether to reuse item embeddings for output or not.
     """
-
-    # Dataloader definition
-    DATALOADER_TYPE = DataLoaderType.USER_HISTORY_LOADER
 
     # Model hyperparameters
     embedding_size: int

@@ -28,7 +28,6 @@ from scipy.sparse import csr_matrix, diags, issparse
 from sklearn.preprocessing import normalize
 
 from warprec.data.entities import Interactions, Sessions
-from warprec.utils.enums import DataLoaderType
 from warprec.utils.config.model_configuration import LRSchedulerConfig, OptimizerConfig
 from warprec.utils.logger import logger
 from warprec.utils.registry import lr_scheduler_registry, optimizer_registry
@@ -84,17 +83,10 @@ class Recommender(nn.Module, ABC):
         seed (int): The seed to use for reproducibility.
         **kwargs (Any): Keyword argument for PyTorch nn.Module.
 
-    Attributes:
-        DATALOADER_TYPE (Optional[DataLoaderType]): The type of dataloader used
-            by this model. This value will be used to pre-compute the required
-            data structure before starting the training process.
-
     Raises:
         ValueError: If the info dictionary does not contain the number of items
             and users of the dataset.
     """
-
-    DATALOADER_TYPE: Optional[DataLoaderType] = None
 
     def __init__(
         self,
