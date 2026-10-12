@@ -101,15 +101,20 @@ class PopREO(TopKMetric):
         self.long_gt += torch.isin(positive_indices, self.long_tail).sum().float()
 
     def compute(self):
-        # Calculate proportions of hits per group
-        pr_short = self.short_recs / (self.short_gt if self.short_gt > 0 else 1.0)
-        pr_long = self.long_recs / (self.long_gt if self.long_gt > 0 else 1.0)
-
-        # Handle the case where one group has zero items
+        # A group with no relevant item has no rate, and with one rate missing
+        # there is nothing to compare: the metric is undefined there.
         if self.short_gt == 0 or self.long_gt == 0:
-            return torch.tensor(0.0)
+            return {self.name: float("nan")}
 
+        # Calculate proportions of hits per group
+        pr_short = self.short_recs / self.short_gt
+        pr_long = self.long_recs / self.long_gt
         pr = torch.stack([pr_short, pr_long])
+
+        # No hit in either group leaves std over mean as 0/0, undefined too.
+        if torch.mean(pr) == 0:
+            return {self.name: float("nan")}
+
         # std(unbiased=False) matches numpy std by default for population std
         pop_reo = (torch.std(pr, unbiased=False) / torch.mean(pr)).item()
         return {self.name: pop_reo}

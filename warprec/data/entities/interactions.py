@@ -76,6 +76,7 @@ class Interactions:
         self._inter_side_sparse: Optional[csr_matrix] = side.matrix
         self._inter_side_tensor: Tensor = None
         self._inter_side_labels: List[str] = []
+        self._inter_side_repeats: List[Any] = []
         self._history_matrix: Tensor = None
         self._history_lens: Tensor = None
         self._history_mask: Tensor = None
@@ -118,6 +119,15 @@ class Interactions:
                 .sort("__order__")
                 .drop("__order__")
             )
+
+            # A long side table gives an item one row per value. The lookup is
+            # indexed by item, so it cannot hold them: record which items repeat
+            # and let the models that read the lookup refuse them.
+            items, counts = np.unique(
+                self._inter_side.select(self.item_label).to_numpy().flatten(),
+                return_counts=True,
+            )
+            self._inter_side_repeats = items[counts > 1].tolist()
 
             # Construct lookup for side information features
             feature_cols = [c for c in self._inter_side.columns if c != self.item_label]
@@ -343,6 +353,14 @@ class Interactions:
             Tensor: Tensor representation of the features if available.
         """
         return self._inter_side_tensor
+
+    def get_side_repeated_items(self) -> List[Any]:
+        """The catalogue items the side information gives more than one row.
+
+        Returns:
+            List[Any]: Their ids, empty when every item has at most one row.
+        """
+        return self._inter_side_repeats
 
     def get_interaction_dataloader(
         self,

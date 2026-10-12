@@ -92,12 +92,17 @@ def test_the_splitter_reports_which_side_is_held_out(
     strategy: str, dimension: str, column: str
 ):
     """The rest of the pipeline reads the protocol off the strategy."""
-    assert Splitter().cold_dimension(SplitSpec(strategy=strategy)) == dimension
+    assert (
+        Splitter().cold_dimension(SplitSpec(strategy=strategy, ratio=0.1)) == dimension
+    )
 
 
 def test_an_ordinary_strategy_holds_nothing_out():
     """Only the cold-start strategies name a dimension."""
-    assert Splitter().cold_dimension(SplitSpec(strategy="random_holdout")) is None
+    assert (
+        Splitter().cold_dimension(SplitSpec(strategy="random_holdout", ratio=0.1))
+        is None
+    )
 
 
 @pytest.mark.parametrize("ratio", [0.0, 1.0, 1.5])

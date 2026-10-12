@@ -129,17 +129,11 @@ class RSP(TopKMetric):
         # Compute total interactions across all users
         total_interactions = self.user_interactions.sum()
 
-        if total_interactions == 0:
-            return {self.name: 0.0}
-
         # What was actually on offer, counted rather than estimated.
         denominator_counts = self.cluster_available
 
-        # Valid clusters for computation
-        valid_mask = denominator_counts > 0
-
-        if not valid_mask.any():
-            return {self.name: 0.0}
+        # Valid clusters for computation: none when no user was scored
+        valid_mask = (denominator_counts > 0) & (total_interactions > 0)
 
         # Compute probabilities per cluster
         probs = torch.zeros_like(self.cluster_recommendations)
@@ -148,13 +142,6 @@ class RSP(TopKMetric):
         )
 
         valid_probs = probs[valid_mask]
-
-        if valid_probs.numel() <= 1:
-            std_prob = 0.0
-            mean_prob = 1.0
-        else:
-            std_prob = torch.std(valid_probs, unbiased=False).item()
-            mean_prob = torch.mean(valid_probs).item()
 
         results = {}
 
@@ -166,10 +153,13 @@ class RSP(TopKMetric):
             else:
                 results[key] = float("nan")
 
-        # Aggregate Score
-        if mean_prob == 0:
-            results[self.name] = 0.0
+        # Aggregate Score. A cluster with nothing on offer has no rate; with
+        # fewer than two rates there is nothing to compare, and with nothing
+        # recommended std over mean is 0/0: the metric is undefined there.
+        if valid_probs.numel() < 2 or torch.mean(valid_probs) == 0:
+            results[self.name] = float("nan")
         else:
-            results[self.name] = std_prob / mean_prob
+            std_prob = torch.std(valid_probs, unbiased=False).item()
+            results[self.name] = std_prob / torch.mean(valid_probs).item()
 
         return results

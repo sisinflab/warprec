@@ -126,6 +126,8 @@ $$
 
 where $P(R@K \mid g_a, y{=}1)$ is the probability that a relevant item from group $g_a$ appears in the top-K recommendations.
 
+Only the groups with a relevant item in the test set have a probability. The metric is undefined, and reported as `NaN`, when fewer than two groups have one or when no relevant item is recommended; the per-group values (`REO_IC1`, ...) are still reported, `NaN` for a group without a relevant item.
+
 !!! note
 
     This metric requires the user to provide clustering information.
@@ -147,6 +149,8 @@ $$
 $$
 
 where $P(R@K \mid g_a)$ is the probability that an item from group $g_a$ is recommended in top-K.
+
+Only the groups with an item on offer to the users have a probability. The metric is undefined, and reported as `NaN`, when fewer than two groups have one or when nothing is recommended; the per-group values (`RSP_IC1`, ...) are still reported, `NaN` for a group with nothing on offer.
 
 !!! note
 

@@ -10,12 +10,15 @@ from typing import Any, Dict, Tuple
 
 import numpy as np
 import pandas as pd
+import pytest
 import yaml
+from pydantic import ValidationError
 
 from warprec.common.initialize import initialize_datasets
 from warprec.data.reader import ReaderFactory
 from warprec.utils.callback import WarpRecCallback
 from warprec.utils.config.config import load_train_configuration
+from warprec.utils.config.reader_configuration import ClusteringInformationReading
 
 N_USERS, N_ITEMS = 12, 20
 
@@ -143,3 +146,48 @@ def test_pre_split_folds_are_loaded_as_train_and_validation_pairs(tmp_path: Path
     for fold, dataset in enumerate(fold_datasets):
         assert dataset.train_set.get_sparse().nnz == int((fold_of != fold).sum())
         assert dataset.eval_set.get_sparse().nnz > 0
+
+
+def test_one_cluster_file_alone_is_read(tmp_path: Path):
+    """Either cluster file may be given without the other."""
+    data = tmp_path / "data.tsv"
+    transactions(3).to_csv(data, sep="\t", index=False)
+    pd.DataFrame(
+        {"user_id": range(N_USERS), "cluster": [u % 2 + 1 for u in range(N_USERS)]}
+    ).to_csv(tmp_path / "users.tsv", sep="\t", index=False)
+    pd.DataFrame(
+        {"item_id": range(N_ITEMS), "cluster": [i % 3 + 1 for i in range(N_ITEMS)]}
+    ).to_csv(tmp_path / "items.tsv", sep="\t", index=False)
+    splitter = {"test_splitting": {"strategy": "temporal_holdout", "ratio": 0.2}}
+
+    only_users, _, _ = build(
+        tmp_path,
+        {
+            "loading_strategy": "dataset",
+            "local_path": str(data),
+            "clustering": {"user_local_path": str(tmp_path / "users.tsv")},
+        },
+        splitter=splitter,
+    )
+    only_items, _, _ = build(
+        tmp_path,
+        {
+            "loading_strategy": "dataset",
+            "local_path": str(data),
+            "clustering": {"item_local_path": str(tmp_path / "items.tsv")},
+        },
+        splitter=splitter,
+    )
+
+    assert only_users.user_cluster is not None
+    assert only_users.item_cluster is None
+    assert len(set(only_users.get_user_cluster().tolist())) == 2
+    assert only_items.user_cluster is None
+    assert only_items.item_cluster is not None
+    assert len(set(only_items.get_item_cluster()[:-1].tolist())) == 3
+
+
+def test_a_clustering_section_naming_no_file_is_refused():
+    """A clustering section with neither file fails when it is loaded."""
+    with pytest.raises(ValidationError, match="names no cluster file"):
+        ClusteringInformationReading(user_sep=",")

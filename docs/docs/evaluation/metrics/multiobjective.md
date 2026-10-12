@@ -6,6 +6,8 @@
 
     For class signatures and source code, see the [Multiobjective Metrics API Reference](../../api-reference/metrics/multiobjective.md).
 
+Both metrics accept any registered Top-K metric as a sub-metric, user-averaged (e.g., `Precision`, `nDCG`) or global (e.g., `ItemCoverage`, `Gini`). A global sub-metric gives one score that every user shares: the result is computed per user, and averaged over users like any user-averaged metric, when at least one sub-metric is user-averaged, and is a single number when all of them are global. A metric that reports several values and none under its own name, such as the `BiasDisparity` family with one value per cluster pair, has no single score to combine and is refused when the results are computed.
+
 ## EucDistance
 
 **Euclidean Distance (EucDistance@K).** Computes the **Euclidean Distance** between the model's performance and an Utopia Point (ideal performance). A lower value indicates the model is closer to the desired objectives.

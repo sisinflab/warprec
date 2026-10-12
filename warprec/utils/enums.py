@@ -61,6 +61,27 @@ class SplittingStrategies(str, Enum):
     ITEM_COLD_START = "item_cold_start"
     USER_COLD_START = "user_cold_start"
 
+    def required_parameters(self) -> tuple:
+        """The parameters the strategy reads and has no default for.
+
+        Both the configuration and a split built from Python check against this,
+        so a strategy missing its parameter fails when it is described rather
+        than when it runs.
+
+        Returns:
+            tuple: The names of the required parameters.
+        """
+        return {
+            "temporal_holdout": ("ratio",),
+            "temporal_leave_k_out": ("k",),
+            "timestamp_slicing": ("timestamp",),
+            "random_holdout": ("ratio",),
+            "random_leave_k_out": ("k",),
+            "k_fold_cross_validation": ("folds",),
+            "item_cold_start": ("ratio",),
+            "user_cold_start": ("ratio",),
+        }[self.value]
+
 
 class ReadingMethods(str, Enum):
     """Represents the types of reding strategies supported.

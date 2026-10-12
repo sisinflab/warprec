@@ -2,7 +2,7 @@
 
 The **Filtering Configuration** module defines the preprocessing strategies applied to the dataset
 *before* the splitting phase. Filtering runs only with `reader.loading_strategy: dataset`; data read
-already split (`loading_strategy: split`) is not filtered, and the section is ignored there.
+already split (`loading_strategy: split`) is not filtered: the section is ignored there, and loading the configuration logs a warning saying so.
 Filtering is a fundamental step when the dataset contains redundant or low-quality interactions,
 or when its size exceeds the available computational resources.
 
@@ -27,7 +27,7 @@ filtering:
 !!! important
     - Strategies are executed **top to bottom** in the exact order they are listed.
     - A strategy can appear only once: if a name is repeated, the YAML loader silently keeps its last parameters, at the position of its first occurrence.
-    - An unknown strategy name, or a missing or invalid required parameter, raises when the configuration is loaded. A key the strategy does not take is ignored.
+    - An unknown strategy name, a missing or invalid required parameter, or a key the strategy does not take raises when the configuration is loaded; the message names the strategy and lists the parameters it takes.
     - The rating-based strategies also work with `rating_type: implicit`: the rating column is still read, and the 1s are stored only when the dataset is built, after filtering.
 
 ## Supported Filtering Strategies

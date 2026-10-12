@@ -9,7 +9,7 @@ It provides flexible control over ranking cutoffs, sampling strategies, statisti
 ## Available Keywords
 
 - **top_k**: Cutoff values used to compute ranking metrics. Can be a single integer or a list.
-- **metrics**: List of evaluation metrics to compute, e.g., `nDCG`, `Precision`, `Recall`, `HitRate`.
+- **metrics**: List of evaluation metrics to compute, e.g., `nDCG`, `Precision`, `Recall`, `HitRate`. Names are matched against the registered metrics regardless of case, including those registered by `general.custom_modules`; an unknown name stops the run when the configuration loads, with the closest registered names.
 - **complex_metrics** List of metrics and their parameters. Check the metrics documentation for more information.
 - **validation_metric**: Metric used for model validation during training. Defaults to `nDCG@10`.
 - **batch_size**: Batch size used during evaluation. Defaults to `1024`.

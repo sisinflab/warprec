@@ -73,8 +73,8 @@ This is achieved through the `split` nested configuration block. To enable this 
 1. Set `loading_strategy` to `split`.
 2. Provide the following options:
 
-- **local_path**: Directory containing all split files. All splits must be located in the same directory.
-- **azure_blob_prefix**: Prefix path in the Azure Blob Storage where split files are located.
+- **local_path**: Directory containing all split files. All splits must be located in the same directory. Mandatory when `reading_method` is `local`.
+- **azure_blob_prefix**: Prefix path in the Azure Blob Storage where split files are located. Mandatory when `reading_method` is `azure_blob`.
 - **ext**: Extension of the split files. Defaults to `.tsv`.
 - **sep**: Column separator used by the split files. Defaults to `'\t'`.
 - **header**: Whether to treat the first row of the split files as headers. Defaults to `True`.
@@ -130,7 +130,7 @@ reader:
 Both files are required: the triples alone do not say which item any entity stands for. The format of each is described in [Reading a Knowledge Graph](../data-management/reader.md#reading-a-knowledge-graph).
 
 !!! important
-    Configuring a knowledge-aware model without `reader.knowledge` terminates the experiment, in the same way a content-based model without `reader.side` does: the training and swarm pipelines stop during configuration validation, the design, evaluation and estimate pipelines when the model is built.
+    Configuring a knowledge-aware model without `reader.knowledge` terminates the experiment, in the same way a content-based model without `reader.side` does: every pipeline stops during configuration validation.
 
 ## Multimodal Feature Reading
 
@@ -167,7 +167,7 @@ Each entry accepts:
     A dense array carries no identifiers of its own, so nothing in the file says which item any row belongs to. A matrix offset by even one row against the catalogue trains without complaint and scores nonsense, which is why the row order must be named rather than assumed. A `tabular` or `parquet` file carries the identifiers in its first column and needs no separate file.
 
 !!! important
-    Configuring a multimodal model without `reader.multimodal` terminates the experiment, as does asking a model for a modality this section does not define: the training and swarm pipelines stop during configuration validation, the design, evaluation and estimate pipelines when the model is built.
+    Configuring a multimodal model without `reader.multimodal` terminates the experiment, as does asking a model for a modality this section does not define: every pipeline stops during configuration validation.
 
 ## Clustering Information Reading
 
@@ -184,6 +184,8 @@ This is configured under the `clustering` nested section:
 - **item_header**: Whether the item clustering file contains a header. Defaults to `True`.
 - **user_file_format**: The format of the user clustering file. Supported values are `tabular` and `parquet`.
 - **item_file_format**: The format of the item clustering file. Supported values are `tabular` and `parquet`.
+
+Either file may be given without the other: the side that has none is treated as a single cluster. A `clustering` section that names neither file is refused when the configuration is loaded.
 
 ## Labels
 

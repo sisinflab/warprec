@@ -82,8 +82,8 @@ class AzureBlobReader(Reader):
     def read_tabular(
         self,
         blob_name: str,
-        column_names: Optional[List[str]],
-        dtypes: Optional[Dict[str, str]],
+        column_names: Optional[List[str]] = None,
+        dtypes: Optional[Dict[str, str]] = None,
         sep: str = "\t",
         header: bool = True,
         *args: Any,
@@ -143,8 +143,16 @@ class AzureBlobReader(Reader):
 
         Returns:
             np.ndarray: The array, two-dimensional and float32.
+
+        Raises:
+            FileNotFoundError: If the blob does not exist.
         """
         content = self._download_blob_content(azure_blob_name, as_bytes=True)
+        if content is None:
+            raise FileNotFoundError(
+                f"The feature blob '{azure_blob_name}' does not exist in container "
+                f"'{self.container_name}'."
+            )
         stream = BytesIO(content)  # type: ignore[arg-type]
 
         return self._process_array(np.load(stream, allow_pickle=False))

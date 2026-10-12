@@ -14,7 +14,7 @@ from warprec.utils.registry import (
     lr_scheduler_registry,
     optimizer_registry,
 )
-from warprec.utils.config.common import _scientific_notation_conversion
+from warprec.utils.config.common import _scientific_notation_conversion, check_seed
 from warprec.utils.logger import logger
 
 # Accepted field formats for model parameters
@@ -62,8 +62,9 @@ class Properties(BaseModel):
             - mean: The mean of the iterations of the best folds.
             - min: The min of the iterations of the best folds.
             - max: The max of the iterations of the best folds.
-        seed (Optional[int]): The seed to use during optimization.
-            This parameter will make the experiment reproducible.
+        seed (int): The seed to use during optimization.
+            This parameter will make the experiment reproducible. An integer
+            from 0 to 2**32 - 1; null is refused.
         time_attr (Optional[str]): The measure of time that will be used
             by the scheduler.
         max_t (Optional[int]): Max time unit given to each trial.
@@ -87,7 +88,7 @@ class Properties(BaseModel):
 
     mode: Optional[str] = "max"
     desired_training_it: Optional[str] = "median"
-    seed: Optional[int] = 42
+    seed: int = 42
     time_attr: Optional[str] = None
     max_t: Optional[int] = None
     grace_period: Optional[int] = None
@@ -118,6 +119,23 @@ class Properties(BaseModel):
                 "Desired_training_it should be either: median, mean, min or max."
             )
         return v.lower()
+
+    @field_validator("seed", mode="before")
+    @classmethod
+    def check_seed(cls, v: Any) -> Any:
+        """Refuse a seed the model and the search cannot be seeded with.
+
+        Args:
+            v (Any): The configured value.
+
+        Returns:
+            Any: The value, unchanged.
+        """
+        return check_seed(
+            v,
+            "optimization.properties.seed",
+            "the model's weights, its training batches and the search are drawn",
+        )
 
     @field_validator("n_startup_trials")
     @classmethod
@@ -574,6 +592,21 @@ class RecomModel(BaseModel, ABC):
 
         # Basic controls
         self.validate_model(_name)
+
+        # A key the model does not declare would reach no hyperparameter. In
+        # cross-validation the fold is added to the parameters, so it is let by.
+        unknown = sorted(set(self.model_extra or {}) - {"fold"})
+        if unknown:
+            accepted = sorted(
+                set(self.__class__.model_fields)
+                - {"meta", "optimization", "early_stopping"}
+            )
+            raise ValueError(
+                f"The model {_name} has no hyperparameter "
+                f"{', '.join(repr(key) for key in unknown)}. Remove it, or check "
+                f"its spelling: the hyperparameters {_name} takes are {accepted}, "
+                "besides 'meta', 'optimization' and 'early_stopping'."
+            )
 
         # General parameters control
         updated_values = self.model_dump(

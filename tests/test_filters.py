@@ -5,13 +5,17 @@ the output is a subset of the input, and its columns are untouched. On top of
 that each filter has to enforce the condition it is named after.
 """
 
+from pathlib import Path
 from typing import Set, Tuple
 
 import narwhals as nw
 import numpy as np
 import pandas as pd
 import pytest
+from pydantic import ValidationError
 
+from warprec.utils.config.common import Labels
+from warprec.utils.config.config import DesignConfiguration
 from warprec.utils.registry import filter_registry
 
 ALL_FILTERS = {
@@ -172,3 +176,42 @@ def test_drop_removes_exactly_the_named_ids(
 
     assert not set(out[column]) & {0, 1}
     assert set(out[column]) == set(transactions[column]) - {0, 1}
+
+
+@pytest.mark.parametrize("name", sorted(ALL_FILTERS))
+def test_a_key_the_filter_does_not_take_is_refused(name: str):
+    """A misspelled parameter raises, naming it, instead of being ignored."""
+    with pytest.raises(ValueError, match="'min_interaction'"):
+        filter_registry.get(name, **ALL_FILTERS[name], min_interaction=3)
+
+
+def test_the_labels_are_accepted_by_every_filter():
+    """The column labels the configuration hands every filter are not refused."""
+    labels = Labels(context_labels=["daytime"]).model_dump()
+    for name, params in ALL_FILTERS.items():
+        filter_registry.get(name, **params, **labels)
+
+
+def test_an_unknown_filter_key_is_refused_at_load(tmp_path: Path):
+    """The configuration names the filter and lists the parameters it takes."""
+    data = tmp_path / "data.tsv"
+    pd.DataFrame({"user_id": [0], "item_id": [0], "rating": [1.0]}).to_csv(
+        data, sep="\t", index=False
+    )
+
+    with pytest.raises(ValidationError, match="UserMin") as error:
+        DesignConfiguration(
+            reader={
+                "loading_strategy": "dataset",
+                "data_type": "transaction",
+                "reading_method": "local",
+                "local_path": str(data),
+                "rating_type": "implicit",
+            },
+            filtering={"UserMin": {"min_interaction": 3, "min_interactions": 3}},
+            models={"Pop": {}},
+            evaluation={"top_k": [5], "metrics": ["nDCG"]},
+        )
+
+    assert "'min_interaction'" in str(error.value)
+    assert "min_interactions" in str(error.value)

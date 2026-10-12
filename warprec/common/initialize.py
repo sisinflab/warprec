@@ -16,8 +16,34 @@ from warprec.utils.config import (
     EvalConfiguration,
 )
 from warprec.utils.callback import WarpRecCallback
+from warprec.utils.enums import ReadingMethods
 from warprec.utils.registry import model_registry
 from warprec.utils.logger import logger
+
+
+def _location(
+    config: Union[TrainConfiguration, DesignConfiguration, EvalConfiguration],
+    local_path: Optional[str],
+    azure_blob: Optional[str],
+) -> Optional[str]:
+    """Pick the location the configured reader reads a file from.
+
+    Every reader takes the location as its first argument, a path for the
+    local reader and a blob name (or prefix) for the Azure one, so the
+    configuration's two keys are resolved here rather than passed by name.
+
+    Args:
+        config (Union[TrainConfiguration, DesignConfiguration, EvalConfiguration]):
+            The configuration, for its reading method.
+        local_path (Optional[str]): The location on the local filesystem.
+        azure_blob (Optional[str]): The location in the Azure container.
+
+    Returns:
+        Optional[str]: The location the reader reads.
+    """
+    if config.reader.reading_method == ReadingMethods.AZURE_BLOB:
+        return azure_blob
+    return local_path
 
 
 def _read_modality(
@@ -50,12 +76,10 @@ def _read_modality(
     match modality.file_format:
         case "numpy":
             features = reader.read_array(
-                local_path=modality.local_path,
-                azure_blob_name=modality.azure_blob_name,
+                _location(config, modality.local_path, modality.azure_blob_name)
             )
             order = reader.read_tabular(
-                local_path=modality.item_path,
-                azure_blob_name=modality.item_azure_blob_name,
+                _location(config, modality.item_path, modality.item_azure_blob_name),
                 column_names=[item_label],
                 dtypes=item_dtypes,
                 sep=modality.sep,
@@ -63,19 +87,16 @@ def _read_modality(
             )
             items = order.select(item_label).to_numpy().flatten().tolist()
         case "tabular" | "parquet":
+            location = _location(config, modality.local_path, modality.azure_blob_name)
             frame = (
                 reader.read_tabular(
-                    local_path=modality.local_path,
-                    azure_blob_name=modality.azure_blob_name,
+                    location,
                     dtypes=item_dtypes,
                     sep=modality.sep,
                     header=modality.header,
                 )
                 if modality.file_format == "tabular"
-                else reader.read_parquet(
-                    local_path=modality.local_path,
-                    azure_blob_name=modality.azure_blob_name,
-                )
+                else reader.read_parquet(location)
             )
 
             # The item column comes first and everything after it is a feature,
@@ -137,18 +158,21 @@ def initialize_datasets(
     splitter = Splitter()
     if config.reader.loading_strategy == "dataset":
         file_format = config.reader.file_format
+        location = _location(
+            config, config.reader.local_path, config.reader.azure_blob_name
+        )
 
         match file_format:
             case "tabular":
                 data = reader.read_tabular(
-                    **config.reader.model_dump(exclude=["labels", "dtypes"]),  # type: ignore[arg-type]
+                    location,
                     column_names=config.reader.column_names(),
                     dtypes=config.reader.column_dtype(),
+                    sep=config.reader.sep,
+                    header=config.reader.header,
                 )
             case "parquet":
-                data = reader.read_parquet(
-                    **config.reader.model_dump(exclude=["labels", "dtypes"]),  # type: ignore[arg-type]
-                )
+                data = reader.read_parquet(location)
             case _:
                 raise ValueError(f"File format '{file_format}'not supported.")
         data = callback.on_data_reading(data)
@@ -187,19 +211,25 @@ def initialize_datasets(
 
     elif config.reader.loading_strategy == "split":
         if config.reader.data_type == "transaction":
-            file_format = config.reader.split.file_format
+            split = config.reader.split
+            file_format = split.file_format
+            location = _location(config, split.local_path, split.azure_blob_prefix)
 
             match file_format:
                 case "tabular":
                     train_data, val_data, test_data = reader.read_tabular_split(
-                        **config.reader.split.model_dump(),
+                        location,
                         column_names=config.reader.column_names(),
                         dtypes=config.reader.column_dtype(),
+                        sep=split.sep,
+                        ext=split.ext,
+                        header=split.header,
                     )
                 case "parquet":
                     train_data, val_data, test_data = reader.read_parquet_split(
-                        **config.reader.split.model_dump(),
+                        location,
                         column_names=config.reader.column_names(),
+                        ext=split.ext,
                     )
                 case _:
                     raise ValueError(f"File format '{file_format}'not supported.")
@@ -250,7 +280,9 @@ def initialize_datasets(
 
     # Side information reading
     if config.reader.side:
-        side_format = config.reader.side.file_format
+        side = config.reader.side
+        side_format = side.file_format
+        location = _location(config, side.local_path, side.azure_blob_name)
 
         # The item column has to be read with the same dtype as the interactions,
         # otherwise the join that attaches the attributes matches nothing.
@@ -261,12 +293,15 @@ def initialize_datasets(
         match side_format:
             case "tabular":
                 side_data = reader.read_tabular(
+                    location,
+                    column_names=side.column_names,
                     dtypes=side_dtypes,
-                    **config.reader.side.model_dump(),
+                    sep=side.sep,
+                    header=side.header,
                 )
             case "parquet":
                 side_data = reader.read_parquet(
-                    **config.reader.side.model_dump(),
+                    location, column_names=side.column_names
                 )
             case _:
                 raise ValueError(f"File format '{side_format}' not supported.")
@@ -282,8 +317,7 @@ def initialize_datasets(
             )
 
         knowledge_data = reader.read_tabular(
-            local_path=knowledge.local_path,
-            azure_blob_name=knowledge.azure_blob_name,
+            _location(config, knowledge.local_path, knowledge.azure_blob_name),
             column_names=knowledge.column_names,
             sep=knowledge.sep,
             header=knowledge.header,
@@ -292,8 +326,7 @@ def initialize_datasets(
         # The item column has to be read as the interactions read it, or the
         # alignment matches nothing and every item silently loses its facts.
         knowledge_links = reader.read_tabular(
-            local_path=knowledge.link_path,
-            azure_blob_name=knowledge.link_azure_blob_name,
+            _location(config, knowledge.link_path, knowledge.link_azure_blob_name),
             column_names=knowledge.link_column_names,
             dtypes={knowledge.link_column_names[0]: config.reader.dtypes.item_id_type},
             sep=knowledge.sep,
@@ -350,8 +383,7 @@ def initialize_datasets(
             match file_format:
                 case "tabular":
                     cluster_data = reader.read_tabular(
-                        local_path=specific_config["local_path"],
-                        blob_name=specific_config["blob_name"],
+                        specific_config["location"],
                         column_names=column_names,
                         dtypes=dtype_map,
                         sep=specific_config["sep"],
@@ -360,8 +392,7 @@ def initialize_datasets(
 
                 case "parquet":
                     cluster_data = reader.read_parquet(
-                        local_path=specific_config["local_path"],
-                        blob_name=specific_config["blob_name"],
+                        specific_config["location"],
                         column_names=column_names,
                     )
 
@@ -378,8 +409,11 @@ def initialize_datasets(
         user_config = {
             "id_label": config.reader.labels.user_id_label,
             "id_type": config.reader.dtypes.user_id_type,
-            "local_path": config.reader.clustering.user_local_path,
-            "blob_name": config.reader.clustering.user_azure_blob_name,
+            "location": _location(
+                config,
+                config.reader.clustering.user_local_path,
+                config.reader.clustering.user_azure_blob_name,
+            ),
             "file_format": config.reader.clustering.user_file_format,
             "sep": config.reader.clustering.user_sep,
             "header": config.reader.clustering.user_header,
@@ -389,28 +423,33 @@ def initialize_datasets(
         item_config = {
             "id_label": config.reader.labels.item_id_label,
             "id_type": config.reader.dtypes.item_id_type,
-            "local_path": config.reader.clustering.item_local_path,
-            "blob_name": config.reader.clustering.item_azure_blob_name,
+            "location": _location(
+                config,
+                config.reader.clustering.item_local_path,
+                config.reader.clustering.item_azure_blob_name,
+            ),
             "file_format": config.reader.clustering.item_file_format,
             "sep": config.reader.clustering.item_sep,
             "header": config.reader.clustering.item_header,
         }
 
-        # Read user clustering data
-        user_cluster = _read_cluster_data_clean(
-            specific_config=user_config,
-            common_cluster_label=common_cluster_label,
-            common_cluster_type=common_cluster_type,
-            reader=reader,
-        )
+        # Either file may come alone: only the side that names one is read, and
+        # the dataset leaves the other without clusters.
+        if user_config["location"]:
+            user_cluster = _read_cluster_data_clean(
+                specific_config=user_config,
+                common_cluster_label=common_cluster_label,
+                common_cluster_type=common_cluster_type,
+                reader=reader,
+            )
 
-        # Read item clustering data
-        item_cluster = _read_cluster_data_clean(
-            specific_config=item_config,
-            common_cluster_label=common_cluster_label,
-            common_cluster_type=common_cluster_type,
-            reader=reader,
-        )
+        if item_config["location"]:
+            item_cluster = _read_cluster_data_clean(
+                specific_config=item_config,
+                common_cluster_label=common_cluster_label,
+                common_cluster_type=common_cluster_type,
+                reader=reader,
+            )
 
     # Dataset common information
     common_params: Dict[str, Any] = {

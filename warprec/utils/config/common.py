@@ -73,6 +73,33 @@ def check_separator(sep: str) -> str:
     return sep
 
 
+def check_seed(value: Any, key: str, draws: str) -> Any:
+    """Refuse a seed the random generators it reaches cannot be seeded with.
+
+    A null seed used to reach the generator and fail there, mid-run, and numpy,
+    which most draws go through, takes seeds from 0 to 2**32 - 1 only.
+
+    Args:
+        value (Any): The configured seed.
+        key (str): Where the seed is configured, for the message.
+        draws (str): What the seed draws, for the message.
+
+    Returns:
+        Any: The seed, unchanged.
+
+    Raises:
+        ValueError: If the seed is null or out of range.
+    """
+    if value is None:
+        raise ValueError(
+            f"{key} cannot be null: {draws} from it. Leave the key out to use the "
+            "default, 42, or give an integer from 0 to 2**32 - 1."
+        )
+    if isinstance(value, int) and not 0 <= value < 2**32:
+        raise ValueError(f"{key} must be an integer from 0 to 2**32 - 1, got {value}.")
+    return value
+
+
 def _convert_to_list(value: Any) -> list:
     """Convert the input value to a list if it is not already a list.
 
