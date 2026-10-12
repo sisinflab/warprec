@@ -91,6 +91,7 @@ class AzureBlobWriter(Writer):
         rating_label: str = "rating",
         reranker: Optional[Any] = None,
         mask_seen: str = "pair",
+        seed: int = 42,
     ) -> None:
         """Uploads recommendations to Azure Blob Storage in a streaming fashion."""
         self._refuse_contextual_recommendations(model)
@@ -103,7 +104,7 @@ class AzureBlobWriter(Writer):
 
         # Get the generator that yields batches of recommendation rows
         batch_generator = self._generate_recommendation_batches(
-            model, dataset, k, reranker, mask_seen
+            model, dataset, k, reranker, mask_seen, seed
         )
 
         def csv_batch_generator() -> Generator[bytes, None, None]:

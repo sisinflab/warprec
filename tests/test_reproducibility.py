@@ -229,11 +229,10 @@ def test_the_ranking_breaks_ties_by_chance_not_by_item_id():
     assert not torch.equal(indices, positional)
     assert set(torch.unique(indices).tolist()) != {0, 1, 2, 3, 4}
 
-    # The shuffle is drawn once per call, so the batch shares it. What matters is
-    # that which items it lands on owes nothing to their position.
+    # Every user is drawn on their own, so across the batch the picks spread
+    # over the catalogue rather than gathering at the low ids.
     picked = sorted(torch.unique(indices).tolist())
-    assert len(picked) == 5, "the shuffle should be one permutation for the batch"
-    assert max(picked) > 5, "the tie break stayed at the low ids"
+    assert len(picked) > 40, "the users of the batch shared one draw"
 
 
 def test_the_tie_break_follows_the_seed():

@@ -169,7 +169,7 @@ The **properties** subsection provides additional parameters to the optimization
 
 - **mode**: Whether to maximize or minimize the validation metric. Accepted values: `min` / `max`. Defaults to `max`.
 - **desired_training_it**: Defines the number of iterations for final training after cross-validation. Strategies: `median`, `mean`, `min`, `max`. Defaults to `median`.
-- **seed**: Random seed for reproducibility. Defaults to `42`.
+- **seed**: Random seed for reproducibility. It seeds the model's weight initialisation and, for iterative models, the shuffle order and the negative samples of the training dataloader, so two runs at one seed train on the same batches and two seeds on different ones. Defaults to `42`.
 - **time_attr**: Attribute used to measure time in the scheduler. Used by the `asha`, `bohb` and `median` schedulers, all of which fall back to `completed_epochs`, the number of training epochs a trial has completed, when it is not provided. Unlike `training_iteration`, `completed_epochs` keeps counting when a paused run is resumed.
 - **max_t**: Maximum time units per trial. Required by the `asha` and `bohb` schedulers.
 - **grace_period**: Minimum time units per trial. Required by the `asha` and `median` schedulers, and ignored by `bohb`, which has no grace period.

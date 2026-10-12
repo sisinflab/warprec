@@ -36,6 +36,7 @@ def build_evaluator(
         feature_lookup=dataset.get_feature_matrix(),
         user_cluster=dataset.get_user_cluster(),
         item_cluster=dataset.get_item_cluster(),
+        seed=evaluation.seed,
         mask_seen=evaluation.mask_seen,
         candidates=evaluation.candidates,
         reranker=reranker,

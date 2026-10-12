@@ -88,7 +88,7 @@ def test_restricting_to_candidates_leaves_only_those_items():
 
 
 def test_ties_are_broken_by_chance_rather_than_by_item_id():
-    """`torch.topk` settles equal scores by position, which is not neutral.
+    """`torch.topk` makes no promise about equal scores, and its choice is not neutral.
 
     A model that scores a whole population alike would otherwise always return
     the same items, which reads as a systematic preference the model does not

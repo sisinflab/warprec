@@ -179,12 +179,14 @@ def objective_function(config: dict) -> None:  # pylint: disable = too-many-loca
                 num_workers=num_workers,
                 pin_memory=pin_memory,
                 persistent_workers=persistent_workers,
+                seed=model.seed,
             )
             eval_dataloader = retrieve_evaluation_dataloader(
                 dataset=dataset,
                 model=model,
                 strategy=strategy,
                 num_negatives=evaluation.num_negatives,
+                seed=evaluation.seed,
                 negative_sampling=evaluation.negative_sampling,
                 neg_alpha=evaluation.neg_alpha,
                 **evaluation_dataloader_kwargs,
@@ -252,6 +254,7 @@ def objective_function(config: dict) -> None:  # pylint: disable = too-many-loca
                 model=model,
                 strategy=strategy,
                 num_negatives=evaluation.num_negatives,
+                seed=evaluation.seed,
                 negative_sampling=evaluation.negative_sampling,
                 neg_alpha=evaluation.neg_alpha,
                 **evaluation_dataloader_kwargs,

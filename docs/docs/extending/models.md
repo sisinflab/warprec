@@ -242,6 +242,8 @@ def get_dataloader(
 
     In this example we use a built-in method `get_contrastive_dataloader` from the Interactions class. This method generates batches of (user, positive item, negative item) tuples for training for BPR or similar models. In some case you might want to implement your own dataloader.
 
+    Pass `**kwargs` on to the dataloader: WarpRec puts the configured `seed` in them, along with the worker settings, and that seed fixes the shuffle order and the negatives. A dataloader of your own should honour it the same way.
+
 **2. `forward`**: Defines the forward pass of the model. The input and output can differ based on the model.
 
 ```python

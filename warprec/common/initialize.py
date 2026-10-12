@@ -541,6 +541,8 @@ def dataset_preparation(
                 dataset.get_sampled_evaluation_dataloader(
                     num_negatives=config.evaluation.num_negatives,
                     seed=config.evaluation.seed,
+                    negative_sampling=config.evaluation.negative_sampling,
+                    neg_alpha=config.evaluation.neg_alpha,
                 )
 
         # Initialize the contextual evaluation structures
@@ -551,6 +553,8 @@ def dataset_preparation(
                 dataset.get_sampled_contextual_evaluation_dataloader(
                     num_negatives=config.evaluation.num_negatives,
                     seed=config.evaluation.seed,
+                    negative_sampling=config.evaluation.negative_sampling,
+                    neg_alpha=config.evaluation.neg_alpha,
                 )
 
     logger.msg("Preparing main dataset inner structures for evaluation.")

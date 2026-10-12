@@ -184,3 +184,28 @@ def test_a_validation_set_only_asks_about_what_its_train_set_knows(
         validation_frame = fold_validation.to_native()
         assert set(validation_frame.item_id) <= set(train_frame.item_id)
         assert set(validation_frame.user_id) <= set(train_frame.user_id)
+
+
+@pytest.mark.parametrize(
+    "spec",
+    [
+        {"strategy": "random_holdout", "ratio": 0.2, "seed": 7},
+        {"strategy": "random_leave_k_out", "k": 2, "seed": 7},
+    ],
+)
+def test_a_random_split_leaves_numpys_global_stream_alone(
+    transactions: pd.DataFrame, spec: dict
+):
+    """A seeded split draws from its own generator, not from np.random's.
+
+    Reseeding the global stream would silently reset whatever a user's own code
+    draws from it afterwards.
+    """
+    np.random.seed(123)
+    expected = np.random.random(5)
+
+    np.random.seed(123)
+    split(transactions, **spec)
+    after = np.random.random(5)
+
+    np.testing.assert_array_equal(after, expected)

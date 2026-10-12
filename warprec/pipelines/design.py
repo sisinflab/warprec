@@ -126,6 +126,7 @@ def design_pipeline(path: str):
             model=model,
             strategy=config.evaluation.strategy,
             num_negatives=config.evaluation.num_negatives,
+            seed=config.evaluation.seed,
             negative_sampling=config.evaluation.negative_sampling,
             neg_alpha=config.evaluation.neg_alpha,
             **evaluation_dataloader_kwargs,
@@ -139,6 +140,7 @@ def design_pipeline(path: str):
                 num_workers=num_workers,
                 pin_memory=pin_memory,
                 persistent_workers=persistent_workers,
+                seed=model.seed,
             )
 
             # Standard training loop

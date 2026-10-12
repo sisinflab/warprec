@@ -22,7 +22,7 @@ It provides flexible control over ranking cutoffs, sampling strategies, statisti
 - **mask_seen**: Which already-seen items are excluded from the ranking, under the `full` strategy: `auto`, `context`, `pair` or `none`. Defaults to `auto`, which excludes items the user has seen **in the same context** when the dataset has contextual columns, and every item the user has seen otherwise. `context` and `pair` force either behaviour and `none` excludes nothing.
 
     This setting also governs the recommendations written to disk, so the list a run reports and the list it writes are filtered by the same rule. A contextual rule is the one exception: a recommendation is produced for a user rather than for a user in a situation, so there is no context to compare a history against and the written list falls back to excluding every item the user has seen. WarpRec says so when it happens.
-- **seed**: Random seed used for reproducibility in sampling. Defaults to `42`.
+- **seed**: Random seed of the evaluation. It draws the negatives of the `sampled` strategy and breaks ties between equally scored items in the ranking, so two runs at one seed agree and a model that ties many items can be read across several seeds. The recommendations a run writes break ties from it too. An integer from `0` to `2**32 - 1`; `null` is refused. Defaults to `42`.
 - **propensity**: Nested section defining the propensity model the debiased estimators read. See [Debiased Evaluation](../evaluation/debiased.md).
 - **stat_significance**: Nested section defining statistical significance tests.
 - **full_evaluation_on_report**: Whether to perform full evaluation each epoch. Defaults to `False`.
