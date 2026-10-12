@@ -28,7 +28,7 @@ from warprec.utils.config import (
     WarpRecRunConfig,
 )
 from warprec.utils.callback import WarpRecCallback
-from warprec.utils.enums import ReadingMethods, WritingMethods
+from warprec.utils.enums import ReadingMethods, SearchSpace, WritingMethods
 from warprec.utils.registry import model_registry, params_registry, filter_registry
 from warprec.utils.logger import logger
 
@@ -451,6 +451,74 @@ class DesignConfiguration(WarpRecConfiguration):
 
     splitter: SplittingConfig = None
     evaluation: EvaluationConfig
+
+    @model_validator(mode="after")
+    def models_validation(self) -> "DesignConfiguration":
+        """Validate every model, and that each is given single values.
+
+        The design pipeline builds each model once, from the values as written,
+        so a search space would reach the model as a list and fail inside it.
+
+        Returns:
+            DesignConfiguration: The validated configuration.
+        """
+        for model_name, model_data in self.models.items():
+            params = self.validate_model(model_name, model_data)
+
+            # Without a parameter class the type of a value is unknown, so a
+            # list cannot be told apart from a list-valued hyperparameter.
+            if model_name.upper() in params_registry.list_registered():
+                self._check_single_values(model_name, model_data, params)
+        return self
+
+    @staticmethod
+    def _check_single_values(
+        model_name: str, model_data: dict, params: RecomModel
+    ) -> None:
+        """Refuse a hyperparameter written as a search space.
+
+        Validation turns every value into the list of alternatives a search
+        would draw from, so a single value is one with exactly one alternative,
+        written as that alternative rather than wrapped in a list.
+
+        Args:
+            model_name (str): The name the model is configured under.
+            model_data (dict): The parameters as written.
+            params (RecomModel): The same parameters, validated.
+
+        Raises:
+            ValueError: If a hyperparameter is a list of values or a range.
+        """
+        validated = params.model_dump()
+        spaces = [space.value for space in SearchSpace]
+        for field, raw in model_data.items():
+            if field in ("meta", "optimization", "early_stopping"):
+                continue
+            space = validated.get(field)
+            if not isinstance(space, list) or not space:
+                continue
+
+            token = space[0] if isinstance(space[0], str) else None
+            if token is not None and token.lower() not in spaces:
+                token = None
+            alternatives = space[1:] if token is not None else space
+            is_range = token is not None and token.lower() not in (
+                SearchSpace.GRID.value,
+                SearchSpace.CHOICE.value,
+            )
+
+            if (
+                is_range
+                or len(alternatives) != 1
+                or (isinstance(raw, list) and raw != alternatives[0])
+            ):
+                raise ValueError(
+                    f"The design pipeline trains {model_name} once, from single "
+                    f"values, but 'models.{model_name}.{field}' is {raw}, which "
+                    "it reads as a search space. Write the one value to train "
+                    "with, without brackets unless the value is itself a list, or "
+                    "run the train pipeline to search over several."
+                )
 
 
 class EvalConfiguration(WarpRecConfiguration):

@@ -160,3 +160,55 @@ def test_single_values_stay_single_values(
     config = load(pipeline, sections(ratings, {"EASE": {"l2": 10.0}}))
 
     assert config.models == {"EASE": {"l2": 10.0}}
+
+
+NEUMF = {
+    "mf_embedding_size": 8,
+    "mlp_embedding_size": 8,
+    "mlp_hidden_size": [16, 8],
+    "mf_train": True,
+    "mlp_train": True,
+    "dropout": 0.1,
+    "reg_weight": 0.001,
+    "weight_decay": 0.0,
+    "batch_size": 32,
+    "epochs": 1,
+    "learning_rate": 0.001,
+    "neg_samples": 1,
+}
+
+
+@pytest.mark.parametrize(
+    "models, key",
+    [
+        ({"EASE": {"l2": [50, 200]}}, "models.EASE.l2"),
+        ({"EASE": {"l2": [50]}}, "models.EASE.l2"),
+        (
+            {
+                "EASE": {
+                    "l2": ["uniform", 10, 100],
+                    "optimization": {"strategy": "random"},
+                }
+            },
+            "models.EASE.l2",
+        ),
+        (
+            {"NeuMF": {**NEUMF, "mlp_hidden_size": [[16, 8], [32]]}},
+            "models.NeuMF.mlp_hidden_size",
+        ),
+        ({"NeuMF": {**NEUMF, "dropout": [0.1, 0.2]}}, "models.NeuMF.dropout"),
+    ],
+)
+def test_the_design_pipeline_refuses_a_search_space(
+    ratings: Path, models: Dict[str, Any], key: str
+):
+    """A design configuration takes single values, and says which key is not one."""
+    with pytest.raises(ValidationError, match=key):
+        load(DesignConfiguration, sections(ratings, models))
+
+
+def test_the_design_pipeline_takes_a_list_valued_hyperparameter(ratings: Path):
+    """A hyperparameter whose single value is a list, as layer sizes are, is accepted."""
+    config = load(DesignConfiguration, sections(ratings, {"NeuMF": NEUMF}))
+
+    assert config.models["NeuMF"]["mlp_hidden_size"] == [16, 8]

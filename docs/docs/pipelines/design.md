@@ -13,7 +13,7 @@ The Design Pipeline is optimized for **rapid prototyping and architectural valid
 
 ## Constraints
 
-- **No HPO:** Each model must have **single-value hyperparameters** — search spaces (lists, ranges) **are not allowed**.
+- **No HPO:** Each model must have **single-value hyperparameters** — search spaces (lists, ranges) **are not allowed**. A configuration that gives one is refused when it is loaded, with a message naming the key, e.g. `models.EASE.l2`. Write the value without brackets, unless the hyperparameter is itself a list (such as `mlp_hidden_size: [64, 32]`).
 - **No Ray:** Runs entirely in the local process; a Ray cluster is not required.
 - **No Writer:** Results are printed to the console but not persisted to disk. Use the Training Pipeline for persistent results.
 - **Single split:** Uses one train/test split only (no cross-validation).
