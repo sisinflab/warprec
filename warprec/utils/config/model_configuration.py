@@ -575,6 +575,21 @@ class RecomModel(BaseModel, ABC):
         # Basic controls
         self.validate_model(_name)
 
+        # A key the model does not declare would reach no hyperparameter. In
+        # cross-validation the fold is added to the parameters, so it is let by.
+        unknown = sorted(set(self.model_extra or {}) - {"fold"})
+        if unknown:
+            accepted = sorted(
+                set(self.__class__.model_fields)
+                - {"meta", "optimization", "early_stopping"}
+            )
+            raise ValueError(
+                f"The model {_name} has no hyperparameter "
+                f"{', '.join(repr(key) for key in unknown)}. Remove it, or check "
+                f"its spelling: the hyperparameters {_name} takes are {accepted}, "
+                "besides 'meta', 'optimization' and 'early_stopping'."
+            )
+
         # General parameters control
         updated_values = self.model_dump(
             exclude=["meta", "optimization", "early_stopping"]

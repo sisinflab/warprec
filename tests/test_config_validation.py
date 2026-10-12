@@ -212,3 +212,17 @@ def test_the_design_pipeline_takes_a_list_valued_hyperparameter(ratings: Path):
     config = load(DesignConfiguration, sections(ratings, {"NeuMF": NEUMF}))
 
     assert config.models["NeuMF"]["mlp_hidden_size"] == [16, 8]
+
+
+@pytest.mark.parametrize("pipeline", ALL_PIPELINES)
+def test_an_unknown_hyperparameter_is_refused_naming_it(
+    pipeline: Type[WarpRecConfiguration], ratings: Path
+):
+    """A key the model does not take fails at load, listing the ones it does."""
+    config = sections(ratings, {"FM": {**FM, "weight_decay": 0.01}})
+    config["reader"]["labels"] = {"context_labels": ["timestamp"]}
+
+    with pytest.raises(ValidationError, match="'weight_decay'") as error:
+        load(pipeline, config)
+
+    assert "reg_weight" in str(error.value)

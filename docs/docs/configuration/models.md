@@ -352,6 +352,8 @@ models:
         l2: [10, 20, 30, 40, 50, 100, 150, 200]
 ```
 
+Every key under a model, besides `meta`, `optimization` and `early_stopping`, must be one of that model's hyperparameters, listed on its page in the [Recommenders Documentation](../recommenders/index.md). A key the model does not take, such as a misspelled one, is refused when the configuration is loaded, by every pipeline, with the hyperparameters the model does take listed.
+
 An in depth configuration might include a model with more parameters and early stopping:
 
 ```yaml
