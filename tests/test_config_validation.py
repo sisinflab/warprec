@@ -6,12 +6,13 @@ failing later, deep inside the code that reads the value.
 """
 
 from pathlib import Path
-from typing import Any, Dict, Type
+from typing import Any, Dict, List, Type
 
 import pandas as pd
 import pytest
 from pydantic import ValidationError
 
+from warprec.utils.config import config as config_module
 from warprec.utils.config.config import (
     DesignConfiguration,
     EstimateConfiguration,
@@ -226,3 +227,66 @@ def test_an_unknown_hyperparameter_is_refused_naming_it(
         load(pipeline, config)
 
     assert "reg_weight" in str(error.value)
+
+
+def attentions(monkeypatch: pytest.MonkeyPatch) -> List[str]:
+    """Record what the configuration logs as needing the user's attention.
+
+    Args:
+        monkeypatch (pytest.MonkeyPatch): Replaces the logger's method.
+
+    Returns:
+        List[str]: The messages, filled as they are logged.
+    """
+    messages: List[str] = []
+    monkeypatch.setattr(
+        config_module.logger,
+        "attention",
+        lambda message, *a, **k: messages.append(message),
+    )
+    return messages
+
+
+@pytest.mark.parametrize("pipeline", PIPELINES)
+def test_filtering_pre_split_data_is_warned_about(
+    pipeline: Type[WarpRecConfiguration],
+    ratings: Path,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    """Filtering is not applied to split data, and loading says so, without failing."""
+    split = ratings.parent / "split"
+    split.mkdir()
+    (split / "train.tsv").write_text(ratings.read_text())
+    messages = attentions(monkeypatch)
+
+    load(
+        pipeline,
+        sections(
+            ratings,
+            {"Pop": {}},
+            reader={
+                "loading_strategy": "split",
+                "data_type": "transaction",
+                "reading_method": "local",
+                "rating_type": "implicit",
+                "split": {"local_path": str(split)},
+            },
+            filtering={"UserMin": {"min_interactions": 2}},
+        ),
+    )
+
+    assert any("'filtering'" in m and "split" in m for m in messages)
+
+
+def test_filtering_a_dataset_is_not_warned_about(
+    ratings: Path, monkeypatch: pytest.MonkeyPatch
+):
+    """The warning is only for split data, which the filters never see."""
+    messages = attentions(monkeypatch)
+
+    load(
+        DesignConfiguration,
+        sections(ratings, {"Pop": {}}, filtering={"UserMin": {"min_interactions": 2}}),
+    )
+
+    assert not any("'filtering'" in m for m in messages)

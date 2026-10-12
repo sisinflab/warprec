@@ -2,7 +2,7 @@
 
 The **Filtering Configuration** module defines the preprocessing strategies applied to the dataset
 *before* the splitting phase. Filtering runs only with `reader.loading_strategy: dataset`; data read
-already split (`loading_strategy: split`) is not filtered, and the section is ignored there.
+already split (`loading_strategy: split`) is not filtered: the section is ignored there, and loading the configuration logs a warning saying so.
 Filtering is a fundamental step when the dataset contains redundant or low-quality interactions,
 or when its size exceeds the available computational resources.
 

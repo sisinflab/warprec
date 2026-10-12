@@ -148,6 +148,16 @@ class WarpRecConfiguration(BaseModel):
                     "Both storage_account_name and container_name must be provided in Azure configuration."
                 )
 
+        # Data read already split never goes through the filters. Such
+        # configurations ran before, so they are warned about, not refused.
+        if self.filtering and self.reader.loading_strategy == "split":
+            logger.attention(
+                "The 'filtering' section is ignored with 'reader.loading_strategy: "
+                "split': data read already split is not filtered. Filter the data "
+                "before splitting it, or read it whole with 'loading_strategy: "
+                "dataset' to have WarpRec filter and split it."
+            )
+
         # Check if the filters have been set correctly
         if self.filtering is not None:
             labels = self.reader.labels.model_dump()
