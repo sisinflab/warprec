@@ -57,7 +57,7 @@ class BiasDisparityBD(TopKMetric):
 
         # Union of required components
         self._REQUIRED_COMPONENTS = (
-            self.bs_metric._REQUIRED_COMPONENTS | self.br_metric._REQUIRED_COMPONENTS
+            self.bs_metric.components | self.br_metric.components
         )
 
         # Metadata for formatting

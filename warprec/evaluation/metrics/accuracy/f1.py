@@ -69,8 +69,7 @@ class F1(TopKMetric):
         # Update needed blocks to be the union of the blocks
         # of the two metrics
         self._REQUIRED_COMPONENTS = (
-            self.metric_instance_1._REQUIRED_COMPONENTS
-            | self.metric_instance_2._REQUIRED_COMPONENTS
+            self.metric_instance_1.components | self.metric_instance_2.components
         )
 
     def update(self, preds: Tensor, user_indices: Tensor, **kwargs: Any):

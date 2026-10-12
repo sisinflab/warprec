@@ -44,7 +44,7 @@ class AUC(BaseMetric):
         )
 
     def update(self, preds: Tensor, **kwargs: Any):
-        target = kwargs.get("binary_relevance", torch.zeros_like(preds))
+        target = self.block(kwargs, "binary_relevance", preds)
 
         # Compute area and positives
         area, positives = self.compute_area_stats(preds, target, self.num_items)

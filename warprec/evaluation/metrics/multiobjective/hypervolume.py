@@ -78,7 +78,7 @@ class Hypervolume(TopKMetric):
             )
             self.sub_metrics.append(m_inst)
             # Collect and union all required data components from sub-metrics
-            required_blocks |= m_inst._REQUIRED_COMPONENTS
+            required_blocks |= m_inst.components
 
         self._REQUIRED_COMPONENTS = required_blocks
 

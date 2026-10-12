@@ -5,12 +5,23 @@ wrong thing, or failed far from its cause, now either works or says what to do.
 """
 
 import uuid
+from typing import Any, Dict, Optional
 
+import numpy as np
+import pandas as pd
+import pytest
+import torch
+from torch import Tensor
+
+import warprec.evaluation  # noqa: F401  (populates the metric registry)
+from warprec.data.dataset import Dataset
+from warprec.evaluation import Evaluator
+from warprec.evaluation.metrics.base_metric import TopKMetric, UserAverageTopKMetric
 from warprec.recommenders.base_recommender import Recommender
 from warprec.recommenders.trainer.trainer import Trainer
 from warprec.utils.config.model_configuration import INT_FIELD, RecomModel
-from warprec.utils.enums import SearchSpace
-from warprec.utils.registry import model_registry, params_registry
+from warprec.utils.enums import RatingType, SearchSpace
+from warprec.utils.registry import metric_registry, model_registry, params_registry
 
 
 def unique_name(prefix: str) -> str:
@@ -66,3 +77,176 @@ def test_a_parameter_class_named_like_its_model_still_validates():
     params = params_class(embedding_size=[8, 16])
 
     assert params.embedding_size == [SearchSpace.GRID, 8, 16]
+
+
+class _TiedScoreRecommender(Recommender):
+    """Scores with many ties, so the ranking depends on how ties are broken."""
+
+    def __init__(self, params: dict, info: dict, **kwargs: Any):
+        super().__init__(params, info, **kwargs)
+        generator = torch.Generator().manual_seed(3)
+        self.scores = torch.randint(
+            0, 4, (info["n_users"], info["n_items"]), generator=generator
+        ).float()
+
+    def predict(
+        self,
+        user_indices: Tensor,
+        *args: Any,
+        item_indices: Optional[Tensor] = None,
+        **kwargs: Any,
+    ) -> Tensor:
+        """Score the requested users over the catalogue.
+
+        Args:
+            user_indices (Tensor): The batch of user indices.
+            *args (Any): Unused.
+            item_indices (Optional[Tensor]): Unused; the tests rank in full.
+            **kwargs (Any): Unused.
+
+        Returns:
+            Tensor: The score matrix for those users.
+        """
+        return self.scores[user_indices].clone()
+
+    def forward(self, *args: Any, **kwargs: Any):
+        """Unused by the evaluation path."""
+        raise NotImplementedError
+
+
+@pytest.fixture(name="ranking_dataset", scope="module")
+def ranking_dataset_fixture() -> Dataset:
+    """Eight users over forty items, each with two held-out items.
+
+    Returns:
+        Dataset: The dataset under test.
+    """
+    rng = np.random.default_rng(5)
+    train_rows, eval_rows = [], []
+    for user in range(8):
+        seen = rng.choice(40, 8, replace=False)
+        train_rows += [(user, int(item), 5.0) for item in seen[:6]]
+        eval_rows += [(user, int(item), 5.0) for item in seen[6:]]
+    columns = ["user_id", "item_id", "rating"]
+    return Dataset(
+        train_data=pd.DataFrame(train_rows, columns=columns),
+        eval_data=pd.DataFrame(eval_rows, columns=columns),
+        rating_type=RatingType.EXPLICIT,
+        rating_label="rating",
+        batch_size=3,
+    )
+
+
+def evaluate_alone(metric_name: str, dataset: Dataset) -> Dict[str, Any]:
+    """Evaluate one metric at k=5, with no other metric next to it.
+
+    Args:
+        metric_name (str): The registered name of the metric.
+        dataset (Dataset): The dataset to evaluate on.
+
+    Returns:
+        Dict[str, Any]: The results at k=5.
+    """
+    evaluator = Evaluator([metric_name], [5], train_set=dataset.train_set.get_sparse())
+    evaluator.evaluate(
+        model=_TiedScoreRecommender({}, dataset.info()),
+        dataloader=dataset.get_evaluation_dataloader(),
+        strategy="full",
+        dataset=dataset,
+    )
+    return evaluator.compute_results()[5]
+
+
+def test_an_undeclared_user_average_metric_evaluates_alone(ranking_dataset: Dataset):
+    """It is given the blocks it reads, and ranks exactly as the built-ins do."""
+    name = unique_name("MyRecall")
+
+    @metric_registry.register(name)
+    class MyRecall(UserAverageTopKMetric):  # pylint: disable=unused-variable
+        """Recall, written without declaring the blocks it reads."""
+
+        def compute_scores(
+            self, preds: Tensor, target: Tensor, top_k_rel: Tensor, **kwargs: Any
+        ) -> Tensor:
+            """The share of each user's relevant items in the top k.
+
+            Args:
+                preds (Tensor): The prediction tensor.
+                target (Tensor): The binary relevance.
+                top_k_rel (Tensor): The binary relevance of the top k.
+                **kwargs (Any): Unused.
+
+            Returns:
+                Tensor: The recall of each user.
+            """
+            return top_k_rel.sum(dim=1) / target.sum(dim=1).clamp(min=1)
+
+    mine = evaluate_alone(name, ranking_dataset)["MyRecall"]
+    builtin = evaluate_alone("Recall", ranking_dataset)["Recall"]
+
+    torch.testing.assert_close(mine, builtin, equal_nan=True)
+
+
+def test_an_undeclared_metric_reading_the_top_k_evaluates_alone(
+    ranking_dataset: Dataset,
+):
+    """A metric reading the top-k indices straight from the keywords gets them."""
+    name = unique_name("MyCoverage")
+
+    @metric_registry.register(name)
+    class MyCoverage(TopKMetric):  # pylint: disable=unused-variable
+        """Item coverage, written without declaring the blocks it reads."""
+
+        seen: Tensor
+
+        def __init__(self, k: int, num_items: int, **kwargs: Any):
+            super().__init__(k)
+            self.add_state(
+                "seen", default=torch.zeros(num_items + 1), dist_reduce_fx="sum"
+            )
+
+        def update(self, preds: Tensor, **kwargs: Any):
+            """Count the items recommended in this batch.
+
+            Args:
+                preds (Tensor): The prediction tensor.
+                **kwargs (Any): The blocks the evaluator computed.
+            """
+            indices = kwargs[f"top_{self.k}_indices"].flatten()
+            self.seen.index_add_(0, indices, torch.ones_like(indices).float())
+
+        def compute(self) -> Dict[str, float]:
+            """The number of distinct items recommended.
+
+            Returns:
+                Dict[str, float]: The coverage under the metric's name.
+            """
+            return {self.name: float((self.seen > 0).sum())}
+
+    mine = evaluate_alone(name, ranking_dataset)["MyCoverage"]
+    builtin = evaluate_alone("ItemCoverage", ranking_dataset)["ItemCoverage"]
+
+    assert mine == float(builtin)
+
+
+def test_a_metric_updated_without_its_blocks_computes_them():
+    """Called directly with blocks missing or None, a metric derives them."""
+    ground = torch.tensor([[0.0, 4.0, 0.0, 5.0], [3.0, 0.0, 0.0, 0.0]])
+    preds = torch.tensor([[0.1, 0.9, 0.2, 0.3], [0.8, 0.1, 0.2, 0.3]])
+    users = torch.tensor([0, 1])
+
+    absent = metric_registry.get("Recall", k=1, num_users=2)
+    absent.update(preds, user_indices=users, ground=ground)
+    none = metric_registry.get("Recall", k=1, num_users=2)
+    none.update(
+        preds,
+        user_indices=users,
+        ground=ground,
+        binary_relevance=None,
+        valid_users=None,
+        top_1_binary_relevance=None,
+    )
+
+    expected = torch.tensor([0.5, 1.0])
+    torch.testing.assert_close(absent.compute()["Recall"], expected)
+    torch.testing.assert_close(none.compute()["Recall"], expected)

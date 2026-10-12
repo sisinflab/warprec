@@ -40,8 +40,8 @@ class GAUC(UserAverageTopKMetric):
         self.num_items = num_items
 
     def unpack_inputs(self, preds: Tensor, **kwargs: Any) -> Tuple[Tensor, Tensor, Any]:
-        target = kwargs.get("binary_relevance", torch.zeros_like(preds))
-        users = kwargs.get("valid_users", self.valid_users(target))
+        target = self.block(kwargs, "binary_relevance", preds)
+        users = self.block(kwargs, "valid_users", preds)
         return target, users, None
 
     def compute_scores(

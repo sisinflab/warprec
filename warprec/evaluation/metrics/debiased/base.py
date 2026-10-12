@@ -1,6 +1,5 @@
 from typing import Any, Optional, Set, Tuple
 
-import torch
 from torch import Tensor
 
 from warprec.evaluation.metrics.base_metric import UserAverageTopKMetric
@@ -117,12 +116,9 @@ class InversePropensityMetric(UserAverageTopKMetric):
             Tuple[Tensor, Tensor, Tensor]: The target, the valid users and the
                 top-k relevance.
         """
-        target = kwargs.get("binary_relevance", torch.zeros_like(preds))
-        users = kwargs.get("valid_users", self.valid_users(target))
-        top_k_rel = kwargs.get(
-            f"top_{self.k}_binary_relevance",
-            self.top_k_relevance(preds, target, self.k),
-        )
+        target = self.block(kwargs, "binary_relevance", preds)
+        users = self.block(kwargs, "valid_users", preds)
+        top_k_rel = self.block(kwargs, f"top_{self.k}_binary_relevance", preds)
         return target, users, top_k_rel
 
     def top_k_indices(self, preds: Tensor, **kwargs: Any) -> Tensor:
@@ -135,7 +131,4 @@ class InversePropensityMetric(UserAverageTopKMetric):
         Returns:
             Tensor: The top-k indices.
         """
-        indices = kwargs.get(f"top_{self.k}_indices")
-        if indices is None:
-            _, indices = torch.topk(preds, self.k, dim=1)
-        return indices
+        return self.block(kwargs, f"top_{self.k}_indices", preds)
