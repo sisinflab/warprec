@@ -585,10 +585,14 @@ class RecomModel(BaseModel, ABC):
 
             return self
 
-        # Create mapping of {field: typing}
-        field_to_type = {}
-        for field, typing in self.__class__.__annotations__.items():
-            field_to_type[field] = typing
+        # Create mapping of {field: typing}. Pydantic's fields span the class
+        # and every class it derives from, so a parameter class extending a
+        # built-in one keeps the types of the fields it inherits; the class's
+        # own annotations hold only the fields it adds, and none of RecomModel's.
+        field_to_type = {
+            field: info.annotation
+            for field, info in self.__class__.model_fields.items()
+        }
 
         # Basic controls
         self.validate_model(_name)

@@ -23,7 +23,7 @@ from warprec.evaluation.metrics.base_metric import TopKMetric, UserAverageTopKMe
 from warprec.pipelines.eval import _load_or_build_model
 from warprec.recommenders.base_recommender import Recommender
 from warprec.recommenders.trainer.trainer import Trainer
-from warprec.utils.config.model_configuration import INT_FIELD, RecomModel
+from warprec.utils.config.model_configuration import FLOAT_FIELD, INT_FIELD, RecomModel
 from warprec.utils.enums import MetricBlock, RatingType, SearchSpace
 from warprec.utils.helpers import load_custom_modules
 from warprec.utils.registry import metric_registry, model_registry, params_registry
@@ -533,3 +533,58 @@ def test_a_subclass_of_a_model_keeps_its_hyperparameters(ranking_dataset: Datase
     )
 
     assert model.get_params() == {"l2": 10.0}
+
+
+BPR_VALUES: Dict[str, Any] = {
+    "embedding_size": [8, 16],
+    "reg_weight": 0.1,
+    "batch_size": 32,
+    "epochs": 1,
+    "learning_rate": ["uniform", 0.001, 0.01],
+    "optimization": {"strategy": "random"},
+}
+
+
+def register_bpr_variant(params_class: type) -> str:
+    """Register a copy of BPR described by the given parameter class.
+
+    Args:
+        params_class (type): The parameter class to register for it.
+
+    Returns:
+        str: The name both are registered under.
+    """
+    name = unique_name("VariantBPR")
+    model_registry.register(name)(type(name, (model_registry.get_class("BPR"),), {}))
+    params_registry.register(name)(params_class)
+    return name
+
+
+def test_a_parameter_class_extending_a_built_in_one_validates_every_field():
+    """Adding one field used to lose the types of the inherited ones (KeyError)."""
+    builtin = params_registry.get_class("BPR")
+
+    class ExtendedBPRParams(builtin):  # type: ignore[valid-type,misc]
+        """BPR's parameters and one more."""
+
+        dropout: FLOAT_FIELD = 0.0
+
+    register_bpr_variant(ExtendedBPRParams)
+    params = ExtendedBPRParams(**BPR_VALUES, dropout=[0.1, 0.2])
+
+    assert params.embedding_size == ["choice", 8, 16]
+    assert params.learning_rate == ["uniform", 0.001, 0.01]
+    assert params.dropout == ["choice", 0.1, 0.2]
+
+
+def test_a_parameter_class_reusing_a_built_in_one_validates_its_fields():
+    """With no annotations of its own, the class reads its parent's."""
+    builtin = params_registry.get_class("BPR")
+
+    class SameBPRParams(builtin):  # type: ignore[valid-type,misc]
+        """BPR's parameters, unchanged."""
+
+    register_bpr_variant(SameBPRParams)
+    params = SameBPRParams(**BPR_VALUES)
+
+    assert params.learning_rate == ["uniform", 0.001, 0.01]
