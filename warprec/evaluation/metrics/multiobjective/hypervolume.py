@@ -1,6 +1,6 @@
 from typing import Any, List
 import torch
-from torch import Tensor
+from torch import Tensor, nn
 from warprec.evaluation.metrics.base_metric import TopKMetric, BaseMetric
 from warprec.utils.registry import metric_registry
 
@@ -62,7 +62,9 @@ class Hypervolume(TopKMetric):
         )
 
         # Dynamically load the component metrics from the registry
-        self.sub_metrics: List[BaseMetric] = []
+        # A ModuleList rather than a list, so that moving the composite moves its
+        # sub-metrics' states with it. It holds BaseMetric instances only.
+        self.sub_metrics: List[BaseMetric] = nn.ModuleList()  # type: ignore[assignment]
         required_blocks = set()
 
         for m_name in metric_names:
@@ -79,6 +81,17 @@ class Hypervolume(TopKMetric):
             required_blocks |= m_inst._REQUIRED_COMPONENTS
 
         self._REQUIRED_COMPONENTS = required_blocks
+
+    def reset(self) -> None:
+        """Reset the sub-metrics along with the composite.
+
+        torchmetrics resets a metric's own states only, and the composite keeps
+        none: without this its sub-metrics would carry every evaluation that
+        reused the evaluator into the next one.
+        """
+        super().reset()
+        for metric in self.sub_metrics:
+            metric.reset()
 
     def update(self, preds: Tensor, **kwargs: Any):
         """Updates the metric state with the new batch of predictions.

@@ -201,3 +201,152 @@ def test_a_sub_metric_with_several_values_is_refused(
 
     with pytest.raises(ValueError, match=f"{name} cannot combine BiasDisparityBD"):
         evaluator.compute_results()
+
+
+COMPOSITES = [
+    ComplexMetricConfig(
+        name="EucDistance",
+        params={
+            "metric_names": ["Precision", "ItemCoverage"],
+            "utopia_points": [1.0, 5.0],
+        },
+    ),
+    ComplexMetricConfig(
+        name="Hypervolume",
+        params={
+            "metric_names": ["Precision", "ItemCoverage"],
+            "nadir_points": [0.0, 0.0],
+            "higher_is_better": [True, True],
+        },
+    ),
+]
+
+
+class _ReversedScoreRecommender(_FixedScoreRecommender):
+    """The golden scores turned upside down, on whatever device asks for them."""
+
+    def __init__(self, params: dict, info: dict, **kwargs: Any):
+        super().__init__(params, info, **kwargs)
+        self.scores = 1.0 - self.scores
+
+    def predict(
+        self, user_indices: torch.Tensor, *args: Any, **kwargs: Any
+    ) -> torch.Tensor:
+        """Return the reversed scores on the device of the user indices.
+
+        Args:
+            user_indices (torch.Tensor): The batch of user indices.
+            *args (Any): Unused.
+            **kwargs (Any): Unused.
+
+        Returns:
+            torch.Tensor: The score matrix for those users.
+        """
+        return self.scores.to(user_indices.device)[user_indices]
+
+
+def composite_values(
+    evaluator: Evaluator, model: Any, dataset: Dataset, device: str = "cpu"
+) -> Dict[str, torch.Tensor]:
+    """Evaluate one model and keep the composite results, on the CPU.
+
+    Args:
+        evaluator (Evaluator): The evaluator to run.
+        model (Any): The model to evaluate.
+        dataset (Dataset): The dataset to evaluate on.
+        device (str): The device of the evaluation.
+
+    Returns:
+        Dict[str, torch.Tensor]: The composite results by name.
+    """
+    evaluator.evaluate(
+        model=model,
+        dataloader=dataset.get_evaluation_dataloader(),
+        strategy="full",
+        dataset=dataset,
+        device=device,
+    )
+    return {
+        name: torch.as_tensor(value).cpu()
+        for name, value in evaluator.compute_results()[K].items()
+        if name.startswith(("EucDistance", "Hypervolume"))
+    }
+
+
+def new_evaluator(dataset: Dataset) -> Evaluator:
+    """An evaluator holding both composites over Precision and ItemCoverage.
+
+    Args:
+        dataset (Dataset): The dataset to evaluate on.
+
+    Returns:
+        Evaluator: The evaluator.
+    """
+    return Evaluator(
+        [], [K], train_set=dataset.train_set.get_sparse(), complex_metrics=COMPOSITES
+    )
+
+
+def test_a_reused_evaluator_reports_the_last_evaluation_alone(dataset: Dataset):
+    """The pipelines evaluate every epoch and model with one evaluator.
+
+    The sub-metrics used to sit outside what the evaluator resets, so a second
+    evaluation reported a blend of both: here the catalogue coverage of the two
+    rankings together rather than of the second one.
+    """
+    info = dataset.info()
+    reused = new_evaluator(dataset)
+    first = composite_values(reused, _FixedScoreRecommender({}, info), dataset)
+    second = composite_values(reused, _ReversedScoreRecommender({}, info), dataset)
+    again = composite_values(reused, _ReversedScoreRecommender({}, info), dataset)
+    fresh = composite_values(
+        new_evaluator(dataset), _ReversedScoreRecommender({}, info), dataset
+    )
+
+    assert first.keys() == fresh.keys() and len(fresh) == 2
+    for name, value in fresh.items():
+        torch.testing.assert_close(second[name], value, equal_nan=True)
+        torch.testing.assert_close(again[name], value, equal_nan=True)
+
+
+def test_moving_the_metrics_moves_the_sub_metrics(dataset: Dataset):
+    """metrics_to reaches the sub-metrics' states, so they follow the evaluation.
+
+    Checked on the 'meta' device, which every machine has.
+    """
+    evaluator = new_evaluator(dataset)
+
+    evaluator.metrics_to("meta")
+
+    for composite in evaluator.metrics[K]:
+        for sub in composite.sub_metrics:
+            for state in sub._defaults:
+                assert getattr(sub, state).device.type == "meta", (
+                    f"{type(composite).__name__}: {sub.name}.{state} stayed behind"
+                )
+
+
+if torch.cuda.is_available():
+    ACCELERATOR = "cuda"
+elif torch.backends.mps.is_available():
+    ACCELERATOR = "mps"
+else:
+    ACCELERATOR = ""
+
+
+@pytest.mark.skipif(not ACCELERATOR, reason="needs a CUDA or MPS device")
+def test_a_composite_evaluates_on_an_accelerator(dataset: Dataset):
+    """A user-averaged sub-metric indexes its states with the batch's users."""
+    info = dataset.info()
+    on_cpu = composite_values(
+        new_evaluator(dataset), _ReversedScoreRecommender({}, info), dataset
+    )
+    on_device = composite_values(
+        new_evaluator(dataset),
+        _ReversedScoreRecommender({}, info),
+        dataset,
+        device=ACCELERATOR,
+    )
+
+    for name, value in on_cpu.items():
+        torch.testing.assert_close(on_device[name], value, equal_nan=True)
