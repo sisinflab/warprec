@@ -2,6 +2,48 @@
 
 <!-- version list -->
 
+## v2.1.5 (2026-10-12)
+
+### Bug Fixes
+
+- A null or out-of-range evaluation.seed is refused when the configuration is read
+  ([`2596453`](https://github.com/sisinflab/warprec/commit/2596453a895e861003386b06189216ccb4cb96d1))
+
+- Evaluation.seed decides the sampled candidates and the tie break, and trials reuse the sample
+  prepared for them
+  ([`522628f`](https://github.com/sisinflab/warprec/commit/522628f916cd7c8bfa3caca45542d58698a0f036))
+
+- Random splits no longer reseed numpy's global random stream, and still produce the same splits
+  ([`07c52b6`](https://github.com/sisinflab/warprec/commit/07c52b65b3d979785ba624d2d6d2e5cdaba8c995))
+
+- The configured seed decides the shuffle order and negatives every iterative model trains on
+  ([`e7af47f`](https://github.com/sisinflab/warprec/commit/e7af47fe35116ac64fdf7c187be6f02385678747))
+
+- The eval pipeline builds each model with its configured seed instead of 42
+  ([`60e22de`](https://github.com/sisinflab/warprec/commit/60e22de68dc238d70ff6bd09379568d2bb7be348))
+
+- Ties in a ranking are broken for each user on their own, so a model that ties many items scores an
+  average rather than one draw
+  ([`864ce1f`](https://github.com/sisinflab/warprec/commit/864ce1f8d208f718aedf95872fe3b043fc85a08e))
+
+- Written recommendations break ties as the evaluation does, so a run writes the lists it evaluated
+  ([`b5f4e74`](https://github.com/sisinflab/warprec/commit/b5f4e749a3c999e1547b99439c91234fc94a0d82))
+
+### Documentation
+
+- The guides show ties broken for each user and evaluation.seed at work
+  ([`9a42eea`](https://github.com/sisinflab/warprec/commit/9a42eeacbf2aee17641cbe608073852714d7b0de))
+
+- Tie-breaking is described without claiming that torch.topk orders equal scores by position
+  ([`e741ab2`](https://github.com/sisinflab/warprec/commit/e741ab2895ab03a481c11054c48cfd6ca7779761))
+
+### Testing
+
+- The tie-break test no longer expects torch.topk to return the lowest ids for equal scores, which
+  it does not promise
+  ([`ca0190d`](https://github.com/sisinflab/warprec/commit/ca0190d681cfe54891093be65ab6d4e0682e57d3))
+
+
 ## v2.1.4 (2026-10-09)
 
 ### Bug Fixes
