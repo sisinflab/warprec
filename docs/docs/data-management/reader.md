@@ -79,7 +79,7 @@ item_id,Action,Comedy,Drama
     - The **first column** must contain the **item ID**.
     - All other columns will be interpreted as features.
 - **Data Type:** both numeric and textual columns are accepted, and the two are interpreted differently. See [How Columns Are Interpreted](#how-columns-are-interpreted) below.
-- **Error Handling:** a model that requires side information when none has been provided stops the experiment: the training and swarm pipelines report it when the configuration is validated, the design, evaluation and estimate pipelines when the model is built.
+- **Error Handling:** a model that requires side information when none has been provided stops the experiment when the configuration is validated, whichever pipeline runs it.
 
 ### How Columns Are Interpreted
 
@@ -196,7 +196,7 @@ The second says which entity each catalogue item stands for, because the graph i
 - **Column Ordering is Crucial:** both files are read positionally. The triples file is `head`, `relation`, `tail`; the alignment file is `item_id`, `entity_id`. The names are set through `column_names` and `link_column_names`.
 - **Header:** both files are assumed to have **no header row** by default, which is how such graphs are usually published. Set `header: True` when yours does.
 - **Both files are required.** The triples alone do not connect the graph to the catalogue.
-- **Error Handling:** a model that requires a knowledge graph when none has been provided stops the experiment: the training and swarm pipelines report it when the configuration is validated, the design, evaluation and estimate pipelines when the model is built.
+- **Error Handling:** a model that requires a knowledge graph when none has been provided stops the experiment when the configuration is validated, whichever pipeline runs it.
 
 ### How the Graph Is Interpreted
 
@@ -247,7 +247,7 @@ B0000668H5
 - **Header:** both files are assumed to have **no header row** by default, which is how such features are usually published. Set `header: True` when yours does.
 - **Both files are required** for the `numpy` format. A dense matrix carries no identifiers, so the row order is what connects it to the catalogue.
 - **A tabular alternative** is available for features that already live in a dataframe: set `file_format: tabular`, put the item ID in the first column and the features in the rest, exactly as for side information. No separate row-order file is then needed.
-- **Error Handling:** a model that requires multimodal features when none have been provided, or that names a modality that was not configured, stops the experiment: the training and swarm pipelines report it when the configuration is validated, the design, evaluation and estimate pipelines when the model is built.
+- **Error Handling:** a model that requires multimodal features when none have been provided, or that names a modality that was not configured, stops the experiment when the configuration is validated, whichever pipeline runs it.
 
 ### How the Modalities Are Interpreted
 

@@ -1,3 +1,4 @@
+import copy
 import os
 import sys
 import importlib
@@ -165,6 +166,129 @@ class WarpRecConfiguration(BaseModel):
 
         return self
 
+    @model_validator(mode="after")
+    def models_validation(self) -> "WarpRecConfiguration":
+        """Validate every model against the registries and the reader.
+
+        Every pipeline runs these checks, so a model missing what it reads is
+        reported when the configuration is loaded rather than when the model is
+        built. The values are only validated here: the models section is left
+        as written, since the design and evaluation pipelines build the models
+        from it. The training pipeline overrides this to also turn the values
+        into search spaces.
+
+        Returns:
+            WarpRecConfiguration: The validated configuration.
+        """
+        for model_name, model_data in self.models.items():
+            self.validate_model(model_name, model_data)
+        return self
+
+    def validate_model(self, model_name: str, model_data: dict) -> RecomModel:
+        """Validate one model's parameters and what it reads.
+
+        Args:
+            model_name (str): The name the model is configured under.
+            model_data (dict): The parameters written for it.
+
+        Returns:
+            RecomModel: The validated parameters.
+
+        Raises:
+            ValueError: If the model is not registered, or it reads side
+                information, context, a knowledge graph or multimodal features
+                the reader does not provide.
+        """
+        if model_name.upper() not in model_registry.list_registered():
+            raise ValueError(
+                f"The model '{model_name}' is not registered. Check its name "
+                "under 'models', or load the module that registers it through "
+                "'general.custom_modules'. These are the models registered: "
+                f"{model_registry.list_registered()}"
+            )
+
+        if model_name.upper() not in params_registry.list_registered():
+            logger.attention(
+                f"The model {model_name} is registered in the model registry, but "
+                "not in parameter registry. The model will be loaded but the "
+                "hyperparameter will not be validated."
+            )
+            return RecomModel(**copy.deepcopy(model_data))
+
+        # The validators edit the lists they are handed, and the values as
+        # written are what the design and evaluation pipelines build from.
+        model_class = params_registry.get(model_name, **copy.deepcopy(model_data))
+
+        if model_class.need_side_information and self.reader.side is None:
+            raise ValueError(
+                f"The model {model_name} requires side information to be provided, "
+                "but none have been provided. Check the configuration file."
+            )
+
+        if model_class.need_context and not self.reader.labels.context_labels:
+            raise ValueError(
+                f"The model {model_name} requires contextual information to be provided, "
+                "but no context_labels have been configured. Check the configuration file."
+            )
+
+        if model_class.need_knowledge and self.reader.knowledge is None:
+            raise ValueError(
+                f"The model {model_name} scores from a knowledge graph, but none "
+                "has been provided. Configure 'reader.knowledge' with the triples "
+                "and the item alignment. Check the configuration file."
+            )
+
+        if model_class.need_multimodal and not self.reader.multimodal:
+            raise ValueError(
+                f"The model {model_name} scores from multimodal item features, but "
+                "none have been provided. Configure 'reader.multimodal' with one "
+                "entry per modality. Check the configuration file."
+            )
+
+        self._check_modalities_exist(model_name, model_data)
+
+        # Check if there is at least one valid combination
+        model_class.validate_all_combinations()
+
+        return model_class
+
+    def _check_modalities_exist(self, model_name: str, model_data: dict) -> None:
+        """Validate that a model only asks for modalities the reader provides.
+
+        A misspelled modality would otherwise surface as an empty feature block
+        at training time, long after the run started.
+
+        Args:
+            model_name (str): The name of the model being validated.
+            model_data (dict): The raw parameters written for that model.
+
+        Raises:
+            ValueError: If the model names a modality that was not configured.
+        """
+        wanted = model_data.get("modalities")
+        if not wanted or not self.reader.multimodal:
+            return
+
+        # A single name may be written unwrapped, as any other parameter may.
+        if isinstance(wanted, str):
+            wanted = [wanted]
+
+        # The parameter is a search space, so it may hold several lists.
+        names = {
+            name
+            for entry in wanted
+            for name in (entry if isinstance(entry, list) else [entry])
+            if isinstance(name, str)
+        }
+
+        missing = sorted(names - set(self.reader.multimodal))
+        if missing:
+            raise ValueError(
+                f"The model {model_name} asks for the modalities {missing}, which "
+                f"'reader.multimodal' does not configure. The configured ones are "
+                f"{sorted(self.reader.multimodal)}. Check the configuration file."
+            )
+
     def get_filters(self) -> List[Filter]:
         """Returns the initialized filters based on the configuration.
 
@@ -252,9 +376,16 @@ class TrainConfiguration(WarpRecConfiguration):
                 "settings in the configuration file."
             )
 
-        # Parse and validate models
-        self.models = self.parse_models()
+        return self
 
+    @model_validator(mode="after")
+    def models_validation(self) -> "TrainConfiguration":
+        """Validate every model and turn its values into search spaces.
+
+        Returns:
+            TrainConfiguration: The validated configuration.
+        """
+        self.models = self.parse_models()
         return self
 
     def parse_models(self) -> dict:
@@ -262,128 +393,25 @@ class TrainConfiguration(WarpRecConfiguration):
 
         Returns:
             dict: The dictionary containing all the models and their parameters.
-
-        Raises:
-            ValueError: If a model requires side information and they have not been provided.
         """
-        parsed_models = {}
-
         # Check if Context-Aware model is in the experiment
         from warprec.recommenders.base_recommender import ContextRecommenderUtils  # pylint: disable = import-outside-toplevel
 
-        for model_name, _ in self.models.items():
-            model_instance = model_registry.get_class(model_name)
+        parsed_models = {}
+        for model_name, model_data in self.models.items():
+            model_class = self.validate_model(model_name, model_data)
 
-            if issubclass(model_instance, ContextRecommenderUtils):
+            if issubclass(
+                model_registry.get_class(model_name), ContextRecommenderUtils
+            ):
                 logger.attention(
                     f"The model {model_name} is a Context-Aware model. "
                     "Leave-One-Out splitting strategy is advised for a correct evaluation."
                 )
 
-        for model_name, model_data in self.models.items():
-            model_class: RecomModel
-            if model_name.upper() not in model_registry.list_registered():
-                logger.negative(
-                    f"The model {model_name} is not registered in the model registry. "
-                    "The model will not be loaded and will not be available for training. "
-                    "Check the configuration file."
-                )
-                continue
-            if (
-                model_name.upper() in model_registry.list_registered()
-                and model_name.upper() not in params_registry.list_registered()
-            ):
-                logger.attention(
-                    f"The model {model_name} is registered in the model registry, but not in parameter registry. "
-                    "The model will be loaded but the hyperparameter will not be validated."
-                )
-                model_class = RecomModel(**model_data)
-                parsed_models[model_name] = model_class.model_dump()
-                continue
-
-            model_class = params_registry.get(model_name, **model_data)
-
-            if model_class.need_side_information and self.reader.side is None:
-                raise ValueError(
-                    f"The model {model_name} requires side information to be provided, "
-                    "but none have been provided. Check the configuration file."
-                )
-
-            if model_class.need_context and not self.reader.labels.context_labels:
-                raise ValueError(
-                    f"The model {model_name} requires contextual information to be provided, "
-                    "but no context_labels have been configured. Check the configuration file."
-                )
-
-            if model_class.need_knowledge and self.reader.knowledge is None:
-                raise ValueError(
-                    f"The model {model_name} scores from a knowledge graph, but none "
-                    "has been provided. Configure 'reader.knowledge' with the triples "
-                    "and the item alignment. Check the configuration file."
-                )
-
-            if model_class.need_multimodal and not self.reader.multimodal:
-                raise ValueError(
-                    f"The model {model_name} scores from multimodal item features, but "
-                    "none have been provided. Configure 'reader.multimodal' with one "
-                    "entry per modality. Check the configuration file."
-                )
-
-            self._check_modalities_exist(model_name, model_data)
-
-            # Check if there is at least one valid combination
-            model_class.validate_all_combinations()
-
-            # Extract model train parameters, removing the meta infos
-            model_data = {
-                k: (
-                    [v]
-                    if not isinstance(v, list) and v is not None and k != "meta"
-                    else v
-                )
-                for k, v in model_data.items()
-            }
-
             parsed_models[model_name] = model_class.model_dump()
 
         return parsed_models
-
-    def _check_modalities_exist(self, model_name: str, model_data: dict) -> None:
-        """Validate that a model only asks for modalities the reader provides.
-
-        A misspelled modality would otherwise surface as an empty feature block
-        at training time, long after the run started.
-
-        Args:
-            model_name (str): The name of the model being validated.
-            model_data (dict): The raw parameters written for that model.
-
-        Raises:
-            ValueError: If the model names a modality that was not configured.
-        """
-        wanted = model_data.get("modalities")
-        if not wanted or not self.reader.multimodal:
-            return
-
-        # A single name may be written unwrapped, as any other parameter may.
-        if isinstance(wanted, str):
-            wanted = [wanted]
-
-        # The parameter is a search space, so it may hold several lists.
-        names = {
-            name
-            for entry in wanted
-            for name in (entry if isinstance(entry, list) else [entry])
-            if isinstance(name, str)
-        }
-
-        missing = sorted(names - set(self.reader.multimodal))
-        if missing:
-            raise ValueError(
-                f"The model {model_name} asks for the modalities {missing}, which "
-                f"'reader.multimodal' does not configure. The configured ones are "
-                f"{sorted(self.reader.multimodal)}. Check the configuration file."
-            )
 
     def get_storage_path(self) -> str:
         """Returns the storage path for the ray results.
