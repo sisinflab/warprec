@@ -11,6 +11,7 @@ import pytest
 import ray
 
 import warprec
+import warprec.recommenders  # noqa: F401  (populates the model registries)
 from warprec import errors
 from warprec.errors import (
     CheckpointError,
@@ -28,6 +29,7 @@ from warprec.errors import (
     WarpRecError,
 )
 from warprec.utils.pause import RunPaused
+from warprec.utils.registry import BasicRegistry, model_registry, params_registry
 
 # Every class, an instance with its fields, and the built-ins it must still be
 EXAMPLES = [
@@ -142,3 +144,55 @@ def test_an_error_crosses_a_ray_task_boundary_as_itself():
     assert isinstance(caught.value, ValueError)
     assert caught.value.path == "c.yml"
     assert caught.value.errors == [("a", "b")]
+
+
+def test_an_unknown_name_suggests_the_closest_registered_one():
+    with pytest.raises(RegistryError) as caught:
+        model_registry.get_class("BRP")
+    error = caught.value
+    assert isinstance(error, ValueError)
+    assert str(error).startswith("'BRP' not found in Recommender registry. ")
+    assert str(error).endswith(". Did you mean 'BPR'?")
+    assert (error.registry, error.name) == ("Recommender", "BRP")
+    assert "BPR" in error.available
+
+
+def test_a_name_far_from_every_registered_one_suggests_nothing():
+    with pytest.raises(RegistryError) as caught:
+        model_registry.get("ZZZZZZZZ")
+    assert "Did you mean" not in str(caught.value)
+
+
+def test_a_name_taken_by_another_class_is_a_registry_error():
+    registry: BasicRegistry = BasicRegistry("Test")
+
+    @registry.register("Taken")
+    class First:  # pylint: disable=unused-variable
+        pass
+
+    with pytest.raises(RegistryError, match="already registered") as caught:
+
+        @registry.register("taken")
+        class Second:  # pylint: disable=unused-variable
+            pass
+
+    assert (caught.value.registry, caught.value.name) == ("Test", "taken")
+    assert caught.value.available == ["TAKEN"]
+
+
+def test_invalid_model_parameters_are_a_configuration_error_by_key():
+    with pytest.raises(ConfigurationError) as caught:
+        params_registry.get(
+            "BPR",
+            embedding_size=8,
+            reg_weight=0.0,
+            batch_size=8,
+            epochs=1,
+            learning_rate=-1,
+        )
+    error = caught.value
+    assert [key for key, _ in error.errors] == ["models.BPR.learning_rate"]
+    assert str(error).startswith(
+        "models.BPR is not valid:\n  models.BPR.learning_rate: "
+    )
+    assert type(error.__cause__).__name__ == "ValidationError"

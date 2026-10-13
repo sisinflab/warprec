@@ -1,7 +1,11 @@
+import difflib
 from typing import TypeVar, Dict, Type, Optional, Callable, List, Generic, TYPE_CHECKING
 
+from pydantic import ValidationError
 from torch.optim.lr_scheduler import LRScheduler
 from torch.optim import Optimizer
+
+from warprec.errors import ConfigurationError, RegistryError
 
 if TYPE_CHECKING:
     from warprec.recommenders.base_recommender import Recommender
@@ -39,11 +43,16 @@ class BasicRegistry(Generic[T]):
 
     Args:
         registry_name (str): Name of the registry.
+        config_section (Optional[str]): The configuration section the registered
+            classes validate, e.g. 'models' for the parameter registry. When
+            given, a pydantic ValidationError raised building one is raised as
+            a ConfigurationError whose keys sit under '<section>.<name>'.
     """
 
-    def __init__(self, registry_name: str):
+    def __init__(self, registry_name: str, config_section: Optional[str] = None):
         self._registry: Dict[str, Type[T]] = {}
         self.registry_name = registry_name
+        self.config_section = config_section
 
     def register(self, name: Optional[str] = None) -> Callable:
         """Decorator to register a class in the registry.
@@ -65,7 +74,7 @@ class BasicRegistry(Generic[T]):
                 Type[T]: Any type of class.
 
             Raises:
-                ValueError: If a different class is registered under the name.
+                RegistryError: If a different class is registered under the name.
             """
             nonlocal name
             key = (name or cls.__name__).upper()
@@ -73,11 +82,14 @@ class BasicRegistry(Generic[T]):
             # The same class registered again, because its module was imported
             # again (a notebook cell run twice, a Ray worker), replaces itself.
             if existing is not None and _qualified(existing) != _qualified(cls):
-                raise ValueError(
+                raise RegistryError(
                     f"Cannot register {_qualified(cls)} as '{name or cls.__name__}' "
                     f"in the {self.registry_name} registry: the name is already "
                     f"registered to {_qualified(existing)} (names are compared "
-                    "ignoring case). Register the class under another name."
+                    "ignoring case). Register the class under another name.",
+                    registry=self.registry_name,
+                    name=name or cls.__name__,
+                    available=self.list_registered(),
                 )
             self._registry[key] = cls
             return cls
@@ -86,6 +98,8 @@ class BasicRegistry(Generic[T]):
 
     def get(self, name: str, *args, **kwargs) -> T:
         """Get an instance from the registry by name.
+
+        An unknown name raises the RegistryError of get_class.
 
         Args:
             name (str): Name of the registered class.
@@ -96,15 +110,19 @@ class BasicRegistry(Generic[T]):
             T: Any type of object stored previously.
 
         Raises:
-            ValueError: If name is not to be found in registry.
+            ConfigurationError: If the registry validates a configuration
+                section and the arguments are not valid for the class.
         """
-        cls = self._registry.get(name.upper())
-        if cls is None:
-            raise ValueError(
-                f"'{name}' not found in {self.registry_name} registry. "
-                f"Available options: {list(self._registry.keys())}"
+        cls = self.get_class(name)
+        if self.config_section is None:
+            return cls(*args, **kwargs)
+        try:
+            return cls(*args, **kwargs)
+        except ValidationError as error:
+            message, errors = ConfigurationError.describe_validation(
+                error, "valid", prefix=f"{self.config_section}.{name}"
             )
-        return cls(*args, **kwargs)
+            raise ConfigurationError(message, errors=errors) from error
 
     def get_class(self, name: str) -> Type[T]:
         """Get the class from the registry by name.
@@ -116,15 +134,39 @@ class BasicRegistry(Generic[T]):
             Type[T]: Any type of object stored previously.
 
         Raises:
-            ValueError: If name is not to be found in registry.
+            RegistryError: If name is not to be found in registry.
         """
         cls = self._registry.get(name.upper())
         if cls is None:
-            raise ValueError(
+            available = list(self._registry.keys())
+            raise RegistryError(
                 f"'{name}' not found in {self.registry_name} registry. "
-                f"Available options: {list(self._registry.keys())}"
+                f"Available options: {available}{self._suggestion(name)}",
+                registry=self.registry_name,
+                name=name,
+                available=available,
             )
         return cls
+
+    def _suggestion(self, name: str) -> str:
+        """The hint naming the registered names closest to an unknown one.
+
+        Args:
+            name (str): The unknown name.
+
+        Returns:
+            str: " Did you mean 'X'?", naming the class as it is spelled when
+                its name is the registered one, or an empty string when no
+                registered name is close.
+        """
+        close = difflib.get_close_matches(name.upper(), list(self._registry), n=3)
+        if not close:
+            return ""
+        spelled = []
+        for key in close:
+            cls_name = self._registry[key].__name__
+            spelled.append(cls_name if cls_name.upper() == key else key)
+        return f". Did you mean {', '.join(repr(s) for s in spelled)}?"
 
     def registered_name(self, cls: type) -> Optional[str]:
         """Get the name a class was registered under.
@@ -162,7 +204,9 @@ class BasicRegistry(Generic[T]):
 model_registry: BasicRegistry["Recommender"] = BasicRegistry("Recommender")
 metric_registry: BasicRegistry["BaseMetric"] = BasicRegistry("Metrics")
 splitting_registry: BasicRegistry["SplittingStrategy"] = BasicRegistry("Splitting")
-params_registry: BasicRegistry["RecomModel"] = BasicRegistry("Params")
+params_registry: BasicRegistry["RecomModel"] = BasicRegistry(
+    "Params", config_section="models"
+)
 search_algorithm_registry: BasicRegistry["BaseSearchWrapper"] = BasicRegistry(
     "SearchAlgorithms"
 )

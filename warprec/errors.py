@@ -51,21 +51,22 @@ class ConfigurationError(WarpRecError, ValueError):
         self.path = str(path) if path is not None else None
         self.errors = list(errors) if errors is not None else []
 
-    @classmethod
-    def from_validation_error(
-        cls,
+    @staticmethod
+    def describe_validation(
         error: "ValidationError",
         what: str,
         path: Optional[Union[str, Path]] = None,
         prefix: str = "",
-    ) -> "ConfigurationError":
-        """Turn a pydantic ValidationError into one readable ConfigurationError.
+    ) -> Tuple[str, List[Tuple[str, str]]]:
+        """The message and the invalid keys of a pydantic ValidationError.
 
         Each invalid key is listed on its own line as its dotted path and the
         validator's own message, without pydantic's input dump and links. An
         error raised by a nested validation that already produced a
         ConfigurationError (a model's hyperparameters, validated inside the
         configuration) contributes its own keys rather than the outer one.
+        Raise them as ``ConfigurationError(message, path=path, errors=errors)``
+        from the ValidationError.
 
         Args:
             error (ValidationError): The pydantic error.
@@ -75,14 +76,15 @@ class ConfigurationError(WarpRecError, ValueError):
                 'models.BPR', prepended to each key.
 
         Returns:
-            ConfigurationError: The error, to be raised from the ValidationError.
+            Tuple[str, List[Tuple[str, str]]]: The message, and one
+                (dotted key path, message) pair per invalid key.
         """
         errors = _validation_errors(error, prefix)
         subject = str(path) if path is not None else (prefix or error.title)
         lines = "\n".join(
             f"  {key}: {msg}" if key else f"  {msg}" for key, msg in errors
         )
-        return cls(f"{subject} is not {what}:\n{lines}", path=path, errors=errors)
+        return f"{subject} is not {what}:\n{lines}", errors
 
 
 def _validation_errors(error: "ValidationError", prefix: str) -> List[Tuple[str, str]]:
