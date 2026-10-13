@@ -1,19 +1,31 @@
 import os
-from typing import Any, Dict, Optional
+import random
+from typing import Any, Dict, Iterator, Optional, Tuple
 
+import numpy as np
 import psutil
 import torch
 import lightning as L
 from ray import train
 from torch import Tensor
+from torch.utils.data import DataLoader
 
 from warprec.data.dataset import Dataset
+from warprec.data.entities.common import (
+    get_generator_state,
+    loader_random_state,
+    prime_loader_workers,
+    restore_loader_random_state,
+    set_generator_state,
+)
 from warprec.evaluation.evaluator import Evaluator
 from warprec.recommenders.base_recommender import TRAIN_LOSS
 from warprec.utils.config.model_configuration import EarlyStopping
 from warprec.utils.logger import logger
 
 COMPLETED_EPOCHS = "completed_epochs"
+RANDOM_STATE = "warprec_random_state"
+_GENERATOR_TYPES = (torch.Generator, np.random.Generator, np.random.RandomState)
 
 
 def _get_memory_usage() -> Dict[str, float]:
@@ -279,3 +291,180 @@ class WarpRecLightningIntegrationCallback(L.Callback):
                 )
             # This trigger will stop Lightning Trainer
             trainer.should_stop = True
+
+
+def _model_generators(pl_module: L.LightningModule) -> Iterator[Tuple[str, Any]]:
+    """The random generators a model keeps as attributes, by attribute path.
+
+    Some models sample during training from a generator of their own (the
+    triples of CKE and KGAT, the edges of KGIN and FREEDOM) rather than from
+    the global one.
+
+    Args:
+        pl_module (L.LightningModule): The model.
+
+    Yields:
+        Tuple[str, Any]: The attribute path and the generator.
+    """
+    for module_name, module in pl_module.named_modules():
+        for attribute, value in vars(module).items():
+            if isinstance(value, _GENERATOR_TYPES):
+                yield f"{module_name}.{attribute}", value
+
+
+class RandomStateCallback(L.Callback):
+    """Makes a resumed trial draw exactly what the uninterrupted one would have.
+
+    A trial checkpoint holds the weights, the optimizer and the loops, but not
+    the random state training draws from: the order the loader shuffles in, the
+    negatives the dataset samples (in this process or in persistent workers),
+    the global generators dropout and augmentation use, and the generators some
+    models keep. A trial resumed from it drew its remaining epochs from fresh
+    generators, so a paused run ended on other weights and other results than
+    one never paused.
+
+    This callback saves all of them with every checkpoint and puts them back
+    before the first resumed epoch. It also repeats the step a plateau
+    learning-rate scheduler takes after the checkpoint of an epoch is written,
+    which the resumed trial would otherwise skip.
+
+    Args:
+        train_dataloader (Optional[DataLoader]): The loader the model trains on,
+            needed to hand their state to persistent workers before they start.
+    """
+
+    def __init__(self, train_dataloader: Optional[DataLoader] = None):
+        super().__init__()
+        self.train_dataloader = train_dataloader
+        self._pending: Optional[Dict[str, Any]] = None
+
+    def _loader(self, trainer: L.Trainer) -> Optional[DataLoader]:
+        """The training loader, as Lightning iterates it when it has one.
+
+        Args:
+            trainer (L.Trainer): The trainer.
+
+        Returns:
+            Optional[DataLoader]: The loader, None when there is none.
+        """
+        loader = trainer.train_dataloader
+        return loader if isinstance(loader, DataLoader) else self.train_dataloader
+
+    def on_save_checkpoint(
+        self,
+        trainer: L.Trainer,
+        pl_module: L.LightningModule,
+        checkpoint: Dict[str, Any],
+    ) -> None:
+        """Adds the random state of training to a checkpoint being written.
+
+        Args:
+            trainer (L.Trainer): The trainer.
+            pl_module (L.LightningModule): The model.
+            checkpoint (Dict[str, Any]): The checkpoint being written.
+        """
+        loader = self._loader(trainer)
+        plateau = {
+            config.monitor: float(trainer.callback_metrics[config.monitor])
+            for config in trainer.lr_scheduler_configs
+            if config.reduce_on_plateau and config.monitor in trainer.callback_metrics
+        }
+        checkpoint[RANDOM_STATE] = {
+            "python": random.getstate(),
+            "numpy": np.random.get_state(),
+            "torch": torch.get_rng_state(),
+            "cuda": (
+                torch.cuda.get_rng_state_all() if torch.cuda.is_available() else None
+            ),
+            "model": {
+                name: get_generator_state(generator)
+                for name, generator in _model_generators(pl_module)
+            },
+            "loader": loader_random_state(loader) if loader is not None else None,
+            "epoch": trainer.current_epoch,
+            "plateau": plateau,
+        }
+
+    def on_load_checkpoint(
+        self,
+        trainer: L.Trainer,
+        pl_module: L.LightningModule,
+        checkpoint: Dict[str, Any],
+    ) -> None:
+        """Keeps the random state of a checkpoint a trial resumes from.
+
+        Persistent workers start before the first resumed epoch, so they are
+        given their state here; everything else is restored at train start.
+
+        Args:
+            trainer (L.Trainer): The trainer.
+            pl_module (L.LightningModule): The model.
+            checkpoint (Dict[str, Any]): The checkpoint being restored.
+        """
+        state = checkpoint.get(RANDOM_STATE)
+        if state is None or trainer.world_size > 1:
+            if trainer.is_global_zero:
+                logger.attention(
+                    "The checkpoint this trial resumes from carries no random "
+                    "state it can restore (it predates WarpRec saving one, or "
+                    "the trial trains on several workers), so the resumed "
+                    "epochs will not draw the samples an uninterrupted run would."
+                )
+            return
+
+        self._pending = state
+        loader = self.train_dataloader
+        if (
+            loader is not None
+            and state["loader"] is not None
+            and not prime_loader_workers(loader, state["loader"])
+        ):
+            logger.attention(
+                "The sampling state of the persistent data loader workers could "
+                "not be saved, so the resumed epochs will draw other negatives "
+                "than an uninterrupted run would."
+            )
+
+    def on_train_start(self, trainer: L.Trainer, pl_module: L.LightningModule) -> None:
+        """Restores the saved random state before the first resumed epoch.
+
+        Lightning has already created the iterator of that epoch when this
+        runs, so it is created again from the restored shuffling generator,
+        as it is at the start of every other epoch.
+
+        Args:
+            trainer (L.Trainer): The trainer.
+            pl_module (L.LightningModule): The model.
+        """
+        state, self._pending = self._pending, None
+        if state is None:
+            return
+
+        loader = self._loader(trainer)
+        if loader is not None and state["loader"] is not None:
+            restore_loader_random_state(loader, state["loader"])
+            fetcher = getattr(trainer.fit_loop, "_data_fetcher", None)
+            if fetcher is not None:
+                iter(fetcher)
+
+        for name, generator in _model_generators(pl_module):
+            if name in state["model"]:
+                set_generator_state(generator, state["model"][name])
+
+        # Lightning steps a plateau scheduler after the epoch's checkpoint is
+        # written, so the checkpoint holds it one step behind
+        for config in trainer.lr_scheduler_configs:
+            value = state["plateau"].get(config.monitor)
+            if (
+                config.reduce_on_plateau
+                and config.interval == "epoch"
+                and value is not None
+                and (state["epoch"] + 1) % config.frequency == 0
+            ):
+                pl_module.lr_scheduler_step(config.scheduler, torch.tensor(value))
+
+        random.setstate(state["python"])
+        np.random.set_state(state["numpy"])
+        torch.set_rng_state(state["torch"])
+        if state["cuda"] is not None and torch.cuda.is_available():
+            torch.cuda.set_rng_state_all(state["cuda"])
