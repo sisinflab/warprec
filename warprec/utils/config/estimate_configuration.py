@@ -1,4 +1,5 @@
 from pydantic import BaseModel, field_validator
+from warprec.errors import ConfigurationError
 
 
 class EstimateConfig(BaseModel):
@@ -19,7 +20,7 @@ class EstimateConfig(BaseModel):
     def check_positive_batches(cls, v: int) -> int:
         """Validates that measured batch counts are strictly positive."""
         if v <= 0:
-            raise ValueError(
+            raise ConfigurationError(
                 "Measured estimate batch counts must be greater than zero."
             )
         return v
@@ -29,5 +30,7 @@ class EstimateConfig(BaseModel):
     def check_non_negative_warmup(cls, v: int) -> int:
         """Validates that warmup batches are non-negative."""
         if v < 0:
-            raise ValueError("Warmup batches must be greater than or equal to zero.")
+            raise ConfigurationError(
+                "Warmup batches must be greater than or equal to zero."
+            )
         return v

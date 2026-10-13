@@ -2,6 +2,7 @@ import difflib
 from typing import List, Literal, Optional, Dict, Any
 
 from pydantic import BaseModel, field_validator, Field
+from warprec.errors import ConfigurationError, RegistryError
 from warprec.utils.config.training_configuration import NegativeSampling
 from warprec.utils.registry import metric_registry
 from warprec.utils.logger import logger
@@ -79,7 +80,7 @@ class PropensityConfig(BaseModel):
     def check_power(cls, v: float):
         """Validate the exponent."""
         if v < 0:
-            raise ValueError(f"Propensity power must not be negative, got {v}.")
+            raise ConfigurationError(f"Propensity power must not be negative, got {v}.")
         return v
 
     @field_validator("clip")
@@ -87,7 +88,7 @@ class PropensityConfig(BaseModel):
     def check_clip(cls, v: float):
         """Validate the propensity floor."""
         if not 0 < v <= 1:
-            raise ValueError(f"Propensity clip must lie in (0, 1], got {v}.")
+            raise ConfigurationError(f"Propensity clip must lie in (0, 1], got {v}.")
         return v
 
 
@@ -102,7 +103,7 @@ def check_metric_name(name: str, key: str) -> None:
         key (str): The configuration key the name was given under.
 
     Raises:
-        ValueError: If no metric is registered under that name.
+        RegistryError: If no metric is registered under that name.
     """
     registered = metric_registry.list_registered()
     if name.upper() in registered:
@@ -119,10 +120,13 @@ def check_metric_name(name: str, key: str) -> None:
         else " Check the spelling against the registered metrics:"
         f" {', '.join(sorted(spelled.values(), key=str.upper))}."
     )
-    raise ValueError(
+    raise RegistryError(
         f"{key} names the metric '{name}', which is not a registered metric.{hint} "
         "A metric of your own must be registered in a module listed under "
-        "general.custom_modules."
+        "general.custom_modules.",
+        registry=metric_registry.registry_name,
+        name=name,
+        available=registered,
     )
 
 
@@ -215,7 +219,9 @@ class EvaluationConfig(BaseModel):
         """Validate top_k."""
         for k in v:
             if k <= 0:
-                raise ValueError("Values for top_k should be positive integers.")
+                raise ConfigurationError(
+                    "Values for top_k should be positive integers."
+                )
         return v
 
     @field_validator("metrics")
@@ -240,20 +246,20 @@ class EvaluationConfig(BaseModel):
     def check_validation_metric(cls, v: str):
         """Validate validation metric."""
         if v is None:
-            raise ValueError("Validation metric must be provided.")
+            raise ConfigurationError("Validation metric must be provided.")
         if "@" not in v:
-            raise ValueError(
+            raise ConfigurationError(
                 f"Validation metric {v} not valid. Validation metric "
                 f"should be defined as: metric_name@top_k."
             )
         if v.count("@") > 1:
-            raise ValueError(
+            raise ConfigurationError(
                 "Validation metric contains more than one @, check your configuration file."
             )
 
         _, top_k = v.split("@")
         if not top_k.isnumeric():
-            raise ValueError(
+            raise ConfigurationError(
                 "Validation metric should be provided with a top_k number."
             )
         return v
@@ -263,7 +269,7 @@ class EvaluationConfig(BaseModel):
     def strategy_validator(cls, v: str):
         """Validate strategy."""
         if v not in ["full", "sampled"]:
-            raise ValueError(
+            raise ConfigurationError(
                 f"The strategy value should be either 'full' or 'sampled'. Value provided: {v}"
             )
         return v
@@ -280,10 +286,10 @@ class EvaluationConfig(BaseModel):
             Optional[float]: The value, unchanged.
 
         Raises:
-            ValueError: If the exponent is negative.
+            ConfigurationError: If the exponent is negative.
         """
         if v is not None and v < 0:
-            raise ValueError(
+            raise ConfigurationError(
                 f"neg_alpha must not be negative, got {v}. A negative "
                 "exponent makes the rarest items the most likely negatives, which is "
                 "not what 'popularity' sampling means."
@@ -306,16 +312,16 @@ class EvaluationConfig(BaseModel):
             Any: The value, unchanged.
 
         Raises:
-            ValueError: If the seed is null or out of range.
+            ConfigurationError: If the seed is null or out of range.
         """
         if v is None:
-            raise ValueError(
+            raise ConfigurationError(
                 "evaluation.seed cannot be null: the evaluation draws its sampled "
                 "negatives and its tie break from it. Leave the key out to use the "
                 "default, 42, or give an integer from 0 to 2**32 - 1."
             )
         if isinstance(v, int) and not 0 <= v < 2**32:
-            raise ValueError(
+            raise ConfigurationError(
                 f"evaluation.seed must be an integer from 0 to 2**32 - 1, got {v}."
             )
         return v
@@ -325,7 +331,7 @@ class EvaluationConfig(BaseModel):
     def num_negatives_validator(cls, v: int):
         """Validate num_negatives."""
         if v is not None and v <= 0:
-            raise ValueError(
+            raise ConfigurationError(
                 f"The num_negatives value should be a positive integer. Value provided: {v}"
             )
         return v

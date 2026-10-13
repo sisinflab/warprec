@@ -1,5 +1,15 @@
 import difflib
-from typing import TypeVar, Dict, Type, Optional, Callable, List, Generic, TYPE_CHECKING
+from typing import (
+    Any,
+    TypeVar,
+    Dict,
+    Type,
+    Optional,
+    Callable,
+    List,
+    Generic,
+    TYPE_CHECKING,
+)
 
 from pydantic import ValidationError
 from torch.optim.lr_scheduler import LRScheduler
@@ -138,24 +148,47 @@ class BasicRegistry(Generic[T]):
         """
         cls = self._registry.get(name.upper())
         if cls is None:
-            available = list(self._registry.keys())
             raise RegistryError(
-                f"'{name}' not found in {self.registry_name} registry. "
-                f"Available options: {available}{self._suggestion(name)}",
-                registry=self.registry_name,
-                name=name,
-                available=available,
+                **self.unknown(
+                    name,
+                    f"'{name}' not found in {self.registry_name} registry. "
+                    f"Available options: {list(self._registry.keys())}",
+                )
             )
         return cls
 
-    def _suggestion(self, name: str) -> str:
+    def unknown(self, name: str, message: str) -> Dict[str, Any]:
+        """The arguments of the RegistryError for a name that is not registered.
+
+        Raise it as ``RegistryError(**registry.unknown(name, message))``.
+
+        Args:
+            name (str): The unknown name.
+            message (str): What is wrong; the closest registered names are
+                appended to it when any is close.
+
+        Returns:
+            Dict[str, Any]: The message, the registry, the name and the names
+                registered.
+        """
+        hint = self.suggest(name)
+        if hint:
+            message += f" {hint}" if message.endswith((".", "?")) else f". {hint}"
+        return {
+            "message": message,
+            "registry": self.registry_name,
+            "name": name,
+            "available": self.list_registered(),
+        }
+
+    def suggest(self, name: str) -> str:
         """The hint naming the registered names closest to an unknown one.
 
         Args:
             name (str): The unknown name.
 
         Returns:
-            str: " Did you mean 'X'?", naming the class as it is spelled when
+            str: "Did you mean 'X'?", naming the class as it is spelled when
                 its name is the registered one, or an empty string when no
                 registered name is close.
         """
@@ -166,7 +199,7 @@ class BasicRegistry(Generic[T]):
         for key in close:
             cls_name = self._registry[key].__name__
             spelled.append(cls_name if cls_name.upper() == key else key)
-        return f". Did you mean {', '.join(repr(s) for s in spelled)}?"
+        return f"Did you mean {', '.join(repr(s) for s in spelled)}?"
 
     def registered_name(self, cls: type) -> Optional[str]:
         """Get the name a class was registered under.

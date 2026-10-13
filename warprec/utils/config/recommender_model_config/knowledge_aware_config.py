@@ -2,6 +2,7 @@ from typing import Any, ClassVar
 
 from pydantic import field_validator
 
+from warprec.errors import ConfigurationError
 from warprec.utils.config.common import (
     validate_between_zero_and_one,
     validate_layer_list,
@@ -31,12 +32,12 @@ def validate_feature_limit(cls: type, value: Any, field: str) -> list:
         list: A list of validated values.
 
     Raises:
-        ValueError: If any value is below -1.
+        ConfigurationError: If any value is below -1.
     """
     values = value if isinstance(value, list) else [value]
     for v in values:
         if isinstance(v, int) and v < -1:
-            raise ValueError(
+            raise ConfigurationError(
                 f"Values of {field} for {cls.__name__} model must be >= -1, where "
                 f"-1 keeps every feature. Values received as input: {values}"
             )

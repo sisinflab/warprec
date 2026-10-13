@@ -4,6 +4,7 @@ from typing import Any, Dict, List, Literal, Optional, Union
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
+from warprec.errors import ConfigurationError, DataNotFoundError
 from warprec.utils.config.common import read_configuration_file
 
 API_KEY_ENV = "WARPREC_API_KEY"
@@ -48,10 +49,12 @@ class ServerSettings(BaseModel):
             str: The prefix, unchanged.
 
         Raises:
-            ValueError: If it does not start with a slash.
+            ConfigurationError: If it does not start with a slash.
         """
         if not value.startswith("/"):
-            raise ValueError(f"route_prefix must start with '/', got '{value}'.")
+            raise ConfigurationError(
+                f"route_prefix must start with '/', got '{value}'."
+            )
         return value
 
     def effective_api_key(self) -> Optional[str]:
@@ -111,14 +114,14 @@ class DeploymentSettings(BaseModel):
             DeploymentSettings: The validated settings.
 
         Raises:
-            ValueError: If both a fixed num_replicas and autoscaling_config are set,
+            ConfigurationError: If both a fixed num_replicas and autoscaling_config are set,
                 or num_replicas is below one.
         """
         if isinstance(self.num_replicas, int):
             if self.num_replicas < 1:
-                raise ValueError("num_replicas must be at least 1.")
+                raise ConfigurationError("num_replicas must be at least 1.")
             if self.autoscaling_config is not None:
-                raise ValueError(
+                raise ConfigurationError(
                     "Set either a fixed num_replicas or autoscaling_config, not both."
                 )
         return self
@@ -182,13 +185,13 @@ class ItemMetadata(BaseModel):
             Any: The columns, each as a mapping.
 
         Raises:
-            ValueError: If an attribute uses a name every item already carries.
+            ConfigurationError: If an attribute uses a name every item already carries.
         """
         if not isinstance(value, dict):
             return value
         reserved = sorted(RESERVED_ATTRIBUTES & set(value))
         if reserved:
-            raise ValueError(
+            raise ConfigurationError(
                 f"Attribute names {reserved} are reserved: every item already has them."
             )
         return {
@@ -208,10 +211,10 @@ class ItemMetadata(BaseModel):
             str: The path, unchanged.
 
         Raises:
-            ValueError: If there is no file at that path.
+            DataNotFoundError: If there is no file at that path.
         """
         if not Path(value).is_file():
-            raise ValueError(f"Item metadata file '{value}' does not exist.")
+            raise DataNotFoundError(f"Item metadata file '{value}' does not exist.")
         return value
 
 
@@ -271,10 +274,10 @@ class EndpointConfig(BaseModel):
             str: The name, unchanged.
 
         Raises:
-            ValueError: If the name is reserved.
+            ConfigurationError: If the name is reserved.
         """
         if value.lower() in RESERVED_NAMES:
-            raise ValueError(f"'{value}' is a reserved name.")
+            raise ConfigurationError(f"'{value}' is a reserved name.")
         return value
 
     @field_validator("device", mode="before")
@@ -293,10 +296,10 @@ class EndpointConfig(BaseModel):
             Any: The device, unchanged.
 
         Raises:
-            ValueError: If it names a CUDA device by number.
+            ConfigurationError: If it names a CUDA device by number.
         """
         if isinstance(value, str) and value.startswith("cuda:"):
-            raise ValueError(
+            raise ConfigurationError(
                 f"device '{value}' cannot be honoured: Ray shows each replica only "
                 "the GPUs it assigned, as cuda:0. Use device: cuda, and choose GPUs "
                 "with deployment.ray_actor_options (num_gpus, accelerator_type)."
@@ -315,10 +318,10 @@ class EndpointConfig(BaseModel):
             str: The path, unchanged.
 
         Raises:
-            ValueError: If there is no file at that path.
+            DataNotFoundError: If there is no file at that path.
         """
         if not Path(value).is_file():
-            raise ValueError(f"Checkpoint '{value}' does not exist.")
+            raise DataNotFoundError(f"Checkpoint '{value}' does not exist.")
         return value
 
     @model_validator(mode="after")
@@ -329,10 +332,10 @@ class EndpointConfig(BaseModel):
             EndpointConfig: The validated endpoint.
 
         Raises:
-            ValueError: If default_k exceeds max_k.
+            ConfigurationError: If default_k exceeds max_k.
         """
         if self.default_k > self.max_k:
-            raise ValueError(
+            raise ConfigurationError(
                 f"default_k ({self.default_k}) cannot exceed max_k ({self.max_k})."
             )
         return self
@@ -383,12 +386,14 @@ class ServingConfiguration(BaseModel):
             ServingConfiguration: The validated configuration.
 
         Raises:
-            ValueError: If a name repeats.
+            ConfigurationError: If a name repeats.
         """
         names = [endpoint.name for endpoint in self.endpoints]
         duplicates = sorted({name for name in names if names.count(name) > 1})
         if duplicates:
-            raise ValueError(f"Endpoint names must be unique, repeated: {duplicates}.")
+            raise ConfigurationError(
+                f"Endpoint names must be unique, repeated: {duplicates}."
+            )
         return self
 
     def portable(self) -> "ServingConfiguration":

@@ -3,6 +3,7 @@ from typing import Dict, Optional
 
 from pydantic import BaseModel, field_validator
 
+from warprec.errors import ConfigurationError
 from warprec.utils.enums import ErroredTrialPolicy, ResumeMode
 
 # A run name becomes a path component locally and a blob key on Azure,
@@ -54,12 +55,12 @@ class WarpRecRunConfig(BaseModel):
             Optional[str]: The validated run name.
 
         Raises:
-            ValueError: If the run name contains unsupported characters.
+            ConfigurationError: If the run name contains unsupported characters.
         """
         if v is None:
             return None
         if not _SAFE_RUN_NAME.match(v):
-            raise ValueError(
+            raise ConfigurationError(
                 f"Run name '{v}' is not valid. It must start with a letter or a "
                 "digit and contain only letters, digits, '.', '_' and '-'."
             )

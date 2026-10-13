@@ -1,6 +1,7 @@
 from typing import Any, Optional, Union
 
 from pydantic import BaseModel, model_validator, field_validator, Field
+from warprec.errors import ConfigurationError
 from warprec.utils.config.common import check_seed
 from warprec.utils.enums import SplittingStrategies
 from warprec.utils.logger import logger
@@ -46,7 +47,7 @@ class SplitStrategy(BaseModel):
         """Validate timestamp."""
         if v and isinstance(v, str):
             if v != "best":
-                raise ValueError(
+                raise ConfigurationError(
                     f"Timestamp must be either an integer or 'best'. You passed {v}."
                 )
         return v
@@ -56,14 +57,14 @@ class SplitStrategy(BaseModel):
         """This method checks if the required information have been passed to the configuration.
 
         Raise:
-            ValueError: If an important field has not been filled with the correct information.
+            ConfigurationError: If an important field has not been filled with the correct information.
             Warning: If a field that will not be used during the experiment has been filled.
         """
         # ValueError checks
         if self.strategy is not None:
             for name in self.strategy.required_parameters():
                 if getattr(self, name) is None:
-                    raise ValueError(
+                    raise ConfigurationError(
                         f"You have chosen {self.strategy.value} splitting but "
                         f"the '{name}' field has not been filled."
                     )
@@ -158,24 +159,24 @@ class SplittingConfig(BaseModel):
             SplittingConfig: The validated configuration.
 
         Raises:
-            ValueError: If the ratio values for test and validation set are too high.
+            ConfigurationError: If the ratio values for test and validation set are too high.
         """
         tol = 1e-6  # Tolerance will be used to check ratios
 
         if self.test_splitting.strategy is None:
-            raise ValueError(
+            raise ConfigurationError(
                 "The test requires a splitting strategy, but none have been provided."
             )
 
         if self.test_splitting.ratio and self.validation_splitting.ratio:
             if self.test_splitting.ratio + self.validation_splitting.ratio + tol >= 1.0:
-                raise ValueError(
+                raise ConfigurationError(
                     "The test and validation ratios are too high and "
                     "there is no space for train set. Check you values."
                 )
 
         if self.test_splitting.strategy == SplittingStrategies.K_FOLD_CROSS_VALIDATION:
-            raise ValueError(
+            raise ConfigurationError(
                 "The test set cannot be created with k-fold-cross-validation. "
                 "Choose another strategy"
             )
@@ -191,7 +192,7 @@ class SplittingConfig(BaseModel):
                 SplitSpec(**self.validation_splitting.model_dump()),
             )
         except ValueError as error:
-            raise ValueError(
+            raise ConfigurationError(
                 f"'splitter.validation_splitting' is refused. {error}"
             ) from error
 

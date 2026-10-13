@@ -6,6 +6,12 @@ from typing import Optional, Type, List, Dict, Any
 
 from pydantic import BaseModel, field_validator, model_validator, Field
 
+from warprec.errors import (
+    ConfigurationError,
+    CustomModuleError,
+    DataNotFoundError,
+    ExtensionError,
+)
 from warprec.utils.helpers import is_python_module
 from warprec.utils.callback import WarpRecCallback
 
@@ -27,7 +33,7 @@ class WarpRecCallbackConfig(BaseModel):
         the parameters passed in args are correct.
 
     Raises:
-        ValueError: If the callback script cannot be found or is incorrect.
+        ConfigurationError: If the callback script cannot be found or is incorrect.
     """
 
     callback_path: Optional[str] = None
@@ -43,17 +49,17 @@ class WarpRecCallbackConfig(BaseModel):
             return None
 
         if not isinstance(v, str):
-            raise ValueError(
+            raise ConfigurationError(
                 f"Callback script path must be a string, got: {type(v).__name__}."
             )
 
         if not v.endswith(".py"):
-            raise ValueError(
+            raise ConfigurationError(
                 f"Callback script path must be a Python file ('.py' extension), got: {v}."
             )
 
         if not os.path.exists(v):
-            raise ValueError(f"Callback script file not found at path: {v}.")
+            raise DataNotFoundError(f"Callback script file not found at path: {v}.")
 
         return v
 
@@ -66,10 +72,14 @@ class WarpRecCallbackConfig(BaseModel):
             return self
 
         if self.callback_path is None and self.callback_name is not None:
-            raise ValueError("callback_name cannot be provided without callback_path.")
+            raise ConfigurationError(
+                "callback_name cannot be provided without callback_path."
+            )
 
         if self.callback_path is not None and self.callback_name is None:
-            raise ValueError("callback_path cannot be provided without callback_name.")
+            raise ConfigurationError(
+                "callback_path cannot be provided without callback_name."
+            )
 
         # Here we know that both field are provided, so we need
         # to check if the implementation exists
@@ -80,7 +90,7 @@ class WarpRecCallbackConfig(BaseModel):
             )
             return self
         except Exception as e:
-            raise ValueError(f"Error validating custom callback: {e}") from e
+            raise ExtensionError(f"Error validating custom callback: {e}") from e
 
     def _load_and_validate_custom_callback_class(
         self, module_path: str, class_name: str
@@ -96,12 +106,14 @@ class WarpRecCallbackConfig(BaseModel):
 
             spec = importlib.util.spec_from_file_location(mod_path.stem, mod_path)
             if spec is None:
-                raise ImportError(f"Could not load spec for module: {module_path}.")
+                raise CustomModuleError(
+                    f"Could not load spec for module: {module_path}."
+                )
             module = importlib.util.module_from_spec(spec)
             spec.loader.exec_module(module)
 
             if not hasattr(module, class_name):
-                raise ValueError(
+                raise ConfigurationError(
                     f"Class '{class_name}' not found in module: {module_path}."
                 )
 
@@ -110,7 +122,7 @@ class WarpRecCallbackConfig(BaseModel):
             # Check if the specified class is an implementation of
             # WarpRec custom callback
             if not issubclass(loaded_class, WarpRecCallback):
-                raise ValueError(
+                raise ExtensionError(
                     f"Class '{class_name}' must inherit from 'WarpRecCallback'."
                 )
 
@@ -178,7 +190,9 @@ class GeneralConfig(BaseModel):
         """Validate backend."""
         if v in ("polars", "pandas"):
             return v
-        raise ValueError(f'Backend {v} is not supported. Use "polars" or "pandas".')
+        raise ConfigurationError(
+            f'Backend {v} is not supported. Use "polars" or "pandas".'
+        )
 
     @field_validator("custom_modules")
     @classmethod
@@ -190,15 +204,17 @@ class GeneralConfig(BaseModel):
         if isinstance(v, str):
             if is_python_module(v):
                 return [v]
-            raise ValueError(f"Custom module path '{v}' is not a valid Python module.")
+            raise ConfigurationError(
+                f"Custom module path '{v}' is not a valid Python module."
+            )
 
         for path in v:
             if not isinstance(path, str):
-                raise ValueError(
+                raise ConfigurationError(
                     f"Each custom module path must be a string, got: {path}."
                 )
             if not is_python_module(path):
-                raise ValueError(
+                raise ConfigurationError(
                     f"Custom module path '{path}' is not a valid Python module."
                 )
         return v
