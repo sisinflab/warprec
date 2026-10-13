@@ -575,7 +575,7 @@ def load_train_configuration(path: str) -> TrainConfiguration:
         a TrainConfiguration object.
 
     A file that is not a valid train configuration raises one
-    ConfigurationError listing every invalid key; a missing file, or missing
+    ConfigurationError listing the invalid keys; a missing file, or missing
     training data it names, raises DataNotFoundError (see
     read_configuration_file).
 
@@ -596,7 +596,7 @@ def load_design_configuration(path: str) -> DesignConfiguration:
         a DesignConfiguration object.
 
     A file that is not a valid design configuration raises one
-    ConfigurationError listing every invalid key; a missing file, or missing
+    ConfigurationError listing the invalid keys; a missing file, or missing
     training data it names, raises DataNotFoundError (see
     read_configuration_file).
 
@@ -617,7 +617,7 @@ def load_eval_configuration(path: str) -> EvalConfiguration:
         a EvalConfiguration object.
 
     A file that is not a valid eval configuration raises one
-    ConfigurationError listing every invalid key; a missing file, or missing
+    ConfigurationError listing the invalid keys; a missing file, or missing
     training data it names, raises DataNotFoundError (see
     read_configuration_file).
 
@@ -638,7 +638,7 @@ def load_estimate_configuration(path: str) -> EstimateConfiguration:
         a EstimateConfiguration object.
 
     A file that is not a valid estimate configuration raises one
-    ConfigurationError listing every invalid key; a missing file, or missing
+    ConfigurationError listing the invalid keys; a missing file, or missing
     training data it names, raises DataNotFoundError (see
     read_configuration_file).
 

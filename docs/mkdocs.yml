@@ -132,6 +132,7 @@ nav:
       - Rating: api-reference/metrics/rating.md
       - Multiobjective: api-reference/metrics/multiobjective.md
       - Debiased: api-reference/metrics/debiased.md
+    - Errors: api-reference/errors.md
 
 theme:
   name: material
@@ -224,3 +225,4 @@ plugins:
           - api-reference/data/*.md
           - api-reference/recommenders/*.md
           - api-reference/metrics/*.md
+          - api-reference/errors.md

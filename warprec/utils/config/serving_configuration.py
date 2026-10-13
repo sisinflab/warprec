@@ -430,7 +430,7 @@ def load_serving_configuration(path: Union[str, Path]) -> ServingConfiguration:
     """Read and validate a serving configuration file.
 
     A file that is not a valid serving configuration raises one
-    ConfigurationError listing every invalid key; a missing file raises
+    ConfigurationError listing the invalid keys; a missing file raises
     DataNotFoundError (see read_configuration_file).
 
     Args:

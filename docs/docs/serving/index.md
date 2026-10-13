@@ -64,6 +64,8 @@ warprec.serve -c serve.yml
 
 The command blocks until it is stopped. Ctrl-C at a terminal and `SIGTERM` from a process manager or a container both shut it down cleanly.
 
+An invalid `serve.yml` or a missing checkpoint is printed as one line, `<ClassName>: <message>`, and the command exits with status 1; `--debug` shows the full traceback. See [Errors](../api-reference/errors.md).
+
 ## API
 
 Every route but `/healthz` requires the `X-API-Key` header when an API key is configured.

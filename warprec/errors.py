@@ -28,7 +28,7 @@ class ConfigurationError(WarpRecError, ValueError):
     Raised for a configuration file, and for the objects built from one: model
     hyperparameters, search spaces, optimizer and scheduler names, filter and
     splitter parameters. Loading a configuration file raises a single
-    ConfigurationError that lists every invalid key.
+    ConfigurationError that lists the invalid keys.
 
     Args:
         message (str): What is wrong and how to fix it.

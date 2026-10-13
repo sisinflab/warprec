@@ -68,7 +68,7 @@ The stash is passed as keyword arguments to every model and, through the evaluat
 - given to models: `name`, `params`, `info`, `interactions`, `transactions`, `knowledge`, `multimodal`, `sessions`, `seed`, `block_size`, `chunk_size`, `checkpoint`, `strict`;
 - given to metrics: `k`, `num_users`, `num_items`, `item_interactions`, `item_indices`, `train_matrix`, `feature_lookup`, `user_cluster`, `item_cluster`, `propensity`.
 
-`add_to_stash` raises a `ValueError` naming the key as soon as one is added. An entry written into the dictionary `get_stash()` returns is checked where the stash is passed on, when a model or the evaluator is built.
+`add_to_stash` raises an [`ExtensionError`](../api-reference/errors.md) (a `ValueError`) naming the key as soon as one is added. An entry written into the dictionary `get_stash()` returns is checked where the stash is passed on, when a model or the evaluator is built.
 
 !!! note
 

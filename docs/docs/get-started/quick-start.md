@@ -88,6 +88,8 @@ evaluation:
 python -m warprec.run -c path/to/config.yml -p design
 ```
 
+If the configuration has a mistake, WarpRec lists every invalid key and exits; add `--debug` to see the full traceback.
+
 WarpRec will:
 
 1. Load and parse the dataset from the local path.

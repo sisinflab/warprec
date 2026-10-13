@@ -59,8 +59,9 @@ class Labels(BaseModel):
 def read_configuration_file(path: Union[str, Path], schema: Type[T], kind: str) -> T:
     """Read a YAML configuration file and validate it against its schema.
 
-    Every invalid key is reported at once, in one ConfigurationError, rather
-    than as pydantic's own error.
+    The invalid keys pydantic finds are reported together, in one
+    ConfigurationError, rather than as pydantic's own error. The checks that
+    compare sections run only once every section is valid on its own.
 
     Args:
         path (Union[str, Path]): The YAML file.
