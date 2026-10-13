@@ -19,9 +19,9 @@ class GuideCallback(WarpRecCallback):
     a line to events.jsonl naming the process it ran in, which is how the guide
     shows where WarpRec calls it.
 
-    The callback is pickled to reach Ray workers (the data preparation and every
-    trial of the train pipeline), so it holds paths and small lists only, never
-    the data itself.
+    The train and swarm pipelines pickle the callback to the Ray worker that
+    prepares the data, so it holds paths and small lists only, never the data
+    itself.
 
     Args:
         *args (Any): The configuration's 'args', unused here.

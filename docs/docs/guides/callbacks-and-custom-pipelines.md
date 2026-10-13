@@ -11,8 +11,8 @@ and decides everything itself. This guide covers:
   and `on_evaluation_complete` see each model, and `on_trial_result`, a Ray
   Tune hook, records every validation report;
 - where each hook runs: all of them in your process for the design pipeline,
-  but split between a Ray worker and your process for the train pipeline, and
-  what that means for state the callback keeps;
+  split between a Ray worker and your process for the train and swarm
+  pipelines, and what that means for state the callback keeps;
 - a custom metric that reads what the callback put in the stash, end to end;
 - a pipeline written against the Python API with no configuration at all:
   read, filter, split, build the datasets, select hyperparameters on
@@ -27,11 +27,12 @@ describe the same interfaces in prose.
 
 ## Running it
 
-`pip install warprec jupyter`. Runs in three to five minutes on a laptop CPU, most of it Ray starting processes for the train pipeline. It reads MovieLens-100K through `guide_data.movielens_100k()`, which downloads and converts it exactly as guide 1 shows. Clone the repository, or download the guide's folder together with `guides/guide_data.py`, and open the notebook from its own folder: the configuration files refer to the data relative to it.
+`pip install warprec jupyter`. Runs in about three minutes on a laptop CPU, most of it Ray starting processes for the train and swarm pipelines. It reads MovieLens-100K through `guide_data.movielens_100k()`, which downloads and converts it exactly as guide 1 shows. Clone the repository, or download the guide's folder together with `guides/guide_data.py`, and open the notebook from its own folder: the configuration files refer to the data relative to it.
 
 ## Files
 
 - [`configs/design.yml`](https://github.com/sisinflab/warprec/blob/main/guides/16-callbacks-and-custom-pipelines/configs/design.yml)
+- [`configs/swarm.yml`](https://github.com/sisinflab/warprec/blob/main/guides/16-callbacks-and-custom-pipelines/configs/swarm.yml)
 - [`configs/train.yml`](https://github.com/sisinflab/warprec/blob/main/guides/16-callbacks-and-custom-pipelines/configs/train.yml)
 - [`user_code/`](https://github.com/sisinflab/warprec/blob/main/guides/16-callbacks-and-custom-pipelines/user_code)
 

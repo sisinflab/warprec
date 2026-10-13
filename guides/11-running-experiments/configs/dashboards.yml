@@ -37,7 +37,7 @@ dashboard:
   codecarbon:
     enabled: true
     save_to_file: true
-    tracking_mode: machine
+    tracking_mode: process
   mlflow:
     enabled: true
     tracking_uri: ../runs/11-running-experiments/mlruns
