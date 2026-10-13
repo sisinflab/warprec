@@ -53,6 +53,11 @@ WarpRec supports **CodeCarbon** via Ray to monitor energy consumption and carbon
 - **save_to_api**: Whether to send results to the CodeCarbon API. Defaults to `False`.
 - **save_to_file**: Whether to save results locally to a file. Defaults to `False`.
 - **tracking_mode**: Tracking mode for CodeCarbon. Options are `machine` or `process`.
+    - `machine` measures the whole machine while a trial runs, whichever process it runs in.
+    - `process` measures the process the trial trains in (the Ray Train worker), not the Ray Tune driver that waits for it. The trial measures itself and the driver appends its row to `emissions.csv`, one row per trial and session. With `save_to_api`, the trial sends its emissions to the API itself, so the API settings must be readable there: put them in `~/.codecarbon.config` or in the `CODECARBON_EXPERIMENT_ID` and `CODECARBON_API_KEY` environment variables rather than in a `.codecarbon.config` next to the configuration. A session cut short by a pause writes no row under `process`.
+
+!!! warning "Location in emissions.csv"
+    CodeCarbon looks up where the machine is from its IP address and writes it to every row of `emissions.csv`: country, region and, on a machine outside a cloud provider, latitude and longitude. WarpRec cannot leave these columns out (the file's columns are CodeCarbon's), so clear them before sharing the file, for example with `pandas`: `df[["country_name", "country_iso_code", "region", "longitude", "latitude"]] = None`.
 
 When using the **save_to_api** feature, the main to correctly track the experiment is to create a `.codecarbon.config` file which contains the following information:
 

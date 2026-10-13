@@ -441,6 +441,15 @@ class Trainer:
             "cpu_per_worker": (
                 scaling_config_dict.get("resources_per_worker") or {}
             ).get("CPU"),
+            # CodeCarbon's 'process' tracking has to run where the trial trains
+            "codecarbon": next(
+                (
+                    callback.trial_settings()
+                    for callback in self._callbacks
+                    if DASHBOARD_AVAILABLE and isinstance(callback, CodeCarbonCallback)
+                ),
+                None,
+            ),
         }
 
         num_folds = len(dataset) if isinstance(dataset, list) else 0
@@ -470,6 +479,7 @@ class Trainer:
                 "params": config,
                 "last_logged_epoch": logged_epochs.get(trial_id),
                 "session_id": session_id,
+                "trial_id": trial_id,
             }
 
             trainer = TorchTrainer(

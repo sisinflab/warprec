@@ -1,8 +1,14 @@
 # pylint: disable=unused-argument, protected-access
+import json
 import os
-from typing import Dict
+import uuid
+from contextlib import contextmanager
+from dataclasses import asdict
+from typing import Any, Dict, Iterator, Optional
 
 from codecarbon import EmissionsTracker
+from codecarbon.output_methods.emissions_data import EmissionsData
+from codecarbon.output_methods.file import FileOutput
 from ray import tune
 from ray.air.integrations.mlflow import MLflowLoggerCallback
 from ray.air.integrations.wandb import WandbLoggerCallback
@@ -53,12 +59,67 @@ class WarpRecMLflowLoggerCallback(MLflowLoggerCallback):
         super().log_trial_result(iteration, trial, renamed)
 
 
+TRIAL_EMISSIONS_DIR = ".codecarbon_trials"
+
+
+@contextmanager
+def trial_emissions(
+    settings: Optional[Dict[str, Any]], trial_id: Optional[str]
+) -> Iterator[None]:
+    """Measure the emissions of the process a trial trains in.
+
+    CodeCarbon's 'process' mode measures the process that starts the tracker,
+    and the driver's Ray Tune callback runs in the driver, not where the trial
+    trains. With 'process' tracking the trial therefore measures itself. It
+    sends its emissions to the CodeCarbon API itself, when asked to, and leaves
+    them for the driver's callback to append to 'emissions.csv', so that one
+    process writes the file.
+
+    Args:
+        settings (Optional[Dict[str, Any]]): What 'CodeCarbonCallback.trial_settings'
+            returned, or None when the trial is not measured.
+        trial_id (Optional[str]): The Ray Tune trial, the project name of the row.
+
+    Yields:
+        None: While the trial trains.
+    """
+    if settings is None:
+        yield
+        return
+
+    tracker = EmissionsTracker(
+        project_name=trial_id,
+        save_to_api=settings["save_to_api"],
+        save_to_file=False,
+        output_dir=settings["output_dir"],
+        tracking_mode="process",
+        log_level="error",
+    )
+    tracker.start()
+    try:
+        yield
+    finally:
+        tracker.stop()
+        data = getattr(tracker, "final_emissions_data", None)
+        if settings["save_to_file"] and data is not None:
+            folder = os.path.join(settings["output_dir"], TRIAL_EMISSIONS_DIR)
+            os.makedirs(folder, exist_ok=True)
+            path = os.path.join(folder, f"{trial_id}-{uuid.uuid4().hex}.json")
+            with open(path, "w", encoding="utf-8") as file:
+                json.dump(asdict(data), file)
+
+
 class CodeCarbonCallback(tune.Callback):
     """Custom CodeCarbon callback for Ray Tune.
 
     The tracker of a trial is stopped, and its emissions written, when the trial
     completes or fails, or when the experiment ends with the trial still
     running, as an interrupted sweep does.
+
+    With 'machine' tracking the trackers run here, on the driver, since the
+    machine is the same from any process on it. With 'process' tracking each
+    trial measures the process it trains in (see 'trial_emissions'), and this
+    callback only appends the rows the trials leave to 'emissions.csv'.
     """
 
     def __init__(
@@ -75,7 +136,46 @@ class CodeCarbonCallback(tune.Callback):
         self.trackers: Dict[str, EmissionsTracker] = {}
         os.makedirs(self.output_dir, exist_ok=True)
 
+    def trial_settings(self) -> Optional[Dict[str, Any]]:
+        """What a trial needs to measure itself.
+
+        Returns:
+            Optional[Dict[str, Any]]: The settings 'trial_emissions' takes, or
+                None when the trials are measured from the driver.
+        """
+        if self.tracking_mode != "process":
+            return None
+        return {
+            "save_to_api": self.save_to_api,
+            "save_to_file": self.save_to_file,
+            "output_dir": self.output_dir,
+        }
+
+    def _write_trial_rows(self, trial_id: Optional[str] = None) -> None:
+        """Append to 'emissions.csv' the rows trials measured themselves.
+
+        Args:
+            trial_id (Optional[str]): The trial whose rows to write, or None
+                for every trial.
+        """
+        folder = os.path.join(self.output_dir, TRIAL_EMISSIONS_DIR)
+        if not os.path.isdir(folder):
+            return
+        output = FileOutput("emissions.csv", self.output_dir, on_csv_write="append")
+        for name in sorted(os.listdir(folder)):
+            if trial_id is not None and not name.startswith(f"{trial_id}-"):
+                continue
+            path = os.path.join(folder, name)
+            with open(path, encoding="utf-8") as file:
+                data = EmissionsData(**json.load(file))
+            output.out(data, data)
+            os.remove(path)
+        if not os.listdir(folder):
+            os.rmdir(folder)
+
     def on_trial_start(self, iteration, trials, trial, **info):
+        if self.tracking_mode == "process":
+            return
         tracker = EmissionsTracker(
             project_name=trial.trial_id,  # Tag each row with its trial
             save_to_api=self.save_to_api,
@@ -89,13 +189,19 @@ class CodeCarbonCallback(tune.Callback):
 
     def on_trial_complete(self, iteration, trials, trial, **info):
         self._stop_tracker(trial.trial_id)
+        if self.save_to_file:
+            self._write_trial_rows(trial.trial_id)
 
     def on_trial_error(self, iteration, trials, trial, **info):
         self._stop_tracker(trial.trial_id)
+        if self.save_to_file:
+            self._write_trial_rows(trial.trial_id)
 
     def on_experiment_end(self, trials, **info):
         for trial_id in list(self.trackers):
             self._stop_tracker(trial_id)
+        if self.save_to_file:
+            self._write_trial_rows()
 
     def _stop_tracker(self, trial_id):
         tracker = self.trackers.pop(trial_id, None)
