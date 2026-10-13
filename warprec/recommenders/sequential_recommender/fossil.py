@@ -10,7 +10,6 @@ from warprec.recommenders.base_recommender import (
 )
 from warprec.recommenders.losses import BPRLoss, EmbLoss
 from warprec.data.entities import Interactions, Sessions
-from warprec.utils.enums import DataLoaderType
 from warprec.utils.registry import model_registry
 
 
@@ -30,7 +29,6 @@ class FOSSIL(IterativeRecommender, SequentialRecommenderUtils):
         **kwargs (Any): Arbitrary keyword arguments.
 
     Attributes:
-        DATALOADER_TYPE: The type of dataloader used.
         embedding_size (int): The dimension of the item embeddings.
         order_len (int): The number of last items to consider for high-order Markov chains.
         alpha (float): The parameter for calculating similarity.
@@ -43,9 +41,6 @@ class FOSSIL(IterativeRecommender, SequentialRecommenderUtils):
         needs_user: True, because predict mixes a user embedding into the
             sequence, so a session needs a known user.
     """
-
-    # Dataloader definition
-    DATALOADER_TYPE = DataLoaderType.SEQUENTIAL_LOADER_WITH_USER_ID
 
     # Model hyperparameters
     embedding_size: int

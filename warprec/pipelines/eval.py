@@ -4,6 +4,7 @@ from typing import Dict, Any
 
 import torch
 
+from warprec.data.stash import MODEL_ARGUMENTS, check_stash
 from warprec.common import initialize_datasets, log_evaluation
 from warprec.data import Dataset
 from warprec.data.reader import ReaderFactory
@@ -142,7 +143,7 @@ def _load_or_build_model(
         sessions=dataset.train_session,
         seed=params.optimization.properties.seed,
         info=dataset.info(),
-        **dataset.get_stash(),
+        **check_stash(dataset.get_stash(), MODEL_ARGUMENTS, "model"),
         block_size=block_size,
         chunk_size=chunk_size,
     )

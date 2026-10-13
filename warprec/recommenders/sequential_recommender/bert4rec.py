@@ -10,7 +10,6 @@ from warprec.recommenders.base_recommender import (
 )
 from warprec.recommenders.losses import BPRLoss, EmbLoss
 from warprec.data.entities import Interactions, Sessions
-from warprec.utils.enums import DataLoaderType
 from warprec.utils.registry import model_registry
 
 
@@ -32,7 +31,6 @@ class BERT4Rec(IterativeRecommender, SequentialRecommenderUtils):
         **kwargs (Any): Arbitrary keyword arguments.
 
     Attributes:
-        DATALOADER_TYPE: The type of dataloader used.
         embedding_size (int): The dimension of the item embeddings (hidden_size).
         n_layers (int): The number of transformer encoder layers.
         n_heads (int): The number of attention heads in the transformer.
@@ -48,9 +46,6 @@ class BERT4Rec(IterativeRecommender, SequentialRecommenderUtils):
         neg_samples (int): The number of negative samples for BPR loss.
         max_seq_len (int): The maximum length of sequences.
     """
-
-    # Dataloader definition
-    DATALOADER_TYPE = DataLoaderType.CLOZE_MASK_LOADER
 
     # Model hyperparameters
     embedding_size: int

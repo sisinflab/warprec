@@ -78,7 +78,10 @@ class ItemMADRating(TopKMetric):
         # Filter only Relevant items (True Positives)
         # We select elements from global_indices and top_k_values where relevance_mask is True
         relevant_indices = torch.masked_select(top_k_indices, rel_mask)
-        relevant_scores = torch.masked_select(top_k_values, rel_mask)
+        # In the accumulators' precision: float64 when the model scores in float64.
+        relevant_scores = torch.masked_select(top_k_values, rel_mask).to(
+            self.item_gains.dtype
+        )
 
         if relevant_indices.numel() > 0:
             # Accumulate counts (1 for every relevant appearance)
@@ -94,7 +97,7 @@ class ItemMADRating(TopKMetric):
         recommended_mask = self.item_counts > 0
 
         if not recommended_mask.any():
-            return {self.name: torch.tensor(0.0)}
+            return {self.name: 0.0}
 
         item_avg_ratings = torch.zeros_like(self.item_gains)
         item_avg_ratings[recommended_mask] = (
@@ -116,7 +119,7 @@ class ItemMADRating(TopKMetric):
         valid_clusters = cluster_counts > 0
 
         if not valid_clusters.any():
-            return {self.name: torch.tensor(0.0)}
+            return {self.name: 0.0}
 
         cluster_means = (
             cluster_sum_ratings[valid_clusters] / cluster_counts[valid_clusters]

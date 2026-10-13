@@ -75,7 +75,7 @@ class Gini(TopKMetric):
             or self.num_items == 0
             or self.free_norm == 0
         ):
-            return {self.name: torch.tensor(0.0)}
+            return {self.name: 0.0}
 
         n_rec_items = recommended_counts.numel()
         sorted_counts, _ = torch.sort(recommended_counts)

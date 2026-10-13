@@ -13,7 +13,6 @@ from warprec.recommenders.collaborative_filtering_recommender.graph_based import
     GraphRecommenderUtils,
 )
 from warprec.recommenders.losses import BPRLoss, EmbLoss, InfoNCELoss
-from warprec.utils.enums import DataLoaderType
 from warprec.utils.registry import model_registry
 
 
@@ -37,7 +36,6 @@ class PAAC(GraphRecommenderUtils, IterativeRecommender):
         **kwargs (Any): Forwarded to parent constructors.
 
     Attributes:
-        DATALOADER_TYPE: POS_NEG_LOADER — yields (user, pos_item, neg_item) triples.
         embedding_size (int): Embedding dimensionality.
         n_layers (int): LightGCN propagation depth.
         lambda1 (float): Weight on the supervised alignment loss (λ₁).
@@ -52,9 +50,6 @@ class PAAC(GraphRecommenderUtils, IterativeRecommender):
         epochs (int): Maximum training epochs.
         learning_rate (float): Adam learning rate.
     """
-
-    # Dataloader definition
-    DATALOADER_TYPE = DataLoaderType.POS_NEG_LOADER
 
     # Model hyperparameters
     embedding_size: int

@@ -11,7 +11,6 @@ from .enums import (
     Schedulers,
     SearchSpace,
     MetricBlock,
-    DataLoaderType,
 )
 from .pause import PauseController, RunPaused, is_pause_requested
 from .helpers import (
@@ -48,7 +47,6 @@ __all__ = [
     "Schedulers",
     "SearchSpace",
     "MetricBlock",
-    "DataLoaderType",
     "PauseController",
     "RunPaused",
     "is_pause_requested",

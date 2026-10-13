@@ -11,7 +11,6 @@ from warprec.recommenders.knowledge_aware_recommender.knowledge_utils import (
     KnowledgeRecommenderUtils,
 )
 from warprec.recommenders.losses import BPRLoss, EmbLoss
-from warprec.utils.enums import DataLoaderType
 from warprec.utils.registry import model_registry
 
 
@@ -40,7 +39,6 @@ class CKE(KnowledgeRecommenderUtils, IterativeRecommender):
         **kwargs (Any): Arbitrary keyword arguments.
 
     Attributes:
-        DATALOADER_TYPE: The type of dataloader used.
         embedding_size (int): The width of the collaborative and entity factors.
         kg_embedding_size (int): The width of the space a relation projects into.
         reg_weight (float): The L2 regularization weight of the recommendation part.
@@ -49,8 +47,6 @@ class CKE(KnowledgeRecommenderUtils, IterativeRecommender):
         epochs (int): The number of epochs.
         learning_rate (float): The learning rate value.
     """
-
-    DATALOADER_TYPE = DataLoaderType.POS_NEG_LOADER
 
     embedding_size: int
     kg_embedding_size: int

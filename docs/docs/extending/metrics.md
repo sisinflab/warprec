@@ -45,6 +45,15 @@ For the **UserAverageTopKMetric** interface, we don't need to worry about accumu
 
     The number of users is not always fixed. We often only consider users who have **at least one relevant item** in the ground truth for evaluation. This ensures the denominator reflects only *valid* evaluation cases.
 
+### What `compute` Returns
+
+`compute()` returns a dictionary from the names the metric reports under to their values, and every value takes one of two shapes:
+
+- a **per-user tensor**, one entry per user index (`num_users` long), for a metric averaged over users. Users the metric does not apply to hold NaN. The number a run logs and writes is its `nanmean`, the per-user files hold the whole vector, and the significance tests compare two models user by user on it. `UserAverageTopKMetric` and `RatingMetric` return this shape for you.
+- a **Python float**, for a global value: a coverage count, a diversity index, a fairness score over clusters. It is written as it is and is left out of the significance tests.
+
+`Evaluator.compute_results()` holds every metric to this: a 0-d tensor, an integer or a NumPy number is turned into a float, and any other value (a tensor of another shape, a list) raises an error naming the metric.
+
 ---
 
 ## Metric Blocks
@@ -86,9 +95,13 @@ The following table summarizes the available Metric Blocks:
 | `TOP_K_BINARY_RELEVANCE` | The binary relevance (`[0, 1]`) of the top-$k$ predicted items, used in precision, recall, and hit-rate computations. Dim: `[batch_size, top_k]`. |
 | `TOP_K_DISCOUNTED_RELEVANCE` | The discounted relevance values of the top-$k$ predicted items, used in ranking-aware metrics such as nDCG. Dim: `[batch_size, top_k]`. |
 
-!!! warning
+### Declaring the Blocks
 
-    Declare every block your metric reads. The evaluator computes only the blocks some metric in the run asked for, so a metric that reads a block without declaring it works next to one that does, and fails when it is evaluated alone.
+The evaluator computes, once per batch, the blocks the metrics in the run declare, and passes `None` for the others. Declaring is what keeps evaluation efficient, and a metric that declares nothing still works:
+
+- **Nothing declared** (`_REQUIRED_COMPONENTS` left unset): the metric is handed every block, computed by the evaluator with the same ranking, tie breaking and re-ranking as the built-in metrics. It works whatever it reads, but every batch pays for the blocks no other metric needed.
+- **Blocks declared**: the metric is handed those, plus whatever the other metrics asked for. Declare every block it reads. The interfaces' `unpack_inputs` (and `BaseMetric.block`, which you can call yourself) compute a block that arrives missing or `None` from the ground truth, but a block read straight from the keyword arguments arrives as `None`.
+- **A metric that reads no block** (it reads the predictions or the ground truth alone) declares an empty set, `_REQUIRED_COMPONENTS = set()`, so that it costs nothing.
 
 ## Registering and Configuring a Metric
 
@@ -102,6 +115,8 @@ from warprec.utils.registry import metric_registry
 class RBP(UserAverageTopKMetric):
     ...
 ```
+
+A name already registered to a different class, built-in or not, is refused with an error naming both classes; names are compared ignoring case.
 
 Point `general.custom_modules` at the file (or package) that holds it. WarpRec imports it before the configuration is validated, so the metric can be named in either list of the `evaluation` section:
 

@@ -11,7 +11,6 @@ from torch.utils.data import DataLoader
 from warprec.data.entities import Interactions, Sessions
 from warprec.recommenders.base_recommender import IterativeRecommender
 from warprec.recommenders.losses import BPRLoss, EmbLoss
-from warprec.utils.enums import DataLoaderType
 from warprec.utils.registry import model_registry
 
 
@@ -134,7 +133,6 @@ class SimRec(IterativeRecommender):
         **kwargs (Any): Arbitrary keyword arguments.
 
     Attributes:
-        DATALOADER_TYPE: Uses POS_NEG_LOADER for BPR-style contrastive sampling of T2.
         embedding_size (int): Dimensionality of embedding vectors.
         n_teacher_layers (int): GCN propagation layers.
         n_student_layers (int): MLP FC layers.
@@ -154,9 +152,6 @@ class SimRec(IterativeRecommender):
         learning_rate (float): Adam LR for student.
         teacher_learning_rate (float): Adam LR for teacher.
     """
-
-    # Dataloader definition
-    DATALOADER_TYPE = DataLoaderType.POS_NEG_LOADER
 
     # Model hyperparameters
     embedding_size: int

@@ -9,6 +9,7 @@ import numpy as np
 import psutil
 import torch
 
+from warprec.data.stash import MODEL_ARGUMENTS, check_stash
 from warprec.common import initialize_datasets
 from warprec.data import Dataset
 from warprec.data.ranking import (
@@ -451,7 +452,7 @@ def _build_model(
         sessions=dataset.train_session,
         seed=seed,
         info=dataset.info(),
-        **dataset.get_stash(),
+        **check_stash(dataset.get_stash(), MODEL_ARGUMENTS, "model"),
         block_size=block_size,
         chunk_size=chunk_size,
     )
@@ -529,7 +530,7 @@ def _run_estimate_setup(  # pylint: disable = too-many-locals
             sessions=train_dataset.train_session,
             block_size=block_size,
             chunk_size=chunk_size,
-            **train_dataset.get_stash(),
+            **check_stash(train_dataset.get_stash(), MODEL_ARGUMENTS, "model"),
         )
         notes.append("Analytical train-space estimate")
         if estimate.get("notes"):

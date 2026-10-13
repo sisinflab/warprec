@@ -11,7 +11,6 @@ from warprec.recommenders.base_recommender import (
 )
 from warprec.recommenders.losses import EmbLoss
 from warprec.data.entities import Interactions, Sessions
-from warprec.utils.enums import DataLoaderType
 from warprec.utils.registry import model_registry
 
 
@@ -32,7 +31,6 @@ class DuoRec(IterativeRecommender, SequentialRecommenderUtils):
         **kwargs (Any): Arbitrary keyword arguments.
 
     Attributes:
-        DATALOADER_TYPE: The type of dataloader used.
         embedding_size (int): Dimension of item and position embeddings.
         n_layers (int): Number of transformer encoder layers.
         n_heads (int): Number of attention heads in the transformer.
@@ -52,8 +50,6 @@ class DuoRec(IterativeRecommender, SequentialRecommenderUtils):
         neg_samples (int): Number of negative samples for training.
         max_seq_len (int): Maximum length of input sequences.
     """
-
-    DATALOADER_TYPE = DataLoaderType.SEQUENTIAL_LOADER
 
     # Model hyperparameters
     embedding_size: int

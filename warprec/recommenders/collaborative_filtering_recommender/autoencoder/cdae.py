@@ -7,7 +7,6 @@ from torch import nn, Tensor
 from warprec.data.entities import Interactions, Sessions
 from warprec.recommenders.base_recommender import IterativeRecommender
 from warprec.recommenders.losses import EmbLoss
-from warprec.utils.enums import DataLoaderType
 from warprec.utils.registry import model_registry
 
 
@@ -29,7 +28,6 @@ class CDAE(IterativeRecommender):
         **kwargs (Any): Arbitrary keyword arguments.
 
     Attributes:
-        DATALOADER_TYPE: The type of dataloader used.
         embedding_size (int): The dimension of the user embeddings and the hidden layer.
         corruption (float): The probability of dropout applied to the input layer (denoising).
         hid_activation (str): The activation function for the hidden layer ('relu', 'tanh', 'sigmoid').
@@ -44,9 +42,6 @@ class CDAE(IterativeRecommender):
     Raises:
         ValueError: If the loss_type is not supported.
     """
-
-    # Dataloader definition
-    DATALOADER_TYPE = DataLoaderType.INTERACTION_LOADER_WITH_USER_ID
 
     # Model hyperparameters
     embedding_size: int

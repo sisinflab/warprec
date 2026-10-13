@@ -12,7 +12,6 @@ from warprec.recommenders.collaborative_filtering_recommender.graph_based import
     GraphRecommenderUtils,
 )
 from warprec.recommenders.losses import EmbLoss
-from warprec.utils.enums import DataLoaderType
 from warprec.utils.registry import model_registry
 
 
@@ -42,9 +41,6 @@ class PopDCL(GraphRecommenderUtils, IterativeRecommender):
         **kwargs (Any): Arbitrary keyword arguments.
 
     Attributes:
-        DATALOADER_TYPE: POS_NEG_LOADER – yields (user, pos_item, neg_item) triplets.
-            The neg_item column is not used by the loss; in-batch negatives are derived
-            from the pos_item column of each mini-batch (see Section 3.2).
         embedding_size (int): Dimensionality of user/item embedding vectors.
         n_layers (int): Number of LightGCN propagation layers.
         temperature (float): Contrastive temperature parameter tau (Section 3.6).
@@ -53,9 +49,6 @@ class PopDCL(GraphRecommenderUtils, IterativeRecommender):
         epochs (int): Number of training epochs.
         learning_rate (float): Adam learning rate.
     """
-
-    # Dataloader definition
-    DATALOADER_TYPE = DataLoaderType.POS_NEG_LOADER
 
     # Model hyperparameters
     embedding_size: int

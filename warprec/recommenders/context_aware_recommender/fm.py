@@ -10,7 +10,6 @@ from warprec.recommenders.base_recommender import (
 )
 from warprec.recommenders.layers import FactorizationMachine
 from warprec.recommenders.losses import EmbLoss
-from warprec.utils.enums import DataLoaderType
 from warprec.data.entities import Interactions
 from warprec.utils.registry import model_registry
 
@@ -29,7 +28,6 @@ class FM(ContextRecommenderUtils, IterativeRecommender):
         **kwargs (Any): Arbitrary keyword arguments.
 
     Attributes:
-        DATALOADER_TYPE: The type of dataloader used.
         embedding_size (int): The size of the latent vectors.
         reg_weight (float): The L2 regularization weight.
         batch_size (int): The batch size used for training.
@@ -37,8 +35,6 @@ class FM(ContextRecommenderUtils, IterativeRecommender):
         learning_rate (float): The learning rate value.
         neg_samples (int): Number of negative samples for training.
     """
-
-    DATALOADER_TYPE = DataLoaderType.ITEM_RATING_LOADER_WITH_CONTEXT
 
     embedding_size: int
     reg_weight: float

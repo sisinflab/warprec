@@ -439,10 +439,11 @@ def test_lattice_anchors_the_learned_graph_to_the_raw_features(dataset: Dataset)
 
 def test_bm3_needs_no_negative_samples(dataset: Dataset):
     """Not sampling negatives is BM3's whole argument."""
-    from warprec.utils.enums import DataLoaderType
-
     model = build("BM3", dataset)
-    assert model.DATALOADER_TYPE is DataLoaderType.POS_DATALOADER
+
+    # Its training data is (user, item) pairs, with no negative drawn.
+    batch = next(iter(model.get_dataloader(dataset.train_set, dataset.train_session)))
+    assert len(batch) == 2
 
     # A training step takes a (user, item) pair and nothing else.
     users = torch.arange(4)

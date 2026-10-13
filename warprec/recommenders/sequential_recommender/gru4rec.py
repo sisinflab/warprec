@@ -10,7 +10,6 @@ from warprec.recommenders.base_recommender import (
 )
 from warprec.recommenders.losses import BPRLoss, EmbLoss
 from warprec.data.entities import Interactions, Sessions
-from warprec.utils.enums import DataLoaderType
 from warprec.utils.registry import model_registry
 
 
@@ -27,7 +26,6 @@ class GRU4Rec(IterativeRecommender, SequentialRecommenderUtils):
         **kwargs (Any): Arbitrary keyword arguments.
 
     Attributes:
-        DATALOADER_TYPE: The type of dataloader used.
         embedding_size (int): The dimension of the item embeddings.
         hidden_size (int): The number of features in the hidden state of the GRU.
         num_layers (int): The number of recurrent layers.
@@ -40,9 +38,6 @@ class GRU4Rec(IterativeRecommender, SequentialRecommenderUtils):
         neg_samples (int): The number of negative samples.
         max_seq_len (int): The maximum length of sequences.
     """
-
-    # Dataloader definition
-    DATALOADER_TYPE = DataLoaderType.SEQUENTIAL_LOADER
 
     # Model hyperparameters
     embedding_size: int

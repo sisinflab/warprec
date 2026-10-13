@@ -6,6 +6,7 @@ import lightning as L
 import torch
 from torch import Tensor
 
+from warprec.data.stash import MODEL_ARGUMENTS, check_stash
 from warprec.data import Dataset
 from warprec.evaluation import build_evaluator
 from warprec.utils.helpers import (
@@ -205,7 +206,7 @@ def remote_model_retraining(
         sessions=main_dataset.train_session,
         seed=seed,
         info=main_dataset.info(),
-        **main_dataset.get_stash(),
+        **check_stash(main_dataset.get_stash(), MODEL_ARGUMENTS, "model"),
         block_size=block_size,
         chunk_size=chunk_size,
     )

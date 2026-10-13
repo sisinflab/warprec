@@ -86,7 +86,7 @@ class ItemMADRanking(TopKMetric):
         recommended_mask = self.item_counts > 0
 
         if not recommended_mask.any():
-            return {self.name: torch.tensor(0.0)}
+            return {self.name: 0.0}
 
         item_avg_gains = torch.zeros_like(self.item_gains)
         item_avg_gains[recommended_mask] = (
@@ -110,7 +110,7 @@ class ItemMADRanking(TopKMetric):
         valid_clusters = cluster_counts > 0
 
         if not valid_clusters.any():
-            return {self.name: torch.tensor(0.0)}
+            return {self.name: 0.0}
 
         cluster_means = (
             cluster_sum_gains[valid_clusters] / cluster_counts[valid_clusters]

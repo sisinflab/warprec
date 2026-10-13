@@ -1,5 +1,4 @@
 from enum import Enum
-from collections import namedtuple
 
 
 class MetricDefault(float, Enum):
@@ -221,107 +220,6 @@ class MetricBlock(str, Enum):
     TOP_K_VALUES = "top_k_values"
     TOP_K_BINARY_RELEVANCE = "top_k_binary_relevance"
     TOP_K_DISCOUNTED_RELEVANCE = "top_k_discounted_relevance"
-
-
-# Custom tuple defining what the enum should contain
-DataLoaderRequirements = namedtuple(
-    "DataLoaderRequirements",
-    ["dataloader_source", "method_name", "construction_params", "fixed_params"],
-)
-
-
-class DataLoaderType(Enum):
-    """Custom enumerator definition for DataLoader types."""
-
-    # Interactions
-    INTERACTION_LOADER = DataLoaderRequirements(
-        dataloader_source="train_set",
-        method_name="get_interaction_loader",
-        construction_params=[],
-        fixed_params={},
-    )
-    INTERACTION_LOADER_WITH_USER_ID = DataLoaderRequirements(
-        dataloader_source="train_set",
-        method_name="get_interaction_loader",
-        construction_params=[],
-        fixed_params={"include_user_id": True},
-    )
-    ITEM_RATING_LOADER = DataLoaderRequirements(
-        dataloader_source="train_set",
-        method_name="get_pointwise_dataloader",
-        construction_params=["neg_samples"],
-        fixed_params={},
-    )
-    ITEM_RATING_LOADER_WITH_CONTEXT = DataLoaderRequirements(
-        dataloader_source="train_set",
-        method_name="get_pointwise_dataloader",
-        construction_params=["neg_samples"],
-        fixed_params={"include_context": True},
-    )
-    POS_DATALOADER = DataLoaderRequirements(
-        dataloader_source="train_set",
-        method_name="get_positive_dataloader",
-        construction_params=[],
-        fixed_params={},
-    )
-    POS_NEG_LOADER = DataLoaderRequirements(
-        dataloader_source="train_set",
-        method_name="get_contrastive_dataloader",
-        construction_params=[],
-        fixed_params={},
-    )
-    HISTORY = DataLoaderRequirements(
-        dataloader_source="train_set",
-        method_name="get_history",
-        construction_params=[],
-        fixed_params={},
-    )
-
-    # Sessions
-    SEQUENTIAL_LOADER = DataLoaderRequirements(
-        dataloader_source="train_session",
-        method_name="get_sequential_dataloader",
-        construction_params=["max_seq_len", "neg_samples"],
-        fixed_params={},
-    )
-    SEQUENTIAL_LOADER_WITH_USER_ID = DataLoaderRequirements(
-        dataloader_source="train_session",
-        method_name="get_sequential_dataloader",
-        construction_params=["max_seq_len", "neg_samples"],
-        fixed_params={"include_user_id": True},
-    )
-    USER_HISTORY_LOADER = DataLoaderRequirements(
-        dataloader_source="train_session",
-        method_name="get_sliding_window_dataloader",
-        construction_params=["max_seq_len", "neg_samples"],
-        fixed_params={},
-    )
-    CLOZE_MASK_LOADER = DataLoaderRequirements(
-        dataloader_source="train_session",
-        method_name="get_cloze_mask_dataloader",
-        construction_params=["max_seq_len", "mask_prob", "neg_samples"],
-        fixed_params={},
-    )
-
-    @property
-    def source(self) -> str:
-        """Getter method for dataloader source."""
-        return self.value.dataloader_source
-
-    @property
-    def method(self) -> str:
-        """Getter method for method."""
-        return self.value.method_name
-
-    @property
-    def construction_params(self) -> list:
-        """Getter method for construction parameters."""
-        return self.value.construction_params
-
-    @property
-    def fixed_params(self) -> dict:
-        """Getter method for fixed parameters."""
-        return self.value.fixed_params
 
 
 class ResumeMode(str, Enum):

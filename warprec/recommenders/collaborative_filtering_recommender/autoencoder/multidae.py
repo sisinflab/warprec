@@ -8,7 +8,6 @@ from torch import nn, Tensor
 from warprec.data.entities import Interactions, Sessions
 from warprec.recommenders.base_recommender import IterativeRecommender
 from warprec.recommenders.losses import MultiDAELoss
-from warprec.utils.enums import DataLoaderType
 from warprec.utils.registry import model_registry
 
 
@@ -87,7 +86,6 @@ class MultiDAE(IterativeRecommender):
         **kwargs (Any): Arbitrary keyword arguments.
 
     Attributes:
-        DATALOADER_TYPE: The type of dataloader used.
         intermediate_dim (int): Intermediate dimension size.
         latent_dim (int): Latent dimension size.
         corruption (float): The probability of dropout applied to the input layer (denoising).
@@ -96,9 +94,6 @@ class MultiDAE(IterativeRecommender):
         epochs (int): The number of epochs.
         learning_rate (float): The learning rate value.
     """
-
-    # Dataloader definition
-    DATALOADER_TYPE = DataLoaderType.INTERACTION_LOADER
 
     intermediate_dim: int
     latent_dim: int

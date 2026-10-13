@@ -13,6 +13,7 @@ alone. Both were unreachable from any test that did not configure clusters or
 item features, so both shipped.
 """
 
+import warnings
 from typing import Any, Dict, List, Optional
 
 import numpy as np
@@ -232,3 +233,119 @@ def test_asking_for_more_negatives_than_exist_is_refused(full_dataset: Dataset):
     """
     with pytest.raises(ValueError, match="left unseen"):
         full_dataset.get_sampled_evaluation_dataloader(num_negatives=4)
+
+
+def assert_result_contract(name: str, value: Any, num_users: int) -> None:
+    """A per-user tensor, one value per user, or a Python float.
+
+    Args:
+        name (str): The result's key, for the message.
+        value (Any): The result.
+        num_users (int): The number of users the evaluator was built for.
+    """
+    if isinstance(value, torch.Tensor):
+        assert value.dim() == 1 and value.numel() == num_users, (
+            f"{name} is a tensor of shape {tuple(value.shape)}, not one value per user"
+        )
+    else:
+        assert type(value) is float, f"{name} is a {type(value).__name__}, not a float"
+
+
+def build_full_evaluator(metric_name: str, dataset: Dataset) -> Evaluator:
+    """An evaluator for one metric, given everything a metric might read.
+
+    Args:
+        metric_name (str): The registered name of the metric.
+        dataset (Dataset): The dataset to evaluate on.
+
+    Returns:
+        Evaluator: The evaluator, not run yet.
+    """
+    train_sparse = dataset.train_set.get_sparse()
+    return Evaluator(
+        [metric_name],
+        [3],
+        train_set=train_sparse,
+        feature_lookup=dataset.get_feature_matrix(),
+        user_cluster=dataset.get_user_cluster(),
+        item_cluster=dataset.get_item_cluster(),
+        propensity=build_propensity(train_sparse.getnnz(axis=0)),
+    )
+
+
+@pytest.mark.parametrize("metric_name", METRICS)
+def test_a_registered_metric_reports_a_per_user_tensor_or_a_float(
+    metric_name: str, roomy_dataset: Dataset
+):
+    """What compute_results returns has one of two shapes, whatever the metric."""
+    evaluator = build_full_evaluator(metric_name, roomy_dataset)
+    evaluator.evaluate(
+        model=_RandomScoreRecommender({}, roomy_dataset.info()),
+        dataloader=roomy_dataset.get_evaluation_dataloader(),
+        strategy="full",
+        dataset=roomy_dataset,
+    )
+
+    for key, value in evaluator.compute_results()[3].items():
+        assert_result_contract(key, value, roomy_dataset.info()["n_users"])
+
+
+@pytest.mark.parametrize("metric_name", METRICS)
+def test_a_metric_with_nothing_counted_reports_the_same_types(
+    metric_name: str, roomy_dataset: Dataset
+):
+    """The early returns for an empty evaluation used to give a 0-d tensor."""
+    evaluator = build_full_evaluator(metric_name, roomy_dataset)
+
+    with warnings.catch_warnings():
+        # torchmetrics warns that compute() is called before update().
+        warnings.simplefilter("ignore")
+        for metric in evaluator.metrics[3]:
+            for key, value in metric.compute().items():
+                assert_result_contract(key, value, roomy_dataset.info()["n_users"])
+
+
+class _DoubleScoreRecommender(_RandomScoreRecommender):
+    """The same scores in float64, as a closed-form model such as EASE gives them."""
+
+    def predict(
+        self,
+        user_indices: torch.Tensor,
+        *args: Any,
+        item_indices: Optional[torch.Tensor] = None,
+        **kwargs: Any,
+    ) -> torch.Tensor:
+        """Score the requested users in double precision.
+
+        Args:
+            user_indices (torch.Tensor): The batch of user indices.
+            *args (Any): Unused.
+            item_indices (Optional[torch.Tensor]): The candidates to score.
+            **kwargs (Any): Unused.
+
+        Returns:
+            torch.Tensor: The float64 score matrix.
+        """
+        return super().predict(user_indices, item_indices=item_indices).double()
+
+
+@pytest.mark.parametrize("strategy", ["full", "sampled"])
+@pytest.mark.parametrize("metric_name", METRICS)
+def test_a_registered_metric_accepts_float64_scores(
+    metric_name: str, strategy: str, roomy_dataset: Dataset
+):
+    """ItemMADRating and UserMADRating could not accumulate float64 scores."""
+    evaluator = build_full_evaluator(metric_name, roomy_dataset)
+    evaluator.evaluate(
+        model=_DoubleScoreRecommender({}, roomy_dataset.info()),
+        dataloader=(
+            roomy_dataset.get_evaluation_dataloader()
+            if strategy == "full"
+            else roomy_dataset.get_sampled_evaluation_dataloader(num_negatives=5)
+        ),
+        strategy=strategy,
+        dataset=roomy_dataset,
+    )
+
+    for key, value in evaluator.compute_results()[3].items():
+        assert_result_contract(key, value, roomy_dataset.info()["n_users"])

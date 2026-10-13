@@ -8,7 +8,6 @@ from torch.nn import functional as F
 
 from warprec.data.entities import Interactions, Sessions
 from warprec.recommenders.base_recommender import IterativeRecommender
-from warprec.utils.enums import DataLoaderType
 from warprec.utils.registry import model_registry
 
 
@@ -160,7 +159,6 @@ class DiffRec(IterativeRecommender):
         **kwargs (Any): Arbitrary keyword arguments.
 
     Attributes:
-        DATALOADER_TYPE: The type of dataloader used.
         hidden_dims (list): The widths of the denoiser's hidden layers.
         time_size (int): The width of the diffusion step description.
         steps (int): How many steps the forward corruption runs for.
@@ -182,8 +180,6 @@ class DiffRec(IterativeRecommender):
         ValueError: If the training interactions were not provided, or the
             sampling starts further in than the schedule reaches.
     """
-
-    DATALOADER_TYPE = DataLoaderType.INTERACTION_LOADER
 
     hidden_dims: list
     time_size: int

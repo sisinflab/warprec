@@ -11,7 +11,6 @@ from warprec.recommenders.collaborative_filtering_recommender.graph_based import
     GraphRecommenderUtils,
 )
 from warprec.recommenders.losses import BPRLoss, EmbLoss, InfoNCELoss
-from warprec.utils.enums import DataLoaderType
 from warprec.utils.registry import model_registry
 
 
@@ -29,7 +28,6 @@ class XSimGCL(IterativeRecommender, GraphRecommenderUtils):
         **kwargs (Any): Arbitrary keyword arguments.
 
     Attributes:
-        DATALOADER_TYPE: The type of dataloader used.
         embedding_size (int): The embedding size of user and item.
         n_layers (int): The number of graph convolution layers.
         lambda_ (float): Coefficient for contrastive loss.
@@ -41,9 +39,6 @@ class XSimGCL(IterativeRecommender, GraphRecommenderUtils):
         epochs (int): The number of epochs.
         learning_rate (float): The learning rate value.
     """
-
-    # Dataloader definition
-    DATALOADER_TYPE = DataLoaderType.POS_NEG_LOADER
 
     # Hyperparameters
     embedding_size: int

@@ -9,7 +9,6 @@ from torch import nn
 from warprec.data.entities import Interactions, Sessions
 from warprec.recommenders.base_recommender import IterativeRecommender
 from warprec.recommenders.losses import MultiVAELoss
-from warprec.utils.enums import DataLoaderType
 from warprec.utils.registry import model_registry
 
 
@@ -123,7 +122,6 @@ class MultiVAE(IterativeRecommender):
         **kwargs (Any): Arbitrary keyword arguments.
 
     Attributes:
-        DATALOADER_TYPE: The type of dataloader used.
         intermediate_dim (int): Intermediate dimension size.
         latent_dim (int): Latent dimension size.
         corruption (float): The probability of dropout applied to the input layer (denoising).
@@ -134,9 +132,6 @@ class MultiVAE(IterativeRecommender):
         anneal_cap (float): Annealing cap for KL divergence.
         anneal_step (int): Annealing step for KL divergence.
     """
-
-    # Dataloader definition
-    DATALOADER_TYPE = DataLoaderType.INTERACTION_LOADER
 
     intermediate_dim: int
     latent_dim: int

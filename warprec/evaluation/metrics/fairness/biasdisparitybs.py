@@ -1,10 +1,11 @@
-from typing import Any, Optional, Tuple
+from typing import Any, Optional, Set, Tuple
 
 import numpy as np
 import torch
 from scipy.sparse import csr_matrix
 from torch import Tensor
 
+from warprec.utils.enums import MetricBlock
 from warprec.utils.registry import metric_registry
 from warprec.evaluation.metrics.base_metric import BaseMetric
 
@@ -40,6 +41,9 @@ class BiasDisparityBS(BaseMetric):
     Raises:
         ValueError: If the training interactions were not provided.
     """
+
+    # It reads the training split alone.
+    _REQUIRED_COMPONENTS: Set[MetricBlock] = set()
 
     user_clusters: Tensor
     item_clusters: Tensor

@@ -10,7 +10,6 @@ from warprec.recommenders.base_recommender import (
 )
 from warprec.recommenders.layers import MLP
 from warprec.recommenders.losses import EmbLoss
-from warprec.utils.enums import DataLoaderType
 from warprec.data.entities import Interactions
 from warprec.utils.registry import model_registry
 
@@ -134,7 +133,6 @@ class xDeepFM(ContextRecommenderUtils, IterativeRecommender):
         **kwargs (Any): Arbitrary keyword arguments.
 
     Attributes:
-        DATALOADER_TYPE: The type of dataloader used.
         embedding_size (int): The size of the latent vectors.
         mlp_hidden_size (List[int]): The MLP hidden layer size list.
         cin_layer_size (List[int]): The size of CIN layers.
@@ -147,8 +145,6 @@ class xDeepFM(ContextRecommenderUtils, IterativeRecommender):
         learning_rate (float): The learning rate value.
         neg_samples (int): Number of negative samples for training.
     """
-
-    DATALOADER_TYPE = DataLoaderType.ITEM_RATING_LOADER_WITH_CONTEXT
 
     embedding_size: int
     mlp_hidden_size: List[int]

@@ -28,6 +28,8 @@ class MyModel(Recommender):
   # Rest of the model implementation...
 ```
 
+Names are compared ignoring case, and a name is taken once: registering a different class under a name already registered, such as `ease` for a model of your own, raises an error naming both classes, so a built-in is never replaced without a word. Registering the same class again (same module and class name, as when a notebook cell runs twice or a Ray worker imports the module) is allowed. The same rule holds for every registry: metrics, parameter classes, filters and the rest.
+
 ### Add the Model to your Configuration
 
 In case you are using configuration files to execute your experiment, you need an extra step to ensure that WarpRec recognizes your model. To use your custom model in a WarpRec pipeline, add it to your configuration file under the `general` section. You have two options:
@@ -376,7 +378,7 @@ class MyBPR(IterativeRecommender):
 
 ## Validating Hyperparameters
 
-Only the attributes annotated on the model class itself are read from `params`. Without anything else, WarpRec accepts any value for them, and the training pipeline logs that the model "is registered in the model registry, but not in parameter registry". To validate them, and to let each one take a search space (see [Models configuration](../configuration/models.md)), register a parameter class **named exactly like the model**:
+Only the attributes annotated on the model class itself are read from `params` (or, for a class that annotates none, those of the nearest model class it derives from; `Recommender`'s own never count). They are the model's hyperparameters: `get_params()` returns them and the model's `name_param`, which names its checkpoints and result rows, is derived from them. A class constant is not a hyperparameter: annotate it as a `ClassVar`, or name it in capitals, and it is left out of both. Without anything else, WarpRec accepts any value for them, and the training pipeline logs that the model "is registered in the model registry, but not in parameter registry". To validate them, and to let each one take a search space (see [Models configuration](../configuration/models.md)), register a parameter class **under the model's name**:
 
 ```python
 from pydantic import field_validator
@@ -387,7 +389,7 @@ from warprec.utils.registry import params_registry
 
 
 @params_registry.register("MyBPR")
-class MyBPR(RecomModel):
+class MyBPRParams(RecomModel):
     embedding_size: INT_FIELD
     batch_size: INT_FIELD
     epochs: INT_FIELD
@@ -399,7 +401,7 @@ class MyBPR(RecomModel):
         return validate_greater_than_zero(cls, v, info.field_name)
 ```
 
-WarpRec finds the class through its own name, so it cannot be called `MyBPRParams`; keep it in a module of its own to avoid clashing with the model class.
+WarpRec finds the class through the name it is registered under, so the class itself can be called anything. A parameter class that shares the model's class name needs a module of its own, or one class would replace the other.
 
 !!! tip
 

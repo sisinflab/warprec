@@ -10,7 +10,6 @@ from warprec.recommenders.collaborative_filtering_recommender.graph_based import
     GraphRecommenderUtils,
 )
 from warprec.recommenders.losses import EmbLoss
-from warprec.utils.enums import DataLoaderType
 from warprec.utils.registry import model_registry
 
 
@@ -32,7 +31,6 @@ class MACRGCN(GraphRecommenderUtils, IterativeRecommender):
         **kwargs (Any): Arbitrary keyword arguments.
 
     Attributes:
-        DATALOADER_TYPE: Uses pointwise loader with negatives for BCE training.
         embedding_size (int): Embedding dimension.
         n_layers (int): Number of LightGCN propagation layers.
         reg_weight (float): L2 regularization weight.
@@ -46,9 +44,6 @@ class MACRGCN(GraphRecommenderUtils, IterativeRecommender):
         epochs (int): Training epochs.
         learning_rate (float): Learning rate.
     """
-
-    # Dataloader definition
-    DATALOADER_TYPE = DataLoaderType.ITEM_RATING_LOADER
 
     # Model hyperparameters
     embedding_size: int

@@ -8,11 +8,16 @@ from warprec.utils.enums import MetricBlock
 
 
 class BaseMetric(Metric, ABC):
-    """The base definition of a metric using Torchmetrics."""
+    """The base definition of a metric using Torchmetrics.
 
-    _REQUIRED_COMPONENTS: Set[MetricBlock] = (
-        set()
-    )  # This defines the data that needs to be pre-computed
+    A metric declares in _REQUIRED_COMPONENTS the blocks it reads, which the
+    evaluator computes once per batch for every metric that asks. A metric that
+    reads none declares an empty set. One that leaves it undeclared (None) is
+    handed every block, which works whatever it reads but costs the blocks no
+    other metric needed.
+    """
+
+    _REQUIRED_COMPONENTS: Optional[Set[MetricBlock]] = None
 
     @abstractmethod
     def compute(self) -> dict[str, float]:
@@ -245,14 +250,71 @@ class BaseMetric(Metric, ABC):
 
         return area_per_user, positives_per_user
 
+    def block(self, blocks: dict, key: str, preds: Tensor) -> Tensor:
+        """Read a block the evaluator computed, computing it when it did not.
+
+        The evaluator computes only the blocks some metric declared, and passes
+        None for the others. A block missing or None is derived here from the
+        ground truth ('ground') and the predictions, as the evaluator would.
+
+        Args:
+            blocks (dict): The keyword arguments the metric was updated with.
+            key (str): The block's key, e.g. 'binary_relevance' or
+                'top_10_indices'.
+            preds (Tensor): The prediction tensor.
+
+        Returns:
+            Tensor: The block.
+
+        Raises:
+            ValueError: If the block is neither given nor derivable, because
+                the ground truth is missing or the key names no block.
+        """
+        value = blocks.get(key)
+        if value is not None:
+            return value
+        ground = blocks.get("ground")
+        if key.startswith("top_"):
+            k_text, _, block = key[len("top_") :].partition("_")
+            if k_text.isdigit():
+                k = int(k_text)
+                if block in ("values", "indices"):
+                    values, indices = torch.topk(preds, k, dim=1)
+                    return values if block == "values" else indices
+                if block in ("binary_relevance", "discounted_relevance"):
+                    return self.top_k_relevance_from_indices(
+                        self.block(blocks, block, preds),
+                        self.block(blocks, f"top_{k}_indices", preds),
+                    )
+        elif ground is not None:
+            derive = {
+                "binary_relevance": self.binary_relevance,
+                "discounted_relevance": self.discounted_relevance,
+                "valid_users": self.valid_users,
+            }.get(key)
+            if derive is not None:
+                return derive(ground)
+        raise ValueError(
+            f"{self.name} reads the block '{key}', which was not given and cannot "
+            "be derived: the ground truth 'ground' is missing or the key names no "
+            "block. Declare the blocks the metric reads in _REQUIRED_COMPONENTS."
+        )
+
     @property
     def name(self):
         """The name of the metric."""
         return self.__class__.__name__
 
     @property
-    def components(self):
-        """The required components to compute the metric."""
+    def components(self) -> Set[MetricBlock]:
+        """The blocks the evaluator computes for the metric.
+
+        Returns:
+            Set[MetricBlock]: The declared blocks, or every block when the
+                metric declares none.
+        """
+        if self._REQUIRED_COMPONENTS is None:
+            return set(MetricBlock)
         return self._REQUIRED_COMPONENTS
 
 
@@ -268,6 +330,9 @@ class RatingMetric(BaseMetric):
         dist_sync_on_step (bool): Torchmetrics parameter.
         **kwargs (Any): Additional keyword arguments to pass to the parent class.
     """
+
+    # It reads the ground truth alone.
+    _REQUIRED_COMPONENTS: Optional[Set[MetricBlock]] = set()
 
     error_sum: Tensor
     total_count: Tensor
@@ -437,12 +502,9 @@ class UserAverageTopKMetric(TopKMetric):
                 - Tensor: The valid users tensor.
                 - Tensor: The top-k relevance tensor.
         """
-        target = kwargs.get("binary_relevance", torch.zeros_like(preds))
-        users = kwargs.get("valid_users", self.valid_users(target))
-        top_k_rel = kwargs.get(
-            f"top_{self.k}_binary_relevance",
-            self.top_k_relevance(preds, target, self.k),
-        )
+        target = self.block(kwargs, "binary_relevance", preds)
+        users = self.block(kwargs, "valid_users", preds)
+        top_k_rel = self.block(kwargs, f"top_{self.k}_binary_relevance", preds)
         return target, users, top_k_rel
 
     @abstractmethod
@@ -473,9 +535,12 @@ class UserAverageTopKMetric(TopKMetric):
             users > 0, batch_scores, torch.tensor(0.0, device=preds.device)
         )
 
-        # Accumulate per user
-        self.scores.index_add_(0, user_indices, batch_scores)
-        self.user_interactions.index_add_(0, user_indices, users)
+        # Accumulate per user, in the accumulators' precision: a score read
+        # from the predictions is float64 when the model scores in float64.
+        self.scores.index_add_(0, user_indices, batch_scores.to(self.scores.dtype))
+        self.user_interactions.index_add_(
+            0, user_indices, users.to(self.user_interactions.dtype)
+        )
 
     def compute(self):
         """Computes the final metric value."""

@@ -52,12 +52,9 @@ class UserMADRanking(UserAverageTopKMetric):
     def unpack_inputs(
         self, preds: Tensor, **kwargs: Any
     ) -> Tuple[Tensor, Tensor, Tensor]:
-        target = kwargs.get("discounted_relevance", torch.zeros_like(preds))
-        users = kwargs.get("valid_users", self.valid_users(target))
-        top_k_rel = kwargs.get(
-            f"top_{self.k}_discounted_relevance",
-            self.top_k_relevance(preds, target, self.k),
-        )
+        target = self.block(kwargs, "discounted_relevance", preds)
+        users = self.block(kwargs, "valid_users", preds)
+        top_k_rel = self.block(kwargs, f"top_{self.k}_discounted_relevance", preds)
         return target, users, top_k_rel
 
     def compute_scores(
@@ -78,7 +75,7 @@ class UserMADRanking(UserAverageTopKMetric):
         mask = self.user_interactions > 0
 
         if not mask.any():
-            return {self.name: torch.tensor(0.0)}
+            return {self.name: 0.0}
 
         user_vals = torch.zeros_like(self.scores)
         user_vals[mask] = self.scores[mask] / self.user_interactions[mask]
@@ -98,7 +95,7 @@ class UserMADRanking(UserAverageTopKMetric):
         valid_clusters = count_cluster > 0
 
         if not valid_clusters.any():
-            return {self.name: torch.tensor(0.0)}
+            return {self.name: 0.0}
 
         mean_cluster = sum_cluster[valid_clusters] / count_cluster[valid_clusters]
 

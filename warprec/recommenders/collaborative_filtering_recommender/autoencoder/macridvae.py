@@ -9,7 +9,6 @@ from torch import Tensor
 from warprec.data.entities import Interactions, Sessions
 from warprec.recommenders.base_recommender import IterativeRecommender
 from warprec.recommenders.losses import EmbLoss
-from warprec.utils.enums import DataLoaderType
 from warprec.utils.registry import model_registry
 
 
@@ -98,7 +97,6 @@ class MacridVAE(IterativeRecommender):
         **kwargs (Any): Arbitrary keyword arguments.
 
     Attributes:
-        DATALOADER_TYPE: The type of dataloader used.
         embedding_size (int): The embedding size of user and item.
         encoder_hidden_dims (List[int]): The hidden dimensions of the encoder MLP.
         k_fac (int): The number of macro concepts (K).
@@ -114,9 +112,6 @@ class MacridVAE(IterativeRecommender):
         epochs (int): The number of epochs.
         learning_rate (float): The learning rate value.
     """
-
-    # Dataloader definition (Same as MultiVAE)
-    DATALOADER_TYPE = DataLoaderType.INTERACTION_LOADER
 
     # Model hyperparameters
     embedding_size: int

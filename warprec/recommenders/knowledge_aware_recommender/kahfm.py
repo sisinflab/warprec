@@ -11,7 +11,6 @@ from warprec.recommenders.knowledge_aware_recommender.knowledge_utils import (
     KnowledgeRecommenderUtils,
 )
 from warprec.recommenders.losses import BPRLoss, EmbLoss
-from warprec.utils.enums import DataLoaderType
 from warprec.utils.registry import model_registry
 
 
@@ -46,7 +45,6 @@ class KaHFM(KnowledgeRecommenderUtils, IterativeRecommender):
         **kwargs (Any): Arbitrary keyword arguments.
 
     Attributes:
-        DATALOADER_TYPE: The type of dataloader used.
         min_feature_items (int): How many items must carry a feature for it to
             become a factor.
         reg_weight (float): The L2 regularization weight of the factors.
@@ -59,8 +57,6 @@ class KaHFM(KnowledgeRecommenderUtils, IterativeRecommender):
         ValueError: If the interactions were not provided, or no feature is
             carried by at least min_feature_items items.
     """
-
-    DATALOADER_TYPE = DataLoaderType.POS_NEG_LOADER
 
     min_feature_items: int
     reg_weight: float

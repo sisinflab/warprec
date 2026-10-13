@@ -17,7 +17,6 @@ from warprec.recommenders.collaborative_filtering_recommender.graph_based import
     SparseDropout,
 )
 from warprec.recommenders.losses import BPRLoss, EmbLoss
-from warprec.utils.enums import DataLoaderType
 from warprec.utils.registry import model_registry
 from warprec.recommenders.collaborative_filtering_recommender.graph_based.graph_utils import (
     SparseAdjacency,
@@ -109,7 +108,6 @@ class NGCF(IterativeRecommender, GraphRecommenderUtils):
         **kwargs (Any): Arbitrary keyword arguments.
 
     Attributes:
-        DATALOADER_TYPE: The type of dataloader used.
         embedding_size (int): The embedding size of user and item.
         weight_size (list[int]): List of hidden sizes for each layer.
         node_dropout (float): Dropout rate for nodes in the adjacency matrix.
@@ -119,9 +117,6 @@ class NGCF(IterativeRecommender, GraphRecommenderUtils):
         epochs (int): The number of epochs.
         learning_rate (float): The learning rate value.
     """
-
-    # Dataloader definition
-    DATALOADER_TYPE = DataLoaderType.POS_NEG_LOADER
 
     # Model hyperparameters
     embedding_size: int
