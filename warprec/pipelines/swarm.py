@@ -141,7 +141,7 @@ def swarm_pipeline(path: str):
                 paused = True
                 logger.attention(
                     "Pause requested. Cancelling the models still running. Their "
-                    "Ray Tune experiments will resume from their last saved context.state."
+                    "Ray Tune experiments will resume from their last saved state."
                 )
                 for name, future in pending.items():
                     ray.cancel(future, force=False, recursive=True)
