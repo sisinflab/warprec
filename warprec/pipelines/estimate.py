@@ -2,7 +2,7 @@ import math
 import os
 import time
 from itertools import product
-from typing import Any, Dict, List, Optional, Sequence
+from typing import Any, Callable, Dict, List, Optional, Sequence
 
 import lightning as L
 import numpy as np
@@ -120,6 +120,22 @@ def _mean_or_nan(values: Sequence[float]) -> float:
     if not filtered:
         return float("nan")
     return float(np.mean(filtered))
+
+
+def _extreme_or_nan(
+    values: Sequence[float], pick: Callable[[List[float]], float]
+) -> float:
+    """The largest or smallest of the values, ignoring the missing ones.
+
+    Args:
+        values (Sequence[float]): The values of every setup.
+        pick (Callable[[List[float]], float]): 'max' or 'min'.
+
+    Returns:
+        float: The value picked, NaN when every value is missing.
+    """
+    filtered = [float(value) for value in values if not math.isnan(float(value))]
+    return float(pick(filtered)) if filtered else float("nan")
 
 
 def _human_duration(seconds: float) -> str:
@@ -303,6 +319,35 @@ def _expand_model_setups(model_name: str, model_params: dict) -> List[dict]:
         setup.update(dict(zip(param_fields, values)))
         setups.append(setup)
     return setups
+
+
+def _measurable_warmup(
+    stage: str, warmup_batches: int, available_batches: int, notes: List[str]
+) -> int:
+    """The warm-up batches to skip, leaving at least one batch to measure.
+
+    A loader with no more batches than the warm-up asks for would be spent on
+    warm-up entirely, and the stage reported with no measurement at all.
+
+    Args:
+        stage (str): The stage the loader serves, for the note.
+        warmup_batches (int): The configured warm-up.
+        available_batches (int): The batches the loader has.
+        notes (List[str]): The notes of the setup, which a reduction is added to.
+
+    Returns:
+        int: The warm-up to use.
+    """
+    if 0 < available_batches <= warmup_batches:
+        reduced = available_batches - 1
+        message = (
+            f"{stage} warm-up reduced from {warmup_batches} to {reduced} "
+            f"batches: the loader has {available_batches}, and one must be measured"
+        )
+        logger.attention(message)
+        notes.append(message)
+        return reduced
+    return warmup_batches
 
 
 def _estimate_eval_loop(
@@ -522,6 +567,7 @@ def _run_estimate_setup(  # pylint: disable = too-many-locals
     if not _uses_cuda(device):
         notes.append("CPU only")
 
+    analytical_ram_mb = float("nan")
     if not is_iterative_model:
         estimate = getattr(model_class, "estimate_space")(
             params=setup,
@@ -535,10 +581,18 @@ def _run_estimate_setup(  # pylint: disable = too-many-locals
         notes.append("Analytical train-space estimate")
         if estimate.get("notes"):
             notes.append(str(estimate["notes"]))
-        return _analytical_report(
-            train_ram_mb=float(estimate["train_ram_mb"]),
-            notes=notes,
-        )
+        analytical_ram_mb = float(estimate["train_ram_mb"])
+
+        # Timing the evaluation takes a fitted model, so the model is fitted
+        # unless the estimate already says the fit would not fit in memory
+        available_mb = psutil.virtual_memory().available / 1024**2
+        if analytical_ram_mb > available_mb:
+            notes.append(
+                "Evaluation not timed: fitting needs about "
+                f"{_human_memory(analytical_ram_mb)}, "
+                f"{_human_memory(available_mb)} available"
+            )
+            return _analytical_report(train_ram_mb=analytical_ram_mb, notes=notes)
 
     baseline_rss_mb = _process_rss_mb()
     train_tracker = EstimateStageTracker(baseline_rss_mb=baseline_rss_mb, device=device)
@@ -548,6 +602,7 @@ def _run_estimate_setup(  # pylint: disable = too-many-locals
         **config.general.callback.kwargs,
     )
 
+    fit_started = time.perf_counter()
     model = _build_model(
         model_name=model_name,
         setup=setup,
@@ -562,6 +617,11 @@ def _run_estimate_setup(  # pylint: disable = too-many-locals
     estimated_train_epoch_time = float("nan")
     estimated_total_train_time = float("nan")
     measured_train_batches = 0
+
+    # A closed-form model is fitted when it is built: that is its training
+    if not is_iterative_model:
+        estimated_total_train_time = time.perf_counter() - fit_started
+        notes.append("Train time measured from one fit")
 
     if isinstance(model, IterativeRecommender):
         model.set_optimization_parameters(
@@ -584,13 +644,16 @@ def _run_estimate_setup(  # pylint: disable = too-many-locals
             seed=model.seed,
         )
         total_train_batches = len(train_dataloader)
+        train_warmup = _measurable_warmup(
+            "Train", estimate_settings["warmup_batches"], total_train_batches, notes
+        )
         train_limit = min(
-            estimate_settings["warmup_batches"] + estimate_settings["train_batches"],
+            train_warmup + estimate_settings["train_batches"],
             total_train_batches,
         )
 
         training_callback = EstimateTrainingCallback(
-            warmup_batches=estimate_settings["warmup_batches"],
+            warmup_batches=train_warmup,
             measured_batches=estimate_settings["train_batches"],
             tracker=train_tracker,
             device=device,
@@ -660,7 +723,9 @@ def _run_estimate_setup(  # pylint: disable = too-many-locals
         strategy=config.evaluation.strategy,
         dataset=eval_dataset,
         device=device,
-        warmup_batches=estimate_settings["warmup_batches"],
+        warmup_batches=_measurable_warmup(
+            "Eval", estimate_settings["warmup_batches"], len(eval_dataloader), notes
+        ),
         measured_batches=estimate_settings["eval_batches"],
         tracker=eval_tracker,
     )
@@ -726,6 +791,21 @@ def _run_estimate_setup(  # pylint: disable = too-many-locals
             }
         )
 
+    # A closed-form model's train-space figures stay the analytical estimate
+    if not is_iterative_model:
+        report.update(
+            {
+                "Train RAM Min": analytical_ram_mb,
+                "Train RAM Avg": analytical_ram_mb,
+                "Train RAM Max": analytical_ram_mb,
+                "Train RAM Std": 0.0,
+                "Train VRAM Min": float("nan"),
+                "Train VRAM Avg": float("nan"),
+                "Train VRAM Max": float("nan"),
+                "Train VRAM Std": float("nan"),
+            }
+        )
+
     if _uses_cuda(device) and torch.cuda.is_available():
         torch.cuda.empty_cache()
 
@@ -761,7 +841,15 @@ def _aggregate_reports(
     aggregated = {"Model Name": model_name, "Setup Count": len(setup_reports)}
 
     for key in numeric_keys:
-        aggregated[key] = _mean_or_nan([report[key] for report in setup_reports])
+        values = [report[key] for report in setup_reports]
+        # A setup's peak is what the run must be able to hold, so across setups
+        # the largest peak is reported, and the smallest minimum
+        if key.endswith(" Max"):
+            aggregated[key] = _extreme_or_nan(values, max)
+        elif key.endswith(" Min"):
+            aggregated[key] = _extreme_or_nan(values, min)
+        else:
+            aggregated[key] = _mean_or_nan(values)
 
     aggregated["Measured Train Batches"] = int(
         round(
