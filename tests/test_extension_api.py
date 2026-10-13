@@ -349,6 +349,10 @@ def test_a_module_named_like_an_imported_one_is_refused(tmp_path: Path):
     with pytest.raises(ImportError, match="json"):
         load_custom_modules([str(path)])
 
+    # Nor is its folder left first on the import path, where every process
+    # started afterwards (a spawned DataLoader worker) would take its 'json'
+    assert str(path.parent.resolve()) not in sys.path
+
 
 def test_the_same_module_may_be_loaded_again_or_from_a_copy(tmp_path: Path):
     """Each pipeline loads the modules again, and Ray ships a copy to its workers."""

@@ -1,7 +1,8 @@
 import time
-from typing import Dict, Any, Optional, List, Tuple
+from typing import Callable, Dict, Any, Optional, List, Tuple
 
 import ray
+from ray import tune
 
 from warprec.common import (
     ModelStatus,
@@ -30,6 +31,162 @@ from warprec.utils.config import (
 from warprec.utils.pause import PauseController
 from warprec.utils.helpers import model_param_from_dict
 from warprec.utils.logger import logger
+
+# The hooks Ray Tune calls on a callback while a sweep runs
+TUNE_HOOKS = (
+    "setup",
+    "on_step_begin",
+    "on_step_end",
+    "on_trial_start",
+    "on_trial_restore",
+    "on_trial_save",
+    "on_trial_result",
+    "on_trial_complete",
+    "on_trial_recover",
+    "on_trial_error",
+    "on_checkpoint",
+    "on_experiment_end",
+)
+
+
+class HookMailbox:
+    """Holds the Ray Tune hook calls the model tasks forward, until delivered.
+
+    It runs as a Ray actor between the model tasks and the driver: a task
+    posts without waiting for an answer, so that Ray Tune's loop is never held
+    up, and the actor runs the calls of one task in the order they were made.
+    """
+
+    def __init__(self) -> None:
+        self.calls: List[Tuple[str, Dict[str, Any]]] = []
+
+    def post(self, call: Tuple[str, Dict[str, Any]]) -> None:
+        """Keep one hook call.
+
+        Args:
+            call (Tuple[str, Dict[str, Any]]): The hook and its arguments.
+        """
+        self.calls.append(call)
+
+    def take(self) -> List[Tuple[str, Dict[str, Any]]]:
+        """Hand over every call kept so far, oldest first.
+
+        Returns:
+            List[Tuple[str, Dict[str, Any]]]: The calls.
+        """
+        calls, self.calls = self.calls, []
+        return calls
+
+
+def _forwarding_hook(hook: str) -> Callable[..., None]:
+    """Build the method a 'TuneHookForwarder' answers one Ray Tune hook with.
+
+    Args:
+        hook (str): The name of the hook.
+
+    Returns:
+        Callable[..., None]: The method, which forwards the call when the custom
+            callback implements the hook.
+    """
+
+    def forward(self: "TuneHookForwarder", **info: Any) -> None:
+        if hook in self.hooks:
+            self.post((hook, info))
+        # The last hook of a sweep: what was posted must have arrived before
+        # the task returns and the driver collects the calls
+        if hook == "on_experiment_end" and self.last_post is not None:
+            ray.get(self.last_post)
+
+    forward.__name__ = hook
+    return forward
+
+
+class TuneHookForwarder(WarpRecCallback):
+    """Stands in for the custom callback in the Ray Tune sweep of a swarm model.
+
+    In the swarm every model's sweep runs inside a Ray task, so the Ray Tune
+    hooks of the custom callback would run on a copy of it in that task, and
+    whatever they collected would never reach the callback the driver calls
+    'on_training_complete' and 'on_evaluation_complete' on. This callback goes
+    into the sweep in its place and forwards every call of a hook the custom
+    callback implements, with its arguments, to the driver, which makes the
+    same call on the custom callback.
+
+    Args:
+        mailbox (Any): Where the calls are posted: a 'HookMailbox' actor, or a
+            'HookMailbox' itself when the run does not span processes.
+        hooks (Tuple[str, ...]): The hooks the custom callback implements.
+    """
+
+    def __init__(self, mailbox: Any, hooks: Tuple[str, ...]):
+        super().__init__()
+        self.mailbox = mailbox
+        self.hooks = hooks
+        self.last_post: Optional[Any] = None
+
+    def post(self, call: Tuple[str, Dict[str, Any]]) -> None:
+        """Post one hook call to the driver.
+
+        Args:
+            call (Tuple[str, Dict[str, Any]]): The hook and its arguments.
+        """
+        if isinstance(self.mailbox, HookMailbox):
+            self.mailbox.post(call)
+        else:
+            self.last_post = self.mailbox.post.remote(call)
+
+
+for _hook in TUNE_HOOKS:
+    setattr(TuneHookForwarder, _hook, _forwarding_hook(_hook))
+
+
+class TuneHookRelay:
+    """Delivers the Ray Tune hooks of the swarm's sweeps to the custom callback.
+
+    Args:
+        callback (WarpRecCallback): The custom callback of the run.
+        mailbox (Optional[Any]): Where the calls are relayed through. Left out,
+            a 'HookMailbox' actor is started when the callback implements any
+            Ray Tune hook.
+    """
+
+    def __init__(self, callback: WarpRecCallback, mailbox: Optional[Any] = None):
+        self.callback = callback
+        self.hooks = tuple(
+            hook
+            for hook in TUNE_HOOKS
+            if getattr(type(callback), hook) is not getattr(tune.Callback, hook)
+        )
+        if mailbox is None and self.hooks:
+            mailbox = ray.remote(num_cpus=0)(HookMailbox).remote()
+        self.mailbox = mailbox
+
+    def forwarder(self) -> TuneHookForwarder:
+        """The callback to put in the sweep of each model task.
+
+        Returns:
+            TuneHookForwarder: A forwarder to this relay.
+        """
+        return TuneHookForwarder(self.mailbox, self.hooks)
+
+    def deliver(self) -> None:
+        """Make on the custom callback every call forwarded so far, in order."""
+        if self.mailbox is None:
+            return
+        calls = (
+            self.mailbox.take()
+            if isinstance(self.mailbox, HookMailbox)
+            else ray.get(self.mailbox.take.remote())
+        )
+        for hook, info in calls:
+            getattr(self.callback, hook)(**info)
+
+    def close(self) -> None:
+        """Deliver what is left and stop the mailbox."""
+        self.deliver()
+        if self.mailbox is not None and not isinstance(self.mailbox, HookMailbox):
+            ray.kill(self.mailbox)
+        self.mailbox = None
 
 
 def swarm_pipeline(path: str):
@@ -109,6 +266,10 @@ def swarm_pipeline(path: str):
 
     context.state_store.save(context.state)
 
+    # The sweeps run in the model tasks: their Ray Tune hooks are relayed to
+    # the custom callback here, so that what it collects is on the driver
+    relay = TuneHookRelay(context.callback)
+
     futures = []
     for model_name in pending_models:
         future = remote_model_pipeline.remote(
@@ -117,7 +278,7 @@ def swarm_pipeline(path: str):
             main_dataset=main_ds_ref,
             val_dataset=val_ds_ref,
             fold_dataset=fold_ds_ref,
-            callback=context.callback,
+            callback=relay.forwarder(),
             data_preparation_time=data_preparation_time,
             run_name=context.run_name,
             writer_timestamp=context.state.writer_timestamp,
@@ -141,7 +302,7 @@ def swarm_pipeline(path: str):
                 paused = True
                 logger.attention(
                     "Pause requested. Cancelling the models still running. Their "
-                    "Ray Tune experiments will resume from their last saved context.state."
+                    "Ray Tune experiments will resume from their last saved state."
                 )
                 for name, future in pending.items():
                     ray.cancel(future, force=False, recursive=True)
@@ -150,6 +311,7 @@ def swarm_pipeline(path: str):
                 break
 
             ready, _ = ray.wait(list(pending.values()), num_returns=1, timeout=5.0)
+            relay.deliver()
             if not ready:
                 continue
 
@@ -165,6 +327,9 @@ def swarm_pipeline(path: str):
                 logger.negative(f"Model {name} did not complete: {e}")
                 context.state.model_state(name).status = ModelStatus.INTERRUPTED
                 context.state_store.save(context.state)
+
+    # Every hook a finished task made is queued by now
+    relay.close()
 
     # Final result logging of driver
     logger.msg("Swarming completed. Aggregating and saving results.")

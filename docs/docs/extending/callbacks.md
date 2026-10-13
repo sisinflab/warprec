@@ -17,6 +17,17 @@ WarpRec provides a set of built-in callbacks that are triggered at specific stag
 
 WarpRec callbacks also inherit all the lifecycle hooks defined by the Ray Tune **Callback** class. For more details on those, refer to the [Ray Tune documentation](https://docs.ray.io/en/latest/tune/api/doc/ray.tune.Callback.html).
 
+### Where the hooks run
+
+In the train and swarm pipelines `on_data_reading` and `on_dataset_creation` run in the Ray task that builds the datasets, on a copy of your callback. Every other hook runs on the driver, on the callback object WarpRec built from the configuration, so state a Ray Tune hook collects is there when `on_training_complete` and `on_evaluation_complete` run. The trials themselves never receive a copy of the callback.
+
+In the [swarm pipeline](../pipelines/swarm.md) each model's sweep runs inside a Ray task, where Ray Tune calls its hooks. WarpRec puts a forwarder in the sweep in place of your callback: each call of a Ray Tune hook your callback implements is sent, with its arguments, to the driver, which makes the same call on your callback. Two things differ from the train pipeline:
+
+- the models are tuned at the same time, so the calls of different models interleave; tell them apart by the `trial` argument (its `trial_id`, or `trial.config`);
+- the calls reach your callback a few seconds after Ray Tune makes them, and all of a model's calls have arrived before its `on_training_complete`.
+
+The hook arguments travel between processes, so a hook only receives what can be pickled; the `Trial` objects Ray Tune passes can.
+
 ### Reporting Example
 
 In this example, we track the `nDCG@5` metric across iterations during the training of a **NeuMF model**.

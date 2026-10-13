@@ -27,7 +27,6 @@ models:
 evaluation:
   top_k: [10]
   metrics: [nDCG, Recall]
-  batch_size: 128
 estimate:
   warmup_batches: 2
   train_batches: 20

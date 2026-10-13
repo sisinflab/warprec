@@ -2,7 +2,7 @@
 
 The Estimate Pipeline is designed for **pre-flight resource and runtime profiling**. It runs locally without Ray, expands discrete model configurations, and reports approximate training and evaluation costs before you launch a full experiment.
 
-For iterative models, WarpRec measures a bounded number of train and evaluation batches and extrapolates end-to-end timings. For non-iterative models such as `ItemKNN` or `EASE`, WarpRec falls back to analytical train-space estimates exposed by the model implementation.
+For iterative models, WarpRec measures a bounded number of train and evaluation batches and extrapolates end-to-end timings. For non-iterative models such as `ItemKNN` or `EASE`, the train-space figures are analytical estimates exposed by the model implementation; the model is then fitted once, which gives its training time, and its evaluation is timed like an iterative model's.
 
 ---
 
@@ -105,5 +105,7 @@ The Estimate Pipeline writes an `Estimate_Report_<timestamp>` file under the exp
 ## Notes on Interpretation
 
 - Timing estimates are extrapolations from a bounded sample of batches rather than full runs.
-- Non-iterative models do not execute training loops during estimation; their train-space values come from model-specific analytical formulas.
+- Non-iterative models do not execute training loops during estimation; their train-space values come from model-specific analytical formulas. They are fitted once, unless the analytical estimate exceeds the memory available, and `Estimated Total Train Time` is the time of that fit. When the fit would not fit in memory, the evaluation is not timed and the notes say so.
+- `warmup_batches` are skipped before timing starts. When a loader has no more batches than that (a small dataset evaluated with the default `evaluation.batch_size` is often a single batch), the warm-up is reduced so that one batch is measured, and the notes say so.
+- A model's row aggregates its setups: the `Max` columns report the largest peak of any setup and the `Min` columns the smallest minimum, so the row says what the most demanding setup needs; the other columns are averages over the setups.
 - If CUDA is not configured, VRAM fields are left empty and the report is produced with CPU-only notes.

@@ -17,6 +17,7 @@ from torch import Tensor
 from warprec.data.stash import MODEL_ARGUMENTS, check_stash
 from warprec.evaluation import build_evaluator
 from warprec.recommenders.callbacks import (
+    RandomStateCallback,
     WarpRecLightningIntegrationCallback,
     _get_memory_usage,
 )
@@ -37,7 +38,7 @@ from warprec.utils.registry import (
 from warprec.utils.logger import logger
 
 
-def objective_function(config: dict) -> None:  # pylint: disable = too-many-locals
+def objective_function(config: dict) -> None:
     """Objective function to optimize the hyperparameters.
 
     Args:
@@ -47,6 +48,24 @@ def objective_function(config: dict) -> None:  # pylint: disable = too-many-loca
     Returns:
         None: This function reports metrics and checkpoints to Ray Tune
             via `train.report()` and does not explicitly return a value.
+    """
+    settings = config.get("codecarbon")
+    if settings is None:
+        _run_trial(config)
+        return
+
+    # pylint: disable = import-outside-toplevel  # the dashboard extra is optional
+    from warprec.recommenders.trainer.dashboard_callbacks import trial_emissions
+
+    with trial_emissions(settings, config.get("trial_id")):
+        _run_trial(config)
+
+
+def _run_trial(config: dict) -> None:  # pylint: disable = too-many-locals
+    """Train and evaluate the model of one trial, reporting to Ray Tune.
+
+    Args:
+        config (dict): The trial configuration 'objective_function' received.
     """
     # Setting up logging
     logging.getLogger("lightning.pytorch").setLevel(logging.ERROR)
@@ -224,7 +243,11 @@ def objective_function(config: dict) -> None:  # pylint: disable = too-many-loca
                 enable_model_summary=False,
                 enable_progress_bar=False,
                 check_val_every_n_epoch=eval_every_n,
-                callbacks=[integration_callback, RayTrainReportCallback()],
+                callbacks=[
+                    integration_callback,
+                    RayTrainReportCallback(),
+                    RandomStateCallback(train_dataloader),
+                ],
             )
             checkpoint = train.get_checkpoint()
             resume = checkpoint.as_directory() if checkpoint else nullcontext()
