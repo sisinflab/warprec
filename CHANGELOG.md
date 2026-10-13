@@ -2,6 +2,55 @@
 
 <!-- version list -->
 
+## v2.1.9 (2026-10-13)
+
+### Bug Fixes
+
+- A custom module refused for its name no longer leaves its folder first on the import path, where
+  it shadowed that module for processes started later
+  ([`f892713`](https://github.com/sisinflab/warprec/commit/f892713e309b6db754105720a739c0720e082c4d))
+
+- A paused and resumed trial draws the same shuffles, negatives and noise as an uninterrupted one,
+  so it ends on the same weights and results
+  ([`83e5f8a`](https://github.com/sisinflab/warprec/commit/83e5f8a209f0c6fa0f25014722b87e4c0056e5f8))
+
+- After cross-validation the saved parameters give the epochs the model was retrained for, and a
+  whole float hyperparameter stays a float
+  ([`24819ae`](https://github.com/sisinflab/warprec/commit/24819ae6d19b1750f5ab3b2ec90a50e46a6445f0))
+
+- CodeCarbon's process tracking measures the process a trial trains in, not the Ray Tune driver
+  ([`188e903`](https://github.com/sisinflab/warprec/commit/188e90304827f56c422254d1f86607795d3e7b1a))
+
+- In the swarm pipeline a custom callback's Ray Tune hooks reach the driver's callback, so what they
+  collect is there at on_training_complete
+  ([`6d783e4`](https://github.com/sisinflab/warprec/commit/6d783e49c9a6b0bf8d1121a6ea6f7b748c1b7277))
+
+- Ray Tune trials no longer receive a copy of the custom and dashboard callbacks, which only the
+  driver calls
+  ([`73e8688`](https://github.com/sisinflab/warprec/commit/73e86885ccea07ff2fe82594cdf0a2d49a5cbaab))
+
+- The cross-validation log lists the best hyperparameters without the internal iterations entry,
+  which it gives separately
+  ([`80ed77c`](https://github.com/sisinflab/warprec/commit/80ed77c0c6baa30d772b2279ca165a549cda5668))
+
+- The estimate report gives a closed-form model's own space note instead of repeating the generic
+  one next to it
+  ([`fe14799`](https://github.com/sisinflab/warprec/commit/fe147995eeed6e84f5316e260b21f4ad25748db7))
+
+- The estimate report gives a model's largest RAM peak, times closed-form models' evaluation, and
+  measures at least one batch of a loader shorter than the warm-up
+  ([`22c2b00`](https://github.com/sisinflab/warprec/commit/22c2b008754990f10ef1365fc479fd3f7e0488e0))
+
+- The swarm pause message says the Ray Tune experiments resume from their last saved state
+  ([`b697a31`](https://github.com/sisinflab/warprec/commit/b697a31340e34a27c32af5c4b05ebe6333699afc))
+
+### Documentation
+
+- Guides 10, 11 and 16 show exact resume, process-level CodeCarbon, the fuller estimate report,
+  retrained epochs after cross-validation and where callback hooks run in swarm
+  ([`5703409`](https://github.com/sisinflab/warprec/commit/57034097d9e46f8923129d809857e0ea6380324e))
+
+
 ## v2.1.8 (2026-10-13)
 
 ### Bug Fixes
