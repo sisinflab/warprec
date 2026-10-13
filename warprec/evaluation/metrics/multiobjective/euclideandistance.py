@@ -1,6 +1,7 @@
 from typing import Any, List
 import torch
 from torch import Tensor, nn
+from warprec.errors import ConfigurationError, EvaluationError
 from warprec.evaluation.metrics.base_metric import TopKMetric, BaseMetric
 from warprec.utils.registry import metric_registry
 
@@ -26,7 +27,7 @@ class EucDistance(TopKMetric):
         **kwargs (Any): Additional keyword arguments to pass to the parent class.
 
     Raises:
-        ValueError: If the provided lists have different lengths.
+        ConfigurationError: If the provided lists have different lengths.
     """
 
     utopia_tensor: Tensor
@@ -46,7 +47,7 @@ class EucDistance(TopKMetric):
         self.num_users = num_users
 
         if len(metric_names) != len(utopia_points):
-            raise ValueError(
+            raise ConfigurationError(
                 "The lists (names, utopia points) must have the same length."
             )
 
@@ -112,7 +113,7 @@ class EucDistance(TopKMetric):
             dict: The distance under the metric's name.
 
         Raises:
-            ValueError: If a sub-metric gives no single value under its name.
+            EvaluationError: If a sub-metric gives no single value under its name.
         """
         sum_squared_diff = torch.zeros((), device=self.utopia_tensor.device)
 
@@ -123,7 +124,7 @@ class EucDistance(TopKMetric):
             # A metric reporting several values (one per cluster pair, say) has
             # no single score to combine; a zero in its place would pass silently
             if metric.name not in res:
-                raise ValueError(
+                raise EvaluationError(
                     f"EucDistance cannot combine {metric.name}: it reports "
                     f"{', '.join(res)} rather than one value under its name. "
                     "Pick sub-metrics that give a single score."

@@ -7,6 +7,7 @@ from torch import Tensor
 from torch.utils.data import DataLoader
 from scipy.sparse import csr_matrix
 
+from warprec.errors import EvaluationError, ExtensionError
 from warprec.data import Dataset
 from warprec.data.stash import METRIC_ARGUMENTS, check_stash
 from warprec.data.ranking import (
@@ -204,11 +205,11 @@ class Evaluator:
             verbose (bool): Wether or not to log progress during evaluation.
 
         Raises:
-            ValueError: If the strategy isn't either "full" or "sampled".
+            EvaluationError: If the strategy isn't either "full" or "sampled".
         """
         # pylint: disable=too-many-statements
         if strategy not in ["full", "sampled"]:
-            raise ValueError(f"Strategy '{strategy}' not supported.")
+            raise EvaluationError(f"Strategy '{strategy}' not supported.")
 
         if verbose:
             logger.msg(f"Starting evaluation process for model {model.name}.")
@@ -577,7 +578,7 @@ class Evaluator:
             float | Tensor: A tensor with one value per user, or a float.
 
         Raises:
-            ValueError: If the value is neither a number nor a per-user tensor.
+            ExtensionError: If the value is neither a number nor a per-user tensor.
         """
         num_users = self.common_params["num_users"]
         if isinstance(value, Tensor):
@@ -588,7 +589,7 @@ class Evaluator:
         elif isinstance(value, (int, float, np.number)) and not isinstance(value, bool):
             return float(value)
         shape = tuple(value.shape) if isinstance(value, Tensor) else None
-        raise ValueError(
+        raise ExtensionError(
             f"The metric result '{name}' is a {type(value).__name__}"
             f"{f' of shape {shape}' if shape is not None else ''}. A metric "
             f"reports a tensor with one value per user ({num_users}) or a number."

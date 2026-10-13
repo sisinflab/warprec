@@ -3,6 +3,7 @@ from typing import Optional
 import numpy as np
 import torch
 from torch import Tensor
+from warprec.errors import EvaluationError
 
 UNIFORM = "uniform"
 POPULARITY = "popularity"
@@ -45,13 +46,13 @@ def build_propensity(
             'uniform' and there is nothing to correct.
 
     Raises:
-        ValueError: If the estimator is not one WarpRec knows.
+        EvaluationError: If the estimator is not one WarpRec knows.
     """
     if estimator == UNIFORM:
         return None
 
     if estimator != POPULARITY:
-        raise ValueError(
+        raise EvaluationError(
             f"Propensity estimator '{estimator}' is not supported. "
             f"Use '{POPULARITY}' or '{UNIFORM}'."
         )

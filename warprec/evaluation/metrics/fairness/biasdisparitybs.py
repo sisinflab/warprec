@@ -5,6 +5,7 @@ import torch
 from scipy.sparse import csr_matrix
 from torch import Tensor
 
+from warprec.errors import EvaluationError
 from warprec.utils.enums import MetricBlock
 from warprec.utils.registry import metric_registry
 from warprec.evaluation.metrics.base_metric import BaseMetric
@@ -39,7 +40,7 @@ class BiasDisparityBS(BaseMetric):
         **kwargs (Any): Additional keyword arguments.
 
     Raises:
-        ValueError: If the training interactions were not provided.
+        EvaluationError: If the training interactions were not provided.
     """
 
     # It reads the training split alone.
@@ -63,7 +64,7 @@ class BiasDisparityBS(BaseMetric):
         super().__init__(dist_sync_on_step=dist_sync_on_step)
 
         if train_matrix is None:
-            raise ValueError(
+            raise EvaluationError(
                 "BiasDisparityBS measures the bias of the training data, so the "
                 "training interactions must be provided."
             )

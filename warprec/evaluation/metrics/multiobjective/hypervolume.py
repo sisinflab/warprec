@@ -1,6 +1,7 @@
 from typing import Any, List
 import torch
 from torch import Tensor, nn
+from warprec.errors import ConfigurationError, EvaluationError
 from warprec.evaluation.metrics.base_metric import TopKMetric, BaseMetric
 from warprec.utils.registry import metric_registry
 
@@ -29,7 +30,7 @@ class Hypervolume(TopKMetric):
         **kwargs (Any): Additional keyword arguments to pass to the parent class.
 
     Raises:
-        ValueError: If the provided lists have different lengths.
+        ConfigurationError: If the provided lists have different lengths.
     """
 
     nadir_tensor: Tensor
@@ -52,7 +53,7 @@ class Hypervolume(TopKMetric):
 
         # Ensure all input lists have the same length to avoid indexing errors
         if not len(metric_names) == len(nadir_points) == len(higher_is_better):
-            raise ValueError(
+            raise ConfigurationError(
                 "The lists (names, nadir points, directions) must have the same length."
             )
 
@@ -120,7 +121,7 @@ class Hypervolume(TopKMetric):
             dict: The volume under the metric's name.
 
         Raises:
-            ValueError: If a sub-metric gives no single value under its name.
+            EvaluationError: If a sub-metric gives no single value under its name.
         """
         hv_per_user = None
 
@@ -131,7 +132,7 @@ class Hypervolume(TopKMetric):
             # A metric reporting several values (one per cluster pair, say) has
             # no single score to combine; a zero in its place would pass silently
             if metric.name not in res:
-                raise ValueError(
+                raise EvaluationError(
                     f"Hypervolume cannot combine {metric.name}: it reports "
                     f"{', '.join(res)} rather than one value under its name. "
                     "Pick sub-metrics that give a single score."
