@@ -6,6 +6,8 @@ handler written for an earlier release still catches it.
 
 import uuid
 from pathlib import Path
+from types import SimpleNamespace
+from typing import Any
 
 import narwhals as nw
 import numpy as np
@@ -15,8 +17,10 @@ import pytest
 from warprec.data.filtering import UserMin, apply_filtering
 from warprec.data.reader.local_reader import LocalReader
 from warprec.data.stash import MODEL_ARGUMENTS, check_stash
+from warprec.common.run_state import RunState
 from warprec.errors import (
     CheckpointError,
+    ClusterError,
     ConfigurationError,
     CustomModuleError,
     DataError,
@@ -24,7 +28,10 @@ from warprec.errors import (
     EvaluationError,
     ExtensionError,
     ModelError,
+    RunStateError,
 )
+from warprec.pipelines import common as pipeline_common
+from warprec.pipelines.eval import _check_checkpoint_matches
 from warprec.evaluation.metrics.multiobjective.hypervolume import Hypervolume
 from warprec.evaluation.propensity import build_propensity
 from warprec.recommenders.collaborative_filtering_recommender.autoencoder.ease import (
@@ -98,6 +105,39 @@ def test_a_checkpoint_of_another_model_is_a_checkpoint_error():
 def test_estimating_a_model_without_its_interactions_is_a_model_error():
     with pytest.raises(ModelError, match="requires interactions"):
         EASE.estimate_space(params={"l2": 1.0}, info={"n_users": 2, "n_items": 3})
+
+
+def test_a_checkpoint_of_another_model_names_its_path():
+    with pytest.raises(CheckpointError, match="holds a BPR model") as caught:
+        _check_checkpoint_matches({"name": "BPR"}, EASE, None, "models/BPR.pth")
+    assert caught.value.path == "models/BPR.pth"
+
+
+def test_a_run_state_from_a_newer_warprec_is_a_run_state_error():
+    with pytest.raises(RunStateError, match="newer than the version") as caught:
+        RunState.from_dict({"schema_version": 10**6})
+    assert isinstance(caught.value, ValueError)
+
+
+def test_an_unreachable_cluster_is_a_cluster_error(monkeypatch: pytest.MonkeyPatch):
+    def refuse(**_: Any) -> None:
+        """Stand in for ray.init on a cluster that does not answer.
+
+        Args:
+            **_ (Any): The arguments of ray.init.
+
+        Raises:
+            ConnectionError: Always.
+        """
+        raise ConnectionError("no cluster")
+
+    monkeypatch.setattr(pipeline_common.ray, "init", refuse)
+    config = SimpleNamespace(
+        general=SimpleNamespace(ray_address="ray://nowhere:10001", custom_modules=[])
+    )
+    with pytest.raises(ClusterError, match="Unable to connect") as caught:
+        pipeline_common.initialise_ray(config)
+    assert isinstance(caught.value, ConnectionError)
 
 
 def test_invalid_parameters_of_an_unvalidated_model_are_a_configuration_error():

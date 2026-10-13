@@ -3,6 +3,7 @@ from typing import Tuple, List, Optional, Dict, Union, Any
 
 from narwhals.dataframe import DataFrame
 
+from warprec.errors import ConfigurationError, DataError
 from warprec.data import Dataset
 from warprec.data.reader import Reader
 from warprec.data.schema import ColumnLabels, SplitSpec
@@ -66,7 +67,7 @@ def _read_modality(
             normalisation to apply.
 
     Raises:
-        ValueError: If the file format is not one features can be read from.
+        ConfigurationError: If the file format is not one features can be read from.
     """
     item_label = modality.item_column_name
     # The item column has to be read as the interactions read it, or the rows
@@ -105,7 +106,7 @@ def _read_modality(
             items = frame.select(columns[0]).to_numpy().flatten().tolist()
             features = frame.select(columns[1:]).to_numpy().astype("float32")
         case _:
-            raise ValueError(
+            raise ConfigurationError(
                 f"The modality '{name}' is configured as "
                 f"'{modality.file_format}', which features cannot be read from."
             )
@@ -138,7 +139,7 @@ def initialize_datasets(
             dataset, an optional validation dataset, and a list of datasets for cross-validation folds.
 
     Raises:
-        ValueError: If the data type specified in the configuration is not supported.
+        ConfigurationError: If the data type specified in the configuration is not supported.
     """
     # Dataset loading
     main_dataset: Dataset = None
@@ -174,7 +175,7 @@ def initialize_datasets(
             case "parquet":
                 data = reader.read_parquet(location)
             case _:
-                raise ValueError(f"File format '{file_format}'not supported.")
+                raise ConfigurationError(f"File format '{file_format}'not supported.")
         data = callback.on_data_reading(data)
 
         # Check for optional filtering
@@ -207,7 +208,7 @@ def initialize_datasets(
                 )
 
             else:
-                raise ValueError("Data type not yet supported.")
+                raise ConfigurationError("Data type not yet supported.")
 
     elif config.reader.loading_strategy == "split":
         if config.reader.data_type == "transaction":
@@ -232,7 +233,9 @@ def initialize_datasets(
                         ext=split.ext,
                     )
                 case _:
-                    raise ValueError(f"File format '{file_format}'not supported.")
+                    raise ConfigurationError(
+                        f"File format '{file_format}'not supported."
+                    )
 
             # Filter out train and validation data if not aligned with the training set
             def _align_set_on_train(
@@ -254,7 +257,7 @@ def initialize_datasets(
                     ),
                 )
                 if len(eval_set) == 0:
-                    raise ValueError(
+                    raise DataError(
                         "After aligning the split with the training set, it resulted in "
                         "an empty set. Please check the consistency of your splits and "
                         "the filtering process."
@@ -276,7 +279,7 @@ def initialize_datasets(
                 else:
                     val_data = _align_set_on_train(train_data, val_data, "Validation")
         else:
-            raise ValueError("Data type not yet supported.")
+            raise ConfigurationError("Data type not yet supported.")
 
     # Side information reading
     if config.reader.side:
@@ -304,14 +307,14 @@ def initialize_datasets(
                     location, column_names=side.column_names
                 )
             case _:
-                raise ValueError(f"File format '{side_format}' not supported.")
+                raise ConfigurationError(f"File format '{side_format}' not supported.")
 
     # Knowledge graph reading
     if config.reader.knowledge:
         knowledge = config.reader.knowledge
 
         if knowledge.file_format != "tabular":
-            raise ValueError(
+            raise ConfigurationError(
                 f"Knowledge graphs are read as tabular files, got "
                 f"'{knowledge.file_format}'."
             )
@@ -361,7 +364,7 @@ def initialize_datasets(
                 DataFrame[Any]: A DataFrame containing the cluster data.
 
             Raises:
-                ValueError: If the file format is not supported.
+                ConfigurationError: If the file format is not supported.
             """
 
             # Define column names
@@ -397,7 +400,9 @@ def initialize_datasets(
                     )
 
                 case _:
-                    raise ValueError(f"File format '{file_format}'not supported.")
+                    raise ConfigurationError(
+                        f"File format '{file_format}'not supported."
+                    )
 
             return cluster_data
 
