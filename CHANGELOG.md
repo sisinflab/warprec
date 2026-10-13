@@ -2,6 +2,50 @@
 
 <!-- version list -->
 
+## v2.1.8 (2026-10-13)
+
+### Bug Fixes
+
+- A custom metric that does not declare its blocks is evaluated alone like any other
+  ([`05f1d14`](https://github.com/sisinflab/warprec/commit/05f1d1433fbde5f2120e3bcdd5e79bd86c0b9aee))
+
+- A model's hyperparameters leave out class constants, so Pop and Random no longer report the base
+  class's DATALOADER_TYPE
+  ([`c148c3b`](https://github.com/sisinflab/warprec/commit/c148c3bcbb9f3d18eec4e285b6d48e8c35af98c6))
+
+- A name already registered to another class, or a custom module name already taken, is refused
+  instead of silently replaced
+  ([`240c9df`](https://github.com/sisinflab/warprec/commit/240c9dffb496163a0c860c3d2fa7e3f673320e43))
+
+- A parameter class extending a built-in one validates the fields it inherits, not only those it
+  adds
+  ([`4507ebd`](https://github.com/sisinflab/warprec/commit/4507ebd1305e3a4fefe7d3655e93a9b7ba42e967))
+
+- A parameter class validates the model it is registered under, whatever the class is called
+  ([`a8152de`](https://github.com/sisinflab/warprec/commit/a8152dea43f59506815d79f28d428d75a5f1525c))
+
+- A stash entry named like an argument WarpRec passes to models or metrics is refused, naming the
+  key
+  ([`8ceaf66`](https://github.com/sisinflab/warprec/commit/8ceaf66725accab40cec437a693941b25e120bf9))
+
+- Every global metric value is reported as a float and every user-averaged one as a per-user tensor
+  ([`c050b67`](https://github.com/sisinflab/warprec/commit/c050b67517cdc106bfe1bfedaf836b2ced675ee4))
+
+- ItemMADRating and UserMADRating evaluate models that score in float64, such as EASE
+  ([`bb91ac5`](https://github.com/sisinflab/warprec/commit/bb91ac5abcd4ef6753ae827c3e91a3e93f785463))
+
+### Documentation
+
+- Guides 4 and 15 describe the refused stash keys and registry names, guides 9 and 14 show Pop's new
+  checkpoint name and float coverage
+  ([`820b2e6`](https://github.com/sisinflab/warprec/commit/820b2e65146268c94485dfd23d504d6434779527))
+
+### Refactoring
+
+- Remove the unused DATALOADER_TYPE model metadata and the DataLoaderType enum
+  ([`129f9bf`](https://github.com/sisinflab/warprec/commit/129f9bfc096a4ef2a7bd04c93818869446c8f868))
+
+
 ## v2.1.7 (2026-10-12)
 
 ### Bug Fixes
