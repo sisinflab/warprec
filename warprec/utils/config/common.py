@@ -1,6 +1,9 @@
-from typing import Any, Type, TypeVar, Optional, List
+from pathlib import Path
+from typing import Any, Type, TypeVar, Optional, List, Union
 
-from pydantic import BaseModel
+import yaml
+from pydantic import BaseModel, ValidationError
+from warprec.errors import ConfigurationError, DataNotFoundError
 from warprec.utils.enums import SearchSpace
 from warprec.utils.registry import similarities_registry
 from warprec.utils.logger import logger
@@ -51,6 +54,38 @@ class Labels(BaseModel):
             rating_label=labels[2],
             timestamp_label=labels[3],
         )
+
+
+def read_configuration_file(path: Union[str, Path], schema: Type[T], kind: str) -> T:
+    """Read a YAML configuration file and validate it against its schema.
+
+    Every invalid key is reported at once, in one ConfigurationError, rather
+    than as pydantic's own error.
+
+    Args:
+        path (Union[str, Path]): The YAML file.
+        schema (Type[T]): The pydantic model the file must satisfy.
+        kind (str): The kind of configuration, e.g. 'train', for the message.
+
+    Returns:
+        T: The validated configuration.
+
+    Raises:
+        DataNotFoundError: If the file, or a file it names that must exist when
+            it is read (the training data), does not exist.
+        ConfigurationError: If the file is not a valid configuration of its kind.
+    """
+    try:
+        with open(path, "r", encoding="utf-8") as file:
+            data = yaml.safe_load(file) or {}
+        return schema.model_validate(data)
+    except ValidationError as error:
+        message, errors = ConfigurationError.describe_validation(
+            error, f"a valid {kind} configuration", path=path
+        )
+        raise ConfigurationError(message, path=path, errors=errors) from error
+    except FileNotFoundError as error:
+        raise DataNotFoundError(str(error)) from error
 
 
 def check_separator(sep: str) -> str:

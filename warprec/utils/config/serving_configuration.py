@@ -2,8 +2,9 @@ import os
 from pathlib import Path
 from typing import Any, Dict, List, Literal, Optional, Union
 
-import yaml
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+
+from warprec.utils.config.common import read_configuration_file
 
 API_KEY_ENV = "WARPREC_API_KEY"
 
@@ -423,12 +424,14 @@ class ServingConfiguration(BaseModel):
 def load_serving_configuration(path: Union[str, Path]) -> ServingConfiguration:
     """Read and validate a serving configuration file.
 
+    A file that is not a valid serving configuration raises one
+    ConfigurationError listing every invalid key; a missing file raises
+    DataNotFoundError (see read_configuration_file).
+
     Args:
         path (Union[str, Path]): The YAML file.
 
     Returns:
         ServingConfiguration: The validated configuration.
     """
-    with open(path, encoding="utf-8") as file:
-        data = yaml.safe_load(file) or {}
-    return ServingConfiguration.model_validate(data)
+    return read_configuration_file(path, ServingConfiguration, "serving")

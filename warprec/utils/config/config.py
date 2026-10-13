@@ -5,7 +5,6 @@ import importlib
 from pathlib import Path
 from typing import Dict, Any, List
 
-import yaml
 from pydantic import BaseModel, model_validator, Field
 from warprec.utils.helpers import (
     is_python_module,
@@ -13,6 +12,7 @@ from warprec.utils.helpers import (
     validation_metric,
 )
 from warprec.data.filtering import Filter
+from warprec.utils.config.common import read_configuration_file
 from warprec.utils.config import (
     GeneralConfig,
     WarpRecCallbackConfig,
@@ -559,6 +559,11 @@ def load_train_configuration(path: str) -> TrainConfiguration:
     """This method reads the train configuration file and returns
         a TrainConfiguration object.
 
+    A file that is not a valid train configuration raises one
+    ConfigurationError listing every invalid key; a missing file, or missing
+    training data it names, raises DataNotFoundError (see
+    read_configuration_file).
+
     Args:
         path (str): The path to the configuration file.
 
@@ -566,15 +571,19 @@ def load_train_configuration(path: str) -> TrainConfiguration:
         TrainConfiguration: The configuration object created from the configuration file.
     """
     logger.msg(f"Reading train configuration file in: {path}")
-    with open(path, "r", encoding="utf-8") as file:
-        data = yaml.safe_load(file)
+    config = read_configuration_file(path, TrainConfiguration, "train")
     logger.msg("Reading process completed correctly.")
-    return TrainConfiguration(**data)
+    return config
 
 
 def load_design_configuration(path: str) -> DesignConfiguration:
     """This method reads the train configuration file and returns
         a DesignConfiguration object.
+
+    A file that is not a valid design configuration raises one
+    ConfigurationError listing every invalid key; a missing file, or missing
+    training data it names, raises DataNotFoundError (see
+    read_configuration_file).
 
     Args:
         path (str): The path to the configuration file.
@@ -583,15 +592,19 @@ def load_design_configuration(path: str) -> DesignConfiguration:
         DesignConfiguration: The configuration object created from the configuration file.
     """
     logger.msg(f"Reading design configuration file in: {path}")
-    with open(path, "r", encoding="utf-8") as file:
-        data = yaml.safe_load(file)
+    config = read_configuration_file(path, DesignConfiguration, "design")
     logger.msg("Reading process completed correctly.")
-    return DesignConfiguration(**data)
+    return config
 
 
 def load_eval_configuration(path: str) -> EvalConfiguration:
     """This method reads the train configuration file and returns
         a EvalConfiguration object.
+
+    A file that is not a valid eval configuration raises one
+    ConfigurationError listing every invalid key; a missing file, or missing
+    training data it names, raises DataNotFoundError (see
+    read_configuration_file).
 
     Args:
         path (str): The path to the configuration file.
@@ -600,15 +613,19 @@ def load_eval_configuration(path: str) -> EvalConfiguration:
         EvalConfiguration: The configuration object created from the configuration file.
     """
     logger.msg(f"Reading eval configuration file in: {path}")
-    with open(path, "r", encoding="utf-8") as file:
-        data = yaml.safe_load(file)
+    config = read_configuration_file(path, EvalConfiguration, "eval")
     logger.msg("Reading process completed correctly.")
-    return EvalConfiguration(**data)
+    return config
 
 
 def load_estimate_configuration(path: str) -> EstimateConfiguration:
     """This method reads the estimate configuration file and returns
         a EstimateConfiguration object.
+
+    A file that is not a valid estimate configuration raises one
+    ConfigurationError listing every invalid key; a missing file, or missing
+    training data it names, raises DataNotFoundError (see
+    read_configuration_file).
 
     Args:
         path (str): The path to the configuration file.
@@ -617,10 +634,9 @@ def load_estimate_configuration(path: str) -> EstimateConfiguration:
         EstimateConfiguration: The configuration object created from the configuration file.
     """
     logger.msg(f"Reading estimate configuration file in: {path}")
-    with open(path, "r", encoding="utf-8") as file:
-        data = yaml.safe_load(file)
+    config = read_configuration_file(path, EstimateConfiguration, "estimate")
     logger.msg("Reading process completed correctly.")
-    return EstimateConfiguration(**data)
+    return config
 
 
 def load_callback(
