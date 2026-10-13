@@ -8,6 +8,7 @@ from torch.utils.data import DataLoader
 from narwhals.dataframe import DataFrame
 from scipy.sparse import csr_matrix, coo_matrix
 
+from warprec.errors import ConfigurationError
 from warprec.data.entities.train_structures import (
     InteractionDataset,
     PointWiseDataset,
@@ -298,11 +299,11 @@ class Interactions:
             coo_matrix: A sparse matrix of shape [num_users, num_items] for the given rating.
 
         Raises:
-            ValueError: If interactions are not explicit or if
+            ConfigurationError: If interactions are not explicit or if
                 rating label is None.
         """
         if self.rating_type != RatingType.EXPLICIT or self.rating_label is None:
-            raise ValueError(
+            raise ConfigurationError(
                 "Filtering by rating is only supported for explicit feedback data."
             )
 

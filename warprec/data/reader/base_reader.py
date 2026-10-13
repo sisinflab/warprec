@@ -10,6 +10,7 @@ import polars as pl
 import narwhals as nw
 from narwhals.dataframe import DataFrame
 
+from warprec.errors import ConfigurationError, DataError, DataNotFoundError
 from warprec.utils.config import WarpRecConfiguration
 from warprec.utils.enums import ReadingMethods
 from warprec.utils.logger import logger
@@ -22,14 +23,14 @@ class Reader(ABC):
         backend (str): The backend to use for reading data.
 
     Raises:
-        ValueError: If the backend is not supported.
+        ConfigurationError: If the backend is not supported.
     """
 
     def __init__(self, backend: str = "polars"):
         self.backend = backend.lower()
 
         if self.backend not in ["polars", "pandas"]:
-            raise ValueError(
+            raise ConfigurationError(
                 f"Initializing reader module with a not supported backend: {self.backend}."
             )
 
@@ -391,7 +392,7 @@ class Reader(ABC):
             train_data.select(nw.len()).item() == 0
             or test_data.select(nw.len()).item() == 0
         ):
-            raise FileNotFoundError(
+            raise DataNotFoundError(
                 f"Train/Test data not found or empty in '{base_location}'."
             )
 
@@ -441,14 +442,14 @@ class Reader(ABC):
             np.ndarray: The array, two-dimensional and float32.
 
         Raises:
-            ValueError: If the array is not one row per item.
+            DataError: If the array is not one row per item.
         """
         if array.ndim == 1:
             # A single feature per item is still a matrix, one column wide.
             array = array.reshape(-1, 1)
 
         if array.ndim != 2:
-            raise ValueError(
+            raise DataError(
                 "A feature file holds one vector per item, so it must be a "
                 f"two-dimensional array, got {array.ndim} dimensions."
             )
@@ -528,7 +529,7 @@ class Reader(ABC):
             train_data.select(nw.len()).item() == 0
             or test_data.select(nw.len()).item() == 0
         ):
-            raise FileNotFoundError(
+            raise DataNotFoundError(
                 f"Train/Test parquet data not found or empty in '{base_location}'."
             )
 
@@ -590,7 +591,7 @@ class ReaderFactory:  # pylint: disable=C0415, R0903
             Reader: An instance of a class that extends the Reader abstract class.
 
         Raises:
-            ValueError: If the reading method specified in the configuration is unknown.
+            ConfigurationError: If the reading method specified in the configuration is unknown.
         """
         reader_type = config.reader.reading_method
         backend = config.general.backend
@@ -613,4 +614,4 @@ class ReaderFactory:  # pylint: disable=C0415, R0903
                     backend=backend,
                 )
 
-        raise ValueError(f"Unknown reader type: {reader_type}")
+        raise ConfigurationError(f"Unknown reader type: {reader_type}")

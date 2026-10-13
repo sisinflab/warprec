@@ -10,6 +10,7 @@ from torch.utils.data import Dataset as TorchDataset
 from torch.nn.utils.rnn import pad_sequence
 from scipy.sparse import csr_matrix
 
+from warprec.errors import DataError
 from warprec.data.entities.context import build_context_array
 from warprec.data.entities.train_structures.interaction_structures import (
     popularity_cumulative,
@@ -90,7 +91,7 @@ def draw_negatives(
         np.ndarray: Exactly num_negatives distinct unseen items, in draw order.
 
     Raises:
-        ValueError: If the user has fewer items left to draw than num_negatives.
+        DataError: If the user has fewer items left to draw than num_negatives.
     """
     seen = np.unique(np.asarray(seen, dtype=np.int64))
     if drawable is None:
@@ -104,7 +105,7 @@ def draw_negatives(
     # cannot line the batch up, and drawing for a user who cannot supply them
     # would never return.
     if available < num_negatives:
-        raise ValueError(
+        raise DataError(
             f"Sampled evaluation asks for {num_negatives} negatives per user, but "
             f"user {user} has only {available} of the {num_items} items left "
             f"unseen{reason}. Lower 'evaluation.num_negatives' or evaluate on the "

@@ -7,6 +7,7 @@ import joblib
 import narwhals as nw
 from narwhals.dataframe import DataFrame
 
+from warprec.errors import DataNotFoundError
 from warprec.data.reader.base_reader import Reader
 
 
@@ -70,11 +71,11 @@ class LocalReader(Reader):
             np.ndarray: The array, two-dimensional and float32.
 
         Raises:
-            FileNotFoundError: If the file does not exist.
+            DataNotFoundError: If the file does not exist.
         """
         path = Path(local_path)
         if not path.exists():
-            raise FileNotFoundError(f"The feature file '{local_path}' does not exist.")
+            raise DataNotFoundError(f"The feature file '{local_path}' does not exist.")
 
         return self._process_array(np.load(path, allow_pickle=False))
 
@@ -165,9 +166,9 @@ class LocalReader(Reader):
                 loaded using `joblib`.
 
         Raises:
-            FileNotFoundError: If the model state was not found in the provided path.
+            DataNotFoundError: If the model state was not found in the provided path.
         """
         path = Path(local_path)
         if path.exists():
             return joblib.load(path)
-        raise FileNotFoundError(f"Model state not found in {path}")
+        raise DataNotFoundError(f"Model state not found in {path}")

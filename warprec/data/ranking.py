@@ -5,6 +5,7 @@ import torch
 from scipy.sparse import csr_matrix
 from torch import Tensor
 
+from warprec.errors import EvaluationError
 from warprec.data.entities.context import context_key
 from warprec.utils.logger import logger
 
@@ -136,13 +137,13 @@ def cold_item_candidates(train_set: csr_matrix, candidates: str) -> Optional[Ten
             is eligible and there is nothing to restrict.
 
     Raises:
-        ValueError: If the candidate set is not one WarpRec knows.
+        EvaluationError: If the candidate set is not one WarpRec knows.
     """
     if candidates == "all":
         return None
 
     if candidates not in ("cold", "warm"):
-        raise ValueError(
+        raise EvaluationError(
             f"Candidate set '{candidates}' is not supported. "
             "Use 'all', 'cold' or 'warm'."
         )

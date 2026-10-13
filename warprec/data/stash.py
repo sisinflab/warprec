@@ -1,4 +1,5 @@
 from typing import Any, Dict, FrozenSet, Iterable
+from warprec.errors import ExtensionError
 
 # The keyword arguments WarpRec passes to every model it builds, restores or
 # estimates, next to the stash.
@@ -55,12 +56,12 @@ def check_stash(
         Dict[str, Any]: The stash, unchanged.
 
     Raises:
-        ValueError: If a stash entry has the name of a reserved argument.
+        ExtensionError: If a stash entry has the name of a reserved argument.
     """
     reserved = set(reserved)
     taken = sorted(key for key in stash if key in reserved)
     if taken:
-        raise ValueError(
+        raise ExtensionError(
             f"The stash entry {', '.join(repr(key) for key in taken)} has the "
             f"name of an argument WarpRec passes to every {receiver} itself, so "
             "one would replace the other. Rename the entry; the names WarpRec "

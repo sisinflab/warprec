@@ -13,6 +13,7 @@ import narwhals as nw
 from narwhals.typing import FrameT
 from narwhals.dataframe import DataFrame
 
+from warprec.errors import ConfigurationError, DataError
 from warprec.data.entities import (
     Interactions,
     KnowledgeGraph,
@@ -96,7 +97,7 @@ class Dataset:
             built only when at least one modality is configured.
 
     Raises:
-        ValueError: If the evaluation_set is not supported.
+        ConfigurationError: If the evaluation_set is not supported.
     """
 
     train_set: Interactions = None
@@ -145,7 +146,9 @@ class Dataset:
         # per structure it derives from them.
         # Check evaluation set
         if evaluation_set not in ["Test", "Validation"]:
-            raise ValueError("Evaluation set must be either 'Test' or 'Validation'.")
+            raise ConfigurationError(
+                "Evaluation set must be either 'Test' or 'Validation'."
+            )
 
         # Materialize the data and ensure
         mat_train_data = self._materialize(train_data)
@@ -714,11 +717,11 @@ class Dataset:
             Optional[DataFrame[Any]]: The processed DataFrame with integer indices.
 
         Raises:
-            ValueError: If the item ID label is not found in side_data.
+            DataError: If the item ID label is not found in side_data.
         """
         # Check for item ID label
         if item_id_label not in side_data.columns:
-            raise ValueError("Item ID label not found inside side information data.")
+            raise DataError("Item ID label not found inside side information data.")
 
         df_processed = side_data.clone()
 
@@ -789,7 +792,7 @@ class Dataset:
             DataFrame[Any]: The frame with the column replaced by its indices.
 
         Raises:
-            ValueError: If the column was not fitted on the training data first.
+            DataError: If the column was not fitted on the training data first.
         """
         cells = [
             "" if value is None else str(value)
@@ -813,7 +816,7 @@ class Dataset:
 
         mapping = self._context_maps.get(col)
         if mapping is None:
-            raise ValueError(
+            raise DataError(
                 f"Mapping for context '{col}' not found. Fit on train first."
             )
 
@@ -864,14 +867,14 @@ class Dataset:
             DataFrame[Any]: The processed data.
 
         Raises:
-            ValueError: If the contextual column names are not
+            DataError: If the contextual column names are not
                 present the the DataFrame.
         """
         df_processed = df.clone()
 
         for col in context_labels:
             if col not in df_processed.columns:
-                raise ValueError(f"Context label '{col}' not found in DataFrame.")
+                raise DataError(f"Context label '{col}' not found in DataFrame.")
 
             separator = self._context_separators.get(col)
             if separator or self._context_types.get(col) == "seq":
@@ -916,7 +919,7 @@ class Dataset:
                 # Use existing mapping
                 mapping = self._context_maps.get(col)
                 if mapping is None:
-                    raise ValueError(
+                    raise DataError(
                         f"Mapping for context '{col}' not found. Fit on train first."
                     )
 

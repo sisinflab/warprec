@@ -8,6 +8,7 @@ import narwhals as nw
 from narwhals.typing import FrameT
 from narwhals.dataframe import DataFrame
 
+from warprec.errors import ConfigurationError, DataError
 from warprec.utils.enums import SplittingStrategies
 from warprec.utils.registry import splitting_registry
 
@@ -220,10 +221,10 @@ class TimestampSlicingSplit(SplittingStrategy):
                 - DataFrame[Any]: Second partition of splitted data.
 
         Raises:
-            ValueError: If the timestamp column is not present in the FrameT.
+            DataError: If the timestamp column is not present in the FrameT.
         """
         if timestamp_label not in data.columns:
-            raise ValueError(
+            raise DataError(
                 "The timestamp column must be present inside the data "
                 "to apply TimestampSlicing splitting strategy. Timestamp column "
                 f"provided: {timestamp_label} not found."
@@ -549,10 +550,11 @@ class ColdStartSplit(SplittingStrategy):
             List[Tuple[DataFrame[Any], DataFrame[Any]]]: The single train/test pair.
 
         Raises:
-            ValueError: If the ratio would leave nothing on one side of the split.
+            ConfigurationError: If the ratio does not lie strictly between 0 and 1.
+            DataError: If the ratio would leave nothing on one side of the split.
         """
         if not 0 < ratio < 1:
-            raise ValueError(
+            raise ConfigurationError(
                 f"A cold-start ratio must lie strictly between 0 and 1, got {ratio}."
             )
 
@@ -563,7 +565,7 @@ class ColdStartSplit(SplittingStrategy):
         )
         n_cold = int(round(len(entities) * ratio))
         if n_cold == 0 or n_cold == len(entities):
-            raise ValueError(
+            raise DataError(
                 f"A ratio of {ratio} over {len(entities)} distinct '{label}' values "
                 f"holds out {n_cold} of them, which leaves one side of the split "
                 "empty. Choose a ratio the catalogue can support."

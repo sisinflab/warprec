@@ -5,6 +5,7 @@ import narwhals as nw
 from narwhals.typing import FrameT
 from narwhals.dataframe import DataFrame
 
+from warprec.errors import ConfigurationError
 from warprec.data.schema import ColumnLabels, SplitSpec
 from warprec.utils.registry import splitting_registry
 from warprec.utils.logger import logger
@@ -50,11 +51,11 @@ class Splitter:
                 folds, or None) and the test set.
 
         Raises:
-            ValueError: If no test split is given, or the validation split holds
+            ConfigurationError: If no test split is given, or the validation split holds
                 out a side of the catalogue the test split does not.
         """
         if test is None or test.strategy is None:
-            raise ValueError(
+            raise ConfigurationError(
                 "split_transaction needs the test split: pass "
                 "test=SplitSpec(strategy=..., ...), e.g. "
                 "test=SplitSpec(strategy='temporal_holdout', ratio=0.2)."
@@ -191,7 +192,7 @@ class Splitter:
                 follows, if any.
 
         Raises:
-            ValueError: If the validation split holds out a side the test split
+            ConfigurationError: If the validation split holds out a side the test split
                 does not.
         """
         if validation is None or validation.strategy is None:
@@ -199,7 +200,7 @@ class Splitter:
         held_out = cls.cold_dimension(validation)
         if held_out is None or held_out == cls.cold_dimension(test):
             return
-        raise ValueError(
+        raise ConfigurationError(
             f"The validation split uses {validation.resolved_strategy().value}, which "
             f"holds {held_out}s out of training, but the test split "
             f"({test.resolved_strategy().value}) does not, so every validation "

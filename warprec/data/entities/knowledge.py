@@ -5,6 +5,7 @@ import torch
 from narwhals.dataframe import DataFrame
 from torch import Tensor
 
+from warprec.errors import ConfigurationError
 from warprec.utils.logger import logger
 
 
@@ -324,12 +325,16 @@ class KnowledgeGraph:
                 the identifiers the graph was read with.
 
         Raises:
-            ValueError: If the order is not 1 or 2, or min_items is below 1.
+            ConfigurationError: If the order is not 1 or 2, or min_items is below 1.
         """
         if order not in (1, 2):
-            raise ValueError(f"An item feature is one or two facts long, not {order}.")
+            raise ConfigurationError(
+                f"An item feature is one or two facts long, not {order}."
+            )
         if min_items < 1:
-            raise ValueError(f"min_items must be at least 1, received {min_items}.")
+            raise ConfigurationError(
+                f"min_items must be at least 1, received {min_items}."
+            )
 
         key = (order, min_items)
         if key not in self._item_features:
