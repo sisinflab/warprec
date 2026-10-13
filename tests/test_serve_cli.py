@@ -33,9 +33,31 @@ def write_config(tmp_path: Path, **server) -> Path:
     return path
 
 
-def test_a_missing_config_is_reported(tmp_path: Path):
-    with pytest.raises(FileNotFoundError, match="missing.yml"):
+def test_a_missing_config_is_reported(tmp_path: Path, capsys: pytest.CaptureFixture):
+    with pytest.raises(SystemExit) as stop:
         main(["-c", str(tmp_path / "missing.yml")])
+    assert stop.value.code == 1
+    assert capsys.readouterr().err.startswith(
+        "DataNotFoundError: Configuration file not found at:"
+    )
+
+
+def test_a_missing_config_raises_a_file_not_found_error_under_debug(tmp_path: Path):
+    with pytest.raises(FileNotFoundError, match="missing.yml"):
+        main(["-c", str(tmp_path / "missing.yml"), "--debug"])
+
+
+def test_an_invalid_config_is_reported_by_key(
+    tmp_path: Path, capsys: pytest.CaptureFixture
+):
+    path = write_config(tmp_path, port=0)
+    with pytest.raises(SystemExit) as stop:
+        main(["-c", str(path)])
+    assert stop.value.code == 1
+    err = capsys.readouterr().err
+    assert err.startswith(f"ConfigurationError: {path} is not a valid serving")
+    assert "\n  server.port: " in err
+    assert "input_value" not in err and "errors.pydantic.dev" not in err
 
 
 def test_export_writes_a_ray_serve_config(

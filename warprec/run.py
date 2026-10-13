@@ -1,6 +1,10 @@
 import argparse
+import sys
 import warnings
 from pathlib import Path
+from typing import List, Optional
+
+from warprec.errors import ConfigurationError, DataNotFoundError, WarpRecError
 
 from warprec.pipelines import (
     design_pipeline,
@@ -14,15 +18,23 @@ from warprec.pipelines import (
 warnings.filterwarnings("ignore", category=UserWarning)
 
 
-def main():
+def main(argv: Optional[List[str]] = None) -> None:
     """Main Warprec access point.
 
     This function will parse and pass the correct arguments
     to the pre-constructed Warprec pipelines.
 
+    A WarpRecError, an error the user can fix, is printed to stderr as
+    '<ClassName>: <message>' without a traceback, and the process exits with
+    status 1; '--debug' raises it instead so the traceback shows. Any other
+    exception is raised as is.
+
+    Args:
+        argv (Optional[List[str]]): The command-line arguments; None reads sys.argv.
+
     Raises:
-        FileNotFoundError: If the configuration file cannot be found.
-        ValueError: If the pipeline selected is not supported.
+        SystemExit: With status 1 when a WarpRecError stops the run.
+        WarpRecError: When a WarpRecError stops the run under '--debug'.
     """
     parser = argparse.ArgumentParser()
     parser.add_argument(
@@ -31,14 +43,36 @@ def main():
     parser.add_argument(
         "-p", "--pipeline", type=str, required=True, help="Pipeline to run"
     )
+    parser.add_argument(
+        "--debug",
+        action="store_true",
+        help="Show the traceback of a configuration or data error",
+    )
 
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
 
-    path = args.config
-    pipeline = args.pipeline.lower()
+    try:
+        _run(args.config, args.pipeline.lower())
+    except WarpRecError as error:
+        if args.debug:
+            raise
+        print(f"{type(error).__name__}: {error}", file=sys.stderr)
+        raise SystemExit(1) from None
 
+
+def _run(path: str, pipeline: str) -> None:
+    """Run a pipeline on a configuration file.
+
+    Args:
+        path (str): The configuration file.
+        pipeline (str): The pipeline's name, in lower case.
+
+    Raises:
+        DataNotFoundError: If the configuration file cannot be found.
+        ConfigurationError: If the pipeline selected is not supported.
+    """
     if not Path(path).is_file():
-        raise FileNotFoundError(f"Configuration file not found at: {path}")
+        raise DataNotFoundError(f"Configuration file not found at: {path}")
 
     if pipeline not in [
         "train",
@@ -47,7 +81,7 @@ def main():
         "swarm",
         "estimate",
     ]:
-        raise ValueError(
+        raise ConfigurationError(
             "Invalid pipeline specified: "
             f"{pipeline}. Choose 'train', 'design', 'eval', 'swarm' or 'estimate'."
         )
