@@ -102,3 +102,5 @@ def test_every_model_gets_measured_batches_and_an_evaluation_time(
         assert pd.notna(report.loc[model, "Estimated Evaluation Time"])
         assert "warm-up reduced" in report.loc[model, "Notes"]
     assert report.loc["BPR", "Measured Train Batches"] >= 1
+    # The model's own note replaces the generic one instead of repeating it
+    assert report.loc["EASE", "Notes"].lower().count("analytical train-space") == 1

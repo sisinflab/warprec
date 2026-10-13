@@ -578,9 +578,7 @@ def _run_estimate_setup(  # pylint: disable = too-many-locals
             chunk_size=chunk_size,
             **check_stash(train_dataset.get_stash(), MODEL_ARGUMENTS, "model"),
         )
-        notes.append("Analytical train-space estimate")
-        if estimate.get("notes"):
-            notes.append(str(estimate["notes"]))
+        notes.append(str(estimate.get("notes") or "Analytical train-space estimate"))
         analytical_ram_mb = float(estimate["train_ram_mb"])
 
         # Timing the evaluation takes a fitted model, so the model is fitted
