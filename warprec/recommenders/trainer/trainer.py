@@ -1,4 +1,4 @@
-# pylint: disable = wrong-import-position, ungrouped-imports
+# pylint: disable = wrong-import-position, ungrouped-imports, too-many-lines
 import os
 
 # Set Ray environment variable to enable new features
@@ -454,6 +454,11 @@ class Trainer:
         )
         session_id = uuid.uuid4().hex
 
+        # The trial function is pickled into every trial, so it must not
+        # reference 'self': that would ship the whole Trainer, the custom and
+        # dashboard callbacks included, to processes that never call them
+        storage_path = self._stg_path
+
         # Driver function that will be launched by Ray Tune and will
         # initialize Ray Train
         def train_driver_fn(config: dict, data_bundle: dict, scaling_config_dict: dict):
@@ -474,7 +479,7 @@ class Trainer:
                 run_config=ray.train.RunConfig(
                     name=f"ray_train_trial_id={trial_id}",
                     callbacks=[TuneReportCallback()],  # type: ignore[list-item]
-                    storage_path=self._stg_path,
+                    storage_path=storage_path,
                     checkpoint_config=ray.train.CheckpointConfig(
                         num_to_keep=opt_config.checkpoint_to_keep,
                         checkpoint_score_attribute=validation_score,
