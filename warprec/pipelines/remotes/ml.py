@@ -251,6 +251,10 @@ def remote_model_retraining(
             train_dataloaders=train_dataloader,
         )
 
+        # What is saved with the model, and written as its best parameters,
+        # has to describe the training it had, not the search's upper bound
+        best_model.epochs = iterations
+
     # Final reporting
     report = {}
     report["Total Params (Best Model)"] = sum(

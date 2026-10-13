@@ -6,11 +6,13 @@ full training set has to train exactly that long, not for the 'epochs' upper
 bound the search was given.
 """
 
+import pandas as pd
 import pytest
 
 import warprec.recommenders  # noqa: F401  (populates the registries)
 from warprec.data.dataset import Dataset
 from warprec.pipelines.remotes.ml import remote_model_retraining
+from warprec.recommenders.trainer.trainer import Trainer
 from warprec.utils.registry import params_registry
 
 HYPERPARAMETERS = {
@@ -45,3 +47,43 @@ def test_retraining_trains_for_the_summarised_iterations(
 
     assert returned == iterations
     assert model.trainer.current_epoch == iterations
+
+
+def test_the_retrained_model_describes_the_epochs_it_trained(dataset: Dataset):
+    """The parameters saved with the model give the epochs it was trained for."""
+    params = params_registry.get(
+        "BPR", **HYPERPARAMETERS, optimization={"num_workers": 0}
+    )
+
+    model, _, _ = remote_model_retraining._function(  # type: ignore[attr-defined]
+        model_name="BPR",
+        best_params={**HYPERPARAMETERS, "iterations": 2},
+        main_dataset=dataset,
+        params=params,
+        custom_modules=[],
+        device="cpu",
+        seed=42,
+    )
+
+    assert model.get_params()["epochs"] == 2
+    assert model.get_state()["params"]["epochs"] == 2
+
+
+def test_cross_validation_keeps_a_float_hyperparameter_a_float():
+    """A float that happens to be whole stays a float in the best parameters."""
+    frame = pd.DataFrame(
+        {
+            "config/l2": [500.0, 500.0, 10.5, 10.5],
+            "config/k": [10, 10, 20, 20],
+            "config/fold": [0, 1, 0, 1],
+            "nDCG@10": [0.3, 0.32, 0.1, 0.12],
+            "iterations": [1, 1, 1, 1],
+        }
+    )
+
+    best, _ = Trainer(storage_path="unused")._aggregate_cv_results(
+        frame, "nDCG@10", "max", "median"
+    )
+
+    assert best["l2"] == 500.0 and isinstance(best["l2"], float)
+    assert best["k"] == 10 and isinstance(best["k"], int)

@@ -866,13 +866,22 @@ class Trainer:
         for col in hyperparam_cols:
             key = col.replace("config/", "")
             val = best_row[col]
-            # Type restoration logic
-            if isinstance(val, (np.integer, int)):
-                best_params[key] = int(val)
-            elif isinstance(val, (np.floating, float)):
-                best_params[key] = int(val) if val.is_integer() else float(val)
-            elif isinstance(val, (np.bool_, bool)):
+            # Type restoration logic. The row mixes the hyperparameters, so
+            # pandas may have widened an integer to a float there: the type is
+            # read from the hyperparameter's own column instead
+            kind = df[col].dtype.kind
+            if kind == "b":
                 best_params[key] = bool(val)
+            elif kind in "iu":
+                best_params[key] = int(val)
+            elif kind == "f":
+                # A float column is a float hyperparameter, unless it holds the
+                # integers of a hyperparameter some trials lack (pandas turns
+                # an integer column with missing values into floats)
+                was_int = df[col].isna().any() and all(
+                    float(v).is_integer() for v in df[col].dropna()
+                )
+                best_params[key] = int(val) if was_int else float(val)
             else:
                 best_params[key] = val
 
