@@ -41,23 +41,39 @@ def load_custom_modules(custom_modules: str | List[str] | None):
         path = Path(module_path)
         # On a Ray worker the path may not exist, the module having been shipped
         # rather than copied there, but it is already importable by name.
+        added: Optional[str] = None
         if path.exists():
             parent = str(path.resolve().parent)
             if parent not in sys.path:
                 sys.path.insert(0, parent)
+                added = parent
         name = path.name.removesuffix(".py")
         try:
             module = importlib.import_module(name)
         except ImportError as e:
+            _remove_from_path(added)
             raise ImportError(
                 f"Failed to import the custom module '{name}' from '{module_path}': {e}"
             ) from e
         if path.exists() and not _is_module_at(module, path):
+            # Left first on the path, the folder would shadow the module it
+            # was refused for in everything imported or started afterwards
+            _remove_from_path(added)
             raise ImportError(
                 f"The custom module '{module_path}' is imported as '{name}', a name "
                 f"already taken by '{getattr(module, '__file__', None) or module}', "
                 "which would be used in its place. Rename one of the two."
             )
+
+
+def _remove_from_path(folder: Optional[str]) -> None:
+    """Take a folder 'load_custom_modules' added back off the import path.
+
+    Args:
+        folder (Optional[str]): The folder, or None when none was added.
+    """
+    if folder is not None and folder in sys.path:
+        sys.path.remove(folder)
 
 
 def _is_module_at(module: ModuleType, path: Path) -> bool:
