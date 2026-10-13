@@ -3,6 +3,7 @@ from typing import List
 import torch
 from torch import nn, Tensor
 from torch.nn import Module
+from warprec.errors import ConfigurationError
 
 
 def get_activation(activation: str = "relu") -> Module:
@@ -15,7 +16,7 @@ def get_activation(activation: str = "relu") -> Module:
         Module: The activation layer requested.
 
     Raises:
-        ValueError: If the activation is not known or supported.
+        ConfigurationError: If the activation is not known or supported.
     """
     match activation:
         case "sigmoid":
@@ -27,7 +28,7 @@ def get_activation(activation: str = "relu") -> Module:
         case "leakyrelu":
             return nn.LeakyReLU()
         case _:
-            raise ValueError("Activation function not supported.")
+            raise ConfigurationError("Activation function not supported.")
 
 
 class MLP(nn.Module):
@@ -79,7 +80,7 @@ class CNN(nn.Module):
         activation (str): The activation function to apply.
 
     Raises:
-        ValueError: If the cnn_channels, cnn_kernels and cnn_strides lists
+        ConfigurationError: If the cnn_channels, cnn_kernels and cnn_strides lists
             do not have the same length.
     """
 
@@ -92,7 +93,7 @@ class CNN(nn.Module):
     ):
         super().__init__()
         if not len(cnn_channels) == len(cnn_kernels) == len(cnn_strides):
-            raise ValueError(
+            raise ConfigurationError(
                 "cnn_channels, cnn_kernels, and cnn_strides must have the same length."
             )
 

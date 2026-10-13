@@ -5,6 +5,7 @@ import torch
 from scipy.sparse import csr_matrix
 from torch import Tensor
 
+from warprec.errors import ConfigurationError, ModelError
 from warprec.recommenders.reranking.base import GreedyReranker
 from warprec.utils.registry import reranker_registry
 
@@ -41,7 +42,8 @@ class Calibration(GreedyReranker):
         **kwargs (Any): Ignored.
 
     Raises:
-        ValueError: If the weight falls outside [0, 1], or no history was given.
+        ConfigurationError: If the weight falls outside [0, 1].
+        ModelError: If no history was given.
     """
 
     def __init__(
@@ -56,10 +58,12 @@ class Calibration(GreedyReranker):
         super().__init__(item_features, pool, **kwargs)
 
         if not 0.0 <= weight <= 1.0:
-            raise ValueError(f"Calibration weight must lie in [0, 1], got {weight}.")
+            raise ConfigurationError(
+                f"Calibration weight must lie in [0, 1], got {weight}."
+            )
 
         if user_history is None:
-            raise ValueError(
+            raise ModelError(
                 "Calibration compares a list against the user's own history and "
                 "therefore needs the training interactions."
             )
@@ -94,10 +98,10 @@ class Calibration(GreedyReranker):
             dict: The target distribution and the running list distribution.
 
         Raises:
-            ValueError: If the batch did not say which users it holds.
+            ModelError: If the batch did not say which users it holds.
         """
         if user_indices is None:
-            raise ValueError("Calibration needs to know which users it is ranking for.")
+            raise ModelError("Calibration needs to know which users it is ranking for.")
 
         target = self.user_mix[user_indices]
         return {

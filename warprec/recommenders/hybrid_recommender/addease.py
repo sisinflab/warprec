@@ -3,6 +3,7 @@ from typing import Any, Optional
 
 import numpy as np
 
+from warprec.errors import ModelError
 from warprec.data.entities import Interactions
 from warprec.recommenders.base_recommender import ItemSimRecommender
 from warprec.utils.registry import model_registry
@@ -43,7 +44,7 @@ class AddEASE(ItemSimRecommender):
         X = interactions.get_sparse()
         item_profile = interactions.get_side_sparse()
         if item_profile is None:
-            raise ValueError("AddEASE requires side information to estimate space.")
+            raise ModelError("AddEASE requires side information to estimate space.")
 
         n_items = info["n_items"]
         collab_sparse_gram_mb = cls._estimated_sparse_square_size_mb(

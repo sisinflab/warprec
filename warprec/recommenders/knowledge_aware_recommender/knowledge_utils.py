@@ -3,6 +3,7 @@ from typing import Any, Optional, Tuple
 import torch
 from torch import Tensor, nn
 
+from warprec.errors import ModelError
 from warprec.data.entities import KnowledgeGraph
 from warprec.utils.logger import logger
 
@@ -33,7 +34,7 @@ class KnowledgeRecommenderUtils(nn.Module):
         triple_tails (Tensor): The tail of each fact, in index space.
 
     Raises:
-        ValueError: If no knowledge graph was provided.
+        ModelError: If no knowledge graph was provided.
     """
 
     n_entities: int
@@ -61,7 +62,7 @@ class KnowledgeRecommenderUtils(nn.Module):
         super().__init__(params, info, *args, **kwargs)  # type: ignore[call-arg]
 
         if knowledge is None:
-            raise ValueError(
+            raise ModelError(
                 f"{type(self).__name__} scores from a knowledge graph, but the "
                 "dataset carries none. Configure 'reader.knowledge'."
             )

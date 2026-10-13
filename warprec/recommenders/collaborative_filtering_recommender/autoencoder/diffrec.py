@@ -6,6 +6,7 @@ import torch
 from torch import Tensor, nn
 from torch.nn import functional as F
 
+from warprec.errors import ConfigurationError, ModelError
 from warprec.data.entities import Interactions, Sessions
 from warprec.recommenders.base_recommender import IterativeRecommender
 from warprec.utils.registry import model_registry
@@ -177,8 +178,9 @@ class DiffRec(IterativeRecommender):
         alphas_cumprod_prev (Tensor): The same, shifted one step back.
 
     Raises:
-        ValueError: If the training interactions were not provided, or the
-            sampling starts further in than the schedule reaches.
+        ModelError: If the training interactions were not provided.
+        ConfigurationError: If the sampling starts further in than the
+            schedule reaches.
     """
 
     hidden_dims: list
@@ -212,13 +214,13 @@ class DiffRec(IterativeRecommender):
         super().__init__(params, info, *args, seed=seed, **kwargs)
 
         if interactions is None:
-            raise ValueError(
+            raise ModelError(
                 "DiffRec repairs a user's interaction vector, so it needs the "
                 "interactions at construction."
             )
 
         if self.sampling_steps > self.steps:
-            raise ValueError(
+            raise ConfigurationError(
                 f"DiffRec was asked to start recommending {self.sampling_steps} "
                 f"steps into a schedule that is only {self.steps} long. "
                 "'sampling_steps' cannot exceed 'steps'."

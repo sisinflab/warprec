@@ -4,6 +4,7 @@ import torch
 from torch import Tensor, nn
 from torch.nn import functional as F
 
+from warprec.errors import ConfigurationError, ModelError
 from warprec.data.entities import MultiModalFeatures
 
 
@@ -34,7 +35,7 @@ class MultiModalRecommenderUtils(nn.Module):
         n_users (int): The number of users, from the recommender base class.
 
     Raises:
-        ValueError: If no features were provided, or a named modality is absent.
+        ModelError: If no features were provided, or a named modality is absent.
     """
 
     modality_names: List[str]
@@ -57,7 +58,7 @@ class MultiModalRecommenderUtils(nn.Module):
         super().__init__(params, info, *args, **kwargs)  # type: ignore[call-arg]
 
         if multimodal is None or not len(multimodal):
-            raise ValueError(
+            raise ModelError(
                 f"{type(self).__name__} scores from multimodal item features, but "
                 "the dataset carries none. Configure 'reader.multimodal'."
             )
@@ -68,7 +69,7 @@ class MultiModalRecommenderUtils(nn.Module):
 
         missing = [name for name in wanted if name not in multimodal]
         if missing:
-            raise ValueError(
+            raise ModelError(
                 f"{type(self).__name__} was asked for the modalities {missing}, "
                 f"which the dataset does not carry. It carries "
                 f"{multimodal.names()}."
@@ -107,10 +108,10 @@ class MultiModalRecommenderUtils(nn.Module):
             Tensor: The sparse, normalised item-item adjacency.
 
         Raises:
-            ValueError: If there is not one weight per modality.
+            ConfigurationError: If there is not one weight per modality.
         """
         if weights is not None and len(weights) != len(self.modality_names):
-            raise ValueError(
+            raise ConfigurationError(
                 f"{type(self).__name__} was given {len(weights)} modality weights "
                 f"for {len(self.modality_names)} modalities "
                 f"({self.modality_names}). There must be one weight per modality, "

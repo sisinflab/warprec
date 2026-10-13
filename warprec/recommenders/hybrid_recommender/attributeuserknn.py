@@ -4,6 +4,7 @@ from typing import Any, Optional
 import numpy as np
 from torch import Tensor
 from scipy.sparse import csr_matrix
+from warprec.errors import ModelError
 from warprec.data.entities import Interactions
 from warprec.recommenders.base_recommender import Recommender
 from warprec.utils.registry import model_registry, similarities_registry
@@ -46,7 +47,7 @@ class AttributeUserKNN(Recommender):
         X_inter = interactions.get_sparse()
         X_feat = interactions.get_side_sparse()
         if X_feat is None:
-            raise ValueError(
+            raise ModelError(
                 "AttributeUserKNN requires side information to estimate space."
             )
 

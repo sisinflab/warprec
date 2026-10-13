@@ -3,6 +3,7 @@ from typing import Any, Optional
 import torch
 from torch import Tensor
 
+from warprec.errors import ConfigurationError
 from warprec.recommenders.reranking.base import GreedyReranker
 from warprec.utils.registry import reranker_registry
 
@@ -28,7 +29,7 @@ class MMR(GreedyReranker):
         **kwargs (Any): Ignored.
 
     Raises:
-        ValueError: If the diversity weight falls outside [0, 1].
+        ConfigurationError: If the diversity weight falls outside [0, 1].
     """
 
     def __init__(
@@ -41,7 +42,9 @@ class MMR(GreedyReranker):
         super().__init__(item_features, pool, **kwargs)
 
         if not 0.0 <= diversity <= 1.0:
-            raise ValueError(f"MMR diversity must lie in [0, 1], got {diversity}.")
+            raise ConfigurationError(
+                f"MMR diversity must lie in [0, 1], got {diversity}."
+            )
 
         self.diversity = diversity
 

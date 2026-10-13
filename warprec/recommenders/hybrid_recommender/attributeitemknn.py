@@ -1,6 +1,7 @@
 # pylint: disable = R0801, E1102
 from typing import Any, Optional
 
+from warprec.errors import ModelError
 from warprec.data.entities import Interactions
 from warprec.recommenders.base_recommender import ItemSimRecommender
 from warprec.utils.registry import model_registry, similarities_registry
@@ -41,7 +42,7 @@ class AttributeItemKNN(ItemSimRecommender):
         X = interactions.get_sparse()
         X_feat = interactions.get_side_sparse()
         if X_feat is None:
-            raise ValueError(
+            raise ModelError(
                 "AttributeItemKNN requires side information to estimate space."
             )
 

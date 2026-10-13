@@ -4,6 +4,7 @@ from typing import Any, List, Optional
 import torch
 from torch import nn, Tensor
 
+from warprec.errors import ModelError
 from warprec.data.entities import Interactions, Sessions
 from warprec.recommenders.base_recommender import IterativeRecommender
 from warprec.recommenders.losses import EmbLoss
@@ -96,7 +97,7 @@ class TwoTower(IterativeRecommender):
             often it is drawn as an in-batch negative.
 
     Raises:
-        ValueError: If the item attributes are asked for but none were provided.
+        ModelError: If the item attributes are asked for but none were provided.
     """
 
     # Model hyperparameters
@@ -134,7 +135,7 @@ class TwoTower(IterativeRecommender):
         if self.use_item_features:
             side = interactions.get_side_sparse() if interactions is not None else None
             if side is None:
-                raise ValueError(
+                raise ModelError(
                     "TwoTower was asked to use item features but the dataset "
                     "carries no side information. Configure 'reader.side' or set "
                     "'use_item_features' to false."

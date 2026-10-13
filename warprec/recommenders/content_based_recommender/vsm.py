@@ -5,6 +5,7 @@ import torch
 import numpy as np
 from torch import Tensor
 
+from warprec.errors import ModelError
 from warprec.data.entities import Interactions
 from warprec.recommenders.base_recommender import Recommender
 from warprec.utils.registry import model_registry, similarities_registry
@@ -47,7 +48,7 @@ class VSM(Recommender):
         X = interactions.get_sparse()
         item_profile = interactions.get_side_sparse()
         if item_profile is None:
-            raise ValueError("VSM requires side information to estimate space.")
+            raise ModelError("VSM requires side information to estimate space.")
 
         n_users = info["n_users"]
         n_items = info["n_items"]

@@ -4,6 +4,7 @@ from typing import Tuple, Any, Optional
 import torch
 from torch import nn, Tensor
 
+from warprec.errors import ConfigurationError
 from warprec.data.entities import Interactions, Sessions
 from warprec.recommenders.base_recommender import IterativeRecommender
 from warprec.recommenders.collaborative_filtering_recommender.graph_based import (
@@ -42,7 +43,7 @@ class SGL(IterativeRecommender, GraphRecommenderUtils):
         learning_rate (float): The learning rate value.
 
     Raises:
-        ValueError: If aug_type is not one of the supported types.
+        ConfigurationError: If aug_type is not one of the supported types.
     """
 
     # Hyperparameters
@@ -71,7 +72,7 @@ class SGL(IterativeRecommender, GraphRecommenderUtils):
         # Validation
         self.aug_type = self.aug_type.upper()
         if self.aug_type not in ["ED", "ND", "RW"]:
-            raise ValueError(
+            raise ConfigurationError(
                 f"Invalid aug_type: {self.aug_type}. "
                 "Supported types: 'ED' (Edge Dropout), 'ND' (Node Dropout), 'RW' (Random Walk)."
             )

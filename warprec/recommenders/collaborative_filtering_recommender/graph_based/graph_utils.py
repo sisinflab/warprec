@@ -5,6 +5,7 @@ import torch
 import numpy as np
 from torch import nn, Tensor
 from scipy.sparse import coo_matrix
+from warprec.errors import ConfigurationError
 
 # Importing PyG runs torch.jit.script on its own pooling layers, which PyTorch
 # now deprecates. Nothing here uses TorchScript, so the notice is silenced for
@@ -330,13 +331,13 @@ class SparseDropout(nn.Module):
         p (float): Dropout rate. Values accepted in range [0, 1].
 
     Raises:
-        ValueError: If p is not in range.
+        ConfigurationError: If p is not in range.
     """
 
     def __init__(self, p: float):
         super().__init__()
         if not 0 <= p <= 1:
-            raise ValueError(
+            raise ConfigurationError(
                 f"Dropout probability has to be between 0 and 1, but got {p}"
             )
         self.p = p

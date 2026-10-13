@@ -4,6 +4,7 @@ from typing import Any, Optional, List
 import torch
 from torch import nn, Tensor
 
+from warprec.errors import ConfigurationError
 from warprec.recommenders.base_recommender import (
     IterativeRecommender,
     ContextRecommenderUtils,
@@ -44,7 +45,7 @@ class DCNv2(ContextRecommenderUtils, IterativeRecommender):
         neg_samples (int): Number of negative samples for training.
 
     Raises:
-        ValueError: If model_structure parameter is not supported.
+        ConfigurationError: If model_structure parameter is not supported.
     """
 
     embedding_size: int
@@ -129,7 +130,7 @@ class DCNv2(ContextRecommenderUtils, IterativeRecommender):
         elif self.model_structure == "stacked":
             final_dim = self.mlp_hidden_size[-1]
         else:
-            raise ValueError(
+            raise ConfigurationError(
                 f"Model structure {self.model_structure} not supported. "
                 "Model structure supported are 'parallel' and 'stacked'."
             )

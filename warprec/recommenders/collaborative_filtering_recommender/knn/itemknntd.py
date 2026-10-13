@@ -4,6 +4,7 @@ from typing import Any, Optional
 import numpy as np
 import scipy.sparse as sp
 
+from warprec.errors import DataError, ModelError
 from warprec.data.entities import Interactions
 from warprec.recommenders.collaborative_filtering_recommender.knn import ItemKNN
 from warprec.utils.registry import model_registry
@@ -29,7 +30,7 @@ class ItemKNNTD(ItemKNN):
             interactions decay faster.
 
     Raises:
-        ValueError: If the timestamp column is not found in the dataset, as
+        DataError: If the timestamp column is not found in the dataset, as
             ItemKNNTD requires timestamps to compute temporal decay.
     """
 
@@ -50,7 +51,7 @@ class ItemKNNTD(ItemKNN):
         )
         timestamps = interactions.get_flat()[3]
         if timestamps is None:
-            raise ValueError("ItemKNNTD requires timestamps to estimate space.")
+            raise ModelError("ItemKNNTD requires timestamps to estimate space.")
 
         base_estimate = ItemKNN.estimate_space(
             params=params, info=info, interactions=interactions, **kwargs
@@ -77,7 +78,7 @@ class ItemKNNTD(ItemKNN):
         # Extract the data and check for timestamp column
         df = interactions.get_df()
         if interactions.timestamp_label not in df.columns:
-            raise ValueError(
+            raise DataError(
                 f"Timestamp column '{interactions.timestamp_label}' not found in the dataset. "
                 "ItemKNNTD requires timestamps to compute temporal decay."
             )

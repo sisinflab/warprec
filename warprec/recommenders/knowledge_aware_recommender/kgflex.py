@@ -6,6 +6,7 @@ import torch
 from scipy.sparse import coo_matrix, csr_matrix, hstack
 from torch import Tensor, nn
 
+from warprec.errors import DataError, ModelError
 from warprec.data.entities import Interactions, KnowledgeGraph, Sessions
 from warprec.recommenders.base_recommender import IterativeRecommender
 from warprec.recommenders.knowledge_aware_recommender.knowledge_utils import (
@@ -68,8 +69,8 @@ class KGFlex(KnowledgeRecommenderUtils, IterativeRecommender):
         item_keys (Tensor): The (item, feature) facts encoded and sorted.
 
     Raises:
-        ValueError: If the interactions were not provided, or no feature
-            informs any user.
+        ModelError: If the interactions were not provided.
+        DataError: If no feature informs any user.
     """
 
     embedding_size: int
@@ -102,7 +103,7 @@ class KGFlex(KnowledgeRecommenderUtils, IterativeRecommender):
         super().__init__(params, info, *args, knowledge=knowledge, seed=seed, **kwargs)
 
         if interactions is None:
-            raise ValueError(
+            raise ModelError(
                 "KGFlex chooses each user's features from the items they "
                 "interacted with, so it needs the interactions at construction."
             )
@@ -129,7 +130,7 @@ class KGFlex(KnowledgeRecommenderUtils, IterativeRecommender):
         gains = np.concatenate([first_kept[2], second_kept[2]])
 
         if users.size == 0:
-            raise ValueError(
+            raise DataError(
                 "No feature of the knowledge graph tells any user's items apart "
                 "from the rest, so KGFlex has nothing to learn. Lower "
                 "min_feature_items or raise the feature limits."

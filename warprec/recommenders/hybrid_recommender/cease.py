@@ -3,6 +3,7 @@ from typing import Any, Optional
 
 import numpy as np
 from scipy.sparse import vstack
+from warprec.errors import ModelError
 from warprec.recommenders.base_recommender import ItemSimRecommender
 from warprec.data.entities import Interactions
 from warprec.utils.registry import model_registry
@@ -43,7 +44,7 @@ class CEASE(ItemSimRecommender):
         X = interactions.get_sparse()
         item_profile = interactions.get_side_sparse()
         if item_profile is None:
-            raise ValueError("CEASE requires side information to estimate space.")
+            raise ModelError("CEASE requires side information to estimate space.")
 
         n_items = info["n_items"]
         extended_nnz = X.nnz + item_profile.nnz

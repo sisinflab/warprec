@@ -5,6 +5,7 @@ import torch
 import torch.nn.functional as F
 from torch import nn, Tensor
 
+from warprec.errors import ConfigurationError
 from warprec.data.entities import Interactions, Sessions
 from warprec.recommenders.base_recommender import IterativeRecommender
 from warprec.recommenders.collaborative_filtering_recommender.graph_based import (
@@ -39,7 +40,7 @@ class DGCF(IterativeRecommender, GraphRecommenderUtils):
         learning_rate (float): The learning rate value.
 
     Raises:
-        ValueError: If embedding size is not divisible by n_factors.
+        ConfigurationError: If embedding size is not divisible by n_factors.
     """
 
     # Model hyperparameters
@@ -65,7 +66,7 @@ class DGCF(IterativeRecommender, GraphRecommenderUtils):
         super().__init__(params, info, seed=seed, *args, **kwargs)
 
         if self.embedding_size % self.n_factors != 0:
-            raise ValueError(
+            raise ConfigurationError(
                 f"embedding_size ({self.embedding_size}) must be divisible by n_factors ({self.n_factors})."
             )
 

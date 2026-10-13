@@ -16,15 +16,20 @@ from warprec.data.filtering import UserMin, apply_filtering
 from warprec.data.reader.local_reader import LocalReader
 from warprec.data.stash import MODEL_ARGUMENTS, check_stash
 from warprec.errors import (
+    CheckpointError,
     ConfigurationError,
     CustomModuleError,
     DataError,
     DataNotFoundError,
     EvaluationError,
     ExtensionError,
+    ModelError,
 )
 from warprec.evaluation.metrics.multiobjective.hypervolume import Hypervolume
 from warprec.evaluation.propensity import build_propensity
+from warprec.recommenders.collaborative_filtering_recommender.autoencoder.ease import (
+    EASE,
+)
 from warprec.utils.helpers import load_custom_modules, model_param_from_dict
 
 
@@ -81,6 +86,18 @@ def test_a_custom_module_that_fails_to_import_is_a_custom_module_error(
         load_custom_modules(str(broken))
     assert isinstance(caught.value, ImportError)
     assert isinstance(caught.value, ExtensionError)
+
+
+def test_a_checkpoint_of_another_model_is_a_checkpoint_error():
+    with pytest.raises(CheckpointError, match="Loading a BPR checkpoint") as caught:
+        EASE.from_checkpoint({"name": "BPR"})
+    assert isinstance(caught.value, ModelError)
+    assert isinstance(caught.value, ValueError)
+
+
+def test_estimating_a_model_without_its_interactions_is_a_model_error():
+    with pytest.raises(ModelError, match="requires interactions"):
+        EASE.estimate_space(params={"l2": 1.0}, info={"n_users": 2, "n_items": 3})
 
 
 def test_invalid_parameters_of_an_unvalidated_model_are_a_configuration_error():

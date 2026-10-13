@@ -7,6 +7,7 @@ import narwhals as nw
 from scipy.sparse import coo_matrix
 from torch import Tensor
 
+from warprec.errors import ModelError
 from warprec.data.entities import Interactions, Sessions
 from warprec.recommenders.base_recommender import (
     Recommender,
@@ -60,7 +61,7 @@ class STAN(Recommender, SequentialRecommenderUtils):
     ) -> dict:
         sessions = kwargs.get("sessions")
         if sessions is None:
-            raise ValueError("STAN requires sessions to estimate space.")
+            raise ModelError("STAN requires sessions to estimate space.")
 
         n_users = info["n_users"]
         n_items = info["n_items"]
