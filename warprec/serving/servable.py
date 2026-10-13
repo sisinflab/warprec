@@ -11,6 +11,7 @@ from scipy.sparse import csr_matrix
 from torch import Tensor
 
 import warprec.recommenders  # noqa: F401  (populates the model registry)
+from warprec.errors import CheckpointError
 from warprec.recommenders.base_recommender import (
     ContextRecommenderUtils,
     Recommender,
@@ -144,9 +145,9 @@ class ServableModel:
         warprec_version (Optional[str]): The WarpRec that wrote the checkpoint.
 
     Raises:
-        ValueError: If the policy asks for a popularity fallback the checkpoint
-            has no data for, or the model is context-aware and the checkpoint
-            lacks its context vocabulary.
+        CheckpointError: If the policy asks for a popularity fallback the
+            checkpoint has no data for, or the model is context-aware and the
+            checkpoint lacks its context vocabulary.
     """
 
     def __init__(
@@ -161,7 +162,7 @@ class ServableModel:
         payload = payload or {}
         seen: Optional[csr_matrix] = payload.get("seen")
         if policy.unknown_user == "popular" and seen is None:
-            raise ValueError(
+            raise CheckpointError(
                 "unknown_user: popular ranks by how often items were seen in "
                 "training, and this checkpoint does not carry that. Save the "
                 "model again with this version of WarpRec."
@@ -204,7 +205,7 @@ class ServableModel:
         self._context: Optional[ContextSchema] = None
         if isinstance(model, ContextRecommenderUtils) and model.context_labels:
             if payload.get("context_maps") is None:
-                raise ValueError(
+                raise CheckpointError(
                     f"{model.name} is context-aware, but this checkpoint does not "
                     "carry the context values it was trained on. Save the model "
                     "again with this version of WarpRec."
@@ -239,22 +240,29 @@ class ServableModel:
 
         Returns:
             ServableModel: The model, ready to answer.
+
+        Raises:
+            CheckpointError: If the checkpoint cannot serve the model as the
+                policy asks, with the checkpoint's path.
         """
         checkpoint = torch.load(path, map_location="cpu", weights_only=False)  # nosec B614
         model_class = model_registry.get_class(checkpoint["name"])
 
-        model = model_class.from_checkpoint(checkpoint=checkpoint)
-        model.to(device)
-        model.eval()
+        try:
+            model = model_class.from_checkpoint(checkpoint=checkpoint)
+            model.to(device)
+            model.eval()
 
-        return cls(
-            model,
-            payload=checkpoint.get("serving"),
-            policy=policy,
-            catalogue=catalogue,
-            presentation=presentation,
-            warprec_version=checkpoint.get("warprec_version"),
-        )
+            return cls(
+                model,
+                payload=checkpoint.get("serving"),
+                policy=policy,
+                catalogue=catalogue,
+                presentation=presentation,
+                warprec_version=checkpoint.get("warprec_version"),
+            )
+        except CheckpointError as error:
+            raise CheckpointError(str(error), path=path) from error
 
     @property
     def n_users(self) -> int:
