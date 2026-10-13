@@ -364,8 +364,11 @@ class Trainer:
             result_df, validation_score, mode, desired_training_it
         )
 
+        hyperparameters = {
+            k: v for k, v in best_hyperparameters.items() if k != "iterations"
+        }
         logger.msg(
-            f"Best params: {best_hyperparameters} | Avg Score: {best_stats['mean']} "
+            f"Best params: {hyperparameters} | Avg Score: {best_stats['mean']} "
             f"| Std: {best_stats['std']} | Iterations: {best_hyperparameters['iterations']}"
         )
         logger.positive(f"CV HPO for {model_name} ended successfully.")
