@@ -1,6 +1,6 @@
 # One BPR configuration trained for three epochs, with CodeCarbon writing the
-# energy each trial used to a CSV and MLflow logging every epoch's report to a
-# local file store. No run.name: WarpRec derives one.
+# energy each Ray node used during the run to a CSV and MLflow logging every
+# epoch's report to a local file store. No run.name: WarpRec derives one.
 reader:
   loading_strategy: dataset
   data_type: transaction
@@ -37,7 +37,6 @@ dashboard:
   codecarbon:
     enabled: true
     save_to_file: true
-    tracking_mode: process
   mlflow:
     enabled: true
     tracking_uri: ../runs/11-running-experiments/mlruns
