@@ -10,12 +10,12 @@ runs:
   using: "composite"
   steps:
     - name: Set up Python
-      uses: actions/setup-python@v5
+      uses: actions/setup-python@v6
       with:
         python-version: ${{ inputs.python-version }}
 
     - name: Cache Poetry venv
-      uses: actions/cache@v4
+      uses: actions/cache@v5
       with:
         path: .venv
         # The action file is part of the key so that changing which extras are
@@ -27,7 +27,7 @@ runs:
     # about a minute per run. mypy invalidates its own cache, so reusing it
     # across runs is safe.
     - name: Cache mypy
-      uses: actions/cache@v4
+      uses: actions/cache@v5
       with:
         path: .mypy_cache
         key: mypy-${{ runner.os }}-${{ hashFiles('poetry.lock') }}-${{ github.sha }}
