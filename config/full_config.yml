@@ -90,7 +90,6 @@ writer:
   writing_method: local
   local_experiment_path: path/to/experiment/dir/
   azure_blob_experiment_container: container-name
-  setup_experiment: [True, False]
   save_split: [True, False]
   results:
     sep: ','
@@ -100,11 +99,6 @@ writer:
     ext: .csv
     header: [True, False]
     file_format: [tabular, parquet]
-    labels:
-      user_id_label: my_user_id_label
-      item_id_label: my_item_id_label
-      rating_label: my_rating_label
-      timestamp_label: my_timestamp_label
   recommendation:
     sep: ','
     ext: .csv
