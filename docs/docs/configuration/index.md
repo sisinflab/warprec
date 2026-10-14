@@ -15,7 +15,7 @@ WarpRec supports multiple pipelines that leverage the configuration system diffe
 4. **Evaluation Pipeline**: Evaluates pre-trained models without training, using provided checkpoints.
 5. **Estimate Pipeline**: Estimates runtime and memory requirements with lightweight profiling before executing a full experiment.
 
-A single configuration file can be used across multiple pipelines; WarpRec ensures that workflows remain interchangeable, with some sections being ignored or interpreted differently depending on the pipeline.
+A single configuration file can be used across multiple pipelines; WarpRec ensures that workflows remain interchangeable, with some sections being ignored or interpreted differently depending on the pipeline. Loading names each section the pipeline ignores (see [Unknown keys](#unknown-keys)).
 
 ### Training Pipeline
 
@@ -231,3 +231,13 @@ Run the estimate pipeline with:
 ```bash
 python -m warprec.run --config path/to/the/config.yml --pipeline estimate
 ```
+
+## Unknown keys
+
+A key WarpRec does not read is ignored, so a misspelled one would leave the run on that key's default. Loading a configuration, in every pipeline, logs one line for each such key, at any depth, with its dotted path and, when a key the section does read is close to it, that key:
+
+```text
+The configuration key 'evaluation.top_kk' is not one WarpRec reads and is ignored. Did you mean 'evaluation.top_k'?
+```
+
+The configuration still loads: the line is a warning, not an error. A section another pipeline reads, such as `writer` in a file run with the design pipeline, is named as a section that pipeline does not read. The dictionaries handed on as they are written are not checked: the `params` of an optimizer, a learning-rate scheduler, a re-ranker or a complex metric, a callback's `kwargs`, MLflow `tags` and the custom resources. A model's hyperparameters and a filter's parameters are checked by its parameter class and by the filter, which refuse a key they do not take, and so does the [serving configuration](serving.md); a custom model registered without a parameter class has its unread keys logged like any other.
