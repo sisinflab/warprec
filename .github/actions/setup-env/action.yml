@@ -10,9 +10,17 @@ runs:
   using: "composite"
   steps:
     - name: Set up Python
+      id: python
       uses: actions/setup-python@v6
       with:
         python-version: ${{ inputs.python-version }}
+
+    # The runner's image (ubuntu26, ...) is a machine variable, which the
+    # expression contexts do not see.
+    - name: Read the runner image
+      id: image
+      shell: bash
+      run: echo "os=${ImageOS:-unknown}" >> "$GITHUB_OUTPUT"
 
     - name: Cache Poetry venv
       uses: actions/cache@v5
@@ -20,8 +28,10 @@ runs:
         path: .venv
         # The action file is part of the key so that changing which extras are
         # installed rebuilds the environment instead of reusing a cached one
-        # that still contains the old set.
-        key: venv-${{ runner.os }}-${{ hashFiles('poetry.lock') }}-${{ hashFiles('pyproject.toml') }}-${{ hashFiles('.github/actions/setup-env/action.yml') }}
+        # that still contains the old set. The runner image and the exact
+        # Python version are too: a venv links to the interpreter it was built
+        # with, so one restored on another image or Python patch release breaks.
+        key: venv-${{ runner.os }}-${{ steps.image.outputs.os }}-py${{ steps.python.outputs.python-version }}-${{ hashFiles('poetry.lock') }}-${{ hashFiles('pyproject.toml') }}-${{ hashFiles('.github/actions/setup-env/action.yml') }}
 
     # mypy re-analyses the whole dependency graph without this, which costs
     # about a minute per run. mypy invalidates its own cache, so reusing it
