@@ -4,7 +4,7 @@ import os
 import sys
 import importlib
 from pathlib import Path
-from typing import ClassVar, Dict, Any, FrozenSet, List
+from typing import ClassVar, Dict, Any, List
 
 from pydantic import BaseModel, model_validator, Field
 from warprec.errors import ConfigurationError, RegistryError
@@ -42,10 +42,10 @@ class WarpRecConfiguration(BaseModel):
         section_schemas (ClassVar[Dict[str, Any]]): The type each model's raw
             parameters are checked against for keys no section reads: they
             are validated by the model's own class, so the field is loose.
-        pipeline_sections (ClassVar[FrozenSet[str]]): The top-level sections
-            the pipelines read. A file shared by several pipelines holds
-            sections one of them does not read, which loading names as such
-            rather than as misspelled.
+        pipeline_sections (ClassVar[Dict[str, Any]]): Every top-level section
+            any pipeline reads, with its type. A file may serve several
+            pipelines, so a section only another one reads is not reported as
+            unknown, and its keys are still checked against its type.
         reader (ReaderConfig): Configuration of the reading process.
         filtering (Dict[str, dict]): The dictionary containing filtering
             information in the format {filter_name: dict{param_1: value, param_2: value, ...}, ...}
@@ -57,22 +57,20 @@ class WarpRecConfiguration(BaseModel):
     """
 
     section_schemas: ClassVar[Dict[str, Any]] = {"models": Dict[str, RecomModel]}
-    pipeline_sections: ClassVar[FrozenSet[str]] = frozenset(
-        {
-            "reader",
-            "filtering",
-            "models",
-            "general",
-            "training",
-            "rerank",
-            "writer",
-            "splitter",
-            "dashboard",
-            "evaluation",
-            "run",
-            "estimate",
-        }
-    )
+    pipeline_sections: ClassVar[Dict[str, Any]] = {
+        "reader": ReaderConfig,
+        "filtering": Dict[str, dict],
+        "models": Dict[str, RecomModel],
+        "general": GeneralConfig,
+        "training": TrainingConfig,
+        "rerank": RerankConfig,
+        "writer": WriterConfig,
+        "splitter": SplittingConfig,
+        "dashboard": DashboardConfig,
+        "evaluation": EvaluationConfig,
+        "run": WarpRecRunConfig,
+        "estimate": EstimateConfig,
+    }
 
     reader: ReaderConfig
     filtering: Dict[str, dict] = None

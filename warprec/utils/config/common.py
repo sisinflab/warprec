@@ -93,7 +93,7 @@ def read_configuration_file(path: Union[str, Path], schema: Type[T], kind: str) 
             data = yaml.safe_load(file) or {}
         # Before validating, so that a misspelled required section is named
         # next to the error its absence raises.
-        warn_unknown_keys(data, schema, kind)
+        warn_unknown_keys(data, schema)
         return schema.model_validate(data)
     except ValidationError as error:
         message, errors = ConfigurationError.describe_validation(
@@ -104,7 +104,7 @@ def read_configuration_file(path: Union[str, Path], schema: Type[T], kind: str) 
         raise DataNotFoundError(str(error)) from error
 
 
-def warn_unknown_keys(data: Any, schema: Type[BaseModel], kind: str) -> None:
+def warn_unknown_keys(data: Any, schema: Type[BaseModel]) -> None:
     """Log every key of a configuration that no section reads.
 
     Pydantic ignores such a key, so a misspelled one leaves the run on the
@@ -117,21 +117,17 @@ def warn_unknown_keys(data: Any, schema: Type[BaseModel], kind: str) -> None:
 
     A schema may hold two class attributes the walk reads: 'section_schemas',
     mapping a field to the type its raw value is walked as when the field is
-    declared looser than that, and 'pipeline_sections', the top-level sections
-    other pipelines read, which this one ignores without being misspelled.
+    declared looser than that, and 'pipeline_sections', mapping every
+    top-level section any pipeline reads to its type. One file may serve
+    several pipelines, so a section only another pipeline reads is not
+    reported, though the keys inside it are checked like any other: a key no
+    pipeline reads is a typo whichever pipeline loads the file.
 
     Args:
         data (Any): The configuration as read from the file.
         schema (Type[BaseModel]): The pydantic model the file must satisfy.
-        kind (str): The kind of configuration, e.g. 'train', for the message.
     """
     for key, meant in _unknown_keys(data, schema, ""):
-        if key in getattr(schema, "pipeline_sections", ()):
-            logger.attention(
-                f"The section '{key}' is not read by the {kind} pipeline and "
-                "is ignored."
-            )
-            continue
         message = (
             f"The configuration key '{key}' is not one WarpRec reads and is ignored."
         )
@@ -164,6 +160,7 @@ def _unknown_keys(
         for name in {field, info.alias or field}
     }
     overrides = getattr(schema, "section_schemas", {})
+    others = getattr(schema, "pipeline_sections", {})
     prefix = f"{path}." if path else ""
     found: List[Tuple[str, Optional[str]]] = []
 
@@ -171,10 +168,14 @@ def _unknown_keys(
         if not isinstance(key, str):
             continue
         info = known.get(key)
+        if info is None and key in others:
+            # A section another pipeline reads: checked, not reported.
+            found.extend(_unknown_in_value(value, others[key], prefix + key))
+            continue
         if info is None:
             if schema.model_config.get("extra") in ("allow", "forbid"):
                 continue
-            close = difflib.get_close_matches(key, list(known), n=1)
+            close = difflib.get_close_matches(key, [*known, *others], n=1)
             found.append((prefix + key, prefix + close[0] if close else None))
             continue
         annotation = overrides.get(key, info.annotation)

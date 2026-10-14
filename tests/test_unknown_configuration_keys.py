@@ -157,18 +157,64 @@ def test_a_key_close_to_nothing_gets_no_suggestion(
     assert "Did you mean" not in messages[0]
 
 
-def test_a_section_the_pipeline_does_not_read_is_named(
+@pytest.mark.parametrize(
+    "loader",
+    [
+        load_design_configuration,
+        load_eval_configuration,
+        load_estimate_configuration,
+        load_train_configuration,
+    ],
+)
+def test_sections_other_pipelines_read_are_not_reported(
+    loader: Callable[[str], Any],
+    tmp_path: Path,
+    interactions_frame: pd.DataFrame,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    """One file may serve every pipeline, each ignoring the others' sections."""
+    messages = attentions(monkeypatch)
+    path = write(
+        tmp_path,
+        interactions_frame,
+        writer=writer(tmp_path),
+        dashboard={"wandb": {"enabled": False}},
+        run={"resume": "never"},
+        estimate={"train_batches": 5},
+    )
+
+    loader(str(path))
+
+    assert messages == []
+
+
+def test_a_typo_inside_a_section_another_pipeline_reads_is_named(
     tmp_path: Path, interactions_frame: pd.DataFrame, monkeypatch: pytest.MonkeyPatch
 ):
+    """The design pipeline does not read 'writer', but no pipeline reads 'sepp'."""
     messages = attentions(monkeypatch)
-    path = write(tmp_path, interactions_frame, writer=writer(tmp_path))
+    path = write(
+        tmp_path,
+        interactions_frame,
+        writer={**writer(tmp_path), "results": {"sepp": ","}},
+    )
 
     load_design_configuration(str(path))
 
     assert len(messages) == 1
-    assert "'writer'" in messages[0]
-    assert "design" in messages[0]
-    assert "Did you mean" not in messages[0]
+    assert messages[0].endswith("Did you mean 'writer.results.sep'?")
+
+
+def test_a_misspelled_section_of_another_pipeline_gets_its_name(
+    tmp_path: Path, interactions_frame: pd.DataFrame, monkeypatch: pytest.MonkeyPatch
+):
+    messages = attentions(monkeypatch)
+    path = write(tmp_path, interactions_frame, estimat={"train_batches": 5})
+
+    load_design_configuration(str(path))
+
+    assert len(messages) == 1
+    assert messages[0].endswith("Did you mean 'estimate'?")
 
 
 def nested_typos(tmp_path: Path) -> Dict[str, Any]:
