@@ -110,5 +110,5 @@ class NoveltyProfileMetric(UserAverageTopKMetric):
     def name(self):
         """The name of the metric."""
         if self.relevance == "binary":
-            return self.__class__.__name__
-        return f"{self.__class__.__name__}[{self.relevance}]"
+            return self.registered_name()
+        return f"{self.registered_name()}[{self.relevance}]"

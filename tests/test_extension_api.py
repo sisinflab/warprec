@@ -19,10 +19,13 @@ import warprec.evaluation  # noqa: F401  (populates the metric registry)
 from warprec.data.dataset import Dataset
 from warprec.data.stash import METRIC_ARGUMENTS
 from warprec.evaluation import Evaluator
+from warprec.evaluation.metrics.accuracy.recall import Recall
 from warprec.evaluation.metrics.base_metric import TopKMetric, UserAverageTopKMetric
+from warprec.evaluation.metrics.bias.aplt import APLT
 from warprec.pipelines.eval import _load_or_build_model
 from warprec.recommenders.base_recommender import Recommender
 from warprec.recommenders.trainer.trainer import Trainer
+from warprec.utils.config.evaluation_configuration import ComplexMetricConfig
 from warprec.utils.config.model_configuration import FLOAT_FIELD, INT_FIELD, RecomModel
 from warprec.utils.enums import MetricBlock, RatingType, SearchSpace
 from warprec.utils.helpers import load_custom_modules
@@ -186,7 +189,7 @@ def test_an_undeclared_user_average_metric_evaluates_alone(ranking_dataset: Data
             """
             return top_k_rel.sum(dim=1) / target.sum(dim=1).clamp(min=1)
 
-    mine = evaluate_alone(name, ranking_dataset)["MyRecall"]
+    mine = evaluate_alone(name, ranking_dataset)[name]
     builtin = evaluate_alone("Recall", ranking_dataset)["Recall"]
 
     torch.testing.assert_close(mine, builtin, equal_nan=True)
@@ -228,10 +231,64 @@ def test_an_undeclared_metric_reading_the_top_k_evaluates_alone(
             """
             return {self.name: float((self.seen > 0).sum())}
 
-    mine = evaluate_alone(name, ranking_dataset)["MyCoverage"]
+    mine = evaluate_alone(name, ranking_dataset)[name]
     builtin = evaluate_alone("ItemCoverage", ranking_dataset)["ItemCoverage"]
 
     assert mine == float(builtin)
+
+
+def test_a_metric_reports_under_the_name_it_is_registered_under(
+    ranking_dataset: Dataset,
+):
+    """A class Foo registered as 'MyName' used to report 'Foo@k'."""
+    name = unique_name("MyName")
+
+    @metric_registry.register(name)
+    class Foo(Recall):  # pylint: disable=unused-variable
+        """Recall, under a name of its own."""
+
+    results = evaluate_alone(name.lower(), ranking_dataset)
+
+    assert set(results) == {name}
+    torch.testing.assert_close(
+        results[name],
+        evaluate_alone("Recall", ranking_dataset)["Recall"],
+        equal_nan=True,
+    )
+
+
+def test_a_parametrised_name_starts_with_the_registered_name(
+    ranking_dataset: Dataset,
+):
+    """A metric naming itself after its parameters builds on the registered name."""
+    name = unique_name("MyLongTail")
+
+    @metric_registry.register(name)
+    class Tail(APLT):  # pylint: disable=unused-variable
+        """APLT, under a name of its own."""
+
+    evaluator = Evaluator(
+        [],
+        [5],
+        train_set=ranking_dataset.train_set.get_sparse(),
+        complex_metrics=[ComplexMetricConfig(name=name, params={"pop_ratio": 0.5})],
+    )
+    evaluator.evaluate(
+        model=_TiedScoreRecommender({}, ranking_dataset.info()),
+        dataloader=ranking_dataset.get_evaluation_dataloader(),
+        strategy="full",
+        dataset=ranking_dataset,
+    )
+
+    assert set(evaluator.compute_results()[5]) == {f"{name}[Pop50%]"}
+
+
+@pytest.mark.parametrize("key", metric_registry.list_registered())
+def test_a_built_in_metric_reports_under_its_class_name(key: str):
+    """Every built-in is registered under its class name, which stays its key."""
+    cls = metric_registry.get_class(key)
+
+    assert cls.registered_name() == cls.__name__
 
 
 def test_a_metric_updated_without_its_blocks_computes_them():

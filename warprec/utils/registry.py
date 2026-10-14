@@ -61,6 +61,8 @@ class BasicRegistry(Generic[T]):
 
     def __init__(self, registry_name: str, config_section: Optional[str] = None):
         self._registry: Dict[str, Type[T]] = {}
+        # The names as they were written when registered, by their key.
+        self._spelled: Dict[str, str] = {}
         self.registry_name = registry_name
         self.config_section = config_section
 
@@ -102,6 +104,7 @@ class BasicRegistry(Generic[T]):
                     available=self.list_registered(),
                 )
             self._registry[key] = cls
+            self._spelled[key] = name or cls.__name__
             return cls
 
         return decorator
@@ -223,6 +226,24 @@ class BasicRegistry(Generic[T]):
             if _qualified(registered) == _qualified(cls):
                 return key
         return None
+
+    def spelled_name(self, cls: type) -> Optional[str]:
+        """Get the name a class was registered under, as it was written.
+
+        The registry compares names ignoring case, so its keys are upper case;
+        this is the name as given to the decorator, or the class's own name
+        when none was given.
+
+        Args:
+            cls (type): The class to look up.
+
+        Returns:
+            Optional[str]: The name, or None when the class is not registered.
+        """
+        key = self.registered_name(cls)
+        if key is None:
+            return None
+        return self._spelled.get(key, key)
 
     def list_registered(self) -> List[str]:
         """List all registered names.

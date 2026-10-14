@@ -6,6 +6,7 @@ from torch import Tensor
 from torchmetrics import Metric
 from warprec.errors import ExtensionError
 from warprec.utils.enums import MetricBlock
+from warprec.utils.registry import metric_registry
 
 
 class BaseMetric(Metric, ABC):
@@ -302,9 +303,28 @@ class BaseMetric(Metric, ABC):
         )
 
     @property
-    def name(self):
-        """The name of the metric."""
-        return self.__class__.__name__
+    def name(self) -> str:
+        """The name the metric reports its results under.
+
+        Returns:
+            str: The name the metric is registered, and configured, under.
+        """
+        return self.registered_name()
+
+    @classmethod
+    def registered_name(cls) -> str:
+        """The name the class is registered under, as it was written.
+
+        A class registered under a name of its own, e.g. 'MyName' on a class
+        Foo, reports under that name, the one the configuration names it by,
+        rather than its class name. Every built-in metric is registered under
+        its class name. A class that is not registered reports under its
+        class name.
+
+        Returns:
+            str: The registered name, or the class name.
+        """
+        return metric_registry.spelled_name(cls) or cls.__name__
 
     @property
     def components(self) -> Set[MetricBlock]:

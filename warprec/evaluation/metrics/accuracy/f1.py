@@ -110,5 +110,5 @@ class F1(TopKMetric):
     def name(self):
         """The name of the metric customized based on the metrics compared."""
         if self.metric_1 == "Precision" and self.metric_2 == "Recall":
-            return self.__class__.__name__
-        return f"F1[{self.metric_1}, {self.metric_2}]"
+            return self.registered_name()
+        return f"{self.registered_name()}[{self.metric_1}, {self.metric_2}]"
