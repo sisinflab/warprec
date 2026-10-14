@@ -8,6 +8,7 @@ import narwhals as nw
 from narwhals.typing import FrameT
 from narwhals.dataframe import DataFrame
 
+from warprec.errors import ConfigurationError, DataError
 from warprec.utils.logger import logger
 from warprec.utils.registry import filter_registry
 
@@ -27,7 +28,7 @@ class Filter(ABC):
             filter. Any other key is refused.
 
     Raises:
-        ValueError: If a keyword is neither a parameter of the filter nor a
+        ConfigurationError: If a keyword is neither a parameter of the filter nor a
             column label.
     """
 
@@ -55,7 +56,7 @@ class Filter(ABC):
                 and param.kind
                 not in (inspect.Parameter.VAR_KEYWORD, inspect.Parameter.VAR_POSITIONAL)
             ]
-            raise ValueError(
+            raise ConfigurationError(
                 f"The filter {type(self).__name__} does not take "
                 f"{', '.join(repr(key) for key in unknown)}. The parameters it "
                 f"takes are {accepted or 'none'}."
@@ -80,13 +81,13 @@ class MinRating(Filter):
         **kwargs (Any): Additional keyword arguments.
 
     Raises:
-        ValueError: If the provided argument is invalid.
+        ConfigurationError: If the provided argument is invalid.
     """
 
     def __init__(self, min_rating: float, **kwargs: Any):
         super().__init__(**kwargs)
         if min_rating <= 0:
-            raise ValueError("min_rating must be a positive float.")
+            raise ConfigurationError("min_rating must be a positive float.")
         self.min_rating = min_rating
 
     def __call__(self, dataset: DataFrame[Any]) -> DataFrame[Any]:
@@ -162,13 +163,13 @@ class UserMin(Filter):
         **kwargs (Any): Additional keyword arguments.
 
     Raises:
-        ValueError: If the provided argument is invalid.
+        ConfigurationError: If the provided argument is invalid.
     """
 
     def __init__(self, min_interactions: int, **kwargs: Any):
         super().__init__(**kwargs)
         if min_interactions <= 0:
-            raise ValueError("min_interactions must be a positive integer.")
+            raise ConfigurationError("min_interactions must be a positive integer.")
         self.min_interactions = min_interactions
 
     def __call__(self, dataset: DataFrame[Any]) -> DataFrame[Any]:
@@ -192,13 +193,13 @@ class UserMax(Filter):
         **kwargs (Any): Additional keyword arguments.
 
     Raises:
-        ValueError: If the provided argument is invalid.
+        ConfigurationError: If the provided argument is invalid.
     """
 
     def __init__(self, max_interactions: int, **kwargs: Any):
         super().__init__(**kwargs)
         if max_interactions <= 0:
-            raise ValueError("max_interactions must be a positive integer.")
+            raise ConfigurationError("max_interactions must be a positive integer.")
         self.max_interactions = max_interactions
 
     def __call__(self, dataset: DataFrame[Any]) -> DataFrame[Any]:
@@ -222,13 +223,13 @@ class ItemMin(Filter):
         **kwargs (Any): Additional keyword arguments.
 
     Raises:
-        ValueError: If the provided argument is invalid.
+        ConfigurationError: If the provided argument is invalid.
     """
 
     def __init__(self, min_interactions: int, **kwargs: Any):
         super().__init__(**kwargs)
         if min_interactions <= 0:
-            raise ValueError("min_interactions must be a positive integer.")
+            raise ConfigurationError("min_interactions must be a positive integer.")
         self.min_interactions = min_interactions
 
     def __call__(self, dataset: DataFrame[Any]) -> DataFrame[Any]:
@@ -252,13 +253,13 @@ class ItemMax(Filter):
         **kwargs (Any): Additional keyword arguments.
 
     Raises:
-        ValueError: If the provided argument is invalid.
+        ConfigurationError: If the provided argument is invalid.
     """
 
     def __init__(self, max_interactions: int, **kwargs: Any):
         super().__init__(**kwargs)
         if max_interactions <= 0:
-            raise ValueError("max_interactions must be a positive integer.")
+            raise ConfigurationError("max_interactions must be a positive integer.")
         self.max_interactions = max_interactions
 
     def __call__(self, dataset: DataFrame[Any]) -> DataFrame[Any]:
@@ -282,13 +283,13 @@ class IterativeKCore(Filter):
         **kwargs (Any): Additional keyword arguments.
 
     Raises:
-        ValueError: If the provided argument is invalid.
+        ConfigurationError: If the provided argument is invalid.
     """
 
     def __init__(self, min_interactions: int, **kwargs: Any):
         super().__init__(**kwargs)
         if min_interactions <= 0:
-            raise ValueError("min_interactions must be a positive integer.")
+            raise ConfigurationError("min_interactions must be a positive integer.")
         self.user_core = UserMin(min_interactions, **kwargs)
         self.item_core = ItemMin(min_interactions, **kwargs)
 
@@ -326,15 +327,15 @@ class NRoundsKCore(Filter):
         **kwargs (Any): Additional keyword arguments.
 
     Raises:
-        ValueError: If the provided argument is invalid.
+        ConfigurationError: If the provided argument is invalid.
     """
 
     def __init__(self, rounds: int, min_interactions: int, **kwargs: Any):
         super().__init__(**kwargs)
         if rounds <= 0:
-            raise ValueError("rounds must be a positive integer.")
+            raise ConfigurationError("rounds must be a positive integer.")
         if min_interactions <= 0:
-            raise ValueError("min_interactions must be a positive integer.")
+            raise ConfigurationError("min_interactions must be a positive integer.")
         self.user_core = UserMin(min_interactions, **kwargs)
         self.item_core = ItemMin(min_interactions, **kwargs)
         self.rounds = rounds
@@ -371,13 +372,13 @@ class UserHeadN(Filter):
         **kwargs (Any): Additional keyword arguments.
 
     Raises:
-        ValueError: If the provided argument is invalid.
+        ConfigurationError: If the provided argument is invalid.
     """
 
     def __init__(self, num_interactions: int, **kwargs: Any):
         super().__init__(**kwargs)
         if num_interactions <= 0:
-            raise ValueError("num_interactions must be a positive integer.")
+            raise ConfigurationError("num_interactions must be a positive integer.")
         self.num_interactions = num_interactions
 
     def __call__(self, dataset: DataFrame[Any]) -> DataFrame[Any]:
@@ -420,13 +421,13 @@ class UserTailN(Filter):
         **kwargs (Any): Additional keyword arguments.
 
     Raises:
-        ValueError: If the provided argument is invalid.
+        ConfigurationError: If the provided argument is invalid.
     """
 
     def __init__(self, num_interactions: int, **kwargs: Any):
         super().__init__(**kwargs)
         if num_interactions <= 0:
-            raise ValueError("num_interactions must be a positive integer.")
+            raise ConfigurationError("num_interactions must be a positive integer.")
         self.num_interactions = num_interactions
 
     def __call__(self, dataset: DataFrame[Any]) -> DataFrame[Any]:
@@ -529,7 +530,7 @@ def apply_filtering(data: FrameT, filters: List[Filter]) -> DataFrame[Any]:
         DataFrame[Any]: The filtered dataset after applying all filters.
 
     Raises:
-        ValueError: If the dataset becomes empty after applying any filter.
+        DataError: If the dataset becomes empty after applying any filter.
     """
     if isinstance(data, nw.LazyFrame):
         mat_data = data.collect()
@@ -554,7 +555,7 @@ def apply_filtering(data: FrameT, filters: List[Filter]) -> DataFrame[Any]:
 
         # Check if the dataset post filtering is empty
         if current_len == 0:
-            raise ValueError(
+            raise DataError(
                 f"Dataset is empty after applying filter {i + 1}/{len(filters)}: "
                 f"{single_filter.__class__.__name__}. Please check the filtering criteria."
             )

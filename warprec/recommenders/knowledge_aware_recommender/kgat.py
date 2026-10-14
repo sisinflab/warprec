@@ -5,6 +5,7 @@ import torch
 from torch import Tensor, nn
 from torch.nn import functional as F
 
+from warprec.errors import ModelError
 from warprec.data.entities import Interactions, KnowledgeGraph, Sessions
 from warprec.recommenders.base_recommender import IterativeRecommender
 from warprec.recommenders.knowledge_aware_recommender.knowledge_utils import (
@@ -94,7 +95,7 @@ class KGAT(KnowledgeRecommenderUtils, IterativeRecommender):
         learning_rate (float): The learning rate value.
 
     Raises:
-        ValueError: If the training interactions were not provided.
+        ModelError: If the training interactions were not provided.
     """
 
     embedding_size: int
@@ -133,7 +134,7 @@ class KGAT(KnowledgeRecommenderUtils, IterativeRecommender):
         )
 
         if interactions is None:
-            raise ValueError(
+            raise ModelError(
                 "KGAT puts the interactions into the graph beside the facts, so "
                 "it needs them at construction."
             )

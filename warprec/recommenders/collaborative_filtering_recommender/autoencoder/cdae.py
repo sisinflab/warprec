@@ -4,6 +4,7 @@ from typing import Any, Optional
 import torch
 from torch import nn, Tensor
 
+from warprec.errors import ConfigurationError
 from warprec.data.entities import Interactions, Sessions
 from warprec.recommenders.base_recommender import IterativeRecommender
 from warprec.recommenders.losses import EmbLoss
@@ -40,7 +41,7 @@ class CDAE(IterativeRecommender):
         learning_rate (float): The learning rate value.
 
     Raises:
-        ValueError: If the loss_type is not supported.
+        ConfigurationError: If the loss_type is not supported.
     """
 
     # Model hyperparameters
@@ -92,7 +93,9 @@ class CDAE(IterativeRecommender):
         elif self.loss_type == "BCE":
             self.main_loss = nn.BCEWithLogitsLoss()
         else:
-            raise ValueError("Invalid loss_type, loss_type must be in [MSE, BCE]")
+            raise ConfigurationError(
+                "Invalid loss_type, loss_type must be in [MSE, BCE]"
+            )
         self.reg_loss = EmbLoss()
 
         # Initialize weights
@@ -106,7 +109,7 @@ class CDAE(IterativeRecommender):
             return nn.Tanh()
         if name == "sigmoid":
             return nn.Sigmoid()
-        raise ValueError(f"Invalid activation function name: {name}")
+        raise ConfigurationError(f"Invalid activation function name: {name}")
 
     def get_dataloader(
         self,

@@ -4,6 +4,7 @@ from typing import Any, Tuple, Set, Optional
 import torch
 from torch import Tensor
 from torchmetrics import Metric
+from warprec.errors import ExtensionError
 from warprec.utils.enums import MetricBlock
 
 
@@ -267,7 +268,7 @@ class BaseMetric(Metric, ABC):
             Tensor: The block.
 
         Raises:
-            ValueError: If the block is neither given nor derivable, because
+            ExtensionError: If the block is neither given nor derivable, because
                 the ground truth is missing or the key names no block.
         """
         value = blocks.get(key)
@@ -294,7 +295,7 @@ class BaseMetric(Metric, ABC):
             }.get(key)
             if derive is not None:
                 return derive(ground)
-        raise ValueError(
+        raise ExtensionError(
             f"{self.name} reads the block '{key}', which was not given and cannot "
             "be derived: the ground truth 'ground' is missing or the key names no "
             "block. Declare the blocks the metric reads in _REQUIRED_COMPONENTS."

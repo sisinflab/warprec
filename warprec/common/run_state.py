@@ -10,6 +10,7 @@ from typing import Any, Dict, Optional, Tuple, TYPE_CHECKING
 import numpy as np
 import torch
 
+from warprec.errors import RunStateError
 from warprec.utils.logger import logger
 
 if TYPE_CHECKING:
@@ -203,11 +204,11 @@ class RunState:
             RunState: The reconstructed run state.
 
         Raises:
-            ValueError: If the manifest was written by a newer WarpRec version.
+            RunStateError: If the manifest was written by a newer WarpRec version.
         """
         stored_version = data.get("schema_version", 0)
         if stored_version > SCHEMA_VERSION:
-            raise ValueError(
+            raise RunStateError(
                 f"Run state schema version {stored_version} is newer than the "
                 "version supported by this WarpRec installation "
                 f"({SCHEMA_VERSION}). Upgrade WarpRec to resume this run."

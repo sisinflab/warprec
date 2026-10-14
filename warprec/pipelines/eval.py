@@ -4,6 +4,7 @@ from typing import Dict, Any
 
 import torch
 
+from warprec.errors import CheckpointError, DataNotFoundError
 from warprec.data.stash import MODEL_ARGUMENTS, check_stash
 from warprec.common import initialize_datasets, log_evaluation
 from warprec.data import Dataset
@@ -33,13 +34,13 @@ def _check_checkpoint_paths(models: Dict[str, Any]) -> None:
         models (Dict[str, Any]): The configured models and their parameters.
 
     Raises:
-        FileNotFoundError: If a model's meta.load_from names a file that does
+        DataNotFoundError: If a model's meta.load_from names a file that does
             not exist.
     """
     for model_name, model_params in models.items():
         load_from = model_param_from_dict(model_name, model_params).meta.load_from
         if load_from is not None and not os.path.isfile(load_from):
-            raise FileNotFoundError(
+            raise DataNotFoundError(
                 f"The checkpoint of {model_name} (meta.load_from) does not "
                 f"exist: {load_from}"
             )
@@ -62,14 +63,15 @@ def _check_checkpoint_matches(
         path (str): Where the checkpoint was read from.
 
     Raises:
-        ValueError: If the checkpoint is of another model, or its user or item
+        CheckpointError: If the checkpoint is of another model, or its user or item
             ids do not map to the same indices as the dataset's.
     """
     saved_name = checkpoint.get("name")
     if saved_name != model_class.__name__:
-        raise ValueError(
+        raise CheckpointError(
             f"The checkpoint {path} holds a {saved_name} model, not a "
-            f"{model_class.__name__}."
+            f"{model_class.__name__}.",
+            path=path,
         )
 
     saved_info = checkpoint.get("info") or {}
@@ -86,13 +88,14 @@ def _check_checkpoint_matches(
         if dict(saved) == dict(current):
             continue
         moved = sum(1 for label, idx in current.items() if saved.get(label) != idx)
-        raise ValueError(
+        raise CheckpointError(
             f"The checkpoint {path} was trained on other {kind} ids than this "
             f"dataset: {len(saved)} {kind}s in the checkpoint, {len(current)} in "
             f"the dataset, {moved} of the dataset's {kind}s missing from the "
             "checkpoint or at another index. Evaluate it on the data, filtering "
             "and splitting it was trained with, validation_splitting included: "
-            "a model trained with a validation split was fitted without it."
+            "a model trained with a validation split was fitted without it.",
+            path=path,
         )
 
 

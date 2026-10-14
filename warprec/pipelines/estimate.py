@@ -9,6 +9,7 @@ import numpy as np
 import psutil
 import torch
 
+from warprec.errors import ConfigurationError
 from warprec.data.stash import MODEL_ARGUMENTS, check_stash
 from warprec.common import initialize_datasets
 from warprec.data import Dataset
@@ -269,21 +270,23 @@ def _setup_options(field: str, value: Any) -> List[Any]:
     if not isinstance(value, list):
         return [value]
     if len(value) == 0:
-        raise ValueError(f"Model field '{field}' cannot define an empty search space.")
+        raise ConfigurationError(
+            f"Model field '{field}' cannot define an empty search space."
+        )
 
     space = value[0]
     if isinstance(space, SearchSpace):
         space = space.value
 
     if space not in {SearchSpace.GRID.value, SearchSpace.CHOICE.value}:
-        raise ValueError(
+        raise ConfigurationError(
             f"Estimate only supports discrete grid-like spaces. "
             f"Field '{field}' uses unsupported search space '{space}'."
         )
 
     options = value[1:]
     if not options:
-        raise ValueError(f"Model field '{field}' has no values to estimate.")
+        raise ConfigurationError(f"Model field '{field}' has no values to estimate.")
     return options
 
 
@@ -293,7 +296,7 @@ def _expand_model_setups(model_name: str, model_params: dict) -> List[dict]:
     if isinstance(strategy, SearchAlgorithms):
         strategy = strategy.value
     if strategy != SearchAlgorithms.GRID.value:
-        raise ValueError(
+        raise ConfigurationError(
             f"Estimate only supports '{SearchAlgorithms.GRID.value}' optimization, "
             f"but model '{model_name}' uses '{strategy}'."
         )
@@ -895,7 +898,7 @@ def estimate_pipeline(path: str) -> None:
         path (str): Path to the configuration file.
 
     Raises:
-        ValueError: If the configured split output format is not supported.
+        ConfigurationError: If the configured split output format is not supported.
     """
     logger.attention(
         "WARNING: Estimate pipeline is experimental. Please submit bug reports via GitHub Issues."
@@ -937,7 +940,7 @@ def estimate_pipeline(path: str) -> None:
                     **config.writer.split.model_dump(),
                 )
             case _:
-                raise ValueError(f"File format '{file_format}'not supported.")
+                raise ConfigurationError(f"File format '{file_format}'not supported.")
 
     data_preparation_time = time.time() - experiment_start_time
     logger.positive(

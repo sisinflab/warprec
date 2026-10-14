@@ -3,6 +3,7 @@ from itertools import product
 from typing import ClassVar
 
 from pydantic import field_validator
+from warprec.errors import ConfigurationError
 from warprec.utils.config.model_configuration import (
     RecomModel,
     INT_FIELD,
@@ -153,7 +154,7 @@ class BERT4Rec(RecomModel):
         )
 
         if not has_valid_combination:
-            raise ValueError(
+            raise ConfigurationError(
                 "No valid hyperparameter combination found for BERT4Rec. "
                 "Ensure there's at least one combination where 'embedding_size' "
                 "is divisible by 'n_heads'."
@@ -173,7 +174,7 @@ class BERT4Rec(RecomModel):
         )
 
         if embedding_size_clean % n_heads_clean != 0:
-            raise ValueError(
+            raise ConfigurationError(
                 f"Inconsistent configuration for BERT4Rec: "
                 f"embedding_size ({embedding_size_clean}) must be divisible "
                 f"by n_heads ({n_heads_clean})."
@@ -315,7 +316,7 @@ class BSARec(RecomModel):
         This method should be called after all individual fields have been validated.
 
         Raises:
-            ValueError: If no valid combination of hyperparameters can be formed.
+            ConfigurationError: If no valid combination of hyperparameters can be formed.
         """
         # Extract parameters to check, removing searching strategy
         embedding_sizes = self._clean_param_list(self.embedding_size)
@@ -329,7 +330,7 @@ class BSARec(RecomModel):
                 break
 
         if not has_valid_combination:
-            raise ValueError(
+            raise ConfigurationError(
                 "No valid hyperparameter combination found for BSARec. "
                 "Ensure there's at least one combination of 'embedding_size' and "
                 "'n_heads' that meets the criteria: "
@@ -341,7 +342,7 @@ class BSARec(RecomModel):
         for a single trial's parameter set.
 
         Raises:
-            ValueError: If the parameter values are not consistent for the model.
+            ConfigurationError: If the parameter values are not consistent for the model.
         """
         # Clean parameters from search space information
         embedding_size_clean = (
@@ -358,7 +359,7 @@ class BSARec(RecomModel):
         # Check if embedding size is divisible by n_heads, otherwise transformer
         # will raise an exception
         if embedding_size_clean % n_heads_clean != 0:
-            raise ValueError(
+            raise ConfigurationError(
                 f"Inconsistent embedding and heads number configuration: "
                 f"embedding_size ({embedding_size_clean}) must be divisible "
                 f"by n_heads ({n_heads_clean})."
@@ -630,7 +631,7 @@ class CL4SRec(RecomModel):
         This method should be called after all individual fields have been validated.
 
         Raises:
-            ValueError: If no valid combination of hyperparameters can be formed.
+            ConfigurationError: If no valid combination of hyperparameters can be formed.
         """
         # Extract parameters to check, removing searching strategy
         embedding_sizes = self._clean_param_list(self.embedding_size)
@@ -644,7 +645,7 @@ class CL4SRec(RecomModel):
                 break
 
         if not has_valid_combination:
-            raise ValueError(
+            raise ConfigurationError(
                 "No valid hyperparameter combination found for CL4SRec. "
                 "Ensure there's at least one combination of 'embedding_size' and "
                 "'n_heads' that meets the criteria: "
@@ -656,7 +657,7 @@ class CL4SRec(RecomModel):
         for a single trial's parameter set.
 
         Raises:
-            ValueError: If the parameter values are not consistent for the model.
+            ConfigurationError: If the parameter values are not consistent for the model.
         """
         # Clean parameters from search space information
         embedding_size_clean = (
@@ -673,7 +674,7 @@ class CL4SRec(RecomModel):
         # Check if embedding size is divisible by n_heads, otherwise transformer
         # will raise an exception
         if embedding_size_clean % n_heads_clean != 0:
-            raise ValueError(
+            raise ConfigurationError(
                 f"Inconsistent embedding and heads number configuration: "
                 f"embedding_size ({embedding_size_clean}) must be divisible "
                 f"by n_heads ({n_heads_clean})."
@@ -859,7 +860,7 @@ class CORE(RecomModel):
                 break
 
         if not has_valid_combination:
-            raise ValueError(
+            raise ConfigurationError(
                 "No valid hyperparameter combination found for CORE. "
                 "When 'dnn_type' is 'trm', 'embedding_size' must be divisible by 'n_heads'."
             )
@@ -883,7 +884,7 @@ class CORE(RecomModel):
         )
 
         if dnn_type_clean == "trm" and embedding_size_clean % n_heads_clean != 0:
-            raise ValueError(
+            raise ConfigurationError(
                 f"Inconsistent configuration for CORE (trm): "
                 f"embedding_size ({embedding_size_clean}) must be divisible "
                 f"by n_heads ({n_heads_clean})."
@@ -1049,7 +1050,7 @@ class DuoRec(RecomModel):
         This method should be called after all individual fields have been validated.
 
         Raises:
-            ValueError: If no valid combination of hyperparameters can be formed.
+            ConfigurationError: If no valid combination of hyperparameters can be formed.
         """
         # Extract parameters to check, removing searching strategy
         embedding_sizes = self._clean_param_list(self.embedding_size)
@@ -1063,7 +1064,7 @@ class DuoRec(RecomModel):
                 break
 
         if not has_valid_combination:
-            raise ValueError(
+            raise ConfigurationError(
                 "No valid hyperparameter combination found for DuoRec. "
                 "Ensure there's at least one combination of 'embedding_size' and "
                 "'n_heads' that meets the criteria: "
@@ -1075,7 +1076,7 @@ class DuoRec(RecomModel):
         for a single trial's parameter set.
 
         Raises:
-            ValueError: If the parameter values are not consistent for the model.
+            ConfigurationError: If the parameter values are not consistent for the model.
         """
         # Clean parameters from search space information
         embedding_size_clean = (
@@ -1092,7 +1093,7 @@ class DuoRec(RecomModel):
         # Check if embedding size is divisible by n_heads, otherwise transformer
         # will raise an exception
         if embedding_size_clean % n_heads_clean != 0:
-            raise ValueError(
+            raise ConfigurationError(
                 f"Inconsistent embedding and heads number configuration: "
                 f"embedding_size ({embedding_size_clean}) must be divisible "
                 f"by n_heads ({n_heads_clean})."
@@ -1248,7 +1249,7 @@ class eSASRec(RecomModel):
         This method should be called after all individual fields have been validated.
 
         Raises:
-            ValueError: If no valid combination of hyperparameters can be formed.
+            ConfigurationError: If no valid combination of hyperparameters can be formed.
         """
         # Extract parameters to check, removing searching strategy
         embedding_sizes = self._clean_param_list(self.embedding_size)
@@ -1262,7 +1263,7 @@ class eSASRec(RecomModel):
                 break
 
         if not has_valid_combination:
-            raise ValueError(
+            raise ConfigurationError(
                 "No valid hyperparameter combination found for eSASRec. "
                 "Ensure there's at least one combination of 'embedding_size' and "
                 "'n_heads' that meets the criteria: "
@@ -1274,7 +1275,7 @@ class eSASRec(RecomModel):
         for a single trial's parameter set.
 
         Raises:
-            ValueError: If the parameter values are not consistent for the model.
+            ConfigurationError: If the parameter values are not consistent for the model.
         """
         # Clean parameters from search space information
         embedding_size_clean = (
@@ -1291,7 +1292,7 @@ class eSASRec(RecomModel):
         # Check if embedding size is divisible by n_heads, otherwise transformer
         # will raise an exception
         if embedding_size_clean % n_heads_clean != 0:
-            raise ValueError(
+            raise ConfigurationError(
                 f"Inconsistent embedding and heads number configuration: "
                 f"embedding_size ({embedding_size_clean}) must be divisible "
                 f"by n_heads ({n_heads_clean})."
@@ -1383,7 +1384,7 @@ class FOSSIL(RecomModel):
         This method should be called after all individual fields have been validated.
 
         Raises:
-            ValueError: If no valid combination of hyperparameters can be formed.
+            ConfigurationError: If no valid combination of hyperparameters can be formed.
         """
         # Extract parameters to check, removing searching strategy
         order_lengths = self._clean_param_list(self.order_len)
@@ -1397,7 +1398,7 @@ class FOSSIL(RecomModel):
                 break
 
         if not has_valid_combination:
-            raise ValueError(
+            raise ConfigurationError(
                 "No valid hyperparameter combination found for FOSSIL. "
                 "Ensure there's at least one combination of 'order_len' and "
                 "'max_seq_len' that meets the criteria: "
@@ -1409,7 +1410,7 @@ class FOSSIL(RecomModel):
         for a single trial's parameter set.
 
         Raises:
-            ValueError: If the parameter values are not consistent for the model.
+            ConfigurationError: If the parameter values are not consistent for the model.
         """
         # Clean parameters from search space information
         order_len_clean = (
@@ -1425,7 +1426,7 @@ class FOSSIL(RecomModel):
 
         # Check is parameters are coherent
         if order_len_clean <= max_seq_len_clean:
-            raise ValueError(
+            raise ConfigurationError(
                 f"Inconsistent order_len and max_seq_len configuration: "
                 f"order_len_clean ({order_len_clean}) must be lesser or equal "
                 f"of max_seq_len ({max_seq_len_clean})."
@@ -1665,7 +1666,7 @@ class gSASRec(RecomModel):
         This method should be called after all individual fields have been validated.
 
         Raises:
-            ValueError: If no valid combination of hyperparameters can be formed.
+            ConfigurationError: If no valid combination of hyperparameters can be formed.
         """
         # Extract parameters to check, removing searching strategy
         embedding_sizes = self._clean_param_list(self.embedding_size)
@@ -1679,7 +1680,7 @@ class gSASRec(RecomModel):
                 break
 
         if not has_valid_combination:
-            raise ValueError(
+            raise ConfigurationError(
                 "No valid hyperparameter combination found for gSASRec. "
                 "Ensure there's at least one combination of 'embedding_size' and "
                 "'n_heads' that meets the criteria: "
@@ -1691,7 +1692,7 @@ class gSASRec(RecomModel):
         for a single trial's parameter set.
 
         Raises:
-            ValueError: If the parameter values are not consistent for the model.
+            ConfigurationError: If the parameter values are not consistent for the model.
         """
         # Clean parameters from search space information
         embedding_size_clean = (
@@ -1708,7 +1709,7 @@ class gSASRec(RecomModel):
         # Check if embedding size is divisible by n_heads, otherwise transformer
         # will raise an exception
         if embedding_size_clean % n_heads_clean != 0:
-            raise ValueError(
+            raise ConfigurationError(
                 f"Inconsistent embedding and heads number configuration: "
                 f"embedding_size ({embedding_size_clean}) must be divisible "
                 f"by n_heads ({n_heads_clean})."
@@ -1948,7 +1949,7 @@ class LinRec(RecomModel):
         This method should be called after all individual fields have been validated.
 
         Raises:
-            ValueError: If no valid combination of hyperparameters can be formed.
+            ConfigurationError: If no valid combination of hyperparameters can be formed.
         """
         # Extract parameters to check, removing searching strategy
         embedding_sizes = self._clean_param_list(self.embedding_size)
@@ -1962,7 +1963,7 @@ class LinRec(RecomModel):
                 break
 
         if not has_valid_combination:
-            raise ValueError(
+            raise ConfigurationError(
                 "No valid hyperparameter combination found for LinRec. "
                 "Ensure there's at least one combination of 'embedding_size' and "
                 "'n_heads' that meets the criteria: "
@@ -1974,7 +1975,7 @@ class LinRec(RecomModel):
         for a single trial's parameter set.
 
         Raises:
-            ValueError: If the parameter values are not consistent for the model.
+            ConfigurationError: If the parameter values are not consistent for the model.
         """
         # Clean parameters from search space information
         embedding_size_clean = (
@@ -1991,7 +1992,7 @@ class LinRec(RecomModel):
         # Check if embedding size is divisible by n_heads, otherwise transformer
         # will raise an exception
         if embedding_size_clean % n_heads_clean != 0:
-            raise ValueError(
+            raise ConfigurationError(
                 f"Inconsistent embedding and heads number configuration: "
                 f"embedding_size ({embedding_size_clean}) must be divisible "
                 f"by n_heads ({n_heads_clean})."
@@ -2223,7 +2224,7 @@ class SASRec(RecomModel):
         This method should be called after all individual fields have been validated.
 
         Raises:
-            ValueError: If no valid combination of hyperparameters can be formed.
+            ConfigurationError: If no valid combination of hyperparameters can be formed.
         """
         # Extract parameters to check, removing searching strategy
         embedding_sizes = self._clean_param_list(self.embedding_size)
@@ -2237,7 +2238,7 @@ class SASRec(RecomModel):
                 break
 
         if not has_valid_combination:
-            raise ValueError(
+            raise ConfigurationError(
                 "No valid hyperparameter combination found for SASRec. "
                 "Ensure there's at least one combination of 'embedding_size' and "
                 "'n_heads' that meets the criteria: "
@@ -2249,7 +2250,7 @@ class SASRec(RecomModel):
         for a single trial's parameter set.
 
         Raises:
-            ValueError: If the parameter values are not consistent for the model.
+            ConfigurationError: If the parameter values are not consistent for the model.
         """
         # Clean parameters from search space information
         embedding_size_clean = (
@@ -2266,7 +2267,7 @@ class SASRec(RecomModel):
         # Check if embedding size is divisible by n_heads, otherwise transformer
         # will raise an exception
         if embedding_size_clean % n_heads_clean != 0:
-            raise ValueError(
+            raise ConfigurationError(
                 f"Inconsistent embedding and heads number configuration: "
                 f"embedding_size ({embedding_size_clean}) must be divisible "
                 f"by n_heads ({n_heads_clean})."

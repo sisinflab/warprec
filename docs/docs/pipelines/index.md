@@ -16,6 +16,8 @@ All pipelines are invoked with the same command structure:
 python -m warprec.run -c <config_file>.yml -p <pipeline>
 ```
 
+An error you can fix, such as an invalid configuration or a missing file, is printed as one line, `<ClassName>: <message>`, and the command exits with status 1. Add `--debug` to see its full traceback. The classes are listed under [Errors](../api-reference/errors.md).
+
 ---
 
 ## Choosing the Right Pipeline

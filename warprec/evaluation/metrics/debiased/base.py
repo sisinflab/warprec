@@ -2,6 +2,7 @@ from typing import Any, Optional, Set, Tuple
 
 from torch import Tensor
 
+from warprec.errors import EvaluationError
 from warprec.evaluation.metrics.base_metric import UserAverageTopKMetric
 from warprec.utils.enums import MetricBlock
 
@@ -28,7 +29,7 @@ class InversePropensityMetric(UserAverageTopKMetric):
         **kwargs (Any): Additional keyword arguments for the parent class.
 
     Raises:
-        ValueError: If no propensity was provided by the evaluation configuration.
+        EvaluationError: If no propensity was provided by the evaluation configuration.
     """
 
     _REQUIRED_COMPONENTS: Set[MetricBlock] = {
@@ -53,7 +54,7 @@ class InversePropensityMetric(UserAverageTopKMetric):
         super().__init__(k, num_users, *args, **kwargs)
 
         if propensity is None:
-            raise ValueError(
+            raise EvaluationError(
                 f"{type(self).__name__} corrects for exposure bias and therefore "
                 "needs propensities. Set 'evaluation.propensity.estimator' to "
                 "'popularity'."

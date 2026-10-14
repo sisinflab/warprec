@@ -35,3 +35,7 @@ This section contains the auto-generated API documentation for WarpRec's core co
 - [Novelty](metrics/novelty.md) -- EFD, EPC.
 - [Rating](metrics/rating.md) -- MAE, MSE, RMSE.
 - [Multiobjective](metrics/multiobjective.md) -- EucDistance, Hypervolume.
+
+## Errors
+
+- [Errors](errors.md) -- WarpRecError and the errors WarpRec raises for something you can fix.

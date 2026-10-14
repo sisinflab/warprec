@@ -27,6 +27,7 @@ from warprec.pipelines import design, estimate, eval as eval_module
 from warprec.pipelines.remotes import ml
 from warprec.recommenders.trainer import objectives
 from warprec.utils import helpers
+from warprec.errors import ConfigurationError
 from warprec.utils.config import load_design_configuration
 from warprec.utils.config.evaluation_configuration import EvaluationConfig
 from warprec.utils.helpers import (
@@ -307,7 +308,7 @@ def test_a_null_seed_is_refused_when_the_configuration_is_loaded(
     config["evaluation"]["seed"] = None
     Path(path).write_text(yaml.safe_dump(config))
 
-    with pytest.raises(ValidationError, match="evaluation.seed"):
+    with pytest.raises(ConfigurationError, match="evaluation.seed"):
         load_design_configuration(path)
 
 

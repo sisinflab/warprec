@@ -5,8 +5,10 @@ from types import ModuleType
 from typing import Any, Optional, Dict, List, Tuple, TYPE_CHECKING
 from pathlib import Path
 
+from pydantic import ValidationError
 from torch.utils.data import DataLoader
 
+from warprec.errors import ConfigurationError, CustomModuleError, EvaluationError
 from warprec.utils.config.model_configuration import RecomModel
 from warprec.utils.registry import params_registry
 
@@ -29,7 +31,7 @@ def load_custom_modules(custom_modules: str | List[str] | None):
             or a directory containing an __init__.py file.
 
     Raises:
-        ImportError: If a module cannot be imported. A run that carried on
+        CustomModuleError: If a module cannot be imported. A run that carried on
             without it would only fail later, on a name it does not know. Also
             if its name is already taken by another module, another custom
             module or one of Python's, which would be used in its place.
@@ -52,14 +54,14 @@ def load_custom_modules(custom_modules: str | List[str] | None):
             module = importlib.import_module(name)
         except ImportError as e:
             _remove_from_path(added)
-            raise ImportError(
+            raise CustomModuleError(
                 f"Failed to import the custom module '{name}' from '{module_path}': {e}"
             ) from e
         if path.exists() and not _is_module_at(module, path):
             # Left first on the path, the folder would shadow the module it
             # was refused for in everything imported or started afterwards
             _remove_from_path(added)
-            raise ImportError(
+            raise CustomModuleError(
                 f"The custom module '{module_path}' is imported as '{name}', a name "
                 f"already taken by '{getattr(module, '__file__', None) or module}', "
                 "which would be used in its place. Rename one of the two."
@@ -145,13 +147,20 @@ def model_param_from_dict(model_name: str, params: dict) -> "RecomModel":
 
     Returns:
         RecomModel: The validated parameter model.
+
+    Raises:
+        ConfigurationError: If the parameters are not valid for the model,
+            listing each invalid key under 'models.<model_name>'.
     """
-    model_params: RecomModel = (
-        params_registry.get(model_name, **params)
-        if model_name.upper() in params_registry.list_registered()
-        else RecomModel(**params)
-    )
-    return model_params
+    if model_name.upper() in params_registry.list_registered():
+        return params_registry.get(model_name, **params)
+    try:
+        return RecomModel(**params)
+    except ValidationError as error:
+        message, errors = ConfigurationError.describe_validation(
+            error, "valid", prefix=f"models.{model_name}"
+        )
+        raise ConfigurationError(message, errors=errors) from error
 
 
 def retrieve_evaluation_dataloader(
@@ -183,7 +192,7 @@ def retrieve_evaluation_dataloader(
         DataLoader: The appropriate evaluation dataloader.
 
     Raises:
-        ValueError: If an unknown evaluation strategy is provided.
+        EvaluationError: If an unknown evaluation strategy is provided.
     """
     from warprec.recommenders.base_recommender import ContextRecommenderUtils  # pylint: disable = import-outside-toplevel
 
@@ -215,7 +224,7 @@ def retrieve_evaluation_dataloader(
                 **kwargs,
             )
         case _:
-            raise ValueError(f"Unknown evaluation strategy: {strategy}")
+            raise EvaluationError(f"Unknown evaluation strategy: {strategy}")
 
 
 def build_evaluation_dataloader_kwargs(

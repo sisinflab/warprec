@@ -1,6 +1,7 @@
 import torch
 import torch.nn.functional as F
 from torch import nn, Tensor
+from warprec.errors import ConfigurationError
 
 
 class BPRLoss(nn.Module):
@@ -56,13 +57,13 @@ class EmbLoss(nn.Module):
             'mean' | 'sum'. Default: 'mean'.
 
     Raises:
-        ValueError: If the reduction is not supported.
+        ConfigurationError: If the reduction is not supported.
     """
 
     def __init__(self, reduction: str = "mean"):
         super().__init__()
         if reduction not in ["mean", "sum"]:
-            raise ValueError(
+            raise ConfigurationError(
                 f"Invalid reduction type: {reduction}. Supported: 'mean', 'sum'."
             )
         self.reduction = reduction

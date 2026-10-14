@@ -5,6 +5,7 @@ import torch
 import torch.nn.functional as F
 from torch import nn, Tensor
 
+from warprec.errors import ConfigurationError
 from warprec.recommenders.base_recommender import (
     IterativeRecommender,
     SequentialRecommenderUtils,
@@ -192,7 +193,7 @@ class DuoRec(IterativeRecommender, SequentialRecommenderUtils):
         if self.sim_type == "cos":
             representations = F.normalize(representations, dim=1)
         elif self.sim_type != "dot":
-            raise ValueError(f"Unknown similarity metric: {self.sim_type}")
+            raise ConfigurationError(f"Unknown similarity metric: {self.sim_type}")
 
         sim_matrix = torch.matmul(representations, representations.transpose(0, 1))
         sim_matrix = sim_matrix / self.tau

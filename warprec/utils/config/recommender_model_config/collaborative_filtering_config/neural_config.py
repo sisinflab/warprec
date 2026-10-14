@@ -3,6 +3,7 @@ from itertools import product
 from typing import ClassVar
 
 from pydantic import field_validator
+from warprec.errors import ConfigurationError
 from warprec.utils.config.model_configuration import (
     RecomModel,
     INT_FIELD,
@@ -115,7 +116,7 @@ class ConvNCF(RecomModel):
         This method should be called after all individual fields have been validated.
 
         Raises:
-            ValueError: If no valid combination of hyperparameters can be formed.
+            ConfigurationError: If no valid combination of hyperparameters can be formed.
         """
         # Extract parameters to check, removing searching strategy
         embedding_sizes = self._clean_param_list(self.embedding_size)
@@ -155,7 +156,7 @@ class ConvNCF(RecomModel):
             break
 
         if not has_valid_combination:
-            raise ValueError(
+            raise ConfigurationError(
                 "No valid hyperparameter combination found for ConvNCF. "
                 "Ensure there's at least one combination of 'embedding_size', "
                 "'cnn_channels', 'cnn_kernels', and 'cnn_strides' that meets the criteria: "
@@ -168,7 +169,7 @@ class ConvNCF(RecomModel):
         for a single trial's parameter set.
 
         Raises:
-            ValueError: If the parameter values are not consistent for the model.
+            ConfigurationError: If the parameter values are not consistent for the model.
         """
         # Clean parameters from search space information
         embedding_size_clean = (
@@ -201,7 +202,7 @@ class ConvNCF(RecomModel):
         # if not, just raise an error.
         # RayTune will skip this trial
         if not len_channels == len_kernels == len_strides:
-            raise ValueError(
+            raise ConfigurationError(
                 f"Inconsistent CNN layer configuration: "
                 f"cnn_channels length ({len_channels}), cnn_kernels length ({len_kernels}), "
                 f"and cnn_strides length ({len_strides}) must be equal. "
@@ -213,7 +214,7 @@ class ConvNCF(RecomModel):
         # Check if the first cnn_channel output layer
         # is the same as the embedding size
         if emb_size != first_layer_cnn:
-            raise ValueError(
+            raise ConfigurationError(
                 f"Embedding size must be the same as the first layer of CNN. "
                 f"embedding_size value ({emb_size}), first cnn layer ({first_layer_cnn}). "
             )
@@ -332,7 +333,7 @@ class NeuMF(RecomModel):
         mf_train or mlp_train is True.
 
         Raises:
-            ValueError: If no valid combination of hyperparameters can be formed.
+            ConfigurationError: If no valid combination of hyperparameters can be formed.
         """
         # Extract parameters to check, removing searching strategy strings
         mf_train_list = self._clean_param_list(self.mf_train)
@@ -347,7 +348,7 @@ class NeuMF(RecomModel):
                 break
 
         if not has_valid_combination:
-            raise ValueError(
+            raise ConfigurationError(
                 "No valid hyperparameter combination found for NeuMF. "
                 "Ensure there's at least one combination where 'mf_train' or 'mlp_train' is True. "
                 "Currently, all defined combinations have both flags set to False."
@@ -358,7 +359,7 @@ class NeuMF(RecomModel):
         for a single trial's parameter set.
 
         Raises:
-            ValueError: If both mf_train and mlp_train are False.
+            ConfigurationError: If both mf_train and mlp_train are False.
         """
         # Clean parameters from search space information (e.g. remove 'choice', 'grid_search')
         mf_train_clean = (
@@ -378,7 +379,7 @@ class NeuMF(RecomModel):
 
         # Check if at least one is True
         if not is_mf_train and not is_mlp_train:
-            raise ValueError(
+            raise ConfigurationError(
                 "Invalid NeuMF configuration: Both 'mf_train' and 'mlp_train' are False. "
                 "At least one part of the model (Matrix Factorization or MLP) must be trained."
             )

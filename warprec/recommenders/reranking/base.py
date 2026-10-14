@@ -4,6 +4,7 @@ from typing import Any, Optional, Tuple
 import torch
 from torch import Tensor
 
+from warprec.errors import ConfigurationError
 from warprec.data.ranking import top_k_breaking_ties
 
 
@@ -26,12 +27,12 @@ class Reranker(ABC):
         **kwargs (Any): Ignored, so that a registry may pass shared arguments.
 
     Raises:
-        ValueError: If the pool is smaller than one.
+        ConfigurationError: If the pool is smaller than one.
     """
 
     def __init__(self, item_features: Tensor, pool: int = 100, **kwargs: Any):
         if pool < 1:
-            raise ValueError(
+            raise ConfigurationError(
                 f"A re-ranking pool must hold at least one item, got {pool}."
             )
 

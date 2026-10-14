@@ -3,6 +3,7 @@ from itertools import product
 from typing import ClassVar
 
 from pydantic import field_validator
+from warprec.errors import ConfigurationError
 from warprec.utils.config.model_configuration import (
     RecomModel,
     INT_FIELD,
@@ -119,7 +120,7 @@ class DGCF(RecomModel):
                 break
 
         if not has_valid_combination:
-            raise ValueError(
+            raise ConfigurationError(
                 "No valid hyperparameter combination found for DGCF. "
                 "Ensure there's at least one combination where 'embedding_size' "
                 "is divisible by 'n_factors'."
@@ -139,7 +140,7 @@ class DGCF(RecomModel):
         )
 
         if embedding_size_clean % n_factors_clean != 0:
-            raise ValueError(
+            raise ConfigurationError(
                 f"Inconsistent configuration for DGCF: "
                 f"embedding_size ({embedding_size_clean}) must be divisible "
                 f"by n_factors ({n_factors_clean})."
@@ -1896,7 +1897,7 @@ class XSimGCL(RecomModel):
         )
 
         if not has_valid_combination:
-            raise ValueError(
+            raise ConfigurationError(
                 "No valid hyperparameter combination found for XSimGCL. "
                 "Ensure there's at least one combination where 'layer_cl' "
                 "is less than or equal to 'n_layers'."
@@ -1916,7 +1917,7 @@ class XSimGCL(RecomModel):
         )
 
         if layer_cl_clean > n_layers_clean:
-            raise ValueError(
+            raise ConfigurationError(
                 f"Inconsistent configuration for XSimGCL: "
                 f"layer_cl ({layer_cl_clean}) cannot be greater than "
                 f"n_layers ({n_layers_clean})."

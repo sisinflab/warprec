@@ -8,6 +8,7 @@ from pandas import DataFrame
 from torch import Tensor
 from scipy.sparse import coo_matrix
 
+from warprec.errors import DataError, DataNotFoundError, ModelError
 from warprec.recommenders.base_recommender import Recommender
 from warprec.utils.registry import model_registry
 
@@ -30,9 +31,10 @@ class ProxyRecommender(Recommender):
         header (bool): Wether or not the recommendation file has an header.
 
     Raises:
-        ValueError: If the item and user mappings or the number of items and users are not provided
-             or if the recommendation file is malformed.
-        FileNotFoundError: If the recommendation file does not exist.
+        ModelError: If the item and user mappings or the number of items and
+            users are not provided.
+        DataError: If the recommendation file is empty or malformed.
+        DataNotFoundError: If the recommendation file does not exist.
         RuntimeError: If an error occurs while reading the recommendation file.
     """
 
@@ -53,7 +55,7 @@ class ProxyRecommender(Recommender):
         imap: dict = info.get("item_mapping", None)
         umap: dict = info.get("user_mapping", None)
         if any(x is None or x == {} for x in [imap, umap]):
-            raise ValueError(
+            raise ModelError(
                 "Item and user mapping must be provided to correctly initialize the model."
             )
 
@@ -91,15 +93,15 @@ class ProxyRecommender(Recommender):
                 dtype=np.float32,
             ).tocsr()
         except FileNotFoundError as exc:
-            raise FileNotFoundError(
+            raise DataNotFoundError(
                 f"Recommendation file {self.recommendation_file} not found."
             ) from exc
         except pd.errors.EmptyDataError as exc:
-            raise ValueError(
+            raise DataError(
                 f"Recommendation file {self.recommendation_file} is empty."
             ) from exc
         except pd.errors.ParserError as exc:
-            raise ValueError(
+            raise DataError(
                 f"Recommendation file {self.recommendation_file} is malformed."
             ) from exc
         except Exception as e:

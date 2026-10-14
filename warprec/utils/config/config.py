@@ -5,14 +5,15 @@ import importlib
 from pathlib import Path
 from typing import Dict, Any, List
 
-import yaml
 from pydantic import BaseModel, model_validator, Field
+from warprec.errors import ConfigurationError, RegistryError
 from warprec.utils.helpers import (
     is_python_module,
     load_custom_modules,
     validation_metric,
 )
 from warprec.data.filtering import Filter
+from warprec.utils.config.common import read_configuration_file
 from warprec.utils.config import (
     GeneralConfig,
     WarpRecCallbackConfig,
@@ -116,8 +117,12 @@ class WarpRecConfiguration(BaseModel):
             WarpRecConfiguration: The validated configuration.
 
         Raises:
-            FileNotFoundError: If the local file has not been found.
-            ValueError: If any information between parts of the configuration file is inconsistent.
+            FileNotFoundError: If the local file has not been found. It stays
+                the built-in, which pydantic lets through, so building the
+                configuration directly still raises it; loading the file
+                raises it as DataNotFoundError.
+            RegistryError: If a filter is not registered.
+            ConfigurationError: If any information between parts of the configuration file is inconsistent.
         """
 
         # Reading method specific checks
@@ -129,7 +134,9 @@ class WarpRecConfiguration(BaseModel):
                 ext = self.reader.split.ext
                 local_path = os.path.join(self.reader.split.local_path, "train" + ext)
             else:
-                raise ValueError("Unsupported local source or missing local path.")
+                raise ConfigurationError(
+                    "Unsupported local source or missing local path."
+                )
 
             if not os.path.exists(local_path):
                 raise FileNotFoundError(f"Training file not at {local_path}")
@@ -137,14 +144,14 @@ class WarpRecConfiguration(BaseModel):
         elif self.reader.reading_method == ReadingMethods.AZURE_BLOB:
             # Check if the Azure configuration is complete
             if self.general.azure is None:
-                raise ValueError(
+                raise ConfigurationError(
                     "Azure configuration must be provided for Azure Blob reading method."
                 )
             if (
                 not self.general.azure.storage_account_name
                 or not self.general.azure.container_name
             ):
-                raise ValueError(
+                raise ConfigurationError(
                     "Both storage_account_name and container_name must be provided in Azure configuration."
                 )
 
@@ -163,14 +170,18 @@ class WarpRecConfiguration(BaseModel):
             labels = self.reader.labels.model_dump()
             for filter_name, filter_params in self.filtering.items():
                 if filter_name.upper() not in filter_registry.list_registered():
-                    raise ValueError(
-                        f"Filter '{filter_name}' is not registered. These are "
-                        f"the filters registered: {filter_registry.list_registered()}"
+                    raise RegistryError(
+                        **filter_registry.unknown(
+                            filter_name,
+                            f"Filter '{filter_name}' is not registered. These are "
+                            "the filters registered: "
+                            f"{filter_registry.list_registered()}",
+                        )
                     )
                 try:
                     filter_registry.get(filter_name, **filter_params, **labels)
                 except Exception as e:
-                    raise ValueError(
+                    raise ConfigurationError(
                         f"Error initializing filter '{filter_name}' with these params {filter_params}: {e}"
                     ) from e
 
@@ -205,16 +216,20 @@ class WarpRecConfiguration(BaseModel):
             RecomModel: The validated parameters.
 
         Raises:
-            ValueError: If the model is not registered, or it reads side
-                information, context, a knowledge graph or multimodal features
-                the reader does not provide.
+            RegistryError: If the model is not registered.
+            ConfigurationError: If it reads side information, context, a
+                knowledge graph or multimodal features the reader does not
+                provide.
         """
         if model_name.upper() not in model_registry.list_registered():
-            raise ValueError(
-                f"The model '{model_name}' is not registered. Check its name "
-                "under 'models', or load the module that registers it through "
-                "'general.custom_modules'. These are the models registered: "
-                f"{model_registry.list_registered()}"
+            raise RegistryError(
+                **model_registry.unknown(
+                    model_name,
+                    f"The model '{model_name}' is not registered. Check its name "
+                    "under 'models', or load the module that registers it through "
+                    "'general.custom_modules'. These are the models registered: "
+                    f"{model_registry.list_registered()}",
+                )
             )
 
         if model_name.upper() not in params_registry.list_registered():
@@ -230,26 +245,26 @@ class WarpRecConfiguration(BaseModel):
         model_class = params_registry.get(model_name, **copy.deepcopy(model_data))
 
         if model_class.need_side_information and self.reader.side is None:
-            raise ValueError(
+            raise ConfigurationError(
                 f"The model {model_name} requires side information to be provided, "
                 "but none have been provided. Check the configuration file."
             )
 
         if model_class.need_context and not self.reader.labels.context_labels:
-            raise ValueError(
+            raise ConfigurationError(
                 f"The model {model_name} requires contextual information to be provided, "
                 "but no context_labels have been configured. Check the configuration file."
             )
 
         if model_class.need_knowledge and self.reader.knowledge is None:
-            raise ValueError(
+            raise ConfigurationError(
                 f"The model {model_name} scores from a knowledge graph, but none "
                 "has been provided. Configure 'reader.knowledge' with the triples "
                 "and the item alignment. Check the configuration file."
             )
 
         if model_class.need_multimodal and not self.reader.multimodal:
-            raise ValueError(
+            raise ConfigurationError(
                 f"The model {model_name} scores from multimodal item features, but "
                 "none have been provided. Configure 'reader.multimodal' with one "
                 "entry per modality. Check the configuration file."
@@ -273,7 +288,7 @@ class WarpRecConfiguration(BaseModel):
             model_data (dict): The raw parameters written for that model.
 
         Raises:
-            ValueError: If the model names a modality that was not configured.
+            ConfigurationError: If the model names a modality that was not configured.
         """
         wanted = model_data.get("modalities")
         if not wanted or not self.reader.multimodal:
@@ -293,7 +308,7 @@ class WarpRecConfiguration(BaseModel):
 
         missing = sorted(names - set(self.reader.multimodal))
         if missing:
-            raise ValueError(
+            raise ConfigurationError(
                 f"The model {model_name} asks for the modalities {missing}, which "
                 f"'reader.multimodal' does not configure. The configured ones are "
                 f"{sorted(self.reader.multimodal)}. Check the configuration file."
@@ -342,21 +357,21 @@ class TrainConfiguration(WarpRecConfiguration):
             TrainConfiguration: The validated configuration.
 
         Raises:
-            ValueError: If any information between parts of the configuration file is inconsistent.
+            ConfigurationError: If any information between parts of the configuration file is inconsistent.
         """
 
         # Writing method specific checks
         if self.writer.writing_method == WritingMethods.AZURE_BLOB:
             # Check if the Azure configuration is complete
             if self.general.azure is None:
-                raise ValueError(
+                raise ConfigurationError(
                     "Azure configuration must be provided for Azure Blob writing method."
                 )
             if (
                 not self.general.azure.storage_account_name
                 or not self.general.azure.container_name
             ):
-                raise ValueError(
+                raise ConfigurationError(
                     "Both storage_account_name and container_name must be provided in Azure configuration."
                 )
 
@@ -370,7 +385,7 @@ class TrainConfiguration(WarpRecConfiguration):
                 val_metric not in self.evaluation.metrics
                 or val_k not in self.evaluation.top_k
             ):
-                raise ValueError(
+                raise ConfigurationError(
                     "Full evaluation on report has been requested but the "
                     "validation metric it's not contained in the evaluation metrics. "
                     f"Validation metric: {self.evaluation.validation_metric} ."
@@ -380,7 +395,7 @@ class TrainConfiguration(WarpRecConfiguration):
 
         # Check if dataset splitting has been correctly setup
         if self.reader.loading_strategy == "dataset" and self.splitter is None:
-            raise ValueError(
+            raise ConfigurationError(
                 "The 'dataset' loading strategy requires an explicit dataset splitting "
                 "configuration, but none was provided. Please verify the splitter "
                 "settings in the configuration file."
@@ -497,7 +512,7 @@ class DesignConfiguration(WarpRecConfiguration):
             params (RecomModel): The same parameters, validated.
 
         Raises:
-            ValueError: If a hyperparameter is a list of values or a range.
+            ConfigurationError: If a hyperparameter is a list of values or a range.
         """
         validated = params.model_dump()
         spaces = [space.value for space in SearchSpace]
@@ -522,7 +537,7 @@ class DesignConfiguration(WarpRecConfiguration):
                 or len(alternatives) != 1
                 or (isinstance(raw, list) and raw != alternatives[0])
             ):
-                raise ValueError(
+                raise ConfigurationError(
                     f"The design pipeline trains {model_name} once, from single "
                     f"values, but 'models.{model_name}.{field}' is {raw}, which "
                     "it reads as a search space. Write the one value to train "
@@ -559,6 +574,11 @@ def load_train_configuration(path: str) -> TrainConfiguration:
     """This method reads the train configuration file and returns
         a TrainConfiguration object.
 
+    A file that is not a valid train configuration raises one
+    ConfigurationError listing the invalid keys; a missing file, or missing
+    training data it names, raises DataNotFoundError (see
+    read_configuration_file).
+
     Args:
         path (str): The path to the configuration file.
 
@@ -566,15 +586,19 @@ def load_train_configuration(path: str) -> TrainConfiguration:
         TrainConfiguration: The configuration object created from the configuration file.
     """
     logger.msg(f"Reading train configuration file in: {path}")
-    with open(path, "r", encoding="utf-8") as file:
-        data = yaml.safe_load(file)
+    config = read_configuration_file(path, TrainConfiguration, "train")
     logger.msg("Reading process completed correctly.")
-    return TrainConfiguration(**data)
+    return config
 
 
 def load_design_configuration(path: str) -> DesignConfiguration:
     """This method reads the train configuration file and returns
         a DesignConfiguration object.
+
+    A file that is not a valid design configuration raises one
+    ConfigurationError listing the invalid keys; a missing file, or missing
+    training data it names, raises DataNotFoundError (see
+    read_configuration_file).
 
     Args:
         path (str): The path to the configuration file.
@@ -583,15 +607,19 @@ def load_design_configuration(path: str) -> DesignConfiguration:
         DesignConfiguration: The configuration object created from the configuration file.
     """
     logger.msg(f"Reading design configuration file in: {path}")
-    with open(path, "r", encoding="utf-8") as file:
-        data = yaml.safe_load(file)
+    config = read_configuration_file(path, DesignConfiguration, "design")
     logger.msg("Reading process completed correctly.")
-    return DesignConfiguration(**data)
+    return config
 
 
 def load_eval_configuration(path: str) -> EvalConfiguration:
     """This method reads the train configuration file and returns
         a EvalConfiguration object.
+
+    A file that is not a valid eval configuration raises one
+    ConfigurationError listing the invalid keys; a missing file, or missing
+    training data it names, raises DataNotFoundError (see
+    read_configuration_file).
 
     Args:
         path (str): The path to the configuration file.
@@ -600,15 +628,19 @@ def load_eval_configuration(path: str) -> EvalConfiguration:
         EvalConfiguration: The configuration object created from the configuration file.
     """
     logger.msg(f"Reading eval configuration file in: {path}")
-    with open(path, "r", encoding="utf-8") as file:
-        data = yaml.safe_load(file)
+    config = read_configuration_file(path, EvalConfiguration, "eval")
     logger.msg("Reading process completed correctly.")
-    return EvalConfiguration(**data)
+    return config
 
 
 def load_estimate_configuration(path: str) -> EstimateConfiguration:
     """This method reads the estimate configuration file and returns
         a EstimateConfiguration object.
+
+    A file that is not a valid estimate configuration raises one
+    ConfigurationError listing the invalid keys; a missing file, or missing
+    training data it names, raises DataNotFoundError (see
+    read_configuration_file).
 
     Args:
         path (str): The path to the configuration file.
@@ -617,10 +649,9 @@ def load_estimate_configuration(path: str) -> EstimateConfiguration:
         EstimateConfiguration: The configuration object created from the configuration file.
     """
     logger.msg(f"Reading estimate configuration file in: {path}")
-    with open(path, "r", encoding="utf-8") as file:
-        data = yaml.safe_load(file)
+    config = read_configuration_file(path, EstimateConfiguration, "estimate")
     logger.msg("Reading process completed correctly.")
-    return EstimateConfiguration(**data)
+    return config
 
 
 def load_callback(

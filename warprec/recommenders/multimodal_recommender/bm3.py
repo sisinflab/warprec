@@ -5,6 +5,7 @@ import torch
 from torch import Tensor, nn
 from torch.nn import functional as F
 
+from warprec.errors import ModelError
 from warprec.data.entities import Interactions, MultiModalFeatures, Sessions
 from warprec.recommenders.base_recommender import IterativeRecommender
 from warprec.recommenders.collaborative_filtering_recommender.graph_based import (
@@ -52,7 +53,7 @@ class BM3(MultiModalRecommenderUtils, GraphRecommenderUtils, IterativeRecommende
         learning_rate (float): The learning rate value.
 
     Raises:
-        ValueError: If the training interactions were not provided.
+        ModelError: If the training interactions were not provided.
     """
 
     embedding_size: int
@@ -78,7 +79,7 @@ class BM3(MultiModalRecommenderUtils, GraphRecommenderUtils, IterativeRecommende
         super().__init__(params, info, *args, multimodal=multimodal, **kwargs)
 
         if interactions is None:
-            raise ValueError(
+            raise ModelError(
                 "BM3 propagates over the interactions, so it needs them at "
                 "construction."
             )

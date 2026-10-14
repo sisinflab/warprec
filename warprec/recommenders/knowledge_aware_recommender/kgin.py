@@ -5,6 +5,7 @@ import torch
 from torch import Tensor, nn
 from torch.nn import functional as F
 
+from warprec.errors import ModelError
 from warprec.data.entities import Interactions, KnowledgeGraph, Sessions
 from warprec.recommenders.base_recommender import IterativeRecommender
 from warprec.recommenders.knowledge_aware_recommender.knowledge_utils import (
@@ -54,7 +55,7 @@ class KGIN(KnowledgeRecommenderUtils, IterativeRecommender):
         edge_relations (Tensor): The relation each edge sits on.
 
     Raises:
-        ValueError: If the training interactions were not provided.
+        ModelError: If the training interactions were not provided.
     """
 
     embedding_size: int
@@ -88,7 +89,7 @@ class KGIN(KnowledgeRecommenderUtils, IterativeRecommender):
         super().__init__(params, info, *args, knowledge=knowledge, seed=seed, **kwargs)
 
         if interactions is None:
-            raise ValueError(
+            raise ModelError(
                 "KGIN reads the interactions as one side of its graph, so it "
                 "needs them at construction."
             )

@@ -3,6 +3,7 @@ from typing import Any, Dict, List, Optional, Tuple, Union
 
 from scipy.sparse import csr_matrix
 
+from warprec.errors import ConfigurationError
 from warprec.utils.enums import RatingType, SplittingStrategies
 
 
@@ -55,7 +56,7 @@ class SplitSpec:
         """Validate that the strategy is given the parameters it reads.
 
         Raises:
-            ValueError: If the strategy is unknown or a parameter it requires is
+            ConfigurationError: If the strategy is unknown or a parameter it requires is
                 missing.
         """
         strategy = self.resolved_strategy()
@@ -67,7 +68,7 @@ class SplitSpec:
             if getattr(self, name) is None
         ]
         if missing:
-            raise ValueError(
+            raise ConfigurationError(
                 f"The {strategy.value} splitting strategy reads "
                 f"{', '.join(repr(name) for name in missing)}, which this SplitSpec "
                 f"does not set. Pass it, e.g. SplitSpec(strategy='{strategy.value}', "

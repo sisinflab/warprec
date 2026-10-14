@@ -1,6 +1,9 @@
-from typing import Any, Type, TypeVar, Optional, List
+from pathlib import Path
+from typing import Any, Type, TypeVar, Optional, List, Union
 
-from pydantic import BaseModel
+import yaml
+from pydantic import BaseModel, ValidationError
+from warprec.errors import ConfigurationError, DataNotFoundError, RegistryError
 from warprec.utils.enums import SearchSpace
 from warprec.utils.registry import similarities_registry
 from warprec.utils.logger import logger
@@ -41,16 +44,49 @@ class Labels(BaseModel):
             Labels: An instance of the Labels class with the provided labels.
 
         Raises:
-            ValueError: If the input is not a list of length 4.
+            ConfigurationError: If the input is not a list of length 4.
         """
         if not isinstance(labels, list) | len(labels) != 4:
-            raise ValueError("Input must be a list of length 4.")
+            raise ConfigurationError("Input must be a list of length 4.")
         return cls(
             user_id_label=labels[0],
             item_id_label=labels[1],
             rating_label=labels[2],
             timestamp_label=labels[3],
         )
+
+
+def read_configuration_file(path: Union[str, Path], schema: Type[T], kind: str) -> T:
+    """Read a YAML configuration file and validate it against its schema.
+
+    The invalid keys pydantic finds are reported together, in one
+    ConfigurationError, rather than as pydantic's own error. The checks that
+    compare sections run only once every section is valid on its own.
+
+    Args:
+        path (Union[str, Path]): The YAML file.
+        schema (Type[T]): The pydantic model the file must satisfy.
+        kind (str): The kind of configuration, e.g. 'train', for the message.
+
+    Returns:
+        T: The validated configuration.
+
+    Raises:
+        DataNotFoundError: If the file, or a file it names that must exist when
+            it is read (the training data), does not exist.
+        ConfigurationError: If the file is not a valid configuration of its kind.
+    """
+    try:
+        with open(path, "r", encoding="utf-8") as file:
+            data = yaml.safe_load(file) or {}
+        return schema.model_validate(data)
+    except ValidationError as error:
+        message, errors = ConfigurationError.describe_validation(
+            error, f"a valid {kind} configuration", path=path
+        )
+        raise ConfigurationError(message, path=path, errors=errors) from error
+    except FileNotFoundError as error:
+        raise DataNotFoundError(str(error)) from error
 
 
 def check_separator(sep: str) -> str:
@@ -88,15 +124,17 @@ def check_seed(value: Any, key: str, draws: str) -> Any:
         Any: The seed, unchanged.
 
     Raises:
-        ValueError: If the seed is null or out of range.
+        ConfigurationError: If the seed is null or out of range.
     """
     if value is None:
-        raise ValueError(
+        raise ConfigurationError(
             f"{key} cannot be null: {draws} from it. Leave the key out to use the "
             "default, 42, or give an integer from 0 to 2**32 - 1."
         )
     if isinstance(value, int) and not 0 <= value < 2**32:
-        raise ValueError(f"{key} must be an integer from 0 to 2**32 - 1, got {value}.")
+        raise ConfigurationError(
+            f"{key} must be an integer from 0 to 2**32 - 1, got {value}."
+        )
     return value
 
 
@@ -173,7 +211,7 @@ def _check_str_values(value: Any, allowed: list) -> bool:
         bool: True if the value is in the allowed list, False otherwise.
 
     Raises:
-        ValueError: If the allowed list is not a list of strings.
+        ConfigurationError: If the allowed list is not a list of strings.
     """
 
     # Check if not string
@@ -188,7 +226,9 @@ def _check_str_values(value: Any, allowed: list) -> bool:
     lower_allowed = []
     for v in allowed:
         if not isinstance(v, str):
-            raise ValueError("Validate str list allowed values must be strings.")
+            raise ConfigurationError(
+                "Validate str list allowed values must be strings."
+            )
         lower_allowed.append(v.lower())
     allowed = lower_allowed
 
@@ -279,13 +319,13 @@ def validate_greater_than_zero(cls: Type[T], value: Any, field: str) -> list:
         list: A list of validated values in the correct format.
 
     Raises:
-        ValueError: If any of the values are not greater then zero.
+        ConfigurationError: If any of the values are not greater then zero.
     """
     value = _convert_to_list(value)
     value = _scientific_notation_conversion(value)
     for v in value:
         if _check_less_equal_zero(v):
-            raise ValueError(
+            raise ConfigurationError(
                 f"Values of {field} for {cls.__name__} model must be > 0. "
                 f"Values received as input: {value}"
             )
@@ -306,13 +346,13 @@ def validate_greater_equal_than_zero(cls: Type[T], value: Any, field: str) -> li
         list: A list of validated values in the correct format.
 
     Raises:
-        ValueError: If any of the values are not greater or equal then zero.
+        ConfigurationError: If any of the values are not greater or equal then zero.
     """
     value = _convert_to_list(value)
     value = _scientific_notation_conversion(value)
     for v in value:
         if _check_less_than_zero(v):
-            raise ValueError(
+            raise ConfigurationError(
                 f"Values of {field} for {cls.__name__} model must be >= 0. "
                 f"Values received as input: {value}"
             )
@@ -333,15 +373,18 @@ def validate_similarity(cls: Type[T], value: Any, field: str) -> list:
         list: A list of validated values in the correct format.
 
     Raises:
-        ValueError: If any of the values are not a supported similarity.
+        RegistryError: If any of the values are not a supported similarity.
     """
     value = _convert_to_list(value)
     for v in value:
         if not _check_similarity(v):
-            raise ValueError(
+            raise RegistryError(
                 f"Values of {field} for {cls.__name__} model must be supported similarities. "
                 f"Values received as input: {value}. "
-                f"Supported similarities: {similarities_registry.list_registered()}"
+                f"Supported similarities: {similarities_registry.list_registered()}",
+                registry=similarities_registry.registry_name,
+                name=str(v),
+                available=similarities_registry.list_registered(),
             )
     return value
 
@@ -361,12 +404,12 @@ def validate_str_list(cls: Type[T], value: Any, allowed: list, field: str) -> li
         list: A list of validated values in the correct format.
 
     Raises:
-        ValueError: If any of the values are not a supported similarity.
+        ConfigurationError: If any of the values are not a supported similarity.
     """
     value = _convert_to_list(value)
     for v in value:
         if not _check_str_values(v, allowed):
-            raise ValueError(
+            raise ConfigurationError(
                 f"Values of {field} for {cls.__name__} model are not allowed. "
                 f"Values received as input: {value}. "
                 f"Supported values: {allowed}"
@@ -388,12 +431,12 @@ def validate_profile(cls: Type[T], value: Any, field: str) -> list:
         list: A list of validated values in the correct format.
 
     Raises:
-        ValueError: If any of the values are not a supported profile.
+        ConfigurationError: If any of the values are not a supported profile.
     """
     value = _convert_to_list(value)
     for v in value:
         if not _check_profile(v):
-            raise ValueError(
+            raise ConfigurationError(
                 f"Values of {field} for {cls.__name__} model must be 'binary' or 'tfidf'. "
                 f"Values received as input: {value}. "
             )
@@ -414,13 +457,13 @@ def validate_between_zero_and_one(cls: Type[T], value: Any, field: str) -> list:
         list: A list of validated values in the correct format.
 
     Raises:
-        ValueError: If any of the values are not between zero and one.
+        ConfigurationError: If any of the values are not between zero and one.
     """
     value = _convert_to_list(value)
     value = _scientific_notation_conversion(value)
     for v in value:
         if _check_between_zero_and_one(v):
-            raise ValueError(
+            raise ConfigurationError(
                 f"Values of {field} for {cls.__name__} model must be >= 0 and <= 1. "
                 f"Values received as input: {value}"
             )
@@ -441,7 +484,7 @@ def validate_layer_list(cls: Type[T], value: Any, field: str) -> list:
         list: A list of validated values in the correct format.
 
     Raises:
-        ValueError: If any of the values are not lists of layers.
+        ConfigurationError: If any of the values are not lists of layers.
     """
     strat = None  # Init strategy
     if not isinstance(value, list):
@@ -453,7 +496,7 @@ def validate_layer_list(cls: Type[T], value: Any, field: str) -> list:
     for layer in value:
         for v in layer:
             if v <= 0:
-                raise ValueError(
+                raise ConfigurationError(
                     f"Values of {field} for {cls.__name__} model must be positive layer values. "
                     f"Values received as input: {value}"
                 )
@@ -477,7 +520,7 @@ def validate_value_list(cls: Type[T], value: Any, field: str) -> list:
         list: A list of validated values in the correct format.
 
     Raises:
-        ValueError: If any of the values is an empty list.
+        ConfigurationError: If any of the values is an empty list.
     """
     if not isinstance(value, list):
         value = [value]
@@ -488,7 +531,7 @@ def validate_value_list(cls: Type[T], value: Any, field: str) -> list:
 
     for entry in value:
         if not entry:
-            raise ValueError(
+            raise ConfigurationError(
                 f"Values of {field} for {cls.__name__} model must name at least "
                 f"one entry. Values received as input: {value}"
             )

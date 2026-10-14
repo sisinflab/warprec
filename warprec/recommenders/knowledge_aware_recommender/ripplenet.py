@@ -4,6 +4,7 @@ from typing import Any, List, Optional, Tuple
 import torch
 from torch import Tensor, nn
 
+from warprec.errors import ModelError
 from warprec.data.entities import Interactions, KnowledgeGraph, Sessions
 from warprec.recommenders.base_recommender import IterativeRecommender
 from warprec.recommenders.knowledge_aware_recommender.knowledge_utils import (
@@ -52,7 +53,7 @@ class RippleNet(KnowledgeRecommenderUtils, IterativeRecommender):
         ripple_tails (Tensor): The tail of each remembered fact.
 
     Raises:
-        ValueError: If the training interactions were not provided.
+        ModelError: If the training interactions were not provided.
     """
 
     embedding_size: int
@@ -83,7 +84,7 @@ class RippleNet(KnowledgeRecommenderUtils, IterativeRecommender):
         super().__init__(params, info, *args, knowledge=knowledge, seed=seed, **kwargs)
 
         if interactions is None:
-            raise ValueError(
+            raise ModelError(
                 "RippleNet spreads out from what a user has already interacted "
                 "with, so it needs the interactions at construction."
             )

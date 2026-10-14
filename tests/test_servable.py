@@ -14,6 +14,7 @@ from typing import List
 import pytest
 import torch
 
+from warprec.errors import CheckpointError
 from warprec.data.dataset import Dataset
 from warprec.recommenders.base_recommender import Recommender
 from warprec.serving.servable import (
@@ -232,6 +233,18 @@ def test_popular_fallback_needs_the_seen_matrix(tmp_path: Path, dataset: Dataset
         ServableModel.from_checkpoint(
             path, policy=ServingPolicy(unknown_user="popular")
         )
+
+
+def test_a_checkpoint_that_cannot_serve_the_policy_is_a_checkpoint_error(
+    tmp_path: Path, dataset: Dataset
+):
+    path = tmp_path / "old.pth"
+    torch.save(make_model("BPR", dataset).get_state(), path)
+    with pytest.raises(CheckpointError, match="popular") as caught:
+        ServableModel.from_checkpoint(
+            path, policy=ServingPolicy(unknown_user="popular")
+        )
+    assert caught.value.path == str(path)
 
 
 def test_describe_reports_the_model(tmp_path: Path, dataset: Dataset):

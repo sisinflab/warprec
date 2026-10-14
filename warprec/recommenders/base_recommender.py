@@ -27,6 +27,7 @@ from torch.utils.data import DataLoader
 from scipy.sparse import csr_matrix, diags, issparse
 from sklearn.preprocessing import normalize
 
+from warprec.errors import CheckpointError, DataError, ModelError
 from warprec.data.entities import Interactions, Sessions
 from warprec.utils.config.model_configuration import LRSchedulerConfig, OptimizerConfig
 from warprec.utils.logger import logger
@@ -84,7 +85,7 @@ class Recommender(nn.Module, ABC):
         **kwargs (Any): Keyword argument for PyTorch nn.Module.
 
     Raises:
-        ValueError: If the info dictionary does not contain the number of items
+        ModelError: If the info dictionary does not contain the number of items
             and users of the dataset.
     """
 
@@ -105,7 +106,7 @@ class Recommender(nn.Module, ABC):
         self.n_users = info.get("n_users")
         self.n_items = info.get("n_items")
         if not self.n_users or not self.n_items:
-            raise ValueError(
+            raise ModelError(
                 f"Incorrect initialization: 'n_users' ({self.n_users}) e 'n_items' ({self.n_items}) "
                 "must be present in the 'info' dictionary."
             )
@@ -266,7 +267,7 @@ class Recommender(nn.Module, ABC):
         interactions: Optional[Interactions], model_name: str
     ) -> Interactions:
         if interactions is None:
-            raise ValueError(f"{model_name} requires interactions to estimate space.")
+            raise ModelError(f"{model_name} requires interactions to estimate space.")
         return interactions
 
     @staticmethod
@@ -357,10 +358,12 @@ class Recommender(nn.Module, ABC):
             Recommender: The Recommender model instance.
 
         Raises:
-            ValueError: When trying to load a model checkpoint of a different model.
+            CheckpointError: When trying to load a model checkpoint of a different
+                model, or a checkpoint of a model that derives its structure from
+                the training interactions without them.
         """
         if checkpoint["name"] != cls.__name__:
-            raise ValueError(
+            raise CheckpointError(
                 f"Warning: Loading a {checkpoint['name']} checkpoint into {cls.__name__} class."
             )
 
@@ -382,7 +385,7 @@ class Recommender(nn.Module, ABC):
             if isinstance(module, cls):
                 return module
 
-            raise ValueError(
+            raise CheckpointError(
                 f"{cls.__name__} derives its structure from the training "
                 "interactions, so they must be passed to from_checkpoint() "
                 "alongside a checkpoint saved before the whole module was kept."
@@ -982,7 +985,7 @@ class ContextRecommenderUtils(nn.Module, ABC):
             row-oriented training records, passed through by the pipelines.
 
     Raises:
-        ValueError: If the side information gives an item more than one row,
+        DataError: If the side information gives an item more than one row,
             which the per-item feature lookup cannot hold.
 
     Attributes:
@@ -1097,7 +1100,7 @@ class ContextRecommenderUtils(nn.Module, ABC):
         if interactions is not None:
             repeated = interactions.get_side_repeated_items()
             if self.feature_labels and repeated:
-                raise ValueError(
+                raise DataError(
                     f"{type(self).__name__} embeds the side information through a "
                     "lookup holding one row per item, but the side information "
                     f"gives several rows to {len(repeated)} items (e.g. "
@@ -1563,7 +1566,7 @@ class ItemSimRecommender(Recommender):
         **kwargs (Any): Keyword argument for PyTorch nn.Module.
 
     Raises:
-        ValueError: If the items value was not passed through the info dict.
+        ModelError: If the items value was not passed through the info dict.
     """
 
     def __init__(
@@ -1578,7 +1581,7 @@ class ItemSimRecommender(Recommender):
         super().__init__(params, info, seed=seed, *args, **kwargs)
         self.n_items = info.get("n_items", None)
         if not self.n_items:
-            raise ValueError(
+            raise ModelError(
                 "Items value must be provided to correctly initialize the model."
             )
         self.train_matrix = interactions.get_sparse()

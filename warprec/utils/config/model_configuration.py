@@ -2,6 +2,7 @@ from typing import List, Literal, Optional, Union, ClassVar, Any, Dict
 from abc import ABC
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator, field_validator
+from warprec.errors import ConfigurationError, RegistryError
 from warprec.utils.enums import (
     SearchAlgorithms,
     Schedulers,
@@ -103,9 +104,9 @@ class Properties(BaseModel):
     def check_mode(cls, v: str):
         """Validate mode."""
         if v is None:
-            raise ValueError("Mode must be provided.")
+            raise ConfigurationError("Mode must be provided.")
         if v.lower() not in ["min", "max"]:
-            raise ValueError("Mode should be either min or max.")
+            raise ConfigurationError("Mode should be either min or max.")
         return v.lower()
 
     @field_validator("desired_training_it")
@@ -113,9 +114,9 @@ class Properties(BaseModel):
     def check_desired_training_it(cls, v: str):
         """Validate desired_training_it."""
         if v is None:
-            raise ValueError("Desired_training_it must be provided.")
+            raise ConfigurationError("Desired_training_it must be provided.")
         if v.lower() not in ["median", "mean", "min", "max"]:
-            raise ValueError(
+            raise ConfigurationError(
                 "Desired_training_it should be either: median, mean, min or max."
             )
         return v.lower()
@@ -142,7 +143,7 @@ class Properties(BaseModel):
     def check_n_startup_trials(cls, v: Optional[int]):
         """Validate n_startup_trials."""
         if v is not None and v <= 0:
-            raise ValueError("Value for n_startup_trials must be >0.")
+            raise ConfigurationError("Value for n_startup_trials must be >0.")
         return v
 
     @field_validator("min_samples_required")
@@ -150,7 +151,7 @@ class Properties(BaseModel):
     def check_min_samples_required(cls, v: Optional[int]):
         """Validate min_samples_required."""
         if v is not None and v <= 0:
-            raise ValueError("Value for min_samples_required must be >0.")
+            raise ConfigurationError("Value for min_samples_required must be >0.")
         return v
 
     @field_validator("min_time_slice")
@@ -158,7 +159,7 @@ class Properties(BaseModel):
     def check_min_time_slice(cls, v: Optional[int]):
         """Validate min_time_slice."""
         if v is not None and v < 0:
-            raise ValueError("Value for min_time_slice must be >=0.")
+            raise ConfigurationError("Value for min_time_slice must be >=0.")
         return v
 
 
@@ -178,9 +179,12 @@ class LRSchedulerConfig(BaseModel):
     def check_name(cls, v: str):
         """Validate name."""
         if v.upper() not in lr_scheduler_registry.list_registered():
-            raise ValueError(
-                "The learning rate scheduler name provided is not supported. These are the "
-                f"supported strategies: {lr_scheduler_registry.list_registered()}"
+            raise RegistryError(
+                **lr_scheduler_registry.unknown(
+                    v,
+                    "The learning rate scheduler name provided is not supported. These are the "
+                    f"supported strategies: {lr_scheduler_registry.list_registered()}",
+                )
             )
         return v
 
@@ -192,12 +196,12 @@ class LRSchedulerConfig(BaseModel):
             LRSchedulerConfig: The validated configuration.
 
         Raises:
-            ValueError: If ReduceLROnPlateau is asked to maximise.
+            ConfigurationError: If ReduceLROnPlateau is asked to maximise.
         """
         if (self.name or "").upper() == "REDUCELRONPLATEAU" and (
             (self.params or {}).get("mode", "min") != "min"
         ):
-            raise ValueError(
+            raise ConfigurationError(
                 "ReduceLROnPlateau steps on the training loss, which falls as the "
                 "model improves, so its mode must be 'min'."
             )
@@ -220,9 +224,12 @@ class OptimizerConfig(BaseModel):
     def check_name(cls, v: str):
         """Validate name."""
         if v.upper() not in optimizer_registry.list_registered():
-            raise ValueError(
-                "The optimizer name provided is not supported. These are the "
-                f"supported optimizers: {optimizer_registry.list_registered()}"
+            raise RegistryError(
+                **optimizer_registry.unknown(
+                    v,
+                    "The optimizer name provided is not supported. These are the "
+                    f"supported optimizers: {optimizer_registry.list_registered()}",
+                )
             )
         return v
 
@@ -311,9 +318,12 @@ class Optimization(BaseModel):
     def check_strategy(cls, v: str):
         """Validate strategy."""
         if v.upper() not in search_algorithm_registry.list_registered():
-            raise ValueError(
-                "The strategy provided is not supported. These are the "
-                f"supported strategies: {search_algorithm_registry.list_registered()}"
+            raise RegistryError(
+                **search_algorithm_registry.unknown(
+                    v,
+                    "The strategy provided is not supported. These are the "
+                    f"supported strategies: {search_algorithm_registry.list_registered()}",
+                )
             )
         return v
 
@@ -331,7 +341,9 @@ class Optimization(BaseModel):
     def check_cpu_per_trial(cls, v: int):
         """Validate cpu_per_trial."""
         if v <= 0:
-            raise ValueError("Requested a number of CPU cores less or equal to zero.")
+            raise ConfigurationError(
+                "Requested a number of CPU cores less or equal to zero."
+            )
         return v
 
     @field_validator("gpu_per_trial")
@@ -343,7 +355,7 @@ class Optimization(BaseModel):
             v = 0
 
         if v > 1 and not v.is_integer():
-            raise ValueError(
+            raise ConfigurationError(
                 "Number of 'gpu_per_trial' not supported. Supported values must be "
                 "in the range (0, 1] or integer values > 1, like 2, 3, ..."
             )
@@ -355,7 +367,9 @@ class Optimization(BaseModel):
     def check_max_concurrent_trials(cls, v: Optional[int]):
         """Validate max_concurrent_trials."""
         if v is not None and v < 0:
-            raise ValueError("Requested a negative value for 'max_concurrent_trials'.")
+            raise ConfigurationError(
+                "Requested a negative value for 'max_concurrent_trials'."
+            )
 
         return v
 
@@ -382,11 +396,11 @@ class Optimization(BaseModel):
         """Checks the properties required by ASHA scheduling.
 
         Raises:
-            ValueError: If a property required by ASHA has not been provided.
+            ConfigurationError: If a property required by ASHA has not been provided.
         """
         for field in ("max_t", "grace_period", "reduction_factor"):
             if getattr(self.properties, field) is None:
-                raise ValueError(
+                raise ConfigurationError(
                     f"{field.capitalize()} property is required for ASHA scheduling. "
                     f"Change type of scheduling or provide the {field} attribute."
                 )
@@ -395,11 +409,11 @@ class Optimization(BaseModel):
         """Checks the search algorithm and the properties required by BOHB.
 
         Raises:
-            ValueError: If the strategy is not 'bohb', or if a property required
+            ConfigurationError: If the strategy is not 'bohb', or if a property required
                 by BOHB has not been provided.
         """
         if self.strategy != SearchAlgorithms.BOHB:
-            raise ValueError(
+            raise ConfigurationError(
                 "The 'bohb' scheduler pauses trials that only the 'bohb' "
                 "search algorithm can resume, so the two must be used "
                 f"together. The current strategy is '{self.strategy.value}'. "
@@ -407,7 +421,7 @@ class Optimization(BaseModel):
             )
         for field in ("max_t", "reduction_factor"):
             if getattr(self.properties, field) is None:
-                raise ValueError(
+                raise ConfigurationError(
                     f"{field.capitalize()} property is required for BOHB scheduling. "
                     f"Change type of scheduling or provide the {field} attribute."
                 )
@@ -421,11 +435,11 @@ class Optimization(BaseModel):
         """Checks the properties used by the median stopping rule.
 
         Raises:
-            ValueError: If a property required by the median stopping rule has
+            ConfigurationError: If a property required by the median stopping rule has
                 not been provided.
         """
         if self.properties.grace_period is None:
-            raise ValueError(
+            raise ConfigurationError(
                 "Grace_period property is required for median stopping scheduling. "
                 "Change type of scheduling or provide the grace_period attribute."
             )
@@ -504,7 +518,7 @@ class EarlyStopping(BaseModel):
     def check_monitor(cls, v: str):
         """Validate monitor."""
         if v not in ["score", "loss"]:
-            raise ValueError(
+            raise ConfigurationError(
                 "Value for monitor must be either 'score' or 'loss'. "
                 f"Value received: {v}"
             )
@@ -515,7 +529,7 @@ class EarlyStopping(BaseModel):
     def check_patience(cls, v: int):
         """Validate patience."""
         if v <= 0:
-            raise ValueError("Value for patience must be >0.")
+            raise ConfigurationError("Value for patience must be >0.")
         return v
 
     @field_validator("grace_period")
@@ -523,7 +537,7 @@ class EarlyStopping(BaseModel):
     def check_grace_period(cls, v: int):
         """Validate grace_period."""
         if v < 0:
-            raise ValueError("Value for grace_period must be >=0.")
+            raise ConfigurationError("Value for grace_period must be >=0.")
         return v
 
 
@@ -605,7 +619,7 @@ class RecomModel(BaseModel, ABC):
                 set(self.__class__.model_fields)
                 - {"meta", "optimization", "early_stopping"}
             )
-            raise ValueError(
+            raise ConfigurationError(
                 f"The model {_name} has no hyperparameter "
                 f"{', '.join(repr(key) for key in unknown)}. Remove it, or check "
                 f"its spelling: the hyperparameters {_name} takes are {accepted}, "
@@ -661,12 +675,15 @@ class RecomModel(BaseModel, ABC):
             name (str): The name of the model.
 
         Raises:
-            ValueError: If model is not registered.
+            RegistryError: If model is not registered.
         """
         if name.upper() not in model_registry.list_registered():
-            raise ValueError(
-                f"Model {name} not in model_registry. "
-                f"These are the available models: {model_registry.list_registered()}."
+            raise RegistryError(
+                **model_registry.unknown(
+                    name,
+                    f"Model {name} not in model_registry. "
+                    f"These are the available models: {model_registry.list_registered()}.",
+                )
             )
 
     def validate_grid_search(
@@ -682,7 +699,7 @@ class RecomModel(BaseModel, ABC):
             List[Union[str, float, int]]: The grid search validated parameter list.
 
         Raises:
-            ValueError: If the values are not of the same type.
+            ConfigurationError: If the values are not of the same type.
         """
         if isinstance(value[0], str):
             _strat: str = value[0]
@@ -690,7 +707,7 @@ class RecomModel(BaseModel, ABC):
                 value.pop(0)
         if all(isinstance(item, type(value[0])) for item in value):
             return [SearchSpace.GRID] + value
-        raise ValueError(
+        raise ConfigurationError(
             f"For the Grid Search optimization, the field {field} must "
             f"have values of the same type. "
             f"Values received: {value}."
@@ -710,7 +727,7 @@ class RecomModel(BaseModel, ABC):
             List[Union[str, float, int]]: The validated parameter list.
 
         Raises:
-            ValueError: If the range is not in a correct format.
+            ConfigurationError: If the range is not in a correct format.
         """
         # We check if a search space has been provided
         # if yes, then we validate the strategy the user provided
@@ -732,7 +749,7 @@ class RecomModel(BaseModel, ABC):
 
         # Final checks for list of values length and distribution constraint
         if len(value) < 3 or len(value) > 5:
-            raise ValueError(
+            raise ConfigurationError(
                 f"Invalid range format for field {field}. "
                 f"Expected [1.0, 5.0] or ['uniform', 1.0, 5.0]. "
                 f"Received: {value}."
@@ -830,11 +847,11 @@ class RecomModel(BaseModel, ABC):
             List[Union[str, float, int]]: The parameter in the uniform format.
 
         Raises:
-            ValueError: If values are not numbers.
+            ConfigurationError: If values are not numbers.
         """
         if all(isinstance(item, (float, int)) for item in value):
             return [SearchSpace.UNIFORM.value] + [float(item) for item in value]
-        raise ValueError(
+        raise ConfigurationError(
             f"The range for field {field} must contain numbers. Received: {value}."
         )
 
@@ -851,7 +868,7 @@ class RecomModel(BaseModel, ABC):
             List[Union[str, float, int]]: The values in uniformed format.
 
         Raises:
-            ValueError: If the SearchSpace is not in the registry.
+            ConfigurationError: If the SearchSpace is not in the registry.
         """
         # Extract the main values
         strat = value[0]  # Selected SearchSpace
@@ -859,7 +876,7 @@ class RecomModel(BaseModel, ABC):
 
         # This check is shared between all search spaces
         if f2 <= f1:
-            raise ValueError(
+            raise ConfigurationError(
                 "The upper bound must be higher than the lower bound. "
                 f"Received: {value} for field {field}"
             )
@@ -868,7 +885,7 @@ class RecomModel(BaseModel, ABC):
             case SearchSpace.QUNIFORM | SearchSpace.QRANDN | SearchSpace.QRANDINT:
                 # Check if the list of values is of expected length
                 if len(value) != 4:
-                    raise ValueError(
+                    raise ConfigurationError(
                         "Quantized distributions require 3 values: "
                         "the first and second value represent the "
                         "lower and upper bound. The third value is the quantization constant. "
@@ -878,12 +895,12 @@ class RecomModel(BaseModel, ABC):
                 # Check on the quantization constant
                 q = float(value[3])
                 if q <= 0:
-                    raise ValueError(
+                    raise ConfigurationError(
                         "The quantization constant must be positive. "
                         f"Received: {value} for field {field}"
                     )
                 if f1 % q != 0 or f2 % q != 0:
-                    raise ValueError(
+                    raise ConfigurationError(
                         "The upper and lower bound must be divisible by the "
                         "quantization factor. "
                         f"Received: {value} for field {field}"
@@ -891,7 +908,7 @@ class RecomModel(BaseModel, ABC):
             case SearchSpace.LOGUNIFORM | SearchSpace.LOGRANDINT:
                 # Check if the list of values is of expected length
                 if len(value) not in [3, 4]:
-                    raise ValueError(
+                    raise ConfigurationError(
                         "Logarithmic distributions require 2 or 3 values: "
                         "the first and second value are required and represent the "
                         "lower and upper bound. The third value is optional and is the base of "
@@ -902,14 +919,14 @@ class RecomModel(BaseModel, ABC):
                 # Check for the optional log base
                 f3 = int(value[3]) if len(value) == 4 else None
                 if f3 is not None and f3 <= 0:
-                    raise ValueError(
+                    raise ConfigurationError(
                         f"Logarithm base must be positive. "
                         f"Received: {value} for field {field}."
                     )
             case SearchSpace.QLOGUNIFORM | SearchSpace.QLOGRANDINT:
                 # Check if the list of values is of expected length
                 if len(value) not in [4, 5]:
-                    raise ValueError(
+                    raise ConfigurationError(
                         "Quantized logarithmic distributions require 3 or 4 values: "
                         "the first and second value are required and represent the "
                         "lower and upper bound. The third value is the quantization constant. "
@@ -920,12 +937,12 @@ class RecomModel(BaseModel, ABC):
                 # Check on the quantization constant
                 q = float(value[3])
                 if q <= 0:
-                    raise ValueError(
+                    raise ConfigurationError(
                         "The quantization constant must be positive. "
                         f"Received: {value} for field {field}"
                     )
                 if q > f2:
-                    raise ValueError(
+                    raise ConfigurationError(
                         "The quantization constant must be lower then "
                         "the upper bound. "
                         f"Received: {value} for field {field}"
@@ -933,7 +950,7 @@ class RecomModel(BaseModel, ABC):
                 # Check for the optional log base
                 f3 = int(value[4]) if len(value) == 5 else None
                 if f3 is not None and f3 <= 0:
-                    raise ValueError(
+                    raise ConfigurationError(
                         f"Logarithm base must be positive. "
                         f"Received: {value} for field {field}."
                     )

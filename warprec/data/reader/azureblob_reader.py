@@ -11,6 +11,7 @@ from azure.identity import DefaultAzureCredential
 from azure.core.exceptions import ResourceNotFoundError
 from azure.storage.blob import BlobServiceClient
 
+from warprec.errors import DataNotFoundError
 from warprec.data.reader.base_reader import Reader
 from warprec.utils.logger import logger
 
@@ -145,11 +146,11 @@ class AzureBlobReader(Reader):
             np.ndarray: The array, two-dimensional and float32.
 
         Raises:
-            FileNotFoundError: If the blob does not exist.
+            DataNotFoundError: If the blob does not exist.
         """
         content = self._download_blob_content(azure_blob_name, as_bytes=True)
         if content is None:
-            raise FileNotFoundError(
+            raise DataNotFoundError(
                 f"The feature blob '{azure_blob_name}' does not exist in container "
                 f"'{self.container_name}'."
             )
@@ -253,13 +254,13 @@ class AzureBlobReader(Reader):
             dict: A dictionary representing the loaded model state (e.g., weights, hyperparameters).
 
         Raises:
-            FileNotFoundError: If the model state blob is not found.
+            DataNotFoundError: If the model state blob is not found.
         """
         logger.msg(f"Loading model state from blob: {blob_name}")
         blob_content_bytes = self._download_blob_content(blob_name, as_bytes=True)
 
         if blob_content_bytes is None:
-            raise FileNotFoundError(
+            raise DataNotFoundError(
                 f"Model state blob '{blob_name}' not found in container '{self.container_name}'."
             )
 

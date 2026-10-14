@@ -4,6 +4,7 @@ import torch
 from torch import Tensor
 from torch.nn import functional as F
 
+from warprec.errors import EvaluationError
 from warprec.evaluation.metrics.base_metric import RatingMetric
 from warprec.utils.enums import MetricBlock
 from warprec.utils.registry import metric_registry
@@ -48,11 +49,11 @@ class LogLoss(RatingMetric):
             **kwargs (Any): The precomputed evaluation blocks.
 
         Raises:
-            ValueError: If the binary relevance block was not supplied.
+            EvaluationError: If the binary relevance block was not supplied.
         """
         relevance = kwargs.get("binary_relevance")
         if relevance is None:
-            raise ValueError(
+            raise EvaluationError(
                 "LogLoss needs the binary relevance of every scored item, which "
                 "the evaluator did not provide."
             )

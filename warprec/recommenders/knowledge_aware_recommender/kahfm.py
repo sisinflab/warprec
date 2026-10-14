@@ -5,6 +5,7 @@ import numpy as np
 import torch
 from torch import Tensor, nn
 
+from warprec.errors import DataError, ModelError
 from warprec.data.entities import Interactions, KnowledgeGraph, Sessions
 from warprec.recommenders.base_recommender import IterativeRecommender
 from warprec.recommenders.knowledge_aware_recommender.knowledge_utils import (
@@ -54,8 +55,8 @@ class KaHFM(KnowledgeRecommenderUtils, IterativeRecommender):
         learning_rate (float): The learning rate value.
 
     Raises:
-        ValueError: If the interactions were not provided, or no feature is
-            carried by at least min_feature_items items.
+        ModelError: If the interactions were not provided.
+        DataError: If no feature is carried by at least min_feature_items items.
     """
 
     min_feature_items: int
@@ -79,7 +80,7 @@ class KaHFM(KnowledgeRecommenderUtils, IterativeRecommender):
         super().__init__(params, info, *args, knowledge=knowledge, seed=seed, **kwargs)
 
         if interactions is None:
-            raise ValueError(
+            raise ModelError(
                 "KaHFM starts every user from the items they interacted with, so "
                 "it needs the interactions at construction."
             )
@@ -91,7 +92,7 @@ class KaHFM(KnowledgeRecommenderUtils, IterativeRecommender):
         # as hyperparameters, and a run is named after them.
         self.feature_labels: List[Tuple[Any, ...]] = labels
         if features.size(1) == 0:
-            raise ValueError(
+            raise DataError(
                 f"No feature of the knowledge graph is carried by "
                 f"{self.min_feature_items} items or more, so KaHFM has no factor "
                 "to learn. Lower min_feature_items."

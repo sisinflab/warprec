@@ -13,6 +13,7 @@ from narwhals.dataframe import DataFrame
 from torch import Tensor
 from tqdm import tqdm
 
+from warprec.errors import ConfigurationError, DataError
 from warprec.data.ranking import (
     mask_seen_pairs,
     resolve_recommendation_mask,
@@ -120,7 +121,7 @@ class Writer(ABC):
             str: The converted DataFrame to string.
 
         Raises:
-            ValueError: If the DataFrame is in a format not supported.
+            DataError: If the DataFrame is in a format not supported.
         """
         native_df = df.to_native()
 
@@ -130,7 +131,7 @@ class Writer(ABC):
         if isinstance(native_df, pd.DataFrame):
             return native_df.to_csv(sep=sep, header=header, index=False)
 
-        raise ValueError(
+        raise DataError(
             "The DataFrame is in a format not compatible with the writer. "
             f"DataFrame type: {type(native_df)}"
         )
@@ -145,7 +146,7 @@ class Writer(ABC):
             bytes: The DataFrame converted to parquet bytes.
 
         Raises:
-            ValueError: If the DataFrame type is not supported.
+            DataError: If the DataFrame type is not supported.
         """
         native_df = df.to_native()
         buffer = BytesIO()
@@ -155,7 +156,7 @@ class Writer(ABC):
         elif isinstance(native_df, pd.DataFrame):
             native_df.to_parquet(buffer, index=False)
         else:
-            raise ValueError(
+            raise DataError(
                 "The DataFrame is in a format not compatible with the writer. "
                 f"DataFrame type: {type(native_df)}"
             )
@@ -729,7 +730,7 @@ class WriterFactory:  # pylint: disable=C0415, R0903
             Writer: An instance of a class that extends the Writer abstract class.
 
         Raises:
-            ValueError: If the writing method specified in the configuration is unknown.
+            ConfigurationError: If the writing method specified in the configuration is unknown.
         """
         writer_type = config.writer.writing_method
 
@@ -764,4 +765,4 @@ class WriterFactory:  # pylint: disable=C0415, R0903
                     timestamp=timestamp,
                 )
 
-        raise ValueError(f"Unknown writer type: {writer_type}")
+        raise ConfigurationError(f"Unknown writer type: {writer_type}")

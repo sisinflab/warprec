@@ -1,6 +1,7 @@
 from typing import Optional, List, Dict, Literal
 
 from pydantic import BaseModel, Field, field_validator, model_validator
+from warprec.errors import ConfigurationError
 from warprec.utils.enums import RatingType, ReadingMethods
 from warprec.utils.config.common import check_separator, Labels
 from warprec.utils.config.training_configuration import (
@@ -128,7 +129,7 @@ class KnowledgeReading(BaseModel):
     def check_column_names(cls, v: Optional[List[str]]):
         """Validate the triple column names."""
         if v is not None and len(v) != 3:
-            raise ValueError(
+            raise ConfigurationError(
                 "A knowledge graph is read as (head, relation, tail), so "
                 f"'column_names' must name three columns, got {len(v)}."
             )
@@ -139,7 +140,7 @@ class KnowledgeReading(BaseModel):
     def check_link_column_names(cls, v: Optional[List[str]]):
         """Validate the alignment column names."""
         if v is not None and len(v) != 2:
-            raise ValueError(
+            raise ConfigurationError(
                 "The alignment pairs an item with an entity, so "
                 f"'link_column_names' must name two columns, got {len(v)}."
             )
@@ -197,13 +198,13 @@ class ModalityReading(BaseModel):
             ModalityReading: The validated configuration.
 
         Raises:
-            ValueError: If the features are an array and no row order was given.
+            ConfigurationError: If the features are an array and no row order was given.
         """
         if self.file_format != "numpy":
             return self
 
         if self.item_path is None and self.item_azure_blob_name is None:
-            raise ValueError(
+            raise ConfigurationError(
                 "A feature array carries no item identifiers, so 'item_path' "
                 "must name the file listing the item of each row."
             )
@@ -256,7 +257,7 @@ class ClusteringInformationReading(BaseModel):
             ClusteringInformationReading: The validated configuration.
 
         Raises:
-            ValueError: If neither the user nor the item file is named.
+            ConfigurationError: If neither the user nor the item file is named.
         """
         if not any(
             (
@@ -266,7 +267,7 @@ class ClusteringInformationReading(BaseModel):
                 self.item_azure_blob_name,
             )
         ):
-            raise ValueError(
+            raise ConfigurationError(
                 "'reader.clustering' names no cluster file. Set 'user_local_path', "
                 "'item_local_path' (or their Azure counterparts), or remove the "
                 "section."
@@ -368,7 +369,7 @@ class ReaderConfig(BaseModel):
         """Validates the loading strategy."""
         supported_strategies = ["dataset", "split"]
         if v not in supported_strategies:
-            raise ValueError(
+            raise ConfigurationError(
                 f"Loading strategy {v} not supported. Supported strategies: {supported_strategies}."
             )
         return v
@@ -379,7 +380,7 @@ class ReaderConfig(BaseModel):
         """Validates the data type."""
         supported_data_types = ["transaction"]
         if v not in supported_data_types:
-            raise ValueError(
+            raise ConfigurationError(
                 f"Data type {v} not supported. Supported data types: {supported_data_types}."
             )
         return v
@@ -409,12 +410,12 @@ class ReaderConfig(BaseModel):
 
         # ValueError checks
         if self.loading_strategy == "split" and not split_value:
-            raise ValueError(
+            raise ConfigurationError(
                 "You have chosen split loading strategy but the "
                 f"'reader.split.{split_key}' field has not been filled."
             )
         if self.loading_strategy == "dataset" and not dataset_value:
-            raise ValueError(
+            raise ConfigurationError(
                 "You have chosen dataset loading strategy but the "
                 f"'reader.{dataset_key}' field has not been filled."
             )

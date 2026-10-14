@@ -4,6 +4,7 @@ import numpy as np
 import torch
 from torch import Tensor
 
+from warprec.errors import DataError
 from warprec.utils.logger import logger
 
 
@@ -87,11 +88,11 @@ class MultiModalFeatures:
                 many items of the catalogue it actually covers.
 
         Raises:
-            ValueError: If the matrix and its row order disagree on how many
+            DataError: If the matrix and its row order disagree on how many
                 rows there are.
         """
         if len(row_items) != matrix.shape[0]:
-            raise ValueError(
+            raise DataError(
                 f"The features hold {matrix.shape[0]} rows but their row order "
                 f"names {len(row_items)} items. The two files do not describe "
                 "the same modality."

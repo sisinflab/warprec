@@ -1,6 +1,7 @@
 from typing import Literal, Optional
 
 from pydantic import BaseModel, field_validator
+from warprec.errors import ConfigurationError
 
 NegativeSampling = Literal["uniform", "popularity"]
 SequencePooling = Literal["mean", "sum", "max"]
@@ -45,10 +46,10 @@ class TrainingConfig(BaseModel):
             Optional[float]: The value, unchanged.
 
         Raises:
-            ValueError: If the exponent is negative.
+            ConfigurationError: If the exponent is negative.
         """
         if v is not None and v < 0:
-            raise ValueError(
+            raise ConfigurationError(
                 f"neg_alpha must not be negative, got {v}. A negative "
                 "exponent makes the rarest items the most likely negatives, which is "
                 "not what 'popularity' sampling means."

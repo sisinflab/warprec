@@ -27,14 +27,12 @@ from warprec.utils.config import RecomModel
 from warprec.utils.helpers import (
     build_evaluation_dataloader_kwargs,
     load_custom_modules,
+    model_param_from_dict,
     resolve_available_cpus,
     resolve_num_workers,
     retrieve_evaluation_dataloader,
 )
-from warprec.utils.registry import (
-    model_registry,
-    params_registry,
-)
+from warprec.utils.registry import model_registry
 from warprec.utils.logger import logger
 
 
@@ -132,11 +130,7 @@ def _run_trial(config: dict) -> None:  # pylint: disable = too-many-locals
     )
 
     # Trial parameter configuration check for consistency
-    model_params: RecomModel = (
-        params_registry.get(model_name, **params)
-        if model_name.upper() in params_registry.list_registered()
-        else RecomModel(**params)
-    )
+    model_params: RecomModel = model_param_from_dict(model_name, params)
     if model_params.need_single_trial_validation:
         try:
             model_params.validate_single_trial_params()

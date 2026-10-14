@@ -4,6 +4,7 @@ from typing import Any, Optional, Tuple
 import torch
 from torch import nn, Tensor
 
+from warprec.errors import ConfigurationError
 from warprec.recommenders.base_recommender import (
     IterativeRecommender,
     SequentialRecommenderUtils,
@@ -383,7 +384,7 @@ class CL4SRec(IterativeRecommender, SequentialRecommenderUtils):
             z_i = torch.nn.functional.normalize(z_i, dim=1)
             z_j = torch.nn.functional.normalize(z_j, dim=1)
         elif sim != "dot":
-            raise ValueError(f"Unknown similarity metric: {sim}")
+            raise ConfigurationError(f"Unknown similarity metric: {sim}")
         return torch.cat([z_i, z_j], dim=0)
 
     def _info_nce(

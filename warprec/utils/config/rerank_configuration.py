@@ -2,6 +2,7 @@ from typing import Any, Dict, Optional
 
 from pydantic import BaseModel, Field, field_validator
 
+from warprec.errors import ConfigurationError, RegistryError
 from warprec.utils.registry import reranker_registry
 
 
@@ -32,9 +33,12 @@ class RerankConfig(BaseModel):
         if v is None:
             return None
         if v.upper() not in reranker_registry.list_registered():
-            raise ValueError(
-                f"Re-ranker {v} not found in registry. Registered: "
-                f"{reranker_registry.list_registered()}."
+            raise RegistryError(
+                **reranker_registry.unknown(
+                    v,
+                    f"Re-ranker {v} not found in registry. Registered: "
+                    f"{reranker_registry.list_registered()}.",
+                )
             )
         return v
 
@@ -43,7 +47,9 @@ class RerankConfig(BaseModel):
     def validate_pool(cls, v: int):
         """Validate the candidate pool."""
         if v < 1:
-            raise ValueError(f"A re-ranking pool must hold at least one item, got {v}.")
+            raise ConfigurationError(
+                f"A re-ranking pool must hold at least one item, got {v}."
+            )
         return v
 
     def enabled(self) -> bool:

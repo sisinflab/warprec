@@ -4,6 +4,7 @@ from typing import Tuple, Any, Optional
 import torch
 from torch import nn, Tensor
 
+from warprec.errors import ConfigurationError
 from warprec.data.entities import Interactions, Sessions
 from warprec.recommenders.base_recommender import IterativeRecommender
 from warprec.recommenders.collaborative_filtering_recommender.graph_based import (
@@ -41,7 +42,7 @@ class EGCF(IterativeRecommender, GraphRecommenderUtils):
         learning_rate (float): The learning rate value.
 
     Raises:
-        ValueError: If the mode is not supported.
+        ConfigurationError: If the mode is not supported.
     """
 
     # Model hyperparameters
@@ -67,7 +68,7 @@ class EGCF(IterativeRecommender, GraphRecommenderUtils):
         super().__init__(params, info, *args, seed=seed, **kwargs)
 
         if self.mode not in ["parallel", "alternating"]:
-            raise ValueError(
+            raise ConfigurationError(
                 f"Unsupported mode: {self.mode}. Available modes are 'parallel' and 'alternating'."
             )
 

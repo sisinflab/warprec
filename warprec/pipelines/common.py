@@ -4,6 +4,7 @@ from typing import Any, Dict, List, Optional, Tuple
 
 import ray
 
+from warprec.errors import ClusterError, ConfigurationError, RunStateError
 import warprec
 from warprec.common import (
     RunState,
@@ -68,7 +69,7 @@ def initialise_ray(config: TrainConfiguration) -> None:
         config (TrainConfiguration): The configuration of the experiment.
 
     Raises:
-        ConnectionError: If unable to connect to the Ray cluster.
+        ClusterError: If unable to connect to the Ray cluster.
     """
     # WarpRec is shipped as the package that is imported here, wherever it is
     # installed, rather than as a path that exists only when WarpRec is run
@@ -82,7 +83,7 @@ def initialise_ray(config: TrainConfiguration) -> None:
         )
         logger.positive("Connected to existing Ray cluster.")
     except ConnectionError as e:
-        raise ConnectionError(
+        raise ClusterError(
             "Unable to connect to Ray cluster. Please ensure Ray is running."
         ) from e
 
@@ -106,7 +107,7 @@ def resolve_run_state(
         RunState: The resumed state, or a fresh one.
 
     Raises:
-        ValueError: If resume is set to 'force' and no usable state exists.
+        RunStateError: If resume is set to 'force' and no usable state exists.
     """
     fingerprint = run_fingerprint(config)
     state_store = RunStateStore(probe_writer, run_name)
@@ -127,12 +128,12 @@ def resolve_run_state(
             "changed). It cannot be resumed."
         )
         if config.run.resume == ResumeMode.FORCE:
-            raise ValueError(message)
+            raise RunStateError(message)
         logger.attention(f"{message} The run will start from scratch.")
         previous_state = None
 
     if previous_state is None and config.run.resume == ResumeMode.FORCE:
-        raise ValueError(
+        raise RunStateError(
             "Resume is set to 'force' but no resumable state was found for run "
             f"'{run_name}' at {state_store.state_path}."
         )
@@ -217,7 +218,7 @@ def prepare_datasets(
             dataset, the validation dataset and the cross-validation folds.
 
     Raises:
-        ValueError: If the configured split file format is not supported.
+        ConfigurationError: If the configured split file format is not supported.
     """
     config = context.config
     cpu_data_prep = config.general.cpu_data_prep
@@ -258,7 +259,7 @@ def prepare_datasets(
                     **config.writer.split.model_dump(),
                 )
             case _:
-                raise ValueError(f"File format '{file_format}'not supported.")
+                raise ConfigurationError(f"File format '{file_format}'not supported.")
 
     return main_dataset, val_dataset, fold_dataset
 

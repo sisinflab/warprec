@@ -2,6 +2,7 @@ import os
 from typing import Optional, List, Literal
 
 from pydantic import BaseModel, Field, field_validator, model_validator
+from warprec.errors import ConfigurationError
 from warprec.utils.config.common import check_separator
 from warprec.utils.enums import WritingMethods
 
@@ -119,13 +120,13 @@ class WriterConfig(BaseModel):
         """Validation of the WriterConfig model."""
         if self.writing_method == WritingMethods.LOCAL:
             if not self.local_experiment_path:
-                raise ValueError(
+                raise ConfigurationError(
                     "When choosing local writing method a local path must be provided."
                 )
             try:
                 os.makedirs(self.local_experiment_path, exist_ok=True)
             except OSError as e:
-                raise ValueError(
+                raise ConfigurationError(
                     f"The local path provided {self.local_experiment_path} "
                     f"is not accessible or writable. Error: {e}"
                 ) from e

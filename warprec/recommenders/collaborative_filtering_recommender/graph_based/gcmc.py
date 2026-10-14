@@ -6,6 +6,7 @@ import torch.nn.functional as F
 from torch import nn, Tensor
 from torch.nn import Module
 
+from warprec.errors import DataError
 from warprec.data.entities import Interactions, Sessions
 from warprec.recommenders.base_recommender import (
     IterativeRecommender,
@@ -97,7 +98,7 @@ class GCMC(IterativeRecommender, GraphRecommenderUtils):
         learning_rate (float): The learning rate value.
 
     Raises:
-        ValueError: If the dataset does not have explicit rating.
+        DataError: If the dataset does not have explicit rating.
     """
 
     # Model hyperparameters
@@ -126,7 +127,7 @@ class GCMC(IterativeRecommender, GraphRecommenderUtils):
         unique_ratings = interactions.get_unique_ratings()
         self.n_ratings = len(unique_ratings)
         if self.n_ratings == 0:
-            raise ValueError(
+            raise DataError(
                 "GCMC model requires explicit feedback with at least one rating value."
             )
 

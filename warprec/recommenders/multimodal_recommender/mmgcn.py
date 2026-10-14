@@ -5,6 +5,7 @@ import torch
 from torch import Tensor, nn
 from torch.nn import functional as F
 
+from warprec.errors import ModelError
 from warprec.data.entities import Interactions, MultiModalFeatures, Sessions
 from warprec.recommenders.base_recommender import IterativeRecommender
 from warprec.recommenders.multimodal_recommender.multimodal_utils import (
@@ -113,7 +114,7 @@ class MMGCN(MultiModalRecommenderUtils, IterativeRecommender):
         adjacency (Tensor): The row-normalised bipartite adjacency.
 
     Raises:
-        ValueError: If the training interactions were not provided.
+        ModelError: If the training interactions were not provided.
     """
 
     embedding_size: int
@@ -140,7 +141,7 @@ class MMGCN(MultiModalRecommenderUtils, IterativeRecommender):
         super().__init__(params, info, *args, multimodal=multimodal, **kwargs)
 
         if interactions is None:
-            raise ValueError(
+            raise ModelError(
                 "MMGCN propagates over the interactions, so it needs them at "
                 "construction."
             )

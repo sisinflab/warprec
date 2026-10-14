@@ -9,6 +9,7 @@ from torch.utils.data import DataLoader
 from torch.nn.utils.rnn import pad_sequence
 from scipy.sparse import csr_matrix
 
+from warprec.errors import DataError
 from warprec.data.entities.common import (
     ITEM_INDEX,
     USER_INDEX,
@@ -43,9 +44,9 @@ class Sessions:
     ):
         # Validation
         if user_id_label not in data.columns:
-            raise ValueError(f"User column '{user_id_label}' not found.")
+            raise DataError(f"User column '{user_id_label}' not found.")
         if item_id_label not in data.columns:
-            raise ValueError(f"Item column '{item_id_label}' not found.")
+            raise DataError(f"Item column '{item_id_label}' not found.")
 
         # Configuration
         self._inter_df = data
@@ -180,7 +181,7 @@ class Sessions:
         kept, because both sequential loaders ask for the same thing.
 
         Raises:
-            ValueError: If no position in the data has a predecessor.
+            DataError: If no position in the data has a predecessor.
         """
         if self._valid_sample_indices is None:
             positions = np.arange(len(self._flat_items))
@@ -193,7 +194,7 @@ class Sessions:
             self._valid_sample_indices = positions[usable]
 
         if len(self._valid_sample_indices) == 0:
-            raise ValueError(
+            raise DataError(
                 "No valid sequences found (min 2 interactions per user needed)."
             )
 
@@ -280,7 +281,7 @@ class Sessions:
         valid_users = np.where(user_lens >= 2)[0]
 
         if len(valid_users) == 0:
-            raise ValueError("No valid sliding windows found.")
+            raise DataError("No valid sliding windows found.")
 
         valid_lens = user_lens[valid_users]
         valid_starts = self._user_offsets[valid_users]
@@ -351,7 +352,7 @@ class Sessions:
         valid_users = np.where(user_lens >= 2)[0]
 
         if len(valid_users) == 0:
-            raise ValueError("No valid users with >= 2 interactions found.")
+            raise DataError("No valid users with >= 2 interactions found.")
 
         # Use the last available window for Cloze task
         user_starts = self._user_offsets[valid_users]
