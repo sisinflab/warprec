@@ -18,7 +18,7 @@ WarpRec ensures strict code portability from local prototyping to industrial dep
 
 ### Green AI
 
-WarpRec is the first Recommender Systems framework to enforce ecological accountability by natively integrating [CodeCarbon](https://mlco2.github.io/codecarbon/). Every training trial can be profiled for real-time energy consumption (CPU, GPU, RAM) and CO2 emissions, enabling researchers to report the environmental cost of their experiments alongside traditional performance metrics.
+WarpRec is the first Recommender Systems framework to enforce ecological accountability by natively integrating [CodeCarbon](https://mlco2.github.io/codecarbon/). A run's energy consumption (CPU, GPU, RAM) and CO2 emissions can be measured on every node of the cluster for the whole run, or for each trial's training processes, enabling researchers to report the environmental cost of their experiments alongside traditional performance metrics.
 
 ### Agentic Readiness
 

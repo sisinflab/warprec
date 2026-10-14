@@ -14,6 +14,11 @@ from ray import tune
 from ray.air.integrations.mlflow import MLflowLoggerCallback
 from ray.air.integrations.wandb import WandbLoggerCallback
 
+from warprec.recommenders.trainer.emissions import (
+    EmissionsRecorder,
+    EmissionsSettings,
+)
+
 
 class WarpRecWandbLoggerCallback(WandbLoggerCallback):
     """Ray's W&B callback, closing the runs of the trials still open at the end.
@@ -140,39 +145,74 @@ def trial_emissions(
 
 
 class CodeCarbonCallback(tune.Callback):
-    """Custom CodeCarbon callback for Ray Tune.
+    """CodeCarbon for a Ray Tune search.
 
-    The tracker of a trial is stopped, and its emissions written, when the trial
-    completes or fails, or when the experiment ends with the trial still
-    running, as an interrupted sweep does.
+    With 'machine' tracking the Ray nodes are measured for the whole run by the
+    run's 'EmissionsRecorder', which the train and swarm pipelines start before
+    they prepare the data and hand over as 'settings'. A search run without
+    one, from a 'Trainer' used on its own, measures the nodes itself, from the
+    moment its trials are set up to the end of the search.
 
-    With 'machine' tracking the trackers run here, on the driver, since the
-    machine is the same from any process on it. With 'process' tracking each
-    trial measures the process it trains in (see 'trial_emissions'), and this
-    callback only appends the rows the trials leave to 'emissions.csv'.
+    With 'process' tracking each trial measures the process it trains in (see
+    'trial_emissions'), and this callback appends the rows the trials leave
+    to 'emissions.csv' when a trial completes or fails, or when the search
+    ends with the trial still running, as an interrupted sweep does.
+
+    Args:
+        save_to_api (bool): Whether to send the emissions to the CodeCarbon API.
+        save_to_file (bool): Whether to write the rows to 'emissions.csv'.
+        output_dir (str): The folder of 'emissions.csv'.
+        tracking_mode (str): CodeCarbon's tracking mode, 'machine' or 'process'.
+        project_name (Optional[str]): The project name of the rows, the run's
+            name. Defaults to 'warprec'.
+        settings (Optional[EmissionsSettings]): The measurement of the run the
+            search belongs to, or None when the search measures itself.
     """
 
     def __init__(
         self,
-        save_to_api=False,
-        save_to_file=False,
-        output_dir="./",
-        tracking_mode="machine",
+        save_to_api: bool = False,
+        save_to_file: bool = False,
+        output_dir: str = "./",
+        tracking_mode: str = "machine",
+        project_name: Optional[str] = None,
+        settings: Optional[EmissionsSettings] = None,
     ):
         self.save_to_api = save_to_api
         self.save_to_file = save_to_file
         self.output_dir = output_dir
         self.tracking_mode = tracking_mode
-        self.trackers: Dict[str, EmissionsTracker] = {}
+        self.project_name = project_name or "warprec"
+        self.settings = settings
+        self._recorder: Optional[EmissionsRecorder] = None
         os.makedirs(self.output_dir, exist_ok=True)
 
-    def trial_settings(self) -> Optional[Dict[str, Any]]:
+    def trial_settings(self, num_workers: int = 1) -> Optional[Dict[str, Any]]:
         """What a trial needs to measure itself.
+
+        Called as the search is set up: a search measuring the nodes itself
+        starts doing so here.
+
+        Args:
+            num_workers (int): The Ray Train workers of each trial.
 
         Returns:
             Optional[Dict[str, Any]]: The settings 'trial_emissions' takes, or
-                None when the trials are measured from the driver.
+                None when the trials are not measured one by one.
         """
+        if (
+            self.settings is None
+            and self.tracking_mode == "machine"
+            and self._recorder is None
+        ):
+            self._recorder = EmissionsRecorder(
+                tracking_mode=self.tracking_mode,
+                save_to_api=self.save_to_api,
+                save_to_file=self.save_to_file,
+                output_dir=self.output_dir,
+                project_name=self.project_name,
+            )
+            self._recorder.start()
         if self.tracking_mode != "process":
             return None
         return {
@@ -203,37 +243,17 @@ class CodeCarbonCallback(tune.Callback):
         if not os.listdir(folder):
             os.rmdir(folder)
 
-    def on_trial_start(self, iteration, trials, trial, **info):
-        if self.tracking_mode == "process":
-            return
-        tracker = EmissionsTracker(
-            project_name=trial.trial_id,  # Tag each row with its trial
-            save_to_api=self.save_to_api,
-            save_to_file=self.save_to_file,
-            output_dir=self.output_dir,
-            tracking_mode=self.tracking_mode,
-            log_level="error",  # Reduce noise
-        )
-        tracker.start()
-        self.trackers[trial.trial_id] = tracker
-
     def on_trial_complete(self, iteration, trials, trial, **info):
-        self._stop_tracker(trial.trial_id)
-        if self.save_to_file:
+        if self.tracking_mode == "process" and self.save_to_file:
             self._write_trial_rows(trial.trial_id)
 
     def on_trial_error(self, iteration, trials, trial, **info):
-        self._stop_tracker(trial.trial_id)
-        if self.save_to_file:
+        if self.tracking_mode == "process" and self.save_to_file:
             self._write_trial_rows(trial.trial_id)
 
     def on_experiment_end(self, trials, **info):
-        for trial_id in list(self.trackers):
-            self._stop_tracker(trial_id)
-        if self.save_to_file:
+        if self.tracking_mode == "process" and self.save_to_file:
             self._write_trial_rows()
-
-    def _stop_tracker(self, trial_id):
-        tracker = self.trackers.pop(trial_id, None)
-        if tracker:
-            tracker.stop()
+        if self._recorder is not None:
+            self._recorder.stop()
+            self._recorder = None

@@ -148,7 +148,6 @@ dashboard:
     codecarbon:
         enabled: true
         save_to_file: true
-        output_dir: ./carbon_reports/
 models:
     LightGCN:
         optimization:
@@ -203,7 +202,7 @@ evaluation:
 - **Hyperparameter search spaces:** Lists (e.g., `[64, 128, 256]`) define discrete choices; `[uniform, min, max]` defines continuous ranges sampled by HyperOpt.
 - **HyperOpt + ASHA:** Bayesian optimization with aggressive early stopping of underperforming trials.
 - **Statistical testing:** Wilcoxon signed-rank test with Bonferroni and FDR corrections, automatically applied across all model pairs.
-- **Green AI:** CodeCarbon tracks energy consumption and CO2 emissions per trial.
+- **Green AI:** CodeCarbon tracks the energy consumption and CO2 emissions of every Ray node over the whole run.
 
 **Step 3: Run the experiment.**
 

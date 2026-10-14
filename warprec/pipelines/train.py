@@ -1,5 +1,5 @@
 import time
-from typing import List, Optional, Dict, Any
+from typing import TYPE_CHECKING, List, Optional, Dict, Any
 
 import ray
 
@@ -11,7 +11,9 @@ from warprec.common import (
 )
 from warprec.data import Dataset
 from warprec.pipelines.common import (
+    PipelineContext,
     bootstrap_pipeline,
+    measure_emissions,
     prepare_datasets,
     report_statistical_significance,
     write_model_outputs,
@@ -32,6 +34,9 @@ from warprec.utils.helpers import (
 from warprec.utils.pause import PauseController, RunPaused
 from warprec.utils.logger import logger
 from warprec.recommenders.trainer import Trainer, TrainingOutcome
+
+if TYPE_CHECKING:
+    from warprec.recommenders.trainer.emissions import EmissionsSettings
 
 
 def resolve_model_outcome(
@@ -115,6 +120,20 @@ def train_pipeline(path: str):
         path (str): Path to the configuration file.
     """
     context = bootstrap_pipeline(path, "train", "Starting experiment.")
+    with measure_emissions(context) as emissions:
+        _train_models(context, emissions)
+
+
+def _train_models(
+    context: PipelineContext, emissions: Optional["EmissionsSettings"]
+) -> None:
+    """Prepare the data, then optimize, evaluate and write every model.
+
+    Args:
+        context (PipelineContext): The context produced by the bootstrap.
+        emissions (Optional[EmissionsSettings]): The run's CodeCarbon
+            measurement, or None when the run is not measured.
+    """
     config = context.config
 
     # Build the datasets on the cluster and persist the splits if asked to
@@ -184,6 +203,7 @@ def train_pipeline(path: str):
                     run_name=context.run_name,
                     errored_trials=config.run.errored_trials,
                     resumable=resumable,
+                    emissions=emissions,
                 )
                 model_state.tune_experiment_name = trainer.experiment_name(model_name)
 

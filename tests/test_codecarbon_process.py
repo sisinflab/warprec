@@ -10,7 +10,7 @@ the driver only writes the rows to 'emissions.csv'.
 import time
 from pathlib import Path
 from types import SimpleNamespace
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 
 import pandas as pd
 import pytest
@@ -24,6 +24,7 @@ from warprec.recommenders.trainer.dashboard_callbacks import (  # noqa: E402
     CodeCarbonCallback,
     trial_emissions,
 )
+from warprec.recommenders.trainer.emissions import EmissionsSettings  # noqa: E402
 from warprec.utils.config import DashboardConfig  # noqa: E402
 from warprec.utils.config.evaluation_configuration import (  # noqa: E402
     EvaluationConfig,
@@ -36,6 +37,7 @@ def _trial_bundle(
     dataset: Dataset,
     tmp_path: Path,
     tracking_mode: str,
+    emissions: Optional[EmissionsSettings] = None,
 ) -> Dict[str, Any]:
     """The data a train-pipeline trial receives, with CodeCarbon enabled.
 
@@ -44,6 +46,8 @@ def _trial_bundle(
         dataset (Dataset): The dataset to optimise on.
         tmp_path (Path): Where Ray Tune would store its results.
         tracking_mode (str): CodeCarbon's tracking mode.
+        emissions (Optional[EmissionsSettings]): The measurement of the run
+            the search belongs to.
 
     Returns:
         Dict[str, Any]: The data bundle of the trials.
@@ -76,7 +80,7 @@ def _trial_bundle(
         }
     )
     trainer_module.Trainer(
-        storage_path=str(tmp_path), dashboard_config=dashboard
+        storage_path=str(tmp_path), dashboard_config=dashboard, emissions=emissions
     )._setup_tuner(
         model_name="BPR",
         params=params,
@@ -96,7 +100,13 @@ def test_process_tracking_travels_to_the_trial(
 ):
     """The trials are told to measure themselves under 'process' tracking only."""
     process = _trial_bundle(monkeypatch, dataset, tmp_path, "process")
-    machine = _trial_bundle(monkeypatch, dataset, tmp_path, "machine")
+    machine = _trial_bundle(
+        monkeypatch,
+        dataset,
+        tmp_path,
+        "machine",
+        EmissionsSettings(tracking_mode="machine", save_to_api=False, project_name="r"),
+    )
 
     assert process["codecarbon"] == {
         "save_to_api": False,
@@ -114,7 +124,6 @@ def test_the_driver_writes_the_row_the_trial_measured(tmp_path: Path):
     trial = SimpleNamespace(trial_id="abc_00000")
 
     callback.on_trial_start(iteration=0, trials=[trial], trial=trial)
-    assert not callback.trackers
 
     # What the trial process does around its training
     with trial_emissions(callback.trial_settings(), trial.trial_id):

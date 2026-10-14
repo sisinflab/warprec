@@ -60,7 +60,6 @@ dashboard:
     codecarbon:
         enabled: true
         save_to_file: true
-        output_dir: ./carbon_reports/
 models:
     LightGCN:
         optimization:

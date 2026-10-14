@@ -35,7 +35,7 @@ WarpRec resolves these four gaps through a unified, backend-agnostic architectur
 | Gap | WarpRec Solution |
 |---|---|
 | **Academic / Industrial** | Backend-agnostic design via Narwhals. Models transition seamlessly from local debugging to distributed training on Ray clusters. |
-| **Green AI** | Native CodeCarbon integration for real-time energy tracking and carbon-emission profiling at the trial level. |
+| **Green AI** | Native CodeCarbon integration for energy tracking and carbon-emission profiling of every cluster node over a whole run, or of each trial's training processes. |
 | **Agentic AI** | Native Model Context Protocol (MCP) server that exposes trained models as queryable tools for LLMs and autonomous agents. |
 | **Scientific Rigor** | Automated hypothesis testing (Wilcoxon, t-test, Mann-Whitney U) with Bonferroni, Holm-Bonferroni, and FDR corrections. |
 
