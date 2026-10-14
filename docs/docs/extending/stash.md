@@ -70,6 +70,13 @@ The stash is passed as keyword arguments to every model and, through the evaluat
 
 `add_to_stash` raises an [`ExtensionError`](../api-reference/errors.md) (a `ValueError`) naming the key as soon as one is added. An entry written into the dictionary `get_stash()` returns is checked where the stash is passed on, when a model or the evaluator is built.
 
-!!! note
+### Entries named like a metric's parameter
 
-    Every metric receives the whole stash, so an entry named like a metric's own parameter (for example `relevance` for EPC and EFD) sets that parameter for every metric that has it. Give stash entries names specific to your data, such as `item_images`.
+Every metric receives the whole stash, so an entry named like a parameter of a metric's constructor sets that parameter. That is how a metric of your own reads an entry: it declares a parameter with the entry's name, as `NewReleaseShare` declares `item_year` in the [callbacks guide](../guides/callbacks-and-custom-pipelines.md).
+
+An entry is refused instead, when the evaluator is built, with an [`ExtensionError`](../api-reference/errors.md) naming the entry and the configured metrics it would reach, when it has the name of:
+
+- a parameter of a built-in metric configured in the run, or of a metric a configured one is built from (the metrics of `F1`, `Hypervolume` and `EucDistance`): for example `relevance` with EPC or EFD, which would otherwise switch them to discounted relevance without a word;
+- a parameter the configuration gives a metric in `complex_metrics.params`, which the entry would clash with.
+
+A parameter belongs to the class nearest in the hierarchy that declares it, so a metric of your own that extends a built-in and declares the parameter again receives the entry. Give stash entries names specific to your data, such as `item_images`, and no other metric is affected.

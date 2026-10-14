@@ -7,7 +7,7 @@ wrong thing, or failed far from its cause, now either works or says what to do.
 import sys
 import uuid
 from pathlib import Path
-from typing import Any, ClassVar, Dict, Optional, Set
+from typing import Any, ClassVar, Dict, List, Optional, Set
 
 import numpy as np
 import pandas as pd
@@ -18,11 +18,15 @@ from torch import Tensor
 import warprec.evaluation  # noqa: F401  (populates the metric registry)
 from warprec.data.dataset import Dataset
 from warprec.data.stash import METRIC_ARGUMENTS
+from warprec.errors import ExtensionError
 from warprec.evaluation import Evaluator
+from warprec.evaluation.metrics.accuracy.recall import Recall
 from warprec.evaluation.metrics.base_metric import TopKMetric, UserAverageTopKMetric
+from warprec.evaluation.metrics.bias.aplt import APLT
 from warprec.pipelines.eval import _load_or_build_model
 from warprec.recommenders.base_recommender import Recommender
 from warprec.recommenders.trainer.trainer import Trainer
+from warprec.utils.config.evaluation_configuration import ComplexMetricConfig
 from warprec.utils.config.model_configuration import FLOAT_FIELD, INT_FIELD, RecomModel
 from warprec.utils.enums import MetricBlock, RatingType, SearchSpace
 from warprec.utils.helpers import load_custom_modules
@@ -186,7 +190,7 @@ def test_an_undeclared_user_average_metric_evaluates_alone(ranking_dataset: Data
             """
             return top_k_rel.sum(dim=1) / target.sum(dim=1).clamp(min=1)
 
-    mine = evaluate_alone(name, ranking_dataset)["MyRecall"]
+    mine = evaluate_alone(name, ranking_dataset)[name]
     builtin = evaluate_alone("Recall", ranking_dataset)["Recall"]
 
     torch.testing.assert_close(mine, builtin, equal_nan=True)
@@ -228,10 +232,64 @@ def test_an_undeclared_metric_reading_the_top_k_evaluates_alone(
             """
             return {self.name: float((self.seen > 0).sum())}
 
-    mine = evaluate_alone(name, ranking_dataset)["MyCoverage"]
+    mine = evaluate_alone(name, ranking_dataset)[name]
     builtin = evaluate_alone("ItemCoverage", ranking_dataset)["ItemCoverage"]
 
     assert mine == float(builtin)
+
+
+def test_a_metric_reports_under_the_name_it_is_registered_under(
+    ranking_dataset: Dataset,
+):
+    """A class Foo registered as 'MyName' used to report 'Foo@k'."""
+    name = unique_name("MyName")
+
+    @metric_registry.register(name)
+    class Foo(Recall):  # pylint: disable=unused-variable
+        """Recall, under a name of its own."""
+
+    results = evaluate_alone(name.lower(), ranking_dataset)
+
+    assert set(results) == {name}
+    torch.testing.assert_close(
+        results[name],
+        evaluate_alone("Recall", ranking_dataset)["Recall"],
+        equal_nan=True,
+    )
+
+
+def test_a_parametrised_name_starts_with_the_registered_name(
+    ranking_dataset: Dataset,
+):
+    """A metric naming itself after its parameters builds on the registered name."""
+    name = unique_name("MyLongTail")
+
+    @metric_registry.register(name)
+    class Tail(APLT):  # pylint: disable=unused-variable
+        """APLT, under a name of its own."""
+
+    evaluator = Evaluator(
+        [],
+        [5],
+        train_set=ranking_dataset.train_set.get_sparse(),
+        complex_metrics=[ComplexMetricConfig(name=name, params={"pop_ratio": 0.5})],
+    )
+    evaluator.evaluate(
+        model=_TiedScoreRecommender({}, ranking_dataset.info()),
+        dataloader=ranking_dataset.get_evaluation_dataloader(),
+        strategy="full",
+        dataset=ranking_dataset,
+    )
+
+    assert set(evaluator.compute_results()[5]) == {f"{name}[Pop50%]"}
+
+
+@pytest.mark.parametrize("key", metric_registry.list_registered())
+def test_a_built_in_metric_reports_under_its_class_name(key: str):
+    """Every built-in is registered under its class name, which stays its key."""
+    cls = metric_registry.get_class(key)
+
+    assert cls.registered_name() == cls.__name__
 
 
 def test_a_metric_updated_without_its_blocks_computes_them():
@@ -424,6 +482,125 @@ def test_the_reserved_metric_names_are_those_the_evaluator_passes(
     )
 
     assert set(evaluator.common_params) | {"k"} == METRIC_ARGUMENTS
+
+
+def build_with_stash(
+    dataset: Dataset,
+    stash: Dict[str, Any],
+    metrics: List[str],
+    complex_metrics: Optional[List[ComplexMetricConfig]] = None,
+) -> Evaluator:
+    """Build an evaluator handed the given stash, at k=5.
+
+    Args:
+        dataset (Dataset): The dataset whose training set the metrics read.
+        stash (Dict[str, Any]): The stash.
+        metrics (List[str]): The metrics configured by name.
+        complex_metrics (Optional[List[ComplexMetricConfig]]): The metrics
+            configured with parameters.
+
+    Returns:
+        Evaluator: The evaluator.
+    """
+    return Evaluator(
+        metrics,
+        [5],
+        train_set=dataset.train_set.get_sparse(),
+        complex_metrics=complex_metrics,
+        additional_data=stash,
+    )
+
+
+def test_a_stash_entry_named_like_a_built_in_parameter_is_refused(
+    ranking_dataset: Dataset,
+):
+    """A 'relevance' entry used to switch EPC and EFD to discounted relevance."""
+    with pytest.raises(ExtensionError, match="'relevance'") as error:
+        build_with_stash(
+            ranking_dataset, {"relevance": "discounted"}, ["nDCG", "EPC", "EFD"]
+        )
+
+    message = str(error.value)
+    assert "EPC" in message and "EFD" in message and "nDCG" not in message
+
+
+def test_a_stash_entry_no_configured_metric_takes_is_accepted(
+    ranking_dataset: Dataset,
+):
+    """The same entry is harmless when no configured metric has that parameter."""
+    build_with_stash(ranking_dataset, {"relevance": "discounted"}, ["nDCG"])
+
+
+def test_a_stash_entry_reaching_a_sub_metric_is_refused(ranking_dataset: Dataset):
+    """A composite hands the stash on to the metrics it is built from."""
+    hypervolume = ComplexMetricConfig(
+        name="Hypervolume",
+        params={
+            "metric_names": ["nDCG", "EPC"],
+            "nadir_points": [0.0, 0.0],
+            "higher_is_better": [True, True],
+        },
+    )
+
+    with pytest.raises(ExtensionError, match="'relevance'.*Hypervolume"):
+        build_with_stash(
+            ranking_dataset, {"relevance": "discounted"}, [], [hypervolume]
+        )
+
+
+def register_stash_metric() -> str:
+    """Register a metric that declares a parameter to receive a stash entry.
+
+    Returns:
+        str: The name the metric is registered under.
+    """
+    name = unique_name("StashReader")
+
+    @metric_registry.register(name)
+    class StashReader(Recall):  # pylint: disable=unused-variable
+        """Recall, keeping the stash entry and the parameter it is configured with."""
+
+        def __init__(
+            self,
+            k: int,
+            num_users: int,
+            item_year: Any = None,
+            persistence: float = 0.5,
+            **kwargs: Any,
+        ):
+            super().__init__(k, num_users, **kwargs)
+            self.item_year = item_year
+            self.persistence = persistence
+
+    return name
+
+
+def test_a_metric_declaring_a_stash_entry_still_receives_it(
+    ranking_dataset: Dataset,
+):
+    """The stash exists to reach the metrics of your own that ask for it."""
+    name = register_stash_metric()
+
+    evaluator = build_with_stash(ranking_dataset, {"item_year": "years"}, [name])
+
+    assert evaluator.metrics[5][0].item_year == "years"
+
+
+def test_a_stash_entry_named_like_a_configured_parameter_is_refused(
+    ranking_dataset: Dataset,
+):
+    """The configuration and the stash would both set it; Python used to fail."""
+    name = register_stash_metric()
+
+    with pytest.raises(ExtensionError, match="'persistence'") as error:
+        build_with_stash(
+            ranking_dataset,
+            {"persistence": 0.9},
+            [],
+            [ComplexMetricConfig(name=name, params={"persistence": 0.7})],
+        )
+
+    assert name in str(error.value)
 
 
 def register_constant_metric(value: Any) -> str:

@@ -29,6 +29,21 @@ from warprec.utils.logger import logger
 from warprec.utils.registry import metric_registry
 
 
+def _sub_metric_names(name: str, params: Dict[str, Any]) -> List[str]:
+    """The metrics a configured metric is built from, if it is registered.
+
+    Args:
+        name (str): The configured metric.
+        params (Dict[str, Any]): Its parameters.
+
+    Returns:
+        List[str]: The names of the metrics it builds.
+    """
+    if name.upper() not in metric_registry.list_registered():
+        return []
+    return metric_registry.get_class(name).sub_metric_names(params)
+
+
 class Evaluator:
     """Evaluator class will evaluate a trained model on a given
     set of metrics, taking into account the cutoff.
@@ -140,8 +155,66 @@ class Evaluator:
         check_stash(
             additional_data, {"k", *self.common_params, *METRIC_ARGUMENTS}, "metric"
         )
+        self._check_stash_parameters(additional_data, metric_list, complex_metrics)
         self.common_params.update(additional_data)
         self._init_metrics(metric_list, complex_metrics)
+
+    @staticmethod
+    def _check_stash_parameters(
+        stash: Dict[str, Any],
+        metric_list: List[str],
+        complex_metrics: Optional[List[ComplexMetricConfig]],
+    ) -> None:
+        """Refuse a stash entry that would set a parameter already set.
+
+        Every metric receives the whole stash as keyword arguments. An entry
+        named like a parameter a configured metric (or a metric it is built
+        from) takes from WarpRec, e.g. EPC's 'relevance', would silently set it
+        for every such metric, and one named like a parameter the
+        configuration gives a metric would clash with it. An entry named like
+        a parameter only a metric of your own declares is the way that metric
+        receives it, and is passed on.
+
+        Args:
+            stash (Dict[str, Any]): The stash.
+            metric_list (List[str]): The metrics configured by name.
+            complex_metrics (Optional[List[ComplexMetricConfig]]): The metrics
+                configured with parameters.
+
+        Raises:
+            ExtensionError: If a stash entry has the name of such a parameter,
+                naming the entry and the configured metrics it would reach.
+        """
+        if not stash:
+            return
+        configured: List[Tuple[str, Dict[str, Any]]] = [
+            (name, {}) for name in metric_list
+        ] + [(metric.name, metric.params) for metric in complex_metrics or []]
+
+        clashes: Dict[str, List[str]] = {}
+        for name, params in configured:
+            classes = []
+            for metric_name in [name, *_sub_metric_names(name, params)]:
+                if metric_name.upper() in metric_registry.list_registered():
+                    classes.append(metric_registry.get_class(metric_name))
+            for key in stash:
+                if key in params or any(c.warprec_parameter(key) for c in classes):
+                    clashes.setdefault(key, [])
+                    if name not in clashes[key]:
+                        clashes[key].append(name)
+
+        if clashes:
+            details = "; ".join(
+                f"{key!r} reaches {', '.join(names)}"
+                for key, names in sorted(clashes.items())
+            )
+            raise ExtensionError(
+                "A stash entry has the name of a parameter WarpRec or the "
+                "configuration sets for a configured metric, and every metric "
+                f"receives the stash, so it would set that parameter: {details}. "
+                "Rename the entry; a metric of your own receives an entry by "
+                "declaring a parameter of the entry's name."
+            )
 
     def _init_metrics(
         self, metric_list: List[str], complex_metrics: List[ComplexMetricConfig] = None

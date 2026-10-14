@@ -7,6 +7,7 @@ from dataclasses import asdict
 from typing import Any, Dict, Iterator, Optional
 
 from codecarbon import EmissionsTracker
+from codecarbon.output_methods.base_output import BaseOutput
 from codecarbon.output_methods.emissions_data import EmissionsData
 from codecarbon.output_methods.file import FileOutput
 from ray import tune
@@ -62,6 +63,33 @@ class WarpRecMLflowLoggerCallback(MLflowLoggerCallback):
 TRIAL_EMISSIONS_DIR = ".codecarbon_trials"
 
 
+class _TrialRow(BaseOutput):
+    """Keep the row a trial's tracker measured, for the driver to write.
+
+    CodeCarbon samples the CPU and RAM utilization and the RAM used every
+    second, and averages them into the row, only while its tracker has an
+    output to write to. The trial's tracker writes nowhere itself, so without
+    one the row read 0 for all three.
+
+    Attributes:
+        total (Optional[EmissionsData]): The row, once the tracker stopped.
+    """
+
+    total: Optional[EmissionsData]
+
+    def __init__(self) -> None:
+        self.total = None
+
+    def out(self, total: EmissionsData, delta: EmissionsData) -> None:
+        """Keep the row the tracker writes when it stops.
+
+        Args:
+            total (EmissionsData): The emissions since the tracker started.
+            delta (EmissionsData): The emissions since the last write.
+        """
+        self.total = total
+
+
 @contextmanager
 def trial_emissions(
     settings: Optional[Dict[str, Any]], trial_id: Optional[str]
@@ -87,6 +115,7 @@ def trial_emissions(
         yield
         return
 
+    row = _TrialRow()
     tracker = EmissionsTracker(
         project_name=trial_id,
         save_to_api=settings["save_to_api"],
@@ -94,13 +123,14 @@ def trial_emissions(
         output_dir=settings["output_dir"],
         tracking_mode="process",
         log_level="error",
+        output_handlers=[row],
     )
     tracker.start()
     try:
         yield
     finally:
         tracker.stop()
-        data = getattr(tracker, "final_emissions_data", None)
+        data = row.total
         if settings["save_to_file"] and data is not None:
             folder = os.path.join(settings["output_dir"], TRIAL_EMISSIONS_DIR)
             os.makedirs(folder, exist_ok=True)

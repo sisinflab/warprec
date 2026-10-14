@@ -1,11 +1,13 @@
+import inspect
 from abc import abstractmethod, ABC
-from typing import Any, Tuple, Set, Optional
+from typing import Any, Dict, List, Tuple, Set, Optional
 
 import torch
 from torch import Tensor
 from torchmetrics import Metric
 from warprec.errors import ExtensionError
 from warprec.utils.enums import MetricBlock
+from warprec.utils.registry import metric_registry
 
 
 class BaseMetric(Metric, ABC):
@@ -302,9 +304,73 @@ class BaseMetric(Metric, ABC):
         )
 
     @property
-    def name(self):
-        """The name of the metric."""
-        return self.__class__.__name__
+    def name(self) -> str:
+        """The name the metric reports its results under.
+
+        Returns:
+            str: The name the metric is registered, and configured, under.
+        """
+        return self.registered_name()
+
+    @classmethod
+    def registered_name(cls) -> str:
+        """The name the class is registered under, as it was written.
+
+        A class registered under a name of its own, e.g. 'MyName' on a class
+        Foo, reports under that name, the one the configuration names it by,
+        rather than its class name. Every built-in metric is registered under
+        its class name. A class that is not registered reports under its
+        class name.
+
+        Returns:
+            str: The registered name, or the class name.
+        """
+        return metric_registry.spelled_name(cls) or cls.__name__
+
+    @classmethod
+    def warprec_parameter(cls, name: str) -> bool:
+        """Whether a constructor parameter of the metric is one of WarpRec's.
+
+        The stash reaches every metric as keyword arguments, so an entry named
+        like a parameter sets it. That is how a metric of your own receives an
+        entry, by declaring a parameter of its name; a parameter a built-in
+        metric declares (EPC's 'relevance') is WarpRec's, set by its default or
+        the configuration, and an entry would change it without a word. The
+        parameter belongs to the class nearest in the hierarchy that names it,
+        so a metric of your own may declare one a built-in it extends has.
+
+        Args:
+            name (str): The parameter.
+
+        Returns:
+            bool: True if the nearest class naming the parameter is WarpRec's.
+        """
+        for klass in cls.__mro__:
+            init = klass.__dict__.get("__init__")
+            if init is None:
+                continue
+            try:
+                parameter = inspect.signature(init).parameters.get(name)
+            except (TypeError, ValueError):
+                continue
+            if parameter is not None and parameter.kind not in (
+                parameter.VAR_POSITIONAL,
+                parameter.VAR_KEYWORD,
+            ):
+                return klass.__module__.split(".")[0] == "warprec"
+        return False
+
+    @classmethod
+    def sub_metric_names(cls, params: Dict[str, Any]) -> List[str]:
+        """The metrics this one builds and hands its keyword arguments to.
+
+        Args:
+            params (Dict[str, Any]): The parameters it is configured with.
+
+        Returns:
+            List[str]: Their names; none for a metric that builds none.
+        """
+        return []
 
     @property
     def components(self) -> Set[MetricBlock]:

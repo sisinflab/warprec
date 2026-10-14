@@ -352,7 +352,7 @@ models:
         l2: [10, 20, 30, 40, 50, 100, 150, 200]
 ```
 
-Every key under a model, besides `meta`, `optimization` and `early_stopping`, must be one of that model's hyperparameters, listed on its page in the [Recommenders Documentation](../recommenders/index.md). A key the model does not take, such as a misspelled one, is refused when the configuration is loaded, by every pipeline, with the hyperparameters the model does take listed.
+Every key under a model, besides `meta`, `optimization` and `early_stopping`, must be one of that model's hyperparameters, listed on its page in the [Recommenders Documentation](../recommenders/index.md). A key the model does not take, such as a misspelled one, is refused when the configuration is loaded, by every pipeline, with the hyperparameters the model does take listed. A custom model registered without a parameter class has nothing to check its keys against, so a key it does not annotate as a hyperparameter is logged instead, and so is a misspelled key inside `meta`, `optimization` or `early_stopping`: neither is refused, both are logged when the configuration is loaded, as every key WarpRec does not read is (see [Unknown keys](index.md#unknown-keys)).
 
 An in depth configuration might include a model with more parameters and early stopping:
 

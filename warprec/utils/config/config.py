@@ -1,9 +1,10 @@
 import copy
+import difflib
 import os
 import sys
 import importlib
 from pathlib import Path
-from typing import Dict, Any, List
+from typing import ClassVar, Dict, Any, List
 
 from pydantic import BaseModel, model_validator, Field
 from warprec.errors import ConfigurationError, RegistryError
@@ -38,6 +39,13 @@ class WarpRecConfiguration(BaseModel):
     """Definition of WarpRec base configuration file structure.
 
     Attributes:
+        section_schemas (ClassVar[Dict[str, Any]]): The type each model's raw
+            parameters are checked against for keys no section reads: they
+            are validated by the model's own class, so the field is loose.
+        pipeline_sections (ClassVar[Dict[str, Any]]): Every top-level section
+            any pipeline reads, with its type. A file may serve several
+            pipelines, so a section only another one reads is not reported as
+            unknown, and its keys are still checked against its type.
         reader (ReaderConfig): Configuration of the reading process.
         filtering (Dict[str, dict]): The dictionary containing filtering
             information in the format {filter_name: dict{param_1: value, param_2: value, ...}, ...}
@@ -47,6 +55,22 @@ class WarpRecConfiguration(BaseModel):
         training (TrainingConfig): The options that shape the training signal.
         rerank (RerankConfig): The re-ranking applied to every list produced.
     """
+
+    section_schemas: ClassVar[Dict[str, Any]] = {"models": Dict[str, RecomModel]}
+    pipeline_sections: ClassVar[Dict[str, Any]] = {
+        "reader": ReaderConfig,
+        "filtering": Dict[str, dict],
+        "models": Dict[str, RecomModel],
+        "general": GeneralConfig,
+        "training": TrainingConfig,
+        "rerank": RerankConfig,
+        "writer": WriterConfig,
+        "splitter": SplittingConfig,
+        "dashboard": DashboardConfig,
+        "evaluation": EvaluationConfig,
+        "run": WarpRecRunConfig,
+        "estimate": EstimateConfig,
+    }
 
     reader: ReaderConfig
     filtering: Dict[str, dict] = None
@@ -238,6 +262,7 @@ class WarpRecConfiguration(BaseModel):
                 "not in parameter registry. The model will be loaded but the "
                 "hyperparameter will not be validated."
             )
+            self._warn_unread_hyperparameters(model_name, model_data)
             return RecomModel(**copy.deepcopy(model_data))
 
         # The validators edit the lists they are handed, and the values as
@@ -276,6 +301,32 @@ class WarpRecConfiguration(BaseModel):
         model_class.validate_all_combinations()
 
         return model_class
+
+    @staticmethod
+    def _warn_unread_hyperparameters(model_name: str, model_data: dict) -> None:
+        """Log the keys a model without a parameter class will not read.
+
+        Such a model sets only the hyperparameters it annotates, so any other
+        key is dropped without a word. A model with a parameter class refuses
+        it instead, when the class validates the parameters.
+
+        Args:
+            model_name (str): The name the model is configured under.
+            model_data (dict): The parameters written for it.
+        """
+        accepted = model_registry.get_class(model_name).hyperparameter_names()
+        reserved = {"meta", "optimization", "early_stopping", "fold"}
+        for key in model_data:
+            if key in reserved or key in accepted:
+                continue
+            message = (
+                f"The configuration key 'models.{model_name}.{key}' is not a "
+                f"hyperparameter of {model_name} and is ignored."
+            )
+            close = difflib.get_close_matches(str(key), accepted, n=1)
+            if close:
+                message += f" Did you mean 'models.{model_name}.{close[0]}'?"
+            logger.attention(message)
 
     def _check_modalities_exist(self, model_name: str, model_data: dict) -> None:
         """Validate that a model only asks for modalities the reader provides.

@@ -33,8 +33,7 @@ The following keywords are available for configuring the writer:
 - **recommendation**: A nested section controlling the formatting of recommendation files.
 
 !!! important
-    Consistency between **Reader** and **Writer** configurations is crucial.
-    For example, if custom labels are defined in the reader, they must be mirrored in the writer to ensure correct file generation.
+    Split files keep the columns the data was read with, custom labels included. To read them back with `loading_strategy: split`, give the reader's `split` section the same `ext`, `sep`, `header` and `file_format` the writer's `split` section used.
 
 ## Results
 

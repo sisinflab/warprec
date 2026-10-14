@@ -1,4 +1,5 @@
-from typing import Any
+import inspect
+from typing import Any, Dict, List
 
 import torch
 from torch import Tensor
@@ -72,6 +73,21 @@ class F1(TopKMetric):
             self.metric_instance_1.components | self.metric_instance_2.components
         )
 
+    @classmethod
+    def sub_metric_names(cls, params: Dict[str, Any]) -> List[str]:
+        """The two metrics combined, which receive the keyword arguments.
+
+        Args:
+            params (Dict[str, Any]): The parameters it is configured with.
+
+        Returns:
+            List[str]: The two metrics' names.
+        """
+        defaults = inspect.signature(cls.__init__).parameters
+        return [
+            params.get(key, defaults[key].default) for key in ("metric_1", "metric_2")
+        ]
+
     def update(self, preds: Tensor, user_indices: Tensor, **kwargs: Any):
         """Updates the metric state with the new batch of predictions."""
         # Update first metric
@@ -110,5 +126,5 @@ class F1(TopKMetric):
     def name(self):
         """The name of the metric customized based on the metrics compared."""
         if self.metric_1 == "Precision" and self.metric_2 == "Recall":
-            return self.__class__.__name__
-        return f"F1[{self.metric_1}, {self.metric_2}]"
+            return self.registered_name()
+        return f"{self.registered_name()}[{self.metric_1}, {self.metric_2}]"

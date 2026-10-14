@@ -121,5 +121,5 @@ class PopRSP(TopKMetric):
     def name(self):
         """The name of the metric."""
         if self.pop_ratio == 0.8:
-            return self.__class__.__name__
-        return f"PopRSP[Pop{int(self.pop_ratio * 100)}%]"
+            return self.registered_name()
+        return f"{self.registered_name()}[Pop{int(self.pop_ratio * 100)}%]"

@@ -1,5 +1,17 @@
+import difflib
 from pathlib import Path
-from typing import Any, Type, TypeVar, Optional, List, Union
+from types import UnionType
+from typing import (
+    Any,
+    Type,
+    TypeVar,
+    Optional,
+    List,
+    Tuple,
+    Union,
+    get_args,
+    get_origin,
+)
 
 import yaml
 from pydantic import BaseModel, ValidationError
@@ -79,6 +91,9 @@ def read_configuration_file(path: Union[str, Path], schema: Type[T], kind: str) 
     try:
         with open(path, "r", encoding="utf-8") as file:
             data = yaml.safe_load(file) or {}
+        # Before validating, so that a misspelled required section is named
+        # next to the error its absence raises.
+        warn_unknown_keys(data, schema)
         return schema.model_validate(data)
     except ValidationError as error:
         message, errors = ConfigurationError.describe_validation(
@@ -87,6 +102,165 @@ def read_configuration_file(path: Union[str, Path], schema: Type[T], kind: str) 
         raise ConfigurationError(message, path=path, errors=errors) from error
     except FileNotFoundError as error:
         raise DataNotFoundError(str(error)) from error
+
+
+def warn_unknown_keys(data: Any, schema: Type[BaseModel]) -> None:
+    """Log every key of a configuration that no section reads.
+
+    Pydantic ignores such a key, so a misspelled one leaves the run on the
+    default without a word. Each is logged once, by its dotted path, with the
+    closest key its section does read. A section that accepts any key (a
+    model's hyperparameters, which the model checks itself) or refuses unknown
+    ones (the serving configuration) is left alone, and so are the free-form
+    dictionaries handed on as they are (callback kwargs, optimizer, scheduler,
+    re-ranker and complex metric params, MLflow tags).
+
+    A schema may hold two class attributes the walk reads: 'section_schemas',
+    mapping a field to the type its raw value is walked as when the field is
+    declared looser than that, and 'pipeline_sections', mapping every
+    top-level section any pipeline reads to its type. One file may serve
+    several pipelines, so a section only another pipeline reads is not
+    reported, though the keys inside it are checked like any other: a key no
+    pipeline reads is a typo whichever pipeline loads the file.
+
+    Args:
+        data (Any): The configuration as read from the file.
+        schema (Type[BaseModel]): The pydantic model the file must satisfy.
+    """
+    for key, meant in _unknown_keys(data, schema, ""):
+        message = (
+            f"The configuration key '{key}' is not one WarpRec reads and is ignored."
+        )
+        if meant is not None:
+            message += f" Did you mean '{meant}'?"
+        logger.attention(message)
+
+
+def _unknown_keys(
+    data: Any, schema: Type[BaseModel], path: str
+) -> List[Tuple[str, Optional[str]]]:
+    """The keys of one section its schema does not read, and their closest.
+
+    Args:
+        data (Any): The section as read from the file.
+        schema (Type[BaseModel]): The pydantic model of the section.
+        path (str): The dotted path of the section, empty at the top.
+
+    Returns:
+        List[Tuple[str, Optional[str]]]: Each unknown key's dotted path, with
+            the dotted path of the closest key the section reads, or None.
+    """
+    if not isinstance(data, dict):
+        return []
+
+    fields = schema.model_fields
+    known = {
+        name: info
+        for field, info in fields.items()
+        for name in {field, info.alias or field}
+    }
+    overrides = getattr(schema, "section_schemas", {})
+    others = getattr(schema, "pipeline_sections", {})
+    prefix = f"{path}." if path else ""
+    found: List[Tuple[str, Optional[str]]] = []
+
+    for key, value in data.items():
+        if not isinstance(key, str):
+            continue
+        info = known.get(key)
+        if info is None and key in others:
+            # A section another pipeline reads: checked, not reported.
+            found.extend(_unknown_in_value(value, others[key], prefix + key))
+            continue
+        if info is None:
+            if schema.model_config.get("extra") in ("allow", "forbid"):
+                continue
+            close = difflib.get_close_matches(key, [*known, *others], n=1)
+            found.append((prefix + key, prefix + close[0] if close else None))
+            continue
+        annotation = overrides.get(key, info.annotation)
+        found.extend(_unknown_in_value(value, annotation, prefix + key))
+
+    return found
+
+
+def _unknown_in_value(
+    value: Any, annotation: Any, path: str
+) -> List[Tuple[str, Optional[str]]]:
+    """The unknown keys inside one value, walked as its annotation says.
+
+    Args:
+        value (Any): The value as read from the file.
+        annotation (Any): The type the value is declared with.
+        path (str): The dotted path of the value.
+
+    Returns:
+        List[Tuple[str, Optional[str]]]: As _unknown_keys.
+    """
+    origin = get_origin(annotation)
+
+    if origin in (Union, UnionType):
+        # Optional[X] and the like: walk the value as the one alternative of
+        # its shape, a section or mapping for a mapping, a list for a list.
+        shape = _shape_of_value(value)
+        for alternative in get_args(annotation):
+            if shape is not None and _shape_of(alternative) is shape:
+                return _unknown_in_value(value, alternative, path)
+        return []
+
+    if isinstance(annotation, type) and issubclass(annotation, BaseModel):
+        return _unknown_keys(value, annotation, path)
+
+    args = get_args(annotation)
+    if origin is dict and isinstance(value, dict) and len(args) == 2:
+        return [
+            unknown
+            for key, entry in value.items()
+            for unknown in _unknown_in_value(entry, args[1], f"{path}.{key}")
+        ]
+
+    if origin is list and isinstance(value, list) and args:
+        return [
+            unknown
+            for index, entry in enumerate(value)
+            for unknown in _unknown_in_value(entry, args[0], f"{path}[{index}]")
+        ]
+
+    return []
+
+
+def _shape_of(annotation: Any) -> Optional[type]:
+    """The container a value of the annotation is read from in a YAML file.
+
+    Args:
+        annotation (Any): A type, possibly generic.
+
+    Returns:
+        Optional[type]: dict for a section or a mapping, list for a list,
+            None for anything else.
+    """
+    if isinstance(annotation, type) and issubclass(annotation, BaseModel):
+        return dict
+    origin = get_origin(annotation)
+    if origin in (dict, list):
+        return origin
+    return None
+
+
+def _shape_of_value(value: Any) -> Optional[type]:
+    """The container a value read from a YAML file is.
+
+    Args:
+        value (Any): The value.
+
+    Returns:
+        Optional[type]: dict for a mapping, list for a list, None otherwise.
+    """
+    if isinstance(value, dict):
+        return dict
+    if isinstance(value, list):
+        return list
+    return None
 
 
 def check_separator(sep: str) -> str:
