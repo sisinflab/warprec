@@ -7,6 +7,7 @@ worker that trains. With 'process' tracking the trial now measures itself and
 the driver only writes the rows to 'emissions.csv'.
 """
 
+import time
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Any, Dict
@@ -124,3 +125,33 @@ def test_the_driver_writes_the_row_the_trial_measured(tmp_path: Path):
     rows = pd.read_csv(tmp_path / "emissions.csv")
     assert rows["project_name"].tolist() == ["abc_00000"]
     assert rows["duration"].iloc[0] > 0
+
+
+def test_the_trial_row_carries_the_utilization_sampled_while_it_trained(
+    tmp_path: Path,
+):
+    """The row used to read 0 for the CPU and RAM utilization and the RAM used.
+
+    CodeCarbon samples them every second only when its tracker has an output to
+    write to, and the trial's tracker wrote nowhere: the driver writes the row.
+    The RAM is read from the first sample on; the CPU utilization of CodeCarbon's
+    first two samples is 0 (psutil measures it since the previous call from the
+    same thread, and each sample runs in a new one), so it is not asserted on a
+    trial this short.
+    """
+    callback = CodeCarbonCallback(
+        save_to_file=True, output_dir=str(tmp_path), tracking_mode="process"
+    )
+    trial = SimpleNamespace(trial_id="abc_00000")
+
+    with trial_emissions(callback.trial_settings(), trial.trial_id):
+        end = time.perf_counter() + 2.5
+        while time.perf_counter() < end:
+            sum(i * i for i in range(10_000))
+
+    callback.on_trial_complete(iteration=1, trials=[trial], trial=trial)
+
+    row = pd.read_csv(tmp_path / "emissions.csv").iloc[0]
+    assert row["tracking_mode"] == "process"
+    assert row["ram_utilization_percent"] > 0
+    assert row["ram_used_gb"] > 0

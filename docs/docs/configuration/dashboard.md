@@ -56,6 +56,9 @@ WarpRec supports **CodeCarbon** via Ray to monitor energy consumption and carbon
     - `machine` measures the whole machine while a trial runs, whichever process it runs in.
     - `process` measures the process the trial trains in (the Ray Train worker), not the Ray Tune driver that waits for it. The trial measures itself and the driver appends its row to `emissions.csv`, one row per trial and session. With `save_to_api`, the trial sends its emissions to the API itself, so the API settings must be readable there: put them in `~/.codecarbon.config` or in the `CODECARBON_EXPERIMENT_ID` and `CODECARBON_API_KEY` environment variables rather than in a `.codecarbon.config` next to the configuration. A session cut short by a pause writes no row under `process`.
 
+!!! note "Utilization columns"
+    `cpu_utilization_percent`, `ram_utilization_percent` and `ram_used_gb` are CodeCarbon's averages of samples it takes once a second, with `psutil`, of the **whole machine**, under either tracking mode: under `process` the energy is the trial's process, the utilization is still the machine's. A trial shorter than a second has no sample, and its row reads 0 for the three. The CPU utilization of a sample is measured since the previous one taken in the same thread, and CodeCarbon takes each sample in a new thread, so its first two samples, and an occasional later one, read 0: on a short trial the CPU column is low or 0 whatever the load. Both are CodeCarbon's behaviour (3.3), not WarpRec's.
+
 !!! warning "Location in emissions.csv"
     CodeCarbon looks up where the machine is from its IP address and writes it to every row of `emissions.csv`: country, region and, on a machine outside a cloud provider, latitude and longitude. WarpRec cannot leave these columns out (the file's columns are CodeCarbon's), so clear them before sharing the file, for example with `pandas`: `df[["country_name", "country_iso_code", "region", "longitude", "latitude"]] = None`.
 
