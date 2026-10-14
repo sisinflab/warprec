@@ -1,8 +1,9 @@
 import os
 import socket
 import threading
+from contextlib import contextmanager
 from dataclasses import asdict, dataclass
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Iterator, List, Optional, Union
 
 import ray
 from codecarbon import EmissionsTracker
@@ -35,11 +36,14 @@ class EmissionsSettings:
         save_to_api (bool): Whether the trackers send their emissions to the
             CodeCarbon API.
         project_name (str): The project name of every row, the run's name.
+        inbox (Any): Under 'process' tracking, the 'EmissionsInbox' actor the
+            trial workers hand their rows to. None otherwise.
     """
 
     tracking_mode: str
     save_to_api: bool
     project_name: str
+    inbox: Any = None
 
 
 class _RowCapture(BaseOutput):
@@ -136,6 +140,131 @@ class NodeEmissionsTracker:  # pylint: disable = too-few-public-methods
         return labelled_row(self._row.total, self._label)
 
 
+@ray.remote(num_cpus=0)
+class EmissionsInbox:
+    """Where the trial workers of a run hand their rows to the driver.
+
+    The rows travel through Ray, so a worker on a node that cannot see the
+    driver's storage delivers its row all the same.
+    """
+
+    def __init__(self) -> None:
+        self._rows: List[Dict[str, Any]] = []
+        self._delivered: Dict[str, int] = {}
+
+    def put(self, trial_id: str, row: Dict[str, Any]) -> None:
+        """Keep the row a worker of a trial measured.
+
+        Args:
+            trial_id (str): The trial.
+            row (Dict[str, Any]): The labelled row.
+        """
+        self._rows.append(row)
+        self._delivered[trial_id] = self._delivered.get(trial_id, 0) + 1
+
+    def take(self) -> List[Dict[str, Any]]:
+        """Hand over the rows kept since the last call.
+
+        Returns:
+            List[Dict[str, Any]]: The rows.
+        """
+        rows, self._rows = self._rows, []
+        return rows
+
+    def delivered(self, trial_id: str) -> int:
+        """How many rows the workers of a trial delivered.
+
+        Args:
+            trial_id (str): The trial.
+
+        Returns:
+            int: The number of rows.
+        """
+        return self._delivered.get(trial_id, 0)
+
+
+def assigned_gpu_ids() -> List[Union[int, str]]:
+    """The GPUs Ray assigned to the calling worker, for CodeCarbon to measure.
+
+    Left to itself, CodeCarbon measures every GPU listed in
+    'CUDA_VISIBLE_DEVICES', which Ray Train shares among the workers of a
+    node, or every GPU of the node when it is unset: each worker would be
+    charged for its neighbours' GPUs. An empty list measures none, so a worker
+    without a GPU is charged for none.
+
+    Returns:
+        List[Union[int, str]]: The ids of the GPUs.
+    """
+    return list(ray.get_gpu_ids())
+
+
+def world_rank() -> int:
+    """The rank of the calling worker among the Ray Train workers of its trial.
+
+    Returns:
+        int: The rank, or 0 outside a Ray Train worker.
+    """
+    try:
+        return ray.train.get_context().get_world_rank()
+    except RuntimeError:
+        return 0
+
+
+@contextmanager
+def trial_emissions(
+    settings: Optional[EmissionsSettings], trial_id: Optional[str]
+) -> Iterator[None]:
+    """Measure the emissions of the Ray Train worker a trial trains in.
+
+    CodeCarbon's 'process' mode measures the process that starts the tracker,
+    and the driver's Ray Tune callback runs in the driver, not where the trial
+    trains. With 'process' tracking each worker of the trial therefore
+    measures itself, only on the GPUs Ray assigned to it. It sends its
+    emissions to the CodeCarbon API itself, when asked to, and hands its row,
+    labelled with its node, trial and rank, to the run's inbox, through Ray,
+    for the driver to write.
+
+    Args:
+        settings (Optional[EmissionsSettings]): The run's measurement, or None
+            when the trial is not measured.
+        trial_id (Optional[str]): The Ray Tune trial.
+
+    Yields:
+        None: While the trial trains.
+    """
+    if settings is None:
+        yield
+        return
+
+    row = _RowCapture()
+    tracker = EmissionsTracker(
+        project_name=settings.project_name,
+        save_to_api=settings.save_to_api,
+        save_to_file=False,
+        tracking_mode="process",
+        log_level="error",
+        output_handlers=[row],
+        gpu_ids=assigned_gpu_ids(),
+    )
+    tracker.start()
+    try:
+        yield
+    finally:
+        tracker.stop()
+        if row.total is not None and settings.inbox is not None:
+            label = f"{node_label()} trial={trial_id} rank={world_rank()}"
+            try:
+                ray.get(
+                    settings.inbox.put.remote(trial_id, labelled_row(row.total, label)),
+                    timeout=TRACKER_TIMEOUT_SECONDS,
+                )
+            except (RayError, GetTimeoutError) as error:
+                logger.attention(
+                    f"The CodeCarbon row of trial {trial_id} ({label}) could not "
+                    f"reach the driver: {type(error).__name__}."
+                )
+
+
 class EmissionsRecorder:
     """The CodeCarbon measurement of a whole run, held by its driver.
 
@@ -148,6 +277,11 @@ class EmissionsRecorder:
     through Ray and the driver appends them to 'emissions.csv', one row per
     node; a node that left the cluster before then has lost its row.
 
+    Under 'process' tracking the trial workers measure themselves (see
+    'trial_emissions') and hand their rows to an 'EmissionsInbox' actor kept
+    on the driver's node, which the driver empties into 'emissions.csv' every
+    'poll_interval' seconds and on 'stop'.
+
     Args:
         tracking_mode (str): CodeCarbon's tracking mode, 'machine' or 'process'.
         save_to_api (bool): Whether the trackers send their emissions to the
@@ -155,7 +289,8 @@ class EmissionsRecorder:
         save_to_file (bool): Whether the driver writes 'emissions.csv'.
         output_dir (str): The folder of 'emissions.csv'.
         project_name (str): The project name of every row, the run's name.
-        poll_interval (float): How often to look for nodes that joined, in seconds.
+        poll_interval (float): How often to look for nodes that joined, or for
+            rows the trial workers delivered, in seconds.
     """
 
     def __init__(
@@ -179,6 +314,7 @@ class EmissionsRecorder:
         self._stopping = threading.Event()
         self._poller: Optional[threading.Thread] = None
         self._poll_error: Optional[str] = None
+        self._inbox: Any = None
 
     @property
     def settings(self) -> EmissionsSettings:
@@ -191,6 +327,7 @@ class EmissionsRecorder:
             tracking_mode=self.tracking_mode,
             save_to_api=self.save_to_api,
             project_name=self.project_name,
+            inbox=self._inbox,
         )
 
     @property
@@ -211,10 +348,15 @@ class EmissionsRecorder:
         self.stop()
 
     def start(self) -> None:
-        """Start measuring, and keep looking for nodes that join."""
-        if self.tracking_mode != "machine":
-            return
-        self._track_new_nodes()
+        """Start measuring, and keep looking for nodes that join or rows."""
+        if self.tracking_mode == "process":
+            self._inbox = EmissionsInbox.options(  # type: ignore[attr-defined]
+                scheduling_strategy=NodeAffinitySchedulingStrategy(
+                    node_id=ray.get_runtime_context().get_node_id(), soft=False
+                ),
+            ).remote()
+        else:
+            self._track_new_nodes()
         self._stopping.clear()
         self._poller = threading.Thread(
             target=self._poll, name="warprec-codecarbon", daemon=True
@@ -250,19 +392,31 @@ class EmissionsRecorder:
             ray.kill(tracker)
         self._write(rows)
 
+        if self._inbox is not None:
+            self._collect()
+            ray.kill(self._inbox)
+            self._inbox = None
+
     def _poll(self) -> None:
-        """Look for nodes that joined the cluster until the run stops."""
+        """Look for nodes that joined, or for delivered rows, until the run stops."""
         while not self._stopping.wait(self.poll_interval):
             try:
-                self._track_new_nodes()
+                if self._inbox is not None:
+                    self._collect()
+                else:
+                    self._track_new_nodes()
             except Exception as error:  # pylint: disable = broad-exception-caught
                 # The thread must outlive a failed look, logged once: the next
                 # look may well succeed
                 if self._poll_error is None:
                     self._poll_error = str(error)
                     logger.attention(
-                        f"CodeCarbon could not look for new Ray nodes: {error}"
+                        f"CodeCarbon's measurement of the run failed a check: {error}"
                     )
+
+    def _collect(self) -> None:
+        """Write the rows the trial workers delivered since the last look."""
+        self._write(ray.get(self._inbox.take.remote()))
 
     def _track_new_nodes(self) -> None:
         """Start a tracker on every alive node that has none."""
