@@ -132,7 +132,7 @@ evaluation:
               persistence: 0.5
 ```
 
-Every metric is constructed with the cutoff `k` and the keyword arguments the evaluator shares with all metrics (the number of users and items, the training matrix, the side information and cluster lookups, the propensities and the dataset's stash), so its constructor must accept `**kwargs`. The `params` of a `complex_metrics` entry arrive as extra keyword arguments. When one metric is configured with several sets of parameters, override its `name` property so that each appears under its own name in the results, building on `self.registered_name()` (e.g. `f"{self.registered_name()}[{self.persistence}]"`) so that the name stays the one the metric is registered under.
+Every metric is constructed with the cutoff `k` and the keyword arguments the evaluator shares with all metrics (the number of users and items, the training matrix, the side information and cluster lookups, the propensities and the dataset's stash), so its constructor must accept `**kwargs`; a parameter of its own named like a stash entry receives that entry (see [Add Data to the Stash](stash.md)). The `params` of a `complex_metrics` entry arrive as extra keyword arguments. When one metric is configured with several sets of parameters, override its `name` property so that each appears under its own name in the results, building on `self.registered_name()` (e.g. `f"{self.registered_name()}[{self.persistence}]"`) so that the name stays the one the metric is registered under.
 
 !!! tip
 

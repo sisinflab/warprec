@@ -1,4 +1,4 @@
-from typing import Any, List
+from typing import Any, Dict, List
 import torch
 from torch import Tensor, nn
 from warprec.errors import ConfigurationError, EvaluationError
@@ -76,6 +76,18 @@ class EucDistance(TopKMetric):
             required_blocks |= m_inst.components
 
         self._REQUIRED_COMPONENTS = required_blocks
+
+    @classmethod
+    def sub_metric_names(cls, params: Dict[str, Any]) -> List[str]:
+        """The metrics combined, which receive the keyword arguments.
+
+        Args:
+            params (Dict[str, Any]): The parameters it is configured with.
+
+        Returns:
+            List[str]: The names in 'metric_names'.
+        """
+        return list(params.get("metric_names") or [])
 
     def reset(self) -> None:
         """Reset the sub-metrics along with the composite.

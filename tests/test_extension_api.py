@@ -7,7 +7,7 @@ wrong thing, or failed far from its cause, now either works or says what to do.
 import sys
 import uuid
 from pathlib import Path
-from typing import Any, ClassVar, Dict, Optional, Set
+from typing import Any, ClassVar, Dict, List, Optional, Set
 
 import numpy as np
 import pandas as pd
@@ -18,6 +18,7 @@ from torch import Tensor
 import warprec.evaluation  # noqa: F401  (populates the metric registry)
 from warprec.data.dataset import Dataset
 from warprec.data.stash import METRIC_ARGUMENTS
+from warprec.errors import ExtensionError
 from warprec.evaluation import Evaluator
 from warprec.evaluation.metrics.accuracy.recall import Recall
 from warprec.evaluation.metrics.base_metric import TopKMetric, UserAverageTopKMetric
@@ -481,6 +482,125 @@ def test_the_reserved_metric_names_are_those_the_evaluator_passes(
     )
 
     assert set(evaluator.common_params) | {"k"} == METRIC_ARGUMENTS
+
+
+def build_with_stash(
+    dataset: Dataset,
+    stash: Dict[str, Any],
+    metrics: List[str],
+    complex_metrics: Optional[List[ComplexMetricConfig]] = None,
+) -> Evaluator:
+    """Build an evaluator handed the given stash, at k=5.
+
+    Args:
+        dataset (Dataset): The dataset whose training set the metrics read.
+        stash (Dict[str, Any]): The stash.
+        metrics (List[str]): The metrics configured by name.
+        complex_metrics (Optional[List[ComplexMetricConfig]]): The metrics
+            configured with parameters.
+
+    Returns:
+        Evaluator: The evaluator.
+    """
+    return Evaluator(
+        metrics,
+        [5],
+        train_set=dataset.train_set.get_sparse(),
+        complex_metrics=complex_metrics,
+        additional_data=stash,
+    )
+
+
+def test_a_stash_entry_named_like_a_built_in_parameter_is_refused(
+    ranking_dataset: Dataset,
+):
+    """A 'relevance' entry used to switch EPC and EFD to discounted relevance."""
+    with pytest.raises(ExtensionError, match="'relevance'") as error:
+        build_with_stash(
+            ranking_dataset, {"relevance": "discounted"}, ["nDCG", "EPC", "EFD"]
+        )
+
+    message = str(error.value)
+    assert "EPC" in message and "EFD" in message and "nDCG" not in message
+
+
+def test_a_stash_entry_no_configured_metric_takes_is_accepted(
+    ranking_dataset: Dataset,
+):
+    """The same entry is harmless when no configured metric has that parameter."""
+    build_with_stash(ranking_dataset, {"relevance": "discounted"}, ["nDCG"])
+
+
+def test_a_stash_entry_reaching_a_sub_metric_is_refused(ranking_dataset: Dataset):
+    """A composite hands the stash on to the metrics it is built from."""
+    hypervolume = ComplexMetricConfig(
+        name="Hypervolume",
+        params={
+            "metric_names": ["nDCG", "EPC"],
+            "nadir_points": [0.0, 0.0],
+            "higher_is_better": [True, True],
+        },
+    )
+
+    with pytest.raises(ExtensionError, match="'relevance'.*Hypervolume"):
+        build_with_stash(
+            ranking_dataset, {"relevance": "discounted"}, [], [hypervolume]
+        )
+
+
+def register_stash_metric() -> str:
+    """Register a metric that declares a parameter to receive a stash entry.
+
+    Returns:
+        str: The name the metric is registered under.
+    """
+    name = unique_name("StashReader")
+
+    @metric_registry.register(name)
+    class StashReader(Recall):  # pylint: disable=unused-variable
+        """Recall, keeping the stash entry and the parameter it is configured with."""
+
+        def __init__(
+            self,
+            k: int,
+            num_users: int,
+            item_year: Any = None,
+            persistence: float = 0.5,
+            **kwargs: Any,
+        ):
+            super().__init__(k, num_users, **kwargs)
+            self.item_year = item_year
+            self.persistence = persistence
+
+    return name
+
+
+def test_a_metric_declaring_a_stash_entry_still_receives_it(
+    ranking_dataset: Dataset,
+):
+    """The stash exists to reach the metrics of your own that ask for it."""
+    name = register_stash_metric()
+
+    evaluator = build_with_stash(ranking_dataset, {"item_year": "years"}, [name])
+
+    assert evaluator.metrics[5][0].item_year == "years"
+
+
+def test_a_stash_entry_named_like_a_configured_parameter_is_refused(
+    ranking_dataset: Dataset,
+):
+    """The configuration and the stash would both set it; Python used to fail."""
+    name = register_stash_metric()
+
+    with pytest.raises(ExtensionError, match="'persistence'") as error:
+        build_with_stash(
+            ranking_dataset,
+            {"persistence": 0.9},
+            [],
+            [ComplexMetricConfig(name=name, params={"persistence": 0.7})],
+        )
+
+    assert name in str(error.value)
 
 
 def register_constant_metric(value: Any) -> str:
