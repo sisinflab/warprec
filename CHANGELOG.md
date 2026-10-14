@@ -2,6 +2,73 @@
 
 <!-- version list -->
 
+## v2.2.0 (2026-10-14)
+
+### Documentation
+
+- The Errors page lists every WarpRec error, when it is raised, its fields, what an earlier except
+  still catches, catching across Ray and the --debug flag of warprec.run and warprec.serve
+  ([`7984ab0`](https://github.com/sisinflab/warprec/commit/7984ab00a40cb25eb14a67663316aa8551aaedb1))
+
+- The guides catch ConfigurationError, RegistryError, ModelError, DataNotFoundError and
+  CheckpointError and show their per-key messages and name suggestions
+  ([`74aa264`](https://github.com/sisinflab/warprec/commit/74aa264d0d3c6319b68601bab6ef8dd56494ef4f))
+
+### Features
+
+- A custom module that cannot be imported raises CustomModuleError, an unknown evaluation strategy
+  EvaluationError, and invalid parameters of a model without its own validation, in a trial too, a
+  ConfigurationError naming each key
+  ([`271842d`](https://github.com/sisinflab/warprec/commit/271842daa3f873d1d676c184f9d8de7b862d0c10))
+
+- An unknown registered name raises RegistryError that suggests the closest name, and invalid model
+  parameters raise a ConfigurationError naming each key
+  ([`de05afa`](https://github.com/sisinflab/warprec/commit/de05afaefbffd0c87cb5ce80c38966c023996ba3))
+
+- Loading an invalid configuration file raises one ConfigurationError listing every invalid key and
+  its message
+  ([`1469b06`](https://github.com/sisinflab/warprec/commit/1469b063e672f25e8cf4185c6d8ee7a7b78019c2))
+
+- The configuration validators raise ConfigurationError, RegistryError suggesting the closest name
+  for an unknown model, filter, metric, optimizer, scheduler, search algorithm, re-ranker or
+  similarity, and DataNotFoundError for a missing file
+  ([`6ca1441`](https://github.com/sisinflab/warprec/commit/6ca144103f6aef6787215cb1b91e99cd93523139))
+
+- Warprec.errors gives every error a user can fix a WarpRecError class that is also the built-in
+  exception it replaces
+  ([`1c0b2a8`](https://github.com/sisinflab/warprec/commit/1c0b2a82c187a0ecedbdc1300d113fefbf8b9575))
+
+- Warprec.run and warprec.serve print a WarpRec error as one line without a traceback and exit with
+  status 1, and --debug shows the traceback
+  ([`6a52f20`](https://github.com/sisinflab/warprec/commit/6a52f2040590734678d87004e13ce8f8bda5d6a5))
+
+### Refactoring
+
+- KGAT built without its interactions raises ModelError like the other knowledge-aware models
+  ([`e2b0931`](https://github.com/sisinflab/warprec/commit/e2b09311875780fbd520bcc9c8c6272e4061bd63))
+
+- Metrics and the evaluator raise EvaluationError, ExtensionError for a custom metric breaking its
+  contract, and ConfigurationError for mismatched multi-objective lists
+  ([`53ee869`](https://github.com/sisinflab/warprec/commit/53ee869113c7a9c726f87dc65c37d2da402de4ac))
+
+- Models raise ModelError, CheckpointError for a checkpoint of another model, ConfigurationError for
+  invalid hyperparameters and DataError for data a model cannot use
+  ([`9592347`](https://github.com/sisinflab/warprec/commit/959234718d9312619d43f8dc048335439fc350e5))
+
+- Serving a checkpoint that lacks what the policy or a context-aware model needs raises
+  CheckpointError with the checkpoint's path
+  ([`769fce3`](https://github.com/sisinflab/warprec/commit/769fce38590eb867f6e85a455402e356f5bb5724))
+
+- The data layer raises DataError, DataNotFoundError, ConfigurationError and ExtensionError instead
+  of ValueError and FileNotFoundError
+  ([`f897d25`](https://github.com/sisinflab/warprec/commit/f897d25b54df548d33f391965150ff3f6c07fce4))
+
+- The pipelines raise RunStateError for a resume that conflicts with the saved state, ClusterError
+  for an unreachable Ray cluster, CheckpointError with its path for a load_from checkpoint that does
+  not fit, and ConfigurationError or DataError for what they read
+  ([`f1e8f72`](https://github.com/sisinflab/warprec/commit/f1e8f72f179f079a383d531e6e19e34a2902ca80))
+
+
 ## v2.1.9 (2026-10-13)
 
 ### Bug Fixes
