@@ -2,6 +2,50 @@
 
 <!-- version list -->
 
+## v2.2.1 (2026-10-14)
+
+### Bug Fixes
+
+- A metric reports its results under the name it is registered under, not its class name
+  ([`6759da6`](https://github.com/sisinflab/warprec/commit/6759da614a90f8e130d2a53ded73cbc1b0a9592a))
+
+- A section another pipeline reads is no longer reported when a configuration is loaded, while a key
+  inside it that no pipeline reads still is
+  ([`9bfddad`](https://github.com/sisinflab/warprec/commit/9bfddad5c8a989cc5ed1b843ef0cd12849113df9))
+
+- A stash entry named like a parameter WarpRec or the configuration sets for a configured metric is
+  refused instead of silently setting it
+  ([`c3e7dab`](https://github.com/sisinflab/warprec/commit/c3e7dabd3641f880c210155c0af53828593578f4))
+
+- CodeCarbon process tracking writes the CPU and RAM utilization and the RAM used it sampled while
+  the trial trained instead of 0
+  ([`75bf716`](https://github.com/sisinflab/warprec/commit/75bf7163352a4461ff75d2d176e249f691feb2bd))
+
+- Loading a configuration logs every key WarpRec does not read, with its dotted path and the closest
+  key it does read
+  ([`92b138f`](https://github.com/sisinflab/warprec/commit/92b138f9f6afe53fd90607476cd5da8956b46038))
+
+### Continuous Integration
+
+- The workflows run on Ubuntu 26.04, and the cached environment is keyed on the runner image and the
+  exact Python version
+  ([`6c0afde`](https://github.com/sisinflab/warprec/commit/6c0afdef87bf219dc15432e2d30f42c1d8ed0d90))
+
+- The workflows use the Node.js 24 releases of actions/checkout, actions/setup-python and
+  actions/cache
+  ([`7b6e986`](https://github.com/sisinflab/warprec/commit/7b6e986bbfce0df1637a80a08057870101e8f301))
+
+### Documentation
+
+- The reference configuration drops writer.setup_experiment and writer.split.labels, which WarpRec
+  no longer reads
+  ([`4e7812b`](https://github.com/sisinflab/warprec/commit/4e7812bd6613317e28c13c6218e92498f49c6e95))
+
+- The writer page says split files keep the columns they were read with, instead of asking for
+  reader labels to be mirrored in the writer
+  ([`54da9f7`](https://github.com/sisinflab/warprec/commit/54da9f7d5b001e70d416bbf537e1f7e1e4fc22e0))
+
+
 ## v2.2.0 (2026-10-14)
 
 ### Documentation
