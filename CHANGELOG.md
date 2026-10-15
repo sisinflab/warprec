@@ -2,6 +2,42 @@
 
 <!-- version list -->
 
+## v2.2.4 (2026-10-15)
+
+### Bug Fixes
+
+- The time report gives the seconds spent reading, filtering, splitting and building each data
+  structure, measured inside the data preparation task
+  ([`dc0e7f2`](https://github.com/sisinflab/warprec/commit/dc0e7f27647f62f550573df6045017df439b86ba))
+
+- Trials with eval_every_n above 1 no longer fail: they report, checkpoint and time only the epochs
+  they validate, and always validate their last
+  ([`1673d7c`](https://github.com/sisinflab/warprec/commit/1673d7cd65418e88c05fee7a5113e6b8f03395d2))
+
+### Build System
+
+- Ruff checks pylint's errors, warnings and size limits in place of pylint, with the existing
+  exceptions marked in place
+  ([`6802786`](https://github.com/sisinflab/warprec/commit/6802786db0fcd37e943ffac23be44163db02a0e9))
+
+### Code Style
+
+- The code drops the pylint directives nobody reads any more
+  ([`0ee4c9a`](https://github.com/sisinflab/warprec/commit/0ee4c9ad2801c929ced548a4f289f01bc942970b))
+
+### Continuous Integration
+
+- Linting runs pre-commit alone with its hook environments cached, without Poetry or the project,
+  with bandit from its own hook and pylint dropped
+  ([`1db984d`](https://github.com/sisinflab/warprec/commit/1db984dee16a4817d364383387e2f377f4801c65))
+
+### Testing
+
+- The suite keeps the reproducibility, data structure, model output and metric value tests and runs
+  in seconds, without Ray, serving or the pipelines
+  ([`93de626`](https://github.com/sisinflab/warprec/commit/93de626ebabb3875b88f490e2ccea99932ce0223))
+
+
 ## v2.2.3 (2026-10-15)
 
 ### Bug Fixes
