@@ -8,6 +8,7 @@ an epoch, to be validated, and above all the time spent only training.
 
 import math
 import time
+from contextlib import nullcontext
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Any, Dict, List, Optional
@@ -16,6 +17,7 @@ import lightning as L
 import numpy as np
 import pandas as pd
 import pytest
+import torch
 
 import warprec.recommenders  # noqa: F401  (populates the registries)
 from warprec.data.dataset import Dataset
@@ -188,6 +190,119 @@ def test_every_epoch_reports_its_training_and_its_validation_apart(
         )
         assert report[SETUP_S] >= STARTED_BEFORE_S
         assert report[SETUP_S] == reports[0][SETUP_S]
+
+
+class Paused(BaseException):
+    """Stands for the trial process being stopped by a pause.
+
+    A BaseException, so that the trial's own error handling lets it through,
+    as it lets through the end of the process.
+    """
+
+
+def _session(
+    monkeypatch: pytest.MonkeyPatch,
+    config: dict,
+    folder: Path,
+    started_before_s: float,
+    pause_after: Optional[int] = None,
+    resume_from: Optional[int] = None,
+) -> List[Dict[str, float]]:
+    """Run one session of a trial and return the reports Ray Tune receives.
+
+    Like Ray's report callback, every epoch saves its checkpoint and then
+    reports. A pause stops the process between the two, so the paused epoch
+    is saved but never reported.
+
+    Args:
+        monkeypatch (pytest.MonkeyPatch): Replaces Ray Train's session.
+        config (dict): The trial configuration.
+        folder (Path): Where the session saves its checkpoints.
+        started_before_s (float): How long before now the session started.
+        pause_after (Optional[int]): The epoch the session pauses after.
+        resume_from (Optional[int]): The epoch whose checkpoint it resumes from.
+
+    Returns:
+        List[Dict[str, float]]: The reports, in the order Ray Tune gets them.
+    """
+    reports: List[Dict[str, float]] = []
+
+    class Report(L.Callback):
+        """Saves the epoch's checkpoint, then reports its metrics."""
+
+        CHECKPOINT_NAME = "checkpoint.ckpt"
+
+        def on_train_epoch_end(
+            self, trainer: L.Trainer, pl_module: L.LightningModule
+        ) -> None:
+            """Save, pause when due, report.
+
+            Args:
+                trainer (L.Trainer): The trainer.
+                pl_module (L.LightningModule): The model.
+
+            Raises:
+                Paused: When the session pauses after this epoch.
+            """
+            target = folder / str(trainer.current_epoch)
+            target.mkdir(parents=True, exist_ok=True)
+            trainer.save_checkpoint(target / self.CHECKPOINT_NAME, weights_only=False)
+            if trainer.current_epoch == pause_after:
+                raise Paused()
+            report = {k: v.item() for k, v in trainer.callback_metrics.items()}
+            reports.append({**report, "epoch": trainer.current_epoch})
+
+    checkpoint = (
+        SimpleNamespace(
+            as_directory=lambda: nullcontext(str(folder / str(resume_from)))
+        )
+        if resume_from is not None
+        else None
+    )
+    monkeypatch.setattr(objectives.train, "get_checkpoint", lambda: checkpoint)
+    monkeypatch.setattr(
+        objectives.train, "report", lambda metrics, **kwargs: reports.append(metrics)
+    )
+    monkeypatch.setattr(objectives, "RayTrainReportCallback", Report)
+    session = {
+        **config,
+        TRIAL_STARTED_AT: time.time() - started_before_s,
+        "session_id": f"started {started_before_s}s ago",
+        "last_logged_epoch": None if resume_from is None else resume_from - 1,
+    }
+    try:
+        objectives.objective_function(session)
+    except Paused:
+        pass
+    return reports
+
+
+def test_a_resumed_trial_reports_each_epoch_with_the_setup_of_its_session(
+    monkeypatch: pytest.MonkeyPatch, dataset: Dataset, tmp_path: Path
+):
+    """An epoch carries the setup of the session that trained it.
+
+    The epoch a pause fell on is reported by the session that resumes, from
+    its checkpoint: it was trained, timed and set up by the paused session.
+    """
+    hyperparameters = {**BPR, "epochs": 4}
+    config = _trial_config(monkeypatch, dataset, tmp_path, "BPR", hyperparameters)
+    first_setup, second_setup = 100.0, 200.0
+
+    first = _session(monkeypatch, config, tmp_path, first_setup, pause_after=1)
+    # The paused epoch's report, as the paused session logged it
+    paused_epoch = torch.load(tmp_path / "1" / "checkpoint.ckpt", weights_only=False)[
+        "callbacks"
+    ]["WarpRecLightningIntegrationCallback"]["last_report"]
+    second = _session(monkeypatch, config, tmp_path, second_setup, resume_from=1)
+
+    assert [report["epoch"] for report in first] == [0]
+    assert [report["epoch"] for report in second] == [1, 2, 3]
+    assert first[0][SETUP_S] == pytest.approx(first_setup, abs=30.0)
+    assert second[0] == paused_epoch
+    assert second[0][SETUP_S] == pytest.approx(first_setup, abs=30.0)
+    for report in second[1:]:
+        assert report[SETUP_S] == pytest.approx(second_setup, abs=30.0)
 
 
 def test_a_closed_form_trial_reports_its_fit_as_its_one_epoch(
