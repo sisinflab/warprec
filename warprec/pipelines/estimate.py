@@ -196,7 +196,15 @@ class EstimateStageTracker:
 
 
 class EstimateTrainingCallback(L.Callback):
-    """Collects training batch timings and resource samples from Lightning."""
+    """Collects training batch timings and resource samples from Lightning.
+
+    A batch's time runs from the end of the batch before it (from the start
+    of the epoch for the first) to its own end, so it includes fetching the
+    batch from the loader: sampling negatives, collating, waiting for the
+    loader's workers. A real epoch spends that time too, and the time
+    report's train-only time includes it. The first 'warmup_batches' batches
+    are run but not measured.
+    """
 
     def __init__(
         self,
@@ -210,23 +218,26 @@ class EstimateTrainingCallback(L.Callback):
         self._measured_batches = measured_batches
         self._tracker = tracker
         self._device = device
-        self._current_start: Optional[float] = None
+        self._previous_end: Optional[float] = None
         self._seen_batches = 0
         self.batch_times: List[float] = []
 
     def on_fit_start(self, trainer, pl_module) -> None:
         self._tracker.start()
 
+    def on_train_epoch_start(self, trainer, pl_module) -> None:
+        _sync_cuda(self._device)
+        self._previous_end = time.perf_counter()
+
     def on_train_batch_start(self, trainer, pl_module, batch, batch_idx) -> None:
         self._tracker.sample()
-        _sync_cuda(self._device)
-        self._current_start = time.perf_counter()
 
     def on_train_batch_end(self, trainer, pl_module, outputs, batch, batch_idx) -> None:
         _sync_cuda(self._device)
+        end = time.perf_counter()
         elapsed = 0.0
-        if self._current_start is not None:
-            elapsed = time.perf_counter() - self._current_start
+        if self._previous_end is not None:
+            elapsed = end - self._previous_end
 
         if self._seen_batches >= self._warmup_batches:
             if len(self.batch_times) < self._measured_batches:
@@ -234,6 +245,8 @@ class EstimateTrainingCallback(L.Callback):
 
         self._seen_batches += 1
         self._tracker.sample()
+        # The next batch is fetched from here on: its time starts now
+        self._previous_end = time.perf_counter()
 
 
 def _model_device(config: EstimateConfiguration, setup: dict) -> str:

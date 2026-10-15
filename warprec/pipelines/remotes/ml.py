@@ -16,6 +16,12 @@ from warprec.utils.helpers import (
     retrieve_evaluation_dataloader,
 )
 from warprec.recommenders.trainer.runtime import lightning_runtime
+from warprec.recommenders.trainer.timing import (
+    EPOCH_TRAIN_S,
+    RETRAINING_TRAIN,
+    EpochTimingCallback,
+    synchronize,
+)
 from warprec.recommenders.base_recommender import (
     Recommender,
     IterativeRecommender,
@@ -54,8 +60,13 @@ def remote_evaluation_and_timing(
     Returns:
         Tuple[Dict[int, Dict[str, float | Tensor]], float, float]: A tuple containing:
             - Dict[int, Dict[str, float | Tensor]]: The results of the evaluation.
-            - float: The evaluation timing.
-            - float: The inference timing.
+            - float: The seconds the evaluation of the model on the test set
+                took on this worker: scoring every batch of the loader and
+                computing the metrics. Ray's scheduling of this task, moving
+                the model here and building the loader are not part of it.
+            - float: The seconds of one prediction call scoring up to 1,000
+                users against up to 1,000 items each, 0 when no timing is
+                required.
     """
     # Load custom modules if provided
     load_custom_modules(custom_modules)
@@ -87,7 +98,8 @@ def remote_evaluation_and_timing(
     )
 
     # Evaluation
-    eval_start_time = time.time()
+    synchronize(device)
+    eval_start_time = time.perf_counter()
     evaluator.evaluate(
         model=model,
         dataloader=dataloader,
@@ -97,7 +109,8 @@ def remote_evaluation_and_timing(
         verbose=True,
     )
     results = evaluator.compute_results()
-    eval_time = time.time() - eval_start_time
+    synchronize(device)
+    eval_time = time.perf_counter() - eval_start_time
 
     # Move metrics back to CPU to avoid CUDA errors on the driver node
     for metric_dict in results.values():
@@ -144,7 +157,8 @@ def remote_evaluation_and_timing(
             device=device
         )
 
-        inference_time_start = time.time()
+        synchronize(device)
+        inference_time_start = time.perf_counter()
         with torch.inference_mode():
             model.predict(
                 user_indices=user_indices,
@@ -153,7 +167,8 @@ def remote_evaluation_and_timing(
                 seq_len=seq_len,
                 contexts=contexts,
             )
-        inference_time = time.time() - inference_time_start
+        synchronize(device)
+        inference_time = time.perf_counter() - inference_time_start
 
     return results, eval_time, inference_time
 
@@ -185,7 +200,8 @@ def remote_model_retraining(
     Returns:
         Tuple[Recommender, dict, int]:
             - The trained model.
-            - A report dictionary with parameter counts.
+            - A report dictionary with parameter counts and the seconds the
+              retraining spent only training.
             - The number of iterations.
     """
     # Load custom modules if provided
@@ -196,7 +212,8 @@ def remote_model_retraining(
     num_workers = params.optimization.num_workers
     iterations = best_params["iterations"]
 
-    # Retrieve the model from the registry
+    # Retrieve the model from the registry. A closed-form model is fitted here
+    build_start = time.perf_counter()
     best_model = model_registry.get(
         name=model_name,
         params=best_params,
@@ -210,6 +227,8 @@ def remote_model_retraining(
         block_size=block_size,
         chunk_size=chunk_size,
     )
+    synchronize(device)
+    train_only_s = time.perf_counter() - build_start
 
     # Train the model using backpropagation if the model is iterative
     if isinstance(best_model, IterativeRecommender):
@@ -235,6 +254,7 @@ def remote_model_retraining(
         )
 
         # The epochs cross-validation settled on, not the search's upper bound
+        timing = EpochTimingCallback()
         l_trainer = L.Trainer(
             max_epochs=iterations,
             devices="auto",
@@ -245,23 +265,26 @@ def remote_model_retraining(
             enable_checkpointing=False,
             enable_model_summary=False,
             enable_progress_bar=False,
+            callbacks=[timing],
         )
         l_trainer.fit(
             best_model,
             train_dataloaders=train_dataloader,
         )
+        train_only_s = sum(epoch[EPOCH_TRAIN_S] for epoch in timing.epochs)
 
         # What is saved with the model, and written as its best parameters,
         # has to describe the training it had, not the search's upper bound
         best_model.epochs = iterations
 
     # Final reporting
-    report = {}
+    report: Dict[str, float] = {}
     report["Total Params (Best Model)"] = sum(
         p.numel() for p in best_model.parameters()
     )
     report["Trainable Params (Best Model)"] = sum(
         p.numel() for p in best_model.parameters() if p.requires_grad
     )
+    report[RETRAINING_TRAIN] = train_only_s
 
     return best_model, report, iterations

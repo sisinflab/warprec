@@ -6,6 +6,9 @@ The **Sequential Recommenders** module of WarpRec focuses on models that leverag
 
     For class signatures, parameters, and source code, see the [Sequential API Reference](../api-reference/recommenders/sequential.md).
 
+!!! note "How a user's sequence is ordered"
+    A user's interactions are ordered by **timestamp, then by their order in the file**: interactions recorded in the same second keep the order they were read in, on every backend. Without a timestamp column, file order alone is used.
+
 ## Summary of Available Sequential Models
 
 | Category | Model | Description |

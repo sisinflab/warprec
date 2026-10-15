@@ -154,6 +154,7 @@ filtering:
 Selects and retains the first N interactions for each user.
 If timestamps are available, interactions are sorted chronologically before selection.
 If no timestamps are provided, the original ordering of interactions is preserved.
+Interactions that share a timestamp keep their order in the file.
 
 ```yaml
 filtering:
@@ -166,6 +167,7 @@ filtering:
 Selects and retains the last N interactions for each user.
 If timestamps are available, interactions are sorted chronologically before selection.
 If no timestamps are provided, the original ordering of interactions is preserved.
+Interactions that share a timestamp keep their order in the file, so of two recorded in the same second the one further down the file counts as the more recent.
 
 ```yaml
 filtering:

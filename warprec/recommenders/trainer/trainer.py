@@ -3,8 +3,11 @@ import os
 
 # Set Ray environment variable to enable new features
 os.environ["RAY_TRAIN_V2_ENABLED"] = "1"
+import hashlib
 import logging
 import math
+import re
+import time
 import uuid
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -15,7 +18,7 @@ import torch
 import numpy as np
 import pyarrow.fs
 import ray
-from ray import tune
+from ray import cloudpickle, tune
 from ray.tune import Tuner, TuneConfig
 from ray.tune.experiment import Trial
 from ray.tune.search.basic_variant import BasicVariantGenerator
@@ -33,6 +36,14 @@ from warprec.recommenders.trainer.logger_callbacks import (
     read_logged_epochs,
 )
 from warprec.recommenders.trainer.objectives import objective_function
+from warprec.recommenders.trainer.timing import (
+    SEARCH_OVERHEAD,
+    TRIAL_STARTED_AT,
+    TrialSpans,
+    search_overhead,
+    summarise_timing,
+    trial_timing,
+)
 from warprec.utils.config import (
     EvaluationConfig,
     RecomModel,
@@ -149,6 +160,7 @@ class Trainer:
         )
         self._errored_trials = errored_trials
         self._resumable = resumable
+        self._spans = TrialSpans()
 
     def experiment_name(self, model_name: str) -> Optional[str]:
         """Builds the deterministic Ray Tune experiment name for a model.
@@ -233,7 +245,9 @@ class Trainer:
             ray_verbose=ray_verbose,
         )
 
+        search_start = time.perf_counter()
         results = tuner.fit()
+        search_s = time.perf_counter() - search_start
 
         # Ray Tune returns normally from an interrupted sweep, so a partial
         # result grid must never be mistaken for a finished optimization.
@@ -279,7 +293,9 @@ class Trainer:
             dataset,
         )
 
-        report = self._create_report(results, best_model)
+        report = self._create_report(
+            results, [best_result.metrics["trial_id"]], search_s, best_model
+        )
         return TrainingOutcome(
             status="completed",
             model=best_model,
@@ -335,7 +351,9 @@ class Trainer:
             ray_verbose=ray_verbose,
         )
 
+        search_start = time.perf_counter()
         results = tuner.fit()
+        search_s = time.perf_counter() - search_start
 
         # Ray Tune returns normally from an interrupted sweep, so a partial
         # result grid must never be mistaken for a finished optimization.
@@ -381,7 +399,7 @@ class Trainer:
         )
         logger.positive(f"CV HPO for {model_name} ended successfully.")
 
-        report = self._create_report(results)
+        report = self._create_report(results, best_stats["trial_ids"], search_s)
         return TrainingOutcome(
             status="completed",
             best_params=best_hyperparameters,
@@ -491,6 +509,8 @@ class Trainer:
                 "last_logged_epoch": logged_epochs.get(trial_id),
                 "session_id": session_id,
                 "trial_id": trial_id,
+                # The trial's setup is counted from here, on the worker
+                TRIAL_STARTED_AT: time.time(),
             }
 
             trainer = TorchTrainer(
@@ -527,10 +547,11 @@ class Trainer:
             opt_config.scheduler, **opt_config.properties.model_dump()
         )
 
-        # Configs
+        # Configs. A fresh record of when the trials run, for this search only
+        self._spans = TrialSpans()
         run_config = ray.tune.RunConfig(
             name=self.experiment_name(model_name),
-            callbacks=self._callbacks,
+            callbacks=[*self._callbacks, self._spans],
             verbose=ray_verbose,
             storage_path=self._stg_path,
             checkpoint_config=ray.tune.CheckpointConfig(
@@ -567,6 +588,17 @@ class Trainer:
             # The inner TorchTrainer will request the actual worker bundles.
             resources={"CPU": 0.05},
         )
+        # Ray Tune registers a trainable in the cluster under its name, once
+        # per job: searches that run at once (the swarm's) need names of their
+        # own, or each overwrites the others and its trials run another model
+        stored_name = (
+            self._stored_trainable_name(os.path.join(self._stg_path, experiment_name))
+            if restore and experiment_name
+            else None
+        )
+        trainable.__name__ = stored_name or self._trainable_name(
+            model_name, experiment_name, session_id
+        )
 
         return self._build_or_restore_tuner(
             trainable=trainable,
@@ -576,6 +608,56 @@ class Trainer:
             experiment_name=experiment_name,
             restore=restore,
         )
+
+    @staticmethod
+    def _trainable_name(
+        model_name: str, experiment_name: Optional[str], session_id: str
+    ) -> str:
+        """The name a search's trainable is registered under with Ray Tune.
+
+        It is unique to the model's search in its run, so that searches running
+        at once do not share one, and the same every time the run is resumed,
+        since a restored search looks its trainable up by the name it was
+        created with.
+
+        Args:
+            model_name (str): The name of the model.
+            experiment_name (Optional[str]): The deterministic experiment name,
+                or None when the run is not resumable.
+            session_id (str): The id of this session, which names the search
+                when it has no experiment name.
+
+        Returns:
+            str: The name, in the ASCII characters Ray Tune's registry accepts.
+        """
+        identity = experiment_name or f"{model_name}__{session_id}"
+        readable = re.sub(r"[^A-Za-z0-9_.-]", "_", identity)
+        digest = hashlib.sha1(
+            identity.encode("utf-8"), usedforsecurity=False
+        ).hexdigest()[:8]
+        return f"warprec__{readable}__{digest}"
+
+    @staticmethod
+    def _stored_trainable_name(experiment_path: str) -> Optional[str]:
+        """The name the trainable of a stored search was registered under.
+
+        A search is restored only with a trainable of the same name; one
+        paused by WarpRec 2.2.2 or earlier used 'train_driver_fn'.
+
+        Args:
+            experiment_path (str): The path of the Ray Tune experiment.
+
+        Returns:
+            Optional[str]: The name, None when the experiment does not say.
+        """
+        fs, fs_path = get_fs_and_path(experiment_path)
+        try:
+            with fs.open_input_file(f"{fs_path}/tuner.pkl") as stored:
+                state = cloudpickle.loads(stored.readall())
+        except (OSError, EOFError, cloudpickle.pickle.UnpicklingError):
+            return None
+        name = state.get("__trainable_name") if isinstance(state, dict) else None
+        return name if isinstance(name, str) else None
 
     def _claim_experiment(self, experiment_name: Optional[str]) -> bool:
         """Decides whether to restore the Ray Tune experiment of a model.
@@ -860,13 +942,16 @@ class Trainer:
                     lambda x: tuple(x) if isinstance(x, list) else x
                 )
 
+        aggregations = {
+            "mean_score": (metric, "mean"),
+            "std_score": (metric, "std"),
+            "desired_training_iterations": ("iterations", desired_it_stat),
+        }
+        if "trial_id" in df:
+            aggregations["trial_ids"] = ("trial_id", list)
         agg_df = (
             df.groupby(hyperparam_cols or (lambda _: 0))
-            .agg(
-                mean_score=(metric, "mean"),
-                std_score=(metric, "std"),
-                desired_training_iterations=("iterations", desired_it_stat),
-            )
+            .agg(**aggregations)
             .reset_index()
         )
 
@@ -896,7 +981,12 @@ class Trainer:
             else:
                 best_params[key] = val
 
-        stats = {"mean": best_row["mean_score"], "std": best_row["std_score"]}
+        stats = {
+            "mean": best_row["mean_score"],
+            "std": best_row["std_score"],
+            # The folds of the best configuration, its trials
+            "trial_ids": list(best_row.get("trial_ids", [])),
+        }
         return best_params, stats
 
     def _parse_params(self, params: RecomModel, num_folds: int = 0) -> dict:
@@ -1008,8 +1098,24 @@ class Trainer:
         return callbacks
 
     def _create_report(
-        self, results: tune.ResultGrid, model: Optional[Recommender] = None
+        self,
+        results: tune.ResultGrid,
+        best_trial_ids: List[str],
+        search_s: float,
+        model: Optional[Recommender] = None,
     ) -> dict:
+        """Summarises the memory, time and size of a finished search.
+
+        Args:
+            results (tune.ResultGrid): The results of the search.
+            best_trial_ids (List[str]): The best trial, or under cross-validation
+                the trials of the best configuration, one per fold.
+            search_s (float): The wall clock of the search, from 'Tuner.fit'.
+            model (Optional[Recommender]): The best model, when there is one.
+
+        Returns:
+            dict: The report, by time report column.
+        """
         report = {}
 
         # Memory stats from dataframe
@@ -1026,6 +1132,15 @@ class Trainer:
         if successful_trials:
             times = [r.metrics.get("time_total_s", 0) for r in successful_trials]
             report["Average Trial Time (s)"] = sum(times) / len(times)
+
+        # Where the trials' time went, from what every epoch reported
+        timing = {
+            r.metrics["trial_id"]: trial_timing(r.metrics_dataframe)
+            for r in results  # type: ignore[attr-defined]
+            if r.metrics and "trial_id" in r.metrics
+        }
+        report.update(summarise_timing(timing, best_trial_ids))
+        report[SEARCH_OVERHEAD] = search_overhead(search_s, self._spans, timing)
 
         # Model stats
         report["Total Params (Best Model)"] = np.nan

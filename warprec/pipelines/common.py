@@ -230,6 +230,44 @@ def data_preparation_seconds(
     return time.time() - started_at - waited
 
 
+def model_timing_row(  # pylint: disable = too-many-arguments
+    model_name: str,
+    data_preparation_time: float,
+    exploration_time: float,
+    ray_report: Dict[str, Any],
+    evaluation_time: float,
+    inference_time: float,
+) -> Dict[str, Any]:
+    """The row of the time report for one model, as train and swarm write it.
+
+    Args:
+        model_name (str): The name of the model.
+        data_preparation_time (float): The seconds the run took to prepare its
+            data, shared by every model.
+        exploration_time (float): The wall clock of the model's search, from
+            building its trainer to loading its best model (and, under
+            cross-validation, retraining it), Ray's scheduling included.
+        ray_report (Dict[str, Any]): The summary of the search: memory,
+            parameters and where the trials' time went.
+        evaluation_time (float): The seconds the evaluation of the best model
+            on the test set took on its worker.
+        inference_time (float): The seconds of one prediction call, which
+            the writer gives in milliseconds.
+
+    Returns:
+        Dict[str, Any]: The row, by column.
+    """
+    return {
+        "Model Name": model_name,
+        "Data Preparation Time": data_preparation_time,
+        "Hyperparameter Exploration Time": exploration_time,
+        **ray_report,
+        "Evaluation Time": evaluation_time,
+        "Inference Time": inference_time,
+        "Total Time": data_preparation_time + exploration_time + evaluation_time,
+    }
+
+
 def measure_emissions(context: PipelineContext) -> AbstractContextManager[Any]:
     """The CodeCarbon measurement of a run, when the configuration asks for one.
 

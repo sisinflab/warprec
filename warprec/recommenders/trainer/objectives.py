@@ -1,4 +1,5 @@
 import logging
+import time
 import warnings
 from contextlib import nullcontext
 from pathlib import Path
@@ -23,6 +24,12 @@ from warprec.recommenders.callbacks import (
 )
 from warprec.recommenders.base_recommender import IterativeRecommender
 from warprec.recommenders.trainer.runtime import lightning_runtime
+from warprec.recommenders.trainer.timing import (
+    TRIAL_STARTED_AT,
+    EpochTimingCallback,
+    epoch_timing,
+    synchronize,
+)
 from warprec.utils.config import RecomModel
 from warprec.utils.helpers import (
     build_evaluation_dataloader_kwargs,
@@ -99,6 +106,8 @@ def _run_trial(config: dict) -> None:  # pylint: disable = too-many-locals
     custom_modules = config.get("custom_modules", [])
     early_stopping_config = config.get("early_stopping_config", None)
     optimization = config.get("optimization", None)
+    # When the trial started, on the trial driver: the setup is counted from it
+    started_at = config.get(TRIAL_STARTED_AT) or time.time()
 
     # Validation metric in the correct format
     validation_score = f"{validation_metric_name}@{validation_top_k}"
@@ -145,6 +154,9 @@ def _run_trial(config: dict) -> None:  # pylint: disable = too-many-locals
 
     # Proceed with normal model training behavior
     try:
+        # A closed-form model is fitted while it is built
+        build_started_at = time.time()
+        build_start = time.perf_counter()
         model = model_registry.get(
             name=model_name,
             params=params,
@@ -159,6 +171,8 @@ def _run_trial(config: dict) -> None:  # pylint: disable = too-many-locals
             block_size=block_size,
             chunk_size=chunk_size,
         )
+        synchronize(device)
+        build_s = time.perf_counter() - build_start
 
         if isinstance(model, IterativeRecommender):
             # Set up the learning rate scheduler and the optimizer
@@ -237,7 +251,9 @@ def _run_trial(config: dict) -> None:  # pylint: disable = too-many-locals
                 enable_model_summary=False,
                 enable_progress_bar=False,
                 check_val_every_n_epoch=eval_every_n,
+                # The timing is logged first, so that the report carries it
                 callbacks=[
+                    EpochTimingCallback(started_at),
                     integration_callback,
                     RayTrainReportCallback(),
                     RandomStateCallback(train_dataloader),
@@ -259,6 +275,8 @@ def _run_trial(config: dict) -> None:  # pylint: disable = too-many-locals
                 )
 
         else:
+            # Its fit is its one epoch, and the evaluation its validation
+            validation_start = time.perf_counter()
             evaluation_dataloader_kwargs = build_evaluation_dataloader_kwargs(
                 num_workers=resolve_num_workers(
                     num_workers,
@@ -286,6 +304,8 @@ def _run_trial(config: dict) -> None:  # pylint: disable = too-many-locals
                 device=device,
             )
             results = evaluator.compute_results()
+            synchronize(device)
+            validation_s = time.perf_counter() - validation_start
 
             # Metrics to report
             metric_report = {
@@ -296,6 +316,14 @@ def _run_trial(config: dict) -> None:  # pylint: disable = too-many-locals
                 for metric_name, value in metrics_results.items()
             }
             metric_report.update(_get_memory_usage())
+            metric_report.update(
+                epoch_timing(
+                    train_s=build_s,
+                    validation_s=validation_s,
+                    samples=float(len(dataset.train_set)),
+                    setup_s=max(build_started_at - started_at, 0.0),
+                )
+            )
 
             # Report to Ray Tune from every rank: report() is collective
             train.report(metrics=metric_report)

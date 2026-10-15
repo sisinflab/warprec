@@ -12,7 +12,7 @@ It allows customization of numerical precision, device usage, logging verbosity,
 - **cpu_data_prep**: The cpu resource to request for data preparation phase. Defaults to `1`.
 - **custom_resources_data_prep**: The custom resources to request for data preparation phase.
 - **label_selector_data_prep**: The label selector used for data preparation phase.
-- **time_report**: Whether to report the time taken by each step. Defaults to `True`.
+- **time_report**: Whether to write the `Time_Report` file, which tells apart the setup, the train-only time, the validation and the test evaluation of every model (see [Time Report](../data-management/writer.md#time-report)). Defaults to `True`.
 - **custom_modules**: Python modules to import custom implementations into WarpRec. Can be a string or a list of strings. Each is imported under its file or directory name, so a name another module already has (a second `models.py`, or one of Python's own such as `json.py`) is refused rather than silently replaced by the other module.
 - **callback**: Nested section to configure a custom callback.
 - **azure**: Nested section to configure Azure information needed for reading and writing data from/to Azure Blob Storage.

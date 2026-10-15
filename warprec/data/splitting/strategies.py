@@ -28,6 +28,11 @@ class SplittingStrategy(ABC):
     def _prepare_stable_data(self, data: FrameT) -> Tuple[DataFrame[Any], str]:
         """Helper method to ensure data has a stable row index for tie-breaking.
         Returns the modified data and the name of the index column.
+
+        Every strategy hands its halves back sorted by this index, in the order
+        of its input, because what follows breaks ties by row order: a
+        validation split, the sequences of a sequential model and the 'first'
+        and 'last' duplicate policies.
         """
         # Make the DataFrame eager in case of LazyFrames
         if isinstance(data, nw.LazyFrame):
@@ -37,6 +42,48 @@ class SplittingStrategy(ABC):
 
         index_col = "__original_row_index__"
         return materialized_data.with_row_index(name=index_col), index_col
+
+    def _order_in_time(
+        self,
+        data: DataFrame[Any],
+        user_id_label: str,
+        timestamp_label: str,
+        idx_col: str,
+    ) -> DataFrame[Any]:
+        """Sort each user's rows into temporal order and number them in it.
+
+        Temporal order is the timestamp, then the position in the file: rows that
+        share a timestamp keep the order they were read in, and the most recent
+        row is the last one. Without a timestamp column, file order alone is used.
+        The number is taken from the position in the sorted frame rather than
+        from a rank of the timestamp: an ordinal rank gives a tie to the row that
+        appears first whichever way it runs, so a descending one called the
+        earlier of two same-second rows the most recent.
+
+        Args:
+            data (DataFrame[Any]): The data, carrying the stable row index.
+            user_id_label (str): The user_id label.
+            timestamp_label (str): The timestamp label.
+            idx_col (str): The name of the stable row index column.
+
+        Returns:
+            DataFrame[Any]: The data sorted by user and temporal order, with
+                ``n_items`` (the user's number of rows) and ``rank`` (the row's
+                1-based place in the user's temporal order) attached.
+        """
+        by = [user_id_label, idx_col]
+        if timestamp_label in data.columns:
+            by.insert(1, timestamp_label)
+
+        position = "__temporal_position__"
+        ordered = data.sort(by=by).with_row_index(name=position)
+        return ordered.with_columns(
+            n_items=nw.len().over(user_id_label).cast(nw.Int64),
+            rank=nw.col(position)
+            .rank(method="ordinal")
+            .over(user_id_label)
+            .cast(nw.Int64),
+        ).drop(position)
 
     def __call__(
         self, data: FrameT, **kwargs: Any
@@ -59,7 +106,8 @@ class TemporalHoldoutSplit(SplittingStrategy):
     """The definition of a temporal holdout splitting strategy.
 
     In case the timestamp will not be provided, the former order
-    of the transactions will be used.
+    of the transactions will be used. Transactions sharing a timestamp
+    keep their order in the file, the later one being the more recent.
     """
 
     def __call__(
@@ -89,19 +137,8 @@ class TemporalHoldoutSplit(SplittingStrategy):
                 - DataFrame[Any]: Second partition of splitted data.
         """
         data_prep, idx_col = self._prepare_stable_data(data)
-
-        # Deterministic sorting
-        if timestamp_label in data_prep.columns:
-            data_prep = data_prep.sort(by=[user_id_label, timestamp_label, idx_col])
-            rank_target_col = timestamp_label
-        else:
-            data_prep = data_prep.sort(by=[user_id_label, idx_col])
-            rank_target_col = idx_col
-
-        # Compute the cumulative count
-        data_with_stats = data_prep.with_columns(
-            n_items=nw.len().over(user_id_label),
-            rank=nw.col(rank_target_col).rank(method="ordinal").over(user_id_label),
+        data_with_stats = self._order_in_time(
+            data_prep, user_id_label, timestamp_label, idx_col
         )
 
         # Masking
@@ -110,8 +147,8 @@ class TemporalHoldoutSplit(SplittingStrategy):
 
         # Clean the output
         cols_to_drop = ["n_items", "rank", idx_col]
-        train = data_with_stats.filter(train_mask).drop(cols_to_drop)
-        test = data_with_stats.filter(~train_mask).drop(cols_to_drop)
+        train = data_with_stats.filter(train_mask).sort(idx_col).drop(cols_to_drop)
+        test = data_with_stats.filter(~train_mask).sort(idx_col).drop(cols_to_drop)
 
         return [(train, test)]
 
@@ -121,7 +158,8 @@ class TemporalLeaveKOutSplit(SplittingStrategy):
     """The definition of a temporal leave k out splitting strategy.
 
     In case the timestamp will not be provided, the former order
-    of the transactions will be used.
+    of the transactions will be used. Transactions sharing a timestamp
+    keep their order in the file, the later one being the more recent.
     """
 
     def __call__(
@@ -151,33 +189,20 @@ class TemporalLeaveKOutSplit(SplittingStrategy):
                 - DataFrame[Any]: Second partition of splitted data.
         """
         data_prep, idx_col = self._prepare_stable_data(data)
-
-        # Deterministic sorting
-        if timestamp_label in data.columns:
-            data_prep = data_prep.sort(by=[user_id_label, timestamp_label, idx_col])
-            rank_target_col = timestamp_label
-        else:
-            data_prep = data_prep.sort(by=[user_id_label, idx_col])
-            rank_target_col = idx_col
-
-        # Pre-filtering
-        data_prep = data_prep.with_columns(n_items=nw.len().over(user_id_label))
-        data_prep = data_prep.filter(nw.col("n_items") > k)
-
-        # Descending sorting
-        data_prep = data_prep.with_columns(
-            rank_desc=nw.col(rank_target_col)
-            .rank(method="ordinal", descending=True)
-            .over(user_id_label)
+        data_prep = self._order_in_time(
+            data_prep, user_id_label, timestamp_label, idx_col
         )
 
-        # Masking
-        test_mask = nw.col("rank_desc") <= k
+        # Pre-filtering
+        data_prep = data_prep.filter(nw.col("n_items") > k)
+
+        # Masking: the last k rows of each user in temporal order
+        test_mask = nw.col("rank") > nw.col("n_items") - k
 
         # Clean the output
-        cols_to_drop = ["n_items", "rank_desc", idx_col]
-        train = data_prep.filter(~test_mask).drop(cols_to_drop)
-        test = data_prep.filter(test_mask).drop(cols_to_drop)
+        cols_to_drop = ["n_items", "rank", idx_col]
+        train = data_prep.filter(~test_mask).sort(idx_col).drop(cols_to_drop)
+        test = data_prep.filter(test_mask).sort(idx_col).drop(cols_to_drop)
 
         return [(train, test)]
 
@@ -233,11 +258,13 @@ class TimestampSlicingSplit(SplittingStrategy):
         data_prep, idx_col = self._prepare_stable_data(data)
 
         if timestamp == "best":
-            # Deterministic sorting
-            data_prep = data_prep.sort(by=[user_id_label, timestamp_label, idx_col])
-
-            # Find the best timestamp
-            best_timestamp = self._best_split(data_prep, user_id_label, timestamp_label)
+            # Find the best timestamp, on a copy sorted by user and time: the
+            # halves themselves keep the order of the input
+            best_timestamp = self._best_split(
+                data_prep.sort(by=[user_id_label, timestamp_label, idx_col]),
+                user_id_label,
+                timestamp_label,
+            )
 
             # Clean the output
             data_prep = data_prep.drop(idx_col)
@@ -383,8 +410,16 @@ class RandomHoldoutSplit(SplittingStrategy):
 
         # Clean the output
         cols_to_drop = ["rand_col", "__pos_idx__", idx_col]
-        train = data_rand.filter(nw.col("__pos_idx__") < split_idx).drop(cols_to_drop)
-        test = data_rand.filter(nw.col("__pos_idx__") >= split_idx).drop(cols_to_drop)
+        train = (
+            data_rand.filter(nw.col("__pos_idx__") < split_idx)
+            .sort(idx_col)
+            .drop(cols_to_drop)
+        )
+        test = (
+            data_rand.filter(nw.col("__pos_idx__") >= split_idx)
+            .sort(idx_col)
+            .drop(cols_to_drop)
+        )
 
         return [(train, test)]
 
@@ -453,8 +488,8 @@ class RandomLeaveKOutSplit(SplittingStrategy):
 
         # Clean the output
         cols_to_drop = ["n_items", "rand_col", "rnd_rank", idx_col]
-        train = data_prep.filter(~test_mask).drop(cols_to_drop)
-        test = data_prep.filter(test_mask).drop(cols_to_drop)
+        train = data_prep.filter(~test_mask).sort(idx_col).drop(cols_to_drop)
+        test = data_prep.filter(test_mask).sort(idx_col).drop(cols_to_drop)
 
         return [(train, test)]
 

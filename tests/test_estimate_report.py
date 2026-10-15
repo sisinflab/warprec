@@ -7,13 +7,21 @@ the default warm-up of ten batches a loader of ten batches or fewer was all
 warm-up, so the report said 'Measured Eval Batches: 0' with nothing to warn.
 """
 
+import time
 from pathlib import Path
 from typing import Any, Dict
 
+import lightning as L
 import pandas as pd
+import torch
 import yaml
 
-from warprec.pipelines.estimate import _aggregate_reports, estimate_pipeline
+from warprec.pipelines.estimate import (
+    EstimateStageTracker,
+    EstimateTrainingCallback,
+    _aggregate_reports,
+    estimate_pipeline,
+)
 
 
 def _report(ram_max: float, ram_min: float, eval_time: float) -> Dict[str, Any]:
@@ -104,3 +112,89 @@ def test_every_model_gets_measured_batches_and_an_evaluation_time(
     assert report.loc["BPR", "Measured Train Batches"] >= 1
     # The model's own note replaces the generic one instead of repeating it
     assert report.loc["EASE", "Notes"].lower().count("analytical train-space") == 1
+
+
+FETCH_S = 0.05
+STEP_S = 0.01
+
+
+class _SlowToFetch(torch.utils.data.Dataset):
+    """Batches that take FETCH_S to fetch, as negative sampling or collation do."""
+
+    def __len__(self) -> int:
+        """Six examples.
+
+        Returns:
+            int: The number of examples.
+        """
+        return 6
+
+    def __getitem__(self, index: int) -> torch.Tensor:
+        """One example, after the wait of fetching its batch.
+
+        Args:
+            index (int): The example.
+
+        Returns:
+            torch.Tensor: The example.
+        """
+        time.sleep(FETCH_S)
+        return torch.ones(1)
+
+
+class _SlowToStep(L.LightningModule):
+    """A model whose every training step takes STEP_S."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.weight = torch.nn.Parameter(torch.ones(1))
+
+    def training_step(self, batch: torch.Tensor, batch_idx: int) -> torch.Tensor:
+        """A step of STEP_S.
+
+        Args:
+            batch (torch.Tensor): The batch.
+            batch_idx (int): Its index.
+
+        Returns:
+            torch.Tensor: The loss.
+        """
+        time.sleep(STEP_S)
+        return (self.weight * batch).sum()
+
+    def configure_optimizers(self) -> torch.optim.Optimizer:
+        """Plain SGD.
+
+        Returns:
+            torch.optim.Optimizer: The optimizer.
+        """
+        return torch.optim.SGD(self.parameters(), lr=0.1)
+
+
+def test_a_measured_training_batch_includes_fetching_it():
+    """A batch's time runs from the end of the one before, so fetching counts.
+
+    A real epoch spends that time too: the time report's train-only time
+    includes it, and so must the estimate extrapolated to an epoch.
+    """
+    tracker = EstimateStageTracker(baseline_rss_mb=0.0, device="cpu")
+    callback = EstimateTrainingCallback(
+        warmup_batches=1, measured_batches=10, tracker=tracker, device="cpu"
+    )
+    trainer = L.Trainer(
+        max_epochs=1,
+        accelerator="cpu",
+        logger=False,
+        enable_checkpointing=False,
+        enable_model_summary=False,
+        enable_progress_bar=False,
+        callbacks=[callback],
+    )
+    loader = torch.utils.data.DataLoader(_SlowToFetch(), batch_size=1)
+
+    trainer.fit(_SlowToStep(), train_dataloaders=loader)
+
+    # The first batch is the warm-up; every other one is fetched, then stepped
+    assert len(callback.batch_times) == len(loader) - 1
+    for batch_time in callback.batch_times:
+        assert batch_time >= FETCH_S + STEP_S
