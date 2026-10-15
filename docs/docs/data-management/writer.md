@@ -82,6 +82,18 @@ A timing and environment summary file (`Time_Report`) with wall-clock measuremen
 
 Unless otherwise specified, durations are wall-clock; inference time is reported in milliseconds.
 
+#### Per-epoch timing in Ray Tune's results
+
+Every epoch of a trial reports, beside its metrics, the keys below. They land in each trial's `progress.csv` and `result.json` under `ray_results/`, and reach the MLflow and W&B dashboards with the epoch's metrics. A closed-form trial reports them once.
+
+| Key | Meaning |
+|---|---|
+| `epoch_train_s` | Seconds of the epoch's training loop, validation excluded. |
+| `epoch_validation_s` | Seconds of the epoch's end-of-epoch validation; `0` for an epoch that was not validated. |
+| `epoch_samples` | Training examples the epoch went through: an interaction or a (user, positive, negative) triplet for most collaborative models, a sequence for the sequential models, a user row for the autoencoders, a training interaction for a closed-form model, summed over the workers. |
+| `train_samples_per_s` | `epoch_samples / epoch_train_s`. |
+| `setup_s` | The trial's setup: from the start of the trial to its first training batch (starting the Ray Train workers, fetching the dataset, building the model and its loaders); for a closed-form model, to the start of its fit. The same value in every report of a session. |
+
 ### Estimate Report
 
 The Estimate Pipeline writes an `Estimate_Report` file with per-model resource and timing projections aggregated across all successful setups:

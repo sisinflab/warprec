@@ -5,6 +5,7 @@ import os
 os.environ["RAY_TRAIN_V2_ENABLED"] = "1"
 import logging
 import math
+import time
 import uuid
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -33,6 +34,7 @@ from warprec.recommenders.trainer.logger_callbacks import (
     read_logged_epochs,
 )
 from warprec.recommenders.trainer.objectives import objective_function
+from warprec.recommenders.trainer.timing import TRIAL_STARTED_AT
 from warprec.utils.config import (
     EvaluationConfig,
     RecomModel,
@@ -491,6 +493,8 @@ class Trainer:
                 "last_logged_epoch": logged_epochs.get(trial_id),
                 "session_id": session_id,
                 "trial_id": trial_id,
+                # The trial's setup is counted from here, on the worker
+                TRIAL_STARTED_AT: time.time(),
             }
 
             trainer = TorchTrainer(
