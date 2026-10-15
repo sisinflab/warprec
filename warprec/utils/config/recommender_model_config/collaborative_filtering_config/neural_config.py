@@ -1,4 +1,3 @@
-# pylint: disable=duplicate-code
 from itertools import product
 from typing import ClassVar
 

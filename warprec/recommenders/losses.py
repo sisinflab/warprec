@@ -31,7 +31,7 @@ class BPRLoss(nn.Module):
             distance = pos_score.unsqueeze(1) - neg_score
 
         # Compute the softplus function of the negative distance
-        loss = F.softplus(-distance)  # pylint: disable=not-callable
+        loss = F.softplus(-distance)
 
         # Return the mean of the bpr losses computed
         return loss.mean()

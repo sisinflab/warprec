@@ -134,7 +134,7 @@ class WarpRecConfiguration(BaseModel):
         return self
 
     @model_validator(mode="after")
-    def config_validation(self) -> "WarpRecConfiguration":
+    def config_validation(self) -> "WarpRecConfiguration":  # noqa: PLR0912
         """This method checks if everything in the configuration file is missing or incorrect.
 
         Returns:
@@ -471,7 +471,7 @@ class TrainConfiguration(WarpRecConfiguration):
             dict: The dictionary containing all the models and their parameters.
         """
         # Check if Context-Aware model is in the experiment
-        from warprec.recommenders.base_recommender import ContextRecommenderUtils  # pylint: disable = import-outside-toplevel
+        from warprec.recommenders.base_recommender import ContextRecommenderUtils
 
         parsed_models = {}
         for model_name, model_data in self.models.items():

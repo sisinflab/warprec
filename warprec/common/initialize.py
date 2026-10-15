@@ -1,4 +1,3 @@
-# pylint: disable=too-many-branches, too-many-statements
 from typing import Tuple, List, Optional, Dict, Union, Any
 
 from narwhals.dataframe import DataFrame
@@ -120,7 +119,7 @@ def _read_modality(
     }
 
 
-def initialize_datasets(
+def initialize_datasets(  # noqa: PLR0912, PLR0915
     reader: Reader,
     callback: WarpRecCallback,
     config: Union[TrainConfiguration, DesignConfiguration, EvalConfiguration],

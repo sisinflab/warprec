@@ -1,4 +1,3 @@
-# pylint: disable = R0801, E1102
 from typing import Any, Optional
 
 import numpy as np
@@ -440,7 +439,7 @@ class STAN(Recommender, SequentialRecommenderUtils):
             seq_len_np = None
 
         for b, user_id in enumerate(user_indices_cpu):
-            user_id = int(user_id)
+            user_id = int(user_id)  # noqa: PLW2901
 
             # Recover current session items (most-recent first order
             # preserved — the evaluator already truncates to max_seq_len).

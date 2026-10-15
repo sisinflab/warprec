@@ -1,4 +1,3 @@
-# pylint: disable = unused-argument
 import random
 import json
 import inspect
@@ -967,7 +966,6 @@ class IterativeRecommender(Recommender, L.LightningModule):
 
 
 class ContextRecommenderUtils(nn.Module, ABC):
-    # pylint: disable = too-many-instance-attributes  # this class is the state it holds
     """Common definition for context-aware recommenders.
 
     This Mixin handles:
@@ -1441,7 +1439,6 @@ class ContextRecommenderUtils(nn.Module, ABC):
         return biases.view(target_items.shape)
 
 
-# pylint: disable = too-few-public-methods
 class SequentialRecommenderUtils(ABC):
     """Common definition for sequential recommenders.
 

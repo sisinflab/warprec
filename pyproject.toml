@@ -93,7 +93,6 @@ pytest = "^8.3.4"
 pytest-cov = "^6.0.0"
 ruff = "^0.9.3"
 mypy = "^1.14.1"
-pylint = "^3.3.3"
 bandit = "^1.8.2"
 nvitop = "^1.4.2"
 matplotlib = "^3.10.3"
@@ -117,6 +116,23 @@ upload_to_repository = false
 upload_to_release = true
 commit_message = "chore(release): {version} [skip ci]"
 commit_author = "github-actions [bot] <github-actions[bot]@users.noreply.github.com>"
+
+
+[tool.ruff.lint]
+# pylint's errors and warnings, and its size limits, at ruff's speed. pylint
+# itself took over a minute on every push; what it adds beyond these (type
+# inference, duplicate code) is mostly mypy's job.
+extend-select = ["PLE", "PLW", "PLR0911", "PLR0912", "PLR0913", "PLR0915"]
+
+[tool.ruff.lint.per-file-ignores]
+# The guides' notebooks are tutorials, not library code
+"*.ipynb" = ["PLW", "PLR"]
+
+[tool.ruff.lint.pylint]
+max-args = 10
+max-branches = 12
+max-statements = 50
+max-returns = 6
 
 
 [tool.coverage.report]

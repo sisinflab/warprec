@@ -1,4 +1,3 @@
-# pylint: disable = R0801, E1102
 from typing import Any, List, Optional, Tuple
 
 import torch
@@ -100,7 +99,6 @@ class FREEDOM(MultiModalRecommenderUtils, GraphRecommenderUtils, IterativeRecomm
         seed: int = 42,
         **kwargs: Any,
     ):
-        # pylint: disable = too-many-arguments, too-many-positional-arguments
         super().__init__(
             params, info, *args, multimodal=multimodal, seed=seed, **kwargs
         )

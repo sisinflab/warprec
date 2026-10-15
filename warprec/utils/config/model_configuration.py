@@ -855,7 +855,7 @@ class RecomModel(BaseModel, ABC):
             f"The range for field {field} must contain numbers. Received: {value}."
         )
 
-    def validate_advanced_distribution(
+    def validate_advanced_distribution(  # noqa: PLR0912
         self, field: str, value: List[Union[str, float, int]]
     ) -> List[Union[str, float, int]]:
         """Validates complex search space distributions.

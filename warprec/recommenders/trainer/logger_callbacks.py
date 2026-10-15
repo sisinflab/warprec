@@ -39,7 +39,7 @@ def read_logged_epochs(experiment_path: str) -> Dict[str, int]:
     return epochs
 
 
-class _StoredHistoryRestore:  # pylint: disable=too-few-public-methods
+class _StoredHistoryRestore:
     """Restores the results a trial wrote before a pause when it is resumed.
 
     Ray Tune copies a trial's result file back from storage only when the trial

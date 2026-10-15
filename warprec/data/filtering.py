@@ -1,4 +1,3 @@
-# pylint: disable = too-few-public-methods
 import inspect
 from typing import List, Any
 from abc import ABC
@@ -13,7 +12,6 @@ from warprec.utils.logger import logger
 from warprec.utils.registry import filter_registry
 
 
-# pylint: disable = unused-argument
 class Filter(ABC):
     """Abstract definition of a filter.
     Filters are used to process datasets by applying specific conditions

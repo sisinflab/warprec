@@ -68,7 +68,7 @@ class Reader(ABC):
             )
         return self._read_with_pandas(source, sep, header, desired_cols, desired_dtypes)
 
-    def _read_with_pandas(
+    def _read_with_pandas(  # noqa: PLR0912, PLR0915
         self,
         source: Any,
         sep: str,
@@ -214,7 +214,7 @@ class Reader(ABC):
 
         return nw_df
 
-    def _read_with_polars(
+    def _read_with_polars(  # noqa: PLR0912
         self,
         source: Any,
         sep: str,
@@ -577,7 +577,7 @@ class Reader(ABC):
         """This method will load a model state from a source."""
 
 
-class ReaderFactory:  # pylint: disable=C0415, R0903
+class ReaderFactory:
     """Factory class for creating Reader instances based on configuration."""
 
     @classmethod

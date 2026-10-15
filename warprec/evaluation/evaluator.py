@@ -75,7 +75,7 @@ class Evaluator:
             ranking, or None to rank by score alone.
     """
 
-    def __init__(
+    def __init__(  # noqa: PLR0913
         self,
         metric_list: List[str],
         k_values: List[int],
@@ -91,7 +91,6 @@ class Evaluator:
         candidates: str = "all",
         reranker: Optional[Any] = None,
     ):
-        # pylint: disable = too-many-arguments, too-many-positional-arguments
         # Metrics, cut-offs and the lookups they need are independent of one
         # another and are not passed together anywhere else, so grouping them
         # would invent a structure rather than reflect one.
@@ -257,7 +256,7 @@ class Evaluator:
             )
             raise e
 
-    def evaluate(
+    def evaluate(  # noqa: PLR0912, PLR0915
         self,
         model: Recommender,
         dataloader: DataLoader,
@@ -280,7 +279,6 @@ class Evaluator:
         Raises:
             EvaluationError: If the strategy isn't either "full" or "sampled".
         """
-        # pylint: disable=too-many-statements
         if strategy not in ["full", "sampled"]:
             raise EvaluationError(f"Strategy '{strategy}' not supported.")
 

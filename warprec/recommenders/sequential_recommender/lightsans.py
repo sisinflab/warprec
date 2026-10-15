@@ -1,4 +1,3 @@
-# pylint: disable = R0801, E1102, W0221, C0103, W0613, W0235
 from typing import Any, Optional
 
 import torch
@@ -15,7 +14,6 @@ from warprec.utils.registry import model_registry
 
 
 class LightSANsLayer(nn.Module):
-    # pylint: disable = too-many-instance-attributes  # this class is the state it holds
     """Implements the Low-Rank Decomposed Self-Attention and Decoupled Position Encoding."""
 
     def __init__(

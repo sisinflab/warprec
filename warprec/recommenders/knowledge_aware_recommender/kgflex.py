@@ -1,4 +1,3 @@
-# pylint: disable = R0801, E1102
 from typing import Any, Dict, List, Optional, Tuple
 
 import numpy as np
@@ -99,7 +98,6 @@ class KGFlex(KnowledgeRecommenderUtils, IterativeRecommender):
         seed: int = 42,
         **kwargs: Any,
     ):
-        # pylint: disable = too-many-arguments, too-many-positional-arguments, too-many-locals
         super().__init__(params, info, *args, knowledge=knowledge, seed=seed, **kwargs)
 
         if interactions is None:
@@ -247,7 +245,6 @@ class KGFlex(KnowledgeRecommenderUtils, IterativeRecommender):
             unexpected_keys (List[str]): Collects the keys the model lacks.
             error_msgs (List[str]): Collects the loading errors.
         """
-        # pylint: disable = too-many-arguments, too-many-positional-arguments
         for name in (
             "user_offsets",
             "pair_feature",

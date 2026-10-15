@@ -51,7 +51,6 @@ class KnowledgeGraph:
         item_label: str = "item_id",
         entity_label: str = "entity_id",
     ):
-        # pylint: disable = too-many-arguments, too-many-positional-arguments
         # The labels name the columns of two files the user wrote, and grouping
         # them would invent a structure neither file has.
         raw_heads = triples.select(head_label).to_numpy().flatten()

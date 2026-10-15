@@ -28,7 +28,6 @@ from warprec.utils.enums import RatingType
 
 # Worker seed function for reproducibility
 class Interactions:
-    # pylint: disable = too-many-instance-attributes  # this class is the state it holds
     """Interactions class will handle the data of the transactions.
 
     Args:

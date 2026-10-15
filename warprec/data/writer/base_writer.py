@@ -481,7 +481,7 @@ class Writer(ABC):
             output_json = json.dumps(existing_data, indent=4)
             self._write_text(path, output_json)
             logger.msg(f"Parameters successfully written to {path}")
-        except Exception as e:  # pylint: disable=broad-exception-caught
+        except Exception as e:
             logger.negative(f"Error writing parameters to {path}: {e}")
 
     def write_tabular_split(
@@ -734,7 +734,7 @@ class Writer(ABC):
             logger.negative(f"Error writing statistical test results to {path}: {e}")
 
 
-class WriterFactory:  # pylint: disable=C0415, R0903
+class WriterFactory:
     """Factory class for creating Writer instances based on configuration.
 
     Attributes:

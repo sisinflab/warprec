@@ -1,4 +1,3 @@
-# pylint: disable=too-few-public-methods
 from .base_reader import Reader, ReaderFactory
 from .local_reader import LocalReader
 

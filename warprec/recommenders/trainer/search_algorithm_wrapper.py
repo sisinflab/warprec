@@ -1,4 +1,3 @@
-# pylint: disable=unused-argument, too-few-public-methods
 """
 This script contains the wrapper of the Ray wrappers for the search algorithms.
 At the time of writing this there is no common interface provided by Ray.

@@ -45,7 +45,6 @@ def _get_memory_usage() -> Dict[str, float]:
 
 
 class WarpRecLightningIntegrationCallback(L.Callback):
-    # pylint: disable = too-many-instance-attributes  # this class is the state it holds
     """PyTorch Lightning callback implementation using WarpRec's custom Evaluator.
 
     Args:
@@ -125,7 +124,7 @@ class WarpRecLightningIntegrationCallback(L.Callback):
             self.es_best_score = state_dict.get("es_best_score")
             self.wait = state_dict.get("wait", 0)
 
-    def on_fit_start(self, trainer, pl_module):  # pylint: disable=unused-argument
+    def on_fit_start(self, trainer, pl_module):
         """PyTorch Lightning hook used to restore what a trial did before a pause.
 
         Ray Tune never receives the report of an epoch that ends while a run is

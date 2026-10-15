@@ -142,7 +142,7 @@ def build_mcp(
     async def popular_items(
         model: str,
         k: Optional[int] = None,
-        filter: Optional[Dict[str, Union[str, List[str]]]] = None,  # pylint: disable=redefined-builtin
+        filter: Optional[Dict[str, Union[str, List[str]]]] = None,
         exclude: Optional[List[Item]] = None,
     ) -> Dict[str, Any]:
         """The items with the most training interactions - what is popular,
@@ -162,7 +162,7 @@ def build_mcp(
         k: Optional[int] = None,
         context: Optional[Dict[str, Any]] = None,
         exclude: Optional[List[Item]] = None,
-        filter: Optional[Dict[str, Union[str, List[str]]]] = None,  # pylint: disable=redefined-builtin
+        filter: Optional[Dict[str, Union[str, List[str]]]] = None,
         explain: bool = False,
     ) -> Dict[str, Any]:
         """Recommend items with one of the models from list_models.

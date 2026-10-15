@@ -1,4 +1,3 @@
-# pylint: disable = R0801, E1102
 from typing import Any, List, Optional, Tuple
 
 import numpy as np
@@ -76,7 +75,6 @@ class KaHFM(KnowledgeRecommenderUtils, IterativeRecommender):
         seed: int = 42,
         **kwargs: Any,
     ):
-        # pylint: disable = too-many-arguments, too-many-positional-arguments
         super().__init__(params, info, *args, knowledge=knowledge, seed=seed, **kwargs)
 
         if interactions is None:

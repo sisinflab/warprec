@@ -1,4 +1,3 @@
-# pylint: disable = R0801, E1102, R0915
 from typing import Any, Optional, List
 
 import torch
@@ -169,7 +168,7 @@ class NFM(ContextRecommenderUtils, IterativeRecommender):
 
         return linear_part + prediction_score
 
-    def predict(
+    def predict(  # noqa: PLR0915
         self,
         user_indices: Tensor,
         *args: Any,

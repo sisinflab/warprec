@@ -1,4 +1,3 @@
-# pylint: disable=duplicate-code
 from pydantic import field_validator
 from warprec.utils.config.model_configuration import (
     RecomModel,

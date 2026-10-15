@@ -71,7 +71,7 @@ def _serve(path: str, export: Optional[str]) -> None:
 
     try:
         # Imported late: Ray Serve is an optional extra.
-        from warprec.serving.app import (  # pylint: disable=import-outside-toplevel
+        from warprec.serving.app import (
             export_serve_config,
             run,
         )

@@ -1,4 +1,3 @@
-# pylint: disable=too-few-public-methods
 # mypy: disable-error-code=override
 from typing import Tuple, Any, Optional, Union, List
 from abc import ABC

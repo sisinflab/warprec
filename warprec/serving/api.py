@@ -45,7 +45,7 @@ def build_api(
     mcp_app = None
     if mcp:
         # Imported here: fastmcp is an optional extra of its own.
-        from warprec.serving.mcp import build_mcp  # pylint: disable=import-outside-toplevel
+        from warprec.serving.mcp import build_mcp
 
         mcp_app = build_mcp(
             models,

@@ -213,7 +213,7 @@ def swarm_pipeline(path: str):
         _swarm_models(context, emissions)
 
 
-def _swarm_models(
+def _swarm_models(  # noqa: PLR0912, PLR0915
     context: PipelineContext, emissions: Optional["EmissionsSettings"]
 ) -> None:
     """Prepare the data, then run every model at once on the cluster.
@@ -432,7 +432,7 @@ def _swarm_models(
 
 
 @ray.remote(num_cpus=0.05)  # Zero-Resource Orchestrator
-def remote_model_pipeline(  # pylint: disable = too-many-arguments, too-many-positional-arguments
+def remote_model_pipeline(  # noqa: PLR0913
     model_name: str,
     config: TrainConfiguration,
     main_dataset: Dataset,

@@ -1,4 +1,3 @@
-# pylint: disable=duplicate-code, too-many-lines, too-many-public-methods
 from itertools import product
 from typing import ClassVar
 

@@ -66,7 +66,7 @@ class LocalWriter(Writer):
             path.mkdir(parents=True, exist_ok=True)
         logger.msg("Experiment folder created successfully.")
 
-    def write_recs(
+    def write_recs(  # noqa: PLR0913
         self,
         model: Recommender,
         dataset: Dataset,
