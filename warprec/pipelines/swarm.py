@@ -14,6 +14,7 @@ from warprec.data import Dataset
 from warprec.pipelines.common import (
     PipelineContext,
     bootstrap_pipeline,
+    data_preparation_seconds,
     measure_emissions,
     prepare_datasets,
     report_statistical_significance,
@@ -236,7 +237,7 @@ def _swarm_models(
     if requires_stat_significance:
         model_results: Dict[str, Any] = {}
 
-    data_preparation_time = time.time() - context.started_at
+    data_preparation_time = data_preparation_seconds(context.started_at, emissions)
     logger.positive(
         f"Data preparation completed in {data_preparation_time:.2f} seconds."
     )

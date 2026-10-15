@@ -23,7 +23,10 @@ from ray.cluster_utils import Cluster  # noqa: E402
 
 from warprec.pipelines import swarm as swarm_module  # noqa: E402
 from warprec.pipelines import train as train_module  # noqa: E402
-from warprec.pipelines.common import measure_emissions  # noqa: E402
+from warprec.pipelines.common import (  # noqa: E402
+    data_preparation_seconds,
+    measure_emissions,
+)
 from warprec.recommenders.trainer import emissions as emissions_module  # noqa: E402
 from warprec.recommenders.trainer.dashboard_callbacks import (  # noqa: E402
     CodeCarbonCallback,
@@ -306,3 +309,75 @@ def test_a_run_with_codecarbon_records_into_its_storage_path(tmp_path: Path):
     assert measurement.project_name == "run-x"
     assert measurement.tracking_mode == "machine"
     assert measurement.save_to_file
+
+
+def slow_tracker(start_seconds: float) -> Any:
+    """A tracker actor whose start takes a while, like one on a busy node.
+
+    Args:
+        start_seconds (float): How long the tracker takes to start.
+
+    Returns:
+        Any: The actor class, in place of 'NodeEmissionsTracker'.
+    """
+
+    @ray.remote(num_cpus=0)
+    class SlowTracker:
+        """Starts after 'start_seconds' and measures nothing."""
+
+        def __init__(self, *args: Any):
+            time.sleep(start_seconds)
+
+        def ready(self) -> bool:
+            """Answer once started."""
+            return True
+
+        def stop(self) -> None:
+            """Hand back no row."""
+            return None
+
+    return SlowTracker
+
+
+def test_the_run_waits_until_every_tracker_is_measuring(
+    cluster: Cluster, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
+    monkeypatch.setattr(emissions_module, "NodeEmissionsTracker", slow_tracker(2.0))
+    measurement = recorder(tmp_path, save_to_file=False)
+    started = time.monotonic()
+    measurement.start()
+    try:
+        # The run's work starts only once the trackers measure, and the wait
+        # is known, so that the data preparation time can leave it out
+        assert time.monotonic() - started >= 2.0
+        assert measurement.settings.startup_seconds >= 2.0
+    finally:
+        measurement.stop()
+
+
+def test_a_tracker_that_does_not_start_in_time_does_not_hold_the_run(
+    cluster: Cluster, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
+    messages = attentions(monkeypatch)
+    monkeypatch.setattr(emissions_module, "TRACKER_START_TIMEOUT_SECONDS", 1.0)
+    monkeypatch.setattr(emissions_module, "NodeEmissionsTracker", slow_tracker(4.0))
+    measurement = recorder(tmp_path, save_to_file=False)
+    started = time.monotonic()
+    measurement.start()
+    try:
+        assert time.monotonic() - started < 3.5
+        assert any("did not start within" in message for message in messages)
+    finally:
+        measurement.stop()
+
+
+def test_the_data_preparation_time_leaves_out_the_wait_for_the_trackers():
+    started_at = time.time() - 10.0
+    settings = emissions_module.EmissionsSettings(
+        tracking_mode="machine",
+        save_to_api=False,
+        project_name="run-x",
+        startup_seconds=4.0,
+    )
+    assert 5.9 < data_preparation_seconds(started_at, settings) < 6.5
+    assert 9.9 < data_preparation_seconds(started_at, None) < 10.5

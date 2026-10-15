@@ -1,6 +1,7 @@
 import os
 import socket
 import threading
+import time
 from contextlib import contextmanager
 from dataclasses import asdict, dataclass
 from typing import Any, Dict, Iterator, List, Optional, Union
@@ -23,6 +24,9 @@ NODE_POLL_SECONDS = 10.0
 # How long the driver waits for a tracker to hand its row back, in seconds
 TRACKER_TIMEOUT_SECONDS = 120.0
 
+# How long a run waits for its trackers to start measuring, in seconds
+TRACKER_START_TIMEOUT_SECONDS = 60.0
+
 
 @dataclass(frozen=True)
 class EmissionsSettings:
@@ -38,12 +42,15 @@ class EmissionsSettings:
         project_name (str): The project name of every row, the run's name.
         inbox (Any): Under 'process' tracking, the 'EmissionsInbox' actor the
             trial workers hand their rows to. None otherwise.
+        startup_seconds (float): How long the run waited for its trackers to
+            start, which its data preparation time leaves out.
     """
 
     tracking_mode: str
     save_to_api: bool
     project_name: str
     inbox: Any = None
+    startup_seconds: float = 0.0
 
 
 class _RowCapture(BaseOutput):
@@ -126,6 +133,14 @@ class NodeEmissionsTracker:  # pylint: disable = too-few-public-methods
             output_handlers=[self._row],
         )
         self._tracker.start()
+
+    def ready(self) -> bool:
+        """Answer once the tracker measures, for the run to wait on.
+
+        Returns:
+            bool: Always True.
+        """
+        return True
 
     def stop(self) -> Optional[Dict[str, Any]]:
         """Stop measuring and hand back the row.
@@ -271,9 +286,10 @@ class EmissionsRecorder:
     Under 'machine' tracking it keeps one tracker on every Ray node, an actor
     pinned to the node that reserves no CPU, from 'start' to 'stop'. Nodes
     that join the cluster in between are looked for every 'poll_interval'
-    seconds and get a tracker too. The trackers start alongside the run's work
-    rather than delaying it, so a tracker measures from the moment its actor is
-    up, a few seconds into the run. On 'stop' every tracker hands its row back
+    seconds and get a tracker too. 'start' returns once every tracker measures,
+    so the run's work is measured from its first step; a tracker that does not
+    start within 'TRACKER_START_TIMEOUT_SECONDS' is logged and measures its
+    node from whenever it starts. On 'stop' every tracker hands its row back
     through Ray and the driver appends them to 'emissions.csv', one row per
     node; a node that left the cluster before then has lost its row.
 
@@ -315,6 +331,7 @@ class EmissionsRecorder:
         self._poller: Optional[threading.Thread] = None
         self._poll_error: Optional[str] = None
         self._inbox: Any = None
+        self._startup_seconds = 0.0
 
     @property
     def settings(self) -> EmissionsSettings:
@@ -328,6 +345,7 @@ class EmissionsRecorder:
             save_to_api=self.save_to_api,
             project_name=self.project_name,
             inbox=self._inbox,
+            startup_seconds=self._startup_seconds,
         )
 
     @property
@@ -348,15 +366,23 @@ class EmissionsRecorder:
         self.stop()
 
     def start(self) -> None:
-        """Start measuring, and keep looking for nodes that join or rows."""
+        """Start measuring, returning once every tracker measures."""
+        started = time.monotonic()
         if self.tracking_mode == "process":
             self._inbox = EmissionsInbox.options(  # type: ignore[attr-defined]
                 scheduling_strategy=NodeAffinitySchedulingStrategy(
                     node_id=ray.get_runtime_context().get_node_id(), soft=False
                 ),
             ).remote()
+            # The trial workers hand their rows to it from the first trial
+            ray.get(self._inbox.take.remote(), timeout=TRACKER_START_TIMEOUT_SECONDS)
         else:
-            self._track_new_nodes()
+            self._wait_until_measuring(self._track_new_nodes())
+        self._startup_seconds = time.monotonic() - started
+        logger.msg(
+            f"CodeCarbon is measuring the run ({self.tracking_mode} tracking), "
+            f"started in {self._startup_seconds:.1f} seconds."
+        )
         self._stopping.clear()
         self._poller = threading.Thread(
             target=self._poll, name="warprec-codecarbon", daemon=True
@@ -418,8 +444,36 @@ class EmissionsRecorder:
         """Write the rows the trial workers delivered since the last look."""
         self._write(ray.get(self._inbox.take.remote()))
 
-    def _track_new_nodes(self) -> None:
-        """Start a tracker on every alive node that has none."""
+    def _wait_until_measuring(self, trackers: Dict[str, Any]) -> None:
+        """Wait until the given trackers measure, or the start timeout passes.
+
+        Args:
+            trackers (Dict[str, Any]): The trackers just started, by node id.
+        """
+        if not trackers:
+            return
+        answers = {tracker.ready.remote(): node for node, tracker in trackers.items()}
+        ready, _ = ray.wait(
+            list(answers),
+            num_returns=len(answers),
+            timeout=TRACKER_START_TIMEOUT_SECONDS,
+        )
+        for answer, node_id in answers.items():
+            if answer not in ready:
+                logger.attention(
+                    f"CodeCarbon's tracker on node {self._hosts[node_id]} "
+                    f"(node={node_id}) did not start within "
+                    f"{TRACKER_START_TIMEOUT_SECONDS:.0f} seconds; the run goes on "
+                    "and the node is measured from whenever it starts."
+                )
+
+    def _track_new_nodes(self) -> Dict[str, Any]:
+        """Start a tracker on every alive node that has none.
+
+        Returns:
+            Dict[str, Any]: The trackers started, by node id.
+        """
+        started: Dict[str, Any] = {}
         for node in ray.nodes():
             node_id = node["NodeID"]
             if not node["Alive"] or node_id in self._trackers:
@@ -435,6 +489,8 @@ class EmissionsRecorder:
                     f"{node.get('NodeManagerHostname')} "
                     f"({node.get('NodeManagerAddress')})"
                 )
+            started[node_id] = tracker
+        return started
 
     def _write(self, rows: List[Dict[str, Any]]) -> None:
         """Append rows to 'emissions.csv', when the run saves to a file.
