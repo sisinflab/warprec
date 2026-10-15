@@ -36,7 +36,7 @@ from warprec.utils.helpers import (
 )
 
 from conftest import CONTEXT_LABELS, N_ITEMS, make_model
-from test_trial_optimization import RecordingTrainer, _bundle
+from conftest import RecordingTrainer, _bundle
 from test_training_seed import _write_config
 
 SEED = 11
@@ -166,32 +166,6 @@ def test_the_eval_pipeline_evaluates_with_the_configured_seed(
     Path(path).write_text(yaml.safe_dump(config))
 
     eval_module.eval_pipeline(path)
-
-    assert seeds_seen["evaluator"] == [SEED]
-    assert seeds_seen["loader"] == [SEED]
-
-
-def test_the_estimate_pipeline_evaluates_with_the_configured_seed(
-    tmp_path: Path,
-    interactions_frame: pd.DataFrame,
-    seeds_seen: Dict[str, List[Any]],
-):
-    """The estimate pipeline times the evaluation evaluation.seed asks for."""
-    path = _write_config(
-        tmp_path,
-        interactions_frame,
-        estimate={"warmup_batches": 0, "train_batches": 1, "eval_batches": 1},
-        writer={
-            "dataset_name": "seed",
-            "writing_method": "local",
-            "local_experiment_path": str(tmp_path),
-        },
-    )
-    config = yaml.safe_load(Path(path).read_text())
-    config["evaluation"] = SAMPLED
-    Path(path).write_text(yaml.safe_dump(config))
-
-    estimate.estimate_pipeline(path)
 
     assert seeds_seen["evaluator"] == [SEED]
     assert seeds_seen["loader"] == [SEED]

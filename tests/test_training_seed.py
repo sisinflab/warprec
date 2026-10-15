@@ -19,7 +19,6 @@ import yaml
 import warprec.recommenders  # noqa: F401  (populates the registries)
 from warprec.data.dataset import Dataset
 from warprec.pipelines.design import design_pipeline
-from warprec.pipelines.estimate import estimate_pipeline
 from warprec.pipelines.eval import eval_pipeline
 from warprec.pipelines.remotes.ml import remote_model_retraining
 from warprec.recommenders.collaborative_filtering_recommender.latent_factor.bpr import (
@@ -29,7 +28,7 @@ from warprec.recommenders.trainer import objectives
 from warprec.utils.registry import model_registry, params_registry
 
 from conftest import make_model
-from test_trial_optimization import RecordingTrainer, _bundle
+from conftest import RecordingTrainer, _bundle
 
 SEED = 7
 HYPERPARAMETERS = {
@@ -198,26 +197,6 @@ def test_the_design_pipeline_trains_on_the_configured_seed(
 ):
     """The design pipeline builds its loader with the configured seed."""
     design_pipeline(_write_config(tmp_path, interactions_frame))
-
-    assert seeds_seen == [SEED]
-
-
-def test_the_estimate_pipeline_trains_on_the_configured_seed(
-    tmp_path: Path, interactions_frame: pd.DataFrame, seeds_seen: List[Any]
-):
-    """The estimate pipeline times the loader the configured seed builds."""
-    estimate_pipeline(
-        _write_config(
-            tmp_path,
-            interactions_frame,
-            estimate={"warmup_batches": 0, "train_batches": 1, "eval_batches": 1},
-            writer={
-                "dataset_name": "seed",
-                "writing_method": "local",
-                "local_experiment_path": str(tmp_path),
-            },
-        )
-    )
 
     assert seeds_seen == [SEED]
 

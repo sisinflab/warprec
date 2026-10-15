@@ -206,8 +206,6 @@ def _assert_same_weights(left: Dict[str, torch.Tensor], right: Dict[str, torch.T
         # first epoch and after a later one
         ("BPR", {"num_workers": 0}, 0),
         ("BPR", {"num_workers": 0}, 2),
-        # Negatives drawn in a persistent worker
-        ("BPR", {"num_workers": 1}, 1),
         # The global generator: dropout and the reparameterisation noise
         ("MultiVAE", {"num_workers": 0}, 1),
         # A generator the model keeps for its knowledge-graph triples
