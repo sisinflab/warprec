@@ -1,6 +1,7 @@
 import time
+from contextlib import AbstractContextManager, nullcontext
 from dataclasses import dataclass
-from typing import Any, Dict, List, Optional, Tuple
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
 
 import ray
 
@@ -30,6 +31,10 @@ from warprec.utils.config import (
 from warprec.pipelines.remotes import remote_data_preparation
 from warprec.utils.enums import ResumeMode
 from warprec.utils.logger import logger
+
+if TYPE_CHECKING:
+    # The dashboard extra is optional
+    from warprec.recommenders.trainer.emissions import EmissionsSettings
 
 
 @dataclass
@@ -202,6 +207,60 @@ def bootstrap_pipeline(path: str, pipeline: str, start_message: str) -> Pipeline
         state_store=state_store,
         run_name=run_name,
         started_at=started_at,
+    )
+
+
+def data_preparation_seconds(
+    started_at: float, emissions: Optional["EmissionsSettings"]
+) -> float:
+    """How long a run took to prepare its data, up to now.
+
+    The run waits for its CodeCarbon trackers to measure before it prepares the
+    data; that wait is not part of the preparation and is left out.
+
+    Args:
+        started_at (float): When the run started, as 'time.time()'.
+        emissions (Optional[EmissionsSettings]): The run's CodeCarbon
+            measurement, or None when the run is not measured.
+
+    Returns:
+        float: The seconds since the run started, without the wait.
+    """
+    waited = emissions.startup_seconds if emissions is not None else 0.0
+    return time.time() - started_at - waited
+
+
+def measure_emissions(context: PipelineContext) -> AbstractContextManager[Any]:
+    """The CodeCarbon measurement of a run, when the configuration asks for one.
+
+    Entered as the run starts its work, before the data is prepared, and left
+    when it ends, whether it completes, pauses or fails, so that the data
+    preparation, the searches, the retraining and the test evaluation are all
+    covered.
+
+    Args:
+        context (PipelineContext): The context produced by the bootstrap.
+
+    Returns:
+        AbstractContextManager[Any]: An 'EmissionsRecorder', which gives the
+            'EmissionsSettings' the trainers take, or a context giving None
+            when CodeCarbon is disabled or not installed.
+    """
+    codecarbon = context.config.dashboard.codecarbon
+    if not codecarbon.enabled:
+        return nullcontext()
+    try:
+        # pylint: disable = import-outside-toplevel  # the dashboard extra is optional
+        from warprec.recommenders.trainer.emissions import EmissionsRecorder
+    except ImportError:
+        # The trainers say the dashboards are not available
+        return nullcontext()
+    return EmissionsRecorder(
+        tracking_mode=codecarbon.tracking_mode,
+        save_to_api=codecarbon.save_to_api,
+        save_to_file=codecarbon.save_to_file,
+        output_dir=context.config.get_storage_path(),
+        project_name=context.run_name,
     )
 
 

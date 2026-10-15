@@ -57,6 +57,7 @@ try:
         WarpRecMLflowLoggerCallback,
         WarpRecWandbLoggerCallback,
     )
+    from warprec.recommenders.trainer.emissions import EmissionsSettings
 
     DASHBOARD_AVAILABLE = True
 except ImportError:
@@ -123,6 +124,10 @@ class Trainer:
             under the same name by an earlier run is moved aside rather than
             restored, so that it cannot leak an old split or configuration
             into this one. Defaults to False.
+        emissions (Optional[EmissionsSettings]): The CodeCarbon measurement of
+            the run the trainer belongs to, when the run measures itself (the
+            train and swarm pipelines do). Without one, a search with CodeCarbon
+            enabled measures itself. Defaults to None.
     """
 
     def __init__(
@@ -134,11 +139,14 @@ class Trainer:
         run_name: Optional[str] = None,
         errored_trials: ErroredTrialPolicy = ErroredTrialPolicy.SKIP,
         resumable: bool = False,
+        emissions: Optional["EmissionsSettings"] = None,
     ):
         self._stg_path = storage_path
         self._custom_modules = custom_modules or []
-        self._callbacks = self._setup_callbacks(custom_callback, dashboard_config)
         self._run_name = run_name
+        self._callbacks = self._setup_callbacks(
+            custom_callback, dashboard_config, emissions
+        )
         self._errored_trials = errored_trials
         self._resumable = resumable
 
@@ -447,7 +455,7 @@ class Trainer:
             # CodeCarbon's 'process' tracking has to run where the trial trains
             "codecarbon": next(
                 (
-                    callback.trial_settings()
+                    callback.trial_settings(scaling_config_dict["num_workers"])
                     for callback in self._callbacks
                     if DASHBOARD_AVAILABLE and isinstance(callback, CodeCarbonCallback)
                 ),
@@ -932,6 +940,7 @@ class Trainer:
         self,
         custom_callback: WarpRecCallback,
         dashboard: Optional[DashboardConfig] = None,
+        emissions: Optional["EmissionsSettings"] = None,
     ) -> List[tune.Callback | WarpRecCallback]:
         callbacks: List[tune.Callback | WarpRecCallback] = [
             custom_callback,
@@ -970,13 +979,19 @@ class Trainer:
                     entity=dashboard.wandb.team,
                 )
             )
-        if dashboard.codecarbon.enabled:
+        # Under 'machine' tracking a run that measures itself already covers
+        # its searches: there is nothing left for a search to measure
+        if dashboard.codecarbon.enabled and not (
+            emissions is not None and emissions.tracking_mode == "machine"
+        ):
             callbacks.append(
                 CodeCarbonCallback(
                     save_to_api=dashboard.codecarbon.save_to_api,
                     save_to_file=dashboard.codecarbon.save_to_file,
                     output_dir=self._stg_path,
                     tracking_mode=dashboard.codecarbon.tracking_mode,
+                    project_name=self._run_name,
+                    settings=emissions,
                 )
             )
         if dashboard.mlflow.enabled:

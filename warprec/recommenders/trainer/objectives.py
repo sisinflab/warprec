@@ -53,7 +53,7 @@ def objective_function(config: dict) -> None:
         return
 
     # pylint: disable = import-outside-toplevel  # the dashboard extra is optional
-    from warprec.recommenders.trainer.dashboard_callbacks import trial_emissions
+    from warprec.recommenders.trainer.emissions import trial_emissions
 
     with trial_emissions(settings, config.get("trial_id")):
         _run_trial(config)

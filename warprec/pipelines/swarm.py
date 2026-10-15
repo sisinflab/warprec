@@ -1,5 +1,5 @@
 import time
-from typing import Callable, Dict, Any, Optional, List, Tuple
+from typing import TYPE_CHECKING, Callable, Dict, Any, Optional, List, Tuple
 
 import ray
 from ray import tune
@@ -12,7 +12,10 @@ from warprec.common import (
 from warprec.data.writer import WriterFactory
 from warprec.data import Dataset
 from warprec.pipelines.common import (
+    PipelineContext,
     bootstrap_pipeline,
+    data_preparation_seconds,
+    measure_emissions,
     prepare_datasets,
     report_statistical_significance,
     write_model_outputs,
@@ -31,6 +34,9 @@ from warprec.utils.config import (
 from warprec.utils.pause import PauseController
 from warprec.utils.helpers import model_param_from_dict
 from warprec.utils.logger import logger
+
+if TYPE_CHECKING:
+    from warprec.recommenders.trainer.emissions import EmissionsSettings
 
 # The hooks Ray Tune calls on a callback while a sweep runs
 TUNE_HOOKS = (
@@ -202,6 +208,20 @@ def swarm_pipeline(path: str):
         "WARNING: Swarm pipeline is experimental. Please submit bug reports via GitHub Issues."
     )
     context = bootstrap_pipeline(path, "swarm", "Start experiment swarming.")
+    with measure_emissions(context) as emissions:
+        _swarm_models(context, emissions)
+
+
+def _swarm_models(
+    context: PipelineContext, emissions: Optional["EmissionsSettings"]
+) -> None:
+    """Prepare the data, then run every model at once on the cluster.
+
+    Args:
+        context (PipelineContext): The context produced by the bootstrap.
+        emissions (Optional[EmissionsSettings]): The run's CodeCarbon
+            measurement, or None when the run is not measured.
+    """
     config = context.config
 
     # Build the datasets on the cluster and persist the splits if asked to
@@ -217,7 +237,7 @@ def swarm_pipeline(path: str):
     if requires_stat_significance:
         model_results: Dict[str, Any] = {}
 
-    data_preparation_time = time.time() - context.started_at
+    data_preparation_time = data_preparation_seconds(context.started_at, emissions)
     logger.positive(
         f"Data preparation completed in {data_preparation_time:.2f} seconds."
     )
@@ -283,6 +303,7 @@ def swarm_pipeline(path: str):
             run_name=context.run_name,
             writer_timestamp=context.state.writer_timestamp,
             resumable=model_name in resumable_models,
+            emissions=emissions,
         )  # type: ignore[call-arg]
         futures.append(future)
 
@@ -410,7 +431,7 @@ def swarm_pipeline(path: str):
 
 
 @ray.remote(num_cpus=0.05)  # Zero-Resource Orchestrator
-def remote_model_pipeline(
+def remote_model_pipeline(  # pylint: disable = too-many-arguments, too-many-positional-arguments
     model_name: str,
     config: TrainConfiguration,
     main_dataset: Dataset,
@@ -421,6 +442,7 @@ def remote_model_pipeline(
     run_name: Optional[str] = None,
     writer_timestamp: Optional[str] = None,
     resumable: bool = False,
+    emissions: Optional["EmissionsSettings"] = None,
 ) -> Tuple[str, Optional[Recommender], Dict, Dict, Dict, Dict]:
     """Orchestrates the entire lifecycle of a single model in parallel.
 
@@ -441,6 +463,8 @@ def remote_model_pipeline(
             file names of this run.
         resumable (bool): Whether the run state allows restoring the Ray Tune
             experiment this model left behind.
+        emissions (Optional[EmissionsSettings]): The run's CodeCarbon
+            measurement, or None when the run is not measured.
 
     Returns:
         Tuple[str, Optional[Recommender], Dict, Dict, Dict, Dict]: A tuple containing:
@@ -468,6 +492,7 @@ def remote_model_pipeline(
         run_name=run_name,
         errored_trials=config.run.errored_trials,
         resumable=resumable,
+        emissions=emissions,
     )
 
     # Run the HPO
