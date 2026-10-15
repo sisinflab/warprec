@@ -6,16 +6,22 @@ report has to tell those apart: how long a model takes to train, to complete
 an epoch, to be validated, and above all the time spent only training.
 """
 
+import math
 import time
 from pathlib import Path
 from types import SimpleNamespace
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 import lightning as L
+import numpy as np
+import pandas as pd
 import pytest
 
 import warprec.recommenders  # noqa: F401  (populates the registries)
 from warprec.data.dataset import Dataset
+from warprec.data.writer import LocalWriter
+from warprec.pipelines.common import model_timing_row
+from warprec.pipelines.remotes.ml import remote_model_retraining
 from warprec.recommenders.callbacks import WarpRecLightningIntegrationCallback
 from warprec.recommenders.trainer import objectives
 from warprec.recommenders.trainer import trainer as trainer_module
@@ -26,6 +32,11 @@ from warprec.recommenders.trainer.timing import (
     SETUP_S,
     TRAIN_SAMPLES_PER_S,
     TRIAL_STARTED_AT,
+    TrialSpans,
+    TrialTiming,
+    search_overhead,
+    summarise_timing,
+    trial_timing,
 )
 from warprec.utils.config.evaluation_configuration import EvaluationConfig
 from warprec.utils.registry import params_registry
@@ -197,3 +208,282 @@ def test_a_closed_form_trial_reports_its_fit_as_its_one_epoch(
         report[EPOCH_SAMPLES] / report[EPOCH_TRAIN_S]
     )
     assert report[SETUP_S] >= STARTED_BEFORE_S
+
+
+def _history(
+    train: List[float],
+    validation: List[float],
+    setup: float,
+    samples: float = 100.0,
+    epochs: Optional[List[int]] = None,
+) -> pd.DataFrame:
+    """The reports of one trial, as Ray Tune keeps them.
+
+    Args:
+        train (List[float]): The training time of each epoch.
+        validation (List[float]): The validation time of each epoch.
+        setup (float): The trial's setup.
+        samples (float): The training examples of every epoch.
+        epochs (Optional[List[int]]): The epoch of each report, when it is
+            not simply its position.
+
+    Returns:
+        pd.DataFrame: The trial's history.
+    """
+    return pd.DataFrame(
+        {
+            "epoch": epochs if epochs is not None else list(range(len(train))),
+            EPOCH_TRAIN_S: train,
+            EPOCH_VALIDATION_S: validation,
+            EPOCH_SAMPLES: [samples] * len(train),
+            SETUP_S: [setup] * len(train),
+        }
+    )
+
+
+def test_a_trial_history_gives_its_timing_once_per_epoch():
+    """An epoch reported twice (a resumed trial) is counted once."""
+    timing = trial_timing(
+        _history([1.0, 2.0, 2.5, 3.0], [0.5, 0.0, 0.5, 0.5], 4.0, epochs=[0, 1, 1, 2])
+    )
+
+    assert timing is not None
+    assert timing.epoch_train_s == [1.0, 2.5, 3.0]
+    assert timing.epoch_validation_s == [0.5, 0.5, 0.5]
+    assert timing.setup_s == 4.0
+    assert timing.samples == 300.0
+
+
+def test_a_history_without_timing_gives_none():
+    """A trial that failed before training reports no timing at all."""
+    assert trial_timing(pd.DataFrame({"nDCG@10": [-math.inf]})) is None
+
+
+def test_the_time_report_describes_the_best_trial_and_every_trial():
+    """Every new column of the time report, from the trials' histories."""
+    trials = {
+        "best": trial_timing(_history([2.0, 4.0, 3.0], [1.0, 0.0, 1.0], 10.0)),
+        "other": trial_timing(_history([1.0], [2.0], 6.0)),
+        "failed": None,
+    }
+
+    report = summarise_timing(trials, ["best"])
+
+    assert report == pytest.approx(
+        {
+            "Best Trial Setup Time (s)": 10.0,
+            "Best Trial Train-Only Time (s)": 9.0,
+            "Best Trial Validation Time (s)": 2.0,
+            "Best Trial Training Time (s)": 11.0,
+            "Best Trial Epochs": 3,
+            "Best Trial Mean Epoch Train Time (s)": 3.0,
+            "Best Trial Min Epoch Train Time (s)": 2.0,
+            "Best Trial Max Epoch Train Time (s)": 4.0,
+            "Best Trial Mean Epoch Validation Time (s)": 1.0,
+            "Best Trial Train Throughput (samples/s)": 300.0 / 9.0,
+            "Mean Trial Setup Time (s)": 8.0,
+            "Mean Trial Train-Only Time (s)": 5.0,
+            "Mean Trial Validation Time (s)": 2.0,
+        }
+    )
+
+
+def test_the_best_trials_of_a_cross_validation_are_averaged_over_the_folds():
+    """Under cross-validation the best configuration ran once per fold."""
+    trials = {
+        "fold0": trial_timing(_history([2.0, 2.0], [1.0, 1.0], 10.0)),
+        "fold1": trial_timing(_history([4.0], [3.0], 20.0)),
+    }
+
+    report = summarise_timing(trials, ["fold0", "fold1"])
+
+    assert report["Best Trial Setup Time (s)"] == pytest.approx(15.0)
+    assert report["Best Trial Train-Only Time (s)"] == pytest.approx(4.0)
+    assert report["Best Trial Epochs"] == pytest.approx(1.5)
+    assert report["Best Trial Max Epoch Train Time (s)"] == pytest.approx(4.0)
+    assert report["Best Trial Train Throughput (samples/s)"] == pytest.approx(
+        300.0 / 8.0
+    )
+
+
+def test_a_report_without_timing_leaves_the_columns_empty():
+    """No trial reported timing: the columns are there, and empty."""
+    report = summarise_timing({"failed": None}, ["failed"])
+
+    assert "Best Trial Train-Only Time (s)" in report
+    assert all(np.isnan(value) for value in report.values())
+
+
+def _spans(*intervals: tuple) -> TrialSpans:
+    """Trial spans as the driver would have recorded them.
+
+    Args:
+        *intervals (tuple): (trial id, start, end) of each run of a trial.
+
+    Returns:
+        TrialSpans: The spans.
+    """
+    spans = TrialSpans()
+    for trial_id, start, end in intervals:
+        spans.spans.setdefault(trial_id, []).append((start, end))
+    return spans
+
+
+def test_the_search_overhead_is_what_trials_did_not_spend_working():
+    """Trials one at a time: the wall clock minus their setup and training."""
+    trials = {
+        "a": TrialTiming(setup_s=3.0, epoch_train_s=[2.0], epoch_validation_s=[1.0]),
+        "b": TrialTiming(setup_s=2.0, epoch_train_s=[1.0], epoch_validation_s=[1.0]),
+    }
+    spans = _spans(("a", 0.0, 7.0), ("b", 7.5, 12.0))
+
+    assert search_overhead(20.0, spans, trials) == pytest.approx(10.0)
+
+
+@pytest.mark.parametrize(
+    "intervals, trials",
+    [
+        # Two trials at once: their times overlap and cannot be subtracted
+        ([("a", 0.0, 7.0), ("b", 5.0, 12.0)], ["a", "b"]),
+        # A trial without timing: its time is neither overhead nor work
+        ([("a", 0.0, 7.0), ("b", 7.5, 12.0)], ["a", "b", "failed"]),
+        # A trial the driver did not see start (a restored search)
+        ([("a", 0.0, 7.0)], ["a", "b"]),
+        # A trial paused and run again counts its setup once
+        ([("a", 0.0, 3.0), ("b", 3.5, 6.0), ("a", 6.5, 9.0)], ["a", "b"]),
+    ],
+)
+def test_the_search_overhead_is_not_given_when_it_cannot_be_honest(
+    intervals: List[tuple], trials: List[str]
+):
+    """Overlapping, untimed or unseen trials leave the overhead empty."""
+    timing = TrialTiming(setup_s=1.0, epoch_train_s=[1.0], epoch_validation_s=[1.0])
+    by_trial: Dict[str, Optional[TrialTiming]] = {
+        trial_id: None if trial_id == "failed" else timing for trial_id in trials
+    }
+
+    assert math.isnan(search_overhead(20.0, _spans(*intervals), by_trial))
+
+
+def test_the_trial_spans_follow_ray_tune():
+    """The driver-side callback records when each trial runs."""
+    spans = TrialSpans()
+    trial = SimpleNamespace(trial_id="a")
+
+    spans.on_trial_start(iteration=0, trials=[], trial=trial)
+    spans.on_trial_complete(iteration=1, trials=[], trial=trial)
+
+    ((start, end),) = spans.spans["a"]
+    assert 0.0 <= start <= end
+
+
+def test_cross_validation_reports_the_trial_ids_of_its_best_configuration():
+    """The folds of the winning configuration are the best trials."""
+    frame = pd.DataFrame(
+        {
+            "trial_id": ["a0", "a1", "b0", "b1"],
+            "config/k": [10, 10, 20, 20],
+            "config/fold": [0, 1, 0, 1],
+            "nDCG@10": [0.3, 0.32, 0.1, 0.12],
+            "iterations": [1, 1, 1, 1],
+        }
+    )
+
+    _, stats = trainer_module.Trainer(storage_path="unused")._aggregate_cv_results(
+        frame, "nDCG@10", "max", "median"
+    )
+
+    assert sorted(stats["trial_ids"]) == ["a0", "a1"]
+
+
+@pytest.mark.parametrize(
+    "model_name, best_params",
+    [
+        ("BPR", {**BPR, "iterations": 2}),
+        ("EASE", {"l2": 10.0, "iterations": 1}),
+    ],
+)
+def test_the_cross_validation_retraining_reports_its_train_only_time(
+    dataset: Dataset, model_name: str, best_params: Dict[str, Any]
+):
+    """The retraining on the full training set is timed as well."""
+    params = params_registry.get(
+        model_name,
+        **{k: v for k, v in best_params.items() if k != "iterations"},
+        optimization={"num_workers": 0},
+    )
+
+    _, report, _ = remote_model_retraining._function(  # type: ignore[attr-defined]
+        model_name=model_name,
+        best_params=best_params,
+        main_dataset=dataset,
+        params=params,
+        custom_modules=[],
+        device="cpu",
+        seed=42,
+    )
+
+    assert report["Retraining Train-Only Time (s)"] > 0.0
+
+
+def test_train_and_swarm_build_the_same_row():
+    """The row the pipelines write keeps every existing column and adds the new."""
+    row = model_timing_row(
+        model_name="BPR",
+        data_preparation_time=1.0,
+        exploration_time=10.0,
+        ray_report={"Average Trial Time (s)": 4.0, "Best Trial Epochs": 3},
+        evaluation_time=2.0,
+        inference_time=0.5,
+    )
+
+    assert row == {
+        "Model Name": "BPR",
+        "Data Preparation Time": 1.0,
+        "Hyperparameter Exploration Time": 10.0,
+        "Average Trial Time (s)": 4.0,
+        "Best Trial Epochs": 3,
+        "Evaluation Time": 2.0,
+        "Inference Time": 0.5,
+        "Total Time": 13.0,
+    }
+
+
+def test_the_written_report_keeps_counts_and_rates_as_numbers(tmp_path: Path):
+    """Only the unlabelled durations become h:mm:ss; epochs and rates stay numbers."""
+    writer = LocalWriter(dataset_name="timing", local_path=str(tmp_path))
+    writer.write_time_report(
+        [
+            {
+                "Model Name": "BPR",
+                "Trainable Params (Best Model)": 0,
+                "Total Params (Best Model)": 0,
+                "Hyperparameter Exploration Time": 75.0,
+                "Best Trial Epochs": 1.5,
+                "Best Trial Train Throughput (samples/s)": 1234.5,
+                "Best Trial Train-Only Time (s)": 4.25,
+                "Inference Time": 0.0131,
+            },
+            {
+                "Model Name": "EASE",
+                "Trainable Params (Best Model)": 0,
+                "Total Params (Best Model)": 0,
+                "Hyperparameter Exploration Time": 3.0,
+                "Best Trial Epochs": np.nan,
+                "Best Trial Train Throughput (samples/s)": np.nan,
+                "Best Trial Train-Only Time (s)": np.nan,
+                "Inference Time": 0.0131,
+            },
+        ]
+    )
+    report = pd.read_csv(
+        next(Path(writer.experiment_evaluation_path).glob("Time_Report_*.tsv")),
+        sep="\t",
+    ).set_index("Model Name")
+
+    assert report.loc["BPR", "Best Trial Epochs"] == pytest.approx(1.5)
+    assert report.loc["BPR", "Best Trial Train Throughput (samples/s)"] == (
+        pytest.approx(1234.5)
+    )
+    assert report.loc["BPR", "Best Trial Train-Only Time (s)"] == pytest.approx(4.25)
+    assert report.loc["BPR", "Hyperparameter Exploration Time"] == "0:01:15"

@@ -34,7 +34,14 @@ from warprec.recommenders.trainer.logger_callbacks import (
     read_logged_epochs,
 )
 from warprec.recommenders.trainer.objectives import objective_function
-from warprec.recommenders.trainer.timing import TRIAL_STARTED_AT
+from warprec.recommenders.trainer.timing import (
+    SEARCH_OVERHEAD,
+    TRIAL_STARTED_AT,
+    TrialSpans,
+    search_overhead,
+    summarise_timing,
+    trial_timing,
+)
 from warprec.utils.config import (
     EvaluationConfig,
     RecomModel,
@@ -151,6 +158,7 @@ class Trainer:
         )
         self._errored_trials = errored_trials
         self._resumable = resumable
+        self._spans = TrialSpans()
 
     def experiment_name(self, model_name: str) -> Optional[str]:
         """Builds the deterministic Ray Tune experiment name for a model.
@@ -235,7 +243,9 @@ class Trainer:
             ray_verbose=ray_verbose,
         )
 
+        search_start = time.perf_counter()
         results = tuner.fit()
+        search_s = time.perf_counter() - search_start
 
         # Ray Tune returns normally from an interrupted sweep, so a partial
         # result grid must never be mistaken for a finished optimization.
@@ -281,7 +291,9 @@ class Trainer:
             dataset,
         )
 
-        report = self._create_report(results, best_model)
+        report = self._create_report(
+            results, [best_result.metrics["trial_id"]], search_s, best_model
+        )
         return TrainingOutcome(
             status="completed",
             model=best_model,
@@ -337,7 +349,9 @@ class Trainer:
             ray_verbose=ray_verbose,
         )
 
+        search_start = time.perf_counter()
         results = tuner.fit()
+        search_s = time.perf_counter() - search_start
 
         # Ray Tune returns normally from an interrupted sweep, so a partial
         # result grid must never be mistaken for a finished optimization.
@@ -383,7 +397,7 @@ class Trainer:
         )
         logger.positive(f"CV HPO for {model_name} ended successfully.")
 
-        report = self._create_report(results)
+        report = self._create_report(results, best_stats["trial_ids"], search_s)
         return TrainingOutcome(
             status="completed",
             best_params=best_hyperparameters,
@@ -531,10 +545,11 @@ class Trainer:
             opt_config.scheduler, **opt_config.properties.model_dump()
         )
 
-        # Configs
+        # Configs. A fresh record of when the trials run, for this search only
+        self._spans = TrialSpans()
         run_config = ray.tune.RunConfig(
             name=self.experiment_name(model_name),
-            callbacks=self._callbacks,
+            callbacks=[*self._callbacks, self._spans],
             verbose=ray_verbose,
             storage_path=self._stg_path,
             checkpoint_config=ray.tune.CheckpointConfig(
@@ -864,13 +879,16 @@ class Trainer:
                     lambda x: tuple(x) if isinstance(x, list) else x
                 )
 
+        aggregations = {
+            "mean_score": (metric, "mean"),
+            "std_score": (metric, "std"),
+            "desired_training_iterations": ("iterations", desired_it_stat),
+        }
+        if "trial_id" in df:
+            aggregations["trial_ids"] = ("trial_id", list)
         agg_df = (
             df.groupby(hyperparam_cols or (lambda _: 0))
-            .agg(
-                mean_score=(metric, "mean"),
-                std_score=(metric, "std"),
-                desired_training_iterations=("iterations", desired_it_stat),
-            )
+            .agg(**aggregations)
             .reset_index()
         )
 
@@ -900,7 +918,12 @@ class Trainer:
             else:
                 best_params[key] = val
 
-        stats = {"mean": best_row["mean_score"], "std": best_row["std_score"]}
+        stats = {
+            "mean": best_row["mean_score"],
+            "std": best_row["std_score"],
+            # The folds of the best configuration, its trials
+            "trial_ids": list(best_row.get("trial_ids", [])),
+        }
         return best_params, stats
 
     def _parse_params(self, params: RecomModel, num_folds: int = 0) -> dict:
@@ -1012,8 +1035,24 @@ class Trainer:
         return callbacks
 
     def _create_report(
-        self, results: tune.ResultGrid, model: Optional[Recommender] = None
+        self,
+        results: tune.ResultGrid,
+        best_trial_ids: List[str],
+        search_s: float,
+        model: Optional[Recommender] = None,
     ) -> dict:
+        """Summarises the memory, time and size of a finished search.
+
+        Args:
+            results (tune.ResultGrid): The results of the search.
+            best_trial_ids (List[str]): The best trial, or under cross-validation
+                the trials of the best configuration, one per fold.
+            search_s (float): The wall clock of the search, from 'Tuner.fit'.
+            model (Optional[Recommender]): The best model, when there is one.
+
+        Returns:
+            dict: The report, by time report column.
+        """
         report = {}
 
         # Memory stats from dataframe
@@ -1030,6 +1069,15 @@ class Trainer:
         if successful_trials:
             times = [r.metrics.get("time_total_s", 0) for r in successful_trials]
             report["Average Trial Time (s)"] = sum(times) / len(times)
+
+        # Where the trials' time went, from what every epoch reported
+        timing = {
+            r.metrics["trial_id"]: trial_timing(r.metrics_dataframe)
+            for r in results  # type: ignore[attr-defined]
+            if r.metrics and "trial_id" in r.metrics
+        }
+        report.update(summarise_timing(timing, best_trial_ids))
+        report[SEARCH_OVERHEAD] = search_overhead(search_s, self._spans, timing)
 
         # Model stats
         report["Total Params (Best Model)"] = np.nan

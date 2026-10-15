@@ -71,16 +71,57 @@ My_Model    10      0.001       0.002       ...
 
 ### Time Report
 
-A timing and environment summary file (`Time_Report`) with wall-clock measurements:
+The `Time_Report` file (written when `general.time_report` is on, by the train and swarm pipelines alike) has one row per model. It tells apart the time a model needs to set up, to train, to complete an epoch and to be validated, and above all the time spent **only training**.
 
-* **Data Preparation Time:** End-to-end data preparation (splitting, filtering, evaluation sampling if enabled).
-* **Hyperparameter Exploration Time:** Total HPO duration, including Ray cluster bootstrap/initialization overhead.
-* **Average Trial Time:** Mean training time per trial, including end-of-epoch evaluation.
-* **Evaluation Time:** Time to evaluate the best model; depends on the evaluation strategy ("full" or "sampled").
-* **Inference Time (ms):** Time to predict for $\mathbf{1,000 users \times 1,000 items}$; intended as a comparative guideline.
-* **Total Time:** Aggregate end-to-end duration for the model's experiment pipeline.
+A column whose name ends in a unit holds a plain number in that unit: `(s)` seconds, `(ms)` milliseconds, `(MB)` megabytes, `(samples/s)` training examples per second. The four durations without a unit (`... Time`) are written as `h:mm:ss`. A column is empty when its value cannot be measured honestly (see each column).
 
-Unless otherwise specified, durations are wall-clock; inference time is reported in milliseconds.
+**The run and the search**
+
+| Column | What it measures |
+|---|---|
+| **Data Preparation Time** | From the start of the run to the end of the data preparation: reading the configuration, starting or connecting to Ray, reading, filtering and splitting the data. The wait for CodeCarbon's trackers is left out. The same for every model. |
+| **Hyperparameter Exploration Time** | Wall clock of the model's search, from building its trainer to loading its best model; under cross-validation it also includes retraining the best configuration on the full training set. It includes everything Ray does: starting Ray Tune, scheduling the trials, starting each trial's Ray Train workers, checkpointing and passing results on. |
+| **Ray Tune Overhead (s)** | The part of the search's wall clock (Ray Tune's `fit`) that no trial spent in setup, training or validation: Ray Tune's start-up, the scheduling of the trials, the checkpoint saved and the report sent after every epoch. It is given only when the trials ran one at a time, each ran once, and every trial reported its timing; with concurrent trials their times overlap and cannot be subtracted from the wall clock, so the column is empty (set `optimization.max_concurrent_trials: 1` to obtain it). |
+| **Average Trial Time (s)** | Mean over the successful trials of Ray Tune's `time_total_s`: a trial's whole wall clock, from the start of its trial driver to its last report. It includes the setup, every epoch's training and validation, and the checkpoint and report of every epoch. |
+| **RAM / VRAM Mean and Max Usage (MB)** | The resident memory (RAM) and the peak GPU memory (VRAM) of each trial's worker at its last report, averaged and maximised over the trials. |
+| **Trainable / Total Params (Best Model)** | Parameter counts of the best model. |
+
+**Where the trials' time went**
+
+A trial's time is split into three parts that do not overlap. They are measured inside the trial, on the worker, with a monotonic clock; on a GPU the clock is read only after the queued work has completed. Under several workers per trial, the first worker's measurement is reported.
+
+- **Setup**: from the start of the trial (its trial driver) to its first training batch: starting the Ray Train worker group, fetching the dataset, building the model, its data loaders and the evaluator, and Lightning's own preparation. On a multi-node cluster the start is read on the driver's node and the end on the worker's, so the clocks of both nodes must agree.
+- **Training (train-only)**: the training loop of every epoch (fetching the batches, forward, backward and optimiser steps), the end-of-epoch validation excluded.
+- **Validation**: the end-of-epoch evaluation on the validation data (every `eval_every_n` epochs).
+
+What is in none of them is the checkpoint saved and the report handed to Ray after every epoch, and the start of the trial's Ray actor; together with the setup, training and validation they add up to the trial's `time_total_s`.
+
+A closed-form model (EASE, ItemKNN, ...) is fitted when it is built: its fit is its single epoch of training, its evaluation its validation (including building the evaluation loader), and its setup ends when the fit starts.
+
+| Column | What it measures |
+|---|---|
+| **Best Trial Setup Time (s)** | The best trial's setup. |
+| **Best Trial Train-Only Time (s)** | The best trial's training, summed over its epochs, without validation. |
+| **Best Trial Validation Time (s)** | The best trial's end-of-epoch validation, summed over its epochs. |
+| **Best Trial Training Time (s)** | Train-only plus validation: the best trial's whole training phase. |
+| **Best Trial Epochs** | The epochs the best trial ran (fewer than `epochs` when early stopping or a scheduler stopped it; 1 for a closed-form model). |
+| **Best Trial Mean / Min / Max Epoch Train Time (s)** | The training time of one epoch of the best trial, without validation. The first epoch starts with the first batch, so it includes starting the data loader's worker processes when `num_workers` > 0. |
+| **Best Trial Mean Epoch Validation Time (s)** | The time of one validation of the best trial, averaged over the epochs that were validated. |
+| **Best Trial Train Throughput (samples/s)** | Training examples processed per second of train-only time. A training example is whatever the model's training loader yields one of: an interaction or a (user, positive, negative) triplet for most collaborative models, a sequence for the sequential models, a user row for the autoencoders. For a closed-form model it is a training interaction. Under several workers the examples of all workers are counted. |
+| **Mean Trial Setup Time (s)** | The setup averaged over every trial that reported its timing. |
+| **Mean Trial Train-Only Time (s)** | The train-only time averaged over every trial that reported its timing. |
+| **Mean Trial Validation Time (s)** | The validation time averaged over every trial that reported its timing. |
+| **Retraining Train-Only Time (s)** | Cross-validation only: the train-only time of retraining the best configuration on the full training set (the fit, for a closed-form model). |
+
+Under cross-validation the best configuration ran once per fold: the best-trial columns average its fold trials, and the epoch statistics pool their epochs. A trial resumed after a pause reports the setup of the session that finished it, and each epoch once.
+
+**The test evaluation**
+
+| Column | What it measures |
+|---|---|
+| **Evaluation Time** | The evaluation of the best model on the test set, measured inside the Ray task that runs it: scoring every batch of the test loader and computing the metrics. Ray's scheduling of the task, moving the model to the task, and building the loader are excluded. It depends on the evaluation strategy (`full` or `sampled`). |
+| **Inference Time (ms)** | Milliseconds of **one** prediction call scoring a batch of up to 1,000 users against up to 1,000 sampled items each (fewer when the dataset has fewer users or items), on the model's device. A comparative guideline, not a serving latency: it is a single cold call. |
+| **Total Time** | Data Preparation Time + Hyperparameter Exploration Time + Evaluation Time. |
 
 #### Per-epoch timing in Ray Tune's results
 
@@ -90,7 +131,7 @@ Every epoch of a trial reports, beside its metrics, the keys below. They land in
 |---|---|
 | `epoch_train_s` | Seconds of the epoch's training loop, validation excluded. |
 | `epoch_validation_s` | Seconds of the epoch's end-of-epoch validation; `0` for an epoch that was not validated. |
-| `epoch_samples` | Training examples the epoch went through: an interaction or a (user, positive, negative) triplet for most collaborative models, a sequence for the sequential models, a user row for the autoencoders, a training interaction for a closed-form model, summed over the workers. |
+| `epoch_samples` | Training examples the epoch went through (see the throughput column above), summed over the workers. |
 | `train_samples_per_s` | `epoch_samples / epoch_train_s`. |
 | `setup_s` | The trial's setup: from the start of the trial to its first training batch (starting the Ray Train workers, fetching the dataset, building the model and its loaders); for a closed-form model, to the start of its fit. The same value in every report of a session. |
 

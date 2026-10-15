@@ -573,14 +573,15 @@ class Writer(ABC):
         new_df = pd.DataFrame(time_report)
         new_df["Inference Time (ms)"] = (new_df.pop("Inference Time") * 1000).round(6)
         for col in new_df.select_dtypes(include=["float"]).columns:
-            # A column whose name gives its unit holds a number in that unit;
-            # only the unlabelled durations are written as h:mm:ss.
-            if col.endswith(("(MB)", "(ms)", "(s)")):
-                new_df[col] = new_df[col].round(6)
-            else:
+            # A column whose name gives its unit holds a number in that unit,
+            # and a count or a rate stays a number; only the durations with no
+            # unit in their name ('... Time') are written as h:mm:ss.
+            if col.endswith("Time"):
                 new_df[col] = new_df[col].apply(
                     lambda s: str(timedelta(seconds=s)) if pd.notna(s) else np.nan
                 )
+            else:
+                new_df[col] = new_df[col].round(6)
 
         merge_keys = ["Model Name"]
         combined_df = pd.concat([existing_df, new_df], ignore_index=True)

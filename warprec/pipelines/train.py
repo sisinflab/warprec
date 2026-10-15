@@ -15,6 +15,7 @@ from warprec.pipelines.common import (
     bootstrap_pipeline,
     data_preparation_seconds,
     measure_emissions,
+    model_timing_row,
     prepare_datasets,
     report_statistical_significance,
     write_model_outputs,
@@ -345,17 +346,14 @@ def _train_models(
                 if config.general.time_report:
                     # Timing report for the current model
                     model_timing_report.append(
-                        {
-                            "Model Name": model_name,
-                            "Data Preparation Time": data_preparation_time,
-                            "Hyperparameter Exploration Time": model_exploration_total_time,
-                            **ray_report,
-                            "Evaluation Time": model_evaluation_total_time,
-                            "Inference Time": inference_time,
-                            "Total Time": data_preparation_time
-                            + model_exploration_total_time
-                            + model_evaluation_total_time,
-                        }
+                        model_timing_row(
+                            model_name=model_name,
+                            data_preparation_time=data_preparation_time,
+                            exploration_time=model_exploration_total_time,
+                            ray_report=ray_report,
+                            evaluation_time=model_evaluation_total_time,
+                            inference_time=inference_time,
+                        )
                     )
 
                     # Update time report

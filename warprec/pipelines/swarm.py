@@ -16,6 +16,7 @@ from warprec.pipelines.common import (
     bootstrap_pipeline,
     data_preparation_seconds,
     measure_emissions,
+    model_timing_row,
     prepare_datasets,
     report_statistical_significance,
     write_model_outputs,
@@ -578,16 +579,13 @@ def remote_model_pipeline(  # pylint: disable = too-many-arguments, too-many-pos
         }
     }
 
-    timing_report = {
-        "Model Name": model_name,
-        "Data Preparation Time": data_preparation_time,
-        "Hyperparameter Exploration Time": model_exploration_total_time,
-        **ray_report,
-        "Evaluation Time": model_evaluation_total_time,
-        "Inference Time": inference_time,
-        "Total Time": data_preparation_time
-        + model_exploration_total_time
-        + model_evaluation_total_time,
-    }
+    timing_report = model_timing_row(
+        model_name=model_name,
+        data_preparation_time=data_preparation_time,
+        exploration_time=model_exploration_total_time,
+        ray_report=ray_report,
+        evaluation_time=model_evaluation_total_time,
+        inference_time=inference_time,
+    )
 
     return model_name, best_model, results, model_params, timing_report, ray_report
