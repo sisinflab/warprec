@@ -1,4 +1,3 @@
-# pylint: disable = R0801
 import csv
 import posixpath
 from io import StringIO

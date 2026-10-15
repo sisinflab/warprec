@@ -21,7 +21,6 @@ from warprec.utils.enums import RatingType
 
 
 class Transactions:
-    # pylint: disable = too-many-instance-attributes  # this class is the state it holds
     """Row-oriented view of the interaction records of a split.
 
     ``Interactions`` represents a split as a sparse user x item matrix. A matrix

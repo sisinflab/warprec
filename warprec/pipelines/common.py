@@ -230,7 +230,7 @@ def data_preparation_seconds(
     return time.time() - started_at - waited
 
 
-def model_timing_row(  # pylint: disable = too-many-arguments
+def model_timing_row(
     model_name: str,
     data_preparation_time: float,
     exploration_time: float,
@@ -288,7 +288,7 @@ def measure_emissions(context: PipelineContext) -> AbstractContextManager[Any]:
     if not codecarbon.enabled:
         return nullcontext()
     try:
-        # pylint: disable = import-outside-toplevel  # the dashboard extra is optional
+        # the dashboard extra is optional
         from warprec.recommenders.trainer.emissions import EmissionsRecorder
     except ImportError:
         # The trainers say the dashboards are not available

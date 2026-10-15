@@ -380,7 +380,6 @@ class SampledContextualEvaluationDataset(TorchDataset):
         neg_alpha: float = 0.75,
         context: Optional[ContextSpec] = None,
     ):
-        # pylint: disable = too-many-arguments, too-many-positional-arguments
         # The evaluation rows, the sampling protocol and the context encoding
         # are decided in different places and only meet here.
         self.num_negatives = num_negatives

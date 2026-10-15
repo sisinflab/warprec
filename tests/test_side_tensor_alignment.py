@@ -76,7 +76,7 @@ def _expected(dataset: Dataset) -> torch.Tensor:
         torch.Tensor: One row per item in index order, then a zero padding row.
     """
     _, inverse = dataset.get_inverse_mappings()
-    feature_maps = dataset._feature_maps  # pylint: disable=protected-access
+    feature_maps = dataset._feature_maps
     by_item = SIDE.set_index("item_id")
     rows = [
         [

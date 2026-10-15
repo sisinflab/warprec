@@ -432,7 +432,7 @@ def _swarm_models(  # noqa: PLR0912, PLR0915
 
 
 @ray.remote(num_cpus=0.05)  # Zero-Resource Orchestrator
-def remote_model_pipeline(  # pylint: disable = too-many-arguments, too-many-positional-arguments  # noqa: PLR0913
+def remote_model_pipeline(  # noqa: PLR0913
     model_name: str,
     config: TrainConfiguration,
     main_dataset: Dataset,

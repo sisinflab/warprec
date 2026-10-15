@@ -194,7 +194,7 @@ def retrieve_evaluation_dataloader(
     Raises:
         EvaluationError: If an unknown evaluation strategy is provided.
     """
-    from warprec.recommenders.base_recommender import ContextRecommenderUtils  # pylint: disable = import-outside-toplevel
+    from warprec.recommenders.base_recommender import ContextRecommenderUtils
 
     # Determine if the model uses context-aware information
     is_context = isinstance(model, ContextRecommenderUtils)
@@ -276,7 +276,7 @@ def resolve_available_cpus(cpu_per_trial: Optional[float] = None) -> int:
     """
     granted = 0
     try:  # inside a Ray task: ask what was granted
-        import ray  # pylint: disable = import-outside-toplevel
+        import ray
 
         # get_runtime_context() starts a local Ray instance when Ray is not up,
         # which is how a driver-only pipeline ended up launching Ray. Inside a
@@ -284,7 +284,7 @@ def resolve_available_cpus(cpu_per_trial: Optional[float] = None) -> int:
         if ray.is_initialized():
             assigned = ray.get_runtime_context().get_assigned_resources()
             granted = int(assigned.get("CPU", 0))
-    except Exception:  # pylint: disable = broad-except
+    except Exception:
         # Ray is unavailable, or this process is not running inside a task:
         # fall through to the configured budget.
         granted = 0

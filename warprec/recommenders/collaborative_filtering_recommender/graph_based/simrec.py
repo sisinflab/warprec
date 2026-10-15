@@ -1,4 +1,3 @@
-# pylint: disable = R0801, R0901, R0902, R0914, R0915
 from typing import Any, Optional, Tuple
 
 import numpy as np
@@ -64,7 +63,7 @@ class GCNTeacher(nn.Module):
         h = ego
         for _ in range(self.n_layers):
             # Eq 4 — H^(t)_{l+1} = A_norm * H^(t)_l
-            h = torch.sparse.mm(self.adj_norm, h)  # pylint: disable=not-callable
+            h = torch.sparse.mm(self.adj_norm, h)
             layer_embeddings.append(h)
 
         # Eq 4 — sum over all layers: H^(t) = sum_{l=0..L} H^(t)_l

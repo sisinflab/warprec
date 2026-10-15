@@ -1,4 +1,3 @@
-# pylint: disable=too-few-public-methods
 from typing import Callable, Any, Dict, Iterable
 
 from ray import tune

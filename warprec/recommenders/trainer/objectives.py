@@ -59,14 +59,14 @@ def objective_function(config: dict) -> None:
         _run_trial(config)
         return
 
-    # pylint: disable = import-outside-toplevel  # the dashboard extra is optional
+    # the dashboard extra is optional
     from warprec.recommenders.trainer.emissions import trial_emissions
 
     with trial_emissions(settings, config.get("trial_id")):
         _run_trial(config)
 
 
-def _run_trial(config: dict) -> None:  # pylint: disable = too-many-locals  # noqa: PLR0915
+def _run_trial(config: dict) -> None:  # noqa: PLR0915
     """Train and evaluate the model of one trial, reporting to Ray Tune.
 
     Args:
@@ -328,7 +328,7 @@ def _run_trial(config: dict) -> None:  # pylint: disable = too-many-locals  # no
             # Report to Ray Tune from every rank: report() is collective
             train.report(metrics=metric_report)
 
-    except Exception as e:  # pylint: disable=broad-exception-caught
+    except Exception as e:
         logger.negative(
             f"The fitting of the model {model_name}, failed "
             f"with parameters: {params}. Error: {e}"

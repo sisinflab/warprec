@@ -462,7 +462,7 @@ class ServableModel:
         k: Optional[int] = None,
         exclude: Optional[List[Label]] = None,
         context: Optional[Union[Dict[str, Any], List[Any]]] = None,
-        filter: Optional[Dict[str, Any]] = None,  # pylint: disable=redefined-builtin
+        filter: Optional[Dict[str, Any]] = None,
         explain: bool = False,
     ) -> Query:
         """Check a request and translate it to the model's indices.
@@ -577,7 +577,7 @@ class ServableModel:
     def popular_items(
         self,
         k: Optional[int] = None,
-        filter: Optional[Dict[str, Any]] = None,  # pylint: disable=redefined-builtin
+        filter: Optional[Dict[str, Any]] = None,
         exclude: Optional[List[Label]] = None,
     ) -> List[Dict[str, Any]]:
         """The items with the most training interactions, for anyone.
@@ -954,7 +954,7 @@ class ServableModel:
             for index, score in zip(indices[keep].tolist(), values[keep].tolist())
         ]
 
-    def _allowed_items(self, filter: Dict[str, Any]) -> np.ndarray:  # pylint: disable=redefined-builtin
+    def _allowed_items(self, filter: Dict[str, Any]) -> np.ndarray:
         """The items whose attributes match a filter.
 
         Values are compared without regard to case. A list of values matches

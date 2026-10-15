@@ -1,4 +1,3 @@
-# pylint: disable = R0801, E1102
 import math
 from typing import Any, Iterable, List, Optional, cast
 
@@ -68,7 +67,6 @@ class Denoiser(nn.Module):
         dropout: float,
         normalize: bool,
     ):
-        # pylint: disable = too-many-arguments, too-many-positional-arguments
         super().__init__()
 
         self.time_size = time_size

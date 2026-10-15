@@ -1,4 +1,3 @@
-# pylint: disable = R0801, E1102
 from typing import Any, List, Optional, Tuple
 
 import torch
@@ -80,7 +79,6 @@ class RippleNet(KnowledgeRecommenderUtils, IterativeRecommender):
         seed: int = 42,
         **kwargs: Any,
     ):
-        # pylint: disable = too-many-arguments, too-many-positional-arguments
         super().__init__(params, info, *args, knowledge=knowledge, seed=seed, **kwargs)
 
         if interactions is None:
@@ -178,7 +176,6 @@ class RippleNet(KnowledgeRecommenderUtils, IterativeRecommender):
             Optional[Tuple[Tensor, Tensor, Tensor]]: The sampled heads, relations
                 and tails, or None when nothing is reachable.
         """
-        # pylint: disable = too-many-arguments, too-many-positional-arguments
         usable = seeds[
             (seeds < self.n_entities) & (offsets[seeds + 1] > offsets[seeds])
         ]

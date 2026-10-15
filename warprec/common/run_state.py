@@ -391,7 +391,7 @@ class RunStateStore:
     def __init__(self, writer: "Writer", run_name: str):
         self._writer = writer
         self._run_name = run_name
-        self._root = writer._path_join(writer.experiment_path, "run_state")  # pylint: disable=protected-access
+        self._root = writer._path_join(writer.experiment_path, "run_state")
 
     @property
     def state_path(self) -> str:
@@ -400,7 +400,7 @@ class RunStateStore:
         Returns:
             str: The manifest path.
         """
-        return self._writer._path_join(self._root, f"{self._run_name}.json")  # pylint: disable=protected-access
+        return self._writer._path_join(self._root, f"{self._run_name}.json")
 
     def _eval_path(self, model_name: str) -> str:
         """Returns the path of a model's persisted evaluation results.
@@ -411,7 +411,7 @@ class RunStateStore:
         Returns:
             str: The path of the serialized results.
         """
-        return self._writer._path_join(  # pylint: disable=protected-access
+        return self._writer._path_join(
             self._root, self._run_name, "eval", f"{model_name}.pt"
         )
 
@@ -427,7 +427,7 @@ class RunStateStore:
             Optional[RunState]: The stored state, or None when it is absent or
                 could not be parsed.
         """
-        content = self._writer._read_text(self.state_path)  # pylint: disable=protected-access
+        content = self._writer._read_text(self.state_path)
         if not content:
             return None
         try:
@@ -447,7 +447,7 @@ class RunStateStore:
             state (RunState): The state to persist.
         """
         state.updated_at = datetime.now().isoformat(timespec="seconds")
-        self._writer._write_text(  # pylint: disable=protected-access
+        self._writer._write_text(
             self.state_path,
             json.dumps(state.to_dict(), indent=4, default=_json_default),
         )
@@ -467,9 +467,7 @@ class RunStateStore:
             buffer = BytesIO()
             torch.save(results, buffer)
             buffer.seek(0)
-            self._writer._write_bytes(  # pylint: disable=protected-access
-                self._eval_path(model_name), buffer.read()
-            )
+            self._writer._write_bytes(self._eval_path(model_name), buffer.read())
         except (OSError, RuntimeError, ValueError) as e:
             logger.attention(
                 f"Could not persist evaluation results for {model_name}: {e}. "
@@ -487,7 +485,7 @@ class RunStateStore:
                 absent or cannot be read.
         """
         try:
-            content = self._writer._read_bytes(self._eval_path(model_name))  # pylint: disable=protected-access
+            content = self._writer._read_bytes(self._eval_path(model_name))
         except (OSError, RuntimeError) as e:
             logger.attention(
                 f"Could not read evaluation results for {model_name}: {e}."

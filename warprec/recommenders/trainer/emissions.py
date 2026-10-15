@@ -113,7 +113,7 @@ def labelled_row(row: EmissionsData, label: str) -> Dict[str, Any]:
 
 
 @ray.remote(num_cpus=0)
-class NodeEmissionsTracker:  # pylint: disable = too-few-public-methods
+class NodeEmissionsTracker:
     """A CodeCarbon 'machine' tracker kept on one Ray node.
 
     Args:
@@ -431,7 +431,7 @@ class EmissionsRecorder:
                     self._collect()
                 else:
                     self._track_new_nodes()
-            except Exception as error:  # pylint: disable = broad-exception-caught
+            except Exception as error:
                 # The thread must outlive a failed look, logged once: the next
                 # look may well succeed
                 if self._poll_error is None:

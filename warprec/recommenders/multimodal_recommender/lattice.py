@@ -1,4 +1,3 @@
-# pylint: disable = R0801, E1102
 from typing import Any, List, Optional, Tuple, cast
 
 import torch
@@ -84,7 +83,6 @@ class LATTICE(MultiModalRecommenderUtils, GraphRecommenderUtils, IterativeRecomm
         multimodal: Optional[MultiModalFeatures] = None,
         **kwargs: Any,
     ):
-        # pylint: disable = too-many-arguments, too-many-positional-arguments
         super().__init__(params, info, *args, multimodal=multimodal, **kwargs)
 
         if interactions is None:

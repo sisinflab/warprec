@@ -183,8 +183,8 @@ class SplittingConfig(BaseModel):
 
         # The splitter refuses a cold-start validation split the test split
         # would empty; the same check runs here so it fails at load.
-        from warprec.data.schema import SplitSpec  # pylint: disable=import-outside-toplevel
-        from warprec.data.splitting import Splitter  # pylint: disable=import-outside-toplevel
+        from warprec.data.schema import SplitSpec
+        from warprec.data.splitting import Splitter
 
         try:
             Splitter.check_validation_cold_start(

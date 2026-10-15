@@ -136,7 +136,7 @@ class PauseController:
         Returns:
             PauseController: This controller.
         """
-        global _ACTIVE_CONTROLLER  # pylint: disable=global-statement  # noqa: PLW0603
+        global _ACTIVE_CONTROLLER  # noqa: PLW0603
 
         if not self._enabled:
             return self
@@ -175,7 +175,7 @@ class PauseController:
             exc (Any): The exception instance, if any.
             tb (Any): The traceback, if any.
         """
-        global _ACTIVE_CONTROLLER  # pylint: disable=global-statement  # noqa: PLW0603
+        global _ACTIVE_CONTROLLER  # noqa: PLW0603
 
         if not self._enabled:
             return

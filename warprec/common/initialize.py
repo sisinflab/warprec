@@ -1,4 +1,3 @@
-# pylint: disable=too-many-branches, too-many-statements
 from typing import Tuple, List, Optional, Dict, Union, Any
 
 from narwhals.dataframe import DataFrame

@@ -1,4 +1,3 @@
-# pylint: disable = too-few-public-methods
 from typing import Any, Dict, Literal, Optional, Set, Tuple, cast
 from abc import ABC, abstractmethod
 from itertools import combinations

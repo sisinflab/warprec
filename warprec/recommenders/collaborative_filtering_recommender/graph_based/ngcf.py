@@ -1,4 +1,3 @@
-# pylint: disable = R0801, E1102
 from typing import Tuple, Any, Optional
 
 import numpy as np

@@ -1,4 +1,3 @@
-# pylint: disable = R0801, E1102
 from typing import Any, List, Optional
 
 import torch
@@ -35,7 +34,6 @@ class ModalityGraph(nn.Module):
     def __init__(
         self, width: int, hidden: int, output: int, n_users: int, n_layers: int
     ):
-        # pylint: disable = too-many-arguments, too-many-positional-arguments
         super().__init__()
 
         self.preference = nn.Parameter(torch.empty(n_users, hidden))
@@ -137,7 +135,6 @@ class MMGCN(MultiModalRecommenderUtils, IterativeRecommender):
         multimodal: Optional[MultiModalFeatures] = None,
         **kwargs: Any,
     ):
-        # pylint: disable = too-many-arguments, too-many-positional-arguments
         super().__init__(params, info, *args, multimodal=multimodal, **kwargs)
 
         if interactions is None:

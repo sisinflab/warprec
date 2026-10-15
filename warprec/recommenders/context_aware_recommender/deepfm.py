@@ -1,4 +1,3 @@
-# pylint: disable = R0801, E1102, R0915
 from typing import Any, Optional, List
 
 import torch
@@ -192,7 +191,6 @@ class DeepFM(ContextRecommenderUtils, IterativeRecommender):
         Returns:
             Tensor: The score matrix {user x item}.
         """
-        # pylint: disable = too-many-locals
         # One name per intermediate tensor of the blockwise score.
         batch_size = user_indices.size(0)
 

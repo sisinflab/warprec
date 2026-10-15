@@ -577,7 +577,7 @@ class Reader(ABC):
         """This method will load a model state from a source."""
 
 
-class ReaderFactory:  # pylint: disable=C0415, R0903
+class ReaderFactory:
     """Factory class for creating Reader instances based on configuration."""
 
     @classmethod

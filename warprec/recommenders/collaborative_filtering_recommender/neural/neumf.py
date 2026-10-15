@@ -1,4 +1,3 @@
-# pylint: disable = R0801, E1102
 from typing import List, Any, Optional
 
 import torch
@@ -134,7 +133,6 @@ class NeuMF(IterativeRecommender):
         self.log("loss", loss, prog_bar=True, on_step=False, on_epoch=True)
         return loss
 
-    # pylint: disable = E0606
     def forward(self, user: Tensor, item: Tensor) -> Tensor:
         """Forward pass of the NeuMF model.
 

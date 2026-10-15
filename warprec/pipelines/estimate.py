@@ -377,7 +377,6 @@ def _estimate_eval_loop(  # noqa: PLR0912, PLR0915
     measured_batches: int,
     tracker: EstimateStageTracker,
 ) -> Dict[str, Any]:
-    # pylint: disable=too-many-statements, too-many-branches
     evaluator.reset_metrics()
     evaluator.metrics_to(device)
     model.eval()
@@ -405,9 +404,7 @@ def _estimate_eval_loop(  # noqa: PLR0912, PLR0915
         _sync_cuda(device)
         start = time.perf_counter()
 
-        batch_data = evaluator._parse_batch(  # pylint: disable=protected-access
-            batch, strategy, device
-        )
+        batch_data = evaluator._parse_batch(batch, strategy, device)
         eval_batch = None
         user_indices = batch_data["user_indices"]
         context = batch_data.get("context")
@@ -417,7 +414,7 @@ def _estimate_eval_loop(  # noqa: PLR0912, PLR0915
         predict_kwargs = {"user_indices": user_indices}
 
         if isinstance(model, SequentialRecommenderUtils):
-            user_seq, seq_len = evaluator._retrieve_sequences_for_user(  # pylint: disable=protected-access
+            user_seq, seq_len = evaluator._retrieve_sequences_for_user(
                 dataset, user_indices.tolist(), model.max_seq_len
             )
             predict_kwargs["user_seq"] = user_seq.to(device)
@@ -427,7 +424,7 @@ def _estimate_eval_loop(  # noqa: PLR0912, PLR0915
             predict_kwargs["contexts"] = context
 
         if strategy == "sampled":
-            candidates, eval_batch = evaluator._sampled_candidates(  # pylint: disable=protected-access
+            candidates, eval_batch = evaluator._sampled_candidates(
                 batch_data, padding_idx
             )
             predict_kwargs["item_indices"] = candidates
@@ -473,7 +470,7 @@ def _estimate_eval_loop(  # noqa: PLR0912, PLR0915
             else:
                 predictions[candidates == padding_idx] = -torch.inf
 
-            evaluator._compute_metrics_step(  # pylint: disable=protected-access
+            evaluator._compute_metrics_step(
                 predictions=predictions,
                 eval_batch=eval_batch,
                 user_indices=user_indices,
@@ -558,7 +555,7 @@ def _require_numeric(value: object, field_name: str) -> float:
     return float(value)
 
 
-def _run_estimate_setup(  # pylint: disable = too-many-locals  # noqa: PLR0915
+def _run_estimate_setup(  # noqa: PLR0915
     config: EstimateConfiguration,
     model_name: str,
     setup: dict,
@@ -566,7 +563,6 @@ def _run_estimate_setup(  # pylint: disable = too-many-locals  # noqa: PLR0915
     eval_dataset: Dataset,
     estimate_settings: dict,
 ) -> Dict[str, Any]:
-    # pylint: disable=too-many-statements
     load_custom_modules(config.general.custom_modules)
 
     params = model_param_from_dict(model_name, setup)
@@ -982,7 +978,7 @@ def estimate_pipeline(path: str) -> None:
                     estimate_settings=estimate_settings,
                 )
                 setup_reports.append(setup_report)
-            except Exception as exc:  # pylint: disable=broad-exception-caught
+            except Exception as exc:
                 logger.negative(
                     f"Estimate setup {idx}/{len(setups)} for model "
                     f"{model_name} failed: {exc}"

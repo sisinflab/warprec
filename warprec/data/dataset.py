@@ -1,4 +1,3 @@
-# pylint: disable = too-many-branches, too-many-statements
 from typing import Callable, Tuple, Optional, List, Any, Dict
 
 import math
@@ -35,7 +34,6 @@ from warprec.utils.logger import logger
 
 
 class Dataset:
-    # pylint: disable = too-many-instance-attributes  # this class is the state it holds
     """The definition of the Dataset class that will handle transaction data.
 
     Args:
@@ -138,8 +136,6 @@ class Dataset:
         context_labels: Optional[List[str]] = None,
         evaluation_set: str = "Test",
     ):
-        # pylint: disable = too-many-arguments, too-many-positional-arguments
-        # pylint: disable = too-many-locals
         # This is the entry point a user constructs directly, so it keeps a
         # flat keyword signature rather than asking them to assemble the
         # value objects it builds internally. The build also keeps one name

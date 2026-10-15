@@ -1,4 +1,3 @@
-# pylint: disable=unused-argument, too-few-public-methods, protected-access
 """
 This script contains the wrapper of the Ray wrappers for the schedulers.
 At the time of writing this there is no common interface provided by Ray.
@@ -46,7 +45,7 @@ class FIFOSchedulerWrapper(FIFOScheduler, BaseSchedulerWrapper):
         **kwargs (Any): Keyword arguments.
     """
 
-    def __init__(self, **kwargs: Any):  # pylint: disable=W0231
+    def __init__(self, **kwargs: Any):
         return None
 
 

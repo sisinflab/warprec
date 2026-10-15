@@ -92,12 +92,11 @@ def _batch_size(batch: Any) -> int:
     """
     try:
         return int(extract_batch_size(batch))
-    except Exception:  # pylint: disable=broad-exception-caught
+    except Exception:
         return 0
 
 
 class EpochTimingCallback(L.Callback):
-    # pylint: disable = too-many-instance-attributes  # this class is the state it holds
     """Times every training epoch apart from the validation that ends it.
 
     Lightning validates inside the training epoch, after its last batch, so

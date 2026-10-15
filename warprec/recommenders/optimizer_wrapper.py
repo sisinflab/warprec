@@ -1,4 +1,3 @@
-# pylint: disable=unused-argument, too-few-public-methods
 from typing import Any, Iterable
 from abc import ABC, abstractmethod
 

@@ -26,7 +26,6 @@ from warprec.data.entities.train_structures import (
 
 
 class Sessions:
-    # pylint: disable = too-many-instance-attributes  # this class is the state it holds
     """
     Handles session-based data preparation for sequential recommenders.
     Transforms user-item interactions into padded sequences or sliding windows.

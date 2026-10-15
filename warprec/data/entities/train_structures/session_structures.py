@@ -220,7 +220,6 @@ class SlidingWindowDataset(Dataset):
         niid: int,
         seed: int = 42,
     ):
-        # pylint: disable = too-many-arguments, too-many-positional-arguments
         # These arguments are the flat session arrays and the sampling
         # parameters, as for ClozeDataset; they form no group that recurs.
         # The dataset owns its stream, so a seed fixes the negatives it draws
@@ -311,7 +310,6 @@ class ClozeDataset(Dataset):
         niid: int,
         seed: int = 42,
     ):
-        # pylint: disable = too-many-arguments, too-many-positional-arguments
         # These arguments are the flat session arrays and the masking
         # parameters; they form no group that recurs elsewhere, so there is
         # nothing to collapse them onto.
