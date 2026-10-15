@@ -113,9 +113,9 @@ A trial's time is split into three parts that do not overlap. They are measured 
 
 - **Setup**: from the start of the trial (its trial driver) to its first training batch: starting the Ray Train worker group, fetching the dataset, building the model, its data loaders and the evaluator, and Lightning's own preparation. On a multi-node cluster the start is read on the driver's node and the end on the worker's, so the clocks of both nodes must agree.
 - **Training (train-only)**: the training loop of every epoch (fetching the batches, forward, backward and optimiser steps), the end-of-epoch validation excluded.
-- **Validation**: the end-of-epoch evaluation on the validation data (every `eval_every_n` epochs).
+- **Validation**: the end-of-epoch evaluation on the validation data (every `eval_every_n` epochs, and the last epoch).
 
-What is in none of them is the checkpoint saved and the report handed to Ray after every epoch, and the start of the trial's Ray actor; together with the setup, training and validation they add up to the trial's `time_total_s` when the trial ran in one session. They do not for a trial resumed after a pause (see below).
+What is in none of them is the checkpoint saved and the report handed to Ray after every validated epoch, and the start of the trial's Ray actor; together with the setup, training and validation they add up to the trial's `time_total_s` when the trial ran in one session. They do not for a trial resumed after a pause (see below).
 
 A closed-form model (EASE, ItemKNN, ...) is fitted when it is built: its fit is its single epoch of training, its evaluation its validation (including building the evaluation loader), and its setup ends when the fit starts.
 
@@ -155,14 +155,18 @@ A trial resumed after a pause ran in several sessions, each starting again from 
 
 #### Per-epoch timing in Ray Tune's results
 
-Every epoch of a trial reports, beside its metrics, the keys below. They land in each trial's `progress.csv` and `result.json` under `ray_results/`, and reach the MLflow and W&B dashboards with the epoch's metrics. A closed-form trial reports them once.
+Every report of a trial carries, beside its metrics, the keys below. They land in each trial's `progress.csv` and `result.json` under `ray_results/`, and reach the MLflow and W&B dashboards with the report's metrics. A closed-form trial reports them once.
+
+A trial reports the epochs it validates: every epoch by default, every `eval_every_n` epochs and the last one otherwise. A report then covers every epoch trained since the previous report, so that each epoch is counted once: with `eval_every_n: 2` and 5 epochs, the reports at epochs 2, 4 and 5 cover 2, 2 and 1 epochs.
 
 | Key | Meaning |
 |---|---|
-| `epoch_train_s` | Seconds of the epoch's training loop, validation excluded. |
-| `epoch_validation_s` | Seconds of the epoch's end-of-epoch validation; `0` for an epoch that was not validated. |
-| `epoch_samples` | Training examples the epoch went through (see the throughput column above), summed over the workers. |
+| `epoch_train_s` | Seconds of the training loop of the epochs the report covers, validation excluded. |
+| `epoch_validation_s` | Seconds of the end-of-epoch validation of the reported epoch. |
+| `epoch_samples` | Training examples those epochs went through (see the throughput column above), summed over the workers. |
 | `train_samples_per_s` | `epoch_samples / epoch_train_s`. |
+| `report_epochs` | The epochs the report covers: `1` when every epoch is validated. |
+| `epoch_train_min_s` / `epoch_train_max_s` | The training time of the shortest and of the longest of those epochs. |
 | `setup_s` | The trial's setup: from the start of the trial to its first training batch (starting the Ray Train workers, fetching the dataset, building the model and its loaders); for a closed-form model, to the start of its fit. The same value in every report of a session. |
 
 When a pause stops a trial after an epoch's checkpoint is saved but before its report reaches Ray Tune, the session that resumes reports that epoch first, with the values the paused session measured (its `setup_s` included); Ray Tune's own columns of that row (`training_iteration`, `time_total_s`, `pid`, ...) belong to the resuming session. Its later epochs carry its own `setup_s`.

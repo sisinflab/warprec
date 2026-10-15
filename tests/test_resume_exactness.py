@@ -74,14 +74,9 @@ class SavingReport(L.Callback):
         trainer.save_checkpoint(target / self.CHECKPOINT_NAME, weights_only=False)
         if trainer.current_epoch == self.pause_after:
             raise Paused()
-
-    def on_train_end(self, trainer: L.Trainer, pl_module: Any) -> None:
-        """Keep the weights the trial ended on.
-
-        Args:
-            trainer (L.Trainer): The trainer.
-            pl_module (Any): The model.
-        """
+        # The last epoch is always reported: its weights are the trial's last
+        if trainer.current_epoch + 1 < trainer.max_epochs:
+            return
         SavingReport.final_weights = {
             name: value.detach().clone()
             for name, value in pl_module.state_dict().items()
@@ -206,6 +201,9 @@ def _assert_same_weights(left: Dict[str, torch.Tensor], right: Dict[str, torch.T
         # first epoch and after a later one
         ("BPR", {"num_workers": 0}, 0),
         ("BPR", {"num_workers": 0}, 2),
+        # Validated every second epoch: only those are saved, and a pause
+        # before the next validation resumes from the last one
+        ("BPR", {"num_workers": 0, "eval_every_n": 2}, 1),
         # The global generator: dropout and the reparameterisation noise
         ("MultiVAE", {"num_workers": 0}, 1),
         # A generator the model keeps for its knowledge-graph triples

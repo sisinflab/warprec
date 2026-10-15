@@ -31,11 +31,15 @@ from warprec.recommenders.trainer import objectives
 from warprec.recommenders.trainer import trainer as trainer_module
 from warprec.recommenders.trainer.timing import (
     EPOCH_SAMPLES,
+    EPOCH_TRAIN_MAX_S,
+    EPOCH_TRAIN_MIN_S,
     EPOCH_TRAIN_S,
     EPOCH_VALIDATION_S,
+    REPORT_EPOCHS,
     SETUP_S,
     TRAIN_SAMPLES_PER_S,
     TRIAL_STARTED_AT,
+    EpochTimingCallback,
     TrialSpans,
     TrialTiming,
     search_overhead,
@@ -60,20 +64,33 @@ STARTED_BEFORE_S = 1.0
 
 
 class RecordingReport(L.Callback):
-    """Stands in for Ray's report callback: keeps what each epoch would report."""
+    """Stands in for Ray's report callback: keeps what each report would carry."""
 
     reports: List[Dict[str, float]] = []
 
     def on_train_epoch_end(self, trainer: L.Trainer, pl_module: L.LightningModule):
-        """Record the metrics Ray Train would receive for this epoch.
+        """Record the metrics Ray Train would receive, with their epoch.
 
         Args:
             trainer (L.Trainer): The trainer.
             pl_module (L.LightningModule): The model.
         """
         RecordingReport.reports.append(
-            {key: value.item() for key, value in trainer.callback_metrics.items()}
+            {
+                **{k: v.item() for k, v in trainer.callback_metrics.items()},
+                "epoch": trainer.current_epoch,
+            }
         )
+
+
+class TimingProbe(EpochTimingCallback):
+    """The trial's timing callback, kept to read the time of every epoch."""
+
+    last: Optional["TimingProbe"] = None
+
+    def __init__(self, started_at: Optional[float] = None):
+        super().__init__(started_at)
+        TimingProbe.last = self
 
 
 def _trial_config(
@@ -83,6 +100,7 @@ def _trial_config(
     model_name: str,
     hyperparameters: Dict[str, Any],
     eval_every_n: int = 1,
+    early_stopping: Optional[Dict[str, Any]] = None,
 ) -> dict:
     """The configuration one trial of the train pipeline receives.
 
@@ -93,6 +111,7 @@ def _trial_config(
         model_name (str): The model of the trial.
         hyperparameters (Dict[str, Any]): The trial's hyperparameters.
         eval_every_n (int): How often the trial validates.
+        early_stopping (Optional[Dict[str, Any]]): The trial's early stopping.
 
     Returns:
         dict: The configuration, as the trial driver hands it to the worker,
@@ -118,6 +137,7 @@ def _trial_config(
             "max_concurrent_trials": 1,
             "eval_every_n": eval_every_n,
         },
+        early_stopping=early_stopping,
     )
     trainer_module.Trainer(storage_path=str(tmp_path))._setup_tuner(
         model_name=model_name,
@@ -146,18 +166,16 @@ def _trial_config(
     }
 
 
-def test_every_epoch_reports_its_training_and_its_validation_apart(
-    monkeypatch: pytest.MonkeyPatch, dataset: Dataset, tmp_path: Path
-):
-    """Training, validation, samples and setup reach every epoch's report."""
-    config = _trial_config(monkeypatch, dataset, tmp_path, "BPR", BPR, eval_every_n=2)
-    monkeypatch.setattr(objectives, "RayTrainReportCallback", RecordingReport)
-    RecordingReport.reports = []
+def _slow_validation(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Make every validation last long enough to be told from training.
 
+    Args:
+        monkeypatch (pytest.MonkeyPatch): Replaces the integration callback's hook.
+    """
     evaluate = WarpRecLightningIntegrationCallback.on_validation_epoch_end
 
     def slow_validation(self: Any, trainer: L.Trainer, pl_module: Any) -> None:
-        """Validate, after waiting long enough to be told from training.
+        """Validate, after waiting.
 
         Args:
             self (Any): The integration callback.
@@ -171,26 +189,121 @@ def test_every_epoch_reports_its_training_and_its_validation_apart(
         WarpRecLightningIntegrationCallback, "on_validation_epoch_end", slow_validation
     )
 
-    objectives.objective_function(config)
 
-    reports = RecordingReport.reports
-    assert len(reports) == BPR["epochs"]
+def _run_recorded(monkeypatch: pytest.MonkeyPatch, config: dict) -> List[dict]:
+    """Run a trial in this process and return what it reports to Ray Tune.
+
+    Args:
+        monkeypatch (pytest.MonkeyPatch): Replaces Ray's report callback.
+        config (dict): The trial configuration.
+
+    Returns:
+        List[dict]: The reports, each with its epoch.
+    """
+    monkeypatch.setattr(objectives, "RayTrainReportCallback", RecordingReport)
+    monkeypatch.setattr(objectives, "EpochTimingCallback", TimingProbe)
+    RecordingReport.reports = []
+    objectives.objective_function(config)
+    return RecordingReport.reports
+
+
+def test_a_trial_validating_every_n_epochs_reports_only_the_validated_ones(
+    monkeypatch: pytest.MonkeyPatch, dataset: Dataset, tmp_path: Path
+):
+    """Every second epoch and the last are reported, with the time of all five.
+
+    A report carries the training of every epoch since the previous report
+    and the epochs it covers, so the trial's timing adds up to its epochs.
+    """
+    config = _trial_config(
+        monkeypatch, dataset, tmp_path, "BPR", {**BPR, "epochs": 5}, eval_every_n=2
+    )
+    _slow_validation(monkeypatch)
+
+    reports = _run_recorded(monkeypatch, config)
+
+    assert [report["epoch"] for report in reports] == [1, 3, 4]
+    assert [report[REPORT_EPOCHS] for report in reports] == [2, 2, 1]
+    assert TimingProbe.last is not None
+    epochs = TimingProbe.last.epochs
+    assert len(epochs) == 5
     training_examples = len(dataset.train_set)
-    for epoch, report in enumerate(reports):
-        assert all(key in report for key in (*EPOCH_KEYS, SETUP_S)), report
-        validated = (epoch + 1) % 2 == 0
-        if validated:
-            assert report[EPOCH_VALIDATION_S] >= SLOW_VALIDATION_S
-        else:
-            assert report[EPOCH_VALIDATION_S] == 0.0
+    first = 0
+    for report in reports:
+        window = epochs[first : report["epoch"] + 1]
+        first = report["epoch"] + 1
+        assert "nDCG@5" in report
+        assert report[EPOCH_VALIDATION_S] >= SLOW_VALIDATION_S
+        assert report[EPOCH_VALIDATION_S] == pytest.approx(
+            sum(epoch[EPOCH_VALIDATION_S] for epoch in window)
+        )
+        assert report[EPOCH_TRAIN_S] == pytest.approx(
+            sum(epoch[EPOCH_TRAIN_S] for epoch in window)
+        )
+        assert report[EPOCH_TRAIN_MIN_S] == min(e[EPOCH_TRAIN_S] for e in window)
+        assert report[EPOCH_TRAIN_MAX_S] == max(e[EPOCH_TRAIN_S] for e in window)
         # The wait inside the validation is not training time
         assert 0.0 < report[EPOCH_TRAIN_S] < SLOW_VALIDATION_S
-        assert report[EPOCH_SAMPLES] == training_examples
+        assert report[EPOCH_SAMPLES] == training_examples * report[REPORT_EPOCHS]
         assert report[TRAIN_SAMPLES_PER_S] == pytest.approx(
             report[EPOCH_SAMPLES] / report[EPOCH_TRAIN_S]
         )
         assert report[SETUP_S] >= STARTED_BEFORE_S
         assert report[SETUP_S] == reports[0][SETUP_S]
+
+    # Read back, the trial's timing is that of all its epochs
+    timing = trial_timing(pd.DataFrame(reports))
+    assert timing is not None
+    assert timing.epochs == 5
+    assert timing.train_s == pytest.approx(sum(e[EPOCH_TRAIN_S] for e in epochs))
+    assert timing.samples == training_examples * 5
+
+
+def test_an_early_stop_between_validations_validates_and_reports_its_epoch(
+    monkeypatch: pytest.MonkeyPatch, dataset: Dataset, tmp_path: Path
+):
+    """Early stopping on the loss can stop on an epoch that was not validated.
+
+    That epoch is the trial's last state: it is validated and reported.
+    """
+    config = _trial_config(
+        monkeypatch,
+        dataset,
+        tmp_path,
+        "BPR",
+        {**BPR, "epochs": 5},
+        eval_every_n=3,
+        # The loss never improves by a billion: the second epoch stops
+        early_stopping={"monitor": "loss", "patience": 1, "min_delta": 1e9},
+    )
+
+    reports = _run_recorded(monkeypatch, config)
+
+    assert [report["epoch"] for report in reports] == [1]
+    (report,) = reports
+    assert "nDCG@5" in report
+    assert report[REPORT_EPOCHS] == 2
+    assert report[EPOCH_VALIDATION_S] > 0.0
+    assert TimingProbe.last is not None
+    assert report[EPOCH_TRAIN_S] == pytest.approx(
+        sum(epoch[EPOCH_TRAIN_S] for epoch in TimingProbe.last.epochs)
+    )
+
+
+def test_every_epoch_is_reported_when_every_epoch_is_validated(
+    monkeypatch: pytest.MonkeyPatch, dataset: Dataset, tmp_path: Path
+):
+    """The default validates and reports each epoch, covering only itself."""
+    config = _trial_config(monkeypatch, dataset, tmp_path, "BPR", BPR)
+
+    reports = _run_recorded(monkeypatch, config)
+
+    assert [report["epoch"] for report in reports] == [0, 1, 2]
+    assert all(report[REPORT_EPOCHS] == 1 for report in reports)
+    assert all(
+        report[EPOCH_TRAIN_MIN_S] == report[EPOCH_TRAIN_MAX_S] == report[EPOCH_TRAIN_S]
+        for report in reports
+    )
 
 
 class Paused(BaseException):
@@ -423,6 +536,24 @@ def test_the_best_trials_of_a_cross_validation_are_averaged_over_the_folds():
     assert report["Best Trial Train Throughput (samples/s)"] == pytest.approx(
         300.0 / 8.0
     )
+
+
+def test_reports_covering_several_epochs_count_every_epoch():
+    """A trial validating every second epoch reports each window of epochs once."""
+    history = _history([3.0, 5.0, 2.0], [1.0, 1.0, 1.0], 10.0, epochs=[1, 3, 4])
+    history[REPORT_EPOCHS] = [2, 2, 1]
+    history[EPOCH_TRAIN_MIN_S] = [1.0, 2.0, 2.0]
+    history[EPOCH_TRAIN_MAX_S] = [2.0, 3.0, 2.0]
+
+    report = summarise_timing({"trial": trial_timing(history)}, ["trial"])
+
+    assert report["Best Trial Epochs"] == 5
+    assert report["Best Trial Train-Only Time (s)"] == pytest.approx(10.0)
+    assert report["Best Trial Mean Epoch Train Time (s)"] == pytest.approx(2.0)
+    assert report["Best Trial Min Epoch Train Time (s)"] == pytest.approx(1.0)
+    assert report["Best Trial Max Epoch Train Time (s)"] == pytest.approx(3.0)
+    assert report["Best Trial Validation Time (s)"] == pytest.approx(3.0)
+    assert report["Best Trial Mean Epoch Validation Time (s)"] == pytest.approx(1.0)
 
 
 def test_a_report_without_timing_leaves_the_columns_empty():

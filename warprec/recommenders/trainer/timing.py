@@ -10,12 +10,17 @@ import torch
 from lightning.pytorch.utilities.data import extract_batch_size
 from ray import tune
 
-# What every epoch of a trial reports to Ray Tune, beside its metrics
+# What every report of a trial carries to Ray Tune, beside its metrics: a
+# trial reports the epochs it validates, and each report covers the epochs
+# since the previous one
 EPOCH_TRAIN_S = "epoch_train_s"
 EPOCH_VALIDATION_S = "epoch_validation_s"
 EPOCH_SAMPLES = "epoch_samples"
 TRAIN_SAMPLES_PER_S = "train_samples_per_s"
 SETUP_S = "setup_s"
+REPORT_EPOCHS = "report_epochs"
+EPOCH_TRAIN_MIN_S = "epoch_train_min_s"
+EPOCH_TRAIN_MAX_S = "epoch_train_max_s"
 
 # The key of the trial configuration that carries when the trial started
 TRIAL_STARTED_AT = "trial_started_at"
@@ -55,25 +60,38 @@ def synchronize(device: Union[str, torch.device, None]) -> None:
 
 
 def epoch_timing(
-    train_s: float, validation_s: float, samples: float, setup_s: float
+    train_s: float,
+    validation_s: float,
+    samples: float,
+    setup_s: float,
+    epoch_train_s: Optional[List[float]] = None,
 ) -> Dict[str, float]:
-    """The timing one epoch reports to Ray Tune.
+    """The timing one report of a trial carries to Ray Tune.
+
+    A report covers the epochs trained since the previous report: one when
+    every epoch is validated, up to 'eval_every_n' otherwise.
 
     Args:
         train_s (float): The time spent training, validation excluded.
         validation_s (float): The time spent in the end-of-epoch evaluation.
-        samples (float): The training examples the epoch went through.
-        setup_s (float): The setup of the trial, the same for every epoch.
+        samples (float): The training examples the epochs went through.
+        setup_s (float): The setup of the trial, the same for every report.
+        epoch_train_s (Optional[List[float]]): The training time of each epoch
+            the report covers, or None when it covers one epoch only.
 
     Returns:
-        Dict[str, float]: The epoch's timing, by result key.
+        Dict[str, float]: The report's timing, by result key.
     """
+    epochs = [train_s] if epoch_train_s is None else epoch_train_s
     return {
         EPOCH_TRAIN_S: train_s,
         EPOCH_VALIDATION_S: validation_s,
         EPOCH_SAMPLES: samples,
         TRAIN_SAMPLES_PER_S: samples / train_s if train_s > 0 else math.nan,
         SETUP_S: setup_s,
+        REPORT_EPOCHS: float(len(epochs)),
+        EPOCH_TRAIN_MIN_S: min(epochs),
+        EPOCH_TRAIN_MAX_S: max(epochs),
     }
 
 
@@ -103,6 +121,8 @@ class EpochTimingCallback(L.Callback):
     the epoch's training time is its whole duration minus the validation in
     it. Each epoch logs the keys of 'epoch_timing', which reach Ray Tune with
     the epoch's report when this callback runs before the report callback.
+    A trial reports only the epochs it validates, so what is logged sums every
+    epoch since the last validated one: a report covers each epoch once.
 
     The setup is the time from the start of the trial to its first training
     batch: starting the Ray Train workers, fetching the dataset, building the
@@ -123,9 +143,11 @@ class EpochTimingCallback(L.Callback):
         self.started_at = time.time() if started_at is None else started_at
         self.setup_s: Optional[float] = None
         self.epochs: List[Dict[str, float]] = []
+        self._unreported: List[Dict[str, float]] = []
         self._epoch_start = 0.0
         self._validation_s = 0.0
         self._validation_start: Optional[float] = None
+        self._validated = False
         self._samples = 0
 
     def on_train_epoch_start(
@@ -141,6 +163,7 @@ class EpochTimingCallback(L.Callback):
         self._epoch_start = time.perf_counter()
         self._validation_s = 0.0
         self._validation_start = None
+        self._validated = False
         self._samples = 0
 
     def on_train_batch_start(
@@ -192,11 +215,12 @@ class EpochTimingCallback(L.Callback):
         synchronize(pl_module.device)
         self._validation_s += time.perf_counter() - self._validation_start
         self._validation_start = None
+        self._validated = True
 
     def on_train_epoch_end(
         self, trainer: L.Trainer, pl_module: L.LightningModule
     ) -> None:
-        """Logs the timing of the epoch that just ended.
+        """Logs the timing of the epochs since the last validated one.
 
         Args:
             trainer (L.Trainer): The trainer.
@@ -208,13 +232,27 @@ class EpochTimingCallback(L.Callback):
             torch.tensor(float(self._samples), device=pl_module.device),
             reduce_op="sum",
         )
-        timing = epoch_timing(
+        setup_s = self.setup_s if self.setup_s is not None else math.nan
+        epoch = epoch_timing(
             train_s=max(elapsed - self._validation_s, 0.0),
             validation_s=self._validation_s,
             samples=float(samples),
-            setup_s=self.setup_s if self.setup_s is not None else math.nan,
+            setup_s=setup_s,
         )
-        self.epochs.append(timing)
+        self.epochs.append(epoch)
+        self._unreported.append(epoch)
+
+        window = self._unreported
+        timing = epoch_timing(
+            train_s=sum(e[EPOCH_TRAIN_S] for e in window),
+            validation_s=sum(e[EPOCH_VALIDATION_S] for e in window),
+            samples=sum(e[EPOCH_SAMPLES] for e in window),
+            setup_s=setup_s,
+            epoch_train_s=[e[EPOCH_TRAIN_S] for e in window],
+        )
+        # A validated epoch is reported: the next report starts after it
+        if self._validated:
+            self._unreported = []
 
         # Logged in double precision, which Lightning keeps: a count of
         # samples past 2**24 would lose its units in single precision
@@ -230,20 +268,63 @@ class EpochTimingCallback(L.Callback):
 
 @dataclass
 class TrialTiming:
-    """Where the time of one trial went, epoch by epoch.
+    """Where the time of one trial went, report by report.
+
+    A report covers the epochs since the previous one: a single epoch when
+    the trial validates every epoch.
 
     Attributes:
         setup_s (float): The trial's setup.
-        epoch_train_s (List[float]): The training time of each epoch.
-        epoch_validation_s (List[float]): The validation time of each epoch,
-            0 for an epoch that was not validated.
+        epoch_train_s (List[float]): The training time of each report's epochs.
+        epoch_validation_s (List[float]): The validation time of each report,
+            0 for one that was not validated.
         samples (float): The training examples of all its epochs.
+        report_epochs (List[float]): The epochs each report covers, one each
+            when empty.
+        epoch_train_min_s (List[float]): The shortest epoch of each report,
+            its training time when empty.
+        epoch_train_max_s (List[float]): The longest epoch of each report,
+            its training time when empty.
     """
 
     setup_s: float
     epoch_train_s: List[float] = field(default_factory=list)
     epoch_validation_s: List[float] = field(default_factory=list)
     samples: float = 0.0
+    report_epochs: List[float] = field(default_factory=list)
+    epoch_train_min_s: List[float] = field(default_factory=list)
+    epoch_train_max_s: List[float] = field(default_factory=list)
+
+    @property
+    def epochs(self) -> float:
+        """The epochs the trial trained.
+
+        Returns:
+            float: The epochs its reports cover.
+        """
+        if self.report_epochs:
+            return float(sum(self.report_epochs))
+        return float(len(self.epoch_train_s))
+
+    @property
+    def shortest_epoch_s(self) -> float:
+        """The training time of the trial's shortest epoch.
+
+        Returns:
+            float: The time, NaN when it reported none.
+        """
+        values = self.epoch_train_min_s or self.epoch_train_s
+        return min(values) if values else math.nan
+
+    @property
+    def longest_epoch_s(self) -> float:
+        """The training time of the trial's longest epoch.
+
+        Returns:
+            float: The time, NaN when it reported none.
+        """
+        values = self.epoch_train_max_s or self.epoch_train_s
+        return max(values) if values else math.nan
 
     @property
     def train_s(self) -> float:
@@ -300,11 +381,25 @@ def trial_timing(history: Optional[pd.DataFrame]) -> Optional[TrialTiming]:
             return [0.0] * len(rows)
         return [float(v) for v in rows[key].fillna(0.0)]
 
+    train = column(EPOCH_TRAIN_S)
+
+    # Results written before a report could cover several epochs lack these
+    def per_report(key: str, default: List[float]) -> List[float]:
+        if key not in rows:
+            return []
+        return [
+            fallback if math.isnan(value) else value
+            for value, fallback in zip(rows[key].astype(float), default)
+        ]
+
     return TrialTiming(
         setup_s=float(rows[SETUP_S].iloc[-1]) if SETUP_S in rows else math.nan,
-        epoch_train_s=column(EPOCH_TRAIN_S),
+        epoch_train_s=train,
         epoch_validation_s=column(EPOCH_VALIDATION_S),
         samples=float(sum(column(EPOCH_SAMPLES))),
+        report_epochs=per_report(REPORT_EPOCHS, [1.0] * len(train)),
+        epoch_train_min_s=per_report(EPOCH_TRAIN_MIN_S, train),
+        epoch_train_max_s=per_report(EPOCH_TRAIN_MAX_S, train),
     )
 
 
@@ -342,12 +437,15 @@ def summarise_timing(
     best_timed = [trials[i] for i in best if trials.get(i) is not None]
     best_timed = [timing for timing in best_timed if timing is not None]
 
-    epochs_train = [t for timing in best_timed for t in timing.epoch_train_s]
+    # A report validates once, whatever the epochs it covers
     epochs_validated = [
         v for timing in best_timed for v in timing.epoch_validation_s if v > 0
     ]
     best_train = sum(timing.train_s for timing in best_timed)
+    best_epochs = sum(timing.epochs for timing in best_timed)
     best_samples = sum(timing.samples for timing in best_timed)
+    shortest = [timing.shortest_epoch_s for timing in best_timed if timing.epochs]
+    longest = [timing.longest_epoch_s for timing in best_timed if timing.epochs]
 
     return {
         BEST_SETUP: _mean(timing.setup_s for timing in best_timed),
@@ -356,10 +454,10 @@ def summarise_timing(
         BEST_TRAINING: _mean(
             timing.train_s + timing.validation_s for timing in best_timed
         ),
-        BEST_EPOCHS: _mean(len(timing.epoch_train_s) for timing in best_timed),
-        BEST_MEAN_EPOCH_TRAIN: _mean(epochs_train),
-        BEST_MIN_EPOCH_TRAIN: min(epochs_train) if epochs_train else math.nan,
-        BEST_MAX_EPOCH_TRAIN: max(epochs_train) if epochs_train else math.nan,
+        BEST_EPOCHS: _mean(timing.epochs for timing in best_timed),
+        BEST_MEAN_EPOCH_TRAIN: best_train / best_epochs if best_epochs else math.nan,
+        BEST_MIN_EPOCH_TRAIN: min(shortest) if shortest else math.nan,
+        BEST_MAX_EPOCH_TRAIN: max(longest) if longest else math.nan,
         BEST_MEAN_EPOCH_VALIDATION: _mean(epochs_validated),
         BEST_THROUGHPUT: best_samples / best_train if best_train > 0 else math.nan,
         MEAN_SETUP: _mean(timing.setup_s for timing in timed),
