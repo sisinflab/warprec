@@ -12,8 +12,5 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Setup Environment
-        uses: ./.github/actions/setup-env
-
-      - name: Run pre-commit
-        run: poetry run pre-commit run --all-files
+      - name: Lint
+        uses: ./.github/actions/lint

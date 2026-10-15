@@ -1,0 +1,28 @@
+name: 'Lint'
+description: 'Runs the pre-commit hooks on every file, without installing the project'
+
+runs:
+  using: "composite"
+  steps:
+    # Every hook the commit stage runs brings its own environment, so linting
+    # needs neither Poetry nor the project's dependencies. mypy needs them and
+    # runs before the push instead.
+    - name: Set up Python
+      id: python
+      uses: actions/setup-python@v6
+      with:
+        python-version: '3.12'
+
+    - name: Cache the hook environments
+      uses: actions/cache@v5
+      with:
+        path: ~/.cache/pre-commit
+        key: pre-commit-${{ runner.os }}-py${{ steps.python.outputs.python-version }}-${{ hashFiles('.pre-commit-config.yaml') }}
+
+    - name: Install pre-commit
+      shell: bash
+      run: python -m pip install --disable-pip-version-check "pre-commit==4.6.2"
+
+    - name: Run pre-commit
+      shell: bash
+      run: pre-commit run --all-files --show-diff-on-failure
