@@ -1,7 +1,7 @@
 import json
 from typing import Dict, Optional, List, Any, Generator
 from abc import ABC, abstractmethod
-from datetime import datetime, timedelta
+from datetime import datetime
 from io import StringIO, BytesIO
 from pathlib import Path
 
@@ -33,6 +33,29 @@ from warprec.utils.config import (
 from warprec.serving.payload import build_serving_payload
 from warprec.utils.enums import WritingMethods
 from warprec.utils.logger import logger
+
+
+def _durations_in_seconds(report: pd.DataFrame) -> pd.DataFrame:
+    """Reads the h:mm:ss durations of an older time report as seconds.
+
+    Up to version 2.2.2 the durations without a unit in their name were
+    written as h:mm:ss (e.g. '0:01:15.5'); they are now numbers of seconds.
+
+    Args:
+        report (pd.DataFrame): The time report as read from its file.
+
+    Returns:
+        pd.DataFrame: The report, every such duration in seconds.
+    """
+    for col in report.select_dtypes(include=["object", "string"]).columns:
+        if col == "Model Name":
+            continue
+        values = report[col].dropna()
+        seconds = pd.to_timedelta(values.astype(str), errors="coerce")
+        if values.empty or seconds.isna().any():
+            continue
+        report[col] = pd.to_timedelta(report[col], errors="coerce").dt.total_seconds()
+    return report
 
 
 class Writer(ABC):
@@ -554,7 +577,18 @@ class Writer(ABC):
     def write_time_report(
         self, time_report: List[Dict[str, Any]], sep: str = "\t", ext: str = ".tsv"
     ):
-        """Writes the time report, handling merging with existing data."""
+        """Writes the time report, handling merging with existing data.
+
+        Every value is written as a number. A duration is in seconds, unless
+        its column names another unit. A report written by an older version,
+        which gave the durations as h:mm:ss, is read back in seconds.
+
+        Args:
+            time_report (List[Dict[str, Any]]): One row per model, its
+                durations in seconds and 'Inference Time' in seconds.
+            sep (str): The separator of the file.
+            ext (str): The extension of the file.
+        """
         path = self._path_join(
             self.experiment_evaluation_path,
             f"Time_Report_{self._timestamp}{ext}",
@@ -564,24 +598,20 @@ class Writer(ABC):
         existing_df = pd.DataFrame()
         if existing_content:
             try:
-                existing_df = pd.read_csv(StringIO(existing_content), sep=sep)
+                existing_df = _durations_in_seconds(
+                    pd.read_csv(StringIO(existing_content), sep=sep)
+                )
             except (pd.errors.ParserError, ValueError, pd.errors.EmptyDataError) as e:
                 logger.attention(
                     f"Could not parse existing time report from {path}: {e}. Overwriting."
                 )
 
+        # Every value is a plain number: a duration in seconds unless its
+        # column names another unit, like 'Inference Time (ms)'
         new_df = pd.DataFrame(time_report)
-        new_df["Inference Time (ms)"] = (new_df.pop("Inference Time") * 1000).round(6)
+        new_df["Inference Time (ms)"] = new_df.pop("Inference Time") * 1000
         for col in new_df.select_dtypes(include=["float"]).columns:
-            # A column whose name gives its unit holds a number in that unit,
-            # and a count or a rate stays a number; only the durations with no
-            # unit in their name ('... Time') are written as h:mm:ss.
-            if col.endswith("Time"):
-                new_df[col] = new_df[col].apply(
-                    lambda s: str(timedelta(seconds=s)) if pd.notna(s) else np.nan
-                )
-            else:
-                new_df[col] = new_df[col].round(6)
+            new_df[col] = new_df[col].round(6)
 
         merge_keys = ["Model Name"]
         combined_df = pd.concat([existing_df, new_df], ignore_index=True)

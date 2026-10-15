@@ -73,7 +73,7 @@ My_Model    10      0.001       0.002       ...
 
 The `Time_Report` file (written when `general.time_report` is on, by the train and swarm pipelines alike) has one row per model. It tells apart the time a model needs to set up, to train, to complete an epoch and to be validated, and above all the time spent **only training**.
 
-A column whose name ends in a unit holds a plain number in that unit: `(s)` seconds, `(ms)` milliseconds, `(MB)` megabytes, `(samples/s)` training examples per second. The four durations without a unit (`... Time`) are written as `h:mm:ss`. A column is empty when its value cannot be measured honestly (see each column).
+Every value is a plain number. **Every duration is in seconds unless its column names another unit**: `Data Preparation Time`, `Hyperparameter Exploration Time`, `Evaluation Time` and `Total Time` are in seconds like the `(s)` columns, `Inference Time (ms)` is in milliseconds; `(MB)` is megabytes and `(samples/s)` training examples per second. Reports written before version 2.2.3 gave the four unlabelled durations as `h:mm:ss`; a run that merges into such a report converts them to seconds. A column is empty when its value cannot be measured honestly (see each column).
 
 **The run and the search**
 

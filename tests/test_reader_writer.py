@@ -314,7 +314,7 @@ def test_a_collaborative_model_still_writes(tmp_path: Path, dataset: Dataset):
 
 
 def test_the_time_report_gives_each_column_in_the_unit_its_name_says(tmp_path: Path):
-    """A column labelled (ms) or (s) holds a number in that unit; the rest durations."""
+    """Every value is a number: seconds, unless the column names another unit."""
     writer = LocalWriter(dataset_name="timing", local_path=str(tmp_path))
     writer.write_time_report(
         [
@@ -336,5 +336,5 @@ def test_the_time_report_gives_each_column_in_the_unit_its_name_says(tmp_path: P
 
     assert float(report["Inference Time (ms)"]) == pytest.approx(13.1)
     assert float(report["Average Trial Time (s)"]) == pytest.approx(12.25)
-    assert report["Total Time"] == "0:01:15"
-    assert report["Data Preparation Time"] == "0:00:03.500000"
+    assert float(report["Total Time"]) == pytest.approx(75.0)
+    assert float(report["Data Preparation Time"]) == pytest.approx(3.5)

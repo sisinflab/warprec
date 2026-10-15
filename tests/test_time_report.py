@@ -475,7 +475,7 @@ def test_train_and_swarm_build_the_same_row():
 
 
 def test_the_written_report_keeps_counts_and_rates_as_numbers(tmp_path: Path):
-    """Only the unlabelled durations become h:mm:ss; epochs and rates stay numbers."""
+    """Durations, epochs and rates are all written as plain numbers."""
     writer = LocalWriter(dataset_name="timing", local_path=str(tmp_path))
     writer.write_time_report(
         [
@@ -511,4 +511,48 @@ def test_the_written_report_keeps_counts_and_rates_as_numbers(tmp_path: Path):
         pytest.approx(1234.5)
     )
     assert report.loc["BPR", "Best Trial Train-Only Time (s)"] == pytest.approx(4.25)
-    assert report.loc["BPR", "Hyperparameter Exploration Time"] == "0:01:15"
+    assert report.loc["BPR", "Hyperparameter Exploration Time"] == (pytest.approx(75.0))
+
+
+def test_a_report_from_an_older_run_is_merged_in_seconds(tmp_path: Path):
+    """A report holding h:mm:ss durations is read back as seconds and kept."""
+    writer = LocalWriter(dataset_name="timing", local_path=str(tmp_path))
+    evaluation = Path(writer.experiment_evaluation_path)
+    evaluation.mkdir(parents=True, exist_ok=True)
+    (evaluation / f"Time_Report_{writer.timestamp}.tsv").write_text(
+        "Model Name\tTrainable Params (Best Model)\tTotal Params (Best Model)\t"
+        "Data Preparation Time\tHyperparameter Exploration Time\t"
+        "Average Trial Time (s)\tEvaluation Time\tTotal Time\tInference Time (ms)\n"
+        "EASE\t0\t0\t0:00:16.953379\t1 day, 0:00:01.500000\t27.2\t"
+        "0:00:00.111793\t1 day, 0:00:18.565172\t65.5\n"
+    )
+
+    writer.write_time_report(
+        [
+            {
+                "Model Name": "BPR",
+                "Trainable Params (Best Model)": 10,
+                "Total Params (Best Model)": 10,
+                "Data Preparation Time": 16.953379,
+                "Hyperparameter Exploration Time": 75.0,
+                "Average Trial Time (s)": 31.5,
+                "Evaluation Time": 0.04,
+                "Total Time": 91.993379,
+                "Inference Time": 0.0429,
+            }
+        ]
+    )
+    report = pd.read_csv(
+        next(evaluation.glob("Time_Report_*.tsv")), sep="\t"
+    ).set_index("Model Name")
+
+    assert report.loc["EASE", "Data Preparation Time"] == pytest.approx(16.953379)
+    assert report.loc["EASE", "Hyperparameter Exploration Time"] == pytest.approx(
+        86401.5
+    )
+    assert report.loc["EASE", "Evaluation Time"] == pytest.approx(0.111793)
+    assert report.loc["EASE", "Inference Time (ms)"] == pytest.approx(65.5)
+    assert report.loc["BPR", "Total Time"] == pytest.approx(91.993379)
+    assert report.loc["BPR", "Inference Time (ms)"] == pytest.approx(42.9)
+    for column in report.columns:
+        assert pd.api.types.is_numeric_dtype(report[column]), column
