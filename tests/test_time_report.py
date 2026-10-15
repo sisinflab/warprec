@@ -21,6 +21,7 @@ import warprec.recommenders  # noqa: F401  (populates the registries)
 from warprec.data.dataset import Dataset
 from warprec.data.writer import LocalWriter
 from warprec.pipelines.common import model_timing_row
+from warprec.pipelines.remotes import ml
 from warprec.pipelines.remotes.ml import remote_model_retraining
 from warprec.recommenders.callbacks import WarpRecLightningIntegrationCallback
 from warprec.recommenders.trainer import objectives
@@ -40,6 +41,8 @@ from warprec.recommenders.trainer.timing import (
 )
 from warprec.utils.config.evaluation_configuration import EvaluationConfig
 from warprec.utils.registry import params_registry
+
+from conftest import make_model
 
 BPR = {
     "embedding_size": 8,
@@ -424,6 +427,28 @@ def test_the_cross_validation_retraining_reports_its_train_only_time(
     )
 
     assert report["Retraining Train-Only Time (s)"] > 0.0
+
+
+def test_the_test_evaluation_and_inference_clocks_wait_for_the_device(
+    monkeypatch: pytest.MonkeyPatch, dataset: Dataset
+):
+    """Both clocks start and stop only once the queued device work is done."""
+    synchronised: List[str] = []
+    monkeypatch.setattr(ml, "synchronize", synchronised.append)
+
+    _, evaluation_s, inference_s = ml.remote_evaluation_and_timing._function(  # type: ignore[attr-defined]
+        model=make_model("EASE", dataset),
+        main_dataset=dataset,
+        evaluation=EvaluationConfig(top_k=[5], metrics=["nDCG"]),
+        num_workers=0,
+        device="cpu",
+        requires_timing=True,
+        custom_modules=[],
+    )
+
+    assert synchronised == ["cpu"] * 4
+    assert evaluation_s > 0.0
+    assert inference_s > 0.0
 
 
 def test_train_and_swarm_build_the_same_row():
