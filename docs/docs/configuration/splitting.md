@@ -30,6 +30,9 @@ WarpRec provides multiple splitting strategies that can be tailored to your expe
 | `item_cold_start` | Cold-start | Hold out every interaction of a ratio of the **items**. |
 | `user_cold_start` | Cold-start | Hold out every interaction of a ratio of the **users**. |
 
+!!! note "Interactions that share a timestamp"
+    Temporal order is the **timestamp, then the order of the rows in the file**: of two interactions of a user recorded in the same second, the one further down the file counts as the more recent. `temporal_holdout` and `temporal_leave_k_out` hold out the last rows in that order, so the split is the same on every backend and every run. Without a timestamp column, file order alone is used. `timestamp_slicing` compares timestamps only, so every interaction at the boundary timestamp lands on the same side.
+
 **1. Temporal Holdout**
 
 Orders interactions by **timestamp** and reserves a portion of the most recent interactions as the test set.
