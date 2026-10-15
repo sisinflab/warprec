@@ -2,6 +2,29 @@
 
 <!-- version list -->
 
+## v2.2.2 (2026-10-15)
+
+### Bug Fixes
+
+- A run measured by CodeCarbon waits until every node's tracker measures before it prepares its
+  data, so the whole run is measured
+  ([`8750cb4`](https://github.com/sisinflab/warprec/commit/8750cb45f32116663c1412a4fafb7deb599cbe8f))
+
+- CodeCarbon's machine tracking measures every Ray node for the whole run, one row per node, instead
+  of the head node once per trial
+  ([`8a70f45`](https://github.com/sisinflab/warprec/commit/8a70f453058dd5e4073e10ebcd32f6371d03a776))
+
+- CodeCarbon's process tracking delivers each trial worker's row through Ray, labelled with its
+  node, trial and rank, charging only the GPUs Ray assigned to it
+  ([`798869e`](https://github.com/sisinflab/warprec/commit/798869ecb2fc2f7b4014f1f7d2522382c2d9fce4))
+
+### Documentation
+
+- Guide 11 shows CodeCarbon's per-node row, and the dashboard page says experiment_id names the host
+  and its IP address, to clear before sharing
+  ([`8e88cc0`](https://github.com/sisinflab/warprec/commit/8e88cc0f712c81741b70afe8197520012b8f9b7e))
+
+
 ## v2.2.1 (2026-10-14)
 
 ### Bug Fixes
