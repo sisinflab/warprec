@@ -72,9 +72,10 @@ class Filter(ABC):
         raise NotImplementedError("Subclasses should implement this method.")
 
     # The columns _order_in_time attaches: a row's 1-based place in its user's
-    # temporal order, and the user's number of rows.
+    # temporal order, the user's number of rows, and the row's place in the input.
     _PLACE = "__temporal_place__"
     _COUNT = "__temporal_count__"
+    _FILE = "__file_order__"
 
     def _order_in_time(self, dataset: DataFrame[Any]) -> DataFrame[Any]:
         """Sort each user's rows into temporal order and number them in it.
@@ -92,18 +93,19 @@ class Filter(ABC):
 
         Returns:
             DataFrame[Any]: The dataset sorted by user and temporal order, with
-                the row's place in its user's order and the user's number of rows
-                attached under ``_PLACE`` and ``_COUNT``.
+                the row's place in its user's order, the user's number of rows
+                and the row's place in the input attached under ``_PLACE``,
+                ``_COUNT`` and ``_FILE``. A filter sorts by ``_FILE`` before it
+                hands the rows on, because what follows breaks ties by row order.
         """
-        file_order, position = "__file_order__", "__temporal_position__"
-        by = [self.user_label, file_order]
+        position = "__temporal_position__"
+        by = [self.user_label, self._FILE]
         if self.timestamp_label in dataset.columns:
             by.insert(1, self.timestamp_label)
 
         ordered = (
-            dataset.with_row_index(name=file_order)
+            dataset.with_row_index(name=self._FILE)
             .sort(by=by)
-            .drop(file_order)
             .with_row_index(name=position)
         )
         return ordered.with_columns(
@@ -436,8 +438,10 @@ class UserHeadN(Filter):
             DataFrame[Any]: Filtered dataset containing only the first num_interactions for each user.
         """
         ordered = self._order_in_time(dataset)
-        return ordered.filter(nw.col(self._PLACE) <= self.num_interactions).drop(
-            [self._PLACE, self._COUNT]
+        return (
+            ordered.filter(nw.col(self._PLACE) <= self.num_interactions)
+            .sort(self._FILE)
+            .drop([self._PLACE, self._COUNT, self._FILE])
         )
 
 
@@ -472,9 +476,13 @@ class UserTailN(Filter):
                        num_interactions for each user.
         """
         ordered = self._order_in_time(dataset)
-        return ordered.filter(
-            nw.col(self._PLACE) > nw.col(self._COUNT) - self.num_interactions
-        ).drop([self._PLACE, self._COUNT])
+        return (
+            ordered.filter(
+                nw.col(self._PLACE) > nw.col(self._COUNT) - self.num_interactions
+            )
+            .sort(self._FILE)
+            .drop([self._PLACE, self._COUNT, self._FILE])
+        )
 
 
 @filter_registry.register("DropUser")

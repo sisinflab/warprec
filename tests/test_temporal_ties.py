@@ -216,3 +216,99 @@ def test_session_sequences_follow_temporal_order(
         != [imap[item_at[p]] for p in order[user]]
     ]
     assert not wrong, f"{len(wrong)} of {len(users)} users' sequences out of order"
+
+
+STRATEGIES = [
+    pytest.param("temporal_holdout", {"ratio": 0.2}, id="temporal_holdout"),
+    pytest.param("temporal_leave_k_out", {"k": 2}, id="temporal_leave_k_out"),
+    pytest.param("random_holdout", {"ratio": 0.2}, id="random_holdout"),
+    pytest.param("random_leave_k_out", {"k": 2}, id="random_leave_k_out"),
+    pytest.param("timestamp_slicing", {"timestamp": 1}, id="timestamp_slicing"),
+    pytest.param("timestamp_slicing", {"timestamp": "best"}, id="timestamp_best"),
+    pytest.param("k_fold_cross_validation", {"folds": 3}, id="k_fold"),
+    pytest.param("user_cold_start", {"ratio": 0.2}, id="user_cold_start"),
+    pytest.param("item_cold_start", {"ratio": 0.2}, id="item_cold_start"),
+]
+
+
+def in_file_order(half: Any) -> bool:
+    """Whether a frame lists its rows in the order the file held them.
+
+    Args:
+        half (Any): A narwhals frame.
+
+    Returns:
+        bool: True if the file positions only grow.
+    """
+    return bool(np.all(np.diff(np.asarray(half["pos"].to_list())) > 0))
+
+
+@pytest.mark.parametrize("strategy,params", STRATEGIES)
+@pytest.mark.parametrize("to_backend", BACKENDS)
+def test_every_split_returns_its_rows_in_file_order(
+    frame: pd.DataFrame,
+    to_backend: Callable[[pd.DataFrame], Any],
+    strategy: str,
+    params: dict,
+):
+    """Both halves of every split keep the rows in the order of the file.
+
+    What comes after a split, a validation split or the sequences of a sequential
+    model, breaks ties in time by the order of the rows it is handed, and the
+    'first' and 'last' duplicate policies read the same order. A split that
+    handed them its rows shuffled, as the random ones did, or sorted by time
+    made them break ties by something other than the file.
+
+    Args:
+        frame (pd.DataFrame): The interactions.
+        to_backend (Callable[[pd.DataFrame], Any]): Converts a frame to the backend.
+        strategy (str): The registered splitting strategy.
+        params (dict): The strategy's parameters.
+    """
+    folds = splitting_registry.get(strategy)(
+        nw.from_native(to_backend(frame)), **params
+    )
+
+    for train, test in folds:
+        assert in_file_order(train)
+        assert in_file_order(test)
+
+
+@pytest.mark.parametrize("name", ["UserHeadN", "UserTailN"])
+@pytest.mark.parametrize("to_backend", BACKENDS)
+def test_head_and_tail_filters_return_their_rows_in_file_order(
+    frame: pd.DataFrame, to_backend: Callable[[pd.DataFrame], Any], name: str
+):
+    """The filters that order rows in time hand them on in file order.
+
+    Args:
+        frame (pd.DataFrame): The interactions.
+        to_backend (Callable[[pd.DataFrame], Any]): Converts a frame to the backend.
+        name (str): The registered filter name.
+    """
+    kept = filter_registry.get(name, num_interactions=5)(
+        nw.from_native(to_backend(frame))
+    )
+
+    assert in_file_order(kept)
+
+
+@pytest.mark.parametrize("to_backend", BACKENDS)
+def test_a_temporal_validation_after_a_random_test_split_follows_the_file(
+    frame: pd.DataFrame, to_backend: Callable[[pd.DataFrame], Any]
+):
+    """A validation set held out of a random split's train set breaks ties by file.
+
+    Args:
+        frame (pd.DataFrame): The interactions.
+        to_backend (Callable[[pd.DataFrame], Any]): Converts a frame to the backend.
+    """
+    train, _ = splitting_registry.get("random_holdout")(
+        nw.from_native(to_backend(frame)), ratio=0.2
+    )[0]
+    remaining = frame[frame["pos"].isin(train["pos"].to_list())]
+    expected = {p for order in temporal_order(remaining).values() for p in order[-1:]}
+
+    _, validation = splitting_registry.get("temporal_leave_k_out")(train, k=1)[0]
+
+    assert positions(validation) == expected

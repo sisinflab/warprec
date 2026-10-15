@@ -33,6 +33,8 @@ WarpRec provides multiple splitting strategies that can be tailored to your expe
 !!! note "Interactions that share a timestamp"
     Temporal order is the **timestamp, then the order of the rows in the file**: of two interactions of a user recorded in the same second, the one further down the file counts as the more recent. `temporal_holdout` and `temporal_leave_k_out` hold out the last rows in that order, so the split is the same on every backend and every run. Without a timestamp column, file order alone is used. `timestamp_slicing` compares timestamps only, so every interaction at the boundary timestamp lands on the same side.
 
+    Every strategy returns the training and the evaluation set with their rows **in file order**, so whatever comes next breaks ties the same way: a temporal validation split taken out of a random test split's training set, the sequences of the [sequential models](../recommenders/sequential.md) and the `first` and `last` [duplicate policies](reader.md).
+
 **1. Temporal Holdout**
 
 Orders interactions by **timestamp** and reserves a portion of the most recent interactions as the test set.

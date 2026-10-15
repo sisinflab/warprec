@@ -28,6 +28,11 @@ class SplittingStrategy(ABC):
     def _prepare_stable_data(self, data: FrameT) -> Tuple[DataFrame[Any], str]:
         """Helper method to ensure data has a stable row index for tie-breaking.
         Returns the modified data and the name of the index column.
+
+        Every strategy hands its halves back sorted by this index, in the order
+        of its input, because what follows breaks ties by row order: a
+        validation split, the sequences of a sequential model and the 'first'
+        and 'last' duplicate policies.
         """
         # Make the DataFrame eager in case of LazyFrames
         if isinstance(data, nw.LazyFrame):
@@ -142,8 +147,8 @@ class TemporalHoldoutSplit(SplittingStrategy):
 
         # Clean the output
         cols_to_drop = ["n_items", "rank", idx_col]
-        train = data_with_stats.filter(train_mask).drop(cols_to_drop)
-        test = data_with_stats.filter(~train_mask).drop(cols_to_drop)
+        train = data_with_stats.filter(train_mask).sort(idx_col).drop(cols_to_drop)
+        test = data_with_stats.filter(~train_mask).sort(idx_col).drop(cols_to_drop)
 
         return [(train, test)]
 
@@ -196,8 +201,8 @@ class TemporalLeaveKOutSplit(SplittingStrategy):
 
         # Clean the output
         cols_to_drop = ["n_items", "rank", idx_col]
-        train = data_prep.filter(~test_mask).drop(cols_to_drop)
-        test = data_prep.filter(test_mask).drop(cols_to_drop)
+        train = data_prep.filter(~test_mask).sort(idx_col).drop(cols_to_drop)
+        test = data_prep.filter(test_mask).sort(idx_col).drop(cols_to_drop)
 
         return [(train, test)]
 
@@ -253,11 +258,13 @@ class TimestampSlicingSplit(SplittingStrategy):
         data_prep, idx_col = self._prepare_stable_data(data)
 
         if timestamp == "best":
-            # Deterministic sorting
-            data_prep = data_prep.sort(by=[user_id_label, timestamp_label, idx_col])
-
-            # Find the best timestamp
-            best_timestamp = self._best_split(data_prep, user_id_label, timestamp_label)
+            # Find the best timestamp, on a copy sorted by user and time: the
+            # halves themselves keep the order of the input
+            best_timestamp = self._best_split(
+                data_prep.sort(by=[user_id_label, timestamp_label, idx_col]),
+                user_id_label,
+                timestamp_label,
+            )
 
             # Clean the output
             data_prep = data_prep.drop(idx_col)
@@ -403,8 +410,16 @@ class RandomHoldoutSplit(SplittingStrategy):
 
         # Clean the output
         cols_to_drop = ["rand_col", "__pos_idx__", idx_col]
-        train = data_rand.filter(nw.col("__pos_idx__") < split_idx).drop(cols_to_drop)
-        test = data_rand.filter(nw.col("__pos_idx__") >= split_idx).drop(cols_to_drop)
+        train = (
+            data_rand.filter(nw.col("__pos_idx__") < split_idx)
+            .sort(idx_col)
+            .drop(cols_to_drop)
+        )
+        test = (
+            data_rand.filter(nw.col("__pos_idx__") >= split_idx)
+            .sort(idx_col)
+            .drop(cols_to_drop)
+        )
 
         return [(train, test)]
 
@@ -473,8 +488,8 @@ class RandomLeaveKOutSplit(SplittingStrategy):
 
         # Clean the output
         cols_to_drop = ["n_items", "rand_col", "rnd_rank", idx_col]
-        train = data_prep.filter(~test_mask).drop(cols_to_drop)
-        test = data_prep.filter(test_mask).drop(cols_to_drop)
+        train = data_prep.filter(~test_mask).sort(idx_col).drop(cols_to_drop)
+        test = data_prep.filter(test_mask).sort(idx_col).drop(cols_to_drop)
 
         return [(train, test)]
 
