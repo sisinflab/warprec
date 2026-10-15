@@ -134,7 +134,7 @@ class WarpRecConfiguration(BaseModel):
         return self
 
     @model_validator(mode="after")
-    def config_validation(self) -> "WarpRecConfiguration":
+    def config_validation(self) -> "WarpRecConfiguration":  # noqa: PLR0912
         """This method checks if everything in the configuration file is missing or incorrect.
 
         Returns:

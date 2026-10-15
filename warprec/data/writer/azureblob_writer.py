@@ -78,7 +78,7 @@ class AzureBlobWriter(Writer):
             logger.msg(f"Container '{self.container_name}' already exists.")
         logger.msg("Experiment setup on Azure completed successfully.")
 
-    def write_recs(
+    def write_recs(  # noqa: PLR0913
         self,
         model: Recommender,
         dataset: Dataset,

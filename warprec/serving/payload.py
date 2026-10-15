@@ -104,7 +104,7 @@ def _scalar_metrics(results: Dict[int, Dict[str, Any]]) -> Dict[str, float]:
     for k, by_metric in results.items():
         for name, value in by_metric.items():
             if isinstance(value, torch.Tensor):
-                value = value.float().nanmean().item()
+                value = value.float().nanmean().item()  # noqa: PLW2901
             if isinstance(value, (int, float, np.number)):
                 metrics[f"{name}@{k}"] = float(value)
     return metrics

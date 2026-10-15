@@ -110,7 +110,7 @@ class Dataset:
     knowledge: Optional[KnowledgeGraph] = None
     multimodal: Optional[MultiModalFeatures] = None
 
-    def __init__(
+    def __init__(  # noqa: PLR0912, PLR0913, PLR0915
         self,
         train_data: FrameT,
         eval_data: Optional[FrameT] = None,

@@ -366,7 +366,7 @@ def _measurable_warmup(
     return warmup_batches
 
 
-def _estimate_eval_loop(
+def _estimate_eval_loop(  # noqa: PLR0912, PLR0915
     evaluator: Evaluator,
     model: Recommender,
     dataloader,
@@ -558,7 +558,7 @@ def _require_numeric(value: object, field_name: str) -> float:
     return float(value)
 
 
-def _run_estimate_setup(  # pylint: disable = too-many-locals
+def _run_estimate_setup(  # pylint: disable = too-many-locals  # noqa: PLR0915
     config: EstimateConfiguration,
     model_name: str,
     setup: dict,

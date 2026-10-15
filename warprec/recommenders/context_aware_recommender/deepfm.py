@@ -171,7 +171,7 @@ class DeepFM(ContextRecommenderUtils, IterativeRecommender):
 
         return linear_part + fm_part + deep_part
 
-    def predict(
+    def predict(  # noqa: PLR0915
         self,
         user_indices: Tensor,
         *args: Any,

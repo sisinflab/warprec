@@ -162,7 +162,7 @@ def _load_or_build_model(
     return model
 
 
-def eval_pipeline(path: str):
+def eval_pipeline(path: str):  # noqa: PLR0915
     """Main function to start the evaluation pipeline.
 
     During the evaluation execution models are expected

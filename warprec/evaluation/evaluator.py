@@ -75,7 +75,7 @@ class Evaluator:
             ranking, or None to rank by score alone.
     """
 
-    def __init__(
+    def __init__(  # noqa: PLR0913
         self,
         metric_list: List[str],
         k_values: List[int],
@@ -257,7 +257,7 @@ class Evaluator:
             )
             raise e
 
-    def evaluate(
+    def evaluate(  # noqa: PLR0912, PLR0915
         self,
         model: Recommender,
         dataloader: DataLoader,

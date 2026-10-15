@@ -366,7 +366,7 @@ class SampledContextualEvaluationDataset(TorchDataset):
     scores its target item as 1 too, and the two strategies grade alike.
     """
 
-    def __init__(
+    def __init__(  # noqa: PLR0913
         self,
         train_interactions: csr_matrix,
         eval_data: DataFrame[Any],

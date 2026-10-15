@@ -126,7 +126,7 @@ def train_pipeline(path: str):
         _train_models(context, emissions)
 
 
-def _train_models(
+def _train_models(  # noqa: PLR0912, PLR0915
     context: PipelineContext, emissions: Optional["EmissionsSettings"]
 ) -> None:
     """Prepare the data, then optimize, evaluate and write every model.

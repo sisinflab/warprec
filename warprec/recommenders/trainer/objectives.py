@@ -66,7 +66,7 @@ def objective_function(config: dict) -> None:
         _run_trial(config)
 
 
-def _run_trial(config: dict) -> None:  # pylint: disable = too-many-locals
+def _run_trial(config: dict) -> None:  # pylint: disable = too-many-locals  # noqa: PLR0915
     """Train and evaluate the model of one trial, reporting to Ray Tune.
 
     Args:

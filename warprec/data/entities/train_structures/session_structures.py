@@ -297,7 +297,7 @@ class ClozeDataset(Dataset):
     Sampled Output: (MaskedSeq, PosItems, NegItems, MaskedIndices)
     """
 
-    def __init__(
+    def __init__(  # noqa: PLR0913
         self,
         flat_items: np.ndarray,
         window_starts: np.ndarray,
