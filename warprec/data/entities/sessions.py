@@ -12,6 +12,7 @@ from scipy.sparse import csr_matrix
 from warprec.errors import DataError
 from warprec.data.entities.common import (
     ITEM_INDEX,
+    ROW_INDEX,
     USER_INDEX,
     map_to_index_space,
     seeded_dataloader,
@@ -77,6 +78,10 @@ class Sessions:
         """
         Centralized pipeline: Map IDs -> Drop Missing -> Sort by User/Time.
         Returns a cached Narwhals DataFrame.
+
+        Each user's rows are put in temporal order: the timestamp, then the
+        position in the file, so rows sharing a timestamp keep the order they
+        were read in. Without a timestamp column, file order alone is used.
         """
         if self._processed_df is not None:
             return self._processed_df
@@ -108,15 +113,19 @@ class Sessions:
                         if c in self._inter_df.columns
                     ]
                 ),
+                nw.col(ROW_INDEX),
             ]
         )
 
-        # Sort
+        # Sort. The joins above do not keep the input order on every backend,
+        # and a sort is not stable on every backend either, so the position in
+        # the file is the last key: it settles every tie the timestamp leaves.
         sort_cols = [self.user_label]
         if self.timestamp_label in self._inter_df.columns:
             sort_cols.append(self.timestamp_label)
+        sort_cols.append(ROW_INDEX)
 
-        self._processed_df = mapped_df.sort(sort_cols)
+        self._processed_df = mapped_df.sort(sort_cols).drop(ROW_INDEX)
         return self._processed_df
 
     def _build_flat_structures(self):

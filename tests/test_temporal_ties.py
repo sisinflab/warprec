@@ -15,7 +15,9 @@ import numpy as np
 import pandas as pd
 import polars as pl
 import pytest
+from scipy.sparse import csr_matrix
 
+from warprec.data.entities.sessions import Sessions
 from warprec.utils.registry import filter_registry, splitting_registry
 
 BACKENDS = [
@@ -173,3 +175,44 @@ def test_head_and_tail_filters_keep_the_first_or_last_rows(
     )
 
     assert positions(kept) == expected
+
+
+@pytest.mark.parametrize("with_timestamp", [True, False], ids=["timestamp", "none"])
+@pytest.mark.parametrize("to_backend", BACKENDS)
+def test_session_sequences_follow_temporal_order(
+    frame: pd.DataFrame,
+    to_backend: Callable[[pd.DataFrame], Any],
+    with_timestamp: bool,
+):
+    """A user's sequence lists the items in temporal order, ties in file order.
+
+    Args:
+        frame (pd.DataFrame): The interactions.
+        to_backend (Callable[[pd.DataFrame], Any]): Converts a frame to the backend.
+        with_timestamp (bool): Whether the data carries its timestamp column.
+    """
+    data = frame if with_timestamp else frame.drop(columns="timestamp")
+    # Without a timestamp, temporal order is file order alone.
+    order = temporal_order(data if with_timestamp else data.assign(timestamp=0))
+    umap = {user: i for i, user in enumerate(sorted(frame["user_id"].unique()))}
+    imap = {item: i for i, item in enumerate(sorted(frame["item_id"].unique()))}
+    item_at = frame["item_id"].to_numpy()
+
+    sessions = Sessions(
+        nw.from_native(to_backend(data)),
+        umap,
+        imap,
+        csr_matrix((len(umap), len(imap))),
+    )
+    users = sorted(order)
+    sequences, lengths = sessions.get_user_history_sequences(
+        [umap[user] for user in users], max_seq_len=len(frame)
+    )
+
+    wrong = [
+        user
+        for row, user in enumerate(users)
+        if sequences[row, : lengths[row]].tolist()
+        != [imap[item_at[p]] for p in order[user]]
+    ]
+    assert not wrong, f"{len(wrong)} of {len(users)} users' sequences out of order"
