@@ -79,12 +79,33 @@ Every value is a plain number. **Every duration is in seconds unless its column 
 
 | Column | What it measures |
 |---|---|
-| **Data Preparation Time** | From the start of the run to the end of the data preparation: reading the configuration, starting or connecting to Ray, reading, filtering and splitting the data. The wait for CodeCarbon's trackers is left out. The same for every model. |
+| **Data Preparation Time** | Wall clock from the start of the run to the end of the data preparation: reading the configuration, starting or connecting to Ray, scheduling the Ray task that prepares the data, reading, filtering and splitting the data, building the datasets, and moving them back from the task. The wait for CodeCarbon's trackers is left out. The same for every model. The columns below break the task's own work down. |
 | **Hyperparameter Exploration Time** | Wall clock of the model's search, from building its trainer to loading its best model; under cross-validation it also includes retraining the best configuration on the full training set. It includes everything Ray does: starting Ray Tune, scheduling the trials, starting each trial's Ray Train workers, checkpointing and passing results on. |
 | **Ray Tune Overhead (s)** | The part of the search's wall clock (Ray Tune's `fit`) that no trial spent in setup, training or validation: Ray Tune's start-up, the scheduling of the trials, the checkpoint saved and the report sent after every epoch. It is given only when the trials ran one at a time, each ran once, and every trial reported its timing; with concurrent trials their times overlap and cannot be subtracted from the wall clock, so the column is empty (set `optimization.max_concurrent_trials: 1` to obtain it). |
 | **Average Trial Time (s)** | Mean over the successful trials of Ray Tune's `time_total_s`: a trial's whole wall clock, from the start of its trial driver to its last report. It includes the setup, every epoch's training and validation, and the checkpoint and report of every epoch. For a trial resumed after a pause it covers only the last session: Ray Tune restarts `time_total_s` (and `training_iteration`) when a trial resumes from its checkpoint. |
 | **RAM / VRAM Mean and Max Usage (MB)** | The resident memory (RAM) and the peak GPU memory (VRAM) of each trial's worker at its last report, averaged and maximised over the trials. |
 | **Trainable / Total Params (Best Model)** | Parameter counts of the best model. |
+
+**Where the data preparation's time went**
+
+The data preparation runs in a Ray task. Each of its steps, and each structure the dataset building is made of, is measured inside that task, where the work is done, with a monotonic clock: none of these columns includes Ray's start-up, the scheduling of the task, or moving the datasets back from it. Nor do they include the custom callback's `on_data_reading` and `on_dataset_creation`. They add up to at most the **Data Preparation Time**. A column is empty when the run does not perform that step or build that structure (no filtering configured, no knowledge graph, ...). When several datasets are built (the main one, the validation one, or one per cross-validation fold), each structure column sums them. All the values are the same for every model.
+
+| Column | What it measures |
+|---|---|
+| **Data Reading Time (s)** | Reading the files: the interactions (or the pre-split train, validation and test files), the side information, the knowledge graph and its item links, the multimodal features and the user and item clusters. |
+| **Filtering Time (s)** | Applying the configured `filtering`. Empty when none is configured. |
+| **Splitting Time (s)** | Splitting the interactions with the configured `splitter`; with pre-split files, aligning the test and validation sets on their training set. |
+| **Dataset Building Time (s)** | Building the datasets: the sum of the structure columns below. |
+| **Dataset Core Building Time (s)** | The part of building a dataset that none of the structures below covers: materialising the frames, the user and item mappings and the cluster lookups. |
+| **Interactions Building Time (s)** | The training and evaluation interactions, and the training interaction matrix (the sparse matrix the models train from). |
+| **Sessions Building Time (s)** | The per-user sequences of the sequential models, built for every dataset. |
+| **Side Information Building Time (s)** | Restricting the interactions to the items with side information, the item feature matrix, the encoded attributes and their item lookup. Empty without side information. |
+| **Context Building Time (s)** | Encoding the contextual features and the row-oriented interactions the context-aware models read. Empty without `context_labels`. |
+| **Knowledge Graph Building Time (s)** | The knowledge graph aligned on the catalogue. Empty without a knowledge graph. |
+| **Multimodal Building Time (s)** | The multimodal item features aligned on the catalogue. Empty without multimodal features. |
+| **Evaluation Data Building Time (s)** | The evaluation loaders built before the search, for the main dataset and every cross-validation fold: the test users' ground truth and, under the `sampled` strategy, their negative candidates. The validation dataset's loaders are built later, by the trials. |
+
+Structures built on first use later on (a model's training loader, its history matrix, ...) are built inside the trials and counted there. The run logs these times as well, once the data preparation ends (`Data preparation breakdown: ...`); so do the design, eval and estimate pipelines, which prepare their data without a Ray task and do not write a time report.
 
 **Where the trials' time went**
 
@@ -92,9 +113,9 @@ A trial's time is split into three parts that do not overlap. They are measured 
 
 - **Setup**: from the start of the trial (its trial driver) to its first training batch: starting the Ray Train worker group, fetching the dataset, building the model, its data loaders and the evaluator, and Lightning's own preparation. On a multi-node cluster the start is read on the driver's node and the end on the worker's, so the clocks of both nodes must agree.
 - **Training (train-only)**: the training loop of every epoch (fetching the batches, forward, backward and optimiser steps), the end-of-epoch validation excluded.
-- **Validation**: the end-of-epoch evaluation on the validation data (every `eval_every_n` epochs).
+- **Validation**: the end-of-epoch evaluation on the validation data (every `eval_every_n` epochs, and the last epoch).
 
-What is in none of them is the checkpoint saved and the report handed to Ray after every epoch, and the start of the trial's Ray actor; together with the setup, training and validation they add up to the trial's `time_total_s` when the trial ran in one session. They do not for a trial resumed after a pause (see below).
+What is in none of them is the checkpoint saved and the report handed to Ray after every validated epoch, and the start of the trial's Ray actor; together with the setup, training and validation they add up to the trial's `time_total_s` when the trial ran in one session. They do not for a trial resumed after a pause (see below).
 
 A closed-form model (EASE, ItemKNN, ...) is fitted when it is built: its fit is its single epoch of training, its evaluation its validation (including building the evaluation loader), and its setup ends when the fit starts.
 
@@ -134,14 +155,18 @@ A trial resumed after a pause ran in several sessions, each starting again from 
 
 #### Per-epoch timing in Ray Tune's results
 
-Every epoch of a trial reports, beside its metrics, the keys below. They land in each trial's `progress.csv` and `result.json` under `ray_results/`, and reach the MLflow and W&B dashboards with the epoch's metrics. A closed-form trial reports them once.
+Every report of a trial carries, beside its metrics, the keys below. They land in each trial's `progress.csv` and `result.json` under `ray_results/`, and reach the MLflow and W&B dashboards with the report's metrics. A closed-form trial reports them once.
+
+A trial reports the epochs it validates: every epoch by default, every `eval_every_n` epochs and the last one otherwise. A report then covers every epoch trained since the previous report, so that each epoch is counted once: with `eval_every_n: 2` and 5 epochs, the reports at epochs 2, 4 and 5 cover 2, 2 and 1 epochs.
 
 | Key | Meaning |
 |---|---|
-| `epoch_train_s` | Seconds of the epoch's training loop, validation excluded. |
-| `epoch_validation_s` | Seconds of the epoch's end-of-epoch validation; `0` for an epoch that was not validated. |
-| `epoch_samples` | Training examples the epoch went through (see the throughput column above), summed over the workers. |
+| `epoch_train_s` | Seconds of the training loop of the epochs the report covers, validation excluded. |
+| `epoch_validation_s` | Seconds of the end-of-epoch validation of the reported epoch. |
+| `epoch_samples` | Training examples those epochs went through (see the throughput column above), summed over the workers. |
 | `train_samples_per_s` | `epoch_samples / epoch_train_s`. |
+| `report_epochs` | The epochs the report covers: `1` when every epoch is validated. |
+| `epoch_train_min_s` / `epoch_train_max_s` | The training time of the shortest and of the longest of those epochs. |
 | `setup_s` | The trial's setup: from the start of the trial to its first training batch (starting the Ray Train workers, fetching the dataset, building the model and its loaders); for a closed-form model, to the start of its fit. The same value in every report of a session. |
 
 When a pause stops a trial after an epoch's checkpoint is saved but before its report reaches Ray Tune, the session that resumes reports that epoch first, with the values the paused session measured (its `setup_s` included); Ray Tune's own columns of that row (`training_iteration`, `time_total_s`, `pid`, ...) belong to the resuming session. Its later epochs carry its own `setup_s`.

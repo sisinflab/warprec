@@ -4,6 +4,7 @@ import lightning as L
 
 from warprec.data.stash import MODEL_ARGUMENTS, check_stash
 from warprec.common import initialize_datasets, log_evaluation
+from warprec.data.timing import DataPreparationTimes
 from warprec.data.reader import ReaderFactory
 from warprec.recommenders.base_recommender import IterativeRecommender
 from warprec.recommenders.callbacks import WarpRecLightningIntegrationCallback
@@ -49,10 +50,12 @@ def design_pipeline(path: str):
     reader = ReaderFactory.get_reader(config=config)
 
     # Load datasets using common utility
+    data_times = DataPreparationTimes()
     main_dataset, _, _ = initialize_datasets(
         reader=reader,
         callback=callback,
         config=config,
+        timings=data_times,
     )
 
     # Create instance of main evaluator used to evaluate the main dataset
@@ -67,6 +70,7 @@ def design_pipeline(path: str):
     logger.positive(
         f"Data preparation completed in {data_preparation_time:.2f} seconds."
     )
+    data_times.log()
 
     for model_name, model_params in config.models.items():
         params = model_param_from_dict(model_name, model_params)

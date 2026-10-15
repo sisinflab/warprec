@@ -7,6 +7,7 @@ import torch
 from warprec.errors import CheckpointError, DataNotFoundError
 from warprec.data.stash import MODEL_ARGUMENTS, check_stash
 from warprec.common import initialize_datasets, log_evaluation
+from warprec.data.timing import DataPreparationTimes
 from warprec.data import Dataset
 from warprec.data.reader import ReaderFactory
 from warprec.data.writer import WriterFactory
@@ -192,10 +193,12 @@ def eval_pipeline(path: str):  # noqa: PLR0915
     writer = WriterFactory.get_writer(config=config)
 
     # Load datasets using common utility
+    data_times = DataPreparationTimes()
     main_dataset, _, _ = initialize_datasets(
         reader=reader,
         callback=callback,
         config=config,
+        timings=data_times,
     )
 
     models = list(config.models.keys())
@@ -223,6 +226,7 @@ def eval_pipeline(path: str):  # noqa: PLR0915
     logger.positive(
         f"Data preparation completed in {data_preparation_time:.2f} seconds."
     )
+    data_times.log()
 
     for model_name, model_params in config.models.items():
         params = model_param_from_dict(model_name, model_params)

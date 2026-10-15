@@ -1,6 +1,7 @@
 from typing import Callable, Tuple, Optional, List, Any, Dict
 
 import math
+import time
 
 import numpy as np
 import torch
@@ -21,6 +22,7 @@ from warprec.data.entities import (
     Transactions,
 )
 from warprec.data.stash import METRIC_ARGUMENTS, MODEL_ARGUMENTS, check_stash
+from warprec.data.timing import timed
 from warprec.data.schema import ColumnLabels, ContextSpec, SideData, SignalOptions
 from warprec.data.eval_loaders import (
     EvaluationDataset,
@@ -146,6 +148,11 @@ class Dataset:
                 "Evaluation set must be either 'Test' or 'Validation'."
             )
 
+        # The seconds each structure takes to build, for the time report; what
+        # is not in one of them is the dataset's own work ('dataset').
+        build_start = time.perf_counter()
+        self._build_times: Dict[str, float] = {}
+
         # Materialize the data and ensure
         mat_train_data = self._materialize(train_data)
         mat_eval_data = self._materialize(eval_data)
@@ -181,13 +188,14 @@ class Dataset:
 
         # If side information data has been provided, we filter the main dataset
         if mat_side_data is not None:
-            mat_train_data, mat_eval_data = self._filter_data(
-                train_set=mat_train_data,
-                eval_set=mat_eval_data,
-                filter_data=mat_side_data,
-                label=item_id_label,
-                keep_eval_values=cold_start == "item",
-            )
+            with timed(self._build_times, "side"):
+                mat_train_data, mat_eval_data = self._filter_data(
+                    train_set=mat_train_data,
+                    eval_set=mat_eval_data,
+                    filter_data=mat_side_data,
+                    label=item_id_label,
+                    keep_eval_values=cold_start == "item",
+                )
 
         # Define dimensions that will lead the experiment
         self._nuid = mat_train_data.select(nw.col(user_id_label).n_unique()).item()
@@ -271,53 +279,59 @@ class Dataset:
         # item mapping is settled and not before.
         self.knowledge: Optional[KnowledgeGraph] = None
         if knowledge_data is not None and knowledge_links is not None:
-            labels = knowledge_labels or {}
-            self.knowledge = KnowledgeGraph(
-                self._materialize(knowledge_data),
-                self._materialize(knowledge_links),
-                self._imap,
-                head_label=labels.get("head", "head"),
-                relation_label=labels.get("relation", "relation"),
-                tail_label=labels.get("tail", "tail"),
-                item_label=labels.get("item", "item_id"),
-                entity_label=labels.get("entity", "entity_id"),
-            )
+            with timed(self._build_times, "knowledge"):
+                labels = knowledge_labels or {}
+                self.knowledge = KnowledgeGraph(
+                    self._materialize(knowledge_data),
+                    self._materialize(knowledge_links),
+                    self._imap,
+                    head_label=labels.get("head", "head"),
+                    relation_label=labels.get("relation", "relation"),
+                    tail_label=labels.get("tail", "tail"),
+                    item_label=labels.get("item", "item_id"),
+                    entity_label=labels.get("entity", "entity_id"),
+                )
 
         # The features are aligned against the catalogue, so they are built once
         # the item mapping is settled, exactly as the knowledge graph is.
         self.multimodal: Optional[MultiModalFeatures] = None
         if multimodal_data:
-            self.multimodal = MultiModalFeatures(
-                {
-                    name: (payload["features"], payload["items"])
-                    for name, payload in multimodal_data.items()
-                },
-                self._imap,
-                normalize={
-                    name: payload.get("normalize", "none")
-                    for name, payload in multimodal_data.items()
-                },
-            )
+            with timed(self._build_times, "multimodal"):
+                self.multimodal = MultiModalFeatures(
+                    {
+                        name: (payload["features"], payload["items"])
+                        for name, payload in multimodal_data.items()
+                    },
+                    self._imap,
+                    normalize={
+                        name: payload.get("normalize", "none")
+                        for name, payload in multimodal_data.items()
+                    },
+                )
 
         # Process contextual data
         if context_labels:
-            mat_train_data = self._process_context_data(
-                mat_train_data, context_labels, fit=True
-            )
-
-            if mat_eval_data is not None:
-                mat_eval_data = self._process_context_data(
-                    mat_eval_data, context_labels, fit=False
+            with timed(self._build_times, "context"):
+                mat_train_data = self._process_context_data(
+                    mat_train_data, context_labels, fit=True
                 )
+
+                if mat_eval_data is not None:
+                    mat_eval_data = self._process_context_data(
+                        mat_eval_data, context_labels, fit=False
+                    )
 
         # Process the side information data and filter not valid columns
         self.side = None
         if mat_side_data is not None:
-            # The content models consume the raw attributes as a feature matrix,
-            # so it is built before the embedding encoding rewrites the values.
-            self._side_matrix = self._build_feature_matrix(mat_side_data, item_id_label)
-            self._nfeat = self._side_matrix.shape[1]
-            self.side = self._process_side_data(mat_side_data, item_id_label)
+            with timed(self._build_times, "side"):
+                # The content models consume the raw attributes as a feature matrix,
+                # so it is built before the embedding encoding rewrites the values.
+                self._side_matrix = self._build_feature_matrix(
+                    mat_side_data, item_id_label
+                )
+                self._nfeat = self._side_matrix.shape[1]
+                self.side = self._process_side_data(mat_side_data, item_id_label)
 
         # Save user and item cluster information inside the dataset
         if mat_user_cluster is not None:
@@ -406,77 +420,89 @@ class Dataset:
         )
 
         # Create the main data structures
-        self.train_set = self._create_inner_set(mat_train_data, side_payload)
+        with timed(self._build_times, "interactions"):
+            self.train_set = self._create_inner_set(mat_train_data, side_payload)
 
-        if mat_eval_data is not None:
-            self.eval_set = self._create_inner_set(
-                mat_eval_data, side_payload, header_msg=evaluation_set
-            )
+            if mat_eval_data is not None:
+                self.eval_set = self._create_inner_set(
+                    mat_eval_data, side_payload, header_msg=evaluation_set
+                )
 
         # Context-aware models read the rows, not the matrix: a matrix cell
         # cannot hold the same pair seen in several contexts.
         if context_labels:
-            self.train_transactions = Transactions(
-                mat_train_data,
-                (self._nuid, self._niid),
-                self._umap,
-                self._imap,
-                side_tensor=self.train_set.get_side_tensor(),
-                labels=self._labels,
-                context=self._context_spec,
-                options=self._options,
-            )
-
-            if mat_eval_data is not None:
-                self.eval_transactions = Transactions(
-                    mat_eval_data,
+            with timed(self._build_times, "context"):
+                self.train_transactions = Transactions(
+                    mat_train_data,
                     (self._nuid, self._niid),
                     self._umap,
                     self._imap,
-                    side_tensor=self.eval_set.get_side_tensor(),
+                    side_tensor=self.train_set.get_side_tensor(),
                     labels=self._labels,
                     context=self._context_spec,
                     options=self._options,
                 )
 
+                if mat_eval_data is not None:
+                    self.eval_transactions = Transactions(
+                        mat_eval_data,
+                        (self._nuid, self._niid),
+                        self._umap,
+                        self._imap,
+                        side_tensor=self.eval_set.get_side_tensor(),
+                        labels=self._labels,
+                        context=self._context_spec,
+                        options=self._options,
+                    )
+
         # Save side information inside the dataset
         if self.side is not None:
-            native_ns = nw.get_native_namespace(self.side)
+            with timed(self._build_times, "side"):
+                native_ns = nw.get_native_namespace(self.side)
 
-            mapping_data = {
-                item_id_label: list(self._imap.keys()),
-                "__item_idx__": list(self._imap.values()),
-            }
-            mapping_df = nw.from_dict(mapping_data, native_namespace=native_ns)
+                mapping_data = {
+                    item_id_label: list(self._imap.keys()),
+                    "__item_idx__": list(self._imap.values()),
+                }
+                mapping_df = nw.from_dict(mapping_data, native_namespace=native_ns)
 
-            # Align the data
-            aligned_side = mapping_df.join(self.side, on=item_id_label, how="left")
-            aligned_side = aligned_side.sort("__item_idx__")
+                # Align the data
+                aligned_side = mapping_df.join(self.side, on=item_id_label, how="left")
+                aligned_side = aligned_side.sort("__item_idx__")
 
-            feat_cols = [c for c in self.side.columns if c != item_id_label]
+                feat_cols = [c for c in self.side.columns if c != item_id_label]
 
-            side_values = (
-                aligned_side.select(feat_cols)
-                .with_columns(nw.all().fill_null(0))
-                .to_numpy()
-            )
+                side_values = (
+                    aligned_side.select(feat_cols)
+                    .with_columns(nw.all().fill_null(0))
+                    .to_numpy()
+                )
 
-            feature_lookup = torch.tensor(side_values).float()
+                feature_lookup = torch.tensor(side_values).float()
 
-            # Padding row
-            padding_row = torch.zeros((1, feature_lookup.size(1)))
-            self._feat_lookup = torch.cat([feature_lookup, padding_row], dim=0)
+                # Padding row
+                padding_row = torch.zeros((1, feature_lookup.size(1)))
+                self._feat_lookup = torch.cat([feature_lookup, padding_row], dim=0)
+
+        # The interaction matrix is built on first use, which is here
+        with timed(self._build_times, "interactions"):
+            train_sparse = self.train_set.get_sparse()
 
         # Sequential recommendation sessions
-        self.train_session = Sessions(
-            mat_train_data,
-            self._umap,
-            self._imap,
-            self.train_set.get_sparse(),
-            user_id_label=user_id_label,
-            item_id_label=item_id_label,
-            timestamp_label=timestamp_label,
-            context_labels=context_labels,
+        with timed(self._build_times, "sessions"):
+            self.train_session = Sessions(
+                mat_train_data,
+                self._umap,
+                self._imap,
+                train_sparse,
+                user_id_label=user_id_label,
+                item_id_label=item_id_label,
+                timestamp_label=timestamp_label,
+                context_labels=context_labels,
+            )
+
+        self._build_times["dataset"] = (
+            time.perf_counter() - build_start - sum(self._build_times.values())
         )
 
     def _materialize(self, data: Optional[FrameT]) -> Optional[DataFrame[Any]]:
@@ -1314,6 +1340,25 @@ class Dataset:
             Tensor: Lookup tensor for item clusters.
         """
         return self._ic
+
+    def get_build_times(self) -> Dict[str, float]:
+        """The seconds the construction of this dataset spent on each structure.
+
+        Only the structures the dataset built are given: 'interactions' (the
+        train and evaluation interactions and the train interaction matrix),
+        'sessions' (the sequences of the sequential models), 'side' (the side
+        information and the catalogue filtered on it), 'context' (the encoded
+        contextual features and the row-oriented transactions), 'knowledge' (the
+        knowledge graph), 'multimodal' (the item features) and 'dataset', the rest
+        of the construction (materialising the frames, the user and item mappings
+        and the cluster lookups). They add up to the construction's whole time.
+        The structures built on first use later on, such as the evaluation
+        loaders, are not included.
+
+        Returns:
+            Dict[str, float]: The seconds of each structure, by name.
+        """
+        return dict(self._build_times)
 
     def get_stash(self) -> Dict[str, Any]:
         """This method retrieves the stash dictionary

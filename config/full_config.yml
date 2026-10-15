@@ -208,6 +208,7 @@ models:
       num_samples: 10
       max_concurrent_trials: 4
       checkpoint_to_keep: 5
+      eval_every_n: 1
     early_stopping:
       monitor: [score, loss]
       patience: 20

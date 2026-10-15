@@ -19,6 +19,7 @@ from warprec.data.stash import MODEL_ARGUMENTS, check_stash
 from warprec.evaluation import build_evaluator
 from warprec.recommenders.callbacks import (
     RandomStateCallback,
+    ReportValidatedEpochs,
     WarpRecLightningIntegrationCallback,
     _get_memory_usage,
 )
@@ -251,11 +252,13 @@ def _run_trial(config: dict) -> None:  # noqa: PLR0915
                 enable_model_summary=False,
                 enable_progress_bar=False,
                 check_val_every_n_epoch=eval_every_n,
-                # The timing is logged first, so that the report carries it
+                # The integration callback validates an epoch that ends the
+                # training before the timing closes it, and the timing is
+                # logged before the report, so that the report carries it
                 callbacks=[
-                    EpochTimingCallback(started_at),
                     integration_callback,
-                    RayTrainReportCallback(),
+                    EpochTimingCallback(started_at),
+                    ReportValidatedEpochs(RayTrainReportCallback()),
                     RandomStateCallback(train_dataloader),
                 ],
             )

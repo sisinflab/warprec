@@ -11,6 +11,7 @@ from warprec.common import (
 )
 from warprec.data.writer import WriterFactory
 from warprec.data import Dataset
+from warprec.data.timing import DataPreparationTimes
 from warprec.pipelines.common import (
     PipelineContext,
     bootstrap_pipeline,
@@ -226,7 +227,7 @@ def _swarm_models(  # noqa: PLR0912, PLR0915
     config = context.config
 
     # Build the datasets on the cluster and persist the splits if asked to
-    main_dataset, val_dataset, fold_dataset = prepare_datasets(context)
+    main_dataset, val_dataset, fold_dataset, data_times = prepare_datasets(context)
 
     # List of models to train
     models = list(config.models.keys())
@@ -242,6 +243,7 @@ def _swarm_models(  # noqa: PLR0912, PLR0915
     logger.positive(
         f"Data preparation completed in {data_preparation_time:.2f} seconds."
     )
+    data_times.log()
     model_timing_report: List[Dict[str, Any]] = []
 
     # Starting the model swarming
@@ -301,6 +303,7 @@ def _swarm_models(  # noqa: PLR0912, PLR0915
             fold_dataset=fold_ds_ref,
             callback=relay.forwarder(),
             data_preparation_time=data_preparation_time,
+            data_times=data_times,
             run_name=context.run_name,
             writer_timestamp=context.state.writer_timestamp,
             resumable=model_name in resumable_models,
@@ -440,6 +443,7 @@ def remote_model_pipeline(  # noqa: PLR0913
     fold_dataset: List[Dataset],
     callback: WarpRecCallback,
     data_preparation_time: float,
+    data_times: Optional[DataPreparationTimes] = None,
     run_name: Optional[str] = None,
     writer_timestamp: Optional[str] = None,
     resumable: bool = False,
@@ -458,6 +462,8 @@ def remote_model_pipeline(  # noqa: PLR0913
         fold_dataset (List[Dataset]): The cross-validation folds.
         callback (WarpRecCallback): The callback object.
         data_preparation_time (float): Time taken for data prep (for reporting).
+        data_times (Optional[DataPreparationTimes]): Where the data preparation
+            spent its time (for reporting).
         run_name (Optional[str]): The identifier of the run, used to give the Ray
             Tune experiment a deterministic name so that it can be restored.
         writer_timestamp (Optional[str]): The timestamp pinned into the output
@@ -586,6 +592,7 @@ def remote_model_pipeline(  # noqa: PLR0913
         ray_report=ray_report,
         evaluation_time=model_evaluation_total_time,
         inference_time=inference_time,
+        data_times=data_times,
     )
 
     return model_name, best_model, results, model_params, timing_report, ray_report

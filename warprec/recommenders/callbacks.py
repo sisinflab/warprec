@@ -76,9 +76,10 @@ class WarpRecLightningIntegrationCallback(L.Callback):
         self.strategy = strategy
         self.last_logged_epoch = last_logged_epoch
         self.session_id = session_id
-        self.last_report: Optional[Dict[str, Any]] = None
         self.resumed_report: Optional[Dict[str, Any]] = None
         self.resumed_session: Optional[str] = None
+        self._trainer: Optional[L.Trainer] = None
+        self._validated = False
 
         # Early Stopping configuration
         self.early_stopping_config = early_stopping_config
@@ -102,9 +103,16 @@ class WarpRecLightningIntegrationCallback(L.Callback):
             Dict[str, Any]: The best score, the early stopping state and the
                 report of the epoch, with the session that wrote it.
         """
+        # Read when the checkpoint is written, right before the epoch's
+        # report: what the epoch logged after this callback is in it too
+        trainer = self._trainer
+        last_report = None
+        if trainer is not None:
+            last_report = {k: v.item() for k, v in trainer.callback_metrics.items()}
+            last_report.update(epoch=trainer.current_epoch, step=trainer.global_step)
         state = {
             "absolute_best_score": self.absolute_best_score,
-            "last_report": self.last_report,
+            "last_report": last_report,
             "session_id": self.session_id,
         }
         if self.early_stopping_config:
@@ -147,6 +155,14 @@ class WarpRecLightningIntegrationCallback(L.Callback):
         ):
             train.report(metrics=report)
 
+    def setup(self, trainer, pl_module, stage):
+        """PyTorch Lightning hook used to keep the trainer the callback serves."""
+        self._trainer = trainer
+
+    def on_train_epoch_start(self, trainer, pl_module):
+        """PyTorch Lightning hook used to note that the epoch is not validated yet."""
+        self._validated = False
+
     def on_train_epoch_end(self, trainer, pl_module):
         pl_module.log(
             COMPLETED_EPOCHS, trainer.current_epoch + 1, on_epoch=True, sync_dist=True
@@ -156,9 +172,6 @@ class WarpRecLightningIntegrationCallback(L.Callback):
         mem_stats = _get_memory_usage()
         for k, v in mem_stats.items():
             pl_module.log(k, v, on_epoch=True, prog_bar=False, sync_dist=True)
-
-        self.last_report = {k: v.item() for k, v in trainer.callback_metrics.items()}
-        self.last_report.update(epoch=trainer.current_epoch, step=trainer.global_step)
 
         # Early stopping on the loss: every epoch has one, evaluated or not
         train_loss = trainer.callback_metrics.get(TRAIN_LOSS)
@@ -171,7 +184,34 @@ class WarpRecLightningIntegrationCallback(L.Callback):
                 trainer, float(train_loss), lower_is_better=True, label="Loss"
             )
 
+        # The last epoch is the state the training ends on: it is validated
+        # even when 'eval_every_n' skips it, or early stopping on the loss
+        # stops between two validations
+        last = trainer.should_stop or (
+            trainer.max_epochs is not None
+            and 0 < trainer.max_epochs <= trainer.current_epoch + 1
+        )
+        if last and not self._validated and trainer.enable_validation:
+            self._validate(trainer)
+
         super().on_train_epoch_end(trainer, pl_module)
+
+    @staticmethod
+    def _validate(trainer: L.Trainer) -> None:
+        """Runs Lightning's validation loop now, at the end of an epoch.
+
+        This is what Lightning itself does after the last batch of an epoch it
+        validates, so every hook of the validation runs as it does there.
+
+        Args:
+            trainer (L.Trainer): The trainer.
+        """
+        connector = trainer._logger_connector
+        first_loop_iter = connector._first_loop_iter
+        trainer.validating = True
+        trainer.fit_loop.epoch_loop.val_loop.run()
+        trainer.training = True
+        connector._first_loop_iter = first_loop_iter
 
     def on_validation_epoch_end(self, trainer, pl_module):
         val_loader = trainer.val_dataloaders
@@ -179,6 +219,7 @@ class WarpRecLightningIntegrationCallback(L.Callback):
         # Safety check
         if val_loader is None:
             return
+        self._validated = True
 
         # Evaluate the model and compute results
         self.evaluator.evaluate(
@@ -290,6 +331,61 @@ class WarpRecLightningIntegrationCallback(L.Callback):
                 )
             # This trigger will stop Lightning Trainer
             trainer.should_stop = True
+
+
+class ReportValidatedEpochs(L.Callback):
+    """Reports to Ray Tune, and checkpoints, only the epochs that were validated.
+
+    Under 'eval_every_n' Lightning validates every N epochs, while Ray's report
+    callback reports every epoch: an epoch without the validation metric fails
+    the trial, and one reported with the metric of an earlier validation would
+    be scored on weights it does not have. The last epoch is always validated
+    (see WarpRecLightningIntegrationCallback), so it is always reported.
+
+    Args:
+        report (L.Callback): The callback that reports and checkpoints an epoch
+            at its end, Ray's 'RayTrainReportCallback'.
+    """
+
+    def __init__(self, report: L.Callback):
+        super().__init__()
+        self.report = report
+        self._validated = False
+
+    def on_train_epoch_start(
+        self, trainer: L.Trainer, pl_module: L.LightningModule
+    ) -> None:
+        """Notes that the epoch starting is not validated yet.
+
+        Args:
+            trainer (L.Trainer): The trainer.
+            pl_module (L.LightningModule): The model.
+        """
+        self._validated = False
+
+    def on_validation_end(
+        self, trainer: L.Trainer, pl_module: L.LightningModule
+    ) -> None:
+        """Notes that the epoch was validated.
+
+        Args:
+            trainer (L.Trainer): The trainer.
+            pl_module (L.LightningModule): The model.
+        """
+        if not trainer.sanity_checking:
+            self._validated = True
+
+    def on_train_epoch_end(
+        self, trainer: L.Trainer, pl_module: L.LightningModule
+    ) -> None:
+        """Reports and checkpoints the epoch when it was validated.
+
+        Args:
+            trainer (L.Trainer): The trainer.
+            pl_module (L.LightningModule): The model.
+        """
+        if self._validated:
+            self.report.on_train_epoch_end(trainer, pl_module)
 
 
 def _model_generators(pl_module: L.LightningModule) -> Iterator[Tuple[str, Any]]:

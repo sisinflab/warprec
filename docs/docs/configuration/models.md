@@ -50,6 +50,7 @@ The **optimization** section defines how hyperparameter optimization is performe
 - **num_workers**: Number of worker processes for data loading, used for both the training and the evaluation DataLoader. Defaults to `None`, in which case WarpRec derives it from the CPUs granted to the trial rather than from the cores of the whole node.
 - **block_size**: Number of items to predict at once for efficiency. Defaults to `50`.
 - **checkpoint_to_keep**: Number of checkpoints to retain in Ray. Defaults to `5`.
+- **eval_every_n**: Validate an iterative model every `eval_every_n` epochs instead of every epoch. Defaults to `1`. A trial reports its results to Ray Tune, and saves a checkpoint, only on the epochs it validates; its last epoch is always validated and reported, whether it is the last of `epochs` or the one early stopping on the loss stops at, so the state a trial ends on is always scored. The trial schedulers (`asha`, `bohb`, `median`) therefore decide only at those epochs, the best iteration is chosen among them, and a paused trial resumes from the last validated epoch. Early stopping on `score` counts validations, on `loss` epochs.
 
 !!! Example "Advanced Resource Management & Node Affinity"
     WarpRec allows strict control over cluster scheduling through logical resources and label selectors.
