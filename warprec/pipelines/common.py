@@ -15,6 +15,7 @@ from warprec.common import (
     warprec_version,
 )
 from warprec.data import Dataset
+from warprec.data.timing import DataPreparationTimes
 from warprec.evaluation.statistical_significance import compute_paired_statistical_test
 from warprec.data.reader import ReaderFactory
 from warprec.data.reader.base_reader import Reader
@@ -237,6 +238,7 @@ def model_timing_row(
     ray_report: Dict[str, Any],
     evaluation_time: float,
     inference_time: float,
+    data_times: Optional[DataPreparationTimes] = None,
 ) -> Dict[str, Any]:
     """The row of the time report for one model, as train and swarm write it.
 
@@ -253,6 +255,9 @@ def model_timing_row(
             on the test set took on its worker.
         inference_time (float): The seconds of one prediction call, which
             the writer gives in milliseconds.
+        data_times (Optional[DataPreparationTimes]): Where the data preparation
+            spent its time, shared by every model. Its columns are NaN when not
+            given.
 
     Returns:
         Dict[str, Any]: The row, by column.
@@ -260,6 +265,7 @@ def model_timing_row(
     return {
         "Model Name": model_name,
         "Data Preparation Time": data_preparation_time,
+        **(data_times or DataPreparationTimes()).columns(),
         "Hyperparameter Exploration Time": exploration_time,
         **ray_report,
         "Evaluation Time": evaluation_time,
@@ -304,15 +310,16 @@ def measure_emissions(context: PipelineContext) -> AbstractContextManager[Any]:
 
 def prepare_datasets(
     context: PipelineContext,
-) -> Tuple[Dataset, Optional[Dataset], Optional[List[Dataset]]]:
+) -> Tuple[Dataset, Optional[Dataset], Optional[List[Dataset]], DataPreparationTimes]:
     """Build the datasets on the Ray cluster, and write the splits if asked to.
 
     Args:
         context (PipelineContext): The context produced by the bootstrap.
 
     Returns:
-        Tuple[Dataset, Optional[Dataset], Optional[List[Dataset]]]: The main
-            dataset, the validation dataset and the cross-validation folds.
+        Tuple[Dataset, Optional[Dataset], Optional[List[Dataset]], DataPreparationTimes]:
+            The main dataset, the validation dataset, the cross-validation folds
+            and where the Ray task preparing them spent its time.
 
     Raises:
         ConfigurationError: If the configured split file format is not supported.
@@ -322,7 +329,7 @@ def prepare_datasets(
     custom_res_data_prep = config.general.custom_resources_data_prep
     label_selector_data_prep = config.general.label_selector_data_prep
 
-    main_dataset, val_dataset, fold_dataset = ray.get(
+    main_dataset, val_dataset, fold_dataset, data_times = ray.get(
         remote_data_preparation.options(
             num_cpus=cpu_data_prep,
             resources=custom_res_data_prep if custom_res_data_prep else None,
@@ -358,7 +365,7 @@ def prepare_datasets(
             case _:
                 raise ConfigurationError(f"File format '{file_format}'not supported.")
 
-    return main_dataset, val_dataset, fold_dataset
+    return main_dataset, val_dataset, fold_dataset, data_times
 
 
 def write_model_outputs(

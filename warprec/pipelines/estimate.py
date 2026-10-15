@@ -12,6 +12,7 @@ import torch
 from warprec.errors import ConfigurationError
 from warprec.data.stash import MODEL_ARGUMENTS, check_stash
 from warprec.common import initialize_datasets
+from warprec.data.timing import DataPreparationTimes
 from warprec.data import Dataset
 from warprec.data.ranking import (
     mask_seen_in_context,
@@ -925,10 +926,12 @@ def estimate_pipeline(path: str) -> None:
     reader = ReaderFactory.get_reader(config=config)
     writer = WriterFactory.get_writer(config=config)
 
+    data_times = DataPreparationTimes()
     main_dataset, val_dataset, fold_dataset = initialize_datasets(
         reader=reader,
         callback=callback,
         config=config,
+        timings=data_times,
     )
 
     if config.splitter and config.writer.save_split:
@@ -955,6 +958,7 @@ def estimate_pipeline(path: str) -> None:
     logger.positive(
         f"Data preparation completed in {data_preparation_time:.2f} seconds."
     )
+    data_times.log()
 
     train_dataset = _training_dataset(main_dataset, val_dataset, fold_dataset)
     estimate_settings = config.estimate.model_dump()

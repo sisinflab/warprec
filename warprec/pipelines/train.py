@@ -139,7 +139,7 @@ def _train_models(  # noqa: PLR0912, PLR0915
     config = context.config
 
     # Build the datasets on the cluster and persist the splits if asked to
-    main_dataset, val_dataset, fold_dataset = prepare_datasets(context)
+    main_dataset, val_dataset, fold_dataset, data_times = prepare_datasets(context)
 
     # List of models to train
     models = list(config.models.keys())
@@ -155,6 +155,7 @@ def _train_models(  # noqa: PLR0912, PLR0915
     logger.positive(
         f"Data preparation completed in {data_preparation_time:.2f} seconds."
     )
+    data_times.log()
     model_timing_report = []
 
     paused = False
@@ -353,6 +354,7 @@ def _train_models(  # noqa: PLR0912, PLR0915
                             ray_report=ray_report,
                             evaluation_time=model_evaluation_total_time,
                             inference_time=inference_time,
+                            data_times=data_times,
                         )
                     )
 

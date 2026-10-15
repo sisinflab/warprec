@@ -11,6 +11,7 @@ from warprec.data.reader import Reader
 from warprec.data.writer import Writer
 from warprec.recommenders.base_recommender import Recommender
 from warprec.data import Dataset
+from warprec.data.timing import DataPreparationTimes
 from warprec.utils.helpers import load_custom_modules
 from warprec.utils.callback import WarpRecCallback
 from warprec.utils.config import TrainConfiguration
@@ -21,7 +22,7 @@ def remote_data_preparation(
     reader: Reader,
     callback: WarpRecCallback,
     config: TrainConfiguration,
-) -> Tuple[Dataset, Optional[Dataset], List[Dataset]]:
+) -> Tuple[Dataset, Optional[Dataset], List[Dataset], DataPreparationTimes]:
     """Remote task to handle heavy data preparation on a worker node.
 
     This function offloads the memory-intensive operations (like joins, sorts,
@@ -34,25 +35,31 @@ def remote_data_preparation(
         config (TrainConfiguration): The configuration object.
 
     Returns:
-        Tuple[Dataset, Optional[Dataset], List[Dataset]]: A tuple containing:
+        Tuple[Dataset, Optional[Dataset], List[Dataset], DataPreparationTimes]: A
+            tuple containing:
             - Dataset: The main dataset.
             - Optional[Dataset]: The validation dataset (if any).
             - List[Dataset]: The list of fold datasets for cross-validation.
+            - DataPreparationTimes: The seconds the task spent reading,
+              filtering, splitting and building each structure, measured in the
+              task, so without Ray's start-up and scheduling.
     """
     # Load custom modules if provided
     load_custom_modules(config.general.custom_modules)
 
     # Load datasets using common utility
+    timings = DataPreparationTimes()
     main_dataset, val_dataset, fold_dataset = initialize_datasets(
         reader=reader,
         callback=callback,
         config=config,
+        timings=timings,
     )
 
     # Prepare dataloaders for evaluation
-    dataset_preparation(main_dataset, fold_dataset, config)
+    dataset_preparation(main_dataset, fold_dataset, config, timings=timings)
 
-    return main_dataset, val_dataset, fold_dataset
+    return main_dataset, val_dataset, fold_dataset, timings
 
 
 @ray.remote

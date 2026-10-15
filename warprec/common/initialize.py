@@ -4,6 +4,7 @@ from narwhals.dataframe import DataFrame
 
 from warprec.errors import ConfigurationError, DataError
 from warprec.data import Dataset
+from warprec.data.timing import DataPreparationTimes
 from warprec.data.reader import Reader
 from warprec.data.schema import ColumnLabels, SplitSpec
 from warprec.data.splitting import Splitter
@@ -123,6 +124,7 @@ def initialize_datasets(  # noqa: PLR0912, PLR0915
     reader: Reader,
     callback: WarpRecCallback,
     config: Union[TrainConfiguration, DesignConfiguration, EvalConfiguration],
+    timings: Optional[DataPreparationTimes] = None,
 ) -> Tuple[Dataset, Dataset | None, List[Dataset]]:
     """Initialize datasets based on the configuration. This is a common operation
     used in both training and design scripts.
@@ -132,6 +134,9 @@ def initialize_datasets(  # noqa: PLR0912, PLR0915
         callback (WarpRecCallback): The callback object for handling events during initialization.
         config (Union[TrainConfiguration, DesignConfiguration, EvalConfiguration]): The configuration
             object containing all necessary settings for data loading, filtering, and splitting.
+        timings (Optional[DataPreparationTimes]): Where the seconds spent reading,
+            filtering, splitting and building each structure of the datasets are
+            added, when given. The callback's own time is in none of them.
 
     Returns:
         Tuple[Dataset, Dataset | None, List[Dataset]]: A tuple containing the main
@@ -140,6 +145,8 @@ def initialize_datasets(  # noqa: PLR0912, PLR0915
     Raises:
         ConfigurationError: If the data type specified in the configuration is not supported.
     """
+    times = timings if timings is not None else DataPreparationTimes()
+
     # Dataset loading
     main_dataset: Dataset = None
     val_data: List[Tuple[DataFrame[Any], DataFrame[Any]]] | DataFrame[Any] = None
@@ -162,25 +169,29 @@ def initialize_datasets(  # noqa: PLR0912, PLR0915
             config, config.reader.local_path, config.reader.azure_blob_name
         )
 
-        match file_format:
-            case "tabular":
-                data = reader.read_tabular(
-                    location,
-                    column_names=config.reader.column_names(),
-                    dtypes=config.reader.column_dtype(),
-                    sep=config.reader.sep,
-                    header=config.reader.header,
-                )
-            case "parquet":
-                data = reader.read_parquet(location)
-            case _:
-                raise ConfigurationError(f"File format '{file_format}'not supported.")
+        with times.measure("reading"):
+            match file_format:
+                case "tabular":
+                    data = reader.read_tabular(
+                        location,
+                        column_names=config.reader.column_names(),
+                        dtypes=config.reader.column_dtype(),
+                        sep=config.reader.sep,
+                        header=config.reader.header,
+                    )
+                case "parquet":
+                    data = reader.read_parquet(location)
+                case _:
+                    raise ConfigurationError(
+                        f"File format '{file_format}'not supported."
+                    )
         data = callback.on_data_reading(data)
 
         # Check for optional filtering
         if config.filtering is not None:
             filters = config.get_filters()
-            data = apply_filtering(data, filters)
+            with times.measure("filtering"):
+                data = apply_filtering(data, filters)
 
         # Splitter testing
         if config.splitter:
@@ -192,19 +203,20 @@ def initialize_datasets(  # noqa: PLR0912, PLR0915
                 )
 
                 # Compute splitting
-                train_data, val_data, test_data = splitter.split_transaction(
-                    data,
-                    labels=ColumnLabels(
-                        user_id=config.reader.labels.user_id_label,
-                        item_id=config.reader.labels.item_id_label,
-                        rating=config.reader.labels.rating_label,
-                        timestamp=config.reader.labels.timestamp_label,
-                    ),
-                    test=SplitSpec(**config.splitter.test_splitting.model_dump()),
-                    validation=SplitSpec(
-                        **config.splitter.validation_splitting.model_dump()
-                    ),
-                )
+                with times.measure("splitting"):
+                    train_data, val_data, test_data = splitter.split_transaction(
+                        data,
+                        labels=ColumnLabels(
+                            user_id=config.reader.labels.user_id_label,
+                            item_id=config.reader.labels.item_id_label,
+                            rating=config.reader.labels.rating_label,
+                            timestamp=config.reader.labels.timestamp_label,
+                        ),
+                        test=SplitSpec(**config.splitter.test_splitting.model_dump()),
+                        validation=SplitSpec(
+                            **config.splitter.validation_splitting.model_dump()
+                        ),
+                    )
 
             else:
                 raise ConfigurationError("Data type not yet supported.")
@@ -215,26 +227,27 @@ def initialize_datasets(  # noqa: PLR0912, PLR0915
             file_format = split.file_format
             location = _location(config, split.local_path, split.azure_blob_prefix)
 
-            match file_format:
-                case "tabular":
-                    train_data, val_data, test_data = reader.read_tabular_split(
-                        location,
-                        column_names=config.reader.column_names(),
-                        dtypes=config.reader.column_dtype(),
-                        sep=split.sep,
-                        ext=split.ext,
-                        header=split.header,
-                    )
-                case "parquet":
-                    train_data, val_data, test_data = reader.read_parquet_split(
-                        location,
-                        column_names=config.reader.column_names(),
-                        ext=split.ext,
-                    )
-                case _:
-                    raise ConfigurationError(
-                        f"File format '{file_format}'not supported."
-                    )
+            with times.measure("reading"):
+                match file_format:
+                    case "tabular":
+                        train_data, val_data, test_data = reader.read_tabular_split(
+                            location,
+                            column_names=config.reader.column_names(),
+                            dtypes=config.reader.column_dtype(),
+                            sep=split.sep,
+                            ext=split.ext,
+                            header=split.header,
+                        )
+                    case "parquet":
+                        train_data, val_data, test_data = reader.read_parquet_split(
+                            location,
+                            column_names=config.reader.column_names(),
+                            ext=split.ext,
+                        )
+                    case _:
+                        raise ConfigurationError(
+                            f"File format '{file_format}'not supported."
+                        )
 
             # Filter out train and validation data if not aligned with the training set
             def _align_set_on_train(
@@ -263,20 +276,23 @@ def initialize_datasets(  # noqa: PLR0912, PLR0915
                     )
                 return eval_set
 
-            test_data = _align_set_on_train(train_data, test_data, "Test")
-            if val_data is not None:
-                if isinstance(val_data, list):
-                    # A fold is trained on its own train set, so that is the
-                    # one its validation set has to be aligned with.
-                    val_data = [
-                        (
-                            val_train,
-                            _align_set_on_train(val_train, val_set, "Validation"),
+            with times.measure("splitting"):
+                test_data = _align_set_on_train(train_data, test_data, "Test")
+                if val_data is not None:
+                    if isinstance(val_data, list):
+                        # A fold is trained on its own train set, so that is the
+                        # one its validation set has to be aligned with.
+                        val_data = [
+                            (
+                                val_train,
+                                _align_set_on_train(val_train, val_set, "Validation"),
+                            )
+                            for val_train, val_set in val_data
+                        ]
+                    else:
+                        val_data = _align_set_on_train(
+                            train_data, val_data, "Validation"
                         )
-                        for val_train, val_set in val_data
-                    ]
-                else:
-                    val_data = _align_set_on_train(train_data, val_data, "Validation")
         else:
             raise ConfigurationError("Data type not yet supported.")
 
@@ -292,21 +308,24 @@ def initialize_datasets(  # noqa: PLR0912, PLR0915
             config.reader.labels.item_id_label: config.reader.dtypes.item_id_type
         }
 
-        match side_format:
-            case "tabular":
-                side_data = reader.read_tabular(
-                    location,
-                    column_names=side.column_names,
-                    dtypes=side_dtypes,
-                    sep=side.sep,
-                    header=side.header,
-                )
-            case "parquet":
-                side_data = reader.read_parquet(
-                    location, column_names=side.column_names
-                )
-            case _:
-                raise ConfigurationError(f"File format '{side_format}' not supported.")
+        with times.measure("reading"):
+            match side_format:
+                case "tabular":
+                    side_data = reader.read_tabular(
+                        location,
+                        column_names=side.column_names,
+                        dtypes=side_dtypes,
+                        sep=side.sep,
+                        header=side.header,
+                    )
+                case "parquet":
+                    side_data = reader.read_parquet(
+                        location, column_names=side.column_names
+                    )
+                case _:
+                    raise ConfigurationError(
+                        f"File format '{side_format}' not supported."
+                    )
 
     # Knowledge graph reading
     if config.reader.knowledge:
@@ -318,29 +337,33 @@ def initialize_datasets(  # noqa: PLR0912, PLR0915
                 f"'{knowledge.file_format}'."
             )
 
-        knowledge_data = reader.read_tabular(
-            _location(config, knowledge.local_path, knowledge.azure_blob_name),
-            column_names=knowledge.column_names,
-            sep=knowledge.sep,
-            header=knowledge.header,
-        )
+        with times.measure("reading"):
+            knowledge_data = reader.read_tabular(
+                _location(config, knowledge.local_path, knowledge.azure_blob_name),
+                column_names=knowledge.column_names,
+                sep=knowledge.sep,
+                header=knowledge.header,
+            )
 
-        # The item column has to be read as the interactions read it, or the
-        # alignment matches nothing and every item silently loses its facts.
-        knowledge_links = reader.read_tabular(
-            _location(config, knowledge.link_path, knowledge.link_azure_blob_name),
-            column_names=knowledge.link_column_names,
-            dtypes={knowledge.link_column_names[0]: config.reader.dtypes.item_id_type},
-            sep=knowledge.sep,
-            header=knowledge.header,
-        )
+            # The item column has to be read as the interactions read it, or the
+            # alignment matches nothing and every item silently loses its facts.
+            knowledge_links = reader.read_tabular(
+                _location(config, knowledge.link_path, knowledge.link_azure_blob_name),
+                column_names=knowledge.link_column_names,
+                dtypes={
+                    knowledge.link_column_names[0]: config.reader.dtypes.item_id_type
+                },
+                sep=knowledge.sep,
+                header=knowledge.header,
+            )
 
     # Multimodal feature reading
     if config.reader.multimodal:
-        multimodal_data = {
-            name: _read_modality(name, modality, reader, config)
-            for name, modality in config.reader.multimodal.items()
-        }
+        with times.measure("reading"):
+            multimodal_data = {
+                name: _read_modality(name, modality, reader, config)
+                for name, modality in config.reader.multimodal.items()
+            }
 
     # Cluster information reading
     if config.reader.clustering:
@@ -439,21 +462,22 @@ def initialize_datasets(  # noqa: PLR0912, PLR0915
 
         # Either file may come alone: only the side that names one is read, and
         # the dataset leaves the other without clusters.
-        if user_config["location"]:
-            user_cluster = _read_cluster_data_clean(
-                specific_config=user_config,
-                common_cluster_label=common_cluster_label,
-                common_cluster_type=common_cluster_type,
-                reader=reader,
-            )
+        with times.measure("reading"):
+            if user_config["location"]:
+                user_cluster = _read_cluster_data_clean(
+                    specific_config=user_config,
+                    common_cluster_label=common_cluster_label,
+                    common_cluster_type=common_cluster_type,
+                    reader=reader,
+                )
 
-        if item_config["location"]:
-            item_cluster = _read_cluster_data_clean(
-                specific_config=item_config,
-                common_cluster_label=common_cluster_label,
-                common_cluster_type=common_cluster_type,
-                reader=reader,
-            )
+            if item_config["location"]:
+                item_cluster = _read_cluster_data_clean(
+                    specific_config=item_config,
+                    common_cluster_label=common_cluster_label,
+                    common_cluster_type=common_cluster_type,
+                    reader=reader,
+                )
 
     # Dataset common information
     common_params: Dict[str, Any] = {
@@ -499,6 +523,7 @@ def initialize_datasets(  # noqa: PLR0912, PLR0915
         test_data,
         **common_params,
     )
+    times.add_build_times(main_dataset.get_build_times())
 
     # Handle validation data
     val_dataset: Dataset = None
@@ -513,20 +538,21 @@ def initialize_datasets(  # noqa: PLR0912, PLR0915
                 evaluation_set="Validation",
                 **common_params,
             )
+            times.add_build_times(val_dataset.get_build_times())
         else:
             # CASE 3: Cross-Validation
             n_folds = len(val_data)
             for idx, fold in enumerate(val_data):
                 logger.msg(f"Creating fold dataset {idx + 1}/{n_folds}")
                 val_train, val_set = fold
-                fold_dataset.append(
-                    Dataset(
-                        val_train,
-                        val_set,
-                        evaluation_set="Validation",
-                        **common_params,
-                    )
+                fold_set = Dataset(
+                    val_train,
+                    val_set,
+                    evaluation_set="Validation",
+                    **common_params,
                 )
+                times.add_build_times(fold_set.get_build_times())
+                fold_dataset.append(fold_set)
 
     # Callback on dataset creation
     callback.on_dataset_creation(
@@ -542,6 +568,7 @@ def dataset_preparation(
     main_dataset: Dataset,
     fold_dataset: Optional[List[Dataset]],
     config: TrainConfiguration,
+    timings: Optional[DataPreparationTimes] = None,
 ):
     """This method prepares the dataloaders inside the dataset
     that will be passed to Ray during HPO. It is important to
@@ -553,7 +580,11 @@ def dataset_preparation(
         fold_dataset (Optional[List[Dataset]]): The list of validation datasets
             of train/val splits.
         config (TrainConfiguration): The configuration file used for the experiment.
+        timings (Optional[DataPreparationTimes]): Where the seconds spent building
+            the evaluation data (the loaders and their candidates) are added, as
+            'evaluation', when given.
     """
+    times = timings if timings is not None else DataPreparationTimes()
 
     def prepare_evaluation_loaders(
         dataset: Dataset, has_classic: bool, has_context: bool
@@ -614,10 +645,12 @@ def dataset_preparation(
         for model_class in model_classes
     )
 
-    prepare_evaluation_loaders(main_dataset, has_classic, has_context)
+    with times.measure("evaluation"):
+        prepare_evaluation_loaders(main_dataset, has_classic, has_context)
     if fold_dataset is not None and isinstance(fold_dataset, list):
         for i, dataset in enumerate(fold_dataset):
             logger.msg(
                 f"Preparing fold dataset {i + 1}/{len(fold_dataset)} inner structures for evaluation."
             )
-            prepare_evaluation_loaders(dataset, has_classic, has_context)
+            with times.measure("evaluation"):
+                prepare_evaluation_loaders(dataset, has_classic, has_context)

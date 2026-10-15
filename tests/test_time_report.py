@@ -21,6 +21,7 @@ import torch
 
 import warprec.recommenders  # noqa: F401  (populates the registries)
 from warprec.data.dataset import Dataset
+from warprec.data.timing import DataPreparationTimes
 from warprec.data.writer import LocalWriter
 from warprec.pipelines.common import model_timing_row
 from warprec.pipelines.remotes import ml
@@ -577,6 +578,9 @@ def test_train_and_swarm_build_the_same_row():
         inference_time=0.5,
     )
 
+    # Without the data preparation's breakdown its columns are there, empty
+    data_columns = DataPreparationTimes().columns()
+    assert all(math.isnan(row.pop(column)) for column in data_columns)
     assert row == {
         "Model Name": "BPR",
         "Data Preparation Time": 1.0,
