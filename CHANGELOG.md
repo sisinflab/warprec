@@ -2,6 +2,69 @@
 
 <!-- version list -->
 
+## v2.2.3 (2026-10-15)
+
+### Bug Fixes
+
+- Every epoch of a trial reports to Ray Tune its train-only time, its validation time, its training
+  samples and throughput, and the trial's setup
+  ([`52377f1`](https://github.com/sisinflab/warprec/commit/52377f142e86bcea31c1163751d2ec11eed75e57))
+
+- Every split and the UserHeadN and UserTailN filters return their rows in file order, so a later
+  validation split, the sequential models and the first and last duplicate policies break ties by
+  the file after a random split too
+  ([`bcba2b4`](https://github.com/sisinflab/warprec/commit/bcba2b4a7f7adba77bbe3c0a7fb601c9802b03f3))
+
+- Models the swarm optimises at once each run their own trials, instead of trials running another
+  model's search with their hyperparameters
+  ([`5dbb40e`](https://github.com/sisinflab/warprec/commit/5dbb40e039db8f7140c1a9cd2eb8eadd0b922b94))
+
+- Sequential models see a user's same-second interactions in file order, and without timestamps the
+  whole history in file order, on pandas and polars alike
+  ([`61c8a74`](https://github.com/sisinflab/warprec/commit/61c8a74e15006cee11736d0c176c730e94c0f773))
+
+- Temporal_leave_k_out holds out the later of two rows sharing a user's latest timestamp, as
+  temporal_holdout does, on pandas and polars alike
+  ([`50840ad`](https://github.com/sisinflab/warprec/commit/50840adc041775dcc94a852aa80e69d158c7d403))
+
+- The estimate pipeline counts fetching each training batch in its time, so its train epoch estimate
+  matches a real epoch's train-only time
+  ([`19e165e`](https://github.com/sisinflab/warprec/commit/19e165ef6c76e9152ec66055dc8a879204f189a0))
+
+- The time report gives the best trial's setup, train-only, validation and per-epoch times and
+  throughput, every trial's means, the cross-validation retraining's train-only time and Ray Tune's
+  overhead
+  ([`0ae1a3e`](https://github.com/sisinflab/warprec/commit/0ae1a3edfde7aacca3a9827d8d31958db26717b1))
+
+- The time report writes every duration as a number of seconds, and reads the h:mm:ss durations of
+  an older report back as seconds
+  ([`eb5b979`](https://github.com/sisinflab/warprec/commit/eb5b979d173321534c8c98447ea1134c86967607))
+
+- The time report's evaluation and inference times are read from a monotonic clock once the GPU has
+  finished its work
+  ([`e14a505`](https://github.com/sisinflab/warprec/commit/e14a5055c3050874f9229336ca4efd5793be8f3a))
+
+- UserTailN keeps the later of two rows sharing a user's timestamp, so the last N interactions are
+  the most recent ones in file order
+  ([`dd3a298`](https://github.com/sisinflab/warprec/commit/dd3a298ee29e60577b85695d679815888fad4380))
+
+### Documentation
+
+- The guides show temporal order breaking ties by file position, the time report's plain seconds and
+  new columns, and the per-epoch timing in progress.csv
+  ([`2b09cd7`](https://github.com/sisinflab/warprec/commit/2b09cd7b612720da74035169cd8c31c9a3e7379f))
+
+- The time report page says what each column covers for a trial resumed after a pause, whose
+  time_total_s Ray Tune restarts
+  ([`ccce3c0`](https://github.com/sisinflab/warprec/commit/ccce3c0463cc6f197609dbf5bc5eac47bbf00951))
+
+### Testing
+
+- A resumed trial reports the epoch its pause fell on with the paused session's setup and every
+  later epoch with its own
+  ([`5ef0968`](https://github.com/sisinflab/warprec/commit/5ef0968698e65e858d8fb40a173e4d2507e2bb33))
+
+
 ## v2.2.2 (2026-10-15)
 
 ### Bug Fixes
