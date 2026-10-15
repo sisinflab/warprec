@@ -71,6 +71,50 @@ class Filter(ABC):
         """Apply the filter to the dataset."""
         raise NotImplementedError("Subclasses should implement this method.")
 
+    # The columns _order_in_time attaches: a row's 1-based place in its user's
+    # temporal order, and the user's number of rows.
+    _PLACE = "__temporal_place__"
+    _COUNT = "__temporal_count__"
+
+    def _order_in_time(self, dataset: DataFrame[Any]) -> DataFrame[Any]:
+        """Sort each user's rows into temporal order and number them in it.
+
+        Temporal order is the timestamp, then the position in the file: rows that
+        share a timestamp keep the order they were read in, and the most recent
+        row is the last one. Without a timestamp column, file order alone is used.
+        The number is taken from the position in the sorted frame rather than
+        from a rank of the timestamp: an ordinal rank gives a tie to the row that
+        appears first whichever way it runs, so a descending one called the
+        earlier of two same-second rows the most recent.
+
+        Args:
+            dataset (DataFrame[Any]): The dataset to order.
+
+        Returns:
+            DataFrame[Any]: The dataset sorted by user and temporal order, with
+                the row's place in its user's order and the user's number of rows
+                attached under ``_PLACE`` and ``_COUNT``.
+        """
+        file_order, position = "__file_order__", "__temporal_position__"
+        by = [self.user_label, file_order]
+        if self.timestamp_label in dataset.columns:
+            by.insert(1, self.timestamp_label)
+
+        ordered = (
+            dataset.with_row_index(name=file_order)
+            .sort(by=by)
+            .drop(file_order)
+            .with_row_index(name=position)
+        )
+        return ordered.with_columns(
+            nw.col(position)
+            .rank(method="ordinal")
+            .over(self.user_label)
+            .cast(nw.Int64)
+            .alias(self._PLACE),
+            nw.len().over(self.user_label).cast(nw.Int64).alias(self._COUNT),
+        ).drop(position)
+
 
 @filter_registry.register("MinRating")
 class MinRating(Filter):
@@ -365,7 +409,8 @@ class NRoundsKCore(Filter):
 @filter_registry.register("UserHeadN")
 class UserHeadN(Filter):
     """Filter to keep only the first N interactions for each user,
-    based on the timestamp.
+    based on the timestamp. Interactions sharing a timestamp keep their
+    order in the file.
 
     Args:
         num_interactions (int): Number of first interactions to keep for each user.
@@ -390,31 +435,17 @@ class UserHeadN(Filter):
         Returns:
             DataFrame[Any]: Filtered dataset containing only the first num_interactions for each user.
         """
-        idx_col = "__stable_row_idx__"
-        dataset = dataset.with_row_index(name=idx_col)
-
-        if self.timestamp_label in dataset.columns:
-            # Sort by User -> Timestamp -> Original Index (Tie-breaker)
-            dataset = dataset.sort(by=[self.user_label, self.timestamp_label, idx_col])
-            rank_target = self.timestamp_label
-        else:
-            # Sort by User -> Original Index
-            dataset = dataset.sort(by=[self.user_label, idx_col])
-            rank_target = idx_col
-
-        # Rank is now stable because data is sorted
-        dataset = dataset.filter(
-            nw.col(rank_target).rank(method="ordinal").over(self.user_label)
-            <= self.num_interactions
+        ordered = self._order_in_time(dataset)
+        return ordered.filter(nw.col(self._PLACE) <= self.num_interactions).drop(
+            [self._PLACE, self._COUNT]
         )
-
-        return dataset.drop(idx_col)
 
 
 @filter_registry.register("UserTailN")
 class UserTailN(Filter):
     """Filter to keep only the last N interactions for each user,
-    based on the timestamp.
+    based on the timestamp. Interactions sharing a timestamp keep their
+    order in the file, the later one being the more recent.
 
     Args:
         num_interactions (int): Number of last interactions to keep for each user.
@@ -440,27 +471,10 @@ class UserTailN(Filter):
             DataFrame[Any]: Filtered dataset containing only the last
                        num_interactions for each user.
         """
-        idx_col = "__stable_row_idx__"
-        dataset = dataset.with_row_index(name=idx_col)
-
-        if self.timestamp_label in dataset.columns:
-            # Sort by User -> Timestamp -> Original Index (Tie-breaker)
-            dataset = dataset.sort(by=[self.user_label, self.timestamp_label, idx_col])
-            rank_target = self.timestamp_label
-        else:
-            # Sort by User -> Original Index
-            dataset = dataset.sort(by=[self.user_label, idx_col])
-            rank_target = idx_col
-
-        # Rank is now stable because data is sorted
-        dataset = dataset.filter(
-            nw.col(rank_target)
-            .rank(method="ordinal", descending=True)
-            .over(self.user_label)
-            <= self.num_interactions
-        )
-
-        return dataset.drop(idx_col)
+        ordered = self._order_in_time(dataset)
+        return ordered.filter(
+            nw.col(self._PLACE) > nw.col(self._COUNT) - self.num_interactions
+        ).drop([self._PLACE, self._COUNT])
 
 
 @filter_registry.register("DropUser")

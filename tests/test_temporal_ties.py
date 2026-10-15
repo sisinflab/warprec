@@ -16,7 +16,7 @@ import pandas as pd
 import polars as pl
 import pytest
 
-from warprec.utils.registry import splitting_registry
+from warprec.utils.registry import filter_registry, splitting_registry
 
 BACKENDS = [
     pytest.param(lambda frame: frame, id="pandas"),
@@ -146,3 +146,30 @@ def test_temporal_holdout_holds_out_the_last_rows(
 
     assert positions(test) == expected
     assert positions(train) == set(frame["pos"]) - expected
+
+
+@pytest.mark.parametrize("n", [1, 3])
+@pytest.mark.parametrize("name", ["UserHeadN", "UserTailN"])
+@pytest.mark.parametrize("to_backend", BACKENDS)
+def test_head_and_tail_filters_keep_the_first_or_last_rows(
+    frame: pd.DataFrame, to_backend: Callable[[pd.DataFrame], Any], name: str, n: int
+):
+    """UserHeadN keeps each user's first n rows in temporal order, UserTailN the last.
+
+    Args:
+        frame (pd.DataFrame): The interactions.
+        to_backend (Callable[[pd.DataFrame], Any]): Converts a frame to the backend.
+        name (str): The registered filter name.
+        n (int): The rows kept per user.
+    """
+    expected = {
+        p
+        for order in temporal_order(frame).values()
+        for p in (order[:n] if name == "UserHeadN" else order[-n:])
+    }
+
+    kept = filter_registry.get(name, num_interactions=n)(
+        nw.from_native(to_backend(frame))
+    )
+
+    assert positions(kept) == expected
