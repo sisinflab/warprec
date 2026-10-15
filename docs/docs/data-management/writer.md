@@ -82,7 +82,7 @@ Every value is a plain number. **Every duration is in seconds unless its column 
 | **Data Preparation Time** | From the start of the run to the end of the data preparation: reading the configuration, starting or connecting to Ray, reading, filtering and splitting the data. The wait for CodeCarbon's trackers is left out. The same for every model. |
 | **Hyperparameter Exploration Time** | Wall clock of the model's search, from building its trainer to loading its best model; under cross-validation it also includes retraining the best configuration on the full training set. It includes everything Ray does: starting Ray Tune, scheduling the trials, starting each trial's Ray Train workers, checkpointing and passing results on. |
 | **Ray Tune Overhead (s)** | The part of the search's wall clock (Ray Tune's `fit`) that no trial spent in setup, training or validation: Ray Tune's start-up, the scheduling of the trials, the checkpoint saved and the report sent after every epoch. It is given only when the trials ran one at a time, each ran once, and every trial reported its timing; with concurrent trials their times overlap and cannot be subtracted from the wall clock, so the column is empty (set `optimization.max_concurrent_trials: 1` to obtain it). |
-| **Average Trial Time (s)** | Mean over the successful trials of Ray Tune's `time_total_s`: a trial's whole wall clock, from the start of its trial driver to its last report. It includes the setup, every epoch's training and validation, and the checkpoint and report of every epoch. |
+| **Average Trial Time (s)** | Mean over the successful trials of Ray Tune's `time_total_s`: a trial's whole wall clock, from the start of its trial driver to its last report. It includes the setup, every epoch's training and validation, and the checkpoint and report of every epoch. For a trial resumed after a pause it covers only the last session: Ray Tune restarts `time_total_s` (and `training_iteration`) when a trial resumes from its checkpoint. |
 | **RAM / VRAM Mean and Max Usage (MB)** | The resident memory (RAM) and the peak GPU memory (VRAM) of each trial's worker at its last report, averaged and maximised over the trials. |
 | **Trainable / Total Params (Best Model)** | Parameter counts of the best model. |
 
@@ -94,7 +94,7 @@ A trial's time is split into three parts that do not overlap. They are measured 
 - **Training (train-only)**: the training loop of every epoch (fetching the batches, forward, backward and optimiser steps), the end-of-epoch validation excluded.
 - **Validation**: the end-of-epoch evaluation on the validation data (every `eval_every_n` epochs).
 
-What is in none of them is the checkpoint saved and the report handed to Ray after every epoch, and the start of the trial's Ray actor; together with the setup, training and validation they add up to the trial's `time_total_s`.
+What is in none of them is the checkpoint saved and the report handed to Ray after every epoch, and the start of the trial's Ray actor; together with the setup, training and validation they add up to the trial's `time_total_s` when the trial ran in one session. They do not for a trial resumed after a pause (see below).
 
 A closed-form model (EASE, ItemKNN, ...) is fitted when it is built: its fit is its single epoch of training, its evaluation its validation (including building the evaluation loader), and its setup ends when the fit starts.
 
@@ -113,7 +113,16 @@ A closed-form model (EASE, ItemKNN, ...) is fitted when it is built: its fit is 
 | **Mean Trial Validation Time (s)** | The validation time averaged over every trial that reported its timing. |
 | **Retraining Train-Only Time (s)** | Cross-validation only: the train-only time of retraining the best configuration on the full training set (the fit, for a closed-form model). |
 
-Under cross-validation the best configuration ran once per fold: the best-trial columns average its fold trials, and the epoch statistics pool their epochs. A trial resumed after a pause reports the setup of the session that finished it, and each epoch once.
+Under cross-validation the best configuration ran once per fold: the best-trial columns average its fold trials, and the epoch statistics pool their epochs.
+
+A trial resumed after a pause ran in several sessions, each starting again from the trial's last checkpoint. For such a trial:
+
+- **Setup** (best and mean) is the setup of the session that trained its last epoch; the setups of the earlier sessions are not added.
+- **Train-only** and **validation** (best and mean), the epoch count and the epoch statistics take every epoch once, from whichever session trained it: they sum the epochs of all sessions. The part of an epoch a pause interrupted before its checkpoint is counted nowhere; the resumed session trains that epoch again and its time is counted.
+- **Average Trial Time** covers the last session only, so it no longer contains the train-only and validation time of the earlier sessions: setup + train-only + validation can exceed it.
+- **RAM / VRAM** are those of the last session's last report.
+- **Ray Tune Overhead** is left empty, since the trial did not run once.
+- **Hyperparameter Exploration Time** is the wall clock of the current run's search; when a whole run resumes, the time its search spent before the interruption is not included.
 
 **The test evaluation**
 
@@ -134,6 +143,8 @@ Every epoch of a trial reports, beside its metrics, the keys below. They land in
 | `epoch_samples` | Training examples the epoch went through (see the throughput column above), summed over the workers. |
 | `train_samples_per_s` | `epoch_samples / epoch_train_s`. |
 | `setup_s` | The trial's setup: from the start of the trial to its first training batch (starting the Ray Train workers, fetching the dataset, building the model and its loaders); for a closed-form model, to the start of its fit. The same value in every report of a session. |
+
+When a pause stops a trial after an epoch's checkpoint is saved but before its report reaches Ray Tune, the session that resumes reports that epoch first, with the values the paused session measured (its `setup_s` included); Ray Tune's own columns of that row (`training_iteration`, `time_total_s`, `pid`, ...) belong to the resuming session. Its later epochs carry its own `setup_s`.
 
 ### Estimate Report
 
