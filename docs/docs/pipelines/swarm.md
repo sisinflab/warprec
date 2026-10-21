@@ -13,6 +13,12 @@ The Swarm Pipeline represents an alternative execution strategy to the standard 
 - Aiming to maximize utilization of all available cluster resources
 - Minimizing end-to-end training time is a primary objective
 
+## Sharing the Cluster
+
+Every model's search runs at the same time, so each takes an **equal share** of the cluster when its number of concurrent trials is computed: the trials the cluster could run for that model, divided by the number of models searched at once, and at least one. The share is fixed when the search starts; a model whose search ends early does not hand its share to the others. A model with `max_concurrent_trials` set uses that value instead.
+
+The orchestrating task of each model reserves almost no resources and never holds the datasets or the model: the trials read the datasets from the object store, and the best model is built, evaluated and written by a task with the resources of one trial.
+
 ## Output Artifacts
 
 The Swarm Pipeline writes the same [output artifacts](training.md#output-artifacts) as the train pipeline: overall and per-user results, recommendations, serialized models when `meta.save_model` is set, best hyperparameters and the time report. The statistical significance tests compare every model the run evaluated, including those completed by an earlier, paused run.
