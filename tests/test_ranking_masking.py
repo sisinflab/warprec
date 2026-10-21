@@ -16,7 +16,9 @@ from warprec.data.dataset import Dataset
 from warprec.evaluation import Evaluator
 
 from warprec.data.ranking import (
+    SeenItems,
     mask_seen_in_context,
+    mask_seen_pairs,
     restrict_to_candidates,
     top_k_breaking_ties,
 )
@@ -188,3 +190,17 @@ def test_reusing_an_evaluator_gives_the_same_results_every_time(dataset: Dataset
         expected = fresh.compute_results()[5]["nDCG"]
         for run in runs:
             assert torch.equal(run.nan_to_num(-1), expected.nan_to_num(-1)), strategy
+
+
+def test_seen_items_mask_what_the_training_matrix_holds(dataset: Dataset):
+    """Masking on the device leaves out exactly the pairs scipy lists."""
+    train = dataset.train_set.get_sparse().tocsr(copy=True)
+    train.data[0] = 0.0  # an explicit zero is not a seen item
+    users = torch.tensor([3, 0, 7, 3])
+
+    expected = torch.rand(len(users), train.shape[1])
+    masked = expected.clone()
+    mask_seen_pairs(expected, train[users.tolist(), :])
+    SeenItems(train).mask(masked, users)
+
+    assert torch.equal(expected, masked)

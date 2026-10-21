@@ -15,7 +15,7 @@ from tqdm import tqdm
 
 from warprec.errors import ConfigurationError, DataError
 from warprec.data.ranking import (
-    mask_seen_pairs,
+    SeenItems,
     rank_top_k,
     resolve_recommendation_mask,
 )
@@ -250,13 +250,13 @@ class Writer(ABC):
         train_sparse = dataset.train_set.get_sparse()
         umap_i, imap_i = dataset.get_inverse_mappings()
         num_users = train_sparse.shape[0]
+        seen = SeenItems(train_sparse, model.device) if policy != "none" else None
         all_user_indices = torch.arange(num_users, device=model.device)
         batch_size = dataset.batch_size
 
         batch_iterator = range(0, num_users, batch_size)
         for i in tqdm(batch_iterator, desc="Generating recommendation batches"):
             user_indices = all_user_indices[i : i + batch_size]
-            train_batch = train_sparse[user_indices.tolist(), :]
 
             user_seq, seq_len = (
                 dataset.train_session.get_user_history_sequences(
@@ -272,8 +272,8 @@ class Writer(ABC):
                     user_seq=user_seq,
                     seq_len=seq_len,
                 )
-                if policy != "none":
-                    mask_seen_pairs(predictions, train_batch)
+                if seen is not None:
+                    seen.mask(predictions, user_indices)
                 # Ties are broken as the evaluator breaks them, from the same
                 # seed and per user, so the list written is the list evaluated.
                 top_k_scores, top_k_items = rank_top_k(

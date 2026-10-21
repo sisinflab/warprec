@@ -1,4 +1,4 @@
-from typing import TYPE_CHECKING, Any, Dict, Optional, Tuple
+from typing import TYPE_CHECKING, Any, Dict, Optional, Tuple, Union
 
 import numpy as np
 import torch
@@ -21,6 +21,74 @@ def mask_seen_pairs(predictions: Tensor, seen: csr_matrix) -> None:
         seen (csr_matrix): The rows of the training matrix for this batch of users.
     """
     predictions[seen.nonzero()] = -torch.inf
+
+
+class SeenItems:
+    """The items every user has seen, held where the scores are computed.
+
+    Masking them with ``mask_seen_pairs`` slices the training matrix with scipy
+    and lists its non-zero entries on the host for every batch. This keeps the
+    matrix's compressed rows as tensors on the evaluation device instead, so a
+    batch is masked by a few tensor operations there, without leaving it.
+
+    On a CUDA device whose free memory the rows would crowd, they stay on the
+    host, and only the entries of each batch are sent to the device.
+
+    Args:
+        seen (csr_matrix): The {user x item} training matrix. Entries stored as
+            explicit zeros are not seen, as with ``mask_seen_pairs``.
+        device (Union[str, torch.device]): The device the scores are on.
+
+    Attributes:
+        MEMORY_SHARE (float): The share of a CUDA device's free memory the
+            rows may take.
+    """
+
+    MEMORY_SHARE: float = 0.25
+
+    def __init__(self, seen: csr_matrix, device: Union[str, torch.device] = "cpu"):
+        seen = csr_matrix(seen, copy=True)
+        seen.eliminate_zeros()
+
+        home = torch.device(device)
+        size = seen.indptr.size * 8 + seen.indices.size * 4
+        if (
+            home.type == "cuda"
+            and size > torch.cuda.mem_get_info(home)[0] * self.MEMORY_SHARE
+        ):
+            home = torch.device("cpu")
+
+        self.indptr = torch.as_tensor(seen.indptr.astype(np.int64)).to(home)
+        self.indices = torch.as_tensor(seen.indices.astype(np.int32)).to(home)
+
+    def mask(self, predictions: Tensor, user_indices: Tensor) -> None:
+        """Exclude from a batch's ranking every item its users have seen.
+
+        Args:
+            predictions (Tensor): The score matrix, one row per user of the
+                batch, modified in place.
+            user_indices (Tensor): The user of each row.
+        """
+        home = self.indptr.device
+        users = user_indices.to(home, torch.long)
+        starts = self.indptr[users]
+        counts = self.indptr[users + 1] - starts
+        total = int(counts.sum())
+        if total == 0:
+            return
+
+        # Every seen entry of the batch: its row in the batch, and its position
+        # in the matrix's column indices
+        rows = torch.repeat_interleave(
+            torch.arange(len(users), device=home), counts, output_size=total
+        )
+        offsets = torch.arange(total, device=home) - torch.repeat_interleave(
+            torch.cumsum(counts, 0) - counts, counts, output_size=total
+        )
+        columns = self.indices[starts[rows] + offsets].long()
+
+        target = predictions.device
+        predictions[rows.to(target), columns.to(target)] = -torch.inf
 
 
 def mask_seen_in_context(

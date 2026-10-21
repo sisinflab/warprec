@@ -13,7 +13,7 @@ from warprec.data.stash import METRIC_ARGUMENTS, check_stash
 from warprec.data.ranking import (
     cold_item_candidates,
     mask_seen_in_context,
-    mask_seen_pairs,
+    SeenItems,
     rank_top_k,
     resolve_mask_policy,
     restrict_to_candidates,
@@ -111,6 +111,10 @@ class Evaluator:
 
         self.reranker = reranker
         self.candidate_mask = cold_item_candidates(train_set, candidates)
+
+        # Built on the first evaluation, on its device, and kept for the next
+        self._seen: Optional[SeenItems] = None
+        self._seen_for: Optional[Tuple[int, str]] = None
         if self.candidate_mask is not None:
             pool = int(self.candidate_mask.sum())
             if pool == 0:
@@ -324,7 +328,6 @@ class Evaluator:
             candidates = batch_data.get("candidates")  # Optional (Sampled only)
 
             # Prepare the model input
-            train_batch = train_sparse[user_indices.tolist(), :]
             predict_kwargs = {"user_indices": user_indices}
 
             # A. Sequential Models Support
@@ -388,7 +391,9 @@ class Evaluator:
                             batch_data.get("target_item"),
                         )
                     else:
-                        mask_seen_pairs(predictions, train_batch)
+                        self._seen_items(train_sparse, device).mask(
+                            predictions, user_indices
+                        )
 
                 elif strategy == "sampled":
                     # Mask seen items
@@ -411,6 +416,22 @@ class Evaluator:
 
         if verbose:
             self._log_results(eval_start_time, model.name)
+
+    def _seen_items(self, train_sparse: csr_matrix, device: Any) -> SeenItems:
+        """The items each user has seen, on the device the scores are on.
+
+        Args:
+            train_sparse (csr_matrix): The training matrix of the evaluated dataset.
+            device (Any): The evaluation device.
+
+        Returns:
+            SeenItems: The seen items, built once per matrix and device.
+        """
+        key = (id(train_sparse), str(device))
+        if self._seen is None or self._seen_for != key:
+            self._seen = SeenItems(train_sparse, device)
+            self._seen_for = key
+        return self._seen
 
     def _sampled_candidates(
         self, batch_data: Dict[str, Any], padding_idx: int
