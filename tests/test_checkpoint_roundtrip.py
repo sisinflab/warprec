@@ -23,7 +23,7 @@ from warprec.recommenders.base_recommender import (
 )
 from warprec.utils.registry import model_registry
 
-from conftest import make_model
+from conftest import build_params, make_model
 
 # Models fitted on the interactions: their constructor cannot run without them,
 # which is exactly what makes the checkpoint the only thing serving can rely on.
@@ -131,6 +131,23 @@ def test_an_older_checkpoint_still_says_what_it_needs(
         multimodal=dataset.multimodal,
     )
     assert isinstance(restored, model_class)
+
+
+def test_lightccf_without_layers_keeps_its_scoring_cache_out_of_the_state(
+    dataset: Dataset,
+):
+    """Its forward returns the embedding weights, which scoring used to register."""
+    model_class = model_registry.get_class("LightCCF")
+    params = {**build_params("LightCCF"), "n_layers": 0}
+    model = model_class(
+        params=params, info=dataset.info(), interactions=dataset.train_set
+    )
+    model.eval()
+    with torch.inference_mode():
+        model.predict(**predict_inputs(model, dataset))
+
+    state = model.get_state()
+    assert not [key for key in state["state_dict"] if key.startswith("_cached_")]
 
 
 def test_checkpoints_record_their_format_and_version(dataset: Dataset):

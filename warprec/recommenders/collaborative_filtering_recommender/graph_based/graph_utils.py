@@ -242,8 +242,12 @@ class GraphRecommenderUtils(nn.Module):
             with torch.no_grad():
                 # Unpack the forward
                 ret = self.forward()
-                self._cached_user_emb = ret[0]
-                self._cached_item_emb = ret[1]
+
+                # A forward that returns the embedding weights themselves would
+                # register them as new parameters under these names, and every
+                # checkpoint saved after a validation would carry them
+                self._cached_user_emb = ret[0].detach()
+                self._cached_item_emb = ret[1].detach()
 
         return self._cached_user_emb, self._cached_item_emb
 

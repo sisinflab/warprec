@@ -122,6 +122,13 @@ def test_model_builds_trains_and_predicts(model_name: str, dataset: Dataset):
     assert scores.shape[1] == dataset.info()["n_items"], f"{model_name}: wrong width"
     assert torch.isfinite(scores).all(), f"{model_name}: non-finite score produced"
 
+    # What scoring caches must stay out of the state: a key a fresh model lacks
+    # makes every checkpoint saved after a validation impossible to load
+    fresh = build_model(model_name, dataset)
+    assert model.state_dict().keys() == fresh.state_dict().keys(), (
+        f"{model_name}: scoring changed the keys of the state dict"
+    )
+
 
 @pytest.mark.parametrize("model_name", MODELS)
 def test_scoring_a_few_items_agrees_with_ranking_them_all(
