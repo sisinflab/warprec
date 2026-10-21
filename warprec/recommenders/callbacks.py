@@ -1,10 +1,11 @@
 import os
 import random
-from typing import Any, Dict, Iterator, Optional, Tuple
+from typing import Any, Dict, Iterator, List, Optional, Tuple
 
 import numpy as np
 import psutil
 import torch
+import torch.distributed as dist
 import lightning as L
 from ray import train
 from torch import Tensor
@@ -464,7 +465,7 @@ class RandomStateCallback(L.Callback):
             for config in trainer.lr_scheduler_configs
             if config.reduce_on_plateau and config.monitor in trainer.callback_metrics
         }
-        checkpoint[RANDOM_STATE] = {
+        state = {
             "python": random.getstate(),
             "numpy": np.random.get_state(),
             "torch": torch.get_rng_state(),
@@ -479,6 +480,16 @@ class RandomStateCallback(L.Callback):
             "epoch": trainer.current_epoch,
             "plateau": plateau,
         }
+
+        # Every rank draws from its own generators, but only the first writes
+        # the checkpoint: each rank's state is gathered for it to keep. Every
+        # rank dumps the checkpoint, so all of them take part in the gather.
+        if trainer.world_size > 1 and dist.is_available() and dist.is_initialized():
+            ranks: List[Any] = [None] * trainer.world_size
+            dist.all_gather_object(ranks, state)
+            checkpoint[RANDOM_STATE] = {"ranks": ranks}
+        else:
+            checkpoint[RANDOM_STATE] = state
 
     def on_load_checkpoint(
         self,
@@ -497,15 +508,19 @@ class RandomStateCallback(L.Callback):
             checkpoint (Dict[str, Any]): The checkpoint being restored.
         """
         state = checkpoint.get(RANDOM_STATE)
-        if state is None or trainer.world_size > 1:
+        saved_ranks = len(state["ranks"]) if state and "ranks" in state else 1
+        if state is None or saved_ranks != trainer.world_size:
             if trainer.is_global_zero:
                 logger.attention(
                     "The checkpoint this trial resumes from carries no random "
                     "state it can restore (it predates WarpRec saving one, or "
-                    "the trial trains on several workers), so the resumed "
-                    "epochs will not draw the samples an uninterrupted run would."
+                    "it was written by a trial training on another number of "
+                    "workers), so the resumed epochs will not draw the samples "
+                    "an uninterrupted run would."
                 )
             return
+        if "ranks" in state:
+            state = state["ranks"][trainer.global_rank]
 
         self._pending = state
         loader = self.train_dataloader
