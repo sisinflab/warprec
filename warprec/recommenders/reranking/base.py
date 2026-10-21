@@ -120,9 +120,16 @@ class Reranker(ABC):
 
         pooled = min(self.pool, depth)
         cut = min(k, pooled)
+
+        # The list is built where the item features are, on the CPU: only the
+        # pool crosses over, whatever device the model scored on
+        home = self.item_features.device
         chosen = self._select(
-            relevance[:, :pooled], candidates[:, :pooled], cut, user_indices
-        )
+            relevance[:, :pooled].to(home),
+            candidates[:, :pooled].to(home),
+            cut,
+            user_indices.to(home) if user_indices is not None else None,
+        ).to(relevance.device)
 
         values = relevance[:, :pooled].gather(1, chosen)
         indices = candidates[:, :pooled].gather(1, chosen)
