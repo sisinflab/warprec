@@ -50,7 +50,7 @@ The following do **not** invalidate a resume, so a paused run can be resumed on 
 
 - `cpu_per_trial`, `gpu_per_trial`, `custom_resources_per_trial`, `label_selector`
 - `max_concurrent_trials`, `num_workers`, and the model `device`
-- `general.ray_verbose` and `general.ray_address`
+- `general.ray_verbose`, `general.ray_address` and `general.gpu_deterministic`
 - the whole `dashboard` section
 - the `run` section itself
 

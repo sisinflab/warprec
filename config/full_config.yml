@@ -261,6 +261,7 @@ general:
   ray_verbose: [0, 1, 2, 3]
   ray_address: auto
   time_report: [True, False]
+  gpu_deterministic: [True, False]
   custom_modules: [path/to/python/module, path/to/python/script.py]
   callback:
     callback_path: path/to/python/script.py
