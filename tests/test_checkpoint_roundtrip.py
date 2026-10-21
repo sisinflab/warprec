@@ -150,6 +150,19 @@ def test_lightccf_without_layers_keeps_its_scoring_cache_out_of_the_state(
     assert not [key for key in state["state_dict"] if key.startswith("_cached_")]
 
 
+def test_a_checkpoint_carrying_the_scoring_cache_still_loads(dataset: Dataset):
+    """Checkpoints written with the cache load without it."""
+    model = make_model("LightCCF", dataset)
+    state = model.get_state()
+    state["state_dict"]["_cached_user_emb"] = model.user_embedding.weight.detach()
+    state["state_dict"]["_cached_item_emb"] = model.item_embedding.weight.detach()
+
+    restored = model_registry.get_class("LightCCF").from_checkpoint(
+        checkpoint=through_disk(state), interactions=dataset.train_set
+    )
+    assert torch.equal(restored.user_embedding.weight, model.user_embedding.weight)
+
+
 def test_checkpoints_record_their_format_and_version(dataset: Dataset):
     """Serving can tell which WarpRec wrote a checkpoint, and in which layout."""
     state = make_model("BPR", dataset).get_state()
