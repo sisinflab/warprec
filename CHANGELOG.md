@@ -2,6 +2,110 @@
 
 <!-- version list -->
 
+## v2.2.6 (2026-10-21)
+
+### Bug Fixes
+
+- A re-ranker never places a masked item, such as one the user has already seen, above an item that
+  can still be recommended
+  ([`51b67f4`](https://github.com/sisinflab/warprec/commit/51b67f4c5c51645b079a67fde43cb3f2ad360c9a))
+
+- General.gpu_deterministic makes GPU trials bitwise reproducible, so a resumed trial ends with the
+  weights of an uninterrupted one
+  ([`eb3ce79`](https://github.com/sisinflab/warprec/commit/eb3ce7961191616f32b1fc8bb3ecbff4e7951d96))
+
+- MMR and Calibration re-rank scores computed on a GPU, which failed on a device mismatch with their
+  item features
+  ([`3d505b3`](https://github.com/sisinflab/warprec/commit/3d505b3b98fae367ba78612ffe4c09e499d8e33e))
+
+- Multimodal models are retrained after cross-validation with their item features, which the
+  retraining did not pass them
+  ([`dc86136`](https://github.com/sisinflab/warprec/commit/dc86136ed1318dc71e43d237f1fa24bc254917b5))
+
+- Saved models carry the evaluation seed and, with side information, the item features and
+  interaction values a re-ranker reads
+  ([`2b990b9`](https://github.com/sisinflab/warprec/commit/2b990b92edf171efe7ac8afa89b7c9ed046b3702))
+
+- Serving breaks ties, masks seen items and re-ranks with the same code as offline evaluation, from
+  the seed the checkpoint records, and an endpoint can configure a re-ranker
+  ([`988e417`](https://github.com/sisinflab/warprec/commit/988e417c061ab55af7fbed875c11153ff02bd2f9))
+
+- STAN, CKE, KGCN, KGAT, VBPR, TwoTower and gSASRec are served from their checkpoint alone
+  ([`fce2689`](https://github.com/sisinflab/warprec/commit/fce268956037e4bb79c950de58e770930ee1bf26))
+
+- The number of concurrent trials is computed from the live nodes that match the label selector and
+  can host a worker, a trial no node can host stops the search at once, swarm searches share the
+  cluster equally, and a restored search takes the number computed for the cluster it resumes on
+  ([`8814750`](https://github.com/sisinflab/warprec/commit/8814750b3fb39ce81e35cc7c7dbc485ebf24c9fb))
+
+- The swarm pipeline no longer warns that it is experimental
+  ([`83e5cd2`](https://github.com/sisinflab/warprec/commit/83e5cd2581ab2575bd381aa8eb1d70ffe8842853))
+
+- The train and swarm drivers never hold the datasets or the models: the data task writes the splits
+  and keeps each dataset in the object store, and one task per model builds, evaluates and writes
+  the best model on the cluster, sending it to the driver only for a callback that receives it
+  ([`89a63ac`](https://github.com/sisinflab/warprec/commit/89a63ac89751355b6524b0b1a884b6aaea51334f))
+
+- The train and swarm pipelines evaluate the best model on the test set with the configured
+  re-ranker, so the results they report are those of the lists they write
+  ([`7a60c7b`](https://github.com/sisinflab/warprec/commit/7a60c7b79ab03f380ca3287026d2a53f1809392b))
+
+- The trainer takes datasets already in the Ray object store by reference, so a search no longer
+  stores them again
+  ([`6291363`](https://github.com/sisinflab/warprec/commit/6291363deb0db968371587566f6c24a19d867d15))
+
+### Documentation
+
+- Every model family is listed as served from its checkpoint alone
+  ([`2678900`](https://github.com/sisinflab/warprec/commit/2678900fbe0788530fa975697fcf97d2eb35ed2b))
+
+- General.gpu_deterministic is documented with what it costs, what it buys for resumed GPU trials,
+  and that it does not invalidate a resume
+  ([`78ac8f2`](https://github.com/sisinflab/warprec/commit/78ac8f2ad70ea8d42b6b90f5ae9114255379d530))
+
+- The callback page says the best model reaches the driver only for a callback that receives it, and
+  the resume page that the best model is rebuilt on the cluster
+  ([`b69bfa7`](https://github.com/sisinflab/warprec/commit/b69bfa7a236aabead258386bca7d5959c5e287ef))
+
+- The configuration and swarm pages say how the number of concurrent trials is computed, shared by
+  the swarm's searches and recomputed on resume
+  ([`5fd19fe`](https://github.com/sisinflab/warprec/commit/5fd19fe1723e038380d314d73b90d1daa11af172))
+
+- The README and the documentation give the counts the registries hold: 87 algorithms, 45 metrics in
+  9 families and 21 data strategies
+  ([`2e48db4`](https://github.com/sisinflab/warprec/commit/2e48db46f4c4d36c78f37c444e451c309bf687b5))
+
+- The README and the documentation home no longer claim a Spark backend, which general.backend does
+  not accept
+  ([`7efbb9b`](https://github.com/sisinflab/warprec/commit/7efbb9b7edcac8a9e5aaf901450bc4a200266d41))
+
+- The README lists every statistical test and correction WarpRec implements, as the architecture
+  page does
+  ([`04072da`](https://github.com/sisinflab/warprec/commit/04072da711fc82d93b55b234c2bbcfe9471cd368))
+
+- The serving configuration documents the rerank key, and the serving page says how served lists
+  break ties and re-rank like the run
+  ([`c6752d7`](https://github.com/sisinflab/warprec/commit/c6752d71095ef61ca983f88b2a04946e13833d07))
+
+### Refactoring
+
+- Evaluation and written recommendations take their top k through one shared ranking call, and a
+  re-ranker can be built from item features and histories without a dataset
+  ([`b25c7ee`](https://github.com/sisinflab/warprec/commit/b25c7ee5b7fcb598d9c0ec87e4794736b7575d26))
+
+- The tie break drops the earlier implementation left unreachable after its return
+  ([`9003146`](https://github.com/sisinflab/warprec/commit/900314655c39ce2ed0ccaf2c11d93b11e93d9002))
+
+### Testing
+
+- A served list is the list the run wrote, with and without a re-ranker
+  ([`88d28a5`](https://github.com/sisinflab/warprec/commit/88d28a5be81273f0854b3ef675d5887e738dbc77))
+
+- The resume exactness test also runs on a CUDA GPU with general.gpu_deterministic, and checks the
+  flag reaches the trial
+  ([`8dd7cdf`](https://github.com/sisinflab/warprec/commit/8dd7cdf6ca9d4294095c7b9967a1697941d37169))
+
+
 ## v2.2.5 (2026-10-21)
 
 ### Bug Fixes
