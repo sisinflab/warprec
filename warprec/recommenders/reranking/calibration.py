@@ -41,10 +41,15 @@ class Calibration(GreedyReranker):
             over the features rather than over the catalogue.
         **kwargs (Any): Ignored.
 
+    Attributes:
+        reads_history (bool): True: the target make-up is the user's own.
+
     Raises:
         ConfigurationError: If the weight falls outside [0, 1].
         ModelError: If no history was given.
     """
+
+    reads_history: bool = True
 
     def __init__(
         self,

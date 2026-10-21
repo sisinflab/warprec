@@ -26,9 +26,16 @@ class Reranker(ABC):
         pool (int): How many of the top candidates are reconsidered.
         **kwargs (Any): Ignored, so that a registry may pass shared arguments.
 
+    Attributes:
+        reads_history (bool): Whether the objective reads the history of the
+            user a list is for, and so cannot re-rank a list that belongs to no
+            known user, such as an anonymous session's.
+
     Raises:
         ConfigurationError: If the pool is smaller than one.
     """
+
+    reads_history: bool = False
 
     def __init__(self, item_features: Tensor, pool: int = 100, **kwargs: Any):
         if pool < 1:

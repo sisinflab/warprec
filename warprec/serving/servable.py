@@ -1,7 +1,7 @@
 import difflib
 import json
-import math
 from dataclasses import dataclass, field
+from itertools import chain
 from pathlib import Path
 from typing import Any, Dict, List, Literal, Optional, Sequence, Union, cast
 
@@ -11,15 +11,19 @@ from scipy.sparse import csr_matrix
 from torch import Tensor
 
 import warprec.recommenders  # noqa: F401  (populates the model registry)
+from warprec.data.ranking import mask_seen_pairs, rank_top_k, restrict_to_candidates
 from warprec.errors import CheckpointError
 from warprec.recommenders.base_recommender import (
     ContextRecommenderUtils,
     Recommender,
     SequentialRecommenderUtils,
 )
+from warprec.recommenders.reranking import Reranker, build_reranker_from
 from warprec.serving.catalogue import Catalogue
 from warprec.serving.context import ContextSchema
 from warprec.serving.errors import ServingError
+from warprec.utils.config.evaluation_configuration import EvaluationConfig
+from warprec.utils.config.rerank_configuration import RerankConfig
 from warprec.utils.logger import logger
 from warprec.utils.registry import model_registry
 
@@ -36,12 +40,15 @@ class ServingPolicy:
         mask_seen (bool): Whether items seen in training are left out.
         unknown_user (Literal["error", "popular"]): The answer for a user
             unseen in training.
+        rerank (Optional[RerankConfig]): The re-ranker applied to the lists
+            the model scores; None ranks by score alone.
     """
 
     default_k: int = 10
     max_k: int = 100
     mask_seen: bool = True
     unknown_user: Literal["error", "popular"] = "error"
+    rerank: Optional[RerankConfig] = None
 
 
 @dataclass(frozen=True)
@@ -137,8 +144,11 @@ class ServableModel:
         payload (Optional[Dict[str, Any]]): What the checkpoint carries for
             serving: the training matrix ('seen'), the packed histories of a
             sequential model ('histories'), the context vocabulary and its
-            counts ('context_maps', 'context_stats') and the training facts
-            ('training'). Older checkpoints carry less, or nothing.
+            counts ('context_maps', 'context_stats'), the item features and
+            interaction values a re-ranker reads ('item_features',
+            'seen_values') and the training facts ('training'), the seed the
+            evaluation broke ties from among them. Older checkpoints carry
+            less, or nothing.
         policy (ServingPolicy): How the endpoint answers.
         catalogue (Optional[Catalogue]): The names and attributes of the items.
         presentation (Presentation): How the endpoint speaks about itself.
@@ -146,8 +156,9 @@ class ServableModel:
 
     Raises:
         CheckpointError: If the policy asks for a popularity fallback the
-            checkpoint has no data for, or the model is context-aware and the
-            checkpoint lacks its context vocabulary.
+            checkpoint has no data for, the model is context-aware and the
+            checkpoint lacks its context vocabulary, or the policy asks for a
+            re-ranker the checkpoint has no item features for.
     """
 
     def __init__(
@@ -180,6 +191,14 @@ class ServableModel:
         self._presentation = presentation
         self._training: Optional[Dict[str, Any]] = payload.get("training")
         self._warprec_version = warprec_version
+
+        # Ties are broken from the seed the evaluation broke them from, so that
+        # a served list is the list the run evaluated and wrote. A checkpoint
+        # saved before the seed was recorded falls back on the default one.
+        evaluation = (self._training or {}).get("evaluation") or {}
+        seed = evaluation.get("seed", EvaluationConfig.model_fields["seed"].default)
+        self._tie_break = torch.Generator().manual_seed(seed)
+        self._reranker = self._build_reranker(policy.rerank, payload)
 
         info = model.info
         self._users = {
@@ -561,16 +580,17 @@ class ServableModel:
         """
         scored = [query for query in queries if not query.fallback]
         rows = iter(self._predict(scored)) if scored else iter(())
-        answers = []
-        for query in queries:
-            if query.fallback:
-                scores = self._popularity.clone()  # type: ignore[union-attr]
-            else:
-                scores = next(rows)
-            answer = self._top_k(scores, query)
+        scores = torch.stack(
+            [self._popularity if query.fallback else next(rows) for query in queries]
+        )
+        # Popularity is the same list for everyone, so only what the model
+        # scored is re-ranked.
+        answers = self._ranked(
+            scores, queries, rerank=[not query.fallback for query in queries]
+        )
+        for query, answer in zip(queries, answers):
             if query.explain:
                 self._explain(query, answer)
-            answers.append(answer)
         return answers
 
     @torch.inference_mode()
@@ -605,7 +625,9 @@ class ServableModel:
         query = Query(k=self._checked_k(k))
         query.exclude = [self._item_index(token) for token in exclude or []]
         query.allowed = self._allowed_items(filter) if filter else None
-        answer = self._top_k(self._popularity.clone(), query, mask_seen=False)
+        answer = self._ranked(
+            self._popularity.clone().unsqueeze(0), [query], mask_seen=False
+        )[0]
         for entry in answer:
             entry["interactions"] = int(entry["score"])
         return answer
@@ -922,37 +944,168 @@ class ServableModel:
                 [query.context for query in queries], device
             )
         with torch.inference_mode():
-            return self._model.predict(**inputs).float()
+            scores = self._model.predict(**inputs)
+            # Half precision is widened, which changes no order. Double
+            # precision, which the closed-form models score in, is kept:
+            # narrowing it would merge distinct scores into ties the run never
+            # had to break.
+            return scores.to(torch.promote_types(scores.dtype, torch.float32))
 
-    def _top_k(
-        self, scores: Tensor, query: Query, mask_seen: bool = True
-    ) -> List[Dict[str, Any]]:
-        """The best items of one row of scores, hidden ones left out.
+    def _ranked(
+        self,
+        scores: Tensor,
+        queries: Sequence[Query],
+        mask_seen: bool = True,
+        rerank: Optional[Sequence[bool]] = None,
+    ) -> List[List[Dict[str, Any]]]:
+        """The best items of each row of scores, hidden ones left out.
+
+        Masking, tie breaking and re-ranking go through the calls the
+        evaluation and the written recommendations make, so a known user is
+        served the list the run evaluated and wrote for them.
+
+        A row without a user - an anonymous session, or popularity - has no
+        index to key its ties on, so it is keyed on one no user has
+        (n_users): ties are still broken by chance rather than by item id, and
+        the same request always gets the same answer, whatever it is batched
+        with.
 
         Args:
-            scores (Tensor): The row of scores, modified in place.
-            query (Query): The query it answers.
+            scores (Tensor): One row of scores per query, modified in place.
+            queries (Sequence[Query]): The queries they answer, in order.
             mask_seen (bool): Whether the items the request has already seen
                 are hidden, as the endpoint's policy says; off for popularity,
                 which is the same for everyone.
+            rerank (Optional[Sequence[bool]]): Whether each row may be
+                re-ranked; None re-ranks none of them.
 
         Returns:
-            List[Dict[str, Any]]: The items, best first. Fewer than k when
-                masking leaves fewer items to rank.
+            List[List[Dict[str, Any]]]: For each query, its items, best first.
+                Fewer than k when masking leaves fewer items to rank.
         """
-        hidden = self._hidden_items(query) if mask_seen else list(query.exclude)
-        if hidden:
-            scores[torch.tensor(hidden, device=scores.device)] = -math.inf
-        if query.allowed is not None:
-            blocked = torch.ones_like(scores, dtype=torch.bool)
-            blocked[torch.as_tensor(query.allowed, device=scores.device)] = False
-            scores[blocked] = -math.inf
-        values, indices = torch.topk(scores, query.k)
-        keep = torch.isfinite(values)
-        return [
-            self._entry(index, score)
-            for index, score in zip(indices[keep].tolist(), values[keep].tolist())
+        mask_seen_pairs(scores, self._hidden_matrix(queries, mask_seen))
+        for row, query in enumerate(queries):
+            if query.allowed is not None:
+                allowed = torch.zeros(
+                    self.n_items, dtype=torch.bool, device=scores.device
+                )
+                allowed[torch.as_tensor(query.allowed, device=scores.device)] = True
+                restrict_to_candidates(scores[row : row + 1], allowed)
+
+        users = torch.tensor(
+            [self.n_users if query.user is None else query.user for query in queries],
+            dtype=torch.long,
+        )
+        # A re-ranker that reads a user's history has none to read for a row
+        # without a user, which is then ranked by score alone.
+        reranker = self._reranker
+        reranked = [
+            reranker is not None
+            and bool(rerank and rerank[row])
+            and (query.user is not None or not reranker.reads_history)
+            for row, query in enumerate(queries)
         ]
+
+        # Every row is ranked to the longest list of the batch and cut to its
+        # own: a shorter list is the head of a longer one.
+        depth = max(query.k for query in queries)
+        values = torch.empty(len(queries), depth, dtype=scores.dtype)
+        indices = torch.empty(len(queries), depth, dtype=torch.long)
+        for group in (False, True):
+            rows = torch.tensor(
+                [row for row, flag in enumerate(reranked) if flag == group],
+                dtype=torch.long,
+            )
+            if rows.numel() == 0:
+                continue
+            part = scores[rows.to(scores.device)]
+            # A re-ranker keeps its item features on the CPU.
+            group_values, group_indices = rank_top_k(
+                part.cpu() if group else part,
+                depth,
+                self._tie_break,
+                users[rows],
+                reranker if group else None,
+            )
+            values[rows] = group_values.cpu()
+            indices[rows] = group_indices.cpu()
+
+        answers = []
+        for row, query in enumerate(queries):
+            top_values, top_indices = values[row, : query.k], indices[row, : query.k]
+            keep = torch.isfinite(top_values)
+            answers.append(
+                [
+                    self._entry(index, score)
+                    for index, score in zip(
+                        top_indices[keep].tolist(), top_values[keep].tolist()
+                    )
+                ]
+            )
+        return answers
+
+    def _hidden_matrix(self, queries: Sequence[Query], mask_seen: bool) -> csr_matrix:
+        """What each query must not get back, as the rows of a seen-item matrix.
+
+        Args:
+            queries (Sequence[Query]): The queries, one row each.
+            mask_seen (bool): Whether seen items are hidden on top of the
+                excluded ones.
+
+        Returns:
+            csr_matrix: A {query x item} matrix, nonzero where an item is hidden.
+        """
+        hidden = [
+            self._hidden_items(query) if mask_seen else list(query.exclude)
+            for query in queries
+        ]
+        indptr = np.zeros(len(hidden) + 1, dtype=np.int64)
+        np.cumsum([len(items) for items in hidden], out=indptr[1:])
+        indices = np.fromiter(
+            chain.from_iterable(hidden), dtype=np.int64, count=int(indptr[-1])
+        )
+        return csr_matrix(
+            (np.ones(indices.size, dtype=np.int8), indices, indptr),
+            shape=(len(hidden), self.n_items),
+        )
+
+    def _build_reranker(
+        self, rerank: Optional[RerankConfig], payload: Dict[str, Any]
+    ) -> Optional[Reranker]:
+        """The re-ranker the policy asks for, built as a run builds it.
+
+        Args:
+            rerank (Optional[RerankConfig]): The configured re-ranker.
+            payload (Dict[str, Any]): What the checkpoint carries for serving.
+
+        Returns:
+            Optional[Reranker]: The re-ranker, or None when none was asked for.
+
+        Raises:
+            CheckpointError: If the checkpoint carries no item features.
+        """
+        if rerank is None or not rerank.enabled():
+            return None
+
+        features = payload.get("item_features")
+        if features is None:
+            raise CheckpointError(
+                f"The '{rerank.name}' re-ranker orders items by what they are, and "
+                "this checkpoint carries no item features. Train with side "
+                "information (reader.side) and save the model again with this "
+                "version of WarpRec."
+            )
+
+        # The history is weighed as the training matrix weighed it, so that a
+        # calibrated list aims at the make-up the run aimed at.
+        history: Optional[csr_matrix] = None
+        values = payload.get("seen_values")
+        if self._seen is not None and values is not None:
+            history = csr_matrix(
+                (values, self._seen.indices, self._seen.indptr),
+                shape=self._seen.shape,
+            )
+        return build_reranker_from(rerank, features, history)
 
     def _allowed_items(self, filter: Dict[str, Any]) -> np.ndarray:
         """The items whose attributes match a filter.

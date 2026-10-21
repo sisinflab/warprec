@@ -6,6 +6,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 
 from warprec.errors import ConfigurationError, DataNotFoundError
 from warprec.utils.config.common import read_configuration_file
+from warprec.utils.config.rerank_configuration import RerankConfig
 
 API_KEY_ENV = "WARPREC_API_KEY"
 
@@ -127,6 +128,35 @@ class DeploymentSettings(BaseModel):
         return self
 
 
+class EndpointRerank(RerankConfig):
+    """The re-ranker an endpoint applies, with the keys of the training 'rerank'.
+
+    Attributes:
+        model_config: Configuration of the PyDantic model; unknown keys are rejected.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    @field_validator("name", mode="before")
+    @classmethod
+    def register_rerankers(cls, value: Any) -> Any:
+        """Make the re-rankers known before the name is checked against them.
+
+        They register when their package is imported, which a serving process
+        has not done yet when it reads its configuration.
+
+        Args:
+            value (Any): The configured name.
+
+        Returns:
+            Any: The name, unchanged.
+        """
+        if value is not None:
+            import warprec.recommenders.reranking  # noqa: F401
+
+        return value
+
+
 # Every served item already carries these keys, so an attribute cannot use them.
 RESERVED_ATTRIBUTES = {"name", "item_id"}
 
@@ -233,6 +263,9 @@ class EndpointConfig(BaseModel):
         mask_seen (bool): Whether items a user saw in training are left out.
         unknown_user (Literal["error", "popular"]): What a user unseen in
             training gets: a 404, or the most popular items.
+        rerank (EndpointRerank): The re-ranker applied to the lists the model
+            scores, as the training configuration's 'rerank' section sets it.
+            No name ranks by score alone.
         item_metadata (Optional[ItemMetadata]): Item names, when available.
         description (Optional[str]): What the endpoint serves, in words, shown
             to clients and agents.
@@ -253,6 +286,7 @@ class EndpointConfig(BaseModel):
     max_k: int = Field(default=100, ge=1)
     mask_seen: bool = True
     unknown_user: Literal["error", "popular"] = "error"
+    rerank: EndpointRerank = Field(default_factory=EndpointRerank)
     item_metadata: Optional[ItemMetadata] = None
     description: Optional[str] = None
     item_noun: str = "item"
