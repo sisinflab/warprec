@@ -332,6 +332,7 @@ def _swarm_models(  # noqa: PLR0912, PLR0915
             emissions=emissions,
             model_state=context.state.model_state(model_name),
             return_model=needs_model,
+            concurrent_searches=len(pending_models),
         )  # type: ignore[call-arg]
         futures.append(future)
 
@@ -488,6 +489,7 @@ def remote_model_pipeline(  # noqa: PLR0913
     emissions: Optional["EmissionsSettings"] = None,
     model_state: Optional[ModelState] = None,
     return_model: bool = False,
+    concurrent_searches: int = 1,
 ) -> SwarmModelResult:
     """Orchestrates the entire lifecycle of a single model in parallel.
 
@@ -515,6 +517,8 @@ def remote_model_pipeline(  # noqa: PLR0913
             model, so that a search it finished is not run again.
         return_model (bool): Whether to bring the best model back, for the
             driver's callback.
+        concurrent_searches (int): How many models the swarm searches at once,
+            which share the cluster equally.
 
     Returns:
         SwarmModelResult: The outcome of the search and, when its best model
@@ -542,6 +546,7 @@ def remote_model_pipeline(  # noqa: PLR0913
         resumable=resumable,
         emissions=emissions,
         gpu_deterministic=config.general.gpu_deterministic,
+        concurrent_searches=concurrent_searches,
     )
 
     # Run the HPO, unless the run state records it finished

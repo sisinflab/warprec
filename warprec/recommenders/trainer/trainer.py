@@ -36,6 +36,10 @@ from warprec.recommenders.trainer.logger_callbacks import (
     read_logged_epochs,
 )
 from warprec.recommenders.trainer.objectives import TRIAL_ERROR, objective_function
+from warprec.recommenders.trainer.search_algorithm_wrapper import (
+    ConcurrencyCap,
+    recap_restored_search,
+)
 from warprec.recommenders.trainer.timing import (
     SEARCH_OVERHEAD,
     TRIAL_STARTED_AT,
@@ -49,6 +53,7 @@ from warprec.utils.config import (
     RecomModel,
     DashboardConfig,
 )
+from warprec.errors import ClusterError
 from warprec.utils.enums import ErroredTrialPolicy
 from warprec.utils.pause import is_pause_requested
 from warprec.utils.helpers import validation_metric
@@ -73,6 +78,91 @@ try:
     DASHBOARD_AVAILABLE = True
 except ImportError:
     DASHBOARD_AVAILABLE = False
+
+
+def _label_matches(rule: str, value: Optional[str]) -> bool:
+    """Whether a node label satisfies one rule of a Ray label selector.
+
+    Args:
+        rule (str): The rule: 'value', '!value', 'in(a,b)' or '!in(a,b)'.
+        value (Optional[str]): The node's value for that label, None when unset.
+
+    Returns:
+        bool: True when the node satisfies the rule.
+    """
+    negated = rule.startswith("!")
+    body = rule[1:] if negated else rule
+    if body.startswith("in(") and body.endswith(")"):
+        allowed = {item.strip() for item in body[3:-1].split(",")}
+    else:
+        allowed = {body}
+    return (value in allowed) != negated
+
+
+def trials_that_fit(
+    nodes: List[Dict[str, Any]],
+    scaling_config_dict: Dict[str, Any],
+    trainer_driver_cpu: float = 0.05,
+) -> int:
+    """How many trials the nodes of a cluster can run at once.
+
+    A trial is a group of workers, each of which has to fit on one node. Only
+    the live nodes whose labels match the trial's label selector and that offer
+    every resource a worker asks for count; each of them hosts as many workers
+    as its scarcest resource allows. The tiny CPU of every trial's Tune driver
+    can go to any node.
+
+    Args:
+        nodes (List[Dict[str, Any]]): The nodes, as 'ray.nodes()' gives them.
+        scaling_config_dict (Dict[str, Any]): The resources of a trial.
+        trainer_driver_cpu (float): The CPU of the trial's Tune driver.
+
+    Returns:
+        int: The number of trials.
+
+    Raises:
+        ClusterError: If no node can host a worker of the trial.
+    """
+    per_worker = {
+        name: amount
+        for name, amount in scaling_config_dict["resources_per_worker"].items()
+        if amount > 0
+    }
+    num_workers = scaling_config_dict["num_workers"]
+    selector = scaling_config_dict.get("label_selector") or {}
+
+    live = [node for node in nodes if node.get("Alive", True)]
+    workers = 0
+    for node in live:
+        labels = node.get("Labels") or {}
+        if not all(
+            _label_matches(rule, labels.get(key)) for key, rule in selector.items()
+        ):
+            continue
+        resources = node.get("Resources") or {}
+        # A small tolerance, so that 1.0 / 0.2 does not count four workers
+        workers += min(
+            (
+                int(resources.get(name, 0.0) / amount + 1e-9)
+                for name, amount in per_worker.items()
+            ),
+            default=0,
+        )
+
+    if workers < num_workers:
+        where = f" on the nodes labelled {selector}" if selector else ""
+        raise ClusterError(
+            f"No trial can run: each needs {num_workers} worker(s) of "
+            f"{per_worker}{where}, and the cluster offers room for {workers}. "
+            "Lower the resources per trial or add nodes that have them."
+        )
+
+    trials = workers // num_workers
+    total_cpu = sum((node.get("Resources") or {}).get("CPU", 0.0) for node in live)
+    trial_cpu = per_worker.get("CPU", 0.0) * num_workers + trainer_driver_cpu
+    if trial_cpu > 0:
+        trials = min(trials, int(total_cpu / trial_cpu + 1e-9))
+    return max(trials, 1)
 
 
 @dataclass(frozen=True)
@@ -142,6 +232,9 @@ class Trainer:
         gpu_deterministic (bool): Whether the trials use deterministic
             algorithms only, as 'general.gpu_deterministic' sets it. Defaults
             to False.
+        concurrent_searches (int): How many searches share the cluster at once,
+            as in the swarm. Each gets an equal share of it when the number of
+            concurrent trials is estimated. Defaults to 1.
     """
 
     def __init__(
@@ -155,8 +248,10 @@ class Trainer:
         resumable: bool = False,
         emissions: Optional["EmissionsSettings"] = None,
         gpu_deterministic: bool = False,
+        concurrent_searches: int = 1,
     ):
         self._stg_path = storage_path
+        self._concurrent_searches = max(1, concurrent_searches)
         self._gpu_deterministic = gpu_deterministic
         self._custom_modules = custom_modules or []
         self._run_name = run_name
@@ -561,17 +656,27 @@ class Trainer:
             trainer.fit()
 
         # Search Algorithm & Scheduler
+        # Estimated even when the limit is set, so that a trial no node can
+        # host stops the run here rather than waiting forever to be scheduled
+        estimated = self._estimate_max_concurrent_trials(scaling_config_dict)
         max_concurrent_trials = (
             opt_config.max_concurrent_trials
             if opt_config.max_concurrent_trials is not None
-            else self._estimate_max_concurrent_trials(scaling_config_dict)
+            else estimated
         )
-        search_alg = search_algorithm_registry.get(
+        search_alg: Any = search_algorithm_registry.get(
             opt_config.strategy,
             metric=validation_score,
             max_concurrent_trials=max_concurrent_trials,
             **opt_config.properties.model_dump(),
         )
+        # Capped by a limiter that a restored search does not reset to its old
+        # cap, so that a search resumed on another cluster runs as many trials
+        # as that cluster can hold
+        if max_concurrent_trials and not isinstance(search_alg, BasicVariantGenerator):
+            search_alg = ConcurrencyCap(
+                search_alg, max_concurrent=max_concurrent_trials
+            )
         scheduler = scheduler_registry.get(
             opt_config.scheduler, **opt_config.properties.model_dump()
         )
@@ -597,13 +702,9 @@ class Trainer:
             search_alg=search_alg,  # type: ignore[arg-type]
             scheduler=scheduler,  # type: ignore[arg-type]
             num_samples=opt_config.num_samples,
-            # A variant generator caps itself, and Ray logs that it is ignoring
-            # the value when it gets one it cannot apply.
-            max_concurrent_trials=(
-                None
-                if isinstance(search_alg, BasicVariantGenerator)
-                else max_concurrent_trials
-            ),
+            # The searcher caps itself, and Ray logs that it is ignoring the
+            # value when it gets one it cannot apply.
+            max_concurrent_trials=None,
             trial_name_creator=self._trial_name_creator(model_name),
             trial_dirname_creator=self._trial_dirname_creator(model_name),
         )
@@ -636,6 +737,7 @@ class Trainer:
             run_config=run_config,
             experiment_name=experiment_name,
             restore=restore,
+            max_concurrent_trials=max_concurrent_trials,
         )
 
     @staticmethod
@@ -737,6 +839,7 @@ class Trainer:
         run_config: Any,
         experiment_name: Optional[str],
         restore: bool = False,
+        max_concurrent_trials: Optional[int] = None,
     ) -> Tuner:
         """Builds a new Tuner, or restores the one left behind by a paused run.
 
@@ -752,6 +855,9 @@ class Trainer:
                 or None when the run is not resumable.
             restore (bool): Whether to restore the experiment, as decided by
                 '_claim_experiment'.
+            max_concurrent_trials (Optional[int]): The concurrency cap computed
+                for this session, which a restored search takes over in place of
+                the one it was paused with.
 
         Returns:
             Tuner: A fresh Tuner, or one restored from a previous run.
@@ -762,7 +868,7 @@ class Trainer:
                 f"Found a resumable Ray Tune experiment at {experiment_path}. "
                 "Unfinished trials will continue from their last checkpoint."
             )
-            return Tuner.restore(
+            tuner = Tuner.restore(
                 experiment_path,
                 trainable=trainable,
                 param_space=param_space,
@@ -770,6 +876,9 @@ class Trainer:
                 resume_errored=self._errored_trials == ErroredTrialPolicy.RESUME,
                 restart_errored=self._errored_trials == ErroredTrialPolicy.RESTART,
             )
+            if max_concurrent_trials is not None:
+                recap_restored_search(tuner, max_concurrent_trials)
+            return tuner
 
         return Tuner(
             trainable,
@@ -837,43 +946,25 @@ class Trainer:
         self,
         scaling_config_dict: Dict[str, Any],
         trainer_driver_cpu: float = 0.05,
-    ) -> Optional[int]:
+    ) -> int:
         """Estimate a safe Tune concurrency limit from Ray Train trial resources.
 
         The Tune trial itself only reserves a tiny driver CPU. The real cluster
         footprint comes from the inner TorchTrainer worker group, so concurrency
         must be capped explicitly to avoid launching more Train runs than the
-        cluster can actually execute in parallel.
+        cluster can actually execute in parallel. The cluster is read as it is
+        when the search starts, or is restored. A search running alongside
+        others, as in the swarm, gets an equal share of it.
+
+        Args:
+            scaling_config_dict (Dict[str, Any]): The resources of a trial.
+            trainer_driver_cpu (float): The CPU of the trial's Tune driver.
+
+        Returns:
+            int: How many trials can run at once, at least 1.
         """
-
-        cluster_resources = ray.cluster_resources()
-        total_trial_resources: Dict[str, float] = {"CPU": trainer_driver_cpu}
-
-        for resource, amount in scaling_config_dict["resources_per_worker"].items():
-            total_trial_resources[resource] = total_trial_resources.get(
-                resource, 0.0
-            ) + (amount * scaling_config_dict["num_workers"])
-
-        concurrency_limits = []
-        for resource, required in total_trial_resources.items():
-            if required <= 0:
-                continue
-
-            available = float(cluster_resources.get(resource, 0.0))
-            if available <= 0:
-                logger.attention(
-                    "Could not estimate max concurrent trials because Ray reports "
-                    f"no available '{resource}' resource."
-                )
-                return None
-
-            concurrency_limits.append(int(available // required))
-
-        if not concurrency_limits:
-            return None
-
-        max_concurrent_trials = min(concurrency_limits)
-        return max_concurrent_trials if max_concurrent_trials > 0 else None
+        trials = trials_that_fit(ray.nodes(), scaling_config_dict, trainer_driver_cpu)
+        return max(1, trials // self._concurrent_searches)
 
     @staticmethod
     def load_best_model(

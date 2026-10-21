@@ -49,7 +49,7 @@ from warprec.recommenders.trainer.timing import (
 from warprec.utils.config.evaluation_configuration import EvaluationConfig
 from warprec.utils.registry import params_registry
 
-from conftest import make_model
+from conftest import keep_ray_out, make_model
 
 BPR = {
     "embedding_size": 8,
@@ -118,7 +118,7 @@ def _trial_config(
             with a trial that started a second ago.
     """
     captured: Dict[str, Any] = {}
-    monkeypatch.setattr(trainer_module.ray, "put", lambda value: value)
+    keep_ray_out(monkeypatch)
     monkeypatch.setattr(
         trainer_module.tune,
         "with_parameters",

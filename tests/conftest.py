@@ -392,6 +392,23 @@ class RecordingTrainer:
         """Train nothing."""
 
 
+def keep_ray_out(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Let a search be set up without a Ray cluster.
+
+    The dataset is handed over as is rather than stored, and the cluster is a
+    single node with room for the trials.
+
+    Args:
+        monkeypatch (pytest.MonkeyPatch): The test's monkeypatch.
+    """
+    monkeypatch.setattr(trainer_module.ray, "put", lambda value: value)
+    monkeypatch.setattr(
+        trainer_module.ray,
+        "nodes",
+        lambda: [{"Alive": True, "Resources": {"CPU": 8.0}, "Labels": {}}],
+    )
+
+
 def _bundle(monkeypatch: pytest.MonkeyPatch, dataset: Dataset, tmp_path: Path) -> dict:
     """The data bundle the train pipeline hands to every trial of BPR.
 
@@ -405,7 +422,7 @@ def _bundle(monkeypatch: pytest.MonkeyPatch, dataset: Dataset, tmp_path: Path) -
             way the trial driver merges them.
     """
     captured: Dict[str, Any] = {}
-    monkeypatch.setattr(trainer_module.ray, "put", lambda value: value)
+    keep_ray_out(monkeypatch)
     monkeypatch.setattr(
         trainer_module.tune,
         "with_parameters",

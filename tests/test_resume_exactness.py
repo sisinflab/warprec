@@ -31,7 +31,7 @@ from warprec.recommenders.trainer import trainer as trainer_module
 from warprec.utils.config.evaluation_configuration import EvaluationConfig
 from warprec.utils.registry import params_registry
 
-from conftest import build_params
+from conftest import build_params, keep_ray_out
 
 EPOCHS = 4
 
@@ -138,7 +138,7 @@ def _trial_config(
         dict: The trial configuration, hyperparameters included.
     """
     captured: Dict[str, Any] = {}
-    monkeypatch.setattr(trainer_module.ray, "put", lambda value: value)
+    keep_ray_out(monkeypatch)
     monkeypatch.setattr(
         trainer_module.tune,
         "with_parameters",
