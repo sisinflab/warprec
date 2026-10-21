@@ -36,7 +36,7 @@ models:
 python -m warprec.run -c train.yml -p train
 ```
 
-The best model of the run is written to `{local_experiment_path}/{dataset_name}/serialized/{Model}_{name}.pth`. Besides the weights, the file carries everything serving needs from the training data: the items each user has seen, each user's recent history for a sequential model, and the context vocabulary for a context-aware one.
+The best model of the run is written to `{local_experiment_path}/{dataset_name}/serialized/{Model}_{name}.pth`. Besides the weights, the file carries everything serving needs from the training data: the items each user has seen, each user's recent history for a sequential model, the context vocabulary for a context-aware one, the evaluation seed ties were broken from and, when the run had side information, the item features a re-ranker reads.
 
 **2. Describe what to serve** in a serving configuration (see [Serving Configuration](../configuration/serving.md) for every key):
 
@@ -210,6 +210,10 @@ curl -s -X POST localhost:8000/v1/models/sasrec/popular -H "X-API-Key: change-me
 
 - **Ids.** Requests and responses use the dataset's own user and item ids. They are matched as strings, so `1` and `"1"` are the same user.
 - **Seen items.** With `mask_seen` (the default), items the user interacted with in training are left out, as are the items of a request's `history` and `exclude`. When masking leaves fewer than `k` items, fewer are returned: a masked item is never used to pad the list.
+- **Same lists as the run.** Masking, tie breaking and re-ranking run through the code the evaluation and the written recommendations use. With `mask_seen` on and the same `rerank` section as the training configuration, a known user is served the list the run wrote for them, which is the list it evaluated under the `pair` seen-item rule.
+    - **Ties** between equal scores are broken by chance rather than by item id, per user, from the evaluation seed the checkpoint records (`42` for checkpoints saved before it was recorded). The same request always gets the same answer.
+    - A request without a known user - an anonymous session, or the popularity fallback - has its ties broken as one more user that no real user is, so it too gets the same answer every time.
+    - **Re-ranking** is set per endpoint with `rerank`: `name` is `null` (the default, rank by score), `MMR` or `Calibration`; `pool` (default `100`) and `params` (default none) are those of the training [`rerank`](../recommenders/reranking.md) section. See [Serving Configuration](../configuration/serving.md). It applies to every list the model scores. `Calibration` reads the user's training history, so an anonymous session is ranked by score alone; `MMR` re-ranks it too. Popularity, as the fallback and from `/popular`, is never re-ranked.
 - **Sequential models.**
     - A `user_id` alone uses the user's training history.
     - A `history` alone is an anonymous session.
@@ -295,4 +299,5 @@ python -m warprec.serve -c serve.yml --export serve_app.yaml
 ## Limitations
 
 - Checkpoints saved before this version serve without seen-item masking or popularity fallback. Graph-based and context-aware models among them must be saved again.
+- Checkpoints saved before the re-ranker could be served carry no item features, so they cannot be served with `rerank`, and break ties from seed `42` whatever seed their run used. Save them again to serve the lists their run wrote.
 - Checkpoints are read from the local file system.

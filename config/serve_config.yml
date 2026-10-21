@@ -16,6 +16,10 @@ endpoints:                 # at least one; names unique, letters/digits/-/_, not
     max_k: 100             # largest k a request may ask for
     mask_seen: true        # leave out items the user saw in training
     unknown_user: error    # error (404) | popular (most interacted items)
+    rerank:                # optional: the training 'rerank' section, applied to every list the model scores
+      name: null           # null (rank by score) | MMR | Calibration; needs a checkpoint trained with reader.side
+      pool: 100            # how many of the top candidates are reconsidered
+      params: {}           # e.g. {diversity: 0.3} for MMR, {weight: 0.5, smoothing: 0.01} for Calibration
     description: null      # what this endpoint serves, shown to clients and agents
     item_noun: item        # what an item is called, e.g. movie, app
     context_descriptions: {}   # context-aware models: {field: what it means}
