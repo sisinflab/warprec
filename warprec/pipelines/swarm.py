@@ -34,7 +34,7 @@ from warprec.utils.config import (
     TrainConfiguration,
 )
 from warprec.utils.pause import PauseController
-from warprec.utils.helpers import model_param_from_dict
+from warprec.utils.helpers import load_custom_modules, model_param_from_dict
 from warprec.utils.logger import logger
 
 if TYPE_CHECKING:
@@ -484,6 +484,9 @@ def remote_model_pipeline(  # noqa: PLR0913
     """
 
     model_exploration_start_time = time.time()
+
+    # The search names its trials after the model, so it has to be registered here
+    load_custom_modules(config.general.custom_modules)
 
     # Retrieve storage path for Ray results
     # based on the writer configuration
