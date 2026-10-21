@@ -60,6 +60,9 @@ class ModelStatus(str, Enum):
             that follow it did not all complete.
         - COMPLETED: Every stage for this model finished and was written.
         - FAILED: Hyperparameter optimization produced no usable model.
+        - FAILED_LOAD: Hyperparameter optimization finished, but its best model
+            could not be built from the result. Resuming the run tries again
+            without repeating the search.
     """
 
     PENDING = "pending"
@@ -67,6 +70,7 @@ class ModelStatus(str, Enum):
     HPO_COMPLETED = "hpo_completed"
     COMPLETED = "completed"
     FAILED = "failed"
+    FAILED_LOAD = "failed_load"
 
 
 @dataclass

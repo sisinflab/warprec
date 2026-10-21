@@ -1,4 +1,6 @@
 import time
+from dataclasses import replace
+from pathlib import Path
 from typing import TYPE_CHECKING, List, Optional, Dict, Any
 
 import ray
@@ -17,6 +19,7 @@ from warprec.pipelines.common import (
     measure_emissions,
     model_timing_row,
     prepare_datasets,
+    raise_failed_loads,
     report_statistical_significance,
     write_model_outputs,
 )
@@ -54,9 +57,9 @@ def resolve_model_outcome(
     """Produces the training outcome for one model, reusing saved state if possible.
 
     When the run state records that hyperparameter optimization already finished
-    for this model, the best model is rebuilt from its checkpoint instead of
-    running the sweep again. Cross-validated runs produce no single best
-    checkpoint, so they fall through to a normal run of the flow.
+    for this model, its result is reused instead of running the sweep again,
+    whether or not its best model could be built then. The outcome carries no
+    model: 'build_best_model' builds it.
 
     Args:
         model_name (str): The name of the model.
@@ -72,34 +75,25 @@ def resolve_model_outcome(
         TrainingOutcome: The outcome of the optimization for this model.
     """
     if (
-        model_state.status == ModelStatus.HPO_COMPLETED
-        and model_state.best_checkpoint_path
+        model_state.status in (ModelStatus.HPO_COMPLETED, ModelStatus.FAILED_LOAD)
         and model_state.best_params is not None
     ):
-        logger.msg(
-            f"Reusing the completed hyperparameter search for {model_name} "
-            f"from {model_state.best_checkpoint_path}."
-        )
-        try:
-            model = trainer.load_best_model(
-                model_name,
-                model_state.best_checkpoint_path,
-                model_state.best_params,
-                main_dataset,
-            )
+        # A cross-validated search keeps no checkpoint: its best model is
+        # retrained from the parameters
+        checkpoint = model_state.best_checkpoint_path
+        if len(fold_dataset) > 0 or (checkpoint and _checkpoint_exists(checkpoint)):
+            logger.msg(f"Reusing the completed hyperparameter search for {model_name}.")
             return TrainingOutcome(
                 status="completed",
-                model=model,
                 best_params=model_state.best_params,
                 report=model_state.ray_report,
                 best_iter=model_state.best_iter,
-                best_checkpoint_path=model_state.best_checkpoint_path,
+                best_checkpoint_path=checkpoint,
             )
-        except (FileNotFoundError, OSError, RuntimeError, KeyError) as e:
-            logger.attention(
-                f"Could not rebuild {model_name} from its saved checkpoint ({e}). "
-                "The hyperparameter search will run again."
-            )
+        logger.attention(
+            f"The best checkpoint of {model_name}, {checkpoint}, no longer exists. "
+            "The hyperparameter search will run again."
+        )
 
     if val_dataset is not None:
         # CASE 2: Train/Validation/Test
@@ -107,10 +101,102 @@ def resolve_model_outcome(
     if len(fold_dataset) > 0:
         # CASE 3: Cross-validation
         return multiple_fold_validation_flow(
-            model_name, params, main_dataset, fold_dataset, trainer, config
+            model_name, params, fold_dataset, trainer, config
         )
     # CASE 1: Train/Test
     return single_split_flow(model_name, params, main_dataset, trainer, config)
+
+
+def _checkpoint_exists(checkpoint_path: str) -> bool:
+    """Whether a trial checkpoint is still where the search left it.
+
+    A closed-form model has none: it is refitted from its parameters.
+
+    Args:
+        checkpoint_path (str): The checkpoint directory, or 'None'.
+
+    Returns:
+        bool: True when there is nothing to find or it was found.
+    """
+    return checkpoint_path == "None" or Path(checkpoint_path).exists()
+
+
+def build_best_model(
+    model_name: str,
+    params: RecomModel,
+    outcome: TrainingOutcome,
+    trainer: Trainer,
+    config: TrainConfiguration,
+    main_dataset: Dataset,
+    cross_validated: bool,
+) -> TrainingOutcome:
+    """Builds the best model of a finished search.
+
+    It is loaded from the best trial's checkpoint, refitted when closed-form,
+    or, after cross-validation, retrained on the main split.
+
+    Args:
+        model_name (str): The name of the model.
+        params (RecomModel): The parameters of the model.
+        outcome (TrainingOutcome): The completed outcome of its search.
+        trainer (Trainer): The trainer that ran the search.
+        config (TrainConfiguration): The configuration file.
+        main_dataset (Dataset): The main dataset which represents train/test split.
+        cross_validated (bool): Whether the search ran over folds.
+
+    Returns:
+        TrainingOutcome: The outcome, carrying the model and its parameter counts.
+    """
+    if not cross_validated:
+        model = trainer.load_best_model(
+            model_name,
+            outcome.best_checkpoint_path,
+            outcome.best_params,
+            main_dataset,
+        )
+        return replace(
+            outcome,
+            model=model,
+            report={**outcome.report, **trainer.parameter_counts(model)},
+        )
+
+    general_device = config.general.device
+    model_device = params.optimization.device
+    device = general_device if model_device is None else model_device
+
+    logger.msg(f"Delegating {model_name} model retraining to Ray cluster")
+
+    # Retrieve resources to request correct node from cluster
+    num_cpus = params.optimization.cpu_per_trial
+    num_gpus = params.optimization.gpu_per_trial
+    custom_res = params.optimization.custom_resources_per_trial or {}
+    label_selector = params.optimization.label_selector or {}
+
+    # Offload the retraining to a worker node
+    best_model, retrain_report, iterations = ray.get(
+        remote_model_retraining.options(
+            num_cpus=num_cpus,
+            num_gpus=num_gpus,
+            resources=custom_res if custom_res else None,
+            label_selector=label_selector if label_selector else None,
+        ).remote(
+            model_name=model_name,
+            best_params=outcome.best_params,
+            main_dataset=main_dataset,
+            params=params,
+            custom_modules=config.general.custom_modules,
+            device=device,
+            seed=params.optimization.properties.seed,
+        )  # type: ignore[call-arg]
+    )
+
+    # Merge the parameter counts into the main report
+    return replace(
+        outcome,
+        model=best_model,
+        report={**outcome.report, **retrain_report},
+        best_iter=iterations,
+    )
 
 
 def train_pipeline(path: str):
@@ -159,6 +245,7 @@ def _train_models(  # noqa: PLR0912, PLR0915
     model_timing_report = []
 
     paused = False
+    failed_loads: List[str] = []
 
     with PauseController(enabled=config.run.pause_on_signal) as pause:
         try:
@@ -233,7 +320,7 @@ def _train_models(  # noqa: PLR0912, PLR0915
                     pause.request_pause()
                     pause.check()
 
-                if outcome.failed or outcome.model is None:
+                if outcome.failed:
                     logger.attention(
                         f"Hyperparameter optimization for {model_name} returned no valid model."
                     )
@@ -241,18 +328,38 @@ def _train_models(  # noqa: PLR0912, PLR0915
                     context.state_store.save(context.state)
                     continue
 
-                best_model = outcome.model
-                ray_report = outcome.report
-                best_iter = outcome.best_iter
-
-                # Record that the search finished, so that a pause during the stages
-                # that follow does not cost the sweep.
+                # Record that the search finished before its best model is built,
+                # so that neither a pause nor a failure to build it costs the sweep
                 model_state.status = ModelStatus.HPO_COMPLETED
                 model_state.best_params = outcome.best_params
                 model_state.best_iter = outcome.best_iter
                 model_state.best_checkpoint_path = outcome.best_checkpoint_path
-                model_state.ray_report = ray_report
+                model_state.ray_report = outcome.report
                 context.state_store.save(context.state)
+
+                try:
+                    outcome = build_best_model(
+                        model_name,
+                        params,
+                        outcome,
+                        trainer,
+                        config,
+                        main_dataset,
+                        cross_validated=val_dataset is None and len(fold_dataset) > 0,
+                    )
+                except Exception as e:
+                    logger.negative(
+                        f"The best model of {model_name} could not be built: "
+                        f"{type(e).__name__}: {e}"
+                    )
+                    model_state.status = ModelStatus.FAILED_LOAD
+                    context.state_store.save(context.state)
+                    failed_loads.append(model_name)
+                    continue
+
+                best_model = outcome.model
+                ray_report = outcome.report
+                best_iter = outcome.best_iter
 
                 model_exploration_total_time = (
                     time.time() - model_exploration_start_time
@@ -390,6 +497,8 @@ def _train_models(  # noqa: PLR0912, PLR0915
             report_statistical_significance(context, model_results, models)
         logger.positive("All experiments concluded. WarpRec is shutting down.")
 
+    raise_failed_loads(failed_loads, context.run_name)
+
 
 def single_split_flow(
     model_name: str,
@@ -450,7 +559,6 @@ def single_split_flow(
 def multiple_fold_validation_flow(
     model_name: str,
     params: RecomModel,
-    main_dataset: Dataset,
     val_datasets: List[Dataset],
     trainer: Trainer,
     config: TrainConfiguration,
@@ -460,15 +568,14 @@ def multiple_fold_validation_flow(
     Args:
         model_name (str): Name of the model to optimize.
         params (RecomModel): The parameter used to train the model.
-        main_dataset (Dataset): The main dataset which represents train/test split.
         val_datasets (List[Dataset]): The validation datasets which represents train/val splits.
             The list can contain n folds of train/val splits.
         trainer (Trainer): The trainer instance used to optimize the model.
         config (TrainConfiguration): The configuration file.
 
     Returns:
-        TrainingOutcome: The outcome of the optimization for this model, carrying
-            the model retrained on the main data split.
+        TrainingOutcome: The outcome of the optimization for this model, without
+            a model: 'build_best_model' retrains it on the main data split.
     """
     # Check for device
     general_device = config.general.device
@@ -478,7 +585,6 @@ def multiple_fold_validation_flow(
     # Retrieve common params
     validation_score = config.evaluation.validation_metric
     desired_training_it = params.optimization.properties.desired_training_it
-    seed = params.optimization.properties.seed
 
     # Evaluation on report
     eval_config = config.evaluation
@@ -497,7 +603,7 @@ def multiple_fold_validation_flow(
     )
 
     # Start HPO phase on validation folds
-    outcome = trainer.train_multiple_fold(
+    return trainer.train_multiple_fold(
         model_name,
         params,
         val_datasets,
@@ -506,48 +612,4 @@ def multiple_fold_validation_flow(
         device=device,
         desired_training_it=desired_training_it,
         ray_verbose=config.general.ray_verbose,
-    )
-
-    # Check in case the HPO was paused or failed
-    if outcome.interrupted or outcome.failed:
-        return outcome
-
-    best_params = outcome.best_params
-
-    logger.msg(f"Delegating {model_name} model retraining to Ray cluster")
-
-    # Retrieve resources to request correct node from cluster
-    num_cpus = params.optimization.cpu_per_trial
-    num_gpus = params.optimization.gpu_per_trial
-    custom_res = params.optimization.custom_resources_per_trial or {}
-    label_selector = params.optimization.label_selector or {}
-
-    # Offload the retraining to a worker node
-    best_model, retrain_report, iterations = ray.get(
-        remote_model_retraining.options(
-            num_cpus=num_cpus,
-            num_gpus=num_gpus,
-            resources=custom_res if custom_res else None,
-            label_selector=label_selector if label_selector else None,
-        ).remote(
-            model_name=model_name,
-            best_params=best_params,
-            main_dataset=main_dataset,
-            params=params,
-            custom_modules=config.general.custom_modules,
-            device=device,
-            seed=seed,
-        )  # type: ignore[call-arg]
-    )
-
-    # Merge the parameter counts into the main report
-    report = dict(outcome.report)
-    report.update(retrain_report)
-
-    return TrainingOutcome(
-        status="completed",
-        model=best_model,
-        best_params=best_params,
-        report=report,
-        best_iter=iterations,
     )

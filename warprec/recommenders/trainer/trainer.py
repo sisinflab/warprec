@@ -227,10 +227,11 @@ class Trainer:
 
         Returns:
             TrainingOutcome: The outcome of the optimization, carrying the best
-                model, its parameters, the summary report, the best training
-                iteration and the checkpoint it was loaded from. When the sweep
-                was paused or produced no usable model, the outcome carries the
-                corresponding status and no model.
+                parameters, the summary report, the best training iteration and
+                the checkpoint to build the best model from, but not the model,
+                which 'load_best_model' builds. When the sweep was paused or
+                produced no usable result, the outcome carries the corresponding
+                status.
         """
 
         mode = params.optimization.properties.mode
@@ -288,20 +289,13 @@ class Trainer:
         )
         logger.positive(f"HPO for {model_name} ended successfully.")
 
-        # Load Best Model
-        best_model = self.load_best_model(
-            model_name,
-            best_checkpoint_path,
-            best_params,
-            dataset,
-        )
-
+        # The best model is built by the caller once it has recorded the search,
+        # so that a failure to build it does not cost the search
         report = self._create_report(
-            results, [best_result.metrics["trial_id"]], search_s, best_model
+            results, [best_result.metrics["trial_id"]], search_s
         )
         return TrainingOutcome(
             status="completed",
-            model=best_model,
             best_params=best_params,
             report=report,
             best_iter=best_iter,
@@ -1214,16 +1208,29 @@ class Trainer:
         report.update(summarise_timing(timing, best_trial_ids))
         report[SEARCH_OVERHEAD] = search_overhead(search_s, self._spans, timing)
 
-        # Model stats
-        report["Total Params (Best Model)"] = np.nan
-        report["Trainable Params (Best Model)"] = np.nan
-
-        if model:
-            report["Total Params (Best Model)"] = sum(
-                p.numel() for p in model.parameters()
-            )
-            report["Trainable Params (Best Model)"] = sum(
-                p.numel() for p in model.parameters() if p.requires_grad
-            )
-
+        # Model stats, filled in once the best model is built
+        report.update(self.parameter_counts(model))
         return report
+
+    @staticmethod
+    def parameter_counts(model: Optional[Recommender]) -> Dict[str, float]:
+        """The parameter counts of the best model, for the time report.
+
+        Args:
+            model (Optional[Recommender]): The best model, None when not built.
+
+        Returns:
+            Dict[str, float]: The total and trainable parameter counts, NaN
+                without a model.
+        """
+        if model is None:
+            return {
+                "Total Params (Best Model)": np.nan,
+                "Trainable Params (Best Model)": np.nan,
+            }
+        return {
+            "Total Params (Best Model)": sum(p.numel() for p in model.parameters()),
+            "Trainable Params (Best Model)": sum(
+                p.numel() for p in model.parameters() if p.requires_grad
+            ),
+        }
