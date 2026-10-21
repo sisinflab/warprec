@@ -432,8 +432,8 @@ class Writer(ABC):
                 has seen and, for a sequential model, their recent history - is
                 saved alongside, so that the file alone can be served.
             training (Optional[Dict[str, Any]]): What the run knows about the
-                training - the dataset name, the evaluation strategy and the test
-                results - saved with the serving data so a server can describe
+                training - the dataset name, the evaluation strategy and seed and
+                the test results - saved with the serving data so a server can describe
                 the model. Used only together with the dataset.
         """
         path = self._path_join(

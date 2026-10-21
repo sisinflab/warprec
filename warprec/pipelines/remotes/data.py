@@ -226,7 +226,12 @@ def write_model_artifacts(
 
     # Model serialization, with what serving needs from the data
     if params.meta.save_model:
-        evaluation: Dict[str, Any] = {"strategy": config.evaluation.strategy}
+        # The seed travels with the model, so that a server breaks ties as the
+        # evaluation and the written recommendations broke them.
+        evaluation: Dict[str, Any] = {
+            "strategy": config.evaluation.strategy,
+            "seed": config.evaluation.seed,
+        }
         if config.evaluation.strategy == "sampled":
             evaluation["num_negatives"] = config.evaluation.num_negatives
         writer.write_model(

@@ -36,19 +36,26 @@ def build_serving_payload(
     often each context value occurred, so that a server can describe the
     context it accepts.
 
+    When the dataset has side information, the item features and the value of
+    every training interaction are kept too: they are what a re-ranker reads,
+    so a server can re-rank its answers exactly as the run re-ranked its lists.
+
     Args:
         model (Recommender): The model being saved.
         dataset (Dataset): The dataset it was trained on.
         training (Optional[Dict[str, Any]]): What the run knows about the
-            training: 'dataset' (its name), 'evaluation' (the strategy) and
-            'metrics' (the test results, by cutoff and metric).
+            training: 'dataset' (its name), 'evaluation' (the strategy and the
+            seed its ties were broken from) and 'metrics' (the test results,
+            by cutoff and metric).
 
     Returns:
         Dict[str, Any]: The binary training matrix under 'seen'; for a
             sequential model, the packed histories under 'histories'; for a
             context-aware model, the index of every known context value under
             'context_maps' and how often each occurred under 'context_stats';
-            and the training facts under 'training'.
+            with side information, the {item x feature} matrix under
+            'item_features' and the value of each entry of 'seen' under
+            'seen_values'; and the training facts under 'training'.
     """
     train = dataset.train_set.get_sparse().tocsr()
     # A stored zero is not an interaction, so it is dropped before the matrix
@@ -59,6 +66,13 @@ def build_serving_payload(
         (np.ones(train.nnz, dtype=np.int8), train.indices, train.indptr),
         shape=train.shape,
     )
+
+    # A re-ranker reads the item features and, to calibrate, each user's
+    # history weighed as the training matrix weighs it: by rating, for
+    # explicit data. The values line up with the entries of 'seen'.
+    side = dataset.train_set.get_side_sparse()
+    item_features = side.tocsr(copy=True) if side is not None else None
+    seen_values = train.data.copy() if side is not None else None
 
     histories: Optional[Dict[str, np.ndarray]] = None
     if isinstance(model, SequentialRecommenderUtils):
@@ -78,6 +92,8 @@ def build_serving_payload(
         "histories": histories,
         "context_maps": context_maps,
         "context_stats": context_stats,
+        "item_features": item_features,
+        "seen_values": seen_values,
         "training": {
             "dataset": training.get("dataset"),
             "trained_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
