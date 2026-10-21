@@ -233,9 +233,6 @@ def swarm_pipeline(path: str):
     Args:
         path (str): Path to the configuration file.
     """
-    logger.attention(
-        "WARNING: Swarm pipeline is experimental. Please submit bug reports via GitHub Issues."
-    )
     context = bootstrap_pipeline(path, "swarm", "Start experiment swarming.")
     with measure_emissions(context) as emissions:
         _swarm_models(context, emissions)
