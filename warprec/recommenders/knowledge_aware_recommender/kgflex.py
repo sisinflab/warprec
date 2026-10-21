@@ -47,7 +47,7 @@ class KGFlex(KnowledgeRecommenderUtils, IterativeRecommender):
         info (dict): The dictionary containing dataset information.
         interactions (Interactions): The training interactions.
         *args (Any): Variable length argument list.
-        knowledge (Optional[KnowledgeGraph]): The facts about the items.
+        knowledge (KnowledgeGraph): The facts about the items.
         seed (int): The seed to use for reproducibility.
         **kwargs (Any): Arbitrary keyword arguments.
 
@@ -94,7 +94,7 @@ class KGFlex(KnowledgeRecommenderUtils, IterativeRecommender):
         info: dict,
         interactions: Interactions,
         *args: Any,
-        knowledge: Optional[KnowledgeGraph] = None,
+        knowledge: KnowledgeGraph,
         seed: int = 42,
         **kwargs: Any,
     ):
@@ -106,8 +106,8 @@ class KGFlex(KnowledgeRecommenderUtils, IterativeRecommender):
                 "interacted with, so it needs the interactions at construction."
             )
 
-        first, first_labels = self._features(1, self.first_order_limit)
-        second, second_labels = self._features(2, self.second_order_limit)
+        first, first_labels = self._features(knowledge, 1, self.first_order_limit)
+        second, second_labels = self._features(knowledge, 2, self.second_order_limit)
         first_items, second_items = self._to_scipy(first), self._to_scipy(second)
 
         history = interactions.get_sparse().tocsr().astype(np.float32)
@@ -179,13 +179,16 @@ class KGFlex(KnowledgeRecommenderUtils, IterativeRecommender):
             "KGFlex",
         )
 
-    def _features(self, order: int, limit: int) -> Tuple[Tensor, List[Tuple[Any, ...]]]:
+    def _features(
+        self, knowledge: KnowledgeGraph, order: int, limit: int
+    ) -> Tuple[Tensor, List[Tuple[Any, ...]]]:
         """The item features of one order, or none when no user may keep any.
 
         Walking two facts from every item is the expensive part of a large
         graph, so it is not done for features that would all be discarded.
 
         Args:
+            knowledge (KnowledgeGraph): The graph to read the features from.
             order (int): 1 for first-order features, 2 for second-order ones.
             limit (int): How many features of this order each user keeps.
 
@@ -201,7 +204,7 @@ class KGFlex(KnowledgeRecommenderUtils, IterativeRecommender):
             )
             return empty.coalesce(), []
 
-        return self._graph.item_features(order=order, min_items=self.min_feature_items)
+        return knowledge.item_features(order=order, min_items=self.min_feature_items)
 
     def get_extra_state(self) -> Dict[str, Any]:
         """What a checkpoint carries besides tensors: the name of each feature.

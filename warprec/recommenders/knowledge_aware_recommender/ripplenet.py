@@ -34,7 +34,7 @@ class RippleNet(KnowledgeRecommenderUtils, IterativeRecommender):
         info (dict): The dictionary containing dataset information.
         interactions (Interactions): The training interactions.
         *args (Any): Variable length argument list.
-        knowledge (Optional[KnowledgeGraph]): The facts about the items.
+        knowledge (KnowledgeGraph): The facts about the items.
         seed (int): The seed to use for reproducibility.
         **kwargs (Any): Arbitrary keyword arguments.
 
@@ -75,7 +75,7 @@ class RippleNet(KnowledgeRecommenderUtils, IterativeRecommender):
         info: dict,
         interactions: Interactions,
         *args: Any,
-        knowledge: Optional[KnowledgeGraph] = None,
+        knowledge: KnowledgeGraph,
         seed: int = 42,
         **kwargs: Any,
     ):
@@ -104,25 +104,31 @@ class RippleNet(KnowledgeRecommenderUtils, IterativeRecommender):
 
         generator = torch.Generator()
         generator.manual_seed(seed)
-        heads, relations, tails = self._build_ripples(interactions, generator)
+        heads, relations, tails = self._build_ripples(
+            interactions, knowledge, generator
+        )
         self.register_buffer("ripple_heads", heads)
         self.register_buffer("ripple_relations", relations)
         self.register_buffer("ripple_tails", tails)
 
     def _build_ripples(
-        self, interactions: Interactions, generator: torch.Generator
+        self,
+        interactions: Interactions,
+        knowledge: KnowledgeGraph,
+        generator: torch.Generator,
     ) -> Tuple[Tensor, Tensor, Tensor]:
         """Spread out from every user's history, one ring at a time.
 
         Args:
             interactions (Interactions): The training interactions.
+            knowledge (KnowledgeGraph): The facts the rings spread over.
             generator (torch.Generator): The stream the sampling draws from.
 
         Returns:
             Tuple[Tensor, Tensor, Tensor]: The heads, relations and tails of each
                 ring, shaped {hop x user x memory}.
         """
-        offsets, neighbours, relations = self._graph.neighbour_index()
+        offsets, neighbours, relations = knowledge.neighbour_index()
         matrix = interactions.get_sparse().tocsr()
 
         heads = torch.full((self.n_hop, self.n_users, self.n_memory), self.n_entities)

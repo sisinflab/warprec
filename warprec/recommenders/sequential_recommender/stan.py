@@ -118,17 +118,18 @@ class STAN(Recommender, SequentialRecommenderUtils):
         # Persist training session information (pre-computed, read-only)
         # -----------------------------------------------------------------
         # We treat each user's history as one past session
-        # (WarpRec's session-based modelling convention).
-        self._flat_items = sessions._flat_items.astype(np.int64)
-        self._flat_users = sessions._flat_users.astype(np.int64)
-        self._user_offsets = sessions._user_offsets.astype(np.int64)
+        # (WarpRec's session-based modelling convention). Everything kept here
+        # is public, so that a checkpoint carries it and the model scores again
+        # without the sessions it was built from.
+        self.flat_items = sessions._flat_items.astype(np.int64)
+        self.user_offsets = sessions._user_offsets.astype(np.int64)
 
         # -----------------------------------------------------------------
         # Session-level timestamp t(s_j) (most-recent event per session)
         # -----------------------------------------------------------------
         # Paper Eq. 5: w2 uses t(s) - t(s_j) where t(.) is "the timestamp of
         # the most recent item i_{j,l(s_j)} in s_j".
-        self._session_timestamps = self._extract_session_timestamps(sessions)
+        self.session_timestamps = self._extract_session_timestamps(sessions)
 
         # -----------------------------------------------------------------
         # Binary session-by-item matrices (CSR and its CSC transpose)
@@ -138,15 +139,18 @@ class STAN(Recommender, SequentialRecommenderUtils):
         # inverted index from Section 5.3 footnote — the column slice for
         # item i gives the session-ids that contain i.
         csr, csc = self._build_session_item_matrices(
-            self._flat_items, self._flat_users, self.n_users, self.n_items
+            self.flat_items,
+            sessions._flat_users.astype(np.int64),
+            self.n_users,
+            self.n_items,
         )
-        self._session_item_csr = csr
-        self._session_item_csc = csc
+        self.session_item_csr = csr
+        self.session_item_csc = csc
 
         # Eq. 4 denominator: |s_j| on the binary session vector = number of
         # unique items in s_j. Precomputed once here.
-        self._session_unique_counts = np.asarray(
-            self._session_item_csr.getnnz(axis=1), dtype=np.float64
+        self.session_unique_counts = np.asarray(
+            self.session_item_csr.getnnz(axis=1), dtype=np.float64
         )
 
     @staticmethod
@@ -216,10 +220,10 @@ class STAN(Recommender, SequentialRecommenderUtils):
     def _get_user_items(self, user_id: int) -> np.ndarray:
         """Return the item sequence of user ``user_id`` in chronological order."""
         start, end = (
-            int(self._user_offsets[user_id]),
-            int(self._user_offsets[user_id + 1]),
+            int(self.user_offsets[user_id]),
+            int(self.user_offsets[user_id + 1]),
         )
-        return self._flat_items[start:end]
+        return self.flat_items[start:end]
 
     def _compute_w1(self, current_seq: np.ndarray) -> np.ndarray:
         """Eq. 3 — w1(i, s) = exp((p(i, s) - l(s)) / lambda_1).
@@ -243,11 +247,11 @@ class STAN(Recommender, SequentialRecommenderUtils):
 
         Returns a vector of shape ``[len(neighbor_ids)]``.
         """
-        if self._session_timestamps is None:
+        if self.session_timestamps is None:
             # ASSUMPTION: dataset without timestamps -> disable Factor-2.
             return np.ones(neighbor_ids.shape[0], dtype=np.float64)
 
-        ts_neighbors = self._session_timestamps[neighbor_ids]
+        ts_neighbors = self.session_timestamps[neighbor_ids]
         # Paper states t(s) > t(s_j); we clip negatives to 0 so that a
         # neighbor session with ts == current_ts gets weight 1 (rather than
         # blowing up via a negative delta). This is consistent with the
@@ -348,8 +352,8 @@ class STAN(Recommender, SequentialRecommenderUtils):
         # ---- Candidate neighbor set via inverted index -----------------
         # Paper Section 5.3 footnote: inverted index of item -> sessions.
         # Union across unique items in s via CSC column slices, then dedup.
-        indptr = self._session_item_csc.indptr
-        indices = self._session_item_csc.indices
+        indptr = self.session_item_csc.indptr
+        indices = self.session_item_csc.indices
         pieces = [indices[indptr[i] : indptr[i + 1]] for i in unique_items.tolist()]
         cand_ids = np.unique(np.concatenate(pieces))
         if cand_ids.size == 0:
@@ -358,9 +362,9 @@ class STAN(Recommender, SequentialRecommenderUtils):
         # ---- Eq. 4 (sim1) vectorized over all candidates ---------------
         # Numerator:   sim1_num(s, s_j) = s_w . s_j = (P @ s_w)[j]  (binary s_j)
         # Denominator: sqrt(l(s)) * sqrt(l(s_j))   (unique cardinalities)
-        p_cand = self._session_item_csr[cand_ids]
+        p_cand = self.session_item_csr[cand_ids]
         dot = np.asarray(p_cand.dot(s_w)).ravel()
-        cand_lengths = self._session_unique_counts[cand_ids]
+        cand_lengths = self.session_unique_counts[cand_ids]
         denom = float(np.sqrt(float(unique_items.shape[0]))) * np.sqrt(cand_lengths)
         sim1_scores = np.zeros(cand_ids.shape[0], dtype=np.float64)
         safe = denom > 0.0
@@ -453,8 +457,8 @@ class STAN(Recommender, SequentialRecommenderUtils):
 
             # Current session timestamp = max timestamp observed for this
             # user (matches paper's t(s) definition). Uses cached array.
-            if self._session_timestamps is not None:
-                current_ts = float(self._session_timestamps[user_id])
+            if self.session_timestamps is not None:
+                current_ts = float(self.session_timestamps[user_id])
             else:
                 current_ts = 0.0  # disables Factor-2 (see _compute_w2)
 

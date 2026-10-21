@@ -2,10 +2,10 @@
 
 Serving loads a checkpoint and nothing else. Models fitted in a single
 closed-form step keep their result in plain attributes rather than in
-parameters, and models whose constructor derives a graph or a matrix from the
-interactions are kept whole, so these are the paths that decide whether a
-model can be served at all. Every checkpoint goes through torch.save and
-torch.load, because pickling is exactly what can fail.
+parameters, and models whose constructor derives a graph, a matrix or a feature
+table from the training data are kept whole, so these are the paths that decide
+whether a model can be served at all. Every checkpoint goes through torch.save
+and torch.load, because pickling is exactly what can fail.
 """
 
 import io
@@ -16,34 +16,19 @@ import torch
 
 import warprec.recommenders  # noqa: F401  (populates the registries)
 from warprec.data.dataset import Dataset
-from warprec.recommenders.base_recommender import (
-    IterativeRecommender,
-    Recommender,
-    SequentialRecommenderUtils,
-)
+from warprec.recommenders.base_recommender import IterativeRecommender
 from warprec.utils.registry import model_registry
 
 from conftest import build_params, make_model
-
-# Models fitted on the interactions: their constructor cannot run without them,
-# which is exactly what makes the checkpoint the only thing serving can rely on.
-# Closed-form models keep what they learned in plain attributes, so the
-# checkpoint is the only thing that can carry it to a serving process.
-CLOSED_FORM = sorted(
-    name
-    for name in model_registry.list_registered()
-    if name != "PROXYRECOMMENDER"
-    and model_registry.get_class(name)._fits_on_interactions()
-    and not issubclass(model_registry.get_class(name), IterativeRecommender)
-)
+from test_model_smoke import MODELS, predict_arguments
 
 # Iteratively trained models keep their result in parameters, but their
-# constructor still derives its shapes from the interactions.
-ITERATIVE_NEEDING_INTERACTIONS = sorted(
+# constructor still derives its shapes from the training data, so they are
+# saved whole.
+SAVED_WHOLE = sorted(
     name
-    for name in model_registry.list_registered()
-    if name != "PROXYRECOMMENDER"
-    and model_registry.get_class(name)._fits_on_interactions()
+    for name in MODELS
+    if model_registry.get_class(name)._fits_on_data()
     and issubclass(model_registry.get_class(name), IterativeRecommender)
 )
 
@@ -56,22 +41,11 @@ def through_disk(state: Dict[str, Any]) -> Dict[str, Any]:
     return torch.load(buffer, map_location="cpu", weights_only=False)
 
 
-def predict_inputs(model: Recommender, dataset: Dataset) -> Dict[str, Any]:
-    """The inputs that score the first few users with any model family."""
-    users = torch.arange(min(4, dataset.info()["n_users"]))
-    inputs: Dict[str, Any] = {"user_indices": users}
-    if isinstance(model, SequentialRecommenderUtils):
-        history, lengths, _ = dataset.train_set.get_history()
-        inputs["user_seq"] = history[users][:, -model.max_seq_len :]
-        inputs["seq_len"] = lengths[users].clamp(max=model.max_seq_len)
-    return inputs
-
-
 def scores_survive_the_round_trip(model_name: str, dataset: Dataset) -> None:
     """A restored model scores exactly as the one that was saved."""
     model = make_model(model_name, dataset)
     model.eval()
-    inputs = predict_inputs(model, dataset)
+    inputs = predict_arguments(model, dataset, torch.arange(4))
     with torch.inference_mode():
         before = model.predict(**inputs)
 
@@ -86,29 +60,18 @@ def scores_survive_the_round_trip(model_name: str, dataset: Dataset) -> None:
     assert torch.equal(before, after), f"{model_name}: scores changed after restoring"
 
 
-def test_the_discovered_sets_are_not_empty():
+def test_the_discovered_set_is_not_empty():
     """Guards against the discovery above silently matching nothing."""
-    assert CLOSED_FORM, "no closed-form models found - check the discovery"
-    assert ITERATIVE_NEEDING_INTERACTIONS, (
-        "no iterative models found - check the discovery"
-    )
+    assert SAVED_WHOLE, "no model saved whole found - check the discovery"
 
 
-@pytest.mark.parametrize("model_name", CLOSED_FORM)
-def test_checkpoint_restores_without_interactions(model_name: str, dataset: Dataset):
-    """Closed-form models come back from their saved attributes."""
+@pytest.mark.parametrize("model_name", MODELS)
+def test_checkpoint_restores_without_training_data(model_name: str, dataset: Dataset):
+    """Every model family comes back from its checkpoint alone."""
     scores_survive_the_round_trip(model_name, dataset)
 
 
-@pytest.mark.parametrize("model_name", ITERATIVE_NEEDING_INTERACTIONS)
-def test_iterative_models_restore_from_the_saved_module(
-    model_name: str, dataset: Dataset
-):
-    """Graph and autoencoder models come back whole, with no training data."""
-    scores_survive_the_round_trip(model_name, dataset)
-
-
-@pytest.mark.parametrize("model_name", ITERATIVE_NEEDING_INTERACTIONS)
+@pytest.mark.parametrize("model_name", SAVED_WHOLE)
 def test_an_older_checkpoint_still_says_what_it_needs(
     model_name: str, dataset: Dataset
 ):
@@ -118,10 +81,10 @@ def test_an_older_checkpoint_still_says_what_it_needs(
     del state["module"]
     model_class = model_registry.get_class(model_name)
 
-    with pytest.raises(ValueError, match="training interactions"):
+    with pytest.raises(ValueError, match="training data"):
         model_class.from_checkpoint(checkpoint=state)
 
-    # With them supplied it rebuilds as before.
+    # With the data supplied it rebuilds as before.
     restored = model_class.from_checkpoint(
         checkpoint=state,
         interactions=dataset.train_set,
@@ -144,7 +107,7 @@ def test_lightccf_without_layers_keeps_its_scoring_cache_out_of_the_state(
     )
     model.eval()
     with torch.inference_mode():
-        model.predict(**predict_inputs(model, dataset))
+        model.predict(**predict_arguments(model, dataset, torch.arange(4)))
 
     state = model.get_state()
     assert not [key for key in state["state_dict"] if key.startswith("_cached_")]

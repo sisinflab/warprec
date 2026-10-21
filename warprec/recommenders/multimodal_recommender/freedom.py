@@ -43,7 +43,7 @@ class FREEDOM(MultiModalRecommenderUtils, GraphRecommenderUtils, IterativeRecomm
         info (dict): The dictionary containing dataset information.
         interactions (Interactions): The training interactions.
         *args (Any): Variable length argument list.
-        multimodal (Optional[MultiModalFeatures]): The precomputed item features.
+        multimodal (MultiModalFeatures): The precomputed item features.
         seed (int): The seed to use for reproducibility.
         **kwargs (Any): Arbitrary keyword arguments.
 
@@ -95,7 +95,7 @@ class FREEDOM(MultiModalRecommenderUtils, GraphRecommenderUtils, IterativeRecomm
         info: dict,
         interactions: Interactions,
         *args: Any,
-        multimodal: Optional[MultiModalFeatures] = None,
+        multimodal: MultiModalFeatures,
         seed: int = 42,
         **kwargs: Any,
     ):

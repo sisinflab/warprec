@@ -31,7 +31,7 @@ class KGCN(KnowledgeRecommenderUtils, IterativeRecommender):
         params (dict): Model parameters.
         info (dict): The dictionary containing dataset information.
         *args (Any): Variable length argument list.
-        knowledge (Optional[KnowledgeGraph]): The facts about the items.
+        knowledge (KnowledgeGraph): The facts about the items.
         seed (int): The seed to use for reproducibility.
         **kwargs (Any): Arbitrary keyword arguments.
 
@@ -66,7 +66,7 @@ class KGCN(KnowledgeRecommenderUtils, IterativeRecommender):
         params: dict,
         info: dict,
         *args: Any,
-        knowledge: Optional[KnowledgeGraph] = None,
+        knowledge: KnowledgeGraph,
         seed: int = 42,
         **kwargs: Any,
     ):
