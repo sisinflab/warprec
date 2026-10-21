@@ -7,7 +7,7 @@ A model saved by the [training pipeline](../pipelines/training.md) can be served
 - models can share a GPU, each asking for a fraction of it;
 - the same configuration runs on a laptop, joins an existing Ray cluster, or is **exported** for `serve deploy` and KubeRay.
 
-General, sequential, graph-based and context-aware models are all served from the checkpoint alone. The dataset, the experiment directory and the training configuration are not needed.
+Every model family is served from the checkpoint alone: general, sequential and session-based, graph-based, context-aware, knowledge-aware and multimodal models. The dataset, the knowledge graph, the multimodal features, the experiment directory and the training configuration are not needed.
 
 ## Install
 
