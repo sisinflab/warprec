@@ -2,6 +2,37 @@
 
 <!-- version list -->
 
+## v2.2.5 (2026-10-21)
+
+### Bug Fixes
+
+- A best model that cannot be built no longer loses its finished search: the search is recorded
+  first, the model is marked failed_load, the run carries on and exits with status 1, and resuming
+  it builds the model without searching again
+  ([`c7313f4`](https://github.com/sisinflab/warprec/commit/c7313f4f21e1b132e67b19393aed1f531d10d6a0))
+
+- A search whose trials all failed ends as failed and names the first trial's error, and its best
+  model only comes from a trial with a finite score and, for an iterative model, a checkpoint
+  ([`88424d9`](https://github.com/sisinflab/warprec/commit/88424d91a6c74fae08a031ebfbec6413e0fc9adc))
+
+- Checkpoints that carry the LightCCF scoring cache load without it, so a search that ended in that
+  error resumes without training again
+  ([`03bf3f5`](https://github.com/sisinflab/warprec/commit/03bf3f5ad95a70346a1e45a8cbd5c6e31379ecd6))
+
+- LightCCF with n_layers 0 keeps the embeddings it caches while scoring out of its checkpoints, so
+  its best model loads after the search
+  ([`aa50bc8`](https://github.com/sisinflab/warprec/commit/aa50bc84c4f8e0c622c1475271144cb7a12a9fb4))
+
+- Swarm runs load the custom modules in the task that runs each model's search, so a custom model
+  can be swarmed
+  ([`58ef8d3`](https://github.com/sisinflab/warprec/commit/58ef8d3aa30b0d7aebfef4a5c1ee847715babf5f))
+
+### Documentation
+
+- The pause and resume page lists the failed_load state and what resuming does with each state
+  ([`56d40e0`](https://github.com/sisinflab/warprec/commit/56d40e06d59b429d2d09164e74659578f750e186))
+
+
 ## v2.2.4 (2026-10-15)
 
 ### Bug Fixes
