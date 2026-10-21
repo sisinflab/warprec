@@ -2,6 +2,35 @@
 
 <!-- version list -->
 
+## v2.2.7 (2026-10-21)
+
+### Bug Fixes
+
+- A trial spread over several workers saves every worker's random state with its checkpoints and
+  each worker restores its own, so a resumed multi-GPU trial draws the samples an uninterrupted one
+  would
+  ([`5b109da`](https://github.com/sisinflab/warprec/commit/5b109da293637779a8e5cc9c972349b27e97a12e))
+
+### Documentation
+
+- The pause and resume and general pages say multi-worker trials restore every worker's random state
+  ([`61f862a`](https://github.com/sisinflab/warprec/commit/61f862af41e6077c12729fb446845995f066e986))
+
+- The search space section says how combinations a model refuses are skipped or replaced before a
+  trial is launched
+  ([`f6b0273`](https://github.com/sisinflab/warprec/commit/f6b027330936c8179bd8d875d5df0e2d0b4f93ba))
+
+### Performance Improvements
+
+- Evaluation, written recommendations and the estimate pipeline mask seen items with tensors on the
+  scoring device instead of slicing the training matrix with scipy on the host for every batch
+  ([`bc5dfa0`](https://github.com/sisinflab/warprec/commit/bc5dfa0e47e194028f81d12242edf792250d05f0))
+
+- Searches skip the combinations of hyperparameters their model refuses before launching a trial for
+  them, and the model-based searchers learn from them and sample another instead
+  ([`de218f2`](https://github.com/sisinflab/warprec/commit/de218f2dc4cc9124616021d4749e96521a55940a))
+
+
 ## v2.2.6 (2026-10-21)
 
 ### Bug Fixes
