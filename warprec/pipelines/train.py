@@ -256,6 +256,7 @@ def _train_models(  # noqa: PLR0912, PLR0915
                     errored_trials=config.run.errored_trials,
                     resumable=resumable,
                     emissions=emissions,
+                    gpu_deterministic=config.general.gpu_deterministic,
                 )
                 model_state.tune_experiment_name = trainer.experiment_name(model_name)
 

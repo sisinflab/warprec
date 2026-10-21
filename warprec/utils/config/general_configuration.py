@@ -163,6 +163,10 @@ class GeneralConfig(BaseModel):
         label_selector_data_prep (Optional[Dict[str, str]]): The label selector used
             for data preparation phase.
         time_report (Optional[bool]): Whether to report the time taken by each step.
+        gpu_deterministic (bool): Whether every process that trains or evaluates
+            uses deterministic algorithms only, so that a run on a GPU, a
+            resumed trial included, is bitwise reproducible. It slows the
+            computation down. Defaults to False.
         custom_modules (Optional[str | List[str]]): List of custom module paths to load.
             This is useful for loading custom modules that are not part of the
             standard Warprec framework.
@@ -178,6 +182,7 @@ class GeneralConfig(BaseModel):
     custom_resources_data_prep: Optional[Dict[str, float | int]] = {}
     label_selector_data_prep: Optional[Dict[str, str]] = None
     time_report: Optional[bool] = True
+    gpu_deterministic: bool = False
     custom_modules: Optional[str | List[str]] = None
     callback: Optional[WarpRecCallbackConfig] = Field(
         default_factory=WarpRecCallbackConfig

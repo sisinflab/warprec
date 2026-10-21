@@ -541,6 +541,7 @@ def remote_model_pipeline(  # noqa: PLR0913
         errored_trials=config.run.errored_trials,
         resumable=resumable,
         emissions=emissions,
+        gpu_deterministic=config.general.gpu_deterministic,
     )
 
     # Run the HPO, unless the run state records it finished

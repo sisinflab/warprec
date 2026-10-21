@@ -14,6 +14,7 @@ from warprec.data.writer import Writer
 from warprec.recommenders.base_recommender import Recommender
 from warprec.data import Dataset
 from warprec.data.timing import DataPreparationTimes
+from warprec.utils.determinism import apply_determinism
 from warprec.utils.helpers import load_custom_modules
 from warprec.utils.callback import WarpRecCallback
 from warprec.utils.config import RecomModel, TrainConfiguration
@@ -160,6 +161,7 @@ def remote_generate_recs(
     """
     # Load custom modules if provided
     load_custom_modules(config.general.custom_modules)
+    apply_determinism(config.general.gpu_deterministic)
     generate_recs(writer, model, dataset, config, device)
     return True
 

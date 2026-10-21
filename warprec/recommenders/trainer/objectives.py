@@ -32,6 +32,7 @@ from warprec.recommenders.trainer.timing import (
     synchronize,
 )
 from warprec.utils.config import RecomModel
+from warprec.utils.determinism import apply_determinism
 from warprec.utils.helpers import (
     build_evaluation_dataloader_kwargs,
     load_custom_modules,
@@ -140,6 +141,9 @@ def _run_trial(config: dict) -> None:  # noqa: PLR0915
 
     # Load custom modules if provided
     load_custom_modules(custom_modules)
+
+    # Before the trial's first GPU operation
+    apply_determinism(config.get("gpu_deterministic", False))
 
     # Extract the correct dataset
     dataset_folds = ray.get(dataset_folds)

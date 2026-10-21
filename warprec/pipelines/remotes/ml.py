@@ -33,6 +33,7 @@ from warprec.recommenders.base_recommender import (
     SequentialRecommenderUtils,
     ContextRecommenderUtils,
 )
+from warprec.utils.determinism import apply_determinism
 from warprec.utils.helpers import load_custom_modules
 from warprec.utils.config import RecomModel, TrainConfiguration
 from warprec.utils.config.evaluation_configuration import EvaluationConfig
@@ -48,6 +49,7 @@ def remote_evaluation_and_timing(
     device: str,
     requires_timing: bool,
     custom_modules: List[str],
+    gpu_deterministic: bool = False,
 ) -> Tuple[Dict[int, Dict[str, float | Tensor]], float, float]:
     """This remote function will be executed on the Ray Cluster using requested resources.
 
@@ -61,6 +63,7 @@ def remote_evaluation_and_timing(
         device (str): The device to use for evaluation.
         requires_timing (bool): Wether or not to calculate timings.
         custom_modules (List[str]): The list of custom modules to load on the worker node.
+        gpu_deterministic (bool): Whether to use deterministic algorithms only.
 
     Returns:
         Tuple[Dict[int, Dict[str, float | Tensor]], float, float]: What
@@ -68,6 +71,7 @@ def remote_evaluation_and_timing(
     """
     # Load custom modules if provided
     load_custom_modules(custom_modules)
+    apply_determinism(gpu_deterministic)
     return evaluate_and_time(
         model, main_dataset, evaluation, num_workers, device, requires_timing
     )
@@ -216,6 +220,7 @@ def remote_model_retraining(
     custom_modules: List[str],
     device: str,
     seed: int,
+    gpu_deterministic: bool = False,
 ) -> Tuple[Recommender, dict, int]:
     """Remote task to handle the final model retraining on a worker node.
 
@@ -230,12 +235,14 @@ def remote_model_retraining(
         custom_modules (List[str]): The list of custom modules to load on the worker node.
         device (str): The device to use for training.
         seed (int): The random seed.
+        gpu_deterministic (bool): Whether to use deterministic algorithms only.
 
     Returns:
         Tuple[Recommender, dict, int]: What 'retrain_model' returns.
     """
     # Load custom modules if provided
     load_custom_modules(custom_modules)
+    apply_determinism(gpu_deterministic)
     return retrain_model(model_name, best_params, main_dataset, params, device, seed)
 
 
@@ -416,6 +423,7 @@ def remote_complete_model(
             that kept the best model from being built.
     """
     load_custom_modules(config.general.custom_modules)
+    apply_determinism(config.general.gpu_deterministic)
 
     build_start = time.perf_counter()
     try:

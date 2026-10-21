@@ -139,6 +139,9 @@ class Trainer:
             the run the trainer belongs to, when the run measures itself (the
             train and swarm pipelines do). Without one, a search with CodeCarbon
             enabled measures itself. Defaults to None.
+        gpu_deterministic (bool): Whether the trials use deterministic
+            algorithms only, as 'general.gpu_deterministic' sets it. Defaults
+            to False.
     """
 
     def __init__(
@@ -151,8 +154,10 @@ class Trainer:
         errored_trials: ErroredTrialPolicy = ErroredTrialPolicy.SKIP,
         resumable: bool = False,
         emissions: Optional["EmissionsSettings"] = None,
+        gpu_deterministic: bool = False,
     ):
         self._stg_path = storage_path
+        self._gpu_deterministic = gpu_deterministic
         self._custom_modules = custom_modules or []
         self._run_name = run_name
         self._callbacks = self._setup_callbacks(
@@ -484,6 +489,7 @@ class Trainer:
             "block_size": opt_config.block_size,
             "chunk_size": opt_config.chunk_size,
             "custom_modules": self._custom_modules,
+            "gpu_deterministic": self._gpu_deterministic,
             "early_stopping_config": params.early_stopping,
             # The trial rebuilds its configuration from the sampled
             # hyperparameters alone, so precision and clipping travel here
