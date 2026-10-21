@@ -38,7 +38,7 @@ Innovation in Recommender Systems is impeded by a fractured ecosystem. Researche
   </div>
   <div class="feature-card">
     <strong>Backend-Agnostic</strong>
-    Write once, run anywhere: Pandas, Polars, or Spark via the Narwhals abstraction layer.
+    Write once, run anywhere: Pandas or Polars via the Narwhals abstraction layer.
   </div>
   <div class="feature-card">
     <strong>Distributed Training</strong>
