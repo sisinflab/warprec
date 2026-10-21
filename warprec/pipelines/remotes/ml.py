@@ -11,6 +11,7 @@ from warprec.data.stash import MODEL_ARGUMENTS, check_stash
 from warprec.data import Dataset
 from warprec.data.writer import Writer
 from warprec.pipelines.remotes.data import generate_recs, write_model_artifacts
+from warprec.recommenders.reranking import Reranker, build_reranker
 from warprec.recommenders.trainer import Trainer, TrainingOutcome
 from warprec.evaluation import build_evaluator
 from warprec.utils.helpers import (
@@ -79,6 +80,7 @@ def evaluate_and_time(
     num_workers: Optional[int],
     device: str,
     requires_timing: bool,
+    reranker: Optional[Reranker] = None,
 ) -> Tuple[Dict[int, Dict[str, float | Tensor]], float, float]:
     """Evaluate a model on the test set, and time one prediction call.
 
@@ -89,6 +91,8 @@ def evaluate_and_time(
         num_workers (Optional[int]): The number of dataloader workers to use for evaluation.
         device (str): The device to use for evaluation.
         requires_timing (bool): Wether or not to calculate timings.
+        reranker (Optional[Reranker]): The re-ranker applied to every list, the
+            one the recommendations are written with.
 
     Returns:
         Tuple[Dict[int, Dict[str, float | Tensor]], float, float]: A tuple containing:
@@ -108,7 +112,7 @@ def evaluate_and_time(
     model.set_seed(model.seed)
 
     # Instantiate the Evaluator locally on the worker node
-    evaluator = build_evaluator(evaluation, main_dataset)
+    evaluator = build_evaluator(evaluation, main_dataset, reranker)
 
     # Retrieve dataloader
     evaluation_dataloader_kwargs = build_evaluation_dataloader_kwargs(
@@ -450,6 +454,8 @@ def remote_complete_model(
         params.optimization.num_workers,
         device,
         config.general.time_report,
+        # The lists evaluated are the lists written
+        build_reranker(config.rerank, main_dataset),
     )
     if params.meta.save_recs:
         generate_recs(writer, model, main_dataset, config, device)
