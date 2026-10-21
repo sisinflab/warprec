@@ -33,7 +33,7 @@ class KGIN(KnowledgeRecommenderUtils, IterativeRecommender):
         info (dict): The dictionary containing dataset information.
         interactions (Interactions): The training interactions.
         *args (Any): Variable length argument list.
-        knowledge (Optional[KnowledgeGraph]): The facts about the items.
+        knowledge (KnowledgeGraph): The facts about the items.
         seed (int): The seed to use for reproducibility.
         **kwargs (Any): Arbitrary keyword arguments.
 
@@ -80,7 +80,7 @@ class KGIN(KnowledgeRecommenderUtils, IterativeRecommender):
         info: dict,
         interactions: Interactions,
         *args: Any,
-        knowledge: Optional[KnowledgeGraph] = None,
+        knowledge: KnowledgeGraph,
         seed: int = 42,
         **kwargs: Any,
     ):
@@ -125,7 +125,11 @@ class KGIN(KnowledgeRecommenderUtils, IterativeRecommender):
         Args:
             interactions (Interactions): The training interactions.
         """
-        heads, relations, tails = self._graph.get_triples()
+        heads, relations, tails = (
+            self.triple_heads,
+            self.triple_relations,
+            self.triple_tails,
+        )
 
         # Every fact is laid down both ways, so a message can travel from an
         # item out to what is known about it and back again.

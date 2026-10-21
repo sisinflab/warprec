@@ -15,6 +15,7 @@ from warprec.utils.callback import WarpRecCallback
 from warprec.evaluation import build_evaluator
 from warprec.recommenders.reranking import build_reranker
 from warprec.utils.config import load_eval_configuration, load_callback
+from warprec.utils.determinism import apply_determinism
 from warprec.utils.helpers import (
     build_evaluation_dataloader_kwargs,
     resolve_available_cpus,
@@ -177,6 +178,7 @@ def eval_pipeline(path: str):  # noqa: PLR0915
 
     # Configuration loading
     config = load_eval_configuration(path)
+    apply_determinism(config.general.gpu_deterministic)
 
     # A missing checkpoint is found before any data is read
     _check_checkpoint_paths(config.models)

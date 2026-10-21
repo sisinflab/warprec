@@ -74,7 +74,7 @@ class KGAT(KnowledgeRecommenderUtils, IterativeRecommender):
         *args (Any): Variable length argument list.
         interactions (Optional[Interactions]): The training interactions, which
             become edges of the same graph.
-        knowledge (Optional[KnowledgeGraph]): The facts about the items.
+        knowledge (KnowledgeGraph): The facts about the items.
         seed (int): The seed to use for reproducibility.
         **kwargs (Any): Arbitrary keyword arguments.
 
@@ -118,7 +118,7 @@ class KGAT(KnowledgeRecommenderUtils, IterativeRecommender):
         info: dict,
         *args: Any,
         interactions: Optional[Interactions] = None,
-        knowledge: Optional[KnowledgeGraph] = None,
+        knowledge: KnowledgeGraph,
         seed: int = 42,
         **kwargs: Any,
     ):

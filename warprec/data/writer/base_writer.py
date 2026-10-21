@@ -16,8 +16,8 @@ from tqdm import tqdm
 from warprec.errors import ConfigurationError, DataError
 from warprec.data.ranking import (
     mask_seen_pairs,
+    rank_top_k,
     resolve_recommendation_mask,
-    top_k_breaking_ties,
 )
 from warprec.data import Dataset
 from warprec.recommenders.base_recommender import (
@@ -276,14 +276,9 @@ class Writer(ABC):
                     mask_seen_pairs(predictions, train_batch)
                 # Ties are broken as the evaluator breaks them, from the same
                 # seed and per user, so the list written is the list evaluated.
-                if reranker is not None:
-                    top_k_scores, top_k_items = reranker(
-                        predictions, k, user_indices, tie_break
-                    )
-                else:
-                    top_k_scores, top_k_items = top_k_breaking_ties(
-                        predictions, k, tie_break, user_indices
-                    )
+                top_k_scores, top_k_items = rank_top_k(
+                    predictions, k, tie_break, user_indices, reranker
+                )
 
             batch_users = user_indices.unsqueeze(1).expand(-1, k).flatten()
             user_labels = [umap_i[idx.item()] for idx in batch_users]
@@ -437,8 +432,8 @@ class Writer(ABC):
                 has seen and, for a sequential model, their recent history - is
                 saved alongside, so that the file alone can be served.
             training (Optional[Dict[str, Any]]): What the run knows about the
-                training - the dataset name, the evaluation strategy and the test
-                results - saved with the serving data so a server can describe
+                training - the dataset name, the evaluation strategy and seed and
+                the test results - saved with the serving data so a server can describe
                 the model. Used only together with the dataset.
         """
         path = self._path_join(

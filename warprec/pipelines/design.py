@@ -12,6 +12,7 @@ from warprec.utils.callback import WarpRecCallback
 from warprec.evaluation import build_evaluator
 from warprec.recommenders.reranking import build_reranker
 from warprec.utils.config import load_design_configuration, load_callback
+from warprec.utils.determinism import apply_determinism
 from warprec.utils.helpers import (
     build_evaluation_dataloader_kwargs,
     resolve_available_cpus,
@@ -38,6 +39,7 @@ def design_pipeline(path: str):
 
     # Configuration loading
     config = load_design_configuration(path)
+    apply_determinism(config.general.gpu_deterministic)
 
     # Load custom callback if specified
     callback: WarpRecCallback = load_callback(

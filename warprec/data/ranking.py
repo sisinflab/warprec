@@ -1,4 +1,4 @@
-from typing import Any, Dict, Optional, Tuple
+from typing import TYPE_CHECKING, Any, Dict, Optional, Tuple
 
 import numpy as np
 import torch
@@ -8,6 +8,9 @@ from torch import Tensor
 from warprec.errors import EvaluationError
 from warprec.data.entities.context import context_key
 from warprec.utils.logger import logger
+
+if TYPE_CHECKING:
+    from warprec.recommenders.reranking.base import Reranker
 
 
 def mask_seen_pairs(predictions: Tensor, seen: csr_matrix) -> None:
@@ -330,48 +333,34 @@ def top_k_breaking_ties(
 
     return values, indices
 
-    rows = ambiguous.nonzero(as_tuple=True)[0]
-    scores = predictions if rows.numel() == predictions.size(0) else predictions[rows]
 
-    # The k-th score splits each row in three: the items above it are in the
-    # list whatever the draw, the items below it are out, and the items equal to
-    # it compete for the places left.
-    kth = values[rows, k - 1 :]
+def rank_top_k(
+    predictions: Tensor,
+    k: int,
+    generator: Optional[torch.Generator] = None,
+    user_indices: Optional[Tensor] = None,
+    reranker: Optional["Reranker"] = None,
+) -> Tuple[Tensor, Tensor]:
+    """The list a ranking hands back: its top k, re-ranked when one is configured.
 
-    # Drawing the keys is the dominant cost, so they are drawn only for the
-    # items that can still make some list. When the ties sit on a known
-    # population, such as the cold items of a cold-start run, that is a small
-    # fraction of the catalogue. When it is most of it, narrowing would only
-    # add a copy of the scores.
-    columns = (scores >= kth).any(dim=0).nonzero(as_tuple=True)[0]
-    narrowed = columns.numel() <= scores.size(1) // 2
-    if narrowed:
-        scores = scores[:, columns]
+    Evaluation, the recommendations a run writes and the answers a server gives
+    all end here once their scores are masked, so the three rank alike: ties
+    are broken per user from the same seed, and the same re-ranker reorders the
+    same pool.
 
-    # Keying the items above the k-th score over every random key, and the ones
-    # below it under, lets one top-k make the choice for every row at once, with
-    # a fresh key per user and item. Drawn where the generator lives, which
-    # torch requires, then moved to the scores: the evaluator's generator is on
-    # the CPU even when the scores are not.
-    keys = torch.rand(scores.shape, generator=generator, device=generator.device).to(
-        predictions.device
-    )
-    keys.masked_fill_(scores < kth, -1.0)
-    keys[scores > kth] += 2.0
-    _, chosen = torch.topk(keys, k, dim=1)
-    del keys
+    Args:
+        predictions (Tensor): The masked score matrix, one row per user.
+        k (int): The cutoff.
+        generator (Optional[torch.Generator]): The generator whose seed breaks
+            ties, as in ``top_k_breaking_ties``.
+        user_indices (Optional[Tensor]): The user of each row, which keys the
+            tie break and tells a re-ranker whose history to read.
+        reranker (Optional[Reranker]): The re-ranker, or None to rank by score.
 
-    # The draw settled which items are in, and in key order. Sorting them by
-    # score, stably, puts a higher score first and leaves equal scores in the
-    # order their keys drew.
-    tied_values, order = torch.sort(
-        scores.gather(1, chosen), dim=1, descending=True, stable=True
-    )
-    chosen = chosen.gather(1, order)
-    if narrowed:
-        chosen = columns[chosen]
-
-    values, indices = values.clone(), indices.clone()
-    values[rows] = tied_values
-    indices[rows] = chosen
-    return values, indices
+    Returns:
+        Tuple[Tensor, Tensor]: The top-k values and the item indices they belong
+            to, in the order they are recommended.
+    """
+    if reranker is not None:
+        return reranker(predictions, k, user_indices, generator)
+    return top_k_breaking_ties(predictions, k, generator, user_indices)

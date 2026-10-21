@@ -40,7 +40,7 @@ class KaHFM(KnowledgeRecommenderUtils, IterativeRecommender):
         info (dict): The dictionary containing dataset information.
         interactions (Interactions): The training interactions.
         *args (Any): Variable length argument list.
-        knowledge (Optional[KnowledgeGraph]): The facts about the items.
+        knowledge (KnowledgeGraph): The facts about the items.
         seed (int): The seed to use for reproducibility.
         **kwargs (Any): Arbitrary keyword arguments.
 
@@ -71,7 +71,7 @@ class KaHFM(KnowledgeRecommenderUtils, IterativeRecommender):
         info: dict,
         interactions: Interactions,
         *args: Any,
-        knowledge: Optional[KnowledgeGraph] = None,
+        knowledge: KnowledgeGraph,
         seed: int = 42,
         **kwargs: Any,
     ):
@@ -83,7 +83,7 @@ class KaHFM(KnowledgeRecommenderUtils, IterativeRecommender):
                 "it needs the interactions at construction."
             )
 
-        features, labels = self._graph.item_features(
+        features, labels = knowledge.item_features(
             order=1, min_items=self.min_feature_items
         )
         # Annotated here rather than on the class: class annotations are read

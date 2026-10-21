@@ -10,13 +10,15 @@ iteration and other test results than the same run left alone.
 
 The trials here run the train pipeline's objective in this process, with
 Ray's reporting replaced by a callback that saves the checkpoint exactly where
-RayTrainReportCallback does, and can stop the trial right after it.
+RayTrainReportCallback does, and can stop the trial right after it. On a GPU
+the trials run with general.gpu_deterministic, without which scatter and index
+kernels make even two uninterrupted trials differ.
 """
 
 from contextlib import nullcontext
 from pathlib import Path
 from types import SimpleNamespace
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Iterator, Optional
 
 import lightning as L
 import pytest
@@ -29,9 +31,20 @@ from warprec.recommenders.trainer import trainer as trainer_module
 from warprec.utils.config.evaluation_configuration import EvaluationConfig
 from warprec.utils.registry import params_registry
 
-from conftest import build_params
+from conftest import build_params, keep_ray_out
 
 EPOCHS = 4
+
+# A resumed trial is bitwise exact on a GPU only with deterministic kernels
+DEVICES = [
+    "cpu",
+    pytest.param(
+        "cuda",
+        marks=pytest.mark.skipif(
+            not torch.cuda.is_available(), reason="needs a CUDA GPU"
+        ),
+    ),
+]
 
 
 class Paused(Exception):
@@ -83,12 +96,32 @@ class SavingReport(L.Callback):
         }
 
 
+@pytest.fixture
+def restore_determinism(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
+    """Starts without deterministic algorithms and restores the process after.
+
+    Args:
+        monkeypatch (pytest.MonkeyPatch): Restores the cuBLAS workspace variable.
+
+    Yields:
+        None: While the test runs.
+    """
+    monkeypatch.delenv("CUBLAS_WORKSPACE_CONFIG", raising=False)
+    enabled = torch.are_deterministic_algorithms_enabled()
+    warn_only = torch.is_deterministic_algorithms_warn_only_enabled()
+    torch.use_deterministic_algorithms(False)
+    yield
+    torch.use_deterministic_algorithms(enabled, warn_only=warn_only)
+
+
 def _trial_config(
     monkeypatch: pytest.MonkeyPatch,
     dataset: Dataset,
     tmp_path: Path,
     model_name: str,
     optimization: Dict[str, Any],
+    device: str = "cpu",
+    gpu_deterministic: bool = False,
 ) -> dict:
     """The configuration the train pipeline hands to a trial of one model.
 
@@ -98,12 +131,14 @@ def _trial_config(
         tmp_path (Path): Where Ray Tune would store its results.
         model_name (str): The model of the trial.
         optimization (Dict[str, Any]): The model's optimization block.
+        device (str): The device the trial trains on.
+        gpu_deterministic (bool): The value of general.gpu_deterministic.
 
     Returns:
         dict: The trial configuration, hyperparameters included.
     """
     captured: Dict[str, Any] = {}
-    monkeypatch.setattr(trainer_module.ray, "put", lambda value: value)
+    keep_ray_out(monkeypatch)
     monkeypatch.setattr(
         trainer_module.tune,
         "with_parameters",
@@ -120,7 +155,9 @@ def _trial_config(
         **hyperparameters,
         optimization={**optimization, "max_concurrent_trials": 1},
     )
-    trainer_module.Trainer(storage_path=str(tmp_path))._setup_tuner(
+    trainer_module.Trainer(
+        storage_path=str(tmp_path), gpu_deterministic=gpu_deterministic
+    )._setup_tuner(
         model_name=model_name,
         params=params,
         dataset=dataset,
@@ -128,7 +165,7 @@ def _trial_config(
             top_k=[5], metrics=["nDCG"], validation_metric="nDCG@5"
         ),
         validation_score="nDCG@5",
-        device="cpu",
+        device=device,
         ray_verbose=0,
     )
     return {**captured["data_bundle"], "params": hyperparameters}
@@ -194,6 +231,7 @@ def _assert_same_weights(left: Dict[str, torch.Tensor], right: Dict[str, torch.T
         assert torch.equal(left[name], right[name]), f"{name} differs"
 
 
+@pytest.mark.parametrize("device", DEVICES)
 @pytest.mark.parametrize(
     "model_name, optimization, pause_after",
     [
@@ -234,9 +272,19 @@ def test_a_resumed_trial_ends_on_the_uninterrupted_weights(
     model_name: str,
     optimization: Dict[str, Any],
     pause_after: int,
+    device: str,
+    restore_determinism: None,
 ):
     """Pausing after any epoch and resuming changes nothing the trial learns."""
-    config = _trial_config(monkeypatch, dataset, tmp_path, model_name, optimization)
+    config = _trial_config(
+        monkeypatch,
+        dataset,
+        tmp_path,
+        model_name,
+        optimization,
+        device=device,
+        gpu_deterministic=device == "cuda",
+    )
 
     uninterrupted = _run_trial(monkeypatch, config, tmp_path / "uninterrupted")
 
@@ -247,3 +295,27 @@ def test_a_resumed_trial_ends_on_the_uninterrupted_weights(
     )
 
     _assert_same_weights(uninterrupted, resumed)
+
+
+def test_gpu_deterministic_is_in_force_before_the_trial_builds_anything(
+    monkeypatch: pytest.MonkeyPatch,
+    dataset: Dataset,
+    tmp_path: Path,
+    restore_determinism: None,
+):
+    """general.gpu_deterministic reaches the process the trial runs in."""
+    config = _trial_config(
+        monkeypatch, dataset, tmp_path, "BPR", {}, gpu_deterministic=True
+    )
+    enabled = []
+
+    def stop(*args: Any, **kwargs: Any):
+        enabled.append(torch.are_deterministic_algorithms_enabled())
+        raise Paused()
+
+    monkeypatch.setattr(objectives.ray, "get", lambda value: value)
+    monkeypatch.setattr(objectives, "build_evaluator", stop)
+    with pytest.raises(Paused):
+        objectives.objective_function(dict(config))
+
+    assert enabled == [True]

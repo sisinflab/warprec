@@ -41,6 +41,7 @@ class ModelServer:
                 max_k=config.max_k,
                 mask_seen=config.mask_seen,
                 unknown_user=config.unknown_user,
+                rerank=config.rerank,
             ),
             catalogue=catalogue,
             presentation=Presentation(

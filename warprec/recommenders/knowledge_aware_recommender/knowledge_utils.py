@@ -69,7 +69,6 @@ class KnowledgeRecommenderUtils(nn.Module):
 
         self.n_entities = info["n_entities"]
         self.n_relations = info["n_relations"]
-        self._graph = knowledge
 
         # The padding row is the entity of an item the graph is silent about. It
         # is held at zero, so such an item contributes nothing from this side.

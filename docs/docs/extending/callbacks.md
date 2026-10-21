@@ -21,6 +21,8 @@ WarpRec callbacks also inherit all the lifecycle hooks defined by the Ray Tune *
 
 In the train and swarm pipelines `on_data_reading` and `on_dataset_creation` run in the Ray task that builds the datasets, on a copy of your callback. Every other hook runs on the driver, on the callback object WarpRec built from the configuration, so state a Ray Tune hook collects is there when `on_training_complete` and `on_evaluation_complete` run. The trials themselves never receive a copy of the callback.
 
+The driver never holds the training data, and holds the best model only for your callback: the model is built, evaluated and written on the cluster, and is brought to the driver, on the CPU, only when your callback overrides `on_training_complete` or `on_evaluation_complete`. A callback that implements neither leaves every model on the cluster.
+
 In the [swarm pipeline](../pipelines/swarm.md) each model's sweep runs inside a Ray task, where Ray Tune calls its hooks. WarpRec puts a forwarder in the sweep in place of your callback: each call of a Ray Tune hook your callback implements is sent, with its arguments, to the driver, which makes the same call on your callback. Two things differ from the train pipeline:
 
 - the models are tuned at the same time, so the calls of different models interleave; tell them apart by the `trial` argument (its `trial_id`, or `trial.config`);

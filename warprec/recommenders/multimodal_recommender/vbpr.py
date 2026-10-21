@@ -32,7 +32,7 @@ class VBPR(MultiModalRecommenderUtils, IterativeRecommender):
         params (dict): Model parameters.
         info (dict): The dictionary containing dataset information.
         *args (Any): Variable length argument list.
-        multimodal (Optional[MultiModalFeatures]): The precomputed item features.
+        multimodal (MultiModalFeatures): The precomputed item features.
         **kwargs (Any): Arbitrary keyword arguments.
 
     Attributes:
@@ -58,7 +58,7 @@ class VBPR(MultiModalRecommenderUtils, IterativeRecommender):
         params: dict,
         info: dict,
         *args: Any,
-        multimodal: Optional[MultiModalFeatures] = None,
+        multimodal: MultiModalFeatures,
         **kwargs: Any,
     ):
         super().__init__(params, info, *args, multimodal=multimodal, **kwargs)

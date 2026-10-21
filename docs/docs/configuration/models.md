@@ -45,7 +45,7 @@ The **optimization** section defines how hyperparameter optimization is performe
 - **cpu_per_trial**: Number of CPU cores allocated per trial. Defaults to `1`.
 - **gpu_per_trial**: Number of GPUs allocated per trial. Defaults to `0`.
 - **custom_resources_per_trial**: A dictionary containing custom resources to request per trial during optimization. Defaults to an empty dictionary.
-- **max_concurrent_trials**: Maximum number of trials allowed to run concurrently. Defaults to `None`, in which case WarpRec estimates a safe cap from the current Ray cluster resources.
+- **max_concurrent_trials**: Maximum number of trials allowed to run concurrently. Defaults to `None`, in which case WarpRec computes it from the cluster: only the live nodes whose labels match `label_selector` and that offer every resource a worker asks for count, each hosting as many workers as its scarcest resource allows, so Tune never starts more trials than the cluster can provide worker groups for. The cap is computed again when a paused search is restored, so it follows the cluster the run resumes on. Whether or not it is set, a search whose trial no node can host stops at once with a `ClusterError` instead of waiting to be scheduled; on a cluster that adds nodes on demand, start them first.
 - **label_selector**: A dictionary containing a set of labels with respective rules.
 - **num_workers**: Number of worker processes for data loading, used for both the training and the evaluation DataLoader. Defaults to `None`, in which case WarpRec derives it from the CPUs granted to the trial rather than from the cores of the whole node.
 - **block_size**: Number of items to predict at once for efficiency. Defaults to `50`.

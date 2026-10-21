@@ -26,9 +26,16 @@ class Reranker(ABC):
         pool (int): How many of the top candidates are reconsidered.
         **kwargs (Any): Ignored, so that a registry may pass shared arguments.
 
+    Attributes:
+        reads_history (bool): Whether the objective reads the history of the
+            user a list is for, and so cannot re-rank a list that belongs to no
+            known user, such as an anonymous session's.
+
     Raises:
         ConfigurationError: If the pool is smaller than one.
     """
+
+    reads_history: bool = False
 
     def __init__(self, item_features: Tensor, pool: int = 100, **kwargs: Any):
         if pool < 1:
@@ -113,9 +120,16 @@ class Reranker(ABC):
 
         pooled = min(self.pool, depth)
         cut = min(k, pooled)
+
+        # The list is built where the item features are, on the CPU: only the
+        # pool crosses over, whatever device the model scored on
+        home = self.item_features.device
         chosen = self._select(
-            relevance[:, :pooled], candidates[:, :pooled], cut, user_indices
-        )
+            relevance[:, :pooled].to(home),
+            candidates[:, :pooled].to(home),
+            cut,
+            user_indices.to(home) if user_indices is not None else None,
+        ).to(relevance.device)
 
         values = relevance[:, :pooled].gather(1, chosen)
         indices = candidates[:, :pooled].gather(1, chosen)
@@ -208,9 +222,18 @@ class GreedyReranker(Reranker):
         taken = torch.zeros(rows, pool, dtype=torch.bool, device=relevance.device)
         order = torch.empty(rows, k, dtype=torch.long, device=relevance.device)
 
+        # A masked candidate, such as an item the user has already seen, only
+        # reaches the pool when too few items are left to fill it. Its scaled
+        # relevance is the lowest a finite one can have, so an objective that
+        # rewards novelty would happily pick it: it is held below every
+        # candidate that can still be recommended instead, and taken in the
+        # model's order once those run out.
+        masked = ~torch.isfinite(relevance)
+        lowest = torch.finfo(scaled.dtype).min
+
         for step in range(k):
             gain = self._marginal_gain(scaled, candidates, taken, step, state)
-            gain = gain.masked_fill(taken, -torch.inf)
+            gain = gain.masked_fill(masked, lowest).masked_fill(taken, -torch.inf)
 
             picked = gain.argmax(dim=1)
             order[:, step] = picked

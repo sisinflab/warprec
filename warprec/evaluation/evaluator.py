@@ -14,9 +14,9 @@ from warprec.data.ranking import (
     cold_item_candidates,
     mask_seen_in_context,
     mask_seen_pairs,
+    rank_top_k,
     resolve_mask_policy,
     restrict_to_candidates,
-    top_k_breaking_ties,
 )
 from warprec.evaluation.metrics.base_metric import BaseMetric
 from warprec.recommenders.base_recommender import (
@@ -549,14 +549,9 @@ class Evaluator:
             ]
         ):
             max_k = max(self.k_values)
-            if self.reranker is not None:
-                top_k_values_full, top_k_indices_full = self.reranker(
-                    predictions, max_k, user_indices, self.tie_g
-                )
-            else:
-                top_k_values_full, top_k_indices_full = top_k_breaking_ties(
-                    predictions, max_k, self.tie_g, user_indices
-                )
+            top_k_values_full, top_k_indices_full = rank_top_k(
+                predictions, max_k, self.tie_g, user_indices, self.reranker
+            )
 
             for k in self.k_values:
                 required = self.required_blocks.get(k, set())

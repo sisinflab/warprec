@@ -32,6 +32,10 @@ The `server` section is optional. Every key has a default.
 - **max_k**: The largest `k` a request may ask for. Defaults to `100`.
 - **mask_seen**: Whether items the user interacted with in training are left out of their recommendations. Defaults to `true`.
 - **unknown_user**: What a user that was not in the training data gets. `error` answers `404`; `popular` answers with the items most interacted with in training, and marks the response with `fallback: true`. Defaults to `error`.
+- **rerank**: Optional. The re-ranker applied to every list the model scores, with the keys of the training configuration's [`rerank`](../recommenders/reranking.md) section. Copy that section here to serve the lists the run evaluated and wrote. Unknown keys are rejected. Defaults to no re-ranker.
+    - **name**: The re-ranker, `MMR` or `Calibration`. `null` ranks by score alone. Either needs a checkpoint saved from a run with side information (`reader.side`), which carries the item features they read; serving any other checkpoint with a re-ranker stops at startup with a `CheckpointError`. Defaults to `null`.
+    - **pool**: How many of the top candidates are reconsidered, at least `1`. Defaults to `100`.
+    - **params**: The re-ranker's own parameters: `diversity` for `MMR`, `weight` and `smoothing` for `Calibration`. Defaults to none, which leaves each at its own default.
 - **item_metadata**: Optional. A delimited file that names the items, so that responses carry a `name` next to each `item_id` and requests may refer to items by name.
     - **path**: The file. It must exist. Required.
     - **sep**: The column separator. Multi-character separators such as `::` are supported. Defaults to `,`.
@@ -75,4 +79,7 @@ endpoints:
   - name: bpr
     checkpoint: experiments/ml-1m/serialized/BPR_example.pth
     unknown_user: popular
+    rerank:
+      name: MMR
+      params: {diversity: 0.3}
 ```

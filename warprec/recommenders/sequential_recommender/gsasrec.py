@@ -1,4 +1,4 @@
-from typing import Callable, Any, Optional
+from typing import Any, Optional
 
 import torch
 from torch import nn, Tensor
@@ -104,7 +104,6 @@ class gSASRec(IterativeRecommender, SequentialRecommenderUtils):
 
         # Initialize weights
         self.apply(self._init_weights)
-        self.gbce_loss = self._gbce_loss_function()
         self.reg_loss = EmbLoss()
 
     def _get_output_embeddings(self) -> nn.Embedding:
@@ -160,64 +159,70 @@ class gSASRec(IterativeRecommender, SequentialRecommenderUtils):
         )
         return transformer_output
 
-    def _gbce_loss_function(self) -> Callable:
-        """Return the General Binary Cross-Entropy (GBCE) loss.
+    def gbce_loss(
+        self,
+        sequence_hidden_states: Tensor,
+        labels: Tensor,
+        negatives: Tensor,
+        model_input: Tensor,
+    ) -> Tensor:
+        """The General Binary Cross-Entropy (GBCE) loss.
+
+        A method rather than a function built in the constructor, so that the
+        model pickles, and with it its checkpoint.
+
+        Args:
+            sequence_hidden_states (Tensor): The transformer output for each step.
+            labels (Tensor): The next item at each step.
+            negatives (Tensor): The negatives drawn for each step.
+            model_input (Tensor): The input sequence.
 
         Returns:
-            Callable: The GBCE loss.
+            Tensor: The loss.
         """
+        pos_neg_concat = torch.cat([labels.unsqueeze(-1), negatives], dim=-1)
+        pos_neg_embeddings = self._get_output_embeddings()(pos_neg_concat)
 
-        def gbce_loss_fn(
-            sequence_hidden_states: Tensor,
-            labels: Tensor,
-            negatives: Tensor,
-            model_input: Tensor,
-        ):
-            pos_neg_concat = torch.cat([labels.unsqueeze(-1), negatives], dim=-1)
-            pos_neg_embeddings = self._get_output_embeddings()(pos_neg_concat)
+        logits = torch.einsum(
+            "bse, bsne -> bsn", sequence_hidden_states, pos_neg_embeddings
+        )
 
-            logits = torch.einsum(
-                "bse, bsne -> bsn", sequence_hidden_states, pos_neg_embeddings
-            )
+        gt = torch.zeros_like(logits).to(logits.device)
+        gt[:, :, 0] = 1.0
 
-            gt = torch.zeros_like(logits).to(logits.device)
-            gt[:, :, 0] = 1.0
+        alpha = self.neg_samples / (self.n_items - 1)
+        t = self.gbce_t
+        beta = alpha * ((1 - 1 / alpha) * t + 1 / alpha)
 
-            alpha = self.neg_samples / (self.n_items - 1)
-            t = self.gbce_t
-            beta = alpha * ((1 - 1 / alpha) * t + 1 / alpha)
+        positive_logits = logits[:, :, 0:1].to(torch.float64)
+        negative_logits = logits[:, :, 1:].to(torch.float64)
+        eps = 1e-10
 
-            positive_logits = logits[:, :, 0:1].to(torch.float64)
-            negative_logits = logits[:, :, 1:].to(torch.float64)
-            eps = 1e-10
+        positive_probs = torch.clamp(torch.sigmoid(positive_logits), eps, 1 - eps)
+        positive_probs_pow = torch.clamp(
+            positive_probs.pow(-beta),
+            min=1.0 + eps,
+            max=torch.finfo(torch.float64).max,
+        )
+        to_log = torch.clamp(
+            torch.div(1.0, (positive_probs_pow - 1)),
+            eps,
+            torch.finfo(torch.float64).max,
+        )
+        positive_logits_transformed = to_log.log()
 
-            positive_probs = torch.clamp(torch.sigmoid(positive_logits), eps, 1 - eps)
-            positive_probs_pow = torch.clamp(
-                positive_probs.pow(-beta),
-                min=1.0 + eps,
-                max=torch.finfo(torch.float64).max,
-            )
-            to_log = torch.clamp(
-                torch.div(1.0, (positive_probs_pow - 1)),
-                eps,
-                torch.finfo(torch.float64).max,
-            )
-            positive_logits_transformed = to_log.log()
+        final_logits = torch.cat([positive_logits_transformed, negative_logits], -1).to(
+            torch.float32
+        )
 
-            final_logits = torch.cat(
-                [positive_logits_transformed, negative_logits], -1
-            ).to(torch.float32)
+        mask = (labels != self.n_items).float()
+        loss_per_element = nn.functional.binary_cross_entropy_with_logits(
+            final_logits, gt, reduction="none"
+        )
 
-            mask = (labels != self.n_items).float()
-            loss_per_element = nn.functional.binary_cross_entropy_with_logits(
-                final_logits, gt, reduction="none"
-            )
-
-            loss_per_element = loss_per_element.mean(-1) * mask
-            total_loss = loss_per_element.sum() / mask.sum().clamp(min=1)
-            return total_loss
-
-        return gbce_loss_fn
+        loss_per_element = loss_per_element.mean(-1) * mask
+        total_loss = loss_per_element.sum() / mask.sum().clamp(min=1)
+        return total_loss
 
     def training_step(self, batch: Any, batch_idx: int):
         positives, negatives = batch

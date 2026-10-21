@@ -36,6 +36,7 @@ from warprec.utils.config import (
     load_callback,
     load_estimate_configuration,
 )
+from warprec.utils.determinism import apply_determinism
 from warprec.utils.enums import SearchAlgorithms, SearchSpace
 from warprec.utils.helpers import (
     build_evaluation_dataloader_kwargs,
@@ -917,6 +918,7 @@ def estimate_pipeline(path: str) -> None:
     experiment_start_time = time.time()
 
     config = load_estimate_configuration(path)
+    apply_determinism(config.general.gpu_deterministic)
     callback: WarpRecCallback = load_callback(
         config.general.callback,
         *config.general.callback.args,

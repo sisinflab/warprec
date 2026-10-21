@@ -14,12 +14,81 @@ from typing import Any, Optional
 from abc import ABC, abstractmethod
 
 from optuna.samplers import TPESampler
+from ray.tune import Tuner
+from ray.tune.search import ConcurrencyLimiter
 from ray.tune.search.basic_variant import BasicVariantGenerator
 from ray.tune.search.hyperopt import HyperOptSearch
 from ray.tune.search.optuna import OptunaSearch
 from ray.tune.search.bohb import TuneBOHB
 from warprec.utils.enums import SearchAlgorithms
+from warprec.utils.logger import logger
 from warprec.utils.registry import search_algorithm_registry
+
+
+class CappedVariantGenerator(BasicVariantGenerator):
+    """Ray Tune's grid and random searcher, keeping the cap it was last given.
+
+    Ray restores a paused search's searcher with the cap it was paused with.
+    WarpRec computes the cap from the cluster as the search resumes, and sets
+    it on the restored searcher, which then keeps it.
+    """
+
+    def set_state(self, state):
+        cap = self.max_concurrent
+        super().set_state(state)
+        self.max_concurrent = cap
+
+
+class ConcurrencyCap(ConcurrencyLimiter):
+    """Ray Tune's concurrency limiter, keeping the cap it was last given.
+
+    See 'CappedVariantGenerator'.
+    """
+
+    def set_state(self, state):
+        cap = self.max_concurrent
+        super().set_state(state)
+        self.max_concurrent = cap
+        self._set_searcher_max_concurrency()
+
+
+def recap_restored_search(tuner: Tuner, max_concurrent_trials: int) -> None:
+    """Give a restored search the concurrency cap computed for this session.
+
+    Ray Tune restores the searcher a search was paused with, cap included, and
+    'Tuner.restore' takes no new configuration, so the cap is set on the restored
+    searcher. A search paused by WarpRec 2.2.5 or earlier has Ray's own searcher,
+    which is converted to the one that keeps the cap.
+
+    Args:
+        tuner (Tuner): The restored tuner, not fitted yet.
+        max_concurrent_trials (int): The cap.
+    """
+    # Tuner.restore exposes no configuration, so the restored one is reached
+    tune_config = getattr(getattr(tuner, "_local_tuner", None), "_tune_config", None)
+    if tune_config is None:
+        logger.attention(
+            "The restored search keeps the concurrency it was paused with: "
+            "this Ray version does not expose its configuration."
+        )
+        return
+
+    searcher = tune_config.search_alg
+    if isinstance(searcher, BasicVariantGenerator):
+        if type(searcher) is BasicVariantGenerator:
+            searcher.__class__ = CappedVariantGenerator
+        searcher.max_concurrent = max_concurrent_trials
+    elif isinstance(searcher, ConcurrencyCap):
+        searcher.set_max_concurrency(max_concurrent_trials)
+        searcher._set_searcher_max_concurrency()
+    elif searcher is not None:
+        tune_config.search_alg = ConcurrencyCap(
+            searcher, max_concurrent=max_concurrent_trials
+        )
+    tune_config.max_concurrent_trials = None
+    logger.msg(
+        f"The restored search runs up to {max_concurrent_trials} trials at once."
+    )
 
 
 class BaseSearchWrapper(ABC):
@@ -60,7 +129,7 @@ class GridSearchWrapper(BaseSearchWrapper):
         max_concurrent_trials: Optional[int] = None,
         **kwargs: Any,
     ):
-        return BasicVariantGenerator(
+        return CappedVariantGenerator(
             random_state=seed, max_concurrent=max_concurrent_trials or 0
         )
 
@@ -94,7 +163,7 @@ class RandomSearchWrapper(BaseSearchWrapper):
         max_concurrent_trials: Optional[int] = None,
         **kwargs: Any,
     ):
-        return BasicVariantGenerator(
+        return CappedVariantGenerator(
             random_state=seed, max_concurrent=max_concurrent_trials or 0
         )
 

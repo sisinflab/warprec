@@ -42,8 +42,12 @@ TRAIN_LOSS = "train_loss"
 
 
 # The layout of the dictionary get_state() returns. Version 2 records the
-# writing WarpRec and keeps interaction-built iterative models whole.
+# writing WarpRec and keeps the iterative models built from training data whole.
 CHECKPOINT_FORMAT = 2
+
+
+# The constructor arguments through which a model is handed its training data.
+TRAINING_DATA = ("interactions", "sessions", "transactions", "knowledge", "multimodal")
 
 
 def _installed_version() -> Optional[str]:
@@ -248,11 +252,11 @@ class Recommender(nn.Module, ABC):
             "warprec_version": _installed_version(),
         }
 
-        # An iteratively trained model whose constructor derives a graph or a
-        # matrix from the interactions cannot be rebuilt from its parameters,
-        # and a serving process has no interactions to hand it. The fitted
-        # module is kept whole so that the checkpoint alone is enough.
-        if isinstance(self, IterativeRecommender) and self._fits_on_interactions():
+        # An iteratively trained model whose constructor derives a graph, a
+        # matrix or a feature table from the training data cannot be rebuilt
+        # from its parameters, and a serving process has no data to hand it.
+        # The fitted module is kept whole so that the checkpoint alone is enough.
+        if isinstance(self, IterativeRecommender) and self._fits_on_data():
             state["module"] = self
         return state
 
@@ -385,7 +389,7 @@ class Recommender(nn.Module, ABC):
         Raises:
             CheckpointError: When trying to load a model checkpoint of a different
                 model, or a checkpoint of a model that derives its structure from
-                the training interactions without them.
+                the training data without that data.
         """
         if checkpoint["name"] != cls.__name__:
             raise CheckpointError(
@@ -393,11 +397,12 @@ class Recommender(nn.Module, ABC):
             )
 
         # A model whose constructor fits on the training data cannot be rebuilt
-        # from parameters alone. When the caller has no interactions to hand -
-        # serving, typically - the fitted attributes saved with the checkpoint
-        # are restored instead of refitting.
+        # from parameters alone. When the caller has not got all of that data to
+        # hand - serving, typically - the fitted attributes or the module saved
+        # with the checkpoint are restored instead of refitting.
         artifacts = checkpoint.get("artifacts")
-        if cls._fits_on_interactions() and "interactions" not in kwargs:
+        required = cls._required_data()
+        if any(name not in kwargs for name in required):
             # A model fitted in one closed-form step keeps its result in plain
             # attributes, so restoring those is enough to score again.
             if artifacts and not issubclass(cls, IterativeRecommender):
@@ -405,14 +410,14 @@ class Recommender(nn.Module, ABC):
 
             # An iteratively trained model keeps its result in parameters, but
             # its constructor derives the graph or the matrix shapes from the
-            # interactions. It is saved whole, so it comes back without them.
+            # training data. It is saved whole, so it comes back without it.
             module = checkpoint.get("module")
             if isinstance(module, cls):
                 return module
 
             raise CheckpointError(
-                f"{cls.__name__} derives its structure from the training "
-                "interactions, so they must be passed to from_checkpoint() "
+                f"{cls.__name__} derives its structure from the training data, "
+                f"so {', '.join(required)} must be passed to from_checkpoint() "
                 "alongside a checkpoint saved before the whole module was kept."
             )
 
@@ -431,14 +436,29 @@ class Recommender(nn.Module, ABC):
         return model
 
     @classmethod
-    def _fits_on_interactions(cls) -> bool:
-        """Whether this model requires the training interactions to be built.
+    def _required_data(cls) -> Tuple[str, ...]:
+        """The training data this model cannot be built without.
 
         Returns:
-            bool: True when ``interactions`` is a required constructor argument.
+            Tuple[str, ...]: The data arguments its constructor requires, among
+                interactions, sessions, transactions, knowledge and multimodal.
         """
-        parameter = inspect.signature(cls.__init__).parameters.get("interactions")
-        return parameter is not None and parameter.default is inspect.Parameter.empty
+        parameters = inspect.signature(cls.__init__).parameters
+        return tuple(
+            name
+            for name in TRAINING_DATA
+            if name in parameters
+            and parameters[name].default is inspect.Parameter.empty
+        )
+
+    @classmethod
+    def _fits_on_data(cls) -> bool:
+        """Whether this model requires any of the training data to be built.
+
+        Returns:
+            bool: True when its constructor requires a data argument.
+        """
+        return bool(cls._required_data())
 
     @classmethod
     def _from_artifacts(

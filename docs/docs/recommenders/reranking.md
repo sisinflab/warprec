@@ -34,6 +34,10 @@ Re-ranking needs item attributes, since both objectives order items by *what the
 are*. A run that configures one without `reader.side` raises rather than silently
 ranking by score.
 
+A served model can be re-ranked the same way: an endpoint's `rerank` key takes this
+section as it is, and the checkpoint carries the item features it reads. See
+[Serving Configuration](../configuration/serving.md).
+
 ## MMR
 
 **Maximal Marginal Relevance.** At each step it takes the item that is both well

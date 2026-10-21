@@ -1,5 +1,5 @@
 import time
-from dataclasses import dataclass, field, replace
+from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Callable, Dict, Any, Optional, List, Tuple
 
 import ray
@@ -12,11 +12,12 @@ from warprec.common import (
     reconcile_model_state,
 )
 from warprec.data.writer import WriterFactory
-from warprec.data import Dataset
 from warprec.data.timing import DataPreparationTimes
 from warprec.pipelines.common import (
     PipelineContext,
+    PreparedDatasets,
     bootstrap_pipeline,
+    callback_needs_model,
     data_preparation_seconds,
     measure_emissions,
     model_timing_row,
@@ -25,11 +26,7 @@ from warprec.pipelines.common import (
     report_statistical_significance,
     write_model_outputs,
 )
-from warprec.pipelines.remotes import (
-    remote_evaluation_and_timing,
-    remote_generate_recs,
-)
-from warprec.pipelines.train import build_best_model, resolve_model_outcome
+from warprec.pipelines.train import complete_model, resolve_model_outcome
 from warprec.recommenders.trainer import Trainer, TrainingOutcome
 from warprec.recommenders.base_recommender import Recommender
 from warprec.utils.callback import WarpRecCallback
@@ -67,7 +64,9 @@ class SwarmModelResult:
     Attributes:
         model_name (str): The name of the model.
         outcome (TrainingOutcome): The outcome of its search, without the model.
-        model (Optional[Recommender]): The best model, when it was built.
+        built (bool): Whether its best model was built and evaluated.
+        model (Optional[Recommender]): The best model, only when the driver's
+            callback receives it.
         load_error (Optional[str]): Why the best model could not be built, when
             the search completed but building it failed.
         results (Dict): The evaluation results of the best model.
@@ -77,6 +76,7 @@ class SwarmModelResult:
 
     model_name: str
     outcome: TrainingOutcome
+    built: bool = False
     model: Optional[Recommender] = None
     load_error: Optional[str] = None
     results: Dict = field(default_factory=dict)
@@ -233,9 +233,6 @@ def swarm_pipeline(path: str):
     Args:
         path (str): Path to the configuration file.
     """
-    logger.attention(
-        "WARNING: Swarm pipeline is experimental. Please submit bug reports via GitHub Issues."
-    )
     context = bootstrap_pipeline(path, "swarm", "Start experiment swarming.")
     with measure_emissions(context) as emissions:
         _swarm_models(context, emissions)
@@ -254,7 +251,9 @@ def _swarm_models(  # noqa: PLR0912, PLR0915
     config = context.config
 
     # Build the datasets on the cluster and persist the splits if asked to
-    main_dataset, val_dataset, fold_dataset, data_times = prepare_datasets(context)
+    data = prepare_datasets(context)
+    data_times = data.layout.times
+    needs_model = callback_needs_model(context.callback)
 
     # List of models to train
     models = list(config.models.keys())
@@ -277,11 +276,6 @@ def _swarm_models(  # noqa: PLR0912, PLR0915
     logger.msg(
         f"Launching the swarm of experiments. Number of different models: {len(models)}"
     )
-
-    # Put datasets in the object store once to avoid sending them multiple times
-    main_ds_ref = ray.put(main_dataset)
-    val_ds_ref = ray.put(val_dataset)
-    fold_ds_ref = ray.put(fold_dataset)
 
     # Only launch the models that are not already finished
     pending_models = []
@@ -325,9 +319,7 @@ def _swarm_models(  # noqa: PLR0912, PLR0915
         future = remote_model_pipeline.remote(
             model_name=model_name,
             config=config,
-            main_dataset=main_ds_ref,
-            val_dataset=val_ds_ref,
-            fold_dataset=fold_ds_ref,
+            data=data,
             callback=relay.forwarder(),
             data_preparation_time=data_preparation_time,
             data_times=data_times,
@@ -336,6 +328,8 @@ def _swarm_models(  # noqa: PLR0912, PLR0915
             resumable=model_name in resumable_models,
             emissions=emissions,
             model_state=context.state.model_state(model_name),
+            return_model=needs_model,
+            concurrent_searches=len(pending_models),
         )  # type: ignore[call-arg]
         futures.append(future)
 
@@ -407,7 +401,7 @@ def _swarm_models(  # noqa: PLR0912, PLR0915
         model_state.best_iter = outcome.best_iter
         model_state.best_checkpoint_path = outcome.best_checkpoint_path
         model_state.ray_report = outcome.report
-        if completed.model is None:
+        if not completed.built:
             logger.negative(
                 f"The best model of {model_name} could not be built: "
                 f"{completed.load_error}"
@@ -418,18 +412,18 @@ def _swarm_models(  # noqa: PLR0912, PLR0915
             continue
         context.state_store.save(context.state)
 
-        best_model = completed.model
         results = completed.results
         model_params = completed.model_params
         timing_report = completed.timing_report
 
         # Callbacks
-        context.callback.on_training_complete(model=best_model)
-        context.callback.on_evaluation_complete(
-            model=best_model,
-            params=model_params[model_name]["Best Params"],
-            results=results,
-        )
+        if needs_model:
+            context.callback.on_training_complete(model=completed.model)
+            context.callback.on_evaluation_complete(
+                model=completed.model,
+                params=model_params[model_name]["Best Params"],
+                results=results,
+            )
 
         # Log the results
         log_evaluation(results, "Test", config.evaluation.max_metric_per_row)
@@ -438,11 +432,9 @@ def _swarm_models(  # noqa: PLR0912, PLR0915
         write_model_outputs(
             context,
             model_name,
-            model_param_from_dict(model_name, config.models[model_name]),
-            best_model,
             results,
+            model_params[model_name]["Best Params"],
             model_params[model_name]["Best Training Iteration"],
-            main_dataset,
         )
 
         if config.general.time_report:
@@ -484,9 +476,7 @@ def _swarm_models(  # noqa: PLR0912, PLR0915
 def remote_model_pipeline(  # noqa: PLR0913
     model_name: str,
     config: TrainConfiguration,
-    main_dataset: Dataset,
-    val_dataset: Optional[Dataset],
-    fold_dataset: List[Dataset],
+    data: PreparedDatasets,
     callback: WarpRecCallback,
     data_preparation_time: float,
     data_times: Optional[DataPreparationTimes] = None,
@@ -495,6 +485,8 @@ def remote_model_pipeline(  # noqa: PLR0913
     resumable: bool = False,
     emissions: Optional["EmissionsSettings"] = None,
     model_state: Optional[ModelState] = None,
+    return_model: bool = False,
+    concurrent_searches: int = 1,
 ) -> SwarmModelResult:
     """Orchestrates the entire lifecycle of a single model in parallel.
 
@@ -504,9 +496,8 @@ def remote_model_pipeline(  # noqa: PLR0913
     Args:
         model_name (str): The name of the model to process.
         config (TrainConfiguration): The configuration object.
-        main_dataset (Dataset): The main dataset.
-        val_dataset (Optional[Dataset]): The validation dataset.
-        fold_dataset (List[Dataset]): The cross-validation folds.
+        data (PreparedDatasets): The datasets of the run, by reference: this
+            task never fetches them, the trials and the model task do.
         callback (WarpRecCallback): The callback object.
         data_preparation_time (float): Time taken for data prep (for reporting).
         data_times (Optional[DataPreparationTimes]): Where the data preparation
@@ -521,6 +512,10 @@ def remote_model_pipeline(  # noqa: PLR0913
             measurement, or None when the run is not measured.
         model_state (Optional[ModelState]): What the run state records of the
             model, so that a search it finished is not run again.
+        return_model (bool): Whether to bring the best model back, for the
+            driver's callback.
+        concurrent_searches (int): How many models the swarm searches at once,
+            which share the cluster equally.
 
     Returns:
         SwarmModelResult: The outcome of the search and, when its best model
@@ -547,6 +542,8 @@ def remote_model_pipeline(  # noqa: PLR0913
         errored_trials=config.run.errored_trials,
         resumable=resumable,
         emissions=emissions,
+        gpu_deterministic=config.general.gpu_deterministic,
+        concurrent_searches=concurrent_searches,
     )
 
     # Run the HPO, unless the run state records it finished
@@ -555,111 +552,50 @@ def remote_model_pipeline(  # noqa: PLR0913
         params,
         trainer,
         config,
-        main_dataset,
-        val_dataset,
-        fold_dataset,
+        data,
         model_state or ModelState(),
     )
     if outcome.interrupted or outcome.failed:
         return SwarmModelResult(model_name=model_name, outcome=outcome)
 
-    try:
-        outcome = build_best_model(
-            model_name,
-            params,
-            outcome,
-            trainer,
-            config,
-            main_dataset,
-            cross_validated=val_dataset is None and len(fold_dataset) > 0,
-        )
-    except Exception as e:
-        return SwarmModelResult(
-            model_name=model_name,
-            outcome=outcome,
-            load_error=f"{type(e).__name__}: {e}",
-        )
+    search_seconds = time.time() - model_exploration_start_time
 
-    best_model = outcome.model
-    ray_report = outcome.report
-    best_iter = outcome.best_iter
-
-    model_exploration_total_time = time.time() - model_exploration_start_time
-
-    # Prepare device and resources
-    general_device = config.general.device
-    model_device = params.optimization.device
-    device = general_device if model_device is None else model_device
-
-    num_cpus = params.optimization.cpu_per_trial
-    num_gpus = params.optimization.gpu_per_trial
-    custom_res = params.optimization.custom_resources_per_trial or {}
-    label_selector = params.optimization.label_selector or {}
-
-    # Fallback: in case the device is set to cuda but no GPUs are requested,
-    # we set num_gpus to 1 to ensure the correct node is selected
-    if device == "cuda" and num_gpus == 0:
-        num_gpus = 1
-
-    # Execute evaluation on a proper device
-    results, model_evaluation_total_time, inference_time = ray.get(
-        remote_evaluation_and_timing.options(
-            num_cpus=num_cpus,
-            num_gpus=num_gpus,
-            resources=custom_res if custom_res else None,
-            label_selector=label_selector if label_selector else None,
-        ).remote(
-            model=best_model,
-            main_dataset=main_dataset,
-            evaluation=config.evaluation,
-            num_workers=params.optimization.num_workers,
-            device=device,
-            requires_timing=config.general.time_report,
-            custom_modules=config.general.custom_modules,
-        )  # type: ignore[call-arg]
+    # Built, evaluated and written by a task of its own, with the resources of
+    # a trial: this one reserves almost none
+    writer = WriterFactory.get_writer(config=config, timestamp=writer_timestamp)
+    completion = complete_model(
+        model_name, params, outcome, data, config, writer, return_model=return_model
     )
-
-    # Recommendation writing
-    if params.meta.save_recs:
-        writer = WriterFactory.get_writer(config=config, timestamp=writer_timestamp)
-        ray.get(
-            remote_generate_recs.options(
-                num_cpus=num_cpus,
-                num_gpus=num_gpus,
-                resources=custom_res if custom_res else None,
-                label_selector=label_selector if label_selector else None,
-            ).remote(
-                writer=writer,
-                model=best_model,
-                dataset=main_dataset,
-                config=config,
-                device=device,
-            )  # type: ignore[call-arg]
+    if completion.error is not None:
+        return SwarmModelResult(
+            model_name=model_name, outcome=outcome, load_error=completion.error
         )
+    outcome = completion.outcome
 
     # Prepare the report to return to the driver
     model_params = {
         model_name: {
-            "Best Params": best_model.get_params(),
-            "Best Training Iteration": best_iter,
+            "Best Params": completion.best_params,
+            "Best Training Iteration": outcome.best_iter,
         }
     }
 
     timing_report = model_timing_row(
         model_name=model_name,
         data_preparation_time=data_preparation_time,
-        exploration_time=model_exploration_total_time,
-        ray_report=ray_report,
-        evaluation_time=model_evaluation_total_time,
-        inference_time=inference_time,
+        exploration_time=search_seconds + completion.build_seconds,
+        ray_report=outcome.report,
+        evaluation_time=completion.evaluation_seconds,
+        inference_time=completion.inference_seconds,
         data_times=data_times,
     )
 
     return SwarmModelResult(
         model_name=model_name,
-        outcome=replace(outcome, model=None),
-        model=best_model,
-        results=results,
+        outcome=outcome,
+        built=True,
+        model=completion.model,
+        results=completion.results,
         model_params=model_params,
         timing_report=timing_report,
     )

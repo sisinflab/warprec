@@ -96,7 +96,7 @@ class MMGCN(MultiModalRecommenderUtils, IterativeRecommender):
         info (dict): The dictionary containing dataset information.
         interactions (Interactions): The training interactions.
         *args (Any): Variable length argument list.
-        multimodal (Optional[MultiModalFeatures]): The precomputed item features.
+        multimodal (MultiModalFeatures): The precomputed item features.
         **kwargs (Any): Arbitrary keyword arguments.
 
     Attributes:
@@ -132,7 +132,7 @@ class MMGCN(MultiModalRecommenderUtils, IterativeRecommender):
         info: dict,
         interactions: Interactions,
         *args: Any,
-        multimodal: Optional[MultiModalFeatures] = None,
+        multimodal: MultiModalFeatures,
         **kwargs: Any,
     ):
         super().__init__(params, info, *args, multimodal=multimodal, **kwargs)
