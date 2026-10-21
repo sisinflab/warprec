@@ -30,7 +30,7 @@ The manifest tracks, for every model, one of six states:
 |---|---|---|
 | `pending` | Not started. | The sweep runs. |
 | `interrupted` | The sweep was paused. | The sweep continues from its last trial checkpoints. |
-| `hpo_completed` | The sweep finished, and its best parameters, iteration and checkpoint are recorded. The stages that follow did not all complete. | The sweep is skipped. The best model is loaded from its checkpoint, refitted from its best parameters when it is closed-form, or retrained on the main split after cross-validation. |
+| `hpo_completed` | The sweep finished, and its best parameters, iteration and checkpoint are recorded. The stages that follow did not all complete. | The sweep is skipped. The best model is loaded from its checkpoint, refitted from its best parameters when it is closed-form (closed-form models save no trial checkpoint), or retrained on the main split after cross-validation, by a task on the cluster with the resources of one trial. |
 | `failed_load` | The sweep finished, but its best model could not be built from the result. | Like `hpo_completed`: building the model is tried again, without searching again. |
 | `completed` | Every stage finished and was written. | Skipped. |
 | `failed` | No trial produced a usable result: every trial failed, or reported a score that is not finite. | Skipped. |
