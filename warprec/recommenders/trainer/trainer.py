@@ -15,6 +15,7 @@ from pathlib import Path
 
 import torch
 import numpy as np
+import pandas as pd
 import pyarrow.fs
 import ray
 from ray import cloudpickle, tune
@@ -34,7 +35,7 @@ from warprec.recommenders.trainer.logger_callbacks import (
     WarpRecJsonLoggerCallback,
     read_logged_epochs,
 )
-from warprec.recommenders.trainer.objectives import objective_function
+from warprec.recommenders.trainer.objectives import TRIAL_ERROR, objective_function
 from warprec.recommenders.trainer.timing import (
     SEARCH_OVERHEAD,
     TRIAL_STARTED_AT,
@@ -226,10 +227,11 @@ class Trainer:
 
         Returns:
             TrainingOutcome: The outcome of the optimization, carrying the best
-                model, its parameters, the summary report, the best training
-                iteration and the checkpoint it was loaded from. When the sweep
-                was paused or produced no usable model, the outcome carries the
-                corresponding status and no model.
+                parameters, the summary report, the best training iteration and
+                the checkpoint to build the best model from, but not the model,
+                which 'load_best_model' builds. When the sweep was paused or
+                produced no usable result, the outcome carries the corresponding
+                status.
         """
 
         mode = params.optimization.properties.mode
@@ -257,23 +259,26 @@ class Trainer:
             )
             return TrainingOutcome(status="interrupted")
 
-        # Check if any trial succeeded
-        if results.errors and len(results) == len(results.errors):
-            logger.negative(f"All trials failed for {model_name}.")
+        # A trial that fails reports a score of -inf (+inf when minimizing)
+        # rather than raising, so Ray Tune counts no error and would pick it
+        best = self._best_usable_trial(
+            results,
+            validation_score,
+            mode,
+            needs_checkpoint=issubclass(
+                model_registry.get_class(model_name), IterativeRecommender
+            ),
+        )
+        if best is None:
+            logger.negative(
+                f"All trials failed for {model_name}. "
+                f"First error: {self._first_trial_error(results)}"
+            )
             return TrainingOutcome(status="failed")
 
-        # Retrieve best result using Ray API
-        best_result = results.get_best_result(metric=validation_score, mode=mode)
-
-        if not best_result:
-            logger.negative(f"Could not determine best result for {model_name}.")
-            return TrainingOutcome(status="failed")
-
+        best_result, best_row = best
         best_params = best_result.config
         best_params = {k: v for k, v in best_params.items() if not k.startswith("_")}
-        best_row = self._get_best_result_row(
-            self._trial_history(best_result), validation_score, mode
-        )
         best_score = best_row.get(validation_score).item()
         best_iter = self._training_iterations(best_row)
         best_checkpoint_path = best_row.get("checkpoint_path")
@@ -284,20 +289,13 @@ class Trainer:
         )
         logger.positive(f"HPO for {model_name} ended successfully.")
 
-        # Load Best Model
-        best_model = self.load_best_model(
-            model_name,
-            best_checkpoint_path,
-            best_params,
-            dataset,
-        )
-
+        # The best model is built by the caller once it has recorded the search,
+        # so that a failure to build it does not cost the search
         report = self._create_report(
-            results, [best_result.metrics["trial_id"]], search_s, best_model
+            results, [best_result.metrics["trial_id"]], search_s
         )
         return TrainingOutcome(
             status="completed",
-            model=best_model,
             best_params=best_params,
             report=report,
             best_iter=best_iter,
@@ -367,10 +365,17 @@ class Trainer:
             filter_metric=validation_score, filter_mode=mode
         )
 
-        if result_df.empty or (
-            mode == "max" and result_df[validation_score].max() == -torch.inf
+        # A failed trial reports an infinite score, whichever the mode
+        if (
+            result_df.empty
+            or not np.isfinite(
+                pd.to_numeric(result_df[validation_score], errors="coerce")
+            ).any()
         ):
-            logger.negative(f"All trials failed for {model_name}.")
+            logger.negative(
+                f"All trials failed for {model_name}. "
+                f"First error: {self._first_trial_error(results)}"
+            )
             return TrainingOutcome(status="failed")
 
         best_rows = {
@@ -901,6 +906,68 @@ class Trainer:
             best_idx = df[metric].idxmin()
         return df.loc[best_idx]
 
+    def _best_usable_trial(
+        self,
+        results: tune.ResultGrid,
+        metric: str,
+        mode: str,
+        needs_checkpoint: bool,
+    ) -> Optional[tuple]:
+        """The best report of the search that a best model can be built from.
+
+        A report counts when its score is finite and, for an iterative model,
+        it came with a checkpoint: a failed trial reports an infinite score
+        without one, and a diverged one a NaN.
+
+        Args:
+            results (tune.ResultGrid): The results of the search.
+            metric (str): The validation metric.
+            mode (str): 'max' or 'min'.
+            needs_checkpoint (bool): Whether the model is rebuilt from a checkpoint.
+
+        Returns:
+            Optional[tuple]: The best trial's result and its best report, or None
+                when no trial produced a usable one.
+        """
+        best: Optional[tuple] = None
+        for result in results:  # type: ignore[attr-defined]
+            if not result.metrics:
+                continue
+            history = self._trial_history(result)
+            if metric not in history:
+                continue
+            scores = pd.to_numeric(history[metric], errors="coerce")
+            usable = history[np.isfinite(scores)]
+            if needs_checkpoint:
+                if "checkpoint_path" not in usable:
+                    continue
+                usable = usable[usable["checkpoint_path"].notna()]
+            if usable.empty:
+                continue
+
+            row = self._get_best_result_row(usable, metric, mode)
+            score = float(row[metric])
+            if best is None or (score > best[2] if mode == "max" else score < best[2]):
+                best = (result, row, score)
+        return best[:2] if best is not None else None
+
+    @staticmethod
+    def _first_trial_error(results: tune.ResultGrid) -> str:
+        """What made the first failed trial of a search fail.
+
+        Args:
+            results (tune.ResultGrid): The results of the search.
+
+        Returns:
+            str: The error, as the trial reported it or as Ray Tune caught it.
+        """
+        for result in results:  # type: ignore[attr-defined]
+            if result.metrics and result.metrics.get(TRIAL_ERROR):
+                return str(result.metrics[TRIAL_ERROR])
+            if result.error:
+                return str(result.error)
+        return "no trial reported a finite score"
+
     def _trial_history(self, result):
         """Returns the reports of a trial, including those made before a pause."""
         history = result.metrics_dataframe
@@ -1141,16 +1208,29 @@ class Trainer:
         report.update(summarise_timing(timing, best_trial_ids))
         report[SEARCH_OVERHEAD] = search_overhead(search_s, self._spans, timing)
 
-        # Model stats
-        report["Total Params (Best Model)"] = np.nan
-        report["Trainable Params (Best Model)"] = np.nan
-
-        if model:
-            report["Total Params (Best Model)"] = sum(
-                p.numel() for p in model.parameters()
-            )
-            report["Trainable Params (Best Model)"] = sum(
-                p.numel() for p in model.parameters() if p.requires_grad
-            )
-
+        # Model stats, filled in once the best model is built
+        report.update(self.parameter_counts(model))
         return report
+
+    @staticmethod
+    def parameter_counts(model: Optional[Recommender]) -> Dict[str, float]:
+        """The parameter counts of the best model, for the time report.
+
+        Args:
+            model (Optional[Recommender]): The best model, None when not built.
+
+        Returns:
+            Dict[str, float]: The total and trainable parameter counts, NaN
+                without a model.
+        """
+        if model is None:
+            return {
+                "Total Params (Best Model)": np.nan,
+                "Trainable Params (Best Model)": np.nan,
+            }
+        return {
+            "Total Params (Best Model)": sum(p.numel() for p in model.parameters()),
+            "Trainable Params (Best Model)": sum(
+                p.numel() for p in model.parameters() if p.requires_grad
+            ),
+        }

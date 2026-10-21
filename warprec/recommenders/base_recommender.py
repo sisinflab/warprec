@@ -73,6 +73,32 @@ def _is_class_var(hint: Any) -> bool:
     return hint is ClassVar or get_origin(hint) is ClassVar
 
 
+def _without_cached_keys(state_dict: Dict[str, Any], model_name: str) -> Dict[str, Any]:
+    """A state dict without the embeddings a graph model cached while scoring.
+
+    A model whose forward returns its embedding weights unchanged (LightCCF with
+    'n_layers: 0') could register that cache as parameters, so checkpoints saved
+    after a validation may carry it under '_cached_' keys, which no freshly built
+    model has: they are dropped so that such checkpoints still load.
+
+    Args:
+        state_dict (Dict[str, Any]): The state dict read from a checkpoint.
+        model_name (str): The model it belongs to, for the warning.
+
+    Returns:
+        Dict[str, Any]: The state dict, without those keys.
+    """
+    cached = [key for key in state_dict if key.startswith("_cached_")]
+    if not cached:
+        return state_dict
+
+    logger.attention(
+        f"The checkpoint of {model_name} carries the cached embeddings "
+        f"{', '.join(cached)}, which are not part of the model. They were dropped."
+    )
+    return {key: value for key, value in state_dict.items() if key not in cached}
+
+
 class Recommender(nn.Module, ABC):
     """Abstract class that defines the basic functionalities of a recommendation model.
 
@@ -399,7 +425,9 @@ class Recommender(nn.Module, ABC):
 
         # Initialize the model and return the instance
         model = cls(**init_args)
-        model.load_state_dict(checkpoint["state_dict"], strict=strict)
+        model.load_state_dict(
+            _without_cached_keys(checkpoint["state_dict"], cls.__name__), strict=strict
+        )
         return model
 
     @classmethod
@@ -963,6 +991,16 @@ class IterativeRecommender(Recommender, L.LightningModule):
         checkpoint["name"] = self.name
         checkpoint["params"] = self.get_params()
         checkpoint["info"] = self.info
+
+    def on_load_checkpoint(self, checkpoint: Dict[str, Any]):
+        """PyTorch Lightning hook called before a trial resumes from a checkpoint.
+
+        Args:
+            checkpoint (Dict[str, Any]): The checkpoint about to be loaded.
+        """
+        checkpoint["state_dict"] = _without_cached_keys(
+            checkpoint["state_dict"], type(self).__name__
+        )
 
 
 class ContextRecommenderUtils(nn.Module, ABC):

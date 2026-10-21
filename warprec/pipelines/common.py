@@ -5,7 +5,12 @@ from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
 
 import ray
 
-from warprec.errors import ClusterError, ConfigurationError, RunStateError
+from warprec.errors import (
+    CheckpointError,
+    ClusterError,
+    ConfigurationError,
+    RunStateError,
+)
 import warprec
 from warprec.common import (
     RunState,
@@ -427,6 +432,28 @@ def write_model_outputs(
                 "metrics": results,
             },
         )
+
+
+def raise_failed_loads(model_names: List[str], run_name: str) -> None:
+    """End a run whose searches finished but some best models could not be built.
+
+    The run goes on to the other models first, and the searches are recorded,
+    so resuming it builds those models again without repeating them.
+
+    Args:
+        model_names (List[str]): The models whose best model could not be built.
+        run_name (str): The name of the run.
+
+    Raises:
+        CheckpointError: When any model is listed.
+    """
+    if not model_names:
+        return
+    raise CheckpointError(
+        f"The best model of {', '.join(model_names)} could not be built from its "
+        "finished search; the error is logged above. Run the same command again "
+        f"with run.name set to '{run_name}' to build it without searching again."
+    )
 
 
 def report_statistical_significance(

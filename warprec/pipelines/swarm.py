@@ -1,10 +1,12 @@
 import time
+from dataclasses import dataclass, field, replace
 from typing import TYPE_CHECKING, Callable, Dict, Any, Optional, List, Tuple
 
 import ray
 from ray import tune
 
 from warprec.common import (
+    ModelState,
     ModelStatus,
     log_evaluation,
     reconcile_model_state,
@@ -19,6 +21,7 @@ from warprec.pipelines.common import (
     measure_emissions,
     model_timing_row,
     prepare_datasets,
+    raise_failed_loads,
     report_statistical_significance,
     write_model_outputs,
 )
@@ -26,15 +29,15 @@ from warprec.pipelines.remotes import (
     remote_evaluation_and_timing,
     remote_generate_recs,
 )
-from warprec.pipelines.train import single_split_flow, multiple_fold_validation_flow
-from warprec.recommenders.trainer import Trainer
+from warprec.pipelines.train import build_best_model, resolve_model_outcome
+from warprec.recommenders.trainer import Trainer, TrainingOutcome
 from warprec.recommenders.base_recommender import Recommender
 from warprec.utils.callback import WarpRecCallback
 from warprec.utils.config import (
     TrainConfiguration,
 )
 from warprec.utils.pause import PauseController
-from warprec.utils.helpers import model_param_from_dict
+from warprec.utils.helpers import load_custom_modules, model_param_from_dict
 from warprec.utils.logger import logger
 
 if TYPE_CHECKING:
@@ -55,6 +58,30 @@ TUNE_HOOKS = (
     "on_checkpoint",
     "on_experiment_end",
 )
+
+
+@dataclass
+class SwarmModelResult:
+    """What the task running one model of a swarm hands back to the driver.
+
+    Attributes:
+        model_name (str): The name of the model.
+        outcome (TrainingOutcome): The outcome of its search, without the model.
+        model (Optional[Recommender]): The best model, when it was built.
+        load_error (Optional[str]): Why the best model could not be built, when
+            the search completed but building it failed.
+        results (Dict): The evaluation results of the best model.
+        model_params (Dict): The best parameters and training iteration.
+        timing_report (Dict): The row of the time report.
+    """
+
+    model_name: str
+    outcome: TrainingOutcome
+    model: Optional[Recommender] = None
+    load_error: Optional[str] = None
+    results: Dict = field(default_factory=dict)
+    model_params: Dict = field(default_factory=dict)
+    timing_report: Dict = field(default_factory=dict)
 
 
 class HookMailbox:
@@ -308,6 +335,7 @@ def _swarm_models(  # noqa: PLR0912, PLR0915
             writer_timestamp=context.state.writer_timestamp,
             resumable=model_name in resumable_models,
             emissions=emissions,
+            model_state=context.state.model_state(model_name),
         )  # type: ignore[call-arg]
         futures.append(future)
 
@@ -359,24 +387,41 @@ def _swarm_models(  # noqa: PLR0912, PLR0915
     # Final result logging of driver
     logger.msg("Swarming completed. Aggregating and saving results.")
 
-    for (
-        model_name,
-        best_model,
-        results,
-        model_params,
-        timing_report,
-        ray_report,
-    ) in completed_models:
-        if best_model is None:
-            status = ray_report.get("status", "failed") if ray_report else "failed"
+    failed_loads: List[str] = []
+    for completed in completed_models:
+        model_name = completed.model_name
+        outcome = completed.outcome
+        model_state = context.state.model_state(model_name)
+        if outcome.interrupted or outcome.failed:
             logger.attention(f"HPO for {model_name} returned no valid model.")
-            context.state.model_state(model_name).status = (
-                ModelStatus.INTERRUPTED
-                if status == "interrupted"
-                else ModelStatus.FAILED
+            model_state.status = (
+                ModelStatus.INTERRUPTED if outcome.interrupted else ModelStatus.FAILED
             )
             context.state_store.save(context.state)
             continue
+
+        # The search finished: recorded whether or not its best model was built,
+        # so that resuming the run builds it again without searching again
+        model_state.status = ModelStatus.HPO_COMPLETED
+        model_state.best_params = outcome.best_params
+        model_state.best_iter = outcome.best_iter
+        model_state.best_checkpoint_path = outcome.best_checkpoint_path
+        model_state.ray_report = outcome.report
+        if completed.model is None:
+            logger.negative(
+                f"The best model of {model_name} could not be built: "
+                f"{completed.load_error}"
+            )
+            model_state.status = ModelStatus.FAILED_LOAD
+            context.state_store.save(context.state)
+            failed_loads.append(model_name)
+            continue
+        context.state_store.save(context.state)
+
+        best_model = completed.model
+        results = completed.results
+        model_params = completed.model_params
+        timing_report = completed.timing_report
 
         # Callbacks
         context.callback.on_training_complete(model=best_model)
@@ -408,7 +453,6 @@ def _swarm_models(  # noqa: PLR0912, PLR0915
             model_results[model_name] = results
             context.state_store.save_eval_results(model_name, results)
 
-        model_state = context.state.model_state(model_name)
         model_state.status = ModelStatus.COMPLETED
         model_state.timing = timing_report
         context.state_store.save(context.state)
@@ -433,6 +477,8 @@ def _swarm_models(  # noqa: PLR0912, PLR0915
 
         logger.positive("Experiment swarming concluded. WarpRec is shutting down.")
 
+    raise_failed_loads(failed_loads, context.run_name)
+
 
 @ray.remote(num_cpus=0.05)  # Zero-Resource Orchestrator
 def remote_model_pipeline(  # noqa: PLR0913
@@ -448,7 +494,8 @@ def remote_model_pipeline(  # noqa: PLR0913
     writer_timestamp: Optional[str] = None,
     resumable: bool = False,
     emissions: Optional["EmissionsSettings"] = None,
-) -> Tuple[str, Optional[Recommender], Dict, Dict, Dict, Dict]:
+    model_state: Optional[ModelState] = None,
+) -> SwarmModelResult:
     """Orchestrates the entire lifecycle of a single model in parallel.
 
     This task acts as a lightweight manager. It launches HPO, Retraining,
@@ -472,18 +519,18 @@ def remote_model_pipeline(  # noqa: PLR0913
             experiment this model left behind.
         emissions (Optional[EmissionsSettings]): The run's CodeCarbon
             measurement, or None when the run is not measured.
+        model_state (Optional[ModelState]): What the run state records of the
+            model, so that a search it finished is not run again.
 
     Returns:
-        Tuple[str, Optional[Recommender], Dict, Dict, Dict, Dict]: A tuple containing:
-            - str: Model name.
-            - Optional[Recommender]: Best model trained.
-            - results (Dict): Evaluation results.
-            - model_params (Dict): Best parameters found.
-            - timing_report (Dict): Timing statistics.
-            - ray_report (Dict): HPO report.
+        SwarmModelResult: The outcome of the search and, when its best model
+            was built, the model, its results and its time report row.
     """
 
     model_exploration_start_time = time.time()
+
+    # The search names its trials after the model, so it has to be registered here
+    load_custom_modules(config.general.custom_modules)
 
     # Retrieve storage path for Ray results
     # based on the writer configuration
@@ -502,23 +549,36 @@ def remote_model_pipeline(  # noqa: PLR0913
         emissions=emissions,
     )
 
-    # Run the HPO
-    if val_dataset is not None:
-        # CASE 2: Train/Validation/Test
-        outcome = single_split_flow(model_name, params, val_dataset, trainer, config)
-    elif len(fold_dataset) > 0:
-        # CASE 3: Cross-validation
-        outcome = multiple_fold_validation_flow(
-            model_name, params, main_dataset, fold_dataset, trainer, config
-        )
-    else:
-        # CASE 1: Train/Test
-        outcome = single_split_flow(model_name, params, main_dataset, trainer, config)
+    # Run the HPO, unless the run state records it finished
+    outcome = resolve_model_outcome(
+        model_name,
+        params,
+        trainer,
+        config,
+        main_dataset,
+        val_dataset,
+        fold_dataset,
+        model_state or ModelState(),
+    )
+    if outcome.interrupted or outcome.failed:
+        return SwarmModelResult(model_name=model_name, outcome=outcome)
 
-    if outcome.interrupted or outcome.failed or outcome.model is None:
-        # The last element reports the status so that the driver can tell an
-        # interrupted model from a failed one.
-        return model_name, None, {}, {}, {}, {"status": outcome.status}
+    try:
+        outcome = build_best_model(
+            model_name,
+            params,
+            outcome,
+            trainer,
+            config,
+            main_dataset,
+            cross_validated=val_dataset is None and len(fold_dataset) > 0,
+        )
+    except Exception as e:
+        return SwarmModelResult(
+            model_name=model_name,
+            outcome=outcome,
+            load_error=f"{type(e).__name__}: {e}",
+        )
 
     best_model = outcome.model
     ray_report = outcome.report
@@ -595,4 +655,11 @@ def remote_model_pipeline(  # noqa: PLR0913
         data_times=data_times,
     )
 
-    return model_name, best_model, results, model_params, timing_report, ray_report
+    return SwarmModelResult(
+        model_name=model_name,
+        outcome=replace(outcome, model=None),
+        model=best_model,
+        results=results,
+        model_params=model_params,
+        timing_report=timing_report,
+    )

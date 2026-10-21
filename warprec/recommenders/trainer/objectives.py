@@ -43,6 +43,31 @@ from warprec.utils.helpers import (
 from warprec.utils.registry import model_registry
 from warprec.utils.logger import logger
 
+# What a failed trial reports along with its infinite score, so that the search
+# can tell it from one that trained, and say why it failed
+TRIAL_FAILED = "trial_failed"
+TRIAL_ERROR = "trial_error"
+
+
+def report_failure(validation_score: str, mode: str, error: Exception) -> None:
+    """Report a failed trial to Ray Tune with the worst possible score.
+
+    Called from every rank: report() is collective, and a single rank calling
+    it deadlocks the others.
+
+    Args:
+        validation_score (str): The validation metric.
+        mode (str): 'max' or 'min'.
+        error (Exception): What made the trial fail.
+    """
+    train.report(
+        {
+            validation_score: -float("inf") if mode == "max" else float("inf"),
+            TRIAL_FAILED: True,
+            TRIAL_ERROR: f"{type(error).__name__}: {error}",
+        }
+    )
+
 
 def objective_function(config: dict) -> None:
     """Objective function to optimize the hyperparameters.
@@ -146,11 +171,7 @@ def _run_trial(config: dict) -> None:  # noqa: PLR0915
             model_params.validate_single_trial_params()
         except ValueError as e:
             logger.negative(str(e))  # Log the custom message from Pydantic validation
-            # Report failure to Ray Train from every rank: report() is
-            # collective, and a single rank calling it deadlocks the others
-            train.report(
-                {validation_score: -float("inf") if mode == "max" else float("inf")}
-            )
+            report_failure(validation_score, mode, e)
             return
 
     # Proceed with normal model training behavior
@@ -338,6 +359,4 @@ def _run_trial(config: dict) -> None:  # noqa: PLR0915
         )
         # Every rank: guarding this one turns any failure during fit() into a
         # deadlock instead of a reported error
-        train.report(
-            {validation_score: -float("inf") if mode == "max" else float("inf")}
-        )
+        report_failure(validation_score, mode, e)
