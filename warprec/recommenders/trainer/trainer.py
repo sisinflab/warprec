@@ -205,7 +205,7 @@ class Trainer:
         self,
         model_name: str,
         params: RecomModel,
-        dataset: Dataset,
+        dataset: Union[Dataset, ray.ObjectRef],
         evaluation: EvaluationConfig,
         validation_score: str,
         device: str = "cpu",
@@ -219,7 +219,9 @@ class Trainer:
         Args:
             model_name (str): The name of the model to optimize.
             params (RecomModel): The parameters of the model.
-            dataset (Dataset): The dataset to use during training.
+            dataset (Union[Dataset, ray.ObjectRef]): The dataset to use during
+                training, or a reference to it in the object store, which the
+                trials read without it being stored again.
             evaluation (EvaluationConfig): The evaluation section of the configuration.
             validation_score (str): The metric to monitor during training.
             device (str): The device that will be used for tensor operations.
@@ -306,19 +308,21 @@ class Trainer:
         self,
         model_name: str,
         params: RecomModel,
-        datasets: List[Dataset],
+        datasets: Union[List[Dataset], ray.ObjectRef],
         evaluation: EvaluationConfig,
         validation_score: str,
         device: str = "cpu",
         desired_training_it: str = "median",
         ray_verbose: int = 1,
+        num_folds: Optional[int] = None,
     ) -> TrainingOutcome:
         """Main method of the Trainer class for cross-validation.
 
         Args:
             model_name (str): The name of the model to optimize.
             params (RecomModel): The parameters of the model.
-            datasets (List[Dataset]): The list of datasets to use during training.
+            datasets (Union[List[Dataset], ray.ObjectRef]): The folds to use during
+                training, or a reference to their list in the object store.
             evaluation (EvaluationConfig): The evaluation section of the configuration.
             validation_score (str): The metric to monitor during training.
             device (str): The device that will be used for tensor operations.
@@ -327,6 +331,8 @@ class Trainer:
                 when training on the full dataset. Either "min", "max",
                 "mean" or "median". Default is "median".
             ray_verbose (int): The Ray level of verbosity.
+            num_folds (Optional[int]): The number of folds, required when the
+                folds are given by reference.
 
         Returns:
             TrainingOutcome: The outcome of the optimization, carrying the best
@@ -334,7 +340,12 @@ class Trainer:
                 produces no single best checkpoint, so the outcome carries no
                 model. When the sweep was paused or produced no usable result,
                 the outcome carries the corresponding status.
+
+        Raises:
+            ValueError: If the folds are given by reference without their number.
         """
+        if not isinstance(datasets, list) and not num_folds:
+            raise ValueError("The number of folds is needed with a reference to them.")
 
         mode = params.optimization.properties.mode
 
@@ -346,6 +357,7 @@ class Trainer:
             validation_score=validation_score,
             device=device,
             ray_verbose=ray_verbose,
+            num_folds=len(datasets) if isinstance(datasets, list) else num_folds,
         )
 
         search_start = time.perf_counter()
@@ -415,23 +427,26 @@ class Trainer:
         self,
         model_name: str,
         params: RecomModel,
-        dataset: Union[Dataset, List[Dataset]],
+        dataset: Union[Dataset, List[Dataset], ray.ObjectRef],
         evaluation: EvaluationConfig,
         validation_score: str,
         device: str,
         ray_verbose: int,
+        num_folds: Optional[int] = None,
     ) -> Tuner:
         """Prepares the Ray Tuner instance.
 
         Args:
             model_name (str): The name of the model to optimize.
             params (RecomModel): The parameters of the model.
-            dataset (Union[Dataset, List[Dataset]]): The dataset(s) to use during
-                training.
+            dataset (Union[Dataset, List[Dataset], ray.ObjectRef]): The dataset(s)
+                to use during training, or a reference to them in the object store.
             evaluation (EvaluationConfig): The evaluation section of the configuration.
             validation_score (str): The metric to monitor during training.
             device (str): The device that will be used for tensor operations.
             ray_verbose (int): The Ray level of verbosity.
+            num_folds (Optional[int]): The number of cross-validation folds, None
+                or 0 for a single split.
 
         Returns:
             Tuner: The configured Ray Tuner instance.
@@ -453,7 +468,10 @@ class Trainer:
         validation_metric_name, validation_top_k = validation_metric(validation_score)
         data_bundle = {
             "model_name": model_name,
-            "dataset_folds": ray.put(dataset),
+            # A dataset already in the object store is not stored again
+            "dataset_folds": (
+                dataset if isinstance(dataset, ray.ObjectRef) else ray.put(dataset)
+            ),
             "evaluation": evaluation,
             "validation_top_k": validation_top_k,
             "validation_metric_name": validation_metric_name,
@@ -485,8 +503,9 @@ class Trainer:
             ),
         }
 
-        num_folds = len(dataset) if isinstance(dataset, list) else 0
-        param_space = self._parse_params(params, num_folds)
+        if isinstance(dataset, list):
+            num_folds = len(dataset)
+        param_space = self._parse_params(params, num_folds or 0)
         experiment_name = self.experiment_name(model_name)
         restore = self._claim_experiment(experiment_name)
         logged_epochs = (
@@ -850,14 +869,17 @@ class Trainer:
         max_concurrent_trials = min(concurrency_limits)
         return max_concurrent_trials if max_concurrent_trials > 0 else None
 
+    @staticmethod
     def load_best_model(
-        self,
         model_name: str,
         checkpoint_path: str,
         best_params: dict,
         dataset: Dataset,
     ) -> Recommender:
         """Loads the model state from a trial checkpoint.
+
+        A closed-form model has no checkpoint: it is refitted from its parameters.
+        The pipelines call this on the cluster, where the dataset is.
 
         Args:
             model_name (str): The name of the model.
