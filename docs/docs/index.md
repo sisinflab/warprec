@@ -25,15 +25,15 @@ Innovation in Recommender Systems is impeded by a fractured ecosystem. Researche
 
 <div class="feature-grid">
   <div class="feature-card">
-    <strong>65+ Algorithms</strong>
-    From matrix factorization to graph-based and sequential architectures, spanning 6 model families.
+    <strong>87 Algorithms</strong>
+    From matrix factorization to graph-based and sequential architectures, spanning 8 model families.
   </div>
   <div class="feature-card">
     <strong>45 GPU-Accelerated Metrics</strong>
     Accuracy, rating, coverage, novelty, diversity, bias, fairness, and multi-objective evaluation.
   </div>
   <div class="feature-card">
-    <strong>19 Data Strategies</strong>
+    <strong>21 Data Strategies</strong>
     13 filtering and 8 splitting strategies for rigorous, leak-free experimental protocols.
   </div>
   <div class="feature-card">

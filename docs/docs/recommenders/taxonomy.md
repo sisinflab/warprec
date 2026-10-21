@@ -1,6 +1,6 @@
 # Models Taxonomy
 
-WarpRec ships with **88 built-in algorithms** spanning 8 model families. All models can run locally or at cluster scale via Ray.
+WarpRec ships with **87 built-in algorithms** spanning 8 model families. All models can run locally or at cluster scale via Ray.
 
 | Family | Model | Description |
 |---|---|---|

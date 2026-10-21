@@ -1,6 +1,6 @@
 # Metrics Taxonomy
 
-WarpRec includes **44 GPU-accelerated metrics** organized into 9 families. All metrics are implemented as PyTorch modules and support distributed evaluation.
+WarpRec includes **45 GPU-accelerated metrics** organized into 9 families. All metrics are implemented as PyTorch modules and support distributed evaluation.
 
 | Family | Metric | Description | Type |
 |---|---|---|---|
