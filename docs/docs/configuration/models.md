@@ -441,6 +441,8 @@ Advanced search algorithms (HyperOpt, Optuna) allow fine-grained exploration of 
 - `choice`: Default for discrete options.
 - `grid`: Default for exhaustive grid search.
 
+Some models constrain their hyperparameters jointly: the attention models need an `embedding_size` their `n_heads` divides. A search space holding at least one valid combination is accepted, and every combination is checked as it is sampled, before a trial is launched for it. Under `grid` and `random` a combination the model refuses is skipped, with a warning naming it, and not replaced, so the search runs fewer trials. Under `hopt`, `optuna` and `bohb` it is reported to the search algorithm as a failed trial, so that the algorithm learns to avoid it, and another combination is sampled in its place.
+
 **Structure of parameter sampling in WarpRec**
 
 Each parameter is defined as a list where:
