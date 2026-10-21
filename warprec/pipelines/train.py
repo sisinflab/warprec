@@ -1,5 +1,4 @@
 import time
-from dataclasses import replace
 from pathlib import Path
 from typing import TYPE_CHECKING, List, Optional, Dict, Any
 
@@ -11,23 +10,22 @@ from warprec.common import (
     log_evaluation,
     reconcile_model_state,
 )
-from warprec.data import Dataset
+from warprec.data.writer.base_writer import Writer
 from warprec.pipelines.common import (
     PipelineContext,
+    PreparedDatasets,
     bootstrap_pipeline,
+    callback_needs_model,
     data_preparation_seconds,
     measure_emissions,
+    model_task_options,
     model_timing_row,
     prepare_datasets,
     raise_failed_loads,
     report_statistical_significance,
     write_model_outputs,
 )
-from warprec.pipelines.remotes import (
-    remote_model_retraining,
-    remote_evaluation_and_timing,
-    remote_generate_recs,
-)
+from warprec.pipelines.remotes import ModelCompletion, remote_complete_model
 from warprec.utils.config import (
     TrainConfiguration,
     RecomModel,
@@ -49,9 +47,7 @@ def resolve_model_outcome(
     params: RecomModel,
     trainer: Trainer,
     config: TrainConfiguration,
-    main_dataset: Dataset,
-    val_dataset: Optional[Dataset],
-    fold_dataset: List[Dataset],
+    data: PreparedDatasets,
     model_state: ModelState,
 ) -> TrainingOutcome:
     """Produces the training outcome for one model, reusing saved state if possible.
@@ -59,16 +55,14 @@ def resolve_model_outcome(
     When the run state records that hyperparameter optimization already finished
     for this model, its result is reused instead of running the sweep again,
     whether or not its best model could be built then. The outcome carries no
-    model: 'build_best_model' builds it.
+    model: 'complete_model' builds it on the cluster.
 
     Args:
         model_name (str): The name of the model.
         params (RecomModel): The parameters of the model.
         trainer (Trainer): The trainer instance used to optimize the model.
         config (TrainConfiguration): The configuration file.
-        main_dataset (Dataset): The main dataset which represents train/test split.
-        val_dataset (Optional[Dataset]): The validation dataset, when present.
-        fold_dataset (List[Dataset]): The cross-validation folds, when present.
+        data (PreparedDatasets): The datasets of the run, by reference.
         model_state (ModelState): The saved state of this model.
 
     Returns:
@@ -81,7 +75,7 @@ def resolve_model_outcome(
         # A cross-validated search keeps no checkpoint: its best model is
         # retrained from the parameters
         checkpoint = model_state.best_checkpoint_path
-        if len(fold_dataset) > 0 or (checkpoint and _checkpoint_exists(checkpoint)):
+        if data.cross_validated or (checkpoint and _checkpoint_exists(checkpoint)):
             logger.msg(f"Reusing the completed hyperparameter search for {model_name}.")
             return TrainingOutcome(
                 status="completed",
@@ -95,16 +89,16 @@ def resolve_model_outcome(
             "The hyperparameter search will run again."
         )
 
-    if val_dataset is not None:
+    if data.layout.has_validation:
         # CASE 2: Train/Validation/Test
-        return single_split_flow(model_name, params, val_dataset, trainer, config)
-    if len(fold_dataset) > 0:
+        return single_split_flow(model_name, params, data.validation, trainer, config)
+    if data.cross_validated:
         # CASE 3: Cross-validation
         return multiple_fold_validation_flow(
-            model_name, params, fold_dataset, trainer, config
+            model_name, params, data.folds, data.layout.n_folds, trainer, config
         )
     # CASE 1: Train/Test
-    return single_split_flow(model_name, params, main_dataset, trainer, config)
+    return single_split_flow(model_name, params, data.main, trainer, config)
 
 
 def _checkpoint_exists(checkpoint_path: str) -> bool:
@@ -121,81 +115,47 @@ def _checkpoint_exists(checkpoint_path: str) -> bool:
     return checkpoint_path == "None" or Path(checkpoint_path).exists()
 
 
-def build_best_model(
+def complete_model(
     model_name: str,
     params: RecomModel,
     outcome: TrainingOutcome,
-    trainer: Trainer,
+    data: PreparedDatasets,
     config: TrainConfiguration,
-    main_dataset: Dataset,
-    cross_validated: bool,
-) -> TrainingOutcome:
-    """Builds the best model of a finished search.
+    writer: Writer,
+    return_model: bool = False,
+) -> ModelCompletion:
+    """Builds, evaluates and writes the best model of a finished search, on the cluster.
 
-    It is loaded from the best trial's checkpoint, refitted when closed-form,
-    or, after cross-validation, retrained on the main split.
+    The best model is loaded from its checkpoint, refitted when it is
+    closed-form, or retrained on the main split after cross-validation, by a
+    task with the resources of one trial, which then evaluates it and writes it.
 
     Args:
         model_name (str): The name of the model.
         params (RecomModel): The parameters of the model.
         outcome (TrainingOutcome): The completed outcome of its search.
-        trainer (Trainer): The trainer that ran the search.
+        data (PreparedDatasets): The datasets of the run, by reference.
         config (TrainConfiguration): The configuration file.
-        main_dataset (Dataset): The main dataset which represents train/test split.
-        cross_validated (bool): Whether the search ran over folds.
+        writer (Writer): The writer of the run.
+        return_model (bool): Whether to bring the model back, for a callback.
 
     Returns:
-        TrainingOutcome: The outcome, carrying the model and its parameter counts.
+        ModelCompletion: What the task returned.
     """
-    if not cross_validated:
-        model = trainer.load_best_model(
-            model_name,
-            outcome.best_checkpoint_path,
-            outcome.best_params,
-            main_dataset,
-        )
-        return replace(
-            outcome,
-            model=model,
-            report={**outcome.report, **trainer.parameter_counts(model)},
-        )
-
-    general_device = config.general.device
-    model_device = params.optimization.device
-    device = general_device if model_device is None else model_device
-
-    logger.msg(f"Delegating {model_name} model retraining to Ray cluster")
-
-    # Retrieve resources to request correct node from cluster
-    num_cpus = params.optimization.cpu_per_trial
-    num_gpus = params.optimization.gpu_per_trial
-    custom_res = params.optimization.custom_resources_per_trial or {}
-    label_selector = params.optimization.label_selector or {}
-
-    # Offload the retraining to a worker node
-    best_model, retrain_report, iterations = ray.get(
-        remote_model_retraining.options(
-            num_cpus=num_cpus,
-            num_gpus=num_gpus,
-            resources=custom_res if custom_res else None,
-            label_selector=label_selector if label_selector else None,
-        ).remote(
+    device, options = model_task_options(params, config)
+    logger.msg(f"Delegating the best {model_name} model to the Ray cluster.")
+    return ray.get(
+        remote_complete_model.options(**options).remote(
             model_name=model_name,
-            best_params=outcome.best_params,
-            main_dataset=main_dataset,
             params=params,
-            custom_modules=config.general.custom_modules,
+            outcome=outcome,
+            main_dataset=data.main,
+            config=config,
+            writer=writer,
+            cross_validated=data.cross_validated,
             device=device,
-            seed=params.optimization.properties.seed,
+            return_model=return_model,
         )  # type: ignore[call-arg]
-    )
-
-    # Merge the parameter counts into the main report
-    return replace(
-        outcome,
-        model=best_model,
-        report={**outcome.report, **retrain_report},
-        best_iter=iterations,
     )
 
 
@@ -225,7 +185,9 @@ def _train_models(  # noqa: PLR0912, PLR0915
     config = context.config
 
     # Build the datasets on the cluster and persist the splits if asked to
-    main_dataset, val_dataset, fold_dataset, data_times = prepare_datasets(context)
+    data = prepare_datasets(context)
+    data_times = data.layout.times
+    needs_model = callback_needs_model(context.callback)
 
     # List of models to train
     models = list(config.models.keys())
@@ -306,9 +268,7 @@ def _train_models(  # noqa: PLR0912, PLR0915
                     params,
                     trainer,
                     config,
-                    main_dataset,
-                    val_dataset,
-                    fold_dataset,
+                    data,
                     model_state,
                 )
 
@@ -337,73 +297,33 @@ def _train_models(  # noqa: PLR0912, PLR0915
                 model_state.ray_report = outcome.report
                 context.state_store.save(context.state)
 
-                try:
-                    outcome = build_best_model(
-                        model_name,
-                        params,
-                        outcome,
-                        trainer,
-                        config,
-                        main_dataset,
-                        cross_validated=val_dataset is None and len(fold_dataset) > 0,
-                    )
-                except Exception as e:
+                search_seconds = time.time() - model_exploration_start_time
+                completion = complete_model(
+                    model_name,
+                    params,
+                    outcome,
+                    data,
+                    config,
+                    context.writer,
+                    return_model=needs_model,
+                )
+                if completion.error is not None:
                     logger.negative(
                         f"The best model of {model_name} could not be built: "
-                        f"{type(e).__name__}: {e}"
+                        f"{completion.error}"
                     )
                     model_state.status = ModelStatus.FAILED_LOAD
                     context.state_store.save(context.state)
                     failed_loads.append(model_name)
                     continue
 
-                best_model = outcome.model
-                ray_report = outcome.report
-                best_iter = outcome.best_iter
-
-                model_exploration_total_time = (
-                    time.time() - model_exploration_start_time
-                )
+                ray_report = completion.outcome.report
+                results = completion.results
+                model_exploration_total_time = search_seconds + completion.build_seconds
 
                 # Callback on training complete
-                context.callback.on_training_complete(model=best_model)
-
-                # Prepare device for current model
-                general_device = config.general.device
-                model_device = params.optimization.device
-                device = general_device if model_device is None else model_device
-
-                # Retrieve resources and labels to request correct node from cluster
-                num_cpus = params.optimization.cpu_per_trial
-                num_gpus = params.optimization.gpu_per_trial
-                custom_res = params.optimization.custom_resources_per_trial or {}
-                label_selector = params.optimization.label_selector or {}
-
-                # Fallback: in case the device is set to cuda but no GPUs are requested,
-                # we set num_gpus to 1 to ensure the correct node is selected
-                if device == "cuda" and num_gpus == 0:
-                    num_gpus = 1
-
-                # Offload evaluation to worker node
-                logger.msg(
-                    f"Delegating evaluation of {model_name} model to Ray cluster"
-                )
-                results, model_evaluation_total_time, inference_time = ray.get(
-                    remote_evaluation_and_timing.options(
-                        num_cpus=num_cpus,
-                        num_gpus=num_gpus,
-                        resources=custom_res if custom_res else None,
-                        label_selector=label_selector if label_selector else None,
-                    ).remote(
-                        model=best_model,
-                        main_dataset=main_dataset,
-                        evaluation=config.evaluation,
-                        num_workers=params.optimization.num_workers,
-                        device=device,
-                        requires_timing=config.general.time_report,
-                        custom_modules=config.general.custom_modules,
-                    )  # type: ignore[call-arg]
-                )
+                if needs_model:
+                    context.callback.on_training_complete(model=completion.model)
 
                 # Log the results
                 log_evaluation(results, "Test", config.evaluation.max_metric_per_row)
@@ -414,42 +334,22 @@ def _train_models(  # noqa: PLR0912, PLR0915
                     )
 
                 # Callback after complete evaluation
-                context.callback.on_evaluation_complete(
-                    model=best_model,
-                    params=params.model_dump(),
-                    results=results,
-                )
+                if needs_model:
+                    context.callback.on_evaluation_complete(
+                        model=completion.model,
+                        params=params.model_dump(),
+                        results=results,
+                    )
 
-                # Results, parameters and the model itself
+                # The results and parameters; the model, the per-user results and
+                # the recommendations were written on the cluster
                 write_model_outputs(
                     context,
                     model_name,
-                    params,
-                    best_model,
                     results,
-                    best_iter,
-                    main_dataset,
+                    completion.best_params,
+                    completion.outcome.best_iter,
                 )
-
-                # Recommendation writing
-                if params.meta.save_recs:
-                    logger.msg(
-                        f"Delegating recommendations generation for {model_name} to Ray cluster"
-                    )
-                    ray.get(
-                        remote_generate_recs.options(
-                            num_cpus=num_cpus,
-                            num_gpus=num_gpus,
-                            resources=custom_res if custom_res else None,
-                            label_selector=label_selector if label_selector else None,
-                        ).remote(
-                            writer=context.writer,
-                            model=best_model,
-                            dataset=main_dataset,
-                            config=config,
-                            device=device,
-                        )  # type: ignore[call-arg]
-                    )
 
                 if config.general.time_report:
                     # Timing report for the current model
@@ -459,8 +359,8 @@ def _train_models(  # noqa: PLR0912, PLR0915
                             data_preparation_time=data_preparation_time,
                             exploration_time=model_exploration_total_time,
                             ray_report=ray_report,
-                            evaluation_time=model_evaluation_total_time,
-                            inference_time=inference_time,
+                            evaluation_time=completion.evaluation_seconds,
+                            inference_time=completion.inference_seconds,
                             data_times=data_times,
                         )
                     )
@@ -503,7 +403,7 @@ def _train_models(  # noqa: PLR0912, PLR0915
 def single_split_flow(
     model_name: str,
     params: RecomModel,
-    dataset: Dataset,
+    dataset: ray.ObjectRef,
     trainer: Trainer,
     config: TrainConfiguration,
 ) -> TrainingOutcome:
@@ -514,7 +414,8 @@ def single_split_flow(
     Args:
         model_name (str): Name of the model to optimize.
         params (RecomModel): The parameter used to train the model.
-        dataset (Dataset): The main dataset which represents train/test split.
+        dataset (ray.ObjectRef): The split to search on, train/test or
+            train/validation, in the object store.
         trainer (Trainer): The trainer instance used to optimize the model.
         config (TrainConfiguration): The configuration file.
 
@@ -559,7 +460,8 @@ def single_split_flow(
 def multiple_fold_validation_flow(
     model_name: str,
     params: RecomModel,
-    val_datasets: List[Dataset],
+    val_datasets: ray.ObjectRef,
+    num_folds: int,
     trainer: Trainer,
     config: TrainConfiguration,
 ) -> TrainingOutcome:
@@ -568,14 +470,15 @@ def multiple_fold_validation_flow(
     Args:
         model_name (str): Name of the model to optimize.
         params (RecomModel): The parameter used to train the model.
-        val_datasets (List[Dataset]): The validation datasets which represents train/val splits.
-            The list can contain n folds of train/val splits.
+        val_datasets (ray.ObjectRef): The list of train/validation folds, in the
+            object store.
+        num_folds (int): The number of folds.
         trainer (Trainer): The trainer instance used to optimize the model.
         config (TrainConfiguration): The configuration file.
 
     Returns:
         TrainingOutcome: The outcome of the optimization for this model, without
-            a model: 'build_best_model' retrains it on the main data split.
+            a model: 'complete_model' retrains it on the main data split.
     """
     # Check for device
     general_device = config.general.device
@@ -612,4 +515,5 @@ def multiple_fold_validation_flow(
         device=device,
         desired_training_it=desired_training_it,
         ray_verbose=config.general.ray_verbose,
+        num_folds=num_folds,
     )

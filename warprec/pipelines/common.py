@@ -8,7 +8,6 @@ import ray
 from warprec.errors import (
     CheckpointError,
     ClusterError,
-    ConfigurationError,
     RunStateError,
 )
 import warprec
@@ -19,14 +18,12 @@ from warprec.common import (
     run_fingerprint,
     warprec_version,
 )
-from warprec.data import Dataset
 from warprec.data.timing import DataPreparationTimes
 from warprec.evaluation.statistical_significance import compute_paired_statistical_test
 from warprec.data.reader import ReaderFactory
 from warprec.data.reader.base_reader import Reader
 from warprec.data.writer import WriterFactory
 from warprec.data.writer.base_writer import Writer
-from warprec.recommenders.base_recommender import Recommender
 from warprec.utils.callback import WarpRecCallback
 from warprec.utils.config import (
     RecomModel,
@@ -34,7 +31,7 @@ from warprec.utils.config import (
     load_callback,
     load_train_configuration,
 )
-from warprec.pipelines.remotes import remote_data_preparation
+from warprec.pipelines.remotes import DataLayout, remote_data_preparation
 from warprec.utils.enums import ResumeMode
 from warprec.utils.logger import logger
 
@@ -313,125 +310,158 @@ def measure_emissions(context: PipelineContext) -> AbstractContextManager[Any]:
     )
 
 
-def prepare_datasets(
-    context: PipelineContext,
-) -> Tuple[Dataset, Optional[Dataset], Optional[List[Dataset]], DataPreparationTimes]:
+@dataclass
+class PreparedDatasets:
+    """The datasets of a run, as references to the objects the cluster holds.
+
+    The driver never fetches them: the trials, the model tasks and the swarm's
+    orchestrators receive the references, and Ray hands each task the datasets
+    it is given from the object store, without serializing them again.
+
+    Attributes:
+        main (ray.ObjectRef): The main dataset, the train/test split.
+        validation (ray.ObjectRef): The validation dataset, a reference to None
+            without one.
+        folds (ray.ObjectRef): The list of cross-validation folds, empty
+            without them.
+        layout (DataLayout): How the data was split, and the preparation times.
+    """
+
+    main: ray.ObjectRef
+    validation: ray.ObjectRef
+    folds: ray.ObjectRef
+    layout: DataLayout
+
+    @property
+    def cross_validated(self) -> bool:
+        """Whether the models are searched over cross-validation folds.
+
+        Returns:
+            bool: True when there are folds and no validation split.
+        """
+        return not self.layout.has_validation and self.layout.n_folds > 0
+
+
+def prepare_datasets(context: PipelineContext) -> PreparedDatasets:
     """Build the datasets on the Ray cluster, and write the splits if asked to.
 
     Args:
         context (PipelineContext): The context produced by the bootstrap.
 
     Returns:
-        Tuple[Dataset, Optional[Dataset], Optional[List[Dataset]], DataPreparationTimes]:
-            The main dataset, the validation dataset, the cross-validation folds
-            and where the Ray task preparing them spent its time.
-
-    Raises:
-        ConfigurationError: If the configured split file format is not supported.
+        PreparedDatasets: References to the main dataset, the validation dataset
+            and the cross-validation folds, and how the task preparing them
+            split the data and spent its time.
     """
     config = context.config
     cpu_data_prep = config.general.cpu_data_prep
     custom_res_data_prep = config.general.custom_resources_data_prep
     label_selector_data_prep = config.general.label_selector_data_prep
 
-    main_dataset, val_dataset, fold_dataset, data_times = ray.get(
-        remote_data_preparation.options(
-            num_cpus=cpu_data_prep,
-            resources=custom_res_data_prep if custom_res_data_prep else None,
-            label_selector=label_selector_data_prep
-            if label_selector_data_prep
-            else None,
-        ).remote(
-            reader=context.reader,
-            callback=context.callback,
-            config=config,
-        )  # type: ignore[call-arg]
+    # Four returns, so that each dataset is an object of its own
+    refs: List[ray.ObjectRef] = remote_data_preparation.options(  # type: ignore[assignment]
+        num_cpus=cpu_data_prep,
+        num_returns=4,
+        resources=custom_res_data_prep if custom_res_data_prep else None,
+        label_selector=label_selector_data_prep if label_selector_data_prep else None,
+    ).remote(
+        reader=context.reader,
+        callback=context.callback,
+        config=config,
+        writer=context.writer,
+    )  # type: ignore[call-arg]
+
+    main_ref, val_ref, folds_ref, layout_ref = refs
+
+    # Only the layout comes to the driver; the datasets stay where they are
+    return PreparedDatasets(
+        main=main_ref, validation=val_ref, folds=folds_ref, layout=ray.get(layout_ref)
     )
 
-    # Write split information if required
-    if config.splitter and config.writer.save_split:
-        file_format = config.writer.split.file_format
 
-        match file_format:
-            case "tabular":
-                context.writer.write_tabular_split(
-                    main_dataset,
-                    val_dataset,
-                    fold_dataset,
-                    **config.writer.split.model_dump(),
-                )
-            case "parquet":
-                context.writer.write_parquet_split(
-                    main_dataset,
-                    val_dataset,
-                    fold_dataset,
-                    **config.writer.split.model_dump(),
-                )
-            case _:
-                raise ConfigurationError(f"File format '{file_format}'not supported.")
+def model_task_options(
+    params: RecomModel, config: TrainConfiguration
+) -> Tuple[str, Dict[str, Any]]:
+    """The device and the resources of the task that completes a model.
 
-    return main_dataset, val_dataset, fold_dataset, data_times
+    Args:
+        params (RecomModel): The parameters of the model.
+        config (TrainConfiguration): The configuration of the experiment.
+
+    Returns:
+        Tuple[str, Dict[str, Any]]: The device, and the options of the Ray task.
+    """
+    general_device = config.general.device
+    model_device = params.optimization.device
+    device = general_device if model_device is None else model_device
+
+    num_gpus = params.optimization.gpu_per_trial
+    # A model on cuda without GPUs requested still needs a node that has one
+    if device == "cuda" and num_gpus == 0:
+        num_gpus = 1
+
+    custom_res = params.optimization.custom_resources_per_trial or {}
+    label_selector = params.optimization.label_selector or {}
+    return device, {
+        "num_cpus": params.optimization.cpu_per_trial,
+        "num_gpus": num_gpus,
+        "resources": custom_res if custom_res else None,
+        "label_selector": label_selector if label_selector else None,
+    }
+
+
+def callback_needs_model(callback: WarpRecCallback) -> bool:
+    """Whether a callback receives the best model, so the driver must fetch it.
+
+    Only the hooks that receive the model count, and only when the callback
+    overrides them: otherwise the model never leaves the cluster.
+
+    Args:
+        callback (WarpRecCallback): The callback of the run.
+
+    Returns:
+        bool: True when it overrides 'on_training_complete' or
+            'on_evaluation_complete'.
+    """
+    return any(
+        getattr(type(callback), hook) is not getattr(WarpRecCallback, hook)
+        for hook in ("on_training_complete", "on_evaluation_complete")
+    )
 
 
 def write_model_outputs(
     context: PipelineContext,
     model_name: str,
-    params: RecomModel,
-    model: Recommender,
     results: Dict[Any, Any],
+    best_params: Dict[str, Any],
     best_iter: int,
-    dataset: Dataset,
 ) -> None:
-    """Write what a run keeps of one evaluated model.
+    """Write what the driver keeps of one evaluated model.
 
     The train and swarm pipelines both call this once a model is evaluated, so
-    that either of them leaves the same files behind: the overall and, when
-    asked for, per-user results, the best parameters and, when 'meta.save_model'
-    is set, the model itself with what serving needs from the data.
+    that either of them leaves the same files behind: the overall results and
+    the best parameters. The per-user results, the model and its
+    recommendations are written on the cluster, by the task that evaluated it.
 
     Args:
         context (PipelineContext): The context produced by the bootstrap.
         model_name (str): The name of the model.
-        params (RecomModel): The parameters of the model.
-        model (Recommender): The best model found.
         results (Dict[Any, Any]): The evaluation results of the model.
+        best_params (Dict[str, Any]): The hyperparameters of the best model.
         best_iter (int): The best training iteration.
-        dataset (Dataset): The main dataset the model was evaluated on.
     """
     config = context.config
     writer = context.writer
 
     writer.write_results(results, model_name, **config.writer.results.model_dump())
-
-    if config.evaluation.save_per_user:
-        i_umap, _ = dataset.get_inverse_mappings()
-        writer.write_results_per_user(
-            results, model_name, i_umap, **config.writer.results.model_dump()
-        )
-
     writer.write_params(
         {
             model_name: {
-                "Best Params": model.get_params(),
+                "Best Params": best_params,
                 "Best Training Iteration": best_iter,
             }
         }
     )
-
-    # Model serialization, with what serving needs from the data
-    if params.meta.save_model:
-        evaluation: Dict[str, Any] = {"strategy": config.evaluation.strategy}
-        if config.evaluation.strategy == "sampled":
-            evaluation["num_negatives"] = config.evaluation.num_negatives
-        writer.write_model(
-            model,
-            dataset=dataset,
-            training={
-                "dataset": config.writer.dataset_name,
-                "evaluation": evaluation,
-                "metrics": results,
-            },
-        )
 
 
 def raise_failed_loads(model_names: List[str], run_name: str) -> None:
