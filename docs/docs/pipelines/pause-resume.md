@@ -22,7 +22,18 @@ A resumed trial keeps its `result.json` and `progress.csv`: the results reported
 <experiment_path>/run_state/<run_name>.json
 ```
 
-The manifest tracks, for every model, one of five states: `pending`, `interrupted`, `hpo_completed`, `completed` or `failed`. On resume, `completed` models are skipped entirely, `hpo_completed` models skip the sweep and rebuild their best model from its checkpoint, and `interrupted` models continue their sweep.
+The manifest tracks, for every model, one of six states:
+
+| State | Meaning | On resume |
+|---|---|---|
+| `pending` | Not started. | The sweep runs. |
+| `interrupted` | The sweep was paused. | The sweep continues from its last trial checkpoints. |
+| `hpo_completed` | The sweep finished, and its best parameters, iteration and checkpoint are recorded. The stages that follow did not all complete. | The sweep is skipped. The best model is loaded from its checkpoint, refitted from its best parameters when it is closed-form, or retrained on the main split after cross-validation. |
+| `failed_load` | The sweep finished, but its best model could not be built from the result. | Like `hpo_completed`: building the model is tried again, without searching again. |
+| `completed` | Every stage finished and was written. | Skipped. |
+| `failed` | No trial produced a usable result: every trial failed, or reported a score that is not finite. | Skipped. |
+
+The search is recorded as `hpo_completed` before its best model is built. When building it fails, the error is logged, the model is marked `failed_load` and the run moves on to the next model. Once every model has been processed, the run exits with status **1** and names the models to build again, which running the same command again does. If the best checkpoint of a recorded search no longer exists, the sweep runs again.
 
 The manifest decides for both layers. A Ray Tune experiment is restored only for a model the manifest records under its current configuration. When the manifest's state is discarded instead — see [What Invalidates a Resume](../configuration/run.md#what-invalidates-a-resume) — the experiment is moved aside to `<run_name>__<model_name>.discarded-<timestamp>` and the model starts a new sweep, so an old split or an old search space can never leak into the new run.
 
