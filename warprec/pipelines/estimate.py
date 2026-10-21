@@ -16,7 +16,7 @@ from warprec.data.timing import DataPreparationTimes
 from warprec.data import Dataset
 from warprec.data.ranking import (
     mask_seen_in_context,
-    mask_seen_pairs,
+    SeenItems,
     resolve_mask_policy,
     restrict_to_candidates,
 )
@@ -387,6 +387,7 @@ def _estimate_eval_loop(  # noqa: PLR0912, PLR0915
     batch_times: List[float] = []
     train_sparse = dataset.train_set.get_sparse()
     padding_idx = train_sparse.shape[1]
+    seen = SeenItems(train_sparse, device)
     max_batches = warmup_batches + measured_batches
 
     # The batches are run here rather than through Evaluator.evaluate so that
@@ -412,7 +413,6 @@ def _estimate_eval_loop(  # noqa: PLR0912, PLR0915
         context = batch_data.get("context")
         candidates = batch_data.get("candidates")
 
-        train_batch = train_sparse[user_indices.tolist(), :]
         predict_kwargs = {"user_indices": user_indices}
 
         if isinstance(model, SequentialRecommenderUtils):
@@ -468,7 +468,7 @@ def _estimate_eval_loop(  # noqa: PLR0912, PLR0915
                         batch_data.get("target_item"),
                     )
                 else:
-                    mask_seen_pairs(predictions, train_batch)
+                    seen.mask(predictions, user_indices)
             else:
                 predictions[candidates == padding_idx] = -torch.inf
 

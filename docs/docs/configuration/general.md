@@ -28,7 +28,7 @@ With `gpu_deterministic: True`, every process that trains or evaluates — the R
 - sets `CUBLAS_WORKSPACE_CONFIG=:4096:8`, which cuBLAS needs to be deterministic, unless the variable is already set (`:16:8` is accepted too, and uses less memory);
 - keeps cuDNN deterministic and its benchmarking off, as WarpRec does for every model whether or not the flag is set.
 
-**What it buys.** A trial that trains on a single GPU worker is bitwise reproducible: run twice, it ends on the same weights, and a trial paused and resumed ends on exactly the weights, best iteration and test results of the uninterrupted one (see [Pause & Resume](../pipelines/pause-resume.md)). The guarantee holds on the same GPU model with the same driver, CUDA and PyTorch versions; a trial spread over several GPU workers is not covered.
+**What it buys.** A trial that trains on a single GPU worker is bitwise reproducible: run twice, it ends on the same weights, and a trial paused and resumed ends on exactly the weights, best iteration and test results of the uninterrupted one (see [Pause & Resume](../pipelines/pause-resume.md)). The guarantee holds on the same GPU model with the same driver, CUDA and PyTorch versions. A trial spread over several GPU workers restores every worker's random state as well, but whether its gradient all-reduce is bitwise repeatable depends on the communication library (NCCL) and is not guaranteed by this flag.
 
 **What it costs.**
 
