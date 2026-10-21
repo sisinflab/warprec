@@ -1,4 +1,4 @@
-from typing import Any, Dict, Optional, Tuple
+from typing import TYPE_CHECKING, Any, Dict, Optional, Tuple
 
 import numpy as np
 import torch
@@ -8,6 +8,9 @@ from torch import Tensor
 from warprec.errors import EvaluationError
 from warprec.data.entities.context import context_key
 from warprec.utils.logger import logger
+
+if TYPE_CHECKING:
+    from warprec.recommenders.reranking.base import Reranker
 
 
 def mask_seen_pairs(predictions: Tensor, seen: csr_matrix) -> None:
@@ -375,3 +378,35 @@ def top_k_breaking_ties(
     values[rows] = tied_values
     indices[rows] = chosen
     return values, indices
+
+
+def rank_top_k(
+    predictions: Tensor,
+    k: int,
+    generator: Optional[torch.Generator] = None,
+    user_indices: Optional[Tensor] = None,
+    reranker: Optional["Reranker"] = None,
+) -> Tuple[Tensor, Tensor]:
+    """The list a ranking hands back: its top k, re-ranked when one is configured.
+
+    Evaluation, the recommendations a run writes and the answers a server gives
+    all end here once their scores are masked, so the three rank alike: ties
+    are broken per user from the same seed, and the same re-ranker reorders the
+    same pool.
+
+    Args:
+        predictions (Tensor): The masked score matrix, one row per user.
+        k (int): The cutoff.
+        generator (Optional[torch.Generator]): The generator whose seed breaks
+            ties, as in ``top_k_breaking_ties``.
+        user_indices (Optional[Tensor]): The user of each row, which keys the
+            tie break and tells a re-ranker whose history to read.
+        reranker (Optional[Reranker]): The re-ranker, or None to rank by score.
+
+    Returns:
+        Tuple[Tensor, Tensor]: The top-k values and the item indices they belong
+            to, in the order they are recommended.
+    """
+    if reranker is not None:
+        return reranker(predictions, k, user_indices, generator)
+    return top_k_breaking_ties(predictions, k, generator, user_indices)

@@ -11,3 +11,5 @@ Auto-generated documentation for re-ranking classes.
 ::: warprec.recommenders.reranking.calibration.Calibration
 
 ::: warprec.recommenders.reranking.factory.build_reranker
+
+::: warprec.recommenders.reranking.factory.build_reranker_from
