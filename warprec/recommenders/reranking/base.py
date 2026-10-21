@@ -208,9 +208,18 @@ class GreedyReranker(Reranker):
         taken = torch.zeros(rows, pool, dtype=torch.bool, device=relevance.device)
         order = torch.empty(rows, k, dtype=torch.long, device=relevance.device)
 
+        # A masked candidate, such as an item the user has already seen, only
+        # reaches the pool when too few items are left to fill it. Its scaled
+        # relevance is the lowest a finite one can have, so an objective that
+        # rewards novelty would happily pick it: it is held below every
+        # candidate that can still be recommended instead, and taken in the
+        # model's order once those run out.
+        masked = ~torch.isfinite(relevance)
+        lowest = torch.finfo(scaled.dtype).min
+
         for step in range(k):
             gain = self._marginal_gain(scaled, candidates, taken, step, state)
-            gain = gain.masked_fill(taken, -torch.inf)
+            gain = gain.masked_fill(masked, lowest).masked_fill(taken, -torch.inf)
 
             picked = gain.argmax(dim=1)
             order[:, step] = picked
