@@ -37,7 +37,9 @@ from warprec.recommenders.trainer.logger_callbacks import (
 )
 from warprec.recommenders.trainer.objectives import TRIAL_ERROR, objective_function
 from warprec.recommenders.trainer.search_algorithm_wrapper import (
+    CappedVariantGenerator,
     ConcurrencyCap,
+    ValidSuggestions,
     recap_restored_search,
 )
 from warprec.recommenders.trainer.timing import (
@@ -670,6 +672,13 @@ class Trainer:
             max_concurrent_trials=max_concurrent_trials,
             **opt_config.properties.model_dump(),
         )
+        # A model whose hyperparameters constrain each other has the
+        # combinations it refuses skipped before a trial is launched for them
+        if params.need_single_trial_validation:
+            if isinstance(search_alg, CappedVariantGenerator):
+                search_alg.model_name = model_name
+            else:
+                search_alg = ValidSuggestions(search_alg, model_name)
         # Capped by a limiter that a restored search does not reset to its old
         # cap, so that a search resumed on another cluster runs as many trials
         # as that cluster can hold
