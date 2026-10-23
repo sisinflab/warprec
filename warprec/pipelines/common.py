@@ -352,6 +352,9 @@ def prepare_datasets(context: PipelineContext) -> PreparedDatasets:
         PreparedDatasets: References to the main dataset, the validation dataset
             and the cross-validation folds, and how the task preparing them
             split the data and spent its time.
+
+    Raises:
+        ClusterError: If Ray's memory monitor stops the data preparation.
     """
     config = context.config
     cpu_data_prep = config.general.cpu_data_prep
@@ -362,6 +365,10 @@ def prepare_datasets(context: PipelineContext) -> PreparedDatasets:
     refs: List[ray.ObjectRef] = remote_data_preparation.options(  # type: ignore[assignment]
         num_cpus=cpu_data_prep,
         num_returns=4,
+        # Ray retries a task its memory monitor kills without limit unless
+        # the task is not retried at all: the preparation would be killed
+        # and started again until the job's time ran out, without an error
+        max_retries=0,
         resources=custom_res_data_prep if custom_res_data_prep else None,
         label_selector=label_selector_data_prep if label_selector_data_prep else None,
     ).remote(
@@ -374,8 +381,19 @@ def prepare_datasets(context: PipelineContext) -> PreparedDatasets:
     main_ref, val_ref, folds_ref, layout_ref = refs
 
     # Only the layout comes to the driver; the datasets stay where they are
+    try:
+        layout = ray.get(layout_ref)
+    except ray.exceptions.OutOfMemoryError as error:
+        raise ClusterError(
+            "Ray's memory monitor stopped the data preparation, which needed "
+            "more memory than its node had left. The datasets are built in "
+            "the task's memory and then stored in Ray's object store, so on "
+            "the node both count: leave the object store at its default size "
+            "(it spills to disk), or prepare the data on a node with more "
+            f"memory (general.label_selector_data_prep). Ray's message: {error}"
+        ) from error
     return PreparedDatasets(
-        main=main_ref, validation=val_ref, folds=folds_ref, layout=ray.get(layout_ref)
+        main=main_ref, validation=val_ref, folds=folds_ref, layout=layout
     )
 
 
