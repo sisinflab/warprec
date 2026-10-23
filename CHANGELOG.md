@@ -2,6 +2,19 @@
 
 <!-- version list -->
 
+## v2.2.8 (2026-10-23)
+
+### Bug Fixes
+
+- A data preparation stopped by Ray's memory monitor ends the run with an error saying so, instead
+  of being retried until the job's time runs out
+  ([`3e16529`](https://github.com/sisinflab/warprec/commit/3e165291228813cb647b38f9941d495dcd25201c))
+
+- The sequential loaders copy the arrays they read at random out of the Ray object store, so a trial
+  on a dataset Ray keeps on disk no longer reads the disk for every sample
+  ([`84a2e7d`](https://github.com/sisinflab/warprec/commit/84a2e7d0b1e0791efa2dc585e5c6b84ace2bc436))
+
+
 ## v2.2.7 (2026-10-21)
 
 ### Bug Fixes
