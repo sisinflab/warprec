@@ -8,7 +8,7 @@ from warprec.recommenders.base_recommender import IterativeRecommender
 from warprec.recommenders.knowledge_aware_recommender.knowledge_utils import (
     KnowledgeRecommenderUtils,
 )
-from warprec.recommenders.losses import BPRLoss, EmbLoss
+from warprec.recommenders.losses import BPRLoss, EmbLoss, dot_scores
 from warprec.utils.registry import model_registry
 
 
@@ -44,6 +44,8 @@ class KGCN(KnowledgeRecommenderUtils, IterativeRecommender):
         batch_size (int): The batch size used for training.
         epochs (int): The number of epochs.
         learning_rate (float): The learning rate value.
+        neg_samples (int): The negatives each positive is contrasted with. The
+            terms they enter are averaged over them.
         neighbour_entities (Tensor): The sampled neighbours of every entity.
         neighbour_relations (Tensor): How each of those neighbours was reached.
     """
@@ -56,6 +58,7 @@ class KGCN(KnowledgeRecommenderUtils, IterativeRecommender):
     batch_size: int
     epochs: int
     learning_rate: float
+    neg_samples: int = 1
 
     # Registered buffers, annotated so that they read as the tensors they are.
     neighbour_entities: Tensor
@@ -242,6 +245,7 @@ class KGCN(KnowledgeRecommenderUtils, IterativeRecommender):
     ):
         return interactions.get_contrastive_dataloader(
             batch_size=self.batch_size,
+            neg_samples=self.neg_samples,
             **kwargs,
         )
 
@@ -250,11 +254,22 @@ class KGCN(KnowledgeRecommenderUtils, IterativeRecommender):
 
         user_e = self.user_embedding(user)
         positive_e = self._pair_representation(user_e, positive)
-        negative_e = self._pair_representation(user_e, negative)
 
+        if negative.dim() == 1:
+            negative_e = self._pair_representation(user_e, negative)
+        else:
+            # Each negative is read through its user's eyes, so the row is
+            # walked as that many pairs, the user repeated beside each.
+            negative_e = self._pair_representation(
+                user_e.repeat_interleave(negative.size(1), dim=0),
+                negative.reshape(-1),
+            ).view(*negative.shape, -1)
+
+        # A row of negatives is each contrasted with the positive, and the loss
+        # and their regularization are averaged over them.
         loss = self.rec_loss(
-            (user_e * positive_e).sum(dim=1), (user_e * negative_e).sum(dim=1)
-        ) + self.reg_weight * self.reg_loss(user_e, positive_e, negative_e)
+            (user_e * positive_e).sum(dim=1), dot_scores(user_e, negative_e)
+        ) + self.reg_weight * self.reg_loss(user_e, positive_e, negatives=negative_e)
 
         self.log("loss", loss, prog_bar=True, on_step=False, on_epoch=True)
         return loss

@@ -57,6 +57,7 @@ class CKE(RecomModel):
         batch_size (INT_FIELD): List of values for batch_size.
         epochs (INT_FIELD): List of values for epochs.
         learning_rate (FLOAT_FIELD): List of values for learning rate.
+        neg_samples (INT_FIELD): List of values for the negatives per positive.
     """
 
     need_knowledge: ClassVar[bool] = True
@@ -68,6 +69,7 @@ class CKE(RecomModel):
     batch_size: INT_FIELD
     epochs: INT_FIELD
     learning_rate: FLOAT_FIELD
+    neg_samples: INT_FIELD = [1]
 
     @field_validator("embedding_size")
     @classmethod
@@ -111,6 +113,12 @@ class CKE(RecomModel):
         """Validate learning_rate."""
         return validate_greater_than_zero(cls, v, "learning_rate")
 
+    @field_validator("neg_samples")
+    @classmethod
+    def check_neg_samples(cls, v: list):
+        """Validate neg_samples."""
+        return validate_greater_than_zero(cls, v, "neg_samples")
+
 
 @params_registry.register("KGAT")
 class KGAT(RecomModel):
@@ -126,6 +134,7 @@ class KGAT(RecomModel):
         batch_size (INT_FIELD): List of values for batch_size.
         epochs (INT_FIELD): List of values for epochs.
         learning_rate (FLOAT_FIELD): List of values for learning rate.
+        neg_samples (INT_FIELD): List of values for the negatives per positive.
     """
 
     need_knowledge: ClassVar[bool] = True
@@ -138,6 +147,7 @@ class KGAT(RecomModel):
     batch_size: INT_FIELD
     epochs: INT_FIELD
     learning_rate: FLOAT_FIELD
+    neg_samples: INT_FIELD = [1]
 
     @field_validator("embedding_size")
     @classmethod
@@ -187,6 +197,12 @@ class KGAT(RecomModel):
         """Validate learning_rate."""
         return validate_greater_than_zero(cls, v, "learning_rate")
 
+    @field_validator("neg_samples")
+    @classmethod
+    def check_neg_samples(cls, v: list):
+        """Validate neg_samples."""
+        return validate_greater_than_zero(cls, v, "neg_samples")
+
 
 @params_registry.register("KGCN")
 class KGCN(RecomModel):
@@ -202,6 +218,7 @@ class KGCN(RecomModel):
         batch_size (INT_FIELD): List of values for batch_size.
         epochs (INT_FIELD): List of values for epochs.
         learning_rate (FLOAT_FIELD): List of values for learning rate.
+        neg_samples (INT_FIELD): List of values for the negatives per positive.
     """
 
     need_knowledge: ClassVar[bool] = True
@@ -214,6 +231,7 @@ class KGCN(RecomModel):
     batch_size: INT_FIELD
     epochs: INT_FIELD
     learning_rate: FLOAT_FIELD
+    neg_samples: INT_FIELD = [1]
 
     @field_validator("embedding_size")
     @classmethod
@@ -257,6 +275,12 @@ class KGCN(RecomModel):
         """Validate learning_rate."""
         return validate_greater_than_zero(cls, v, "learning_rate")
 
+    @field_validator("neg_samples")
+    @classmethod
+    def check_neg_samples(cls, v: list):
+        """Validate neg_samples."""
+        return validate_greater_than_zero(cls, v, "neg_samples")
+
     @field_validator("aggregator")
     @classmethod
     def check_aggregator(cls, v: list):
@@ -278,6 +302,7 @@ class RippleNet(RecomModel):
         batch_size (INT_FIELD): List of values for batch_size.
         epochs (INT_FIELD): List of values for epochs.
         learning_rate (FLOAT_FIELD): List of values for learning rate.
+        neg_samples (INT_FIELD): List of values for the negatives per positive.
     """
 
     need_knowledge: ClassVar[bool] = True
@@ -290,6 +315,7 @@ class RippleNet(RecomModel):
     batch_size: INT_FIELD
     epochs: INT_FIELD
     learning_rate: FLOAT_FIELD
+    neg_samples: INT_FIELD = [1]
 
     @field_validator("embedding_size")
     @classmethod
@@ -339,6 +365,12 @@ class RippleNet(RecomModel):
         """Validate learning_rate."""
         return validate_greater_than_zero(cls, v, "learning_rate")
 
+    @field_validator("neg_samples")
+    @classmethod
+    def check_neg_samples(cls, v: list):
+        """Validate neg_samples."""
+        return validate_greater_than_zero(cls, v, "neg_samples")
+
 
 @params_registry.register("KGIN")
 class KGIN(RecomModel):
@@ -357,6 +389,7 @@ class KGIN(RecomModel):
         batch_size (INT_FIELD): List of values for batch_size.
         epochs (INT_FIELD): List of values for epochs.
         learning_rate (FLOAT_FIELD): List of values for learning rate.
+        neg_samples (INT_FIELD): List of values for the negatives per positive.
     """
 
     need_knowledge: ClassVar[bool] = True
@@ -372,6 +405,7 @@ class KGIN(RecomModel):
     batch_size: INT_FIELD
     epochs: INT_FIELD
     learning_rate: FLOAT_FIELD
+    neg_samples: INT_FIELD = [1]
 
     @field_validator("embedding_size")
     @classmethod
@@ -433,6 +467,12 @@ class KGIN(RecomModel):
         """Validate learning_rate."""
         return validate_greater_than_zero(cls, v, "learning_rate")
 
+    @field_validator("neg_samples")
+    @classmethod
+    def check_neg_samples(cls, v: list):
+        """Validate neg_samples."""
+        return validate_greater_than_zero(cls, v, "neg_samples")
+
     @field_validator("independence")
     @classmethod
     def check_independence(cls, v: list):
@@ -453,6 +493,7 @@ class KaHFM(RecomModel):
         batch_size (INT_FIELD): List of values for batch_size.
         epochs (INT_FIELD): List of values for epochs.
         learning_rate (FLOAT_FIELD): List of values for learning rate.
+        neg_samples (INT_FIELD): List of values for the negatives per positive.
     """
 
     need_knowledge: ClassVar[bool] = True
@@ -463,6 +504,7 @@ class KaHFM(RecomModel):
     batch_size: INT_FIELD
     epochs: INT_FIELD
     learning_rate: FLOAT_FIELD
+    neg_samples: INT_FIELD = [1]
 
     @field_validator("min_feature_items")
     @classmethod
@@ -500,6 +542,12 @@ class KaHFM(RecomModel):
         """Validate learning_rate."""
         return validate_greater_than_zero(cls, v, "learning_rate")
 
+    @field_validator("neg_samples")
+    @classmethod
+    def check_neg_samples(cls, v: list):
+        """Validate neg_samples."""
+        return validate_greater_than_zero(cls, v, "neg_samples")
+
 
 @params_registry.register("KGFlex")
 class KGFlex(RecomModel):
@@ -517,6 +565,7 @@ class KGFlex(RecomModel):
         batch_size (INT_FIELD): List of values for batch_size.
         epochs (INT_FIELD): List of values for epochs.
         learning_rate (FLOAT_FIELD): List of values for learning rate.
+        neg_samples (INT_FIELD): List of values for the negatives per positive.
     """
 
     need_knowledge: ClassVar[bool] = True
@@ -528,6 +577,7 @@ class KGFlex(RecomModel):
     batch_size: INT_FIELD
     epochs: INT_FIELD
     learning_rate: FLOAT_FIELD
+    neg_samples: INT_FIELD = [1]
 
     @field_validator("embedding_size")
     @classmethod
@@ -570,3 +620,9 @@ class KGFlex(RecomModel):
     def check_learning_rate(cls, v: list):
         """Validate learning_rate."""
         return validate_greater_than_zero(cls, v, "learning_rate")
+
+    @field_validator("neg_samples")
+    @classmethod
+    def check_neg_samples(cls, v: list):
+        """Validate neg_samples."""
+        return validate_greater_than_zero(cls, v, "neg_samples")

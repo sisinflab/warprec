@@ -10,7 +10,7 @@ from warprec.recommenders.base_recommender import IterativeRecommender
 from warprec.recommenders.knowledge_aware_recommender.knowledge_utils import (
     KnowledgeRecommenderUtils,
 )
-from warprec.recommenders.losses import BPRLoss, EmbLoss
+from warprec.recommenders.losses import BPRLoss, EmbLoss, dot_scores
 from warprec.utils.registry import model_registry
 
 
@@ -49,6 +49,8 @@ class KGIN(KnowledgeRecommenderUtils, IterativeRecommender):
         batch_size (int): The batch size used for training.
         epochs (int): The number of epochs.
         learning_rate (float): The learning rate value.
+        neg_samples (int): The negatives each positive is contrasted with. The
+            terms they enter are averaged over them.
         edge_heads (Tensor): The head of each fact, as a graph edge.
         edge_tails (Tensor): The tail of each fact, as a graph edge.
         edge_relations (Tensor): The relation each edge sits on.
@@ -68,6 +70,7 @@ class KGIN(KnowledgeRecommenderUtils, IterativeRecommender):
     batch_size: int
     epochs: int
     learning_rate: float
+    neg_samples: int = 1
 
     # Registered buffers, annotated so that they read as the tensors they are.
     edge_heads: Tensor
@@ -292,6 +295,7 @@ class KGIN(KnowledgeRecommenderUtils, IterativeRecommender):
     ):
         return interactions.get_contrastive_dataloader(
             batch_size=self.batch_size,
+            neg_samples=self.neg_samples,
             **kwargs,
         )
 
@@ -303,11 +307,13 @@ class KGIN(KnowledgeRecommenderUtils, IterativeRecommender):
         positive_e = entities[self.entity_of(positive)]
         negative_e = entities[self.entity_of(negative)]
 
+        # A row of negatives is each contrasted with the positive, and the loss
+        # and their regularization are averaged over them.
         loss = (
             self.bpr_loss(
-                (user_e * positive_e).sum(dim=1), (user_e * negative_e).sum(dim=1)
+                (user_e * positive_e).sum(dim=1), dot_scores(user_e, negative_e)
             )
-            + self.reg_weight * self.reg_loss(user_e, positive_e, negative_e)
+            + self.reg_weight * self.reg_loss(user_e, positive_e, negatives=negative_e)
             + self.ind_weight * self.independence_loss()
         )
 

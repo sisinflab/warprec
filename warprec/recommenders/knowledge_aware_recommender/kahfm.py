@@ -10,7 +10,7 @@ from warprec.recommenders.base_recommender import IterativeRecommender
 from warprec.recommenders.knowledge_aware_recommender.knowledge_utils import (
     KnowledgeRecommenderUtils,
 )
-from warprec.recommenders.losses import BPRLoss, EmbLoss
+from warprec.recommenders.losses import BPRLoss, EmbLoss, dot_scores
 from warprec.utils.registry import model_registry
 
 
@@ -52,6 +52,8 @@ class KaHFM(KnowledgeRecommenderUtils, IterativeRecommender):
         batch_size (int): The batch size used for training.
         epochs (int): The number of epochs.
         learning_rate (float): The learning rate value.
+        neg_samples (int): The negatives each positive is contrasted with. The
+            terms they enter are averaged over them.
 
     Raises:
         ModelError: If the interactions were not provided.
@@ -64,6 +66,7 @@ class KaHFM(KnowledgeRecommenderUtils, IterativeRecommender):
     batch_size: int
     epochs: int
     learning_rate: float
+    neg_samples: int = 1
 
     def __init__(
         self,
@@ -169,6 +172,7 @@ class KaHFM(KnowledgeRecommenderUtils, IterativeRecommender):
     ):
         return interactions.get_contrastive_dataloader(
             batch_size=self.batch_size,
+            neg_samples=self.neg_samples,
             **kwargs,
         )
 
@@ -182,12 +186,18 @@ class KaHFM(KnowledgeRecommenderUtils, IterativeRecommender):
         negative_b = self.item_bias(negative).squeeze(-1)
 
         positive_score = positive_b + (user_f * positive_f).sum(dim=-1)
-        negative_score = negative_b + (user_f * negative_f).sum(dim=-1)
+        negative_score = negative_b + dot_scores(user_f, negative_f)
+
+        # A row of negatives is each contrasted with the positive, and the loss
+        # and the regularization of their factors and biases are averaged over
+        # them. A row of biases is given a trailing axis so that it reads as one.
+        if negative.dim() > 1:
+            negative_b = negative_b.unsqueeze(-1)
 
         loss = (
             self.rec_loss(positive_score, negative_score)
-            + self.reg_weight * self.reg_loss(user_f, positive_f, negative_f)
-            + self.bias_reg_weight * self.reg_loss(positive_b, negative_b)
+            + self.reg_weight * self.reg_loss(user_f, positive_f, negatives=negative_f)
+            + self.bias_reg_weight * self.reg_loss(positive_b, negatives=negative_b)
         )
 
         self.log("loss", loss, prog_bar=True, on_step=False, on_epoch=True)
