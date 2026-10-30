@@ -60,6 +60,8 @@ class KGFlex(KnowledgeRecommenderUtils, IterativeRecommender):
         batch_size (int): The batch size used for training.
         epochs (int): The number of epochs.
         learning_rate (float): The learning rate value.
+        neg_samples (int): The negatives each positive is contrasted with. The
+            terms they enter are averaged over them.
         user_offsets (Tensor): Where each user's features start among the pairs.
         pair_feature (Tensor): The feature of each (user, feature) pair.
         pair_weight (Tensor): The information gain of each pair.
@@ -79,6 +81,7 @@ class KGFlex(KnowledgeRecommenderUtils, IterativeRecommender):
     batch_size: int
     epochs: int
     learning_rate: float
+    neg_samples: int = 1
 
     # Registered buffers, annotated so that they read as the tensors they are.
     user_offsets: Tensor
@@ -491,12 +494,19 @@ class KGFlex(KnowledgeRecommenderUtils, IterativeRecommender):
 
         Args:
             pairs (Tuple[Tensor, Tensor, Tensor]): The output of _user_pairs.
-            item (Tensor): One item per user of the batch.
+            item (Tensor): One item per user of the batch, or a row of several.
 
         Returns:
             Tensor: One score per (user, item); 0 when nothing is shared.
         """
         rows, features, contribution = pairs
+
+        # A row of items is matched against each of the user's features at once,
+        # the feature and its contribution broadcast along the row.
+        if item.dim() > 1:
+            features = features.unsqueeze(-1)
+            contribution = contribution.unsqueeze(-1)
+
         keys = item[rows] * self.n_features + features
         position = torch.searchsorted(self.item_keys, keys).clamp(
             max=self.item_keys.numel() - 1
@@ -504,7 +514,7 @@ class KGFlex(KnowledgeRecommenderUtils, IterativeRecommender):
         shared = (self.item_keys[position] == keys).to(contribution.dtype)
 
         return torch.zeros(
-            item.numel(), device=contribution.device, dtype=contribution.dtype
+            item.shape, device=contribution.device, dtype=contribution.dtype
         ).index_add_(0, rows, contribution * shared)
 
     def get_dataloader(
@@ -515,6 +525,7 @@ class KGFlex(KnowledgeRecommenderUtils, IterativeRecommender):
     ):
         return interactions.get_contrastive_dataloader(
             batch_size=self.batch_size,
+            neg_samples=self.neg_samples,
             **kwargs,
         )
 
@@ -523,7 +534,8 @@ class KGFlex(KnowledgeRecommenderUtils, IterativeRecommender):
 
         pairs = self._user_pairs(user)
 
-        # The paper adds no regularizer.
+        # The paper adds no regularizer. A row of negatives is each contrasted
+        # with the positive, and the loss averaged over them.
         loss = self.rec_loss(
             self._shared(pairs, positive), self._shared(pairs, negative)
         )

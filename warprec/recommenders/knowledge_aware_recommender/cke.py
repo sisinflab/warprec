@@ -9,7 +9,7 @@ from warprec.recommenders.base_recommender import IterativeRecommender
 from warprec.recommenders.knowledge_aware_recommender.knowledge_utils import (
     KnowledgeRecommenderUtils,
 )
-from warprec.recommenders.losses import BPRLoss, EmbLoss
+from warprec.recommenders.losses import BPRLoss, EmbLoss, dot_scores
 from warprec.utils.registry import model_registry
 
 
@@ -45,6 +45,8 @@ class CKE(KnowledgeRecommenderUtils, IterativeRecommender):
         batch_size (int): The batch size used for training.
         epochs (int): The number of epochs.
         learning_rate (float): The learning rate value.
+        neg_samples (int): The negatives each positive is contrasted with. The
+            terms they enter are averaged over them.
     """
 
     embedding_size: int
@@ -54,6 +56,7 @@ class CKE(KnowledgeRecommenderUtils, IterativeRecommender):
     batch_size: int
     epochs: int
     learning_rate: float
+    neg_samples: int = 1
 
     def __init__(
         self,
@@ -151,6 +154,7 @@ class CKE(KnowledgeRecommenderUtils, IterativeRecommender):
     ):
         return interactions.get_contrastive_dataloader(
             batch_size=self.batch_size,
+            neg_samples=self.neg_samples,
             **kwargs,
         )
 
@@ -161,8 +165,11 @@ class CKE(KnowledgeRecommenderUtils, IterativeRecommender):
         positive_e = self.item_representation(positive)
         negative_e = self.item_representation(negative)
 
+        # A row of negatives is each contrasted with the positive, and the loss
+        # and their regularization are averaged over them. The corrupted facts
+        # of the knowledge loss are its own and are not affected.
         recommendation = self.rec_loss(
-            (user_e * positive_e).sum(dim=1), (user_e * negative_e).sum(dim=1)
+            (user_e * positive_e).sum(dim=1), dot_scores(user_e, negative_e)
         )
 
         # The facts are learned beside the interactions, one batch of each, so
@@ -172,7 +179,7 @@ class CKE(KnowledgeRecommenderUtils, IterativeRecommender):
         loss = (
             recommendation
             + knowledge
-            + self.reg_weight * self.reg_loss(user_e, positive_e, negative_e)
+            + self.reg_weight * self.reg_loss(user_e, positive_e, negatives=negative_e)
             + self.kg_reg_weight * knowledge_reg
         )
 

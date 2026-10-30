@@ -60,12 +60,14 @@ models:
     batch_size: 2048
     epochs: 200
     learning_rate: 0.001
+    neg_samples: 1
 ```
 
 - **embedding_size**: The width of both the collaborative and the projected feature factors. The user embedding is twice this, one half reading each.
 - **The feature vectors are held fixed.** Only the projection out of them and the feature bias are learned, as in the paper.
 - **modalities**: Which modalities to read. Defaults to every configured one.
 - **reg_weight**: The L2 regularization weight.
+- **neg_samples**: How many negatives each positive is contrasted with. Defaults to `1`. With more, the BPR loss and the negatives' regularization are averaged over them, both halves of each negative's score included. See [BPR](collaborative.md#bpr) for when more help.
 
 ## Graph-Based
 
@@ -92,6 +94,7 @@ models:
     batch_size: 2048
     epochs: 200
     learning_rate: 0.001
+    neg_samples: 1
 ```
 
 - **feature_size**: The width each modality is projected to before entering the loss.
@@ -102,6 +105,7 @@ models:
 - **dropout**: The share of interactions dropped at the start of each epoch. Set it to `0` to train on the whole graph.
 - **modality_weights**: How much each modality's item-item graph counts, in the order `modalities` lists them. Defaults to equal weight.
 - **reg_weight**: The weight of the per-modality contrast in the loss.
+- **neg_samples**: How many negatives each positive is contrasted with. Defaults to `1`. With more, the recommendation contrast and each per-modality contrast are averaged over them. See [BPR](collaborative.md#bpr) for when more help.
 
 !!! note "Memory"
 
@@ -123,10 +127,12 @@ models:
     batch_size: 2048
     epochs: 200
     learning_rate: 0.001
+    neg_samples: 1
 ```
 
 - **feature_size**: The width each modality is projected to before propagation.
 - **n_layers**: How many hops each modality graph runs. The reference implementation unrolls three by name; here the depth is a parameter and the reference is the `n_layers: 3` case of it.
+- **neg_samples**: How many negatives each positive is contrasted with. Defaults to `1`. With more, the BPR loss and the negatives' share of the identity regularization are averaged over them. See [BPR](collaborative.md#bpr) for when more help.
 
 !!! note "Cost grows with the modalities"
 
@@ -153,11 +159,13 @@ models:
     batch_size: 2048
     epochs: 200
     learning_rate: 0.001
+    neg_samples: 1
 ```
 
 - **knn_k**: How many neighbours each item keeps.
 - **lambda_coeff**: How much of the raw-feature graph is kept. At `1.0` the graph is entirely the frozen one and the learning is switched off; at `0.0` it is entirely learned.
 - **n_layers** / **n_ui_layers**: Hops over the item-item and the user-item graph.
+- **neg_samples**: How many negatives each positive is contrasted with. Defaults to `1`. With more, the BPR loss and the negatives' regularization are averaged over them. See [BPR](collaborative.md#bpr) for when more help.
 
 !!! warning "The learned graph is dense"
 
@@ -186,11 +194,13 @@ models:
     batch_size: 2048
     epochs: 200
     learning_rate: 0.001
+    neg_samples: 1
 ```
 
 - **knn_k**: How many neighbours each item keeps in the frozen feature graph.
 - **cl_weight**: The weight of the content-behaviour agreement.
 - **temperature**: The temperature of that agreement. Lower values make it sharper.
+- **neg_samples**: How many negatives each positive is contrasted with. Defaults to `1`. With more, the BPR loss and the negatives' regularization are averaged over them; the content-behaviour agreement does not involve them and is unchanged. See [BPR](collaborative.md#bpr) for when more help.
 
 ### BM3
 

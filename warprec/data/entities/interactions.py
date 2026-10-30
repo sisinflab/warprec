@@ -479,6 +479,7 @@ class Interactions:
         batch_size: int = 1024,
         shuffle: bool = True,
         seed: int = 42,
+        neg_samples: int = 1,
         **kwargs: Any,
     ) -> DataLoader:
         """Create a PyTorch DataLoader with triplets for implicit feedback.
@@ -487,10 +488,13 @@ class Interactions:
             batch_size (int): The batch size.
             shuffle (bool): Whether to shuffle the data.
             seed (int): Seed for reproducibility.
+            neg_samples (int): The negatives drawn for each positive.
             **kwargs (Any): The additional keyword arguments to pass the Dataloader.
 
         Returns:
-            DataLoader: Yields triplets of (user, positive_item, negative_item).
+            DataLoader: Yields triplets of (user, positive_item, negative_item),
+                the negatives of a batch shaped [batch_size] with one negative
+                per positive and [batch_size, neg_samples] with several.
         """
         pos_users, pos_items = self._get_mapped_indices()
 
@@ -503,6 +507,7 @@ class Interactions:
             negative_sampling=self.negative_sampling,
             neg_alpha=self.neg_alpha,
             seed=seed,
+            neg_samples=neg_samples,
         )
 
         return seeded_dataloader(

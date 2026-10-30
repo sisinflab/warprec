@@ -11,7 +11,7 @@ from warprec.recommenders.base_recommender import IterativeRecommender
 from warprec.recommenders.collaborative_filtering_recommender.graph_based import (
     GraphRecommenderUtils,
 )
-from warprec.recommenders.losses import EmbLoss
+from warprec.recommenders.losses import EmbLoss, dot_scores
 from warprec.utils.registry import model_registry
 
 
@@ -38,6 +38,9 @@ class UltraGCN(IterativeRecommender, GraphRecommenderUtils):
         batch_size (int): The batch size used for training.
         epochs (int): The number of epochs.
         learning_rate (float): The learning rate value.
+        neg_samples (int): The negatives each positive is contrasted with. Every
+            negative term of the objective and of the constraint loss is averaged
+            over them, each keeping its weight.
     """
 
     # Hyperparameters
@@ -50,6 +53,7 @@ class UltraGCN(IterativeRecommender, GraphRecommenderUtils):
     batch_size: int
     epochs: int
     learning_rate: float
+    neg_samples: int = 1
 
     def __init__(
         self,
@@ -168,6 +172,7 @@ class UltraGCN(IterativeRecommender, GraphRecommenderUtils):
     ):
         return interactions.get_contrastive_dataloader(
             batch_size=self.batch_size,
+            neg_samples=self.neg_samples,
             **kwargs,
         )
 
@@ -182,12 +187,13 @@ class UltraGCN(IterativeRecommender, GraphRecommenderUtils):
         pos_item_emb = self.item_embedding(pos_item)
         neg_item_emb = self.item_embedding(neg_item)
 
-        # Calculate scores
-        pos_scores = torch.mul(user_emb, pos_item_emb).sum(dim=1)
-        neg_scores = torch.mul(user_emb, neg_item_emb).sum(dim=1)
+        # Calculate scores, [batch_size] or [batch_size, k] for the negatives
+        pos_scores = dot_scores(user_emb, pos_item_emb)
+        neg_scores = dot_scores(user_emb, neg_item_emb)
 
         # Main Objective (L_O)
-        # -log(sigmoid(pos)) - log(sigmoid(-neg))
+        # -log(sigmoid(pos)) - log(sigmoid(-neg)), the mean also averaging
+        # over the negatives of each positive
         loss_O = -F.logsigmoid(pos_scores).mean() - F.logsigmoid(-neg_scores).mean()
 
         # Constraint Loss (L_C)
@@ -197,7 +203,11 @@ class UltraGCN(IterativeRecommender, GraphRecommenderUtils):
         beta_user_part = self.user_degree_pow[user] * self.user_sqrt_deg[user]  # type: ignore[index]
 
         beta_pos = beta_user_part / self.item_sqrt_deg[pos_item]  # type: ignore[index]
-        beta_neg = beta_user_part / self.item_sqrt_deg[neg_item]  # type: ignore[index]
+        # Several negatives each take their own beta, averaged over them below
+        beta_user_neg = (
+            beta_user_part if neg_item.dim() == 1 else beta_user_part.unsqueeze(1)
+        )
+        beta_neg = beta_user_neg / self.item_sqrt_deg[neg_item]  # type: ignore[index]
 
         loss_C = (
             -(beta_pos * F.logsigmoid(pos_scores)).mean()
@@ -214,7 +224,9 @@ class UltraGCN(IterativeRecommender, GraphRecommenderUtils):
         loss_I = -(ii_weights * F.logsigmoid(ii_scores)).sum(dim=1).mean()
 
         # Calculate L2 loss
-        reg_loss = self.reg_weight * self.reg_loss(user_emb, pos_item_emb, neg_item_emb)
+        reg_loss = self.reg_weight * self.reg_loss(
+            user_emb, pos_item_emb, negatives=neg_item_emb
+        )
 
         # Loss logging
         loss = loss_O + (self.w_lambda * loss_C) + (self.w_gamma * loss_I) + reg_loss

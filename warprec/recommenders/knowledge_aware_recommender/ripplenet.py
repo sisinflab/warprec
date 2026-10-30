@@ -47,6 +47,8 @@ class RippleNet(KnowledgeRecommenderUtils, IterativeRecommender):
         batch_size (int): The batch size used for training.
         epochs (int): The number of epochs.
         learning_rate (float): The learning rate value.
+        neg_samples (int): The negatives each positive is contrasted with. The
+            terms they enter are averaged over them.
         ripple_heads (Tensor): The head of each remembered fact, per user and ring.
         ripple_relations (Tensor): The relation of each remembered fact.
         ripple_tails (Tensor): The tail of each remembered fact.
@@ -63,6 +65,7 @@ class RippleNet(KnowledgeRecommenderUtils, IterativeRecommender):
     batch_size: int
     epochs: int
     learning_rate: float
+    neg_samples: int = 1
 
     # Registered buffers, annotated so that they read as the tensors they are.
     ripple_heads: Tensor
@@ -290,6 +293,7 @@ class RippleNet(KnowledgeRecommenderUtils, IterativeRecommender):
     ):
         return interactions.get_contrastive_dataloader(
             batch_size=self.batch_size,
+            neg_samples=self.neg_samples,
             **kwargs,
         )
 
@@ -298,17 +302,24 @@ class RippleNet(KnowledgeRecommenderUtils, IterativeRecommender):
 
         rings = self._rings_of(user)
         positive_e = self.entity_embedding(self.entity_of(positive)).unsqueeze(1)
-        negative_e = self.entity_embedding(self.entity_of(negative)).unsqueeze(1)
+
+        # The rings are read against a block of items at once, so a row of
+        # negatives is already one: {batch x negatives x dim}.
+        negative_e = self.entity_embedding(self.entity_of(negative))
+        if negative.dim() == 1:
+            negative_e = negative_e.unsqueeze(1)
 
         positive_score = (positive_e * self._address(rings, positive_e)).sum(dim=-1)
         negative_score = (negative_e * self._address(rings, negative_e)).sum(dim=-1)
 
         # A fact that does not hold as a fact should not be carrying preference,
         # so the rings are pushed towards being plausible as well as useful.
+        # Each negative is contrasted with the positive, and the loss and their
+        # regularization are averaged over them.
         loss = (
             self.rec_loss(positive_score, negative_score)
             - self.kg_weight * self._plausibility(user)
-            + self.reg_weight * self.reg_loss(positive_e, negative_e)
+            + self.reg_weight * self.reg_loss(positive_e, negatives=negative_e)
         )
 
         self.log("loss", loss, prog_bar=True, on_step=False, on_epoch=True)

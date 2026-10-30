@@ -31,6 +31,7 @@ class VBPR(RecomModel):
         batch_size (INT_FIELD): List of values for batch_size.
         epochs (INT_FIELD): List of values for epochs.
         learning_rate (FLOAT_FIELD): List of values for learning rate.
+        neg_samples (INT_FIELD): List of values for the negatives per positive.
     """
 
     need_multimodal: ClassVar[bool] = True
@@ -41,6 +42,7 @@ class VBPR(RecomModel):
     batch_size: INT_FIELD
     epochs: INT_FIELD
     learning_rate: FLOAT_FIELD
+    neg_samples: INT_FIELD = [1]
 
     @field_validator("embedding_size")
     @classmethod
@@ -78,6 +80,12 @@ class VBPR(RecomModel):
         """Validate learning_rate."""
         return validate_greater_than_zero(cls, v, "learning_rate")
 
+    @field_validator("neg_samples")
+    @classmethod
+    def check_neg_samples(cls, v: list):
+        """Validate neg_samples."""
+        return validate_greater_than_zero(cls, v, "neg_samples")
+
 
 @params_registry.register("FREEDOM")
 class FREEDOM(RecomModel):
@@ -99,6 +107,7 @@ class FREEDOM(RecomModel):
         batch_size (INT_FIELD): List of values for batch_size.
         epochs (INT_FIELD): List of values for epochs.
         learning_rate (FLOAT_FIELD): List of values for learning rate.
+        neg_samples (INT_FIELD): List of values for the negatives per positive.
     """
 
     need_multimodal: ClassVar[bool] = True
@@ -115,6 +124,7 @@ class FREEDOM(RecomModel):
     batch_size: INT_FIELD
     epochs: INT_FIELD
     learning_rate: FLOAT_FIELD
+    neg_samples: INT_FIELD = [1]
 
     @field_validator("embedding_size")
     @classmethod
@@ -188,6 +198,12 @@ class FREEDOM(RecomModel):
         """Validate learning_rate."""
         return validate_greater_than_zero(cls, v, "learning_rate")
 
+    @field_validator("neg_samples")
+    @classmethod
+    def check_neg_samples(cls, v: list):
+        """Validate neg_samples."""
+        return validate_greater_than_zero(cls, v, "neg_samples")
+
 
 @params_registry.register("MMGCN")
 class MMGCN(RecomModel):
@@ -203,6 +219,7 @@ class MMGCN(RecomModel):
         batch_size (INT_FIELD): List of values for batch_size.
         epochs (INT_FIELD): List of values for epochs.
         learning_rate (FLOAT_FIELD): List of values for learning rate.
+        neg_samples (INT_FIELD): List of values for the negatives per positive.
     """
 
     need_multimodal: ClassVar[bool] = True
@@ -215,6 +232,7 @@ class MMGCN(RecomModel):
     batch_size: INT_FIELD
     epochs: INT_FIELD
     learning_rate: FLOAT_FIELD
+    neg_samples: INT_FIELD = [1]
 
     @field_validator("embedding_size")
     @classmethod
@@ -258,6 +276,12 @@ class MMGCN(RecomModel):
         """Validate learning_rate."""
         return validate_greater_than_zero(cls, v, "learning_rate")
 
+    @field_validator("neg_samples")
+    @classmethod
+    def check_neg_samples(cls, v: list):
+        """Validate neg_samples."""
+        return validate_greater_than_zero(cls, v, "neg_samples")
+
     @field_validator("modalities")
     @classmethod
     def check_modalities(cls, v: Optional[list]):
@@ -282,6 +306,7 @@ class LATTICE(RecomModel):
         batch_size (INT_FIELD): List of values for batch_size.
         epochs (INT_FIELD): List of values for epochs.
         learning_rate (FLOAT_FIELD): List of values for learning rate.
+        neg_samples (INT_FIELD): List of values for the negatives per positive.
     """
 
     need_multimodal: ClassVar[bool] = True
@@ -297,6 +322,7 @@ class LATTICE(RecomModel):
     batch_size: INT_FIELD
     epochs: INT_FIELD
     learning_rate: FLOAT_FIELD
+    neg_samples: INT_FIELD = [1]
 
     @field_validator("embedding_size")
     @classmethod
@@ -357,6 +383,12 @@ class LATTICE(RecomModel):
     def check_learning_rate(cls, v: list):
         """Validate learning_rate."""
         return validate_greater_than_zero(cls, v, "learning_rate")
+
+    @field_validator("neg_samples")
+    @classmethod
+    def check_neg_samples(cls, v: list):
+        """Validate neg_samples."""
+        return validate_greater_than_zero(cls, v, "neg_samples")
 
     @field_validator("modalities")
     @classmethod
@@ -466,6 +498,7 @@ class MGCN(RecomModel):
         batch_size (INT_FIELD): List of values for batch_size.
         epochs (INT_FIELD): List of values for epochs.
         learning_rate (FLOAT_FIELD): List of values for learning rate.
+        neg_samples (INT_FIELD): List of values for the negatives per positive.
     """
 
     need_multimodal: ClassVar[bool] = True
@@ -481,6 +514,7 @@ class MGCN(RecomModel):
     batch_size: INT_FIELD
     epochs: INT_FIELD
     learning_rate: FLOAT_FIELD
+    neg_samples: INT_FIELD = [1]
 
     @field_validator("embedding_size")
     @classmethod
@@ -541,6 +575,12 @@ class MGCN(RecomModel):
     def check_learning_rate(cls, v: list):
         """Validate learning_rate."""
         return validate_greater_than_zero(cls, v, "learning_rate")
+
+    @field_validator("neg_samples")
+    @classmethod
+    def check_neg_samples(cls, v: list):
+        """Validate neg_samples."""
+        return validate_greater_than_zero(cls, v, "neg_samples")
 
     @field_validator("modalities")
     @classmethod

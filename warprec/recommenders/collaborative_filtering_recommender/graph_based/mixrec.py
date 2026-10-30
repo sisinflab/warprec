@@ -9,7 +9,7 @@ from warprec.recommenders.base_recommender import IterativeRecommender
 from warprec.recommenders.collaborative_filtering_recommender.graph_based import (
     GraphRecommenderUtils,
 )
-from warprec.recommenders.losses import BPRLoss, EmbLoss
+from warprec.recommenders.losses import BPRLoss, EmbLoss, dot_scores
 from warprec.utils.registry import model_registry
 
 
@@ -36,6 +36,8 @@ class MixRec(IterativeRecommender, GraphRecommenderUtils):
         batch_size (int): The batch size used for training.
         epochs (int): The number of epochs.
         learning_rate (float): The learning rate value.
+        neg_samples (int): The negatives each positive is contrasted with. The
+            losses that involve them are averaged over them.
     """
 
     # Model hyperparameters
@@ -48,6 +50,7 @@ class MixRec(IterativeRecommender, GraphRecommenderUtils):
     batch_size: int
     epochs: int
     learning_rate: float
+    neg_samples: int = 1
 
     def __init__(
         self,
@@ -99,6 +102,7 @@ class MixRec(IterativeRecommender, GraphRecommenderUtils):
     ):
         return interactions.get_contrastive_dataloader(
             batch_size=self.batch_size,
+            neg_samples=self.neg_samples,
             **kwargs,
         )
 
@@ -244,14 +248,14 @@ class MixRec(IterativeRecommender, GraphRecommenderUtils):
 
         # Calculate BPR loss
         pos_scores = torch.mul(u_embeddings, pos_embeddings).sum(dim=1)
-        neg_scores = torch.mul(u_embeddings, neg_embeddings).sum(dim=1)
+        neg_scores = dot_scores(u_embeddings, neg_embeddings)
         bpr_pos = self.bpr_loss(pos_scores, neg_scores)
 
         # Calculate L2 loss
         reg_loss = self.reg_weight * self.reg_loss(
             self.user_embedding(user),
             self.item_embedding(pos_item),
-            self.item_embedding(neg_item),
+            negatives=self.item_embedding(neg_item),
         )
 
         # Generate Mixing Parameters
@@ -269,7 +273,9 @@ class MixRec(IterativeRecommender, GraphRecommenderUtils):
         # Individual Mixing
         u_mix = self._mix_embeddings(u_embeddings, u_dis, beta_u)
         pos_mix = self._mix_embeddings(pos_embeddings, pos_dis, beta_i)
-        neg_mix = self._mix_embeddings(neg_embeddings, neg_dis, beta_i)
+        # A row of negatives shares its positive's mixing coefficient
+        beta_neg = beta_i if neg_item.dim() == 1 else beta_i.unsqueeze(1)
+        neg_mix = self._mix_embeddings(neg_embeddings, neg_dis, beta_neg)
 
         # Collective Mixing
         u_cm = self._collective_mixing(u_embeddings)
@@ -277,7 +283,7 @@ class MixRec(IterativeRecommender, GraphRecommenderUtils):
 
         # Mixed Negative BPR
         # Encourages item to stay close to user even if mixed with negative
-        neg_mix_scores = torch.mul(u_embeddings, neg_mix).sum(dim=1)
+        neg_mix_scores = dot_scores(u_embeddings, neg_mix)
         bpr_neg = self.bpr_loss(pos_scores, neg_mix_scores)
 
         # We use the mean of beta_i for scalar weighting or element-wise

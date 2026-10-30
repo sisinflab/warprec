@@ -10,7 +10,7 @@ from warprec.recommenders.base_recommender import IterativeRecommender
 from warprec.recommenders.multimodal_recommender.multimodal_utils import (
     MultiModalRecommenderUtils,
 )
-from warprec.recommenders.losses import BPRLoss
+from warprec.recommenders.losses import BPRLoss, dot_scores
 from warprec.utils.registry import model_registry
 
 
@@ -109,6 +109,8 @@ class MMGCN(MultiModalRecommenderUtils, IterativeRecommender):
         batch_size (int): The batch size used for training.
         epochs (int): The number of epochs.
         learning_rate (float): The learning rate value.
+        neg_samples (int): The negatives each positive is contrasted with.
+            Every loss term that involves them is averaged over them.
         adjacency (Tensor): The row-normalised bipartite adjacency.
 
     Raises:
@@ -123,6 +125,7 @@ class MMGCN(MultiModalRecommenderUtils, IterativeRecommender):
     batch_size: int
     epochs: int
     learning_rate: float
+    neg_samples: int = 1
 
     adjacency: Tensor
 
@@ -210,6 +213,7 @@ class MMGCN(MultiModalRecommenderUtils, IterativeRecommender):
     ):
         return interactions.get_contrastive_dataloader(
             batch_size=self.batch_size,
+            neg_samples=self.neg_samples,
             **kwargs,
         )
 
@@ -221,15 +225,20 @@ class MMGCN(MultiModalRecommenderUtils, IterativeRecommender):
         positive_e = nodes[positive + self.n_users]
         negative_e = nodes[negative + self.n_users]
 
+        # A row of negatives is averaged over before it joins the regularizer,
+        # so that a positive's share does not grow with their number.
+        negative_square = self.identity[negative + self.n_users] ** 2
+        if negative.dim() > 1:
+            negative_square = negative_square.mean(dim=1)
         regularizer = (
             self.identity[user] ** 2
             + self.identity[positive + self.n_users] ** 2
-            + self.identity[negative + self.n_users] ** 2
+            + negative_square
         ).mean()
 
         loss = (
             self.bpr_loss(
-                (user_e * positive_e).sum(dim=1), (user_e * negative_e).sum(dim=1)
+                dot_scores(user_e, positive_e), dot_scores(user_e, negative_e)
             )
             + self.reg_weight * regularizer
         )

@@ -5,7 +5,7 @@ from torch import nn, Tensor
 
 from warprec.data.entities import Interactions, Sessions
 from warprec.recommenders.base_recommender import IterativeRecommender
-from warprec.recommenders.losses import BPRLoss, EmbLoss
+from warprec.recommenders.losses import BPRLoss, EmbLoss, dot_scores
 from warprec.utils.registry import model_registry
 
 
@@ -27,6 +27,8 @@ class BPR(IterativeRecommender):
         batch_size (int): The batch size used for training.
         epochs (int): The number of epochs.
         learning_rate (float): The learning rate value.
+        neg_samples (int): The negatives each positive is contrasted with. Its
+            loss is the BPR loss averaged over them.
     """
 
     # Model hyperparameters
@@ -35,6 +37,7 @@ class BPR(IterativeRecommender):
     batch_size: int
     epochs: int
     learning_rate: float
+    neg_samples: int = 1
 
     def __init__(
         self,
@@ -65,13 +68,14 @@ class BPR(IterativeRecommender):
     ):
         return interactions.get_contrastive_dataloader(
             batch_size=self.batch_size,
+            neg_samples=self.neg_samples,
             **kwargs,
         )
 
     def training_step(self, batch: Any, batch_idx: int) -> Tensor:
         user, pos_item, neg_item = batch
 
-        # Compute BPR loss
+        # Compute BPR loss, averaged over the negatives of each positive
         pos_item_score = self.forward(user, pos_item)
         neg_item_score = self.forward(user, neg_item)
         bpr_loss = self.bpr_loss(pos_item_score, neg_item_score)
@@ -80,7 +84,7 @@ class BPR(IterativeRecommender):
         reg_loss = self.reg_weight * self.reg_loss(
             self.user_embedding(user),
             self.item_embedding(pos_item),
-            self.item_embedding(neg_item),
+            negatives=self.item_embedding(neg_item),
         )
 
         # Loss logging
@@ -93,15 +97,13 @@ class BPR(IterativeRecommender):
 
         Args:
             user (Tensor): The tensor containing the user indexes.
-            item (Tensor): The tensor containing the item indexes.
+            item (Tensor): The tensor containing the item indexes, one per user
+                or a row of several.
 
         Returns:
             Tensor: The predicted score for each pair of positive and negative items.
         """
-        user_e = self.user_embedding(user)
-        item_e = self.item_embedding(item)
-
-        return torch.mul(user_e, item_e).sum(dim=1)
+        return dot_scores(self.user_embedding(user), self.item_embedding(item))
 
     def predict(
         self,

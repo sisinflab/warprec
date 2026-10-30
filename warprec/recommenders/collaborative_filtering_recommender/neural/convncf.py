@@ -33,6 +33,8 @@ class ConvNCF(IterativeRecommender):
         batch_size (int): The batch size used for training.
         epochs (int): The number of epochs.
         learning_rate (float): The learning rate value.
+        neg_samples (int): The negatives each positive is contrasted with.
+            Every loss term that involves them is averaged over them.
     """
 
     # Model hyperparameters
@@ -46,6 +48,7 @@ class ConvNCF(IterativeRecommender):
     batch_size: int
     epochs: int
     learning_rate: float
+    neg_samples: int = 1
 
     def __init__(
         self,
@@ -96,22 +99,31 @@ class ConvNCF(IterativeRecommender):
     ):
         return interactions.get_contrastive_dataloader(
             batch_size=self.batch_size,
+            neg_samples=self.neg_samples,
             **kwargs,
         )
 
     def training_step(self, batch: Any, batch_idx: int):
         user, pos_item, neg_item = batch
 
-        # Calculate BPR loss
+        # Calculate BPR loss. A row of negatives is scored as one flat batch of
+        # pairs, the user repeated beside each, which costs the CNN once per
+        # negative; the loss is averaged over them.
         pos_item_score = self.forward(user, pos_item)
-        neg_item_score = self.forward(user, neg_item)
+        if neg_item.dim() == 1:
+            neg_item_score = self.forward(user, neg_item)
+        else:
+            neg_item_score = self.forward(
+                user.unsqueeze(1).expand_as(neg_item).reshape(-1),
+                neg_item.reshape(-1),
+            ).view_as(neg_item)
         bpr_loss = self.bpr_loss(pos_item_score, neg_item_score)
 
         # Calculate L2 regularization
         reg_loss = self.reg_weight * self.reg_loss(
             self.user_embedding(user),
             self.item_embedding(pos_item),
-            self.item_embedding(neg_item),
+            negatives=self.item_embedding(neg_item),
         )
 
         # Loss logging

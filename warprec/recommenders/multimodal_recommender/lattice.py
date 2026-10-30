@@ -13,7 +13,7 @@ from warprec.recommenders.collaborative_filtering_recommender.graph_based import
 from warprec.recommenders.multimodal_recommender.multimodal_utils import (
     MultiModalRecommenderUtils,
 )
-from warprec.recommenders.losses import BPRLoss, EmbLoss
+from warprec.recommenders.losses import BPRLoss, EmbLoss, dot_scores
 from warprec.utils.registry import model_registry
 
 
@@ -54,6 +54,8 @@ class LATTICE(MultiModalRecommenderUtils, GraphRecommenderUtils, IterativeRecomm
         batch_size (int): The batch size used for training.
         epochs (int): The number of epochs.
         learning_rate (float): The learning rate value.
+        neg_samples (int): The negatives each positive is contrasted with.
+            Every loss term that involves them is averaged over them.
         frozen_item_graph (Tensor): The graph built from the raw features.
 
     Raises:
@@ -71,6 +73,7 @@ class LATTICE(MultiModalRecommenderUtils, GraphRecommenderUtils, IterativeRecomm
     batch_size: int
     epochs: int
     learning_rate: float
+    neg_samples: int = 1
 
     frozen_item_graph: Tensor
 
@@ -220,6 +223,7 @@ class LATTICE(MultiModalRecommenderUtils, GraphRecommenderUtils, IterativeRecomm
     ):
         return interactions.get_contrastive_dataloader(
             batch_size=self.batch_size,
+            neg_samples=self.neg_samples,
             **kwargs,
         )
 
@@ -229,9 +233,11 @@ class LATTICE(MultiModalRecommenderUtils, GraphRecommenderUtils, IterativeRecomm
         users, items = self.forward()
         user_e, positive_e, negative_e = users[user], items[positive], items[negative]
 
+        # Several negatives per positive are averaged, in the contrast and in
+        # the regularization alike.
         loss = self.bpr_loss(
-            (user_e * positive_e).sum(dim=1), (user_e * negative_e).sum(dim=1)
-        ) + self.reg_weight * self.reg_loss(user_e, positive_e, negative_e)
+            dot_scores(user_e, positive_e), dot_scores(user_e, negative_e)
+        ) + self.reg_weight * self.reg_loss(user_e, positive_e, negatives=negative_e)
 
         self.log("loss", loss, prog_bar=True, on_step=False, on_epoch=True)
         return loss
