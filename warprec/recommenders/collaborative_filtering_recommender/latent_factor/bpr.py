@@ -27,6 +27,8 @@ class BPR(IterativeRecommender):
         batch_size (int): The batch size used for training.
         epochs (int): The number of epochs.
         learning_rate (float): The learning rate value.
+        neg_samples (int): The negatives each positive is contrasted with. Its
+            loss is the BPR loss averaged over them.
     """
 
     # Model hyperparameters
@@ -35,6 +37,7 @@ class BPR(IterativeRecommender):
     batch_size: int
     epochs: int
     learning_rate: float
+    neg_samples: int = 1
 
     def __init__(
         self,
@@ -65,23 +68,29 @@ class BPR(IterativeRecommender):
     ):
         return interactions.get_contrastive_dataloader(
             batch_size=self.batch_size,
+            neg_samples=self.neg_samples,
             **kwargs,
         )
 
     def training_step(self, batch: Any, batch_idx: int) -> Tensor:
         user, pos_item, neg_item = batch
 
-        # Compute BPR loss
+        # Compute BPR loss, averaged over the negatives of each positive
         pos_item_score = self.forward(user, pos_item)
         neg_item_score = self.forward(user, neg_item)
         bpr_loss = self.bpr_loss(pos_item_score, neg_item_score)
 
-        # Compute L2 regularization
-        reg_loss = self.reg_weight * self.reg_loss(
-            self.user_embedding(user),
-            self.item_embedding(pos_item),
-            self.item_embedding(neg_item),
-        )
+        # Compute L2 regularization. Several negatives are averaged, so that a
+        # positive's regularization does not grow with their number
+        user_e = self.user_embedding(user)
+        pos_e = self.item_embedding(pos_item)
+        neg_e = self.item_embedding(neg_item)
+        if neg_item.dim() == 1:
+            reg_loss = self.reg_weight * self.reg_loss(user_e, pos_e, neg_e)
+        else:
+            reg_loss = self.reg_weight * (
+                self.reg_loss(user_e, pos_e) + self.reg_loss(neg_e) / neg_item.size(1)
+            )
 
         # Loss logging
         loss = bpr_loss + reg_loss
@@ -93,15 +102,18 @@ class BPR(IterativeRecommender):
 
         Args:
             user (Tensor): The tensor containing the user indexes.
-            item (Tensor): The tensor containing the item indexes.
+            item (Tensor): The tensor containing the item indexes, one per user
+                or a row of several.
 
         Returns:
             Tensor: The predicted score for each pair of positive and negative items.
         """
         user_e = self.user_embedding(user)
         item_e = self.item_embedding(item)
+        if item.dim() > user.dim():
+            user_e = user_e.unsqueeze(1)
 
-        return torch.mul(user_e, item_e).sum(dim=1)
+        return torch.mul(user_e, item_e).sum(dim=-1)
 
     def predict(
         self,

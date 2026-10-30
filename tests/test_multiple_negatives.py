@@ -8,6 +8,8 @@ from warprec.data.entities.train_structures.interaction_structures import (
     NegativeSampler,
 )
 
+from conftest import make_model
+
 
 def test_several_negatives_are_items_the_user_has_not_seen(dataset: Dataset):
     train = dataset.train_set.get_sparse()
@@ -28,3 +30,17 @@ def test_the_loader_yields_a_row_of_negatives_per_positive(dataset: Dataset):
     many_users, many_positives, many_negatives = next(iter(many))
     assert many_negatives.shape == (8, 4)
     assert torch.equal(users, many_users) and torch.equal(positives, many_positives)
+
+
+def test_bpr_trains_on_several_negatives(dataset: Dataset):
+    model = make_model("BPR", dataset)
+    model.neg_samples = 4
+    batch = next(
+        iter(
+            model.get_dataloader(
+                interactions=dataset.train_set, sessions=dataset.train_session
+            )
+        )
+    )
+    assert batch[2].shape[1] == 4
+    assert torch.isfinite(model.training_step(batch, 0))

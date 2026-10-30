@@ -91,6 +91,7 @@ class BPR(RecomModel):
         batch_size (INT_FIELD): List of values for batch_size.
         epochs (INT_FIELD): List of values for epochs.
         learning_rate (FLOAT_FIELD): List of values for learning rate.
+        neg_samples (INT_FIELD): List of values for the negatives per positive.
     """
 
     embedding_size: INT_FIELD
@@ -98,6 +99,7 @@ class BPR(RecomModel):
     batch_size: INT_FIELD
     epochs: INT_FIELD
     learning_rate: FLOAT_FIELD
+    neg_samples: INT_FIELD = [1]
 
     @field_validator("embedding_size")
     @classmethod
@@ -128,6 +130,12 @@ class BPR(RecomModel):
     def check_learning_rate(cls, v: list):
         """Validate learning_rate."""
         return validate_greater_than_zero(cls, v, "learning_rate")
+
+    @field_validator("neg_samples")
+    @classmethod
+    def check_neg_samples(cls, v: list):
+        """Validate neg_samples."""
+        return validate_greater_than_zero(cls, v, "neg_samples")
 
 
 @params_registry.register("FISM")
