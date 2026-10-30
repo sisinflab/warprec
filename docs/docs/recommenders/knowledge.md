@@ -55,11 +55,13 @@ models:
     batch_size: 2048
     epochs: 200
     learning_rate: 0.001
+    neg_samples: 1
 ```
 
 - **kg_embedding_size**: The width of the relation-specific space entities are projected into by TransR.
 - **reg_weight**: The L2 regularization weight of the recommendation component.
 - **kg_reg_weight**: The L2 regularization weight of the knowledge component.
+- **neg_samples**: How many negatives each positive is contrasted with, `1` by default. With more, the recommendation loss and the negatives' regularization are averaged over them; the corrupted facts of the knowledge loss are not affected. See [BPR](collaborative.md#bpr) for when more help.
 
 ## Propagation-Based
 
@@ -82,12 +84,14 @@ models:
     batch_size: 2048
     epochs: 200
     learning_rate: 0.001
+    neg_samples: 1
 ```
 
 - **layers**: One width per propagation hop. The list length is the number of hops, so `[64, 32]` propagates twice.
 - **kg_embedding_size**: The width of the relation-specific space used both by the knowledge loss and by the attention.
 - **dropout**: Applied to the output of each aggregator.
 - **reg_weight**: The L2 regularization weight, applied to both components.
+- **neg_samples**: How many negatives each positive is contrasted with, `1` by default. With more, the recommendation loss and the negatives' regularization are averaged over them; the corrupted facts of the knowledge loss are not affected. See [BPR](collaborative.md#bpr) for when more help.
 
 !!! note "Memory"
 
@@ -110,11 +114,13 @@ models:
     batch_size: 2048
     epochs: 200
     learning_rate: 0.001
+    neg_samples: 1
 ```
 
 - **neighbour_size**: How many neighbours each entity is given. An entity with more is sampled down, one with fewer is sampled with replacement, and one with none stands in for its own neighbourhood.
 - **n_iter**: How many hops out from an item to read. The gather grows as `neighbour_size ** n_iter`, so two hops at size 8 already reads 64 entities per item.
 - **aggregator**: How a node is combined with its neighbourhood: `sum`, `neighbour` or `concat`.
+- **neg_samples**: How many negatives each positive is contrasted with, `1` by default. With more, the BPR loss and the negatives' regularization are averaged over them. See [BPR](collaborative.md#bpr) for when more help.
 
 !!! note "Scoring cost"
 
@@ -140,6 +146,7 @@ models:
     batch_size: 2048
     epochs: 200
     learning_rate: 0.001
+    neg_samples: 1
 ```
 
 - **n_factors**: How many intents to keep.
@@ -148,6 +155,7 @@ models:
 - **mess_dropout**: The dropout applied to each hop's output.
 - **independence**: How intents are pushed apart. `distance` is the distance correlation the paper uses; `cosine` is a cheaper alternative.
 - **ind_weight**: The weight of that independence term.
+- **neg_samples**: How many negatives each positive is contrasted with, `1` by default. With more, the BPR loss and the negatives' regularization are averaged over them. See [BPR](collaborative.md#bpr) for when more help.
 
 ### RippleNet
 
@@ -166,11 +174,13 @@ models:
     batch_size: 1024
     epochs: 200
     learning_rate: 0.001
+    neg_samples: 1
 ```
 
 - **n_hop**: How many rings to spread out from the history.
 - **n_memory**: How many facts each ring holds. A user's reachable set grows very fast, so the rings are sampled down to this size.
 - **kg_weight**: The weight of the fact-plausibility term.
+- **neg_samples**: How many negatives each positive is contrasted with, `1` by default. With more, the BPR loss and the negatives' regularization are averaged over them. See [BPR](collaborative.md#bpr) for when more help.
 
 !!! warning "Memory and width"
 
@@ -201,11 +211,13 @@ models:
     batch_size: 1024
     epochs: 100
     learning_rate: 0.001
+    neg_samples: 1
 ```
 
 - **min_feature_items**: How many items must carry a feature for it to become a factor. The width of the model is the number of features kept, so there is no `embedding_size`.
 - **reg_weight**: The L2 regularization weight of the user and item factors.
 - **bias_reg_weight**: The L2 regularization weight of the item biases.
+- **neg_samples**: How many negatives each positive is contrasted with, `1` by default. With more, the BPR loss and the regularization of the negatives' factors and biases are averaged over them. See [BPR](collaborative.md#bpr) for when more help.
 
 !!! note "Reading the factors"
 
@@ -227,11 +239,13 @@ models:
     batch_size: 1024
     epochs: 50
     learning_rate: 0.005
+    neg_samples: 1
 ```
 
 - **first_order_limit**: How many first-order features each user keeps, by information gain. `-1` keeps every informative one, `0` none.
 - **second_order_limit**: The same, for second-order features.
 - **min_feature_items**: How many items must carry a feature for it to be considered.
+- **neg_samples**: How many negatives each positive is contrasted with, `1` by default. With more, the BPR loss is averaged over them. These are the training negatives, not the ones drawn once to weigh the features. See [BPR](collaborative.md#bpr) for when more help.
 
 !!! warning "Memory"
 
