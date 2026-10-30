@@ -254,7 +254,10 @@ models:
     batch_size: 2048
     epochs: 200
     learning_rate: 0.001
+    neg_samples: 1
 ```
+
+- **neg_samples**: How many negatives each positive is contrasted with. Defaults to `1`. With more, the BPR loss and the L2 regularization of the negatives are averaged over them. See [BPR](#bpr) for when more help.
 
 ### EGCF
 
@@ -274,7 +277,10 @@ models:
     batch_size: 2048
     epochs: 200
     learning_rate: 0.001
+    neg_samples: 1
 ```
+
+- **neg_samples**: How many negatives each positive is contrasted with. Defaults to `1`. With more, the BPR loss and the L2 regularization of the negatives are averaged over them. See [BPR](#bpr) for when more help.
 
 ### ESIGCF
 
@@ -294,7 +300,10 @@ models:
     batch_size: 2048
     epochs: 200
     learning_rate: 0.001
+    neg_samples: 1
 ```
+
+- **neg_samples**: How many negatives each positive is contrasted with. Defaults to `1`. With more, the BPR loss, the candidate loss on the generated negatives and the L2 regularization of the negatives are averaged over them. See [BPR](#bpr) for when more help.
 
 ### GCMC
 
@@ -330,7 +339,10 @@ models:
     batch_size: 2048
     epochs: 200
     learning_rate: 0.001
+    neg_samples: 1
 ```
+
+- **neg_samples**: How many negatives each positive is contrasted with. Defaults to `1`. With more, the BPR loss and the L2 regularization of the negatives are averaged over them. See [BPR](#bpr) for when more help.
 
 ### LightGCL
 
@@ -351,7 +363,10 @@ models:
     batch_size: 2048
     epochs: 200
     learning_rate: 0.001
+    neg_samples: 1
 ```
+
+- **neg_samples**: How many negatives each positive is contrasted with. Defaults to `1`. With more, the BPR loss and the L2 regularization of the negatives are averaged over them. See [BPR](#bpr) for when more help.
 
 ### LightGCN
 
@@ -368,7 +383,10 @@ models:
     batch_size: 2048
     epochs: 200
     learning_rate: 0.001
+    neg_samples: 1
 ```
+
+- **neg_samples**: How many negatives each positive is contrasted with. Defaults to `1`. With more, the BPR loss and the L2 regularization of the negatives are averaged over them. See [BPR](#bpr) for when more help.
 
 ### LightGCN++ { #lightgcnpp }
 
@@ -388,7 +406,10 @@ models:
     batch_size: 2048
     epochs: 200
     learning_rate: 0.001
+    neg_samples: 1
 ```
+
+- **neg_samples**: How many negatives each positive is contrasted with. Defaults to `1`. With more, the BPR loss and the L2 regularization of the negatives are averaged over them. See [BPR](#bpr) for when more help.
 
 ### LightGODE
 
@@ -450,7 +471,10 @@ models:
     batch_size: 2048
     epochs: 200
     learning_rate: 0.001
+    neg_samples: 1
 ```
+
+- **neg_samples**: How many negatives each positive is contrasted with. Defaults to `1`. With more, the BPR loss on the original and on the mixed negatives and the L2 regularization of the negatives are averaged over them. See [BPR](#bpr) for when more help.
 
 ### NGCF
 
