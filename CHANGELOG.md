@@ -2,6 +2,58 @@
 
 <!-- version list -->
 
+## v2.3.0 (2026-10-30)
+
+### Documentation
+
+- The BPR page documents neg_samples and what more negatives did on MovieLens-100K
+  ([`6c23b58`](https://github.com/sisinflab/warprec/commit/6c23b58f61e44cac28c8920a1b7c46e24894965e))
+
+- The DGCF, EGCF, ESIGCF, LightCCF, LightGCL, LightGCN, LightGCN++ and MixRec pages document
+  neg_samples
+  ([`7f79fa4`](https://github.com/sisinflab/warprec/commit/7f79fa4102afcf894a2cb46f3bdbc07148a0e088))
+
+- The knowledge-aware pages document neg_samples for CKE, KGAT, KGCN, KGIN, RippleNet, KaHFM and
+  KGFlex
+  ([`5940693`](https://github.com/sisinflab/warprec/commit/5940693af87a667839052e15d395174d7a0fa956))
+
+- The multimodal and ConvNCF pages document neg_samples
+  ([`7fe6db5`](https://github.com/sisinflab/warprec/commit/7fe6db5d67ada6e0e7fc7a76a98c36a755ba4804))
+
+- The NGCF, PAAC, SGL, SimGCL, SimRec, UltraGCN and XSimGCL pages document neg_samples
+  ([`b7856c5`](https://github.com/sisinflab/warprec/commit/b7856c567e502bba2dc27c8b8209c26401ff9596))
+
+### Features
+
+- BPR takes neg_samples, the negatives each positive is contrasted with, averaging its loss and
+  their regularization over them
+  ([`66ba6ea`](https://github.com/sisinflab/warprec/commit/66ba6ea22f5d06960ff6ac65194255cf2c47a532))
+
+- CKE, KGAT, KGCN, KGFlex, KGIN, KaHFM and RippleNet take neg_samples, the negatives each positive
+  is contrasted with
+  ([`c0aa9ad`](https://github.com/sisinflab/warprec/commit/c0aa9ade5681a1c698bd5277c8be7b82bb52b8d1))
+
+- DGCF, EGCF, ESIGCF, LightCCF, LightGCL, LightGCN, LightGCN++ and MixRec take neg_samples, the
+  negatives each positive is contrasted with
+  ([`636a126`](https://github.com/sisinflab/warprec/commit/636a12641de19e02f86f0b2df2b152c8d36830a1))
+
+- FREEDOM, LATTICE, MGCN, MMGCN, VBPR and ConvNCF take neg_samples, the negatives each positive is
+  contrasted with
+  ([`bd150f6`](https://github.com/sisinflab/warprec/commit/bd150f6f8c3ee9f97b56271dd163fd55fb36612d))
+
+- NGCF, PAAC, SGL, SimGCL, SimRec, UltraGCN and XSimGCL take neg_samples, the negatives each
+  positive is contrasted with
+  ([`5af9b13`](https://github.com/sisinflab/warprec/commit/5af9b13e9fdea79bacdbc6474d39b6684dd4f549))
+
+- Pairwise models score and regularize a row of negatives through shared helpers, dot_scores and the
+  negatives argument of EmbLoss
+  ([`aab1d6b`](https://github.com/sisinflab/warprec/commit/aab1d6b316af55e5dcabace1b5764ba98cc976f0))
+
+- The contrastive loader draws several negatives per positive when asked, a row of them per triplet,
+  and one as before by default
+  ([`fefcad5`](https://github.com/sisinflab/warprec/commit/fefcad50d61319580cfb36688e02d60e53237806))
+
+
 ## v2.2.9 (2026-10-30)
 
 ### Bug Fixes
