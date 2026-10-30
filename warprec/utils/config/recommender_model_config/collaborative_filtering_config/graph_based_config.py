@@ -37,6 +37,7 @@ class DGCF(RecomModel):
         batch_size (INT_FIELD): List of values for batch_size.
         epochs (INT_FIELD): List of values for epochs.
         learning_rate (FLOAT_FIELD): List of values for learning rate.
+        neg_samples (INT_FIELD): List of values for the negatives per positive.
         need_single_trial_validation (ClassVar[bool]): Flag to enable single trial validation.
     """
 
@@ -49,6 +50,7 @@ class DGCF(RecomModel):
     batch_size: INT_FIELD
     epochs: INT_FIELD
     learning_rate: FLOAT_FIELD
+    neg_samples: INT_FIELD = [1]
     need_single_trial_validation: ClassVar[bool] = True
 
     @field_validator("embedding_size")
@@ -105,6 +107,12 @@ class DGCF(RecomModel):
         """Validate learning_rate."""
         return validate_greater_than_zero(cls, v, "learning_rate")
 
+    @field_validator("neg_samples")
+    @classmethod
+    def check_neg_samples(cls, v: list):
+        """Validate neg_samples."""
+        return validate_greater_than_zero(cls, v, "neg_samples")
+
     def validate_all_combinations(self):
         """Validates if at least one valid combination of hyperparameters exists.
         Ensures that there is at least one combination where embedding_size is divisible by n_factors.
@@ -160,6 +168,7 @@ class EGCF(RecomModel):
         batch_size (INT_FIELD): List of values for batch_size.
         epochs (INT_FIELD): List of values for epochs.
         learning_rate (FLOAT_FIELD): List of values for learning rate.
+        neg_samples (INT_FIELD): List of values for the negatives per positive.
     """
 
     embedding_size: INT_FIELD
@@ -171,6 +180,7 @@ class EGCF(RecomModel):
     batch_size: INT_FIELD
     epochs: INT_FIELD
     learning_rate: FLOAT_FIELD
+    neg_samples: INT_FIELD = [1]
 
     @field_validator("embedding_size")
     @classmethod
@@ -227,6 +237,12 @@ class EGCF(RecomModel):
         """Validate learning_rate."""
         return validate_greater_than_zero(cls, v, "learning_rate")
 
+    @field_validator("neg_samples")
+    @classmethod
+    def check_neg_samples(cls, v: list):
+        """Validate neg_samples."""
+        return validate_greater_than_zero(cls, v, "neg_samples")
+
 
 @params_registry.register("ESIGCF")
 class ESIGCF(RecomModel):
@@ -242,6 +258,7 @@ class ESIGCF(RecomModel):
         batch_size (INT_FIELD): List of values for batch_size.
         epochs (INT_FIELD): List of values for epochs.
         learning_rate (FLOAT_FIELD): List of values for learning rate.
+        neg_samples (INT_FIELD): List of values for the negatives per positive.
     """
 
     embedding_size: INT_FIELD
@@ -253,6 +270,7 @@ class ESIGCF(RecomModel):
     batch_size: INT_FIELD
     epochs: INT_FIELD
     learning_rate: FLOAT_FIELD
+    neg_samples: INT_FIELD = [1]
 
     @field_validator("embedding_size")
     @classmethod
@@ -307,6 +325,12 @@ class ESIGCF(RecomModel):
     def check_learning_rate(cls, v: list):
         """Validate learning_rate."""
         return validate_greater_than_zero(cls, v, "learning_rate")
+
+    @field_validator("neg_samples")
+    @classmethod
+    def check_neg_samples(cls, v: list):
+        """Validate neg_samples."""
+        return validate_greater_than_zero(cls, v, "neg_samples")
 
 
 @params_registry.register("GCMC")
@@ -379,6 +403,7 @@ class LightCCF(RecomModel):
         batch_size (INT_FIELD): List of values for batch_size.
         epochs (INT_FIELD): List of values for epochs.
         learning_rate (FLOAT_FIELD): List of values for learning rate.
+        neg_samples (INT_FIELD): List of values for the negatives per positive.
     """
 
     embedding_size: INT_FIELD
@@ -389,6 +414,7 @@ class LightCCF(RecomModel):
     batch_size: INT_FIELD
     epochs: INT_FIELD
     learning_rate: FLOAT_FIELD
+    neg_samples: INT_FIELD = [1]
 
     @field_validator("embedding_size")
     @classmethod
@@ -438,6 +464,12 @@ class LightCCF(RecomModel):
         """Validate learning_rate."""
         return validate_greater_than_zero(cls, v, "learning_rate")
 
+    @field_validator("neg_samples")
+    @classmethod
+    def check_neg_samples(cls, v: list):
+        """Validate neg_samples."""
+        return validate_greater_than_zero(cls, v, "neg_samples")
+
 
 @params_registry.register("LightGCL")
 class LightGCL(RecomModel):
@@ -454,6 +486,7 @@ class LightGCL(RecomModel):
         batch_size (INT_FIELD): List of values for batch_size.
         epochs (INT_FIELD): List of values for epochs.
         learning_rate (FLOAT_FIELD): List of values for learning rate.
+        neg_samples (INT_FIELD): List of values for the negatives per positive.
     """
 
     embedding_size: INT_FIELD
@@ -466,6 +499,7 @@ class LightGCL(RecomModel):
     batch_size: INT_FIELD
     epochs: INT_FIELD
     learning_rate: FLOAT_FIELD
+    neg_samples: INT_FIELD = [1]
 
     @field_validator("embedding_size")
     @classmethod
@@ -527,6 +561,12 @@ class LightGCL(RecomModel):
         """Validate learning_rate."""
         return validate_greater_than_zero(cls, v, "learning_rate")
 
+    @field_validator("neg_samples")
+    @classmethod
+    def check_neg_samples(cls, v: list):
+        """Validate neg_samples."""
+        return validate_greater_than_zero(cls, v, "neg_samples")
+
 
 @params_registry.register("LightGCN")
 class LightGCN(RecomModel):
@@ -539,6 +579,7 @@ class LightGCN(RecomModel):
         batch_size (INT_FIELD): List of values for batch_size.
         epochs (INT_FIELD): List of values for epochs.
         learning_rate (FLOAT_FIELD): List of values for learning rate.
+        neg_samples (INT_FIELD): List of values for the negatives per positive.
     """
 
     embedding_size: INT_FIELD
@@ -547,6 +588,7 @@ class LightGCN(RecomModel):
     batch_size: INT_FIELD
     epochs: INT_FIELD
     learning_rate: FLOAT_FIELD
+    neg_samples: INT_FIELD = [1]
 
     @field_validator("embedding_size")
     @classmethod
@@ -584,6 +626,12 @@ class LightGCN(RecomModel):
         """Validate learning_rate."""
         return validate_greater_than_zero(cls, v, "learning_rate")
 
+    @field_validator("neg_samples")
+    @classmethod
+    def check_neg_samples(cls, v: list):
+        """Validate neg_samples."""
+        return validate_greater_than_zero(cls, v, "neg_samples")
+
 
 @params_registry.register("LightGCNpp")
 class LightGCNpp(RecomModel):
@@ -599,6 +647,7 @@ class LightGCNpp(RecomModel):
         batch_size (INT_FIELD): List of values for batch_size.
         epochs (INT_FIELD): List of values for epochs.
         learning_rate (FLOAT_FIELD): List of values for learning rate.
+        neg_samples (INT_FIELD): List of values for the negatives per positive.
     """
 
     embedding_size: INT_FIELD
@@ -610,6 +659,7 @@ class LightGCNpp(RecomModel):
     batch_size: INT_FIELD
     epochs: INT_FIELD
     learning_rate: FLOAT_FIELD
+    neg_samples: INT_FIELD = [1]
 
     @field_validator("embedding_size")
     @classmethod
@@ -664,6 +714,12 @@ class LightGCNpp(RecomModel):
     def check_learning_rate(cls, v: list):
         """Validate learning_rate."""
         return validate_greater_than_zero(cls, v, "learning_rate")
+
+    @field_validator("neg_samples")
+    @classmethod
+    def check_neg_samples(cls, v: list):
+        """Validate neg_samples."""
+        return validate_greater_than_zero(cls, v, "neg_samples")
 
 
 @params_registry.register("LightGODE")
@@ -858,6 +914,7 @@ class MixRec(RecomModel):
         batch_size (INT_FIELD): List of values for batch_size.
         epochs (INT_FIELD): List of values for epochs.
         learning_rate (FLOAT_FIELD): List of values for learning rate.
+        neg_samples (INT_FIELD): List of values for the negatives per positive.
     """
 
     embedding_size: INT_FIELD
@@ -869,6 +926,7 @@ class MixRec(RecomModel):
     batch_size: INT_FIELD
     epochs: INT_FIELD
     learning_rate: FLOAT_FIELD
+    neg_samples: INT_FIELD = [1]
 
     @field_validator("embedding_size")
     @classmethod
@@ -923,6 +981,12 @@ class MixRec(RecomModel):
     def check_learning_rate(cls, v: list):
         """Validate learning_rate."""
         return validate_greater_than_zero(cls, v, "learning_rate")
+
+    @field_validator("neg_samples")
+    @classmethod
+    def check_neg_samples(cls, v: list):
+        """Validate neg_samples."""
+        return validate_greater_than_zero(cls, v, "neg_samples")
 
 
 @params_registry.register("NGCF")

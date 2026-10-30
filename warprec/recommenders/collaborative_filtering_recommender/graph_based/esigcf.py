@@ -9,7 +9,7 @@ from warprec.recommenders.base_recommender import IterativeRecommender
 from warprec.recommenders.collaborative_filtering_recommender.graph_based import (
     GraphRecommenderUtils,
 )
-from warprec.recommenders.losses import BPRLoss, EmbLoss, InfoNCELoss
+from warprec.recommenders.losses import BPRLoss, EmbLoss, InfoNCELoss, dot_scores
 from warprec.utils.registry import model_registry
 
 
@@ -36,6 +36,8 @@ class ESIGCF(IterativeRecommender, GraphRecommenderUtils):
         batch_size (int): The batch size used for training.
         epochs (int): The number of epochs.
         learning_rate (float): The learning rate value.
+        neg_samples (int): The negatives each positive is contrasted with. The
+            losses that involve them are averaged over them.
     """
 
     # Model hyperparameters
@@ -48,6 +50,7 @@ class ESIGCF(IterativeRecommender, GraphRecommenderUtils):
     batch_size: int
     epochs: int
     learning_rate: float
+    neg_samples: int = 1
 
     def __init__(
         self,
@@ -159,6 +162,7 @@ class ESIGCF(IterativeRecommender, GraphRecommenderUtils):
     ):
         return interactions.get_contrastive_dataloader(
             batch_size=self.batch_size,
+            neg_samples=self.neg_samples,
             **kwargs,
         )
 
@@ -178,16 +182,21 @@ class ESIGCF(IterativeRecommender, GraphRecommenderUtils):
         ego_neg_emb = self.item_embedding(neg_item)
 
         # Generate "Intent-aware" Negative Item
-        # Generated Negative = LeakyReLU(Pos * Neg)
-        can_neg_emb = self.gen_activation(pos_emb * neg_emb)
+        # Generated Negative = LeakyReLU(Pos * Neg), one per negative of a row
+        if neg_item.dim() == 1:
+            can_neg_emb = self.gen_activation(pos_emb * neg_emb)
+        else:
+            can_neg_emb = self.gen_activation(pos_emb.unsqueeze(1) * neg_emb)
 
         # Calculate BPR loss
         pos_scores = torch.sum(u_emb * pos_emb, dim=1)
-        neg_scores = torch.sum(u_emb * neg_emb, dim=1)
+        neg_scores = dot_scores(u_emb, neg_emb)
         bpr_loss = self.bpr_loss_func(pos_scores, neg_scores)
 
         # Calculate L2 loss
-        reg_loss = self.reg_weight * self.reg_loss_func(ego_pos_emb, ego_neg_emb)
+        reg_loss = self.reg_weight * self.reg_loss_func(
+            ego_pos_emb, negatives=ego_neg_emb
+        )
 
         # SSL Intent Loss (User - Positive Item)
         # Align user and positive item
@@ -195,8 +204,17 @@ class ESIGCF(IterativeRecommender, GraphRecommenderUtils):
         ssl_loss = self.ssl_lambda * ssl_intent_loss
 
         # Candidate/Item Loss (Positive Item - Generated Negative)
-        # Align Positive Item with Generated Negative (Intent View)
-        can_item_loss = self.nce_loss(pos_emb, can_neg_emb)
+        # Align Positive Item with Generated Negative (Intent View), averaged
+        # over the generated negatives of a row
+        if neg_item.dim() == 1:
+            can_item_loss = self.nce_loss(pos_emb, can_neg_emb)
+        else:
+            can_item_loss = torch.stack(
+                [
+                    self.nce_loss(pos_emb, can_neg_emb[:, j])
+                    for j in range(can_neg_emb.size(1))
+                ]
+            ).mean()
         can_loss = self.can_lambda * can_item_loss
 
         # Loss logging
