@@ -9,7 +9,7 @@ from warprec.recommenders.base_recommender import IterativeRecommender
 from warprec.recommenders.collaborative_filtering_recommender.graph_based import (
     GraphRecommenderUtils,
 )
-from warprec.recommenders.losses import BPRLoss, EmbLoss, InfoNCELoss
+from warprec.recommenders.losses import BPRLoss, EmbLoss, InfoNCELoss, dot_scores
 from warprec.utils.registry import model_registry
 
 
@@ -37,6 +37,8 @@ class XSimGCL(IterativeRecommender, GraphRecommenderUtils):
         batch_size (int): The batch size used for training.
         epochs (int): The number of epochs.
         learning_rate (float): The learning rate value.
+        neg_samples (int): The negatives each positive is contrasted with. The
+            BPR loss is averaged over them.
     """
 
     # Hyperparameters
@@ -50,6 +52,7 @@ class XSimGCL(IterativeRecommender, GraphRecommenderUtils):
     batch_size: int
     epochs: int
     learning_rate: float
+    neg_samples: int = 1
 
     def __init__(
         self,
@@ -91,6 +94,7 @@ class XSimGCL(IterativeRecommender, GraphRecommenderUtils):
     ):
         return interactions.get_contrastive_dataloader(
             batch_size=self.batch_size,
+            neg_samples=self.neg_samples,
             **kwargs,
         )
 
@@ -169,9 +173,9 @@ class XSimGCL(IterativeRecommender, GraphRecommenderUtils):
         batch_pos = items_final[pos_item]
         batch_neg = items_final[neg_item]
 
-        # Calculate scores
-        pos_scores = (batch_users * batch_pos).sum(dim=1)
-        neg_scores = (batch_users * batch_neg).sum(dim=1)
+        # Calculate scores, the BPR loss averaging over the negatives
+        pos_scores = dot_scores(batch_users, batch_pos)
+        neg_scores = dot_scores(batch_users, batch_neg)
 
         bpr_loss = self.bpr_loss(pos_scores, neg_scores)
 
@@ -184,7 +188,7 @@ class XSimGCL(IterativeRecommender, GraphRecommenderUtils):
         reg_loss = self.reg_weight * self.reg_loss(
             self.user_embedding(user),
             self.item_embedding(pos_item),
-            self.item_embedding(neg_item),
+            negatives=self.item_embedding(neg_item),
         )
 
         # Loss logging

@@ -1002,6 +1002,7 @@ class NGCF(RecomModel):
         batch_size (INT_FIELD): List of values for batch_size.
         epochs (INT_FIELD): List of values for epochs.
         learning_rate (FLOAT_FIELD): List of values for learning rate.
+        neg_samples (INT_FIELD): List of values for the negatives per positive.
     """
 
     embedding_size: INT_FIELD
@@ -1012,6 +1013,7 @@ class NGCF(RecomModel):
     batch_size: INT_FIELD
     epochs: INT_FIELD
     learning_rate: FLOAT_FIELD
+    neg_samples: INT_FIELD = [1]
 
     @field_validator("embedding_size")
     @classmethod
@@ -1061,6 +1063,12 @@ class NGCF(RecomModel):
         """Validate learning_rate."""
         return validate_greater_than_zero(cls, v, "learning_rate")
 
+    @field_validator("neg_samples")
+    @classmethod
+    def check_neg_samples(cls, v: list):
+        """Validate neg_samples."""
+        return validate_greater_than_zero(cls, v, "neg_samples")
+
 
 @params_registry.register("PAAC")
 class PAAC(RecomModel):
@@ -1080,6 +1088,7 @@ class PAAC(RecomModel):
         batch_size (INT_FIELD): List of values for batch_size.
         epochs (INT_FIELD): List of values for epochs.
         learning_rate (FLOAT_FIELD): List of values for learning rate.
+        neg_samples (INT_FIELD): List of values for the negatives per positive.
     """
 
     embedding_size: INT_FIELD
@@ -1095,6 +1104,7 @@ class PAAC(RecomModel):
     batch_size: INT_FIELD
     epochs: INT_FIELD
     learning_rate: FLOAT_FIELD
+    neg_samples: INT_FIELD = [1]
 
     @field_validator("embedding_size")
     @classmethod
@@ -1173,6 +1183,12 @@ class PAAC(RecomModel):
     def check_learning_rate(cls, v: list):
         """Validate learning_rate."""
         return validate_greater_than_zero(cls, v, "learning_rate")
+
+    @field_validator("neg_samples")
+    @classmethod
+    def check_neg_samples(cls, v: list):
+        """Validate neg_samples."""
+        return validate_greater_than_zero(cls, v, "neg_samples")
 
 
 @params_registry.register("PopDCL")
@@ -1466,6 +1482,7 @@ class SGL(RecomModel):
         batch_size (INT_FIELD): List of values for batch_size.
         epochs (INT_FIELD): List of values for epochs.
         learning_rate (FLOAT_FIELD): List of values for learning rate.
+        neg_samples (INT_FIELD): List of values for the negatives per positive.
     """
 
     embedding_size: INT_FIELD
@@ -1478,6 +1495,7 @@ class SGL(RecomModel):
     batch_size: INT_FIELD
     epochs: INT_FIELD
     learning_rate: FLOAT_FIELD
+    neg_samples: INT_FIELD = [1]
 
     @field_validator("embedding_size")
     @classmethod
@@ -1540,6 +1558,12 @@ class SGL(RecomModel):
         """Validate learning_rate."""
         return validate_greater_than_zero(cls, v, "learning_rate")
 
+    @field_validator("neg_samples")
+    @classmethod
+    def check_neg_samples(cls, v: list):
+        """Validate neg_samples."""
+        return validate_greater_than_zero(cls, v, "neg_samples")
+
 
 @params_registry.register("SimGCL")
 class SimGCL(RecomModel):
@@ -1555,6 +1579,7 @@ class SimGCL(RecomModel):
         batch_size (INT_FIELD): List of values for batch_size.
         epochs (INT_FIELD): List of values for epochs.
         learning_rate (FLOAT_FIELD): List of values for learning rate.
+        neg_samples (INT_FIELD): List of values for the negatives per positive.
     """
 
     embedding_size: INT_FIELD
@@ -1566,6 +1591,7 @@ class SimGCL(RecomModel):
     batch_size: INT_FIELD
     epochs: INT_FIELD
     learning_rate: FLOAT_FIELD
+    neg_samples: INT_FIELD = [1]
 
     @field_validator("embedding_size")
     @classmethod
@@ -1621,6 +1647,12 @@ class SimGCL(RecomModel):
         """Validate learning_rate."""
         return validate_greater_than_zero(cls, v, "learning_rate")
 
+    @field_validator("neg_samples")
+    @classmethod
+    def check_neg_samples(cls, v: list):
+        """Validate neg_samples."""
+        return validate_greater_than_zero(cls, v, "neg_samples")
+
 
 @params_registry.register("SimRec")
 class SimRec(RecomModel):
@@ -1645,6 +1677,7 @@ class SimRec(RecomModel):
         epochs (INT_FIELD): List of values for epochs.
         learning_rate (FLOAT_FIELD): List of values for learning rate.
         teacher_learning_rate (FLOAT_FIELD): List of values for teacher learning rate.
+        neg_samples (INT_FIELD): List of values for the negatives per positive.
     """
 
     embedding_size: INT_FIELD
@@ -1665,6 +1698,7 @@ class SimRec(RecomModel):
     epochs: INT_FIELD
     learning_rate: FLOAT_FIELD
     teacher_learning_rate: FLOAT_FIELD
+    neg_samples: INT_FIELD = [1]
 
     @field_validator("embedding_size")
     @classmethod
@@ -1774,6 +1808,12 @@ class SimRec(RecomModel):
         """Validate teacher_learning_rate."""
         return validate_greater_than_zero(cls, v, "teacher_learning_rate")
 
+    @field_validator("neg_samples")
+    @classmethod
+    def check_neg_samples(cls, v: list):
+        """Validate neg_samples."""
+        return validate_greater_than_zero(cls, v, "neg_samples")
+
 
 @params_registry.register("UltraGCN")
 class UltraGCN(RecomModel):
@@ -1789,6 +1829,7 @@ class UltraGCN(RecomModel):
         batch_size (INT_FIELD): List of values for batch_size.
         epochs (INT_FIELD): List of values for epochs.
         learning_rate (FLOAT_FIELD): List of values for learning rate.
+        neg_samples (INT_FIELD): List of values for the negatives per positive.
     """
 
     embedding_size: INT_FIELD
@@ -1800,6 +1841,7 @@ class UltraGCN(RecomModel):
     batch_size: INT_FIELD
     epochs: INT_FIELD
     learning_rate: FLOAT_FIELD
+    neg_samples: INT_FIELD = [1]
 
     @field_validator("embedding_size")
     @classmethod
@@ -1855,6 +1897,12 @@ class UltraGCN(RecomModel):
         """Validate learning_rate."""
         return validate_greater_than_zero(cls, v, "learning_rate")
 
+    @field_validator("neg_samples")
+    @classmethod
+    def check_neg_samples(cls, v: list):
+        """Validate neg_samples."""
+        return validate_greater_than_zero(cls, v, "neg_samples")
+
 
 @params_registry.register("XSimGCL")
 class XSimGCL(RecomModel):
@@ -1871,6 +1919,7 @@ class XSimGCL(RecomModel):
         batch_size (INT_FIELD): List of values for batch_size.
         epochs (INT_FIELD): List of values for epochs.
         learning_rate (FLOAT_FIELD): List of values for learning rate.
+        neg_samples (INT_FIELD): List of values for the negatives per positive.
         need_single_trial_validation (ClassVar[bool]): Flag to enable single trial validation.
     """
 
@@ -1884,6 +1933,7 @@ class XSimGCL(RecomModel):
     batch_size: INT_FIELD
     epochs: INT_FIELD
     learning_rate: FLOAT_FIELD
+    neg_samples: INT_FIELD = [1]
     need_single_trial_validation: ClassVar[bool] = True
 
     @field_validator("embedding_size")
@@ -1945,6 +1995,12 @@ class XSimGCL(RecomModel):
     def check_learning_rate(cls, v: list):
         """Validate learning_rate."""
         return validate_greater_than_zero(cls, v, "learning_rate")
+
+    @field_validator("neg_samples")
+    @classmethod
+    def check_neg_samples(cls, v: list):
+        """Validate neg_samples."""
+        return validate_greater_than_zero(cls, v, "neg_samples")
 
     def validate_all_combinations(self):
         """Validates if at least one valid combination of hyperparameters exists.

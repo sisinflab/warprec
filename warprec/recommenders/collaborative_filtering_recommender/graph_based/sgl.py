@@ -9,7 +9,7 @@ from warprec.recommenders.base_recommender import IterativeRecommender
 from warprec.recommenders.collaborative_filtering_recommender.graph_based import (
     GraphRecommenderUtils,
 )
-from warprec.recommenders.losses import BPRLoss, EmbLoss, InfoNCELoss
+from warprec.recommenders.losses import BPRLoss, EmbLoss, InfoNCELoss, dot_scores
 from warprec.utils.registry import model_registry
 from warprec.recommenders.collaborative_filtering_recommender.graph_based.graph_utils import (
     SparseAdjacency,
@@ -40,6 +40,8 @@ class SGL(IterativeRecommender, GraphRecommenderUtils):
         batch_size (int): The batch size used for training.
         epochs (int): The number of epochs.
         learning_rate (float): The learning rate value.
+        neg_samples (int): The negatives each positive is contrasted with. The
+            BPR loss is averaged over them.
 
     Raises:
         ConfigurationError: If aug_type is not one of the supported types.
@@ -56,6 +58,7 @@ class SGL(IterativeRecommender, GraphRecommenderUtils):
     batch_size: int
     epochs: int
     learning_rate: float
+    neg_samples: int = 1
 
     def __init__(
         self,
@@ -113,6 +116,7 @@ class SGL(IterativeRecommender, GraphRecommenderUtils):
     ):
         return interactions.get_contrastive_dataloader(
             batch_size=self.batch_size,
+            neg_samples=self.neg_samples,
             **kwargs,
         )
 
@@ -218,9 +222,9 @@ class SGL(IterativeRecommender, GraphRecommenderUtils):
         pos_embeddings = item_all_embeddings[pos_item]
         neg_embeddings = item_all_embeddings[neg_item]
 
-        # Calculate BPR loss
-        pos_scores = torch.mul(u_embeddings, pos_embeddings).sum(dim=1)
-        neg_scores = torch.mul(u_embeddings, neg_embeddings).sum(dim=1)
+        # Calculate BPR loss, averaged over the negatives of each positive
+        pos_scores = dot_scores(u_embeddings, pos_embeddings)
+        neg_scores = dot_scores(u_embeddings, neg_embeddings)
         bpr_loss = self.bpr_loss(pos_scores, neg_scores)
 
         # Calculate SSL loss
@@ -255,7 +259,7 @@ class SGL(IterativeRecommender, GraphRecommenderUtils):
         reg_loss = self.reg_weight * self.reg_loss(
             self.user_embedding(user),
             self.item_embedding(pos_item),
-            self.item_embedding(neg_item),
+            negatives=self.item_embedding(neg_item),
         )
 
         # Loss logging

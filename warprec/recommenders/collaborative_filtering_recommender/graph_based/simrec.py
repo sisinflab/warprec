@@ -9,7 +9,7 @@ from torch.utils.data import DataLoader
 
 from warprec.data.entities import Interactions, Sessions
 from warprec.recommenders.base_recommender import IterativeRecommender
-from warprec.recommenders.losses import BPRLoss, EmbLoss
+from warprec.recommenders.losses import BPRLoss, EmbLoss, dot_scores
 from warprec.utils.registry import model_registry
 
 
@@ -150,6 +150,8 @@ class SimRec(IterativeRecommender):
         epochs (int): Number of student training epochs.
         learning_rate (float): Adam LR for student.
         teacher_learning_rate (float): Adam LR for teacher.
+        neg_samples (int): The negatives each positive is contrasted with in the
+            teacher's BPR pre-training, its loss averaged over them.
     """
 
     # Model hyperparameters
@@ -171,6 +173,7 @@ class SimRec(IterativeRecommender):
     epochs: int
     learning_rate: float
     teacher_learning_rate: float
+    neg_samples: int = 1
 
     def __init__(
         self,
@@ -277,7 +280,7 @@ class SimRec(IterativeRecommender):
         self, interactions: Interactions, sessions: Sessions, **kwargs: Any
     ) -> DataLoader:
         return interactions.get_contrastive_dataloader(
-            batch_size=self.batch_size, **kwargs
+            batch_size=self.batch_size, neg_samples=self.neg_samples, **kwargs
         )
 
     def _pretrain_teacher_step(
@@ -297,19 +300,19 @@ class SimRec(IterativeRecommender):
         user_emb, item_emb = self.teacher.get_user_item_embeddings()
         u = user_emb[user]  # [B, d]
         pos = item_emb[pos_item]  # [B, d]
-        neg = item_emb[neg_item]  # [B, d]
+        neg = item_emb[neg_item]  # [B, d] or [B, k, d]
 
-        pos_scores = (u * pos).sum(dim=-1)
-        neg_scores = (u * neg).sum(dim=-1)
+        pos_scores = dot_scores(u, pos)
+        neg_scores = dot_scores(u, neg)
 
-        # Eq 11 — BPR loss
+        # Eq 11 — BPR loss, averaged over the negatives of each positive
         bpr = self.bpr_loss(pos_scores, neg_scores)
 
         # Eq 11 — weight-decay on initial embeddings
         reg = self.teacher_reg_weight * self.reg_loss(
             self.teacher.user_embedding(user),
             self.teacher.item_embedding(pos_item),
-            self.teacher.item_embedding(neg_item),
+            negatives=self.teacher.item_embedding(neg_item),
         )
         loss = bpr + reg
         loss.backward()

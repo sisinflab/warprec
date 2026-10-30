@@ -9,7 +9,7 @@ from warprec.recommenders.base_recommender import IterativeRecommender
 from warprec.recommenders.collaborative_filtering_recommender.graph_based import (
     GraphRecommenderUtils,
 )
-from warprec.recommenders.losses import BPRLoss, EmbLoss, InfoNCELoss
+from warprec.recommenders.losses import BPRLoss, EmbLoss, InfoNCELoss, dot_scores
 from warprec.utils.registry import model_registry
 
 
@@ -43,6 +43,8 @@ class SimGCL(IterativeRecommender, GraphRecommenderUtils):
         batch_size (int): The batch size used for training.
         epochs (int): The number of epochs.
         learning_rate (float): The learning rate value.
+        neg_samples (int): The negatives each positive is contrasted with. The
+            BPR loss is averaged over them.
     """
 
     # Model hyperparameters
@@ -55,6 +57,7 @@ class SimGCL(IterativeRecommender, GraphRecommenderUtils):
     batch_size: int
     epochs: int
     learning_rate: float
+    neg_samples: int = 1
 
     def __init__(
         self,
@@ -97,6 +100,7 @@ class SimGCL(IterativeRecommender, GraphRecommenderUtils):
     ):
         return interactions.get_contrastive_dataloader(
             batch_size=self.batch_size,
+            neg_samples=self.neg_samples,
             **kwargs,
         )
 
@@ -216,13 +220,13 @@ class SimGCL(IterativeRecommender, GraphRecommenderUtils):
         user_v1, item_v1 = self._cl_view1
         user_v2, item_v2 = self._cl_view2
 
-        # --- BPR recommendation loss — Eq. 5 ---
+        # --- BPR recommendation loss — Eq. 5, averaged over the negatives ---
         batch_users = users_final[user]
         batch_pos = items_final[pos_item]
         batch_neg = items_final[neg_item]
 
-        pos_scores = (batch_users * batch_pos).sum(dim=1)
-        neg_scores = (batch_users * batch_neg).sum(dim=1)
+        pos_scores = dot_scores(batch_users, batch_pos)
+        neg_scores = dot_scores(batch_users, batch_neg)
         bpr_loss = self.bpr_loss(pos_scores, neg_scores)
 
         # --- Contrastive loss — Eq. 2 (InfoNCE between view1 and view2) ---
@@ -234,7 +238,7 @@ class SimGCL(IterativeRecommender, GraphRecommenderUtils):
         reg_loss = self.reg_weight * self.reg_loss(
             self.user_embedding(user),
             self.item_embedding(pos_item),
-            self.item_embedding(neg_item),
+            negatives=self.item_embedding(neg_item),
         )
 
         # Joint loss — Eq. 1

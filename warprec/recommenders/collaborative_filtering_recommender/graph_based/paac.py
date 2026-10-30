@@ -11,7 +11,7 @@ from warprec.recommenders.base_recommender import IterativeRecommender
 from warprec.recommenders.collaborative_filtering_recommender.graph_based import (
     GraphRecommenderUtils,
 )
-from warprec.recommenders.losses import BPRLoss, EmbLoss, InfoNCELoss
+from warprec.recommenders.losses import BPRLoss, EmbLoss, InfoNCELoss, dot_scores
 from warprec.utils.registry import model_registry
 
 
@@ -48,6 +48,8 @@ class PAAC(GraphRecommenderUtils, IterativeRecommender):
         batch_size (int): Training batch size.
         epochs (int): Maximum training epochs.
         learning_rate (float): Adam learning rate.
+        neg_samples (int): The negatives each positive is contrasted with. The
+            BPR loss is averaged over them.
     """
 
     # Model hyperparameters
@@ -64,6 +66,7 @@ class PAAC(GraphRecommenderUtils, IterativeRecommender):
     batch_size: int
     epochs: int
     learning_rate: float
+    neg_samples: int = 1
 
     def __init__(
         self,
@@ -122,6 +125,7 @@ class PAAC(GraphRecommenderUtils, IterativeRecommender):
     ) -> DataLoader:
         return interactions.get_contrastive_dataloader(
             batch_size=self.batch_size,
+            neg_samples=self.neg_samples,
             **kwargs,
         )
 
@@ -354,8 +358,9 @@ class PAAC(GraphRecommenderUtils, IterativeRecommender):
         pos_emb = item_emb[pos_item]
         neg_emb = item_emb[neg_item]
 
-        pos_scores = torch.mul(u_emb, pos_emb).sum(dim=1)
-        neg_scores = torch.mul(u_emb, neg_emb).sum(dim=1)
+        # BPR loss, averaged over the negatives of each positive
+        pos_scores = dot_scores(u_emb, pos_emb)
+        neg_scores = dot_scores(u_emb, neg_emb)
         rec_loss = self.bpr_loss(pos_scores, neg_scores)
 
         sa_loss = self._supervised_alignment_loss(user, pos_item, item_emb)
@@ -373,7 +378,7 @@ class PAAC(GraphRecommenderUtils, IterativeRecommender):
         reg_loss = self.reg_weight * self.reg_loss(
             self.user_embedding(user),
             self.item_embedding(pos_item),
-            self.item_embedding(neg_item),
+            negatives=self.item_embedding(neg_item),
         )
 
         loss = rec_loss + self.lambda1 * sa_loss + self.lambda2 * cl_loss + reg_loss
