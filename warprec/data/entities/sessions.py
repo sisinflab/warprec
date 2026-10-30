@@ -206,32 +206,6 @@ class Sessions:
                 "No valid sequences found (min 2 interactions per user needed)."
             )
 
-    def _keep_in_memory(self) -> None:
-        """Copy the arrays the loaders read at random out of Ray's object store.
-
-        Fetched from the store they are read-only views, which Ray keeps on disk
-        when the store is full, so every sample would read the disk.
-        """
-
-        def resident(array: Optional[np.ndarray]) -> Optional[np.ndarray]:
-            # Arrays the process can write are already its own
-            if array is None or array.flags.writeable:
-                return array
-            return array.copy()
-
-        self._flat_items = resident(self._flat_items)
-        self._flat_users = resident(self._flat_users)
-        self._user_offsets = resident(self._user_offsets)
-        self._valid_sample_indices = resident(self._valid_sample_indices)
-
-        # Negative sampling reads only the structure of the matrix
-        sparse = self._inter_sparse
-        if sparse is not None and not sparse.indices.flags.writeable:
-            self._inter_sparse = csr_matrix(
-                (sparse.data, sparse.indices.copy(), sparse.indptr.copy()),
-                shape=sparse.shape,
-            )
-
     def get_sequential_dataloader(
         self,
         max_seq_len: int,
@@ -243,7 +217,6 @@ class Sessions:
         **kwargs: Any,
     ) -> DataLoader:
         """Standard SASRec/RNN style dataloader (History -> Next Item)."""
-        self._keep_in_memory()
 
         self._require_valid_targets()
 
@@ -278,7 +251,6 @@ class Sessions:
         **kwargs: Any,
     ) -> DataLoader:
         """Sequential dataloader that also samples a same-target positive sequence."""
-        self._keep_in_memory()
 
         self._require_valid_targets()
 
@@ -311,7 +283,6 @@ class Sessions:
         **kwargs: Any,
     ) -> DataLoader:
         """Sequence-to-Sequence dataloader (Sliding Windows)."""
-        self._keep_in_memory()
 
         # 1. Calculate Windows
         user_lens = np.diff(self._user_offsets)
@@ -384,7 +355,6 @@ class Sessions:
         **kwargs: Any,
     ) -> DataLoader:
         """BERT4Rec style dataloader (Masked Language Modeling)."""
-        self._keep_in_memory()
 
         user_lens = np.diff(self._user_offsets)
         valid_users = np.where(user_lens >= 2)[0]
