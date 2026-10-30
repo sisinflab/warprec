@@ -143,6 +143,39 @@ class NegativeSampler:
                 continue
             return candidate
 
+    def sample_many(self, user_idx: int, count: int) -> np.ndarray:
+        """Draw several items the user has not interacted with, independently.
+
+        Drawn from the same distribution as 'sample', a batch at a time: the
+        candidates the user has seen are drawn again until none is left.
+
+        Args:
+            user_idx (int): The index of the user to sample negatives for.
+            count (int): How many to draw.
+
+        Returns:
+            np.ndarray: The sampled item indices.
+        """
+        start = self.sparse_matrix.indptr[user_idx]
+        end = self.sparse_matrix.indptr[user_idx + 1]
+        seen_items = self.sparse_matrix.indices[start:end]
+
+        drawn = np.empty(count, dtype=np.int64)
+        filled = 0
+        while filled < count:
+            missing = count - filled
+            if self._cumulative is None:
+                candidates = self.rng.integers(0, self.niid, size=missing)
+            else:
+                candidates = np.searchsorted(self._cumulative, self.rng.random(missing))
+                candidates = np.minimum(candidates, self.niid - 1)
+
+            unseen = ~np.isin(candidates, seen_items, assume_unique=False)
+            kept = candidates[unseen]
+            drawn[filled : filled + len(kept)] = kept
+            filled += len(kept)
+        return drawn
+
 
 class PointWiseDataset(Dataset):
     """A PyTorch Dataset for (user, item, rating) triplets that generates samples on-the-fly.
@@ -244,6 +277,7 @@ class ContrastiveDataset(Dataset):
     """A PyTorch Dataset for (user, positive_item, negative_item) triplets.
 
     Generates negative samples on-the-fly using the sparse interaction matrix.
+    With several negatives per positive, the negatives of a triplet are a vector.
 
     Args:
         user_ids (Tensor): Tensor of user indices for positive interactions.
@@ -256,6 +290,7 @@ class ContrastiveDataset(Dataset):
             strategy applies to the interaction counts.
         seed (int): The seed of the sampler's generator, so that two runs with the
             same seed draw the same negatives.
+        neg_samples (int): The negatives drawn for each positive.
     """
 
     def __init__(
@@ -267,11 +302,13 @@ class ContrastiveDataset(Dataset):
         negative_sampling: str = "uniform",
         neg_alpha: float = 0.75,
         seed: int = 42,
+        neg_samples: int = 1,
     ):
         self.user_ids = user_ids
         self.item_ids = item_ids
         self.sparse_matrix = sparse_matrix
         self.niid = niid
+        self.neg_samples = neg_samples
         self.sampler = NegativeSampler(
             sparse_matrix, niid, negative_sampling, neg_alpha, seed=seed
         )
@@ -284,9 +321,15 @@ class ContrastiveDataset(Dataset):
         user_tensor = self.user_ids[idx]
         pos_item_tensor = self.item_ids[idx]
 
-        # Negative Sampling
-        candidate = self.sampler.sample(int(user_tensor.item()))
-        neg_item_tensor = torch.tensor(candidate, dtype=torch.long)
+        # Negative Sampling. One negative is a scalar, as it always was
+        if self.neg_samples == 1:
+            candidate = self.sampler.sample(int(user_tensor.item()))
+            neg_item_tensor = torch.tensor(candidate, dtype=torch.long)
+        else:
+            candidates = self.sampler.sample_many(
+                int(user_tensor.item()), self.neg_samples
+            )
+            neg_item_tensor = torch.from_numpy(candidates)
 
         # Return triplet (user, pos, neg)
         return user_tensor, pos_item_tensor, neg_item_tensor
