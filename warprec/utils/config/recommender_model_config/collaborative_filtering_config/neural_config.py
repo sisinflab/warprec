@@ -34,6 +34,7 @@ class ConvNCF(RecomModel):
         batch_size (INT_FIELD): List of values for batch_size.
         epochs (INT_FIELD): List of values for epochs.
         learning_rate (FLOAT_FIELD): List of values for learning rate.
+        neg_samples (INT_FIELD): List of values for the negatives per positive.
         need_single_trial_validation (ClassVar[bool]): Whether or not to check if a Ray Tune
             trial parameter are valid.
     """
@@ -48,6 +49,7 @@ class ConvNCF(RecomModel):
     batch_size: INT_FIELD
     epochs: INT_FIELD
     learning_rate: FLOAT_FIELD
+    neg_samples: INT_FIELD = [1]
     need_single_trial_validation: ClassVar[bool] = True
 
     @field_validator("embedding_size")
@@ -109,6 +111,12 @@ class ConvNCF(RecomModel):
     def check_learning_rate(cls, v: list):
         """Validate learning_rate."""
         return validate_greater_than_zero(cls, v, "learning_rate")
+
+    @field_validator("neg_samples")
+    @classmethod
+    def check_neg_samples(cls, v: list):
+        """Validate neg_samples."""
+        return validate_greater_than_zero(cls, v, "neg_samples")
 
     def validate_all_combinations(self):
         """Validates if at least one valid combination of hyperparameters exists.

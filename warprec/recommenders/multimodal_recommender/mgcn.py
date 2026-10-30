@@ -13,7 +13,7 @@ from warprec.recommenders.collaborative_filtering_recommender.graph_based import
 from warprec.recommenders.multimodal_recommender.multimodal_utils import (
     MultiModalRecommenderUtils,
 )
-from warprec.recommenders.losses import BPRLoss, EmbLoss
+from warprec.recommenders.losses import BPRLoss, EmbLoss, dot_scores
 from warprec.utils.registry import model_registry
 
 
@@ -56,6 +56,8 @@ class MGCN(MultiModalRecommenderUtils, GraphRecommenderUtils, IterativeRecommend
         batch_size (int): The batch size used for training.
         epochs (int): The number of epochs.
         learning_rate (float): The learning rate value.
+        neg_samples (int): The negatives each positive is contrasted with.
+            Every loss term that involves them is averaged over them.
         item_item (Tensor): The frozen item-item feature graph.
         user_item (Tensor): The row-normalised user-item matrix.
 
@@ -74,6 +76,7 @@ class MGCN(MultiModalRecommenderUtils, GraphRecommenderUtils, IterativeRecommend
     batch_size: int
     epochs: int
     learning_rate: float
+    neg_samples: int = 1
 
     item_item: Tensor
     user_item: Tensor
@@ -258,6 +261,7 @@ class MGCN(MultiModalRecommenderUtils, GraphRecommenderUtils, IterativeRecommend
     ):
         return interactions.get_contrastive_dataloader(
             batch_size=self.batch_size,
+            neg_samples=self.neg_samples,
             **kwargs,
         )
 
@@ -274,11 +278,13 @@ class MGCN(MultiModalRecommenderUtils, GraphRecommenderUtils, IterativeRecommend
             behaviour, [self.n_users, self.n_items + 1]
         )
 
+        # Several negatives per positive are averaged, in the contrast and in
+        # the regularization alike; the agreement does not involve them.
         loss = (
             self.bpr_loss(
-                (user_e * positive_e).sum(dim=1), (user_e * negative_e).sum(dim=1)
+                dot_scores(user_e, positive_e), dot_scores(user_e, negative_e)
             )
-            + self.reg_weight * self.reg_loss(user_e, positive_e, negative_e)
+            + self.reg_weight * self.reg_loss(user_e, positive_e, negatives=negative_e)
             + self.cl_weight
             * (
                 self._agreement(content_items[positive], behaviour_items[positive])

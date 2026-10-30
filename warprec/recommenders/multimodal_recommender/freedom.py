@@ -12,7 +12,7 @@ from warprec.recommenders.collaborative_filtering_recommender.graph_based import
 from warprec.recommenders.multimodal_recommender.multimodal_utils import (
     MultiModalRecommenderUtils,
 )
-from warprec.recommenders.losses import BPRLoss, EmbLoss
+from warprec.recommenders.losses import BPRLoss, EmbLoss, dot_scores
 from warprec.utils.registry import model_registry
 
 
@@ -63,6 +63,8 @@ class FREEDOM(MultiModalRecommenderUtils, GraphRecommenderUtils, IterativeRecomm
         batch_size (int): The batch size used for training.
         epochs (int): The number of epochs.
         learning_rate (float): The learning rate value.
+        neg_samples (int): The negatives each positive is contrasted with.
+            Every loss term that involves them is averaged over them.
         item_item (Tensor): The frozen item-item adjacency.
         edge_users (Tensor): The user end of each training interaction.
         edge_items (Tensor): The item end of each training interaction.
@@ -81,6 +83,7 @@ class FREEDOM(MultiModalRecommenderUtils, GraphRecommenderUtils, IterativeRecomm
     batch_size: int
     epochs: int
     learning_rate: float
+    neg_samples: int = 1
 
     # Registered buffers, annotated so that they read as the tensors they are
     # rather than as the union a buffer is typed with.
@@ -216,6 +219,7 @@ class FREEDOM(MultiModalRecommenderUtils, GraphRecommenderUtils, IterativeRecomm
     ):
         return interactions.get_contrastive_dataloader(
             batch_size=self.batch_size,
+            neg_samples=self.neg_samples,
             **kwargs,
         )
 
@@ -257,7 +261,8 @@ class FREEDOM(MultiModalRecommenderUtils, GraphRecommenderUtils, IterativeRecomm
         Args:
             user_e (Tensor): The propagated user embeddings of the batch.
             positive (Tensor): The positive item indices.
-            negative (Tensor): The negative item indices.
+            negative (Tensor): The negative item indices, one per user or a row
+                of several, over which the contrast is averaged.
 
         Returns:
             Tensor: The summed per-modality contrast.
@@ -267,8 +272,8 @@ class FREEDOM(MultiModalRecommenderUtils, GraphRecommenderUtils, IterativeRecomm
         for refined, projection in zip(self.refined, self.projections):
             projected = projection(refined.weight)
             total = total + self.bpr_loss(
-                (user_e * projected[positive]).sum(dim=1),
-                (user_e * projected[negative]).sum(dim=1),
+                dot_scores(user_e, projected[positive]),
+                dot_scores(user_e, projected[negative]),
             )
 
         return total
@@ -279,9 +284,11 @@ class FREEDOM(MultiModalRecommenderUtils, GraphRecommenderUtils, IterativeRecomm
         users, items = self.forward()
         user_e = users[user]
 
+        # Several negatives per positive are each contrasted with it, and every
+        # contrast below is averaged over them.
         recommendation = self.bpr_loss(
-            (user_e * items[positive]).sum(dim=1),
-            (user_e * items[negative]).sum(dim=1),
+            dot_scores(user_e, items[positive]),
+            dot_scores(user_e, items[negative]),
         )
 
         # The projections are pulled towards the collaborative space by the same
