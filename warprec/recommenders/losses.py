@@ -1,7 +1,25 @@
+from typing import Optional
+
 import torch
 import torch.nn.functional as F
 from torch import nn, Tensor
 from warprec.errors import ConfigurationError
+
+
+def dot_scores(users: Tensor, items: Tensor) -> Tensor:
+    """The dot product of each user with its item, or with each of its row of items.
+
+    Args:
+        users (Tensor): The user representations, [batch_size, embedding_size].
+        items (Tensor): One item per user, [batch_size, embedding_size], or a row
+            of several, [batch_size, n, embedding_size].
+
+    Returns:
+        Tensor: The scores, [batch_size] or [batch_size, n].
+    """
+    if items.dim() > users.dim():
+        users = users.unsqueeze(-2)
+    return torch.mul(users, items).sum(dim=-1)
 
 
 class BPRLoss(nn.Module):
@@ -68,29 +86,41 @@ class EmbLoss(nn.Module):
             )
         self.reduction = reduction
 
-    def forward(self, *embeddings: Tensor) -> Tensor:
+    def forward(
+        self, *embeddings: Tensor, negatives: Optional[Tensor] = None
+    ) -> Tensor:
         """Compute the L2 regularization loss.
 
         Args:
             *embeddings (Tensor): Variable number of embedding tensors.
+            negatives (Optional[Tensor]): The embeddings of the negatives of a
+                pairwise loss: one per row, regularized like the others, or a row
+                of several, [batch_size, n, embedding_size], averaged over the n
+                so that a positive's regularization does not grow with them.
 
         Returns:
             Tensor: The computed regularization loss.
         """
         # Edge case: No embedding passed
-        if not embeddings:
+        if not embeddings and negatives is None:
             return torch.tensor(0.0)
 
         # PyTorch will handle the casting to Tensor
-        l2_reg = torch.tensor(0.0, device=embeddings[0].device)
+        first = embeddings[0] if embeddings else negatives
+        l2_reg = torch.tensor(0.0, device=first.device)
         for emb in embeddings:
             l2_reg = l2_reg + emb.pow(2).sum()
+        if negatives is not None:
+            negative_reg = negatives.pow(2).sum()
+            if negatives.dim() > 2:
+                negative_reg = negative_reg / negatives.size(1)
+            l2_reg = l2_reg + negative_reg
 
         # Scale by 1/2 (standard convention in RecSys)
         l2_reg = 0.5 * l2_reg
 
         if self.reduction == "mean":
-            batch_size = embeddings[0].size(0)
+            batch_size = first.size(0)
             return l2_reg / batch_size
         return l2_reg
 

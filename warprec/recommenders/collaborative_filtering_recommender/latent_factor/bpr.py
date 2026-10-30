@@ -5,7 +5,7 @@ from torch import nn, Tensor
 
 from warprec.data.entities import Interactions, Sessions
 from warprec.recommenders.base_recommender import IterativeRecommender
-from warprec.recommenders.losses import BPRLoss, EmbLoss
+from warprec.recommenders.losses import BPRLoss, EmbLoss, dot_scores
 from warprec.utils.registry import model_registry
 
 
@@ -80,17 +80,12 @@ class BPR(IterativeRecommender):
         neg_item_score = self.forward(user, neg_item)
         bpr_loss = self.bpr_loss(pos_item_score, neg_item_score)
 
-        # Compute L2 regularization. Several negatives are averaged, so that a
-        # positive's regularization does not grow with their number
-        user_e = self.user_embedding(user)
-        pos_e = self.item_embedding(pos_item)
-        neg_e = self.item_embedding(neg_item)
-        if neg_item.dim() == 1:
-            reg_loss = self.reg_weight * self.reg_loss(user_e, pos_e, neg_e)
-        else:
-            reg_loss = self.reg_weight * (
-                self.reg_loss(user_e, pos_e) + self.reg_loss(neg_e) / neg_item.size(1)
-            )
+        # Compute L2 regularization
+        reg_loss = self.reg_weight * self.reg_loss(
+            self.user_embedding(user),
+            self.item_embedding(pos_item),
+            negatives=self.item_embedding(neg_item),
+        )
 
         # Loss logging
         loss = bpr_loss + reg_loss
@@ -108,12 +103,7 @@ class BPR(IterativeRecommender):
         Returns:
             Tensor: The predicted score for each pair of positive and negative items.
         """
-        user_e = self.user_embedding(user)
-        item_e = self.item_embedding(item)
-        if item.dim() > user.dim():
-            user_e = user_e.unsqueeze(1)
-
-        return torch.mul(user_e, item_e).sum(dim=-1)
+        return dot_scores(self.user_embedding(user), self.item_embedding(item))
 
     def predict(
         self,
