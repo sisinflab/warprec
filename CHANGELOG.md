@@ -2,6 +2,15 @@
 
 <!-- version list -->
 
+## v2.2.9 (2026-10-30)
+
+### Bug Fixes
+
+- The sequential loaders read the dataset from the Ray object store again instead of copying it into
+  every trial, which cost each trial about 20 bytes of memory per training interaction
+  ([`f4f8482`](https://github.com/sisinflab/warprec/commit/f4f8482bf8febcce19c98a9af81e1a9c1678775e))
+
+
 ## v2.2.8 (2026-10-23)
 
 ### Bug Fixes
