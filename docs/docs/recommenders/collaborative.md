@@ -941,7 +941,10 @@ models:
     batch_size: 2048
     epochs: 200
     learning_rate: 0.001
+    neg_samples: 1
 ```
+
+- **neg_samples**: How many negatives each positive is contrasted with. Defaults to `1`. With more, the BPR loss and the negatives' regularization are averaged over them. Every negative goes through the CNN, so a training step costs time and memory in proportion to them. See [BPR](#bpr) for when more help.
 
 ### NeuMF
 
