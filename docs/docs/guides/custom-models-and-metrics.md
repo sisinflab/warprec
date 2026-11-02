@@ -17,7 +17,9 @@ next to the built-ins in an `Evaluator`. This guide writes three such files in
 - a metric, used bare under `metrics` and with a parameter under
   `complex_metrics`;
 - all of it run by the design pipeline, then from Python next to the built-ins
-  the two models re-implement, which they match exactly.
+  the two models re-implement, which they match exactly;
+- the same configuration on Ray through the train pipeline, which changes the
+  configuration but not the results.
 
 The [Extending WarpRec](https://warprec.readthedocs.io/en/latest/extending/models/)
 pages describe the same interfaces in prose.
@@ -26,13 +28,13 @@ pages describe the same interfaces in prose.
 
 ## Running it
 
-`pip install warprec jupyter`. Runs in one to two minutes on a laptop CPU. It reads MovieLens-100K through `guide_data.movielens_100k()`, which downloads and converts it exactly as guide 1 shows. Clone the repository, or download the guide's folder together with `guides/guide_data.py`, and open the notebook from its own folder: the configuration files refer to the data relative to it.
+`pip install warprec jupyter`. Runs in about two minutes on a laptop CPU, a third of it starting and stopping Ray. It reads MovieLens-100K through `guide_data.movielens_100k()`, which downloads and converts it exactly as guide 1 shows. Clone the repository, or download the guide's folder together with `guides/guide_data.py`, and open the notebook from its own folder: the configuration files refer to the data relative to it.
 
 ## Files
 
 - [`configs/design.yml`](https://github.com/sisinflab/warprec/blob/main/guides/15-custom-models-and-metrics/configs/design.yml)
+- [`configs/ray.yml`](https://github.com/sisinflab/warprec/blob/main/guides/15-custom-models-and-metrics/configs/ray.yml)
 - [`configs/train.yml`](https://github.com/sisinflab/warprec/blob/main/guides/15-custom-models-and-metrics/configs/train.yml)
-- [`.ruff_cache/`](https://github.com/sisinflab/warprec/blob/main/guides/15-custom-models-and-metrics/.ruff_cache)
 - [`user_code/`](https://github.com/sisinflab/warprec/blob/main/guides/15-custom-models-and-metrics/user_code)
 
 ## Reference
