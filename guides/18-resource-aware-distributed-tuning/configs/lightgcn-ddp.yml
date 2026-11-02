@@ -19,7 +19,7 @@ writer:
 models:
   LightGCN:                   # heavy: propagates the whole graph every step
     optimization:
-      cpu_per_trial: 4
+      cpu_per_trial: 8              # 4 for each of the two workers
       gpu_per_trial: 2              # one trial, one worker on each of two GPUs
       properties:
         seed: 42
