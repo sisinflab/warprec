@@ -25,7 +25,7 @@ to Ray.
 
 ## Running it
 
-a Linux machine with two CUDA GPUs (this notebook was run on two RTX 4090 and 32 CPU cores) and `pip install "warprec[dashboard]" jupyter`. Runs in about two hours. MovieLens-100K is small for these GPUs, so LightGCN is given large embeddings and deep propagation to make it as compute-heavy as it is on larger data: the numbers show how the settings change a search, not what the hardware can do. Clone the repository, or download the guide's folder together with `guides/guide_data.py`, and open the notebook from its own folder: the configuration files refer to the data relative to it.
+a Linux machine with two CUDA GPUs (this notebook was run on two RTX 4090 and 32 CPU cores) and `pip install "warprec[dashboard]" jupyter`. Runs in about 25 minutes. MovieLens-100K is small for these GPUs: even LightGCN, given large embeddings and four layers of propagation, leaves them mostly idle. The numbers show how to measure what each setting buys, and why the answer depends on how much work a trial gives its GPU. Clone the repository, or download the guide's folder together with `guides/guide_data.py`, and open the notebook from its own folder: the configuration files refer to the data relative to it.
 
 ## Files
 

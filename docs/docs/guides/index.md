@@ -25,7 +25,7 @@ the first time a guide needs them, and everything the guides write goes to
 `guides/runs/`; neither is committed. Most guides use MovieLens-100K and run in a
 minute or two on a laptop CPU; the ones that run the training pipeline on a local
 Ray instance or start a server (10, 11, 16 and 17) take five to fifteen minutes.
-Guide 18 needs a Linux machine with two CUDA GPUs and runs in about an hour.
+Guide 18 needs a Linux machine with two CUDA GPUs and runs in about 25 minutes.
 
 ## The guides
 
