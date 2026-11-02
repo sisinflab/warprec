@@ -25,7 +25,7 @@ nav:
       - 10 · Distributed Hyperparameter Search: guides/distributed-hyperparameter-search.md
       - 11 · Resumable, Measured Experiments: guides/resumable-measured-experiments.md
     - Evaluation:
-      - 12 · Rigorous Cross-Paradigm Benchmarking: guides/rigorous-cross-paradigm-benchmarking.md
+      - 12 · Cross-Paradigm Benchmarking: guides/cross-paradigm-benchmarking.md
       - 13 · Cold-Start, Debiased and Re-Ranked Evaluation: guides/cold-start-debiased-and-re-ranked-evaluation.md
       - 14 · Evaluating Models Trained Anywhere: guides/evaluating-models-trained-anywhere.md
     - Extending and Deploying:

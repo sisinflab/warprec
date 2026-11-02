@@ -1,4 +1,4 @@
-# 12 · Rigorous Cross-Paradigm Benchmarking
+# 12 · Cross-Paradigm Benchmarking
 
 Every pipeline ends by handing a trained model to an `Evaluator`. This guide
 drives the evaluator directly, on three fast models fitted to MovieLens-100K,
@@ -18,7 +18,7 @@ covers:
 
 Running whole pipelines is guide 10's subject; models are guide 9's.
 
-[Open the notebook](https://github.com/sisinflab/warprec/blob/main/guides/12-rigorous-cross-paradigm-benchmarking/rigorous-cross-paradigm-benchmarking.ipynb){ .md-button .md-button--primary }
+[Open the notebook](https://github.com/sisinflab/warprec/blob/main/guides/12-cross-paradigm-benchmarking/cross-paradigm-benchmarking.ipynb){ .md-button .md-button--primary }
 
 ## Running it
 
@@ -26,12 +26,12 @@ Running whole pipelines is guide 10's subject; models are guide 9's.
 
 ## Files
 
-- [`configs/complete.yml`](https://github.com/sisinflab/warprec/blob/main/guides/12-rigorous-cross-paradigm-benchmarking/configs/complete.yml)
-- [`configs/evaluation.yml`](https://github.com/sisinflab/warprec/blob/main/guides/12-rigorous-cross-paradigm-benchmarking/configs/evaluation.yml)
-- [`configs/families.yml`](https://github.com/sisinflab/warprec/blob/main/guides/12-rigorous-cross-paradigm-benchmarking/configs/families.yml)
-- [`configs/mask-seen.yml`](https://github.com/sisinflab/warprec/blob/main/guides/12-rigorous-cross-paradigm-benchmarking/configs/mask-seen.yml)
-- [`configs/metrics.yml`](https://github.com/sisinflab/warprec/blob/main/guides/12-rigorous-cross-paradigm-benchmarking/configs/metrics.yml)
-- [`configs/sampled.yml`](https://github.com/sisinflab/warprec/blob/main/guides/12-rigorous-cross-paradigm-benchmarking/configs/sampled.yml)
+- [`configs/complete.yml`](https://github.com/sisinflab/warprec/blob/main/guides/12-cross-paradigm-benchmarking/configs/complete.yml)
+- [`configs/evaluation.yml`](https://github.com/sisinflab/warprec/blob/main/guides/12-cross-paradigm-benchmarking/configs/evaluation.yml)
+- [`configs/families.yml`](https://github.com/sisinflab/warprec/blob/main/guides/12-cross-paradigm-benchmarking/configs/families.yml)
+- [`configs/mask-seen.yml`](https://github.com/sisinflab/warprec/blob/main/guides/12-cross-paradigm-benchmarking/configs/mask-seen.yml)
+- [`configs/metrics.yml`](https://github.com/sisinflab/warprec/blob/main/guides/12-cross-paradigm-benchmarking/configs/metrics.yml)
+- [`configs/sampled.yml`](https://github.com/sisinflab/warprec/blob/main/guides/12-cross-paradigm-benchmarking/configs/sampled.yml)
 
 ## Reference
 

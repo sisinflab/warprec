@@ -45,7 +45,7 @@ Guide 18 needs a Linux machine with two CUDA GPUs and runs in about 25 minutes.
 | 10 | [Distributed Hyperparameter Search](distributed-hyperparameter-search.md) | The train pipeline on Ray: search spaces, strategies, schedulers, cross-validation |
 | 11 | [Resumable, Measured Experiments](resumable-measured-experiments.md) | Run names, pause and resume, dashboards, the estimate and swarm pipelines |
 | | **Evaluation** | |
-| 12 | [Rigorous Cross-Paradigm Benchmarking](rigorous-cross-paradigm-benchmarking.md) | The `Evaluator`, full and sampled, `mask_seen`, every metric family, significance across model families |
+| 12 | [Cross-Paradigm Benchmarking](cross-paradigm-benchmarking.md) | The `Evaluator`, full and sampled, `mask_seen`, every metric family, significance across model families |
 | 13 | [Cold-Start, Debiased and Re-Ranked Evaluation](cold-start-debiased-and-re-ranked-evaluation.md) | Cold-start protocols, IPS and SNIPS estimators, MMR and Calibration |
 | 14 | [Evaluating Models Trained Anywhere](evaluating-models-trained-anywhere.md) | The eval pipeline on checkpoints, `ProxyRecommender`, saved recommendations |
 | | **Extending and deploying** | |
