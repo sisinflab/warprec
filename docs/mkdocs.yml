@@ -32,6 +32,7 @@ nav:
       - 15 · From Prototyping to Cluster Scaling: guides/from-prototyping-to-cluster-scaling.md
       - 16 · Extending the Lifecycle with Callbacks: guides/extending-the-lifecycle-with-callbacks.md
       - 17 · From Offline Validation to Verified Deployment: guides/from-offline-validation-to-verified-deployment.md
+      - 18 · Resource-Aware Distributed Tuning: guides/resource-aware-distributed-tuning.md
   - Pipelines:
     - Standardized Workflows: pipelines/index.md
     - Training: pipelines/training.md

@@ -7,7 +7,7 @@ The notebooks are committed with their outputs, so they can be read here without
 running anything.
 
 ```bash
-pip install warprec jupyter        # guide 17 needs "warprec[mcp]"
+pip install warprec jupyter        # guide 17 needs "warprec[mcp]", guide 18 "warprec[dashboard]"
 jupyter lab guides/
 ```
 
@@ -39,6 +39,8 @@ and everything a guide writes goes to `guides/runs/`; both are ignored by git.
 | 15 | [From Prototyping to Cluster Scaling](15-from-prototyping-to-cluster-scaling/from-prototyping-to-cluster-scaling.ipynb) | Your own model, parameter class and metric through `custom_modules`, from the design pipeline to Ray |
 | 16 | [Extending the Lifecycle with Callbacks](16-extending-the-lifecycle-with-callbacks/extending-the-lifecycle-with-callbacks.ipynb) | Every callback hook, where it runs, and a pipeline written against the API |
 | 17 | [From Offline Validation to Verified Deployment](17-from-offline-validation-to-verified-deployment/from-offline-validation-to-verified-deployment.ipynb) | Serving checkpoints on Ray Serve: REST, sequential and contextual requests, MCP, served lists checked against the run |
+| | **Scaling** | |
+| 18 | [Resource-Aware Distributed Tuning](18-resource-aware-distributed-tuning/resource-aware-distributed-tuning.ipynb) | Trial footprints, packing trials on GPUs, ASHA, DDP across two GPUs, swarm, time and energy per setup |
 
 [`cluster/`](cluster/) holds a Ray cluster configuration for Google Cloud.
 

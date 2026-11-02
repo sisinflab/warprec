@@ -15,7 +15,7 @@ configuration files it runs.
 ```bash
 git clone https://github.com/sisinflab/warprec.git
 cd warprec
-pip install warprec jupyter        # guide 17 needs "warprec[mcp]"
+pip install warprec jupyter        # guide 17 needs "warprec[mcp]", guide 18 "warprec[dashboard]"
 jupyter lab guides/
 ```
 
@@ -25,6 +25,7 @@ the first time a guide needs them, and everything the guides write goes to
 `guides/runs/`; neither is committed. Most guides use MovieLens-100K and run in a
 minute or two on a laptop CPU; the ones that run the training pipeline on a local
 Ray instance or start a server (10, 11, 16 and 17) take five to fifteen minutes.
+Guide 18 needs a Linux machine with two CUDA GPUs and runs in about an hour.
 
 ## The guides
 
@@ -51,6 +52,8 @@ Ray instance or start a server (10, 11, 16 and 17) take five to fifteen minutes.
 | 15 | [From Prototyping to Cluster Scaling](from-prototyping-to-cluster-scaling.md) | Your own model, parameter class and metric through `custom_modules`, from the design pipeline to Ray |
 | 16 | [Extending the Lifecycle with Callbacks](extending-the-lifecycle-with-callbacks.md) | Every callback hook, where it runs, and a pipeline written against the API |
 | 17 | [From Offline Validation to Verified Deployment](from-offline-validation-to-verified-deployment.md) | Serving checkpoints on Ray Serve: REST, sequential and contextual requests, MCP, served lists checked against the run |
+| | **Scaling** | |
+| 18 | [Resource-Aware Distributed Tuning](resource-aware-distributed-tuning.md) | Trial footprints, packing trials on GPUs, ASHA, DDP across two GPUs, swarm, time and energy per setup |
 
 The guides build on each other in this order, but each one runs on its own.
 The [Ray cluster configuration](https://github.com/sisinflab/warprec/tree/main/guides/cluster)

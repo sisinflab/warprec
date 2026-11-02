@@ -1,0 +1,45 @@
+# An 8-trial grid of LightGCN, one trial per GPU.
+reader:
+  loading_strategy: dataset
+  data_type: transaction
+  reading_method: local
+  local_path: ../data/ml-100k/ratings.tsv
+  rating_type: implicit
+splitter:
+  test_splitting:
+    strategy: temporal_holdout
+    ratio: 0.1
+  validation_splitting:
+    strategy: temporal_holdout
+    ratio: 0.1
+writer:
+  dataset_name: lightgcn
+  writing_method: local
+  local_experiment_path: ../runs/18-resource-aware-distributed-tuning/
+models:
+  LightGCN:                   # heavy: propagates the whole graph every step
+    optimization:
+      cpu_per_trial: 2
+      gpu_per_trial: 1
+      properties:
+        seed: 42
+    embedding_size: [grid, 64, 128]
+    n_layers: [grid, 2, 3]
+    learning_rate: [grid, 0.001, 0.005]
+    reg_weight: 0.0001
+    batch_size: 2048
+    epochs: 20
+evaluation:
+  top_k: [10]
+  metrics: [nDCG, Recall]
+  validation_metric: nDCG@10
+general:
+  device: cuda
+  ray_address: local          # a private Ray instance with every GPU it can see
+  ray_verbose: 0
+  time_report: true
+dashboard:
+  codecarbon:                 # one tracker per node, for the whole run
+    enabled: true
+    save_to_file: true
+    tracking_mode: machine
