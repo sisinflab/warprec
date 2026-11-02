@@ -19,12 +19,12 @@ writer:
 models:
   LightGCN:                   # heavy: propagates the whole graph every step
     optimization:
-      cpu_per_trial: 2
+      cpu_per_trial: 4
       gpu_per_trial: 1
       properties:
         seed: 42
-    embedding_size: [grid, 64, 128]
-    n_layers: [grid, 2, 3]
+    embedding_size: [grid, 512, 1024]
+    n_layers: [grid, 3, 4]
     learning_rate: [grid, 0.001, 0.005]
     reg_weight: 0.0001
     batch_size: 2048

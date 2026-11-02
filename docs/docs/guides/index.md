@@ -53,7 +53,7 @@ Guide 18 needs a Linux machine with two CUDA GPUs and runs in about an hour.
 | 16 | [Extending the Lifecycle with Callbacks](extending-the-lifecycle-with-callbacks.md) | Every callback hook, where it runs, and a pipeline written against the API |
 | 17 | [From Offline Validation to Verified Deployment](from-offline-validation-to-verified-deployment.md) | Serving checkpoints on Ray Serve: REST, sequential and contextual requests, MCP, served lists checked against the run |
 | | **Scaling** | |
-| 18 | [Resource-Aware Distributed Tuning](resource-aware-distributed-tuning.md) | Trial footprints, packing trials on GPUs, ASHA, DDP across two GPUs, swarm, time and energy per setup |
+| 18 | [Resource-Aware Distributed Tuning](resource-aware-distributed-tuning.md) | Trial footprints, packing trials on GPUs, ASHA, DDP across two GPUs, time and energy per setup |
 
 The guides build on each other in this order, but each one runs on its own.
 The [Ray cluster configuration](https://github.com/sisinflab/warprec/tree/main/guides/cluster)

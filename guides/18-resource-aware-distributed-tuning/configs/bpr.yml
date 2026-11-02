@@ -19,7 +19,7 @@ writer:
 models:
   BPR:                        # light: an embedding lookup per sample
     optimization:
-      cpu_per_trial: 2
+      cpu_per_trial: 4
       gpu_per_trial: 1
       properties:
         seed: 42

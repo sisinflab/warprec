@@ -1,4 +1,4 @@
-# Both searches in one run, each with the resources it needs.
+# One BPR trial on one GPU.
 reader:
   loading_strategy: dataset
   data_type: transaction
@@ -13,33 +13,21 @@ splitter:
     strategy: temporal_holdout
     ratio: 0.1
 writer:
-  dataset_name: swarm
+  dataset_name: bpr-single
   writing_method: local
   local_experiment_path: ../runs/18-resource-aware-distributed-tuning/
 models:
   BPR:                        # light: an embedding lookup per sample
     optimization:
-      cpu_per_trial: 2
-      gpu_per_trial: 0.5            # light: two trials per GPU
+      cpu_per_trial: 4
+      gpu_per_trial: 1
       properties:
         seed: 42
-    embedding_size: [grid, 64, 128]
-    learning_rate: [grid, 0.001, 0.005]
-    reg_weight: [grid, 0.00001, 0.0001]
+    embedding_size: 128
+    learning_rate: 0.005
+    reg_weight: 0.0001
     neg_samples: 4
     batch_size: 1024
-    epochs: 20
-  LightGCN:                   # heavy: propagates the whole graph every step
-    optimization:
-      cpu_per_trial: 2
-      gpu_per_trial: 1              # heavy: a GPU per trial
-      properties:
-        seed: 42
-    embedding_size: [grid, 64, 128]
-    n_layers: [grid, 2, 3]
-    learning_rate: [grid, 0.001, 0.005]
-    reg_weight: 0.0001
-    batch_size: 2048
     epochs: 20
 evaluation:
   top_k: [10]
