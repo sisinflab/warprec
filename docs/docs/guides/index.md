@@ -44,13 +44,13 @@ Ray instance or start a server (10, 11, 16 and 17) take five to fifteen minutes.
 | 10 | [Hyperparameter search](hyperparameter-search.md) | The train pipeline on Ray: search spaces, strategies, schedulers, cross-validation |
 | 11 | [Running experiments](running-experiments.md) | Run names, pause and resume, dashboards, the estimate and swarm pipelines |
 | | **Evaluation** | |
-| 12 | [Evaluation](evaluation.md) | The `Evaluator`, full and sampled, `mask_seen`, every metric family, significance |
+| 12 | [Evaluation](evaluation.md) | The `Evaluator`, full and sampled, `mask_seen`, every metric family, significance across model families |
 | 13 | [Cold start, debiasing and re-ranking](cold-start-debiasing-reranking.md) | Cold-start protocols, IPS and SNIPS estimators, MMR and Calibration |
 | 14 | [Evaluating existing models](evaluating-existing-models.md) | The eval pipeline on checkpoints, `ProxyRecommender`, saved recommendations |
 | | **Extending and deploying** | |
-| 15 | [Custom models and metrics](custom-models-and-metrics.md) | Your own model, parameter class and metric through `custom_modules` |
+| 15 | [Custom models and metrics](custom-models-and-metrics.md) | Your own model, parameter class and metric through `custom_modules`, from the design pipeline to Ray |
 | 16 | [Callbacks and custom pipelines](callbacks-and-custom-pipelines.md) | Every callback hook, where it runs, and a pipeline written against the API |
-| 17 | [Serving](serving.md) | Serving checkpoints on Ray Serve: REST, sequential and contextual requests, MCP |
+| 17 | [Serving](serving.md) | Serving checkpoints on Ray Serve: REST, sequential and contextual requests, MCP, served lists checked against the run |
 
 The guides build on each other in this order, but each one runs on its own.
 The [Ray cluster configuration](https://github.com/sisinflab/warprec/tree/main/guides/cluster)

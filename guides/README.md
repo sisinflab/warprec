@@ -32,13 +32,13 @@ and everything a guide writes goes to `guides/runs/`; both are ignored by git.
 | 10 | [Hyperparameter search](10-hyperparameter-search/hyperparameter-search.ipynb) | The train pipeline on Ray: search spaces, strategies, schedulers, cross-validation |
 | 11 | [Running experiments](11-running-experiments/running-experiments.ipynb) | Run names, pause and resume, dashboards, the estimate and swarm pipelines |
 | | **Evaluation** | |
-| 12 | [Evaluation](12-evaluation/evaluation.ipynb) | The `Evaluator`, full and sampled, `mask_seen`, every metric family, significance |
+| 12 | [Evaluation](12-evaluation/evaluation.ipynb) | The `Evaluator`, full and sampled, `mask_seen`, every metric family, significance across model families |
 | 13 | [Cold start, debiasing and re-ranking](13-cold-start-debiasing-reranking/cold-start-debiasing-reranking.ipynb) | Cold-start protocols, IPS and SNIPS estimators, MMR and Calibration |
 | 14 | [Evaluating existing models](14-evaluating-existing-models/evaluating-existing-models.ipynb) | The eval pipeline on checkpoints, `ProxyRecommender`, saved recommendations |
 | | **Extending and deploying** | |
-| 15 | [Custom models and metrics](15-custom-models-and-metrics/custom-models-and-metrics.ipynb) | Your own model, parameter class and metric through `custom_modules` |
+| 15 | [Custom models and metrics](15-custom-models-and-metrics/custom-models-and-metrics.ipynb) | Your own model, parameter class and metric through `custom_modules`, from the design pipeline to Ray |
 | 16 | [Callbacks and custom pipelines](16-callbacks-and-custom-pipelines/callbacks-and-custom-pipelines.ipynb) | Every callback hook, where it runs, and a pipeline written against the API |
-| 17 | [Serving](17-serving/serving.ipynb) | Serving checkpoints on Ray Serve: REST, sequential and contextual requests, MCP |
+| 17 | [Serving](17-serving/serving.ipynb) | Serving checkpoints on Ray Serve: REST, sequential and contextual requests, MCP, served lists checked against the run |
 
 [`cluster/`](cluster/) holds a Ray cluster configuration for Google Cloud.
 
