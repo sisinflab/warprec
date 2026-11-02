@@ -13,7 +13,8 @@ covers:
   information, clusters or parameters;
 - per-user results, `save_per_user`, `validation_metric` and
   `full_evaluation_on_report`;
-- significance tests between models, with corrections for multiple testing.
+- significance tests between models, with corrections for multiple testing,
+  and a comparison across model families on one split.
 
 Running whole pipelines is guide 10's subject; models are guide 9's.
 
@@ -21,12 +22,13 @@ Running whole pipelines is guide 10's subject; models are guide 9's.
 
 ## Running it
 
-`pip install warprec jupyter`. Runs in about a minute on MovieLens-100K (`guide_data.movielens_100k()` downloads and converts it exactly as guide 1 shows). Clone the repository, or download the guide's folder together with `guides/guide_data.py`, and open the notebook from its own folder: the configuration files refer to the data relative to it.
+`pip install warprec jupyter`. Runs in two to three minutes on MovieLens-100K (`guide_data.movielens_100k()` downloads and converts it exactly as guide 1 shows). Clone the repository, or download the guide's folder together with `guides/guide_data.py`, and open the notebook from its own folder: the configuration files refer to the data relative to it.
 
 ## Files
 
 - [`configs/complete.yml`](https://github.com/sisinflab/warprec/blob/main/guides/12-evaluation/configs/complete.yml)
 - [`configs/evaluation.yml`](https://github.com/sisinflab/warprec/blob/main/guides/12-evaluation/configs/evaluation.yml)
+- [`configs/families.yml`](https://github.com/sisinflab/warprec/blob/main/guides/12-evaluation/configs/families.yml)
 - [`configs/mask-seen.yml`](https://github.com/sisinflab/warprec/blob/main/guides/12-evaluation/configs/mask-seen.yml)
 - [`configs/metrics.yml`](https://github.com/sisinflab/warprec/blob/main/guides/12-evaluation/configs/metrics.yml)
 - [`configs/sampled.yml`](https://github.com/sisinflab/warprec/blob/main/guides/12-evaluation/configs/sampled.yml)
