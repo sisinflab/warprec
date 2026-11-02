@@ -136,4 +136,4 @@ Every metric is constructed with the cutoff `k` and the keyword arguments the ev
 
 !!! tip
 
-    [Guide 15 · Custom models and metrics](../guides/custom-models-and-metrics.md) builds a complete metric (rank-biased precision with a `persistence` parameter), uses it in both lists, and checks its values by hand.
+    [Guide 15 · From Prototyping to Cluster Scaling](../guides/from-prototyping-to-cluster-scaling.md) builds a complete metric (rank-biased precision with a `persistence` parameter), uses it in both lists, and checks its values by hand.

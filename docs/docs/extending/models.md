@@ -405,4 +405,4 @@ WarpRec finds the class through the name it is registered under, so the class it
 
 !!! tip
 
-    [Guide 15 · Custom models and metrics](../guides/custom-models-and-metrics.md) runs all of this end to end: a closed-form and an iterative model, a parameter class and a custom metric, loaded through `custom_modules`, checked against the built-in models they reproduce.
+    [Guide 15 · From Prototyping to Cluster Scaling](../guides/from-prototyping-to-cluster-scaling.md) runs all of this end to end: a closed-form and an iterative model, a parameter class and a custom metric, loaded through `custom_modules`, checked against the built-in models they reproduce.

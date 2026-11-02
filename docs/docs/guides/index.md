@@ -31,26 +31,26 @@ Ray instance or start a server (10, 11, 16 and 17) take five to fifteen minutes.
 | # | Guide | What it covers |
 |---|---|---|
 | | **Data** | |
-| 1 | [Reading data](reading-data.md) | Files WarpRec reads, the reader, the `Dataset`, ready-made splits and folds |
-| 2 | [Filtering](filtering.md) | All thirteen filters, and why their order matters |
-| 3 | [Splitting](splitting.md) | All eight strategies, alignment, seeds, validation holdout and folds |
-| 4 | [Side information and clusters](side-information-and-clusters.md) | Item features, user and item clusters, the stash |
-| 5 | [Context](context.md) | Contextual fields, `Transactions`, duplicates, contextual evaluation |
-| 6 | [Knowledge graphs](knowledge-graphs.md) | `reader.knowledge`, coverage, the `KnowledgeGraph`, KaHFM |
-| 7 | [Multimodal features](multimodal-features.md) | `reader.multimodal`, file layouts, coverage, VBPR |
-| 8 | [Dataloaders](dataloaders.md) | Every training and evaluation loader, negative sampling, seeding |
+| 1 | [From Raw Files to a Dataset](from-raw-files-to-a-dataset.md) | Files WarpRec reads, the reader, the `Dataset`, ready-made splits and folds |
+| 2 | [Reproducible Data Filtering](reproducible-data-filtering.md) | All thirteen filters, and why their order matters |
+| 3 | [Leak-Free Data Splitting](leak-free-data-splitting.md) | All eight strategies, alignment, seeds, validation holdout and folds |
+| 4 | [Enriching Items and Users](enriching-items-and-users.md) | Item features, user and item clusters, the stash |
+| 5 | [Context-Aware Data](context-aware-data.md) | Contextual fields, `Transactions`, duplicates, contextual evaluation |
+| 6 | [Knowledge-Graph Data](knowledge-graph-data.md) | `reader.knowledge`, coverage, the `KnowledgeGraph`, KaHFM |
+| 7 | [Multimodal Item Features](multimodal-item-features.md) | `reader.multimodal`, file layouts, coverage, VBPR |
+| 8 | [Seeded Data Loading](seeded-data-loading.md) | Every training and evaluation loader, negative sampling, seeding |
 | | **Models and training** | |
-| 9 | [Model families](model-families.md) | The registry, the model contract, one model per family, the design pipeline, checkpoints |
-| 10 | [Hyperparameter search](hyperparameter-search.md) | The train pipeline on Ray: search spaces, strategies, schedulers, cross-validation |
-| 11 | [Running experiments](running-experiments.md) | Run names, pause and resume, dashboards, the estimate and swarm pipelines |
+| 9 | [One Interface, Every Model Family](one-interface-every-model-family.md) | The registry, the model contract, one model per family, the design pipeline, checkpoints |
+| 10 | [Distributed Hyperparameter Search](distributed-hyperparameter-search.md) | The train pipeline on Ray: search spaces, strategies, schedulers, cross-validation |
+| 11 | [Resumable, Measured Experiments](resumable-measured-experiments.md) | Run names, pause and resume, dashboards, the estimate and swarm pipelines |
 | | **Evaluation** | |
-| 12 | [Evaluation](evaluation.md) | The `Evaluator`, full and sampled, `mask_seen`, every metric family, significance across model families |
-| 13 | [Cold start, debiasing and re-ranking](cold-start-debiasing-reranking.md) | Cold-start protocols, IPS and SNIPS estimators, MMR and Calibration |
-| 14 | [Evaluating existing models](evaluating-existing-models.md) | The eval pipeline on checkpoints, `ProxyRecommender`, saved recommendations |
+| 12 | [Rigorous Cross-Paradigm Benchmarking](rigorous-cross-paradigm-benchmarking.md) | The `Evaluator`, full and sampled, `mask_seen`, every metric family, significance across model families |
+| 13 | [Cold-Start, Debiased and Re-Ranked Evaluation](cold-start-debiased-and-re-ranked-evaluation.md) | Cold-start protocols, IPS and SNIPS estimators, MMR and Calibration |
+| 14 | [Evaluating Models Trained Anywhere](evaluating-models-trained-anywhere.md) | The eval pipeline on checkpoints, `ProxyRecommender`, saved recommendations |
 | | **Extending and deploying** | |
-| 15 | [Custom models and metrics](custom-models-and-metrics.md) | Your own model, parameter class and metric through `custom_modules`, from the design pipeline to Ray |
-| 16 | [Callbacks and custom pipelines](callbacks-and-custom-pipelines.md) | Every callback hook, where it runs, and a pipeline written against the API |
-| 17 | [Serving](serving.md) | Serving checkpoints on Ray Serve: REST, sequential and contextual requests, MCP, served lists checked against the run |
+| 15 | [From Prototyping to Cluster Scaling](from-prototyping-to-cluster-scaling.md) | Your own model, parameter class and metric through `custom_modules`, from the design pipeline to Ray |
+| 16 | [Extending the Lifecycle with Callbacks](extending-the-lifecycle-with-callbacks.md) | Every callback hook, where it runs, and a pipeline written against the API |
+| 17 | [From Offline Validation to Verified Deployment](from-offline-validation-to-verified-deployment.md) | Serving checkpoints on Ray Serve: REST, sequential and contextual requests, MCP, served lists checked against the run |
 
 The guides build on each other in this order, but each one runs on its own.
 The [Ray cluster configuration](https://github.com/sisinflab/warprec/tree/main/guides/cluster)

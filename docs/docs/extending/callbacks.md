@@ -162,4 +162,4 @@ This ensures **all datasets** involved in the experiment are enriched with a `st
 
 !!! tip
 
-    [Guide 16 · Callbacks and custom pipelines](../guides/callbacks-and-custom-pipelines.md) implements every hook, shows in which process each one runs under the design and the train pipeline, fills the stash for a custom metric, and records the trial reports with `on_trial_result`.
+    [Guide 16 · Extending the Lifecycle with Callbacks](../guides/extending-the-lifecycle-with-callbacks.md) implements every hook, shows in which process each one runs under the design and the train pipeline, fills the stash for a custom metric, and records the trial reports with `on_trial_result`.

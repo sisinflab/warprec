@@ -51,4 +51,4 @@ The `recommendation_file` parameter points to the file containing the precompute
 
 !!! tip
 
-    [Guide 14 · Evaluating existing models](../guides/evaluating-existing-models.md) evaluates an external item-kNN next to WarpRec models, shows the effect of each of the points above, and reads a file WarpRec wrote with `meta.save_recs` back through `ProxyRecommender`.
+    [Guide 14 · Evaluating Models Trained Anywhere](../guides/evaluating-models-trained-anywhere.md) evaluates an external item-kNN next to WarpRec models, shows the effect of each of the points above, and reads a file WarpRec wrote with `meta.save_recs` back through `ProxyRecommender`.
