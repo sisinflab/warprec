@@ -32,7 +32,7 @@ and everything a guide writes goes to `guides/runs/`; both are ignored by git.
 | 10 | [Distributed Hyperparameter Search](10-distributed-hyperparameter-search/distributed-hyperparameter-search.ipynb) | The train pipeline on Ray: search spaces, strategies, schedulers, cross-validation |
 | 11 | [Resumable, Measured Experiments](11-resumable-measured-experiments/resumable-measured-experiments.ipynb) | Run names, pause and resume, dashboards, the estimate and swarm pipelines |
 | | **Evaluation** | |
-| 12 | [Rigorous Cross-Paradigm Benchmarking](12-rigorous-cross-paradigm-benchmarking/rigorous-cross-paradigm-benchmarking.ipynb) | The `Evaluator`, full and sampled, `mask_seen`, every metric family, significance across model families |
+| 12 | [Cross-Paradigm Benchmarking](12-cross-paradigm-benchmarking/cross-paradigm-benchmarking.ipynb) | The `Evaluator`, full and sampled, `mask_seen`, every metric family, significance across model families |
 | 13 | [Cold-Start, Debiased and Re-Ranked Evaluation](13-cold-start-debiased-and-re-ranked-evaluation/cold-start-debiased-and-re-ranked-evaluation.ipynb) | Cold-start protocols, IPS and SNIPS estimators, MMR and Calibration |
 | 14 | [Evaluating Models Trained Anywhere](14-evaluating-models-trained-anywhere/evaluating-models-trained-anywhere.ipynb) | The eval pipeline on checkpoints, `ProxyRecommender`, saved recommendations |
 | | **Extending and deploying** | |
