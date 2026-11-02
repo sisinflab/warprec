@@ -72,7 +72,7 @@ The stash is passed as keyword arguments to every model and, through the evaluat
 
 ### Entries named like a metric's parameter
 
-Every metric receives the whole stash, so an entry named like a parameter of a metric's constructor sets that parameter. That is how a metric of your own reads an entry: it declares a parameter with the entry's name, as `NewReleaseShare` declares `item_year` in the [callbacks guide](../guides/callbacks-and-custom-pipelines.md).
+Every metric receives the whole stash, so an entry named like a parameter of a metric's constructor sets that parameter. That is how a metric of your own reads an entry: it declares a parameter with the entry's name, as `NewReleaseShare` declares `item_year` in the [callbacks guide](../guides/extending-the-lifecycle-with-callbacks.md).
 
 An entry is refused instead, when the evaluator is built, with an [`ExtensionError`](../api-reference/errors.md) naming the entry and the configured metrics it would reach, when it has the name of:
 

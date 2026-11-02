@@ -1,0 +1,49 @@
+# bpr-packed.yml with ASHA stopping the weaker trials early.
+reader:
+  loading_strategy: dataset
+  data_type: transaction
+  reading_method: local
+  local_path: ../data/ml-100k/ratings.tsv
+  rating_type: implicit
+splitter:
+  test_splitting:
+    strategy: temporal_holdout
+    ratio: 0.1
+  validation_splitting:
+    strategy: temporal_holdout
+    ratio: 0.1
+writer:
+  dataset_name: bpr-asha
+  writing_method: local
+  local_experiment_path: ../runs/18-resource-aware-distributed-tuning/
+models:
+  BPR:                        # light: an embedding lookup per sample
+    optimization:
+      cpu_per_trial: 4
+      gpu_per_trial: 0.5
+      properties:
+        seed: 42
+        max_t: 20                 # ASHA: the longest a trial runs, in epochs
+        grace_period: 4           # every trial runs at least 4
+        reduction_factor: 2       # half the trials stop at each rung
+      scheduler: asha
+    embedding_size: [grid, 64, 128]
+    learning_rate: [grid, 0.001, 0.005]
+    reg_weight: [grid, 0.00001, 0.0001]
+    neg_samples: 4
+    batch_size: 1024
+    epochs: 20
+evaluation:
+  top_k: [10]
+  metrics: [nDCG, Recall]
+  validation_metric: nDCG@10
+general:
+  device: cuda
+  ray_address: local          # a private Ray instance with every GPU it can see
+  ray_verbose: 0
+  time_report: true
+dashboard:
+  codecarbon:                 # one tracker per node, for the whole run
+    enabled: true
+    save_to_file: true
+    tracking_mode: machine

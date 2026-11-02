@@ -12,26 +12,27 @@ nav:
   - Guides:
     - Overview: guides/index.md
     - Data:
-      - 1 · Reading Data: guides/reading-data.md
-      - 2 · Filtering: guides/filtering.md
-      - 3 · Splitting: guides/splitting.md
-      - 4 · Side Information and Clusters: guides/side-information-and-clusters.md
-      - 5 · Context: guides/context.md
-      - 6 · Knowledge Graphs: guides/knowledge-graphs.md
-      - 7 · Multimodal Features: guides/multimodal-features.md
-      - 8 · Dataloaders: guides/dataloaders.md
+      - 1 · From Raw Files to a Dataset: guides/from-raw-files-to-a-dataset.md
+      - 2 · Reproducible Data Filtering: guides/reproducible-data-filtering.md
+      - 3 · Leak-Free Data Splitting: guides/leak-free-data-splitting.md
+      - 4 · Enriching Items and Users: guides/enriching-items-and-users.md
+      - 5 · Context-Aware Data: guides/context-aware-data.md
+      - 6 · Knowledge-Graph Data: guides/knowledge-graph-data.md
+      - 7 · Multimodal Item Features: guides/multimodal-item-features.md
+      - 8 · Seeded Data Loading: guides/seeded-data-loading.md
     - Models and Training:
-      - 9 · Model Families: guides/model-families.md
-      - 10 · Hyperparameter Search: guides/hyperparameter-search.md
-      - 11 · Running Experiments: guides/running-experiments.md
+      - 9 · One Interface, Every Model Family: guides/one-interface-every-model-family.md
+      - 10 · Distributed Hyperparameter Search: guides/distributed-hyperparameter-search.md
+      - 11 · Resumable, Measured Experiments: guides/resumable-measured-experiments.md
     - Evaluation:
-      - 12 · Evaluation: guides/evaluation.md
-      - 13 · Cold Start, Debiasing and Re-Ranking: guides/cold-start-debiasing-reranking.md
-      - 14 · Evaluating Existing Models: guides/evaluating-existing-models.md
+      - 12 · Rigorous Cross-Paradigm Benchmarking: guides/rigorous-cross-paradigm-benchmarking.md
+      - 13 · Cold-Start, Debiased and Re-Ranked Evaluation: guides/cold-start-debiased-and-re-ranked-evaluation.md
+      - 14 · Evaluating Models Trained Anywhere: guides/evaluating-models-trained-anywhere.md
     - Extending and Deploying:
-      - 15 · Custom Models and Metrics: guides/custom-models-and-metrics.md
-      - 16 · Callbacks and Custom Pipelines: guides/callbacks-and-custom-pipelines.md
-      - 17 · Serving: guides/serving.md
+      - 15 · From Prototyping to Cluster Scaling: guides/from-prototyping-to-cluster-scaling.md
+      - 16 · Extending the Lifecycle with Callbacks: guides/extending-the-lifecycle-with-callbacks.md
+      - 17 · From Offline Validation to Verified Deployment: guides/from-offline-validation-to-verified-deployment.md
+      - 18 · Resource-Aware Distributed Tuning: guides/resource-aware-distributed-tuning.md
   - Pipelines:
     - Standardized Workflows: pipelines/index.md
     - Training: pipelines/training.md

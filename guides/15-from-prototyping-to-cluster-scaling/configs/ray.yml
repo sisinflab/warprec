@@ -1,0 +1,46 @@
+# design.yml, unchanged but for the lines marked: the same data, split, models
+# and hyperparameters, run by the train pipeline on a Ray instance.
+general:
+  device: cpu
+  ray_address: local          # added: a private Ray instance; an address joins a cluster
+  ray_verbose: 0              # added
+  # Imported before any other section is validated, so the names they
+  # register can be used below.
+  custom_modules:
+    - user_code/my_models.py
+    - user_code/my_params.py
+    - user_code/my_metrics.py
+reader:
+  loading_strategy: dataset
+  data_type: transaction
+  reading_method: local
+  local_path: ../data/ml-100k/ratings.tsv
+  rating_type: implicit
+splitter:
+  test_splitting:
+    strategy: temporal_holdout
+    ratio: 0.2
+writer:                       # added: where the run writes its results
+  dataset_name: ml-100k
+  writing_method: local
+  local_experiment_path: ../runs/15-custom-models-and-metrics/ray
+models:
+  MyEASE:
+    l2: 200.0
+    optimization:
+      num_workers: 0
+  MyBPR:
+    embedding_size: 64
+    batch_size: 1024
+    epochs: 10
+    learning_rate: 0.005
+    optimization:
+      num_workers: 0
+      eval_every_n: 10        # added: validate only the last epoch, the one design keeps
+evaluation:
+  top_k: [10]
+  metrics: [nDCG, Precision, RBP]
+  complex_metrics:
+    - name: RBP
+      params:
+        persistence: 0.5
