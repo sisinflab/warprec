@@ -14,6 +14,9 @@ them the way an application or an LLM agent would. It covers:
 - starting `warprec.serve` and the REST API: model cards, recommendations for
   a user, for an anonymous session and in a context, scoring your own
   candidates, item search, popular items, filters, and the errors;
+- checking that a served model recommends what the run evaluated: the same
+  lists, re-ranker included, and the same nDCG, where scoring it by hand does
+  not;
 - the MCP endpoint, called with an MCP client as an agent would;
 - `--export`, which turns the same file into a Ray Serve config for a cluster.
 
@@ -24,13 +27,14 @@ checkpoint file itself.
 
 ## Running it
 
-`pip install "warprec[mcp]" jupyter` (the `mcp` extra includes the `serving` one). Runs in five to eight minutes on a laptop CPU, most of it training; the server listens on port 8117 while the guide runs. Clone the repository, or download the guide's folder together with `guides/guide_data.py`, and open the notebook from its own folder: the configuration files refer to the data relative to it.
+`pip install "warprec[mcp]" jupyter` (the `mcp` extra includes the `serving` one). Runs in eight to twelve minutes on a laptop CPU, most of it training; the server listens on port 8117 while the guide runs. Clone the repository, or download the guide's folder together with `guides/guide_data.py`, and open the notebook from its own folder: the configuration files refer to the data relative to it.
 
 ## Files
 
 - [`configs/context.yml`](https://github.com/sisinflab/warprec/blob/main/guides/17-serving/configs/context.yml)
 - [`configs/serve.yml`](https://github.com/sisinflab/warprec/blob/main/guides/17-serving/configs/serve.yml)
 - [`configs/train.yml`](https://github.com/sisinflab/warprec/blob/main/guides/17-serving/configs/train.yml)
+- [`configs/verify.yml`](https://github.com/sisinflab/warprec/blob/main/guides/17-serving/configs/verify.yml)
 
 ## Reference
 

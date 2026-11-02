@@ -1,4 +1,4 @@
-# Three models on one server. Paths are relative to the directory the server
+# Four endpoints on one server. Paths are relative to the directory the server
 # is started from (this guide's folder).
 server:                   # host: 127.0.0.1 by default; an export listens on 0.0.0.0
   port: 8117
@@ -37,3 +37,14 @@ endpoints:
     context_descriptions:
       daypart: the part of the day, in US Central time
       weekend: whether it is a weekday or the weekend
+
+  - name: ease_mmr
+    checkpoint: ../runs/17-serving/ml-100k-mmr/serialized/EASE_WiseFoxOfForce.pth
+    description: Films from MovieLens-100K, diversified across genres
+    item_noun: movie
+    item_metadata: *movies
+    rerank:                # the re-ranker the run evaluated and wrote with
+      name: MMR
+      pool: 50
+      params:
+        diversity: 0.3
